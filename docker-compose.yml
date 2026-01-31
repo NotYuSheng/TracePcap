@@ -57,46 +57,41 @@ services:
     networks:
       - tracecap-network
 
-  # Spring Boot Backend (optional - comment out if running locally)
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: tracecap-backend
-  #   environment:
-  #     SPRING_PROFILES_ACTIVE: dev
-  #     DATABASE_URL: jdbc:postgresql://postgres:5432/tracecap
-  #     DATABASE_USERNAME: tracecap_user
-  #     DATABASE_PASSWORD: tracecap_pass
-  #     MINIO_ENDPOINT: http://minio:9000
-  #     MINIO_ACCESS_KEY: minioadmin
-  #     MINIO_SECRET_KEY: minioadmin
-  #     MINIO_BUCKET: tracecap-files
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
-  #   networks:
-  #     - tracecap-network
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tracecap-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:postgresql://postgres:5432/tracecap
+      DATABASE_USERNAME: tracecap_user
+      DATABASE_PASSWORD: tracecap_pass
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tracecap-files
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - tracecap-network
 
-  # React Frontend (optional - comment out if running locally)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: tracecap-frontend
-  #   environment:
-  #     VITE_API_BASE_URL: http://localhost:8080/api
-  #     VITE_USE_MOCK_DATA: "false"
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - tracecap-network
+  # Nginx - Serves frontend and proxies API to backend
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+    container_name: tracecap-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - tracecap-network
 
 volumes:
   postgres_data:

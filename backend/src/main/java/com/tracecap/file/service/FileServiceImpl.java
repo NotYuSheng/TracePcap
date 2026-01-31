@@ -51,10 +51,12 @@ public class FileServiceImpl implements FileService {
         // Generate unique ID and file name
         UUID fileId = UUID.randomUUID();
         String fileName = fileId.toString() + getFileExtension(file.getOriginalFilename());
+        log.info("DEBUG: Generated fileId: {}, fileName: {}", fileId, fileName);
 
         try {
             // Upload to MinIO
             String minioPath = storageService.uploadFile(file, fileName);
+            log.info("DEBUG: Returned minioPath: {}", minioPath);
 
             // Save metadata to database
             FileEntity fileEntity = FileEntity.builder()
@@ -68,10 +70,12 @@ public class FileServiceImpl implements FileService {
 
             fileEntity = fileRepository.save(fileEntity);
             log.info("File uploaded successfully: {} (ID: {})", file.getOriginalFilename(), fileId);
+            log.info("DEBUG: About to publish event - fileId value: {}, fileEntity.getId(): {}", fileId, fileEntity.getId());
 
             // Publish event - listener will trigger async analysis AFTER transaction commits
             log.info("Publishing file uploaded event for file: {}", fileId);
             eventPublisher.publishEvent(new FileUploadedEvent(this, fileId));
+            log.info("DEBUG: Event published with fileId: {}", fileId);
 
             return fileMapper.toUploadResponse(fileEntity);
 

@@ -39,8 +39,10 @@ export const useAnalysisData = (fileId: string) => {
 
           if (status === 'COMPLETED') {
             // Analysis is done, fetch the results
+            console.log(`[useAnalysisData] File ${fileId} is COMPLETED, fetching analysis...`)
             try {
               const summary = await analysisService.getAnalysisSummary(fileId)
+              console.log(`[useAnalysisData] Successfully fetched analysis for ${fileId}`, summary)
               if (!cancelled) {
                 setData(summary)
                 setCurrentFileId(fileId)
@@ -48,8 +50,12 @@ export const useAnalysisData = (fileId: string) => {
                 setError(null)
                 setLoading(false)
                 if (pollInterval) clearInterval(pollInterval)
+                console.log(`[useAnalysisData] Set loading=false, cleared interval`)
+              } else {
+                console.log(`[useAnalysisData] Request was cancelled, not updating state`)
               }
             } catch (err) {
+              console.error(`[useAnalysisData] Error fetching analysis:`, err)
               if (!cancelled) {
                 const error = err instanceof Error ? err : new Error('Failed to fetch analysis')
                 setError(error)

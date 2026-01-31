@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Backend
+backend/target
+backend/.gradle
+backend/build
+backend/*.jar
+backend/*.war
+
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Logs
+*.log
+backend-final.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sample files
+sample-files
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+.dockerignore
+docker-compose*.yml
