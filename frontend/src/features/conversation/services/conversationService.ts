@@ -1,24 +1,119 @@
 import { apiClient } from '@/services/api/client'
 import { API_ENDPOINTS } from '@/services/api/endpoints'
-import type { Conversation, Session } from '@/types'
+import type { Conversation, Session, NetworkEndpoint, Protocol, PaginatedResponse } from '@/types'
 import { mockConversations, mockSessions, getConversationById } from '@/mocks/mockConversationData'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true'
 
+// Backend response type (what the API actually returns)
+interface ConversationApiResponse {
+  conversationId: string
+  srcIp: string
+  srcPort: number | null
+  dstIp: string
+  dstPort: number | null
+  protocol: string
+  packetCount: number
+  totalBytes: number
+  startTime: string | number[] // LocalDateTime can be array or ISO string
+  endTime: string | number[]
+  durationMs: number
+}
+
+// Transform backend response to frontend format
+function transformConversation(apiData: ConversationApiResponse): Conversation {
+  const srcEndpoint: NetworkEndpoint = {
+    ip: apiData.srcIp,
+    port: apiData.srcPort ?? 0,
+  }
+
+  const dstEndpoint: NetworkEndpoint = {
+    ip: apiData.dstIp,
+    port: apiData.dstPort ?? 0,
+  }
+
+  // Convert LocalDateTime array [year, month, day, hour, min, sec, nano] to timestamp
+  const parseDateTime = (dt: string | number[]): number => {
+    if (typeof dt === 'string') {
+      return new Date(dt).getTime()
+    }
+    if (Array.isArray(dt) && dt.length >= 6) {
+      // [year, month (1-12), day, hour, min, sec, nano]
+      return new Date(dt[0], dt[1] - 1, dt[2], dt[3], dt[4], dt[5]).getTime()
+    }
+    return Date.now()
+  }
+
+  // Map protocol string to Protocol object
+  const protocolName = apiData.protocol.toUpperCase()
+  const protocolLayer =
+    protocolName === 'TCP' || protocolName === 'UDP' ? 'transport' :
+    protocolName === 'ICMP' ? 'network' :
+    'application'
+
+  return {
+    id: apiData.conversationId,
+    endpoints: [srcEndpoint, dstEndpoint],
+    protocol: {
+      layer: protocolLayer as Protocol['layer'],
+      name: protocolName,
+    },
+    startTime: parseDateTime(apiData.startTime),
+    endTime: parseDateTime(apiData.endTime),
+    packetCount: apiData.packetCount,
+    totalBytes: apiData.totalBytes,
+    packets: [], // Packets would need separate endpoint
+    direction: 'bidirectional', // Backend doesn't track this yet
+  }
+}
+
 export const conversationService = {
   /**
-   * Get all conversations for a PCAP file
+   * Get conversations for a PCAP file with pagination
    * @param fileId - The file ID to get conversations for
-   * @returns List of conversations
+   * @param page - Page number (1-indexed)
+   * @param pageSize - Number of items per page
+   * @returns Paginated conversation response
    */
-  getConversations: async (fileId: string): Promise<Conversation[]> => {
+  getConversations: async (
+    fileId: string,
+    page: number = 1,
+    pageSize: number = 25
+  ): Promise<PaginatedResponse<Conversation>> => {
     if (USE_MOCK) {
       await new Promise((resolve) => setTimeout(resolve, 600))
-      return mockConversations
+      // Mock pagination
+      const total = mockConversations.length
+      const startIndex = (page - 1) * pageSize
+      const endIndex = Math.min(startIndex + pageSize, total)
+      const data = mockConversations.slice(startIndex, endIndex)
+      return {
+        data,
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      }
     }
 
-    const response = await apiClient.get<Conversation[]>(API_ENDPOINTS.CONVERSATIONS(fileId))
-    return response.data
+    const response = await apiClient.get<{
+      data: ConversationApiResponse[]
+      page: number
+      pageSize: number
+      total: number
+      totalPages: number
+    }>(API_ENDPOINTS.CONVERSATIONS(fileId), {
+      params: { page, pageSize },
+    })
+
+    // Transform backend response to frontend format
+    return {
+      data: response.data.data.map(transformConversation),
+      page: response.data.page,
+      pageSize: response.data.pageSize,
+      total: response.data.total,
+      totalPages: response.data.totalPages,
+    }
   },
 
   /**

@@ -29,52 +29,49 @@ export const useAnalysisData = (fileId: string) => {
       setLoading(true)
       setError(null)
 
-      // Poll file status until completed or failed
+      // Poll analysis endpoint using HTTP status codes
       const pollStatus = async () => {
         try {
-          const fileMetadata = await apiClient.get(`${API_ENDPOINTS.FILE_METADATA(fileId)}`)
-          const status = fileMetadata.data.status
-
-          console.log(`File ${fileId} status: ${status}`)
-
-          if (status === 'COMPLETED') {
-            // Analysis is done, fetch the results
-            console.log(`[useAnalysisData] File ${fileId} is COMPLETED, fetching analysis...`)
-            try {
-              const summary = await analysisService.getAnalysisSummary(fileId)
-              console.log(`[useAnalysisData] Successfully fetched analysis for ${fileId}`, summary)
-              if (!cancelled) {
-                setData(summary)
-                setCurrentFileId(fileId)
-                setAnalysisSummary(fileId, summary)
-                setError(null)
-                setLoading(false)
-                if (pollInterval) clearInterval(pollInterval)
-                console.log(`[useAnalysisData] Set loading=false, cleared interval`)
-              } else {
-                console.log(`[useAnalysisData] Request was cancelled, not updating state`)
-              }
-            } catch (err) {
-              console.error(`[useAnalysisData] Error fetching analysis:`, err)
-              if (!cancelled) {
-                const error = err instanceof Error ? err : new Error('Failed to fetch analysis')
-                setError(error)
-                setLoading(false)
-                if (pollInterval) clearInterval(pollInterval)
-              }
+          // Try to fetch the analysis summary
+          const response = await apiClient.get(`${API_ENDPOINTS.ANALYSIS_SUMMARY(fileId)}`, {
+            validateStatus: (status) => {
+              // Accept 200 (completed), 202 (processing), and 500 (failed)
+              return status === 200 || status === 202 || status === 500
             }
-          } else if (status === 'FAILED') {
-            // Analysis failed
+          })
+
+          console.log(`[useAnalysisData] File ${fileId} HTTP status: ${response.status}`)
+
+          if (response.status === 200) {
+            // 200 OK: Analysis completed successfully
+            console.log(`[useAnalysisData] Analysis completed, received data`)
             if (!cancelled) {
-              setError(new Error('Analysis failed'))
+              setData(response.data)
+              setCurrentFileId(fileId)
+              setAnalysisSummary(fileId, response.data)
+              setError(null)
+              setLoading(false)
+              if (pollInterval) clearInterval(pollInterval)
+              console.log(`[useAnalysisData] Set loading=false, cleared interval`)
+            }
+          } else if (response.status === 202) {
+            // 202 Accepted: Still processing, keep polling
+            const retryAfter = response.headers['retry-after'] || '2'
+            console.log(`[useAnalysisData] Still processing, retry after ${retryAfter}s`)
+            // Keep polling (interval handles this)
+          } else if (response.status === 500) {
+            // 500 Internal Server Error: Analysis failed
+            if (!cancelled) {
+              setError(new Error('Analysis failed on server'))
               setLoading(false)
               if (pollInterval) clearInterval(pollInterval)
             }
           }
-          // If status is PROCESSING, keep polling
-        } catch (err) {
+        } catch (err: any) {
+          console.error(`[useAnalysisData] Error polling analysis:`, err)
+          // Handle unexpected errors (404, network errors, etc.)
           if (!cancelled) {
-            const error = err instanceof Error ? err : new Error('Failed to check file status')
+            const error = err instanceof Error ? err : new Error('Failed to fetch analysis')
             setError(error)
             setLoading(false)
             if (pollInterval) clearInterval(pollInterval)

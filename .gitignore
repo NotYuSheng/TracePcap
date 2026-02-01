@@ -1,0 +1,16 @@
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
+# Frontend specific
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Backend specific
+backend/.env
+backend/src/main/resources/application-local.yml
+
+# Keep example files
+!**/.env.example

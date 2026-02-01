@@ -23,4 +23,8 @@ export const API_ENDPOINTS = {
   // Story (Not yet implemented in backend)
   GENERATE_STORY: (fileId: string) => `/story/generate/${fileId}`,
   GET_STORY: (storyId: string) => `/story/${storyId}`,
+
+  // Filter Generator (Not yet implemented in backend)
+  GENERATE_FILTER: (fileId: string) => `/filter/generate/${fileId}`,
+  EXECUTE_FILTER: (fileId: string) => `/filter/execute/${fileId}`,
 } as const

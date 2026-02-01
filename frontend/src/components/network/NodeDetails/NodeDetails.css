@@ -1,0 +1,68 @@
+.node-details-panel {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.stats-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.stats-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.stats-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.connections-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #f8f9fa;
+  border-radius: 0.25rem;
+  padding: 0.5rem;
+}
+
+.connection-item {
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.protocol-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.protocol-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.protocol-name {
+  font-weight: 500;
+}
+
+.text-monospace {
+  font-family: monospace;
+}

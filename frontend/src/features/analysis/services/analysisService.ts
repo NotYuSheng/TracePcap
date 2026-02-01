@@ -20,34 +20,21 @@ export const analysisService = {
       return generateMockAnalysis(fileId, 'free5gc.pcap')
     }
 
-    // Fetch data from multiple endpoints
-    const [summaryRes, protocolsRes, conversationsRes] = await Promise.all([
-      apiClient.get(API_ENDPOINTS.ANALYSIS_SUMMARY(fileId)),
-      apiClient.get(API_ENDPOINTS.PROTOCOL_STATS(fileId)),
-      apiClient.get(API_ENDPOINTS.CONVERSATIONS(fileId)),
-    ])
-
+    // Fetch analysis summary (now includes all data we need)
+    const summaryRes = await apiClient.get(API_ENDPOINTS.ANALYSIS_SUMMARY(fileId))
     const summary = summaryRes.data
-    const protocols = protocolsRes.data
-    const conversations = conversationsRes.data
 
     // Transform backend response to frontend format
-    const startTime = summary.startTime ? new Date(summary.startTime).getTime() : Date.now()
-    const endTime = summary.endTime ? new Date(summary.endTime).getTime() : Date.now()
+    // Backend already returns Unix timestamps in milliseconds
+    const startTime = summary.timeRange?.[0] || Date.now()
+    const endTime = summary.timeRange?.[1] || Date.now()
 
-    // Transform protocol stats
-    const protocolDistribution = Object.entries(protocols.protocols || {}).map(
-      ([name, stats]: [string, any]) => ({
-        protocol: name,
-        count: stats.packetCount || 0,
-        bytes: stats.bytes || 0,
-        percentage: stats.percentage || 0,
-      })
-    )
+    // Use protocol distribution from summary (already in the correct format)
+    const protocolDistribution = summary.protocolDistribution || []
 
-    // Transform conversations (top 5)
-    const topConversations = (conversations || []).slice(0, 5).map((conv: any) => ({
-      id: conv.conversationId,
+    // Use top conversations from summary (already provided by backend)
+    const topConversations = (summary.topConversations || []).map((conv: any) => ({
+      id: conv.id,
       endpoints: [
         { ip: conv.srcIp, port: conv.srcPort || 0 },
         { ip: conv.dstIp, port: conv.dstPort || 0 },
@@ -55,27 +42,23 @@ export const analysisService = {
       protocol: { name: conv.protocol, layer: 'Transport' },
       packetCount: conv.packetCount || 0,
       totalBytes: conv.totalBytes || 0,
-      startTime,
-      endTime,
+      startTime: conv.startTime || startTime,
+      endTime: conv.endTime || endTime,
     }))
 
-    // Extract unique hosts from conversations
-    const hostsSet = new Set<string>()
-    ;(conversations || []).forEach((conv: any) => {
-      hostsSet.add(conv.srcIp)
-      hostsSet.add(conv.dstIp)
-    })
-    const uniqueHosts = Array.from(hostsSet).map((ip) => ({
-      ip,
-      port: 0,
+    // Use unique hosts from summary (already provided by backend)
+    const uniqueHosts = (summary.uniqueHosts || []).map((host: any) => ({
+      ip: host.ip,
+      port: host.port || 0,
+      hostname: host.hostname,
     }))
 
     return {
       fileId: summary.fileId,
       fileName: summary.fileName || 'unknown.pcap',
-      fileSize: summary.totalBytes || 0,
-      uploadTime: summary.analyzedAt ? new Date(summary.analyzedAt).getTime() : Date.now(),
-      totalPackets: summary.packetCount || 0,
+      fileSize: summary.fileSize || 0,
+      uploadTime: summary.uploadTime || Date.now(),
+      totalPackets: summary.totalPackets || 0,
       timeRange: [startTime, endTime],
       protocolDistribution,
       topConversations,

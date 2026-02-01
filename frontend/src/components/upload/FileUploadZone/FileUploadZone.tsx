@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
+import { Card } from '@govtechsg/sgds-react'
+import { CloudUpload } from 'lucide-react'
 import './FileUploadZone.css'
 
 interface FileUploadZoneProps {
@@ -12,7 +14,7 @@ interface FileUploadZoneProps {
 export const FileUploadZone = ({
   onFileSelect,
   disabled = false,
-  maxSize = 100 * 1024 * 1024, // 100MB default
+  maxSize = 500 * 1024 * 1024, // 500MB default
   acceptedFileTypes = ['.pcap', '.pcapng', '.cap'],
 }: FileUploadZoneProps) => {
   const onDrop = useCallback(
@@ -36,58 +38,67 @@ export const FileUploadZone = ({
     })
 
   return (
-    <div className="file-upload-zone-container">
-      <div
-        {...getRootProps()}
-        className={`file-upload-zone ${isDragActive ? 'drag-active' : ''} ${
-          isDragReject ? 'drag-reject' : ''
-        } ${disabled ? 'disabled' : ''}`}
-      >
-        <input {...getInputProps()} />
+    <Card className="upload-card">
+      <Card.Body className="text-center p-5">
+        <div className="upload-icon my-3">
+          <CloudUpload size={64} strokeWidth={1.5} className="text-primary" />
+        </div>
+        <h4 className="mb-3">Upload PCAP File</h4>
 
-        <div className="upload-icon">
-          <i className="bi bi-cloud-upload" style={{ fontSize: '3rem' }}></i>
+        <div
+          {...getRootProps()}
+          className={`upload-dropzone mb-3 ${isDragActive ? 'drag-active' : ''} ${
+            isDragReject ? 'drag-reject' : ''
+          } ${disabled ? 'disabled' : ''}`}
+        >
+          <input {...getInputProps()} />
+
+          {isDragActive && !isDragReject ? (
+            <p className="mb-2">
+              <strong>Drop your file here</strong>
+            </p>
+          ) : isDragReject ? (
+            <p className="mb-2 text-danger">
+              <strong>Invalid file type</strong>
+            </p>
+          ) : (
+            <>
+              <p className="mb-2">
+                <strong>Click to browse</strong> or drag & drop
+              </p>
+              <small className="text-muted">
+                Supports {acceptedFileTypes.join(', ')} (max {Math.round(maxSize / 1024 / 1024)}MB)
+              </small>
+            </>
+          )}
         </div>
 
-        {isDragActive && !isDragReject && (
-          <p className="upload-text">Drop your PCAP file here...</p>
+        {disabled && (
+          <div className="text-center">
+            <span
+              className="spinner-border spinner-border-sm me-2"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            <span>Uploading...</span>
+          </div>
         )}
 
-        {isDragReject && (
-          <p className="upload-text error">
-            Invalid file type. Please upload a PCAP file.
-          </p>
+        {fileRejections.length > 0 && (
+          <div className="mt-3">
+            {fileRejections.map(({ file, errors }) => (
+              <div key={file.name} className="alert alert-danger text-start">
+                <strong>{file.name}</strong>
+                <ul className="mb-0 mt-2">
+                  {errors.map((e) => (
+                    <li key={e.code}>{e.message}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
-
-        {!isDragActive && (
-          <>
-            <p className="upload-text">
-              Drag & drop a PCAP file here, or click to browse
-            </p>
-            <button type="button" className="btn btn-primary" disabled={disabled}>
-              Browse Files
-            </button>
-            <p className="upload-hint">
-              Supported formats: {acceptedFileTypes.join(', ')} (Max {maxSize / 1024 / 1024}MB)
-            </p>
-          </>
-        )}
-      </div>
-
-      {fileRejections.length > 0 && (
-        <div className="file-rejections">
-          {fileRejections.map(({ file, errors }) => (
-            <div key={file.name} className="alert alert-danger">
-              <strong>{file.name}</strong>
-              <ul>
-                {errors.map((e) => (
-                  <li key={e.code}>{e.message}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      </Card.Body>
+    </Card>
   )
 }

@@ -50,6 +50,9 @@ export interface AnalysisSummary {
   fiveWs?: FiveWsAnalysis
 }
 
+// Alias for backward compatibility
+export type AnalysisData = AnalysisSummary
+
 export interface ProtocolStats {
   protocol: string
   count: number
@@ -214,4 +217,31 @@ export interface Session {
   totalPackets: number
   totalBytes: number
   purpose?: string
+}
+
+// Filter Generator Types
+export interface FilterGenerationRequest {
+  fileId: string
+  naturalLanguageQuery: string
+}
+
+export interface FilterGenerationResponse {
+  filter: string
+  explanation: string
+  confidence: number
+  suggestions?: string[]
+}
+
+export interface FilterExecutionRequest {
+  fileId: string
+  filter: string
+}
+
+export interface FilterExecutionResponse {
+  packets: Packet[]
+  totalMatches: number
+  executionTime: number
+  page?: number
+  pageSize?: number
+  totalPages?: number
 }

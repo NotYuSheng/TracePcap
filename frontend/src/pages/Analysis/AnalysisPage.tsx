@@ -16,10 +16,12 @@ export const AnalysisPage = () => {
     const path = location.pathname
     if (path.includes('/conversations')) {
       setActiveTab('conversations')
-    } else if (path.includes('/timeline')) {
-      setActiveTab('timeline')
     } else if (path.includes('/story')) {
       setActiveTab('story')
+    } else if (path.includes('/filter-generator')) {
+      setActiveTab('filter-generator')
+    } else if (path.includes('/network-diagram')) {
+      setActiveTab('network-diagram')
     } else {
       setActiveTab('overview')
     }
@@ -60,17 +62,18 @@ export const AnalysisPage = () => {
   return (
     <div className="analysis-page">
       <div className="analysis-header mb-4">
-        <h1>Network Traffic Analysis</h1>
+        <h2>Network Traffic Analysis</h2>
         <p className="text-muted">File ID: {fileId}</p>
       </div>
 
       {/* Navigation Tabs */}
-      <ul className="nav nav-tabs mb-4">
+      <ul className="nav nav-tabs">
         <li className="nav-item">
           <button
             className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => handleTabChange('overview')}
           >
+            <i className="bi bi-speedometer2 me-2"></i>
             Overview
           </button>
         </li>
@@ -79,15 +82,8 @@ export const AnalysisPage = () => {
             className={`nav-link ${activeTab === 'conversations' ? 'active' : ''}`}
             onClick={() => handleTabChange('conversations')}
           >
+            <i className="bi bi-arrow-left-right me-2"></i>
             Conversations
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'timeline' ? 'active' : ''}`}
-            onClick={() => handleTabChange('timeline')}
-          >
-            Timeline
           </button>
         </li>
         <li className="nav-item">
@@ -95,13 +91,36 @@ export const AnalysisPage = () => {
             className={`nav-link ${activeTab === 'story' ? 'active' : ''}`}
             onClick={() => handleTabChange('story')}
           >
+            <i className="bi bi-journal-text me-2"></i>
             Story
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'filter-generator' ? 'active' : ''}`}
+            onClick={() => handleTabChange('filter-generator')}
+          >
+            <i className="bi bi-funnel me-2"></i>
+            Filter Generator
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'network-diagram' ? 'active' : ''}`}
+            onClick={() => handleTabChange('network-diagram')}
+          >
+            <i className="bi bi-diagram-3 me-2"></i>
+            Network Diagram
           </button>
         </li>
       </ul>
 
       {/* Tab Content */}
-      <Outlet context={{ data, fileId }} />
+      <div className="card">
+        <div className="card-body">
+          <Outlet context={{ data, fileId }} />
+        </div>
+      </div>
     </div>
   )
 }

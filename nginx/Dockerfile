@@ -18,14 +18,29 @@ RUN npm run build
 # Stage 2: Serve with nginx and proxy to backend
 FROM nginx:alpine
 
+# Install gettext for envsubst (used in entrypoint script) and tzdata for timezone
+RUN apk add --no-cache gettext tzdata
+
+# Set timezone to Singapore
+ENV TZ=Asia/Singapore
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration for reverse proxy
-COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+# Create templates directory
+RUN mkdir -p /etc/nginx/templates
+
+# Copy nginx configuration template
+COPY nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
+
+# Copy and set up entrypoint script
+COPY nginx/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Expose port 80
 EXPOSE 80
 
-# Start nginx
+# Use custom entrypoint to process template, then start nginx
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

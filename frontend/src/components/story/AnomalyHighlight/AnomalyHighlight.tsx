@@ -49,10 +49,12 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
           <div className="flex-grow-1">
             <h6 className="alert-heading mb-1">{highlight.title}</h6>
             <p className="mb-1">{highlight.description}</p>
-            <small className="text-muted">
-              <i className="bi bi-clock me-1"></i>
-              {formatTimestamp(highlight.timestamp)}
-            </small>
+            {highlight.timestamp && (
+              <small className="text-muted">
+                <i className="bi bi-clock me-1"></i>
+                {formatTimestamp(highlight.timestamp)}
+              </small>
+            )}
           </div>
         </div>
       ))}

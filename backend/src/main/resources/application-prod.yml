@@ -8,11 +8,11 @@ spring:
 logging:
   level:
     root: WARN
-    com.tracecap: INFO
+    com.tracepcap: INFO
     org.springframework: WARN
     org.hibernate: WARN
   file:
-    name: /var/log/tracecap/application.log
+    name: /var/log/tracepcap/application.log
     max-size: 100MB
     max-history: 30
     total-size-cap: 1GB
@@ -22,7 +22,7 @@ minio:
   endpoint: ${MINIO_ENDPOINT}
   access-key: ${MINIO_ACCESS_KEY}
   secret-key: ${MINIO_SECRET_KEY}
-  bucket: ${MINIO_BUCKET:tracecap-files-prod}
+  bucket: ${MINIO_BUCKET:tracepcap-files-prod}
 
 # Production database (use environment variables)
 spring.datasource:

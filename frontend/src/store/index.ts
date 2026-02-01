@@ -15,7 +15,7 @@ export const useStore = create<StoreState>()(
         ...createAnalysisSlice(...a),
       }),
       {
-        name: 'tracecap-storage',
+        name: 'tracepcap-storage',
         partialize: (state) => ({
           // Only persist certain parts of state
           recentFiles: state.recentFiles,
@@ -24,7 +24,7 @@ export const useStore = create<StoreState>()(
       }
     ),
     {
-      name: 'TraceCap Store',
+      name: 'TracePcap Store',
     }
   )
 )

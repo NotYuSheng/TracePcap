@@ -1,65 +1,12 @@
-.file-list-container {
-  margin-top: 3rem;
+/* File List Card Styles */
+.file-list-card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.file-list-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: #212529;
+.file-list-card .list-group-item {
+  transition: background-color 0.2s ease;
 }
 
-.file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.file-list-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  background-color: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.file-list-item:hover {
-  border-color: var(--tracecap-primary);
+.file-list-card .list-group-item:hover {
   background-color: #f8f9fa;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.file-icon {
-  font-size: 2rem;
-  color: var(--tracecap-primary);
-}
-
-.file-details {
-  flex: 1;
-}
-
-.file-name {
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 0.25rem;
-}
-
-.file-meta {
-  font-size: 0.85rem;
-  color: #6c757d;
-}
-
-.file-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.file-actions button {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
 }

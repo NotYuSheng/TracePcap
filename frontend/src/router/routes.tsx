@@ -4,8 +4,9 @@ import { UploadPage } from '@pages/Upload'
 import { AnalysisPage } from '@pages/Analysis'
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview'
 import { ConversationPage } from '@pages/Conversation'
-import { TimelinePage } from '@pages/Timeline'
 import { StoryPage } from '@pages/Story'
+import { FilterGeneratorPage } from '@pages/FilterGenerator'
+import { NetworkDiagramPage } from '@pages/NetworkDiagram'
 import { NotFoundPage } from '@pages/NotFound'
 
 export const router = createBrowserRouter([
@@ -30,12 +31,16 @@ export const router = createBrowserRouter([
             element: <ConversationPage />,
           },
           {
-            path: 'timeline',
-            element: <TimelinePage />,
-          },
-          {
             path: 'story',
             element: <StoryPage />,
+          },
+          {
+            path: 'filter-generator',
+            element: <FilterGeneratorPage />,
+          },
+          {
+            path: 'network-diagram',
+            element: <NetworkDiagramPage />,
           },
         ],
       },

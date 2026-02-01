@@ -7,13 +7,13 @@
 
 /* Base styles */
 :root {
-  /* Custom variables for TraceCap theme */
-  --tracecap-primary: #0076d1;
-  --tracecap-secondary: #5925dc;
-  --tracecap-success: #1d8348;
-  --tracecap-danger: #c0392b;
-  --tracecap-warning: #f39c12;
-  --tracecap-info: #2980b9;
+  /* Custom variables for TracePcap theme */
+  --tracepcap-primary: #0076d1;
+  --tracepcap-secondary: #5925dc;
+  --tracepcap-success: #1d8348;
+  --tracepcap-danger: #c0392b;
+  --tracepcap-warning: #f39c12;
+  --tracepcap-info: #2980b9;
 
   /* Network visualization colors */
   --network-client: #3498db;
@@ -27,6 +27,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  background-color: #f8f9fa;
 }
 
 #root {
@@ -35,39 +36,25 @@ body {
   flex-direction: column;
 }
 
+/* Container width - consistent with MeetMemo */
+.container {
+  max-width: 1200px;
+}
+
 /* Main Layout Styles */
 .main-layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: #f8fafc;
 }
 
 .main-header {
-  background-color: var(--tracecap-primary);
-  color: white;
-  padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.main-header h2 {
-  margin: 0;
-}
-
-.main-header nav {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.main-header nav a {
-  color: white;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.main-header nav a:hover {
-  text-decoration: underline;
+  background-color: white;
+  border-bottom: 1px solid #dee2e6;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .main-content {
@@ -76,15 +63,7 @@ body {
 }
 
 .main-footer {
-  background-color: #f8f9fa;
-  padding: 1rem 2rem;
-  text-align: center;
   border-top: 1px solid #dee2e6;
-}
-
-.main-footer p {
-  margin: 0;
-  color: #6c757d;
 }
 
 /* Page Styles */

@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { Card } from '@govtechsg/sgds-react'
+import { AlertCircle } from 'lucide-react'
 import { useStore } from '@/store'
 import type { RecentFile } from '@/store/slices/uploadSlice'
 import './FileList.css'
@@ -33,54 +35,74 @@ export const FileList = () => {
     navigate(`/analysis/${file.id}`)
   }
 
-  const handleRemoveFile = (e: React.MouseEvent, fileId: string) => {
+  const handleRemoveFile = (fileId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     removeRecentFile(fileId)
   }
 
-  if (recentFiles.length === 0) {
-    return null
-  }
-
   return (
-    <div className="file-list-container">
-      <h3 className="file-list-title">Recent Uploads</h3>
-      <div className="file-list">
-        {recentFiles.map((file) => (
-          <div
-            key={file.id}
-            className="file-list-item"
-            onClick={() => handleFileClick(file)}
-          >
-            <div className="file-icon">
-              <i className="bi bi-file-earmark-binary"></i>
-            </div>
-            <div className="file-details">
-              <div className="file-name">{file.name}</div>
-              <div className="file-meta">
-                {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
-              </div>
-            </div>
-            <div className="file-actions">
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
+    <Card className="file-list-card mt-4">
+      <Card.Header>
+        <h5 className="mb-0">
+          <i className="bi bi-clock-history me-2"></i>
+          Recent Uploads
+        </h5>
+      </Card.Header>
+      <Card.Body className="p-0">
+        {recentFiles.length === 0 ? (
+          <div className="text-center text-muted py-4">
+            <p className="mb-0">
+              No recent uploads. Upload a PCAP file to get started!
+            </p>
+          </div>
+        ) : (
+          <div className="list-group list-group-flush">
+            {recentFiles.map((file) => (
+              <div
+                key={file.id}
+                className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                style={{ cursor: 'pointer' }}
                 onClick={() => handleFileClick(file)}
               >
-                <i className="bi bi-graph-up"></i> Analyze
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={(e) => handleRemoveFile(e, file.id)}
-                title="Remove from list"
-              >
-                <i className="bi bi-trash"></i>
-              </button>
-            </div>
+                <div className="flex-grow-1">
+                  <div className="d-flex align-items-center gap-2">
+                    <i className="bi bi-file-earmark-binary text-primary" style={{ fontSize: '1.2rem' }}></i>
+                    <div>
+                      <div className="fw-medium">{file.name}</div>
+                      <small className="text-muted">
+                        {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+                <div className="d-flex gap-2 align-items-center">
+                  <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleFileClick(file)
+                    }}
+                  >
+                    <i className="bi bi-graph-up me-1"></i>
+                    Analyze
+                  </button>
+                  <button
+                    className="btn btn-link btn-sm p-0 text-danger"
+                    onClick={(e) => handleRemoveFile(file.id, e)}
+                    title="Delete this file"
+                  >
+                    <i className="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        )}
+        <div className="card-footer text-muted small">
+          <AlertCircle size={14} className="me-1" />
+          Files are automatically deleted after 12 hours
+        </div>
+      </Card.Body>
+    </Card>
   )
 }

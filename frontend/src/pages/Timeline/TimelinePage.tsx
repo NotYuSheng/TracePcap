@@ -53,10 +53,11 @@ export const TimelinePage = () => {
   }
 
   // Calculate summary statistics
-  const totalPackets = timelineData.reduce((sum, point) => sum + point.packetCount, 0)
-  const totalBytes = timelineData.reduce((sum, point) => sum + point.bytes, 0)
-  const avgPackets = Math.round(totalPackets / timelineData.length)
-  const maxPackets = Math.max(...timelineData.map((p) => p.packetCount))
+  const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0)
+  const totalBytes = timelineData.reduce((sum, point) => sum + (point.bytes || 0), 0)
+  const avgPackets = Math.round(totalPackets / timelineData.length) || 0
+  const packetCounts = timelineData.map((p) => p.packetCount || 0).filter(n => !isNaN(n))
+  const maxPackets = packetCounts.length > 0 ? Math.max(...packetCounts) : 0
 
   return (
     <div className="timeline-page">

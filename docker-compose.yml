@@ -2,31 +2,33 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: tracecap-postgres
+    container_name: tracepcap-postgres
     environment:
-      POSTGRES_DB: tracecap
-      POSTGRES_USER: tracecap_user
-      POSTGRES_PASSWORD: tracecap_pass
+      POSTGRES_DB: tracepcap
+      POSTGRES_USER: tracepcap_user
+      POSTGRES_PASSWORD: tracepcap_pass
+      TZ: Asia/Singapore
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracecap_user -d tracecap"]
+      test: ["CMD-SHELL", "pg_isready -U tracepcap_user -d tracepcap"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - tracecap-network
+      - tracepcap-network
 
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
-    container_name: tracecap-minio
+    container_name: tracepcap-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      TZ: Asia/Singapore
     ports:
       - "9000:9000"  # API
       - "9001:9001"  # Console
@@ -38,60 +40,75 @@ services:
       timeout: 20s
       retries: 3
     networks:
-      - tracecap-network
+      - tracepcap-network
 
   # MinIO Client (mc) - Create bucket on startup
   minio-init:
     image: minio/mc:latest
-    container_name: tracecap-minio-init
+    container_name: tracepcap-minio-init
     depends_on:
       - minio
     entrypoint: >
       /bin/sh -c "
       sleep 5;
       /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
-      /usr/bin/mc mb myminio/tracecap-files --ignore-existing;
-      /usr/bin/mc anonymous set public myminio/tracecap-files;
+      /usr/bin/mc mb myminio/tracepcap-files --ignore-existing;
+      /usr/bin/mc anonymous set public myminio/tracepcap-files;
       exit 0;
       "
     networks:
-      - tracecap-network
+      - tracepcap-network
 
   # Spring Boot Backend
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: tracecap-backend
+    container_name: tracepcap-backend
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DATABASE_URL: jdbc:postgresql://postgres:5432/tracecap
-      DATABASE_USERNAME: tracecap_user
-      DATABASE_PASSWORD: tracecap_pass
+      DATABASE_URL: jdbc:postgresql://postgres:5432/tracepcap
+      DATABASE_USERNAME: tracepcap_user
+      DATABASE_PASSWORD: tracepcap_pass
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: tracecap-files
+      MINIO_BUCKET: tracepcap-files
+      # Upload Configuration (from .env) - single source of truth
+      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-536870912}
+      # LLM Configuration (OpenAI API Format)
+      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-https://api.openai.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
+      # Timezone Configuration
+      TZ: Asia/Singapore
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_healthy
     networks:
-      - tracecap-network
+      - tracepcap-network
 
   # Nginx - Serves frontend and proxies API to backend
   nginx:
     build:
       context: .
       dockerfile: ./nginx/Dockerfile
-    container_name: tracecap-nginx
+    container_name: tracepcap-nginx
+    environment:
+      # Upload Configuration (from .env)
+      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-536870912}
+      # Timezone Configuration
+      TZ: Asia/Singapore
     ports:
-      - "80:80"
+      - "${NGINX_PORT:-80}:80"
     depends_on:
       - backend
     networks:
-      - tracecap-network
+      - tracepcap-network
 
 volumes:
   postgres_data:
@@ -100,5 +117,5 @@ volumes:
     driver: local
 
 networks:
-  tracecap-network:
+  tracepcap-network:
     driver: bridge
