@@ -24,6 +24,12 @@
 
 A comprehensive network packet analysis tool that runs entirely self-hosted. Upload PCAP files to visualize network traffic patterns, analyze packet flows, generate intelligent filters, and gain insights through AI-powered analysis. Perfect for network troubleshooting, security analysis, protocol debugging, or educational purposes.
 
+<div align="center">
+
+![TracePcap Demo](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
+
+</div>
+
 ## Features
 
 | Feature | Description |
@@ -57,7 +63,7 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 
 **1. Clone and setup:**
 ```bash
-git clone https://github.com/yourusername/TracePcap.git
+git clone https://github.com/NotYuSheng/TracePcap.git
 cd TracePcap
 cp .env .env.local  # Optional: customize your configuration
 ```
