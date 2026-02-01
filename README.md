@@ -81,7 +81,7 @@ NGINX_PORT=80  # Change if port 80 is already in use
 
 # LLM Configuration (Local LLM Server)
 LLM_API_BASE_URL=http://localhost:1234/v1
-LLM_API_KEY=not-needed
+LLM_API_KEY=
 LLM_MODEL=Qwen2.5-14B-Coder-Instruct
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=2000
