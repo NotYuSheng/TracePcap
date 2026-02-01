@@ -206,10 +206,10 @@ public class FilterService {
     }
 
     /**
-     * Execute a filter on a PCAP file and return matching packets
+     * Execute a filter on a PCAP file and return matching packets with pagination
      */
-    public FilterExecutionResponse executeFilter(UUID fileId, String filterExpression) {
-        log.info("Executing filter on file {}: {}", fileId, filterExpression);
+    public FilterExecutionResponse executeFilter(UUID fileId, String filterExpression, int page, int pageSize) {
+        log.info("Executing filter on file {}: {} (page: {}, pageSize: {})", fileId, filterExpression, page, pageSize);
 
         long startTime = System.currentTimeMillis();
         FileEntity fileEntity = fileService.getFileById(fileId);
@@ -234,15 +234,32 @@ public class FilterService {
                 );
             }
 
-            List<PacketDto> packets = filterPackets(tempFile, filterExpression);
+            // Collect all matching packets (up to a reasonable limit)
+            List<PacketDto> allPackets = filterPackets(tempFile, filterExpression, 10000);
+            int totalMatches = allPackets.size();
+
+            // Calculate pagination
+            int totalPages = (int) Math.ceil((double) totalMatches / pageSize);
+            int startIndex = (page - 1) * pageSize;
+            int endIndex = Math.min(startIndex + pageSize, totalMatches);
+
+            // Get packets for current page
+            List<PacketDto> pagePackets = startIndex < totalMatches
+                    ? allPackets.subList(startIndex, endIndex)
+                    : List.of();
+
             long executionTime = System.currentTimeMillis() - startTime;
 
-            log.info("Filter execution completed: {} matches in {}ms", packets.size(), executionTime);
+            log.info("Filter execution completed: {} total matches, returning {} for page {}/{}",
+                     totalMatches, pagePackets.size(), page, totalPages);
 
             return FilterExecutionResponse.builder()
-                    .packets(packets)
-                    .totalMatches(packets.size())
+                    .packets(pagePackets)
+                    .totalMatches(totalMatches)
                     .executionTime(executionTime)
+                    .page(page)
+                    .pageSize(pageSize)
+                    .totalPages(totalPages)
                     .build();
 
         } catch (IllegalArgumentException e) {
@@ -260,9 +277,9 @@ public class FilterService {
     }
 
     /**
-     * Filter packets from PCAP file using BPF filter
+     * Filter packets from PCAP file using BPF filter with a maximum limit
      */
-    private List<PacketDto> filterPackets(File pcapFile, String bpfFilter) {
+    private List<PacketDto> filterPackets(File pcapFile, String bpfFilter, int maxPackets) {
         List<PacketDto> matchedPackets = new ArrayList<>();
         int packetCount = 0;
 
@@ -280,7 +297,7 @@ public class FilterService {
             }
 
             Packet packet;
-            while ((packet = handle.getNextPacket()) != null && packetCount < MAX_PACKETS) {
+            while ((packet = handle.getNextPacket()) != null && packetCount < maxPackets) {
                 try {
                     PacketDto packetDto = convertToPacketDto(packet, handle, packetCount);
                     if (packetDto != null) {
@@ -292,8 +309,8 @@ public class FilterService {
                 }
             }
 
-            if (packetCount >= MAX_PACKETS) {
-                log.info("Reached maximum packet limit of {}", MAX_PACKETS);
+            if (packetCount >= maxPackets) {
+                log.info("Reached maximum packet limit of {}", maxPackets);
             }
 
         } catch (PcapNativeException | NotOpenException e) {

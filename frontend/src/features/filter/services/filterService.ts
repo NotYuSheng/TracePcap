@@ -133,16 +133,29 @@ export const filterService = {
   },
 
   /**
-   * Execute a pcap filter and get matching packets
+   * Execute a pcap filter and get matching packets with pagination
    * @param fileId - The file ID to execute filter on
    * @param filter - The pcap filter string
-   * @returns Matching packets
+   * @param page - Page number (1-indexed)
+   * @param pageSize - Number of packets per page
+   * @returns Matching packets with pagination info
    */
-  executeFilter: async (fileId: string, filter: string): Promise<FilterExecutionResponse> => {
+  executeFilter: async (
+    fileId: string,
+    filter: string,
+    page: number = 1,
+    pageSize: number = 25
+  ): Promise<FilterExecutionResponse> => {
     if (USE_MOCK) {
       // Simulate filter execution time
       await new Promise((resolve) => setTimeout(resolve, 800))
-      return generateMockPackets()
+      const mockData = generateMockPackets()
+      return {
+        ...mockData,
+        page,
+        pageSize,
+        totalPages: Math.ceil(mockData.totalMatches / pageSize),
+      }
     }
 
     const request: FilterExecutionRequest = {
@@ -152,7 +165,10 @@ export const filterService = {
 
     const response = await apiClient.post<FilterExecutionResponse>(
       API_ENDPOINTS.EXECUTE_FILTER(fileId),
-      request
+      request,
+      {
+        params: { page, pageSize }
+      }
     )
     return response.data
   }

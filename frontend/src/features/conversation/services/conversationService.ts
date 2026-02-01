@@ -1,6 +1,6 @@
 import { apiClient } from '@/services/api/client'
 import { API_ENDPOINTS } from '@/services/api/endpoints'
-import type { Conversation, Session, NetworkEndpoint, Protocol } from '@/types'
+import type { Conversation, Session, NetworkEndpoint, Protocol, PaginatedResponse } from '@/types'
 import { mockConversations, mockSessions, getConversationById } from '@/mocks/mockConversationData'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true'
@@ -69,20 +69,51 @@ function transformConversation(apiData: ConversationApiResponse): Conversation {
 
 export const conversationService = {
   /**
-   * Get all conversations for a PCAP file
+   * Get conversations for a PCAP file with pagination
    * @param fileId - The file ID to get conversations for
-   * @returns List of conversations
+   * @param page - Page number (1-indexed)
+   * @param pageSize - Number of items per page
+   * @returns Paginated conversation response
    */
-  getConversations: async (fileId: string): Promise<Conversation[]> => {
+  getConversations: async (
+    fileId: string,
+    page: number = 1,
+    pageSize: number = 25
+  ): Promise<PaginatedResponse<Conversation>> => {
     if (USE_MOCK) {
       await new Promise((resolve) => setTimeout(resolve, 600))
-      return mockConversations
+      // Mock pagination
+      const total = mockConversations.length
+      const startIndex = (page - 1) * pageSize
+      const endIndex = Math.min(startIndex + pageSize, total)
+      const data = mockConversations.slice(startIndex, endIndex)
+      return {
+        data,
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      }
     }
 
-    const response = await apiClient.get<ConversationApiResponse[]>(API_ENDPOINTS.CONVERSATIONS(fileId))
+    const response = await apiClient.get<{
+      data: ConversationApiResponse[]
+      page: number
+      pageSize: number
+      total: number
+      totalPages: number
+    }>(API_ENDPOINTS.CONVERSATIONS(fileId), {
+      params: { page, pageSize },
+    })
 
     // Transform backend response to frontend format
-    return response.data.map(transformConversation)
+    return {
+      data: response.data.data.map(transformConversation),
+      page: response.data.page,
+      pageSize: response.data.pageSize,
+      total: response.data.total,
+      totalPages: response.data.totalPages,
+    }
   },
 
   /**

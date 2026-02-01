@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { AnalysisData, Packet } from '@/types'
 import { filterService } from '@/features/filter/services/filterService'
+import { Pagination } from '@components/common/Pagination'
 
 interface AnalysisOutletContext {
   data: AnalysisData
@@ -24,6 +25,11 @@ export const FilterGeneratorPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [selectedPacket, setSelectedPacket] = useState<Packet | null>(null)
   const [showCheatSheet, setShowCheatSheet] = useState(false)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(25)
+  const [totalPages, setTotalPages] = useState(0)
 
   const validateFilter = (filter: string): { valid: boolean; message?: string } => {
     const trimmed = filter.trim()
@@ -99,7 +105,7 @@ export const FilterGeneratorPage = () => {
     }
   }
 
-  const handleExecuteFilter = async () => {
+  const handleExecuteFilter = async (page: number = currentPage) => {
     if (!editableFilter.trim()) {
       setError('Please generate or enter a filter first')
       return
@@ -108,10 +114,12 @@ export const FilterGeneratorPage = () => {
     try {
       setExecuting(true)
       setError(null)
-      const result = await filterService.executeFilter(fileId, editableFilter)
+      const result = await filterService.executeFilter(fileId, editableFilter, page, pageSize)
       setPackets(result.packets)
       setTotalMatches(result.totalMatches)
       setExecutionTime(result.executionTime)
+      setTotalPages(result.totalPages || 0)
+      setCurrentPage(page)
     } catch (err) {
       // Provide specific error message based on the error type
       const errorMsg = err instanceof Error ? err.message : String(err)
@@ -128,6 +136,10 @@ export const FilterGeneratorPage = () => {
     } finally {
       setExecuting(false)
     }
+  }
+
+  const handlePageChange = (page: number) => {
+    handleExecuteFilter(page)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -264,7 +276,7 @@ export const FilterGeneratorPage = () => {
                 <div className="d-flex gap-2">
                   <button
                     className="btn btn-success"
-                    onClick={handleExecuteFilter}
+                    onClick={() => handleExecuteFilter(1)}
                     disabled={executing || !editableFilter.trim()}
                   >
                     {executing ? (
@@ -421,6 +433,19 @@ export const FilterGeneratorPage = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-3">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={handlePageChange}
+                      pageSize={pageSize}
+                      totalItems={totalMatches}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

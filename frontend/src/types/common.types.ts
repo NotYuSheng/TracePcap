@@ -241,4 +241,7 @@ export interface FilterExecutionResponse {
   packets: Packet[]
   totalMatches: number
   executionTime: number
+  page?: number
+  pageSize?: number
+  totalPages?: number
 }

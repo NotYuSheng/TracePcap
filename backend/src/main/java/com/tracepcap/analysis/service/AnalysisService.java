@@ -19,10 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -139,12 +136,89 @@ public class AnalysisService {
         AnalysisResultEntity analysis = analysisResultRepository.findByFileId(fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Analysis not found for file: " + fileId));
 
+        FileEntity file = analysis.getFile();
+
+        // Convert time to Unix timestamps (milliseconds)
+        Long startTimeMs = analysis.getStartTime() != null
+                ? analysis.getStartTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+                : null;
+        Long endTimeMs = analysis.getEndTime() != null
+                ? analysis.getEndTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+                : null;
+        Long uploadTimeMs = file.getUploadedAt() != null
+                ? file.getUploadedAt().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+                : null;
+
+        // Build protocol distribution
+        List<AnalysisSummaryResponse.ProtocolStat> protocolDistribution = new ArrayList<>();
+        if (analysis.getProtocolStats() != null) {
+            analysis.getProtocolStats().forEach((protocol, statsObj) -> {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> stats = (Map<String, Object>) statsObj;
+                protocolDistribution.add(AnalysisSummaryResponse.ProtocolStat.builder()
+                        .protocol(protocol)
+                        .count(((Number) stats.get("packetCount")).longValue())
+                        .bytes(stats.get("bytes") != null ? ((Number) stats.get("bytes")).longValue() : 0L)
+                        .percentage((Double) stats.get("percentage"))
+                        .build());
+            });
+        }
+
+        // Get top conversations
+        List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+        List<AnalysisSummaryResponse.ConversationSummary> topConversations = conversations.stream()
+                .sorted((a, b) -> Long.compare(b.getTotalBytes(), a.getTotalBytes()))
+                .limit(10)
+                .map(conv -> AnalysisSummaryResponse.ConversationSummary.builder()
+                        .id(conv.getId().toString())
+                        .srcIp(conv.getSrcIp())
+                        .srcPort(conv.getSrcPort())
+                        .dstIp(conv.getDstIp())
+                        .dstPort(conv.getDstPort())
+                        .protocol(conv.getProtocol())
+                        .startTime(conv.getStartTime() != null
+                                ? conv.getStartTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+                                : null)
+                        .endTime(conv.getEndTime() != null
+                                ? conv.getEndTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+                                : null)
+                        .packetCount(conv.getPacketCount())
+                        .totalBytes(conv.getTotalBytes())
+                        .build())
+                .collect(Collectors.toList());
+
+        // Get unique hosts
+        Set<String> uniqueIps = new HashSet<>();
+        List<AnalysisSummaryResponse.UniqueHost> uniqueHosts = new ArrayList<>();
+        conversations.forEach(conv -> {
+            if (uniqueIps.add(conv.getSrcIp())) {
+                uniqueHosts.add(AnalysisSummaryResponse.UniqueHost.builder()
+                        .ip(conv.getSrcIp())
+                        .port(conv.getSrcPort())
+                        .build());
+            }
+            if (uniqueIps.add(conv.getDstIp())) {
+                uniqueHosts.add(AnalysisSummaryResponse.UniqueHost.builder()
+                        .ip(conv.getDstIp())
+                        .port(conv.getDstPort())
+                        .build());
+            }
+        });
+
         return AnalysisSummaryResponse.builder()
                 .analysisId(analysis.getId())
-                .fileId(analysis.getFile().getId())
-                .fileName(analysis.getFile().getFileName())
-                .packetCount(analysis.getPacketCount())
-                .totalBytes(analysis.getTotalBytes())
+                .fileId(file.getId().toString())
+                .fileName(file.getFileName())
+                .fileSize(file.getFileSize())
+                .uploadTime(uploadTimeMs)
+                .totalPackets(analysis.getPacketCount())
+                .timeRange(startTimeMs != null && endTimeMs != null
+                        ? List.of(startTimeMs, endTimeMs)
+                        : List.of())
+                .protocolDistribution(protocolDistribution)
+                .topConversations(topConversations)
+                .uniqueHosts(uniqueHosts)
+                // Legacy fields
                 .startTime(analysis.getStartTime())
                 .endTime(analysis.getEndTime())
                 .durationMs(analysis.getDurationMs())

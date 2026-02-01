@@ -45,18 +45,31 @@ public class FilterController {
 
     @PostMapping("/execute/{fileId}")
     @Operation(
-            summary = "Execute filter on PCAP file",
-            description = "Applies a BPF filter to a PCAP file and returns matching packets"
+            summary = "Execute filter on PCAP file with pagination",
+            description = "Applies a BPF filter to a PCAP file and returns matching packets with pagination support"
     )
     public ResponseEntity<FilterExecutionResponse> executeFilter(
             @PathVariable String fileId,
-            @Valid @RequestBody FilterExecutionRequest request) {
+            @Valid @RequestBody FilterExecutionRequest request,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "25") int pageSize) {
 
-        log.info("Executing filter on file {}: {}", fileId, request.getFilter());
+        log.info("Executing filter on file {}: {} (page: {}, pageSize: {})",
+                 fileId, request.getFilter(), page, pageSize);
+
+        // Validate pagination parameters
+        if (page < 1) {
+            page = 1;
+        }
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 25; // Default to 25 if invalid
+        }
 
         FilterExecutionResponse response = filterService.executeFilter(
                 UUID.fromString(fileId),
-                request.getFilter()
+                request.getFilter(),
+                page,
+                pageSize
         );
 
         return ResponseEntity.ok(response);

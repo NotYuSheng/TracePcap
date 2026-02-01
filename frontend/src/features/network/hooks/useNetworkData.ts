@@ -45,7 +45,9 @@ export function useNetworkData(
       setError(null)
 
       // Fetch conversations from API
-      const conversations = await conversationService.getConversations(fileId)
+      // For network visualization, fetch all conversations (use large page size)
+      const response = await conversationService.getConversations(fileId, 1, 10000)
+      const conversations = response.data
 
       // Transform to graph data with conversation limit
       const graphData = networkService.buildNetworkGraph(
