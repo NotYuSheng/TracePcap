@@ -14,23 +14,23 @@ spring:
 logging:
   level:
     root: INFO
-    com.tracecap: DEBUG
+    com.tracepcap: DEBUG
     org.springframework: DEBUG
     org.hibernate: DEBUG
   file:
-    name: logs/tracecap-dev.log
+    name: logs/tracepcap-dev.log
 
-# Development-specific MinIO (local)
-minio:
-  endpoint: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin
+# Development-specific MinIO (uses environment variable or fallback)
+# minio:
+#   endpoint: http://localhost:9000
+#   access-key: minioadmin
+#   secret-key: minioadmin
 
-# Development database (local PostgreSQL)
-spring.datasource:
-  url: jdbc:postgresql://localhost:5432/tracecap
-  username: tracecap_user
-  password: tracecap_pass
+# Development database (uses environment variables or fallback from main config)
+# spring.datasource:
+#   url: jdbc:postgresql://localhost:5432/tracepcap
+#   username: tracepcap_user
+#   password: tracepcap_pass
 
 # Disable production optimizations
 server:

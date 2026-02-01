@@ -13,18 +13,18 @@
 }
 
 .file-upload-zone:hover:not(.disabled) {
-  border-color: var(--tracecap-primary);
+  border-color: var(--tracepcap-primary);
   background-color: #e9ecef;
 }
 
 .file-upload-zone.drag-active {
-  border-color: var(--tracecap-primary);
+  border-color: var(--tracepcap-primary);
   background-color: #e7f3ff;
   border-style: solid;
 }
 
 .file-upload-zone.drag-reject {
-  border-color: var(--tracecap-danger);
+  border-color: var(--tracepcap-danger);
   background-color: #ffe7e7;
   border-style: solid;
 }
@@ -35,7 +35,7 @@
 }
 
 .upload-icon {
-  color: var(--tracecap-primary);
+  color: var(--tracepcap-primary);
   margin-bottom: 1rem;
 }
 
@@ -46,7 +46,7 @@
 }
 
 .upload-text.error {
-  color: var(--tracecap-danger);
+  color: var(--tracepcap-danger);
 }
 
 .upload-hint {

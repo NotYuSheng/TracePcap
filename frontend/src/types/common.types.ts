@@ -50,6 +50,9 @@ export interface AnalysisSummary {
   fiveWs?: FiveWsAnalysis
 }
 
+// Alias for backward compatibility
+export type AnalysisData = AnalysisSummary
+
 export interface ProtocolStats {
   protocol: string
   count: number

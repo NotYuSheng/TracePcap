@@ -28,14 +28,14 @@
 }
 
 .file-list-item:hover {
-  border-color: var(--tracecap-primary);
+  border-color: var(--tracepcap-primary);
   background-color: #f8f9fa;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .file-icon {
   font-size: 2rem;
-  color: var(--tracecap-primary);
+  color: var(--tracepcap-primary);
 }
 
 .file-details {

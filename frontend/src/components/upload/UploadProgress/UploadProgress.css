@@ -8,12 +8,12 @@
 }
 
 .upload-progress.error {
-  border-color: var(--tracecap-danger);
+  border-color: var(--tracepcap-danger);
   background-color: #fff5f5;
 }
 
 .upload-progress.success {
-  border-color: var(--tracecap-success);
+  border-color: var(--tracepcap-success);
   background-color: #f0fff4;
 }
 
@@ -32,7 +32,7 @@
 
 .file-info i {
   font-size: 1.5rem;
-  color: var(--tracecap-primary);
+  color: var(--tracepcap-primary);
 }
 
 .file-name {
@@ -68,5 +68,5 @@
 
 .error-text {
   font-size: 0.85rem;
-  color: var(--tracecap-danger);
+  color: var(--tracepcap-danger);
 }

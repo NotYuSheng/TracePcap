@@ -7,13 +7,13 @@
 
 /* Base styles */
 :root {
-  /* Custom variables for TraceCap theme */
-  --tracecap-primary: #0076d1;
-  --tracecap-secondary: #5925dc;
-  --tracecap-success: #1d8348;
-  --tracecap-danger: #c0392b;
-  --tracecap-warning: #f39c12;
-  --tracecap-info: #2980b9;
+  /* Custom variables for TracePcap theme */
+  --tracepcap-primary: #0076d1;
+  --tracepcap-secondary: #5925dc;
+  --tracepcap-success: #1d8348;
+  --tracepcap-danger: #c0392b;
+  --tracepcap-warning: #f39c12;
+  --tracepcap-info: #2980b9;
 
   /* Network visualization colors */
   --network-client: #3498db;
@@ -43,7 +43,7 @@ body {
 }
 
 .main-header {
-  background-color: var(--tracecap-primary);
+  background-color: var(--tracepcap-primary);
   color: white;
   padding: 1rem 2rem;
   display: flex;

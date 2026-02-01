@@ -6,15 +6,16 @@ interface AnalysisSummaryProps {
 }
 
 export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes'
+  const formatFileSize = (bytes: number | undefined | null): string => {
+    if (!bytes || bytes === 0) return '0 Bytes'
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
   }
 
-  const formatDuration = (start: number, end: number): string => {
+  const formatDuration = (start: number | undefined | null, end: number | undefined | null): string => {
+    if (!start || !end) return 'N/A'
     const durationMs = end - start
     const seconds = Math.floor(durationMs / 1000)
     const minutes = Math.floor(seconds / 60)
@@ -25,8 +26,8 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
     return `${seconds}s`
   }
 
-  const formatNumber = (num: number): string => {
-    return num.toLocaleString()
+  const formatNumber = (num: number | undefined | null): string => {
+    return num?.toLocaleString() || '0'
   }
 
   return (
@@ -71,7 +72,7 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
           <div className="card-content">
             <div className="card-label">Duration</div>
             <div className="card-value">
-              {formatDuration(summary.timeRange[0], summary.timeRange[1])}
+              {formatDuration(summary.timeRange?.[0], summary.timeRange?.[1])}
             </div>
           </div>
         </div>
@@ -82,7 +83,7 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
           </div>
           <div className="card-content">
             <div className="card-label">Protocols</div>
-            <div className="card-value">{summary.protocolDistribution.length}</div>
+            <div className="card-value">{summary.protocolDistribution?.length || 0}</div>
           </div>
         </div>
 
@@ -92,7 +93,7 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
           </div>
           <div className="card-content">
             <div className="card-label">Unique Hosts</div>
-            <div className="card-value">{summary.uniqueHosts.length}</div>
+            <div className="card-value">{summary.uniqueHosts?.length || 0}</div>
           </div>
         </div>
 
@@ -102,7 +103,7 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
           </div>
           <div className="card-content">
             <div className="card-label">Conversations</div>
-            <div className="card-value">{summary.topConversations.length}</div>
+            <div className="card-value">{summary.topConversations?.length || 0}</div>
           </div>
         </div>
 

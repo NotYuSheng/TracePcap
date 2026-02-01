@@ -5,14 +5,14 @@ export const MainLayout = () => {
     <div className="main-layout">
       <header className="main-header">
         <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <h2>TraceCap</h2>
+          <h2>TracePcap</h2>
         </Link>
       </header>
       <main className="main-content">
         <Outlet />
       </main>
       <footer className="main-footer">
-        <p>&copy; 2026 TraceCap. PCAP Analysis Tool.</p>
+        <p>&copy; 2026 TracePcap. PCAP Analysis Tool.</p>
       </footer>
     </div>
   )

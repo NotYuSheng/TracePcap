@@ -12,10 +12,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.tracecap</groupId>
-    <artifactId>tracecap-backend</artifactId>
+    <groupId>com.tracepcap</groupId>
+    <artifactId>tracepcap-backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>TraceCap Backend</name>
+    <name>TracePcap Backend</name>
     <description>PCAP file analysis and visualization backend</description>
 
     <properties>

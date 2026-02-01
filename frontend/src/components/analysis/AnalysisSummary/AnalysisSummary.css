@@ -27,13 +27,13 @@
 }
 
 .summary-card:hover {
-  border-color: var(--tracecap-primary);
+  border-color: var(--tracepcap-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .card-icon {
   font-size: 2rem;
-  color: var(--tracecap-primary);
+  color: var(--tracepcap-primary);
   min-width: 2rem;
 }
 

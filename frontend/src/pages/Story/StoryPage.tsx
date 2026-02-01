@@ -16,7 +16,6 @@ interface AnalysisOutletContext {
 export const StoryPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>()
   const [story, setStory] = useState<Story | null>(null)
-  const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

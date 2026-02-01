@@ -12,7 +12,7 @@ interface FileUploadZoneProps {
 export const FileUploadZone = ({
   onFileSelect,
   disabled = false,
-  maxSize = 100 * 1024 * 1024, // 100MB default
+  maxSize = 500 * 1024 * 1024, // 500MB default
   acceptedFileTypes = ['.pcap', '.pcapng', '.cap'],
 }: FileUploadZoneProps) => {
   const onDrop = useCallback(
