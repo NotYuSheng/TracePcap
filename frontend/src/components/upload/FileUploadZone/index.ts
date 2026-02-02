@@ -1,1 +1,1 @@
-export { FileUploadZone } from './FileUploadZone'
+export { FileUploadZone } from './FileUploadZone';

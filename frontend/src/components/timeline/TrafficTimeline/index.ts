@@ -1,1 +1,1 @@
-export { TrafficTimeline } from './TrafficTimeline'
+export { TrafficTimeline } from './TrafficTimeline';

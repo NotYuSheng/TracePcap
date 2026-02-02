@@ -1,9 +1,9 @@
-import { apiClient } from '@/services/api/client'
-import { API_ENDPOINTS } from '@/services/api/endpoints'
-import type { AnalysisSummary, ProtocolStats, FiveWsAnalysis, KillChainPhase } from '@/types'
-import { generateMockAnalysis, mockAnalysisSummary } from '@/mocks/mockAnalysisData'
+import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
+import type { AnalysisSummary, ProtocolStats, FiveWsAnalysis, KillChainPhase } from '@/types';
+import { generateMockAnalysis, mockAnalysisSummary } from '@/mocks/mockAnalysisData';
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 export const analysisService = {
   /**
@@ -14,23 +14,23 @@ export const analysisService = {
   getAnalysisSummary: async (fileId: string): Promise<AnalysisSummary> => {
     if (USE_MOCK) {
       // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 800))
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       // Return mock data (you can customize based on fileId if needed)
-      return generateMockAnalysis(fileId, 'free5gc.pcap')
+      return generateMockAnalysis(fileId, 'free5gc.pcap');
     }
 
     // Fetch analysis summary (now includes all data we need)
-    const summaryRes = await apiClient.get(API_ENDPOINTS.ANALYSIS_SUMMARY(fileId))
-    const summary = summaryRes.data
+    const summaryRes = await apiClient.get(API_ENDPOINTS.ANALYSIS_SUMMARY(fileId));
+    const summary = summaryRes.data;
 
     // Transform backend response to frontend format
     // Backend already returns Unix timestamps in milliseconds
-    const startTime = summary.timeRange?.[0] || Date.now()
-    const endTime = summary.timeRange?.[1] || Date.now()
+    const startTime = summary.timeRange?.[0] || Date.now();
+    const endTime = summary.timeRange?.[1] || Date.now();
 
     // Use protocol distribution from summary (already in the correct format)
-    const protocolDistribution = summary.protocolDistribution || []
+    const protocolDistribution = summary.protocolDistribution || [];
 
     // Use top conversations from summary (already provided by backend)
     const topConversations = (summary.topConversations || []).map((conv: any) => ({
@@ -44,14 +44,14 @@ export const analysisService = {
       totalBytes: conv.totalBytes || 0,
       startTime: conv.startTime || startTime,
       endTime: conv.endTime || endTime,
-    }))
+    }));
 
     // Use unique hosts from summary (already provided by backend)
     const uniqueHosts = (summary.uniqueHosts || []).map((host: any) => ({
       ip: host.ip,
       port: host.port || 0,
       hostname: host.hostname,
-    }))
+    }));
 
     return {
       fileId: summary.fileId,
@@ -63,7 +63,7 @@ export const analysisService = {
       protocolDistribution,
       topConversations,
       uniqueHosts,
-    }
+    };
   },
 
   /**
@@ -73,14 +73,12 @@ export const analysisService = {
    */
   getProtocolStats: async (fileId: string): Promise<ProtocolStats[]> => {
     if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      return mockAnalysisSummary.protocolDistribution
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return mockAnalysisSummary.protocolDistribution;
     }
 
-    const response = await apiClient.get<ProtocolStats[]>(
-      API_ENDPOINTS.PROTOCOL_STATS(fileId)
-    )
-    return response.data
+    const response = await apiClient.get<ProtocolStats[]>(API_ENDPOINTS.PROTOCOL_STATS(fileId));
+    return response.data;
   },
 
   /**
@@ -90,12 +88,12 @@ export const analysisService = {
    */
   getFiveWs: async (fileId: string): Promise<FiveWsAnalysis> => {
     if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      return mockAnalysisSummary.fiveWs!
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return mockAnalysisSummary.fiveWs!;
     }
 
-    const response = await apiClient.get<FiveWsAnalysis>(API_ENDPOINTS.FIVE_WS(fileId))
-    return response.data
+    const response = await apiClient.get<FiveWsAnalysis>(API_ENDPOINTS.FIVE_WS(fileId));
+    return response.data;
   },
 
   /**
@@ -105,14 +103,12 @@ export const analysisService = {
    */
   getKillChain: async (fileId: string): Promise<KillChainPhase[]> => {
     if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 500));
       // Return empty array for now (can add mock kill chain data later)
-      return []
+      return [];
     }
 
-    const response = await apiClient.get<KillChainPhase[]>(
-      API_ENDPOINTS.KILL_CHAIN(fileId)
-    )
-    return response.data
+    const response = await apiClient.get<KillChainPhase[]>(API_ENDPOINTS.KILL_CHAIN(fileId));
+    return response.data;
   },
-}
+};

@@ -1,1 +1,1 @@
-export { FilterGeneratorPage } from './FilterGeneratorPage'
+export { FilterGeneratorPage } from './FilterGeneratorPage';

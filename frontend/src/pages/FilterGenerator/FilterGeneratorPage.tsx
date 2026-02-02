@@ -1,163 +1,181 @@
-import { useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import type { AnalysisData, Packet } from '@/types'
-import { filterService } from '@/features/filter/services/filterService'
-import { Pagination } from '@components/common/Pagination'
+import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import type { AnalysisData, Packet } from '@/types';
+import { filterService } from '@/features/filter/services/filterService';
+import { Pagination } from '@components/common/Pagination';
 
 interface AnalysisOutletContext {
-  data: AnalysisData
-  fileId: string
+  data: AnalysisData;
+  fileId: string;
 }
 
 export const FilterGeneratorPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>()
-  const [query, setQuery] = useState('')
-  const [generatedFilter, setGeneratedFilter] = useState('')
-  const [editableFilter, setEditableFilter] = useState('')
-  const [explanation, setExplanation] = useState('')
-  const [confidence, setConfidence] = useState<number | null>(null)
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [packets, setPackets] = useState<Packet[]>([])
-  const [totalMatches, setTotalMatches] = useState<number>(0)
-  const [executionTime, setExecutionTime] = useState<number | null>(null)
-  const [generating, setGenerating] = useState(false)
-  const [executing, setExecuting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedPacket, setSelectedPacket] = useState<Packet | null>(null)
-  const [showCheatSheet, setShowCheatSheet] = useState(false)
+  const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const [query, setQuery] = useState('');
+  const [generatedFilter, setGeneratedFilter] = useState('');
+  const [editableFilter, setEditableFilter] = useState('');
+  const [explanation, setExplanation] = useState('');
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [packets, setPackets] = useState<Packet[]>([]);
+  const [totalMatches, setTotalMatches] = useState<number>(0);
+  const [executionTime, setExecutionTime] = useState<number | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [executing, setExecuting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPacket, setSelectedPacket] = useState<Packet | null>(null);
+  const [showCheatSheet, setShowCheatSheet] = useState(false);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(25)
-  const [totalPages, setTotalPages] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(25);
+  const [totalPages, setTotalPages] = useState(0);
 
   const validateFilter = (filter: string): { valid: boolean; message?: string } => {
-    const trimmed = filter.trim()
+    const trimmed = filter.trim();
 
     // Check if filter is empty
     if (!trimmed) {
       return {
         valid: false,
-        message: 'The AI generated an empty filter. This usually means the LLM service is not responding correctly or your query was too vague. Try a more specific query like "HTTP traffic" or "DNS queries".'
-      }
+        message:
+          'The AI generated an empty filter. This usually means the LLM service is not responding correctly or your query was too vague. Try a more specific query like "HTTP traffic" or "DNS queries".',
+      };
     }
 
     // Check for common invalid patterns
     if (trimmed.includes('undefined') || trimmed.includes('null')) {
       return {
         valid: false,
-        message: 'The AI generated an incomplete filter. The LLM service may not be configured properly.'
-      }
+        message:
+          'The AI generated an incomplete filter. The LLM service may not be configured properly.',
+      };
     }
 
     // Check minimum length
     if (trimmed.length < 2) {
       return {
         valid: false,
-        message: 'The generated filter is too short to be valid. Try rephrasing your query.'
-      }
+        message: 'The generated filter is too short to be valid. Try rephrasing your query.',
+      };
     }
 
-    return { valid: true }
-  }
+    return { valid: true };
+  };
 
   const handleGenerateFilter = async () => {
     if (!query.trim()) {
-      setError('Please enter a query')
-      return
+      setError('Please enter a query');
+      return;
     }
 
     try {
-      setGenerating(true)
-      setError(null)
-      const result = await filterService.generateFilter(fileId, query)
+      setGenerating(true);
+      setError(null);
+      const result = await filterService.generateFilter(fileId, query);
 
       // Validate the generated filter
-      const validation = validateFilter(result.filter)
+      const validation = validateFilter(result.filter);
       if (!validation.valid) {
-        setError(`❌ Invalid Filter Generated: ${validation.message}`)
-        setGeneratedFilter('')
-        setEditableFilter('')
-        return
+        setError(`❌ Invalid Filter Generated: ${validation.message}`);
+        setGeneratedFilter('');
+        setEditableFilter('');
+        return;
       }
 
-      setGeneratedFilter(result.filter)
-      setEditableFilter(result.filter)
-      setExplanation(result.explanation)
-      setConfidence(result.confidence)
-      setSuggestions(result.suggestions || [])
+      setGeneratedFilter(result.filter);
+      setEditableFilter(result.filter);
+      setExplanation(result.explanation);
+      setConfidence(result.confidence);
+      setSuggestions(result.suggestions || []);
       // Clear previous packet results when generating new filter
-      setPackets([])
-      setTotalMatches(0)
-      setExecutionTime(null)
+      setPackets([]);
+      setTotalMatches(0);
+      setExecutionTime(null);
     } catch (err) {
       // Provide helpful error message for common issues
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      if (errorMsg.includes('500') || errorMsg.includes('LLM') || errorMsg.includes('Failed to generate')) {
-        setError('🔴 LLM Service Unavailable: The AI service at http://100.64.0.1:1234 is not responding. Please start LM Studio or another OpenAI-compatible LLM server, then try again.')
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      if (
+        errorMsg.includes('500') ||
+        errorMsg.includes('LLM') ||
+        errorMsg.includes('Failed to generate')
+      ) {
+        setError(
+          '🔴 LLM Service Unavailable: The AI service at http://100.64.0.1:1234 is not responding. Please start LM Studio or another OpenAI-compatible LLM server, then try again.'
+        );
       } else if (errorMsg.includes('timeout') || errorMsg.includes('ECONNREFUSED')) {
-        setError('🔴 Connection Failed: Cannot reach the LLM service. Make sure it\'s running on http://100.64.0.1:1234')
+        setError(
+          "🔴 Connection Failed: Cannot reach the LLM service. Make sure it's running on http://100.64.0.1:1234"
+        );
       } else {
-        setError(`❌ Error: ${errorMsg || 'Failed to generate filter'}`)
+        setError(`❌ Error: ${errorMsg || 'Failed to generate filter'}`);
       }
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
-  }
+  };
 
   const handleExecuteFilter = async (page: number = currentPage) => {
     if (!editableFilter.trim()) {
-      setError('Please generate or enter a filter first')
-      return
+      setError('Please generate or enter a filter first');
+      return;
     }
 
     try {
-      setExecuting(true)
-      setError(null)
-      const result = await filterService.executeFilter(fileId, editableFilter, page, pageSize)
-      setPackets(result.packets)
-      setTotalMatches(result.totalMatches)
-      setExecutionTime(result.executionTime)
-      setTotalPages(result.totalPages || 0)
-      setCurrentPage(page)
+      setExecuting(true);
+      setError(null);
+      const result = await filterService.executeFilter(fileId, editableFilter, page, pageSize);
+      setPackets(result.packets);
+      setTotalMatches(result.totalMatches);
+      setExecutionTime(result.executionTime);
+      setTotalPages(result.totalPages || 0);
+      setCurrentPage(page);
     } catch (err) {
       // Provide specific error message based on the error type
-      const errorMsg = err instanceof Error ? err.message : String(err)
+      const errorMsg = err instanceof Error ? err.message : String(err);
 
-      if (errorMsg.includes('syntax error') || errorMsg.includes('BPF') || errorMsg.includes('parse filter')) {
-        setError(`❌ Invalid BPF Syntax: The filter "${editableFilter}" is not valid BPF syntax. Common valid filters: "tcp port 80", "udp port 53", "host 192.168.1.1", "icmp". Check the BPF Cheat Sheet for help.`)
+      if (
+        errorMsg.includes('syntax error') ||
+        errorMsg.includes('BPF') ||
+        errorMsg.includes('parse filter')
+      ) {
+        setError(
+          `❌ Invalid BPF Syntax: The filter "${editableFilter}" is not valid BPF syntax. Common valid filters: "tcp port 80", "udp port 53", "host 192.168.1.1", "icmp". Check the BPF Cheat Sheet for help.`
+        );
       } else if (errorMsg.includes('500')) {
-        setError('🔴 Server Error: The backend encountered an error while executing the filter. This might be due to invalid syntax or a server issue.')
+        setError(
+          '🔴 Server Error: The backend encountered an error while executing the filter. This might be due to invalid syntax or a server issue.'
+        );
       } else if (errorMsg.includes('404')) {
-        setError('❌ File Not Found: The PCAP file could not be found. It may have been deleted.')
+        setError('❌ File Not Found: The PCAP file could not be found. It may have been deleted.');
       } else {
-        setError(`❌ Execution Failed: ${errorMsg || 'Unknown error occurred'}`)
+        setError(`❌ Execution Failed: ${errorMsg || 'Unknown error occurred'}`);
       }
     } finally {
-      setExecuting(false)
+      setExecuting(false);
     }
-  }
+  };
 
   const handlePageChange = (page: number) => {
-    handleExecuteFilter(page)
-  }
+    handleExecuteFilter(page);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && e.ctrlKey) {
-      e.preventDefault()
-      handleGenerateFilter()
+      e.preventDefault();
+      handleGenerateFilter();
     }
-  }
+  };
 
   const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString()
-  }
+    return new Date(timestamp).toLocaleString();
+  };
 
   const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-  }
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   return (
     <div className="filter-generator-page">
@@ -190,7 +208,7 @@ export const FilterGeneratorPage = () => {
                   rows={3}
                   placeholder="Examples:&#10;- Show me all HTTP traffic&#10;- Find DNS queries&#10;- Traffic from 192.168.1.1&#10;- SSH connections"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={e => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   disabled={generating}
                 />
@@ -228,7 +246,9 @@ export const FilterGeneratorPage = () => {
                   <i className="bi bi-funnel me-2"></i>
                   Generated Filter
                   {confidence !== null && (
-                    <span className={`badge ms-2 ${confidence > 0.8 ? 'bg-success' : confidence > 0.6 ? 'bg-warning' : 'bg-secondary'}`}>
+                    <span
+                      className={`badge ms-2 ${confidence > 0.8 ? 'bg-success' : confidence > 0.6 ? 'bg-warning' : 'bg-secondary'}`}
+                    >
                       {(confidence * 100).toFixed(0)}% confidence
                     </span>
                   )}
@@ -252,7 +272,7 @@ export const FilterGeneratorPage = () => {
                     id="filter"
                     className="form-control font-monospace"
                     value={editableFilter}
-                    onChange={(e) => setEditableFilter(e.target.value)}
+                    onChange={e => setEditableFilter(e.target.value)}
                     disabled={executing}
                   />
                 </div>
@@ -291,10 +311,7 @@ export const FilterGeneratorPage = () => {
                       </>
                     )}
                   </button>
-                  <button
-                    className="btn btn-outline-info"
-                    onClick={() => setShowCheatSheet(true)}
-                  >
+                  <button className="btn btn-outline-info" onClick={() => setShowCheatSheet(true)}>
                     <i className="bi bi-file-earmark-text me-2"></i>
                     BPF Cheat Sheet
                   </button>
@@ -333,7 +350,9 @@ export const FilterGeneratorPage = () => {
                 No Matching Packets Found
               </h5>
               <p className="mb-2">
-                The filter <code className="text-dark bg-light px-2 py-1 rounded">{editableFilter}</code> is valid but didn't match any packets in this PCAP file.
+                The filter{' '}
+                <code className="text-dark bg-light px-2 py-1 rounded">{editableFilter}</code> is
+                valid but didn't match any packets in this PCAP file.
               </p>
               <hr />
               <p className="mb-0">
@@ -342,7 +361,9 @@ export const FilterGeneratorPage = () => {
               <ul className="mb-0">
                 <li>Try a broader filter (e.g., just "tcp" or "udp")</li>
                 <li>Check if the PCAP file contains the type of traffic you're looking for</li>
-                <li>Modify the port numbers, IP addresses, or protocol if they don't match the capture</li>
+                <li>
+                  Modify the port numbers, IP addresses, or protocol if they don't match the capture
+                </li>
                 <li>Generate a new filter with a different query</li>
               </ul>
               {executionTime !== null && (
@@ -367,13 +388,9 @@ export const FilterGeneratorPage = () => {
                     Matching Packets
                   </h5>
                   <div>
-                    <span className="badge bg-primary me-2">
-                      {totalMatches} matches
-                    </span>
+                    <span className="badge bg-primary me-2">{totalMatches} matches</span>
                     {executionTime !== null && (
-                      <span className="badge bg-secondary">
-                        {executionTime}ms
-                      </span>
+                      <span className="badge bg-secondary">{executionTime}ms</span>
                     )}
                   </div>
                 </div>
@@ -393,7 +410,7 @@ export const FilterGeneratorPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {packets.map((packet) => (
+                      {packets.map(packet => (
                         <tr
                           key={packet.id}
                           className={selectedPacket?.id === packet.id ? 'table-active' : ''}
@@ -408,9 +425,7 @@ export const FilterGeneratorPage = () => {
                             {packet.destination.ip}:{packet.destination.port}
                           </td>
                           <td>
-                            <span className="badge bg-info">
-                              {packet.protocol.name}
-                            </span>
+                            <span className="badge bg-info">{packet.protocol.name}</span>
                           </td>
                           <td>{formatBytes(packet.size)}</td>
                           <td>
@@ -454,7 +469,11 @@ export const FilterGeneratorPage = () => {
 
       {/* Packet Details Modal */}
       {selectedPacket && (
-        <div className="modal show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        >
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
@@ -473,7 +492,9 @@ export const FilterGeneratorPage = () => {
                   </div>
                   <div className="col-md-6">
                     <strong>Protocol:</strong>
-                    <p>{selectedPacket.protocol.name} ({selectedPacket.protocol.layer})</p>
+                    <p>
+                      {selectedPacket.protocol.name} ({selectedPacket.protocol.layer})
+                    </p>
                   </div>
                 </div>
                 <div className="row mb-3">
@@ -482,7 +503,10 @@ export const FilterGeneratorPage = () => {
                     <p className="font-monospace">
                       {selectedPacket.source.ip}:{selectedPacket.source.port}
                       {selectedPacket.source.hostname && (
-                        <><br /><small className="text-muted">{selectedPacket.source.hostname}</small></>
+                        <>
+                          <br />
+                          <small className="text-muted">{selectedPacket.source.hostname}</small>
+                        </>
                       )}
                     </p>
                   </div>
@@ -491,7 +515,12 @@ export const FilterGeneratorPage = () => {
                     <p className="font-monospace">
                       {selectedPacket.destination.ip}:{selectedPacket.destination.port}
                       {selectedPacket.destination.hostname && (
-                        <><br /><small className="text-muted">{selectedPacket.destination.hostname}</small></>
+                        <>
+                          <br />
+                          <small className="text-muted">
+                            {selectedPacket.destination.hostname}
+                          </small>
+                        </>
                       )}
                     </p>
                   </div>
@@ -515,7 +544,10 @@ export const FilterGeneratorPage = () => {
                 <div className="row">
                   <div className="col-12">
                     <strong>Payload:</strong>
-                    <pre className="bg-light p-3 rounded mt-2 font-monospace small" style={{ maxHeight: '300px', overflow: 'auto' }}>
+                    <pre
+                      className="bg-light p-3 rounded mt-2 font-monospace small"
+                      style={{ maxHeight: '300px', overflow: 'auto' }}
+                    >
                       {selectedPacket.payload || 'No payload data'}
                     </pre>
                   </div>
@@ -537,7 +569,11 @@ export const FilterGeneratorPage = () => {
 
       {/* Cheat Sheet Modal */}
       {showCheatSheet && (
-        <div className="modal show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        >
           <div className="modal-dialog modal-xl">
             <div className="modal-content">
               <div className="modal-header">
@@ -582,7 +618,6 @@ export const FilterGeneratorPage = () => {
           </div>
         </div>
       )}
-
     </div>
-  )
-}
+  );
+};

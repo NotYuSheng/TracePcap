@@ -1,4 +1,4 @@
-import type { Story } from '@/types'
+import type { Story } from '@/types';
 
 export const mockStory: Story = {
   id: 'story-1',
@@ -55,8 +55,7 @@ export const mockStory: Story = {
       id: 'highlight-1',
       type: 'anomaly',
       title: 'Port Scanning Detected',
-      description:
-        'Sequential port scan detected from client device targeting internal gateway',
+      description: 'Sequential port scan detected from client device targeting internal gateway',
       timestamp: Date.now() - 2000000,
     },
     {
@@ -125,7 +124,7 @@ export const mockStory: Story = {
       relatedData: { conversations: ['conv-1', 'conv-3'] },
     },
   ],
-}
+};
 
 export const generateMockStory = (fileId: string): Story => {
   return {
@@ -133,5 +132,5 @@ export const generateMockStory = (fileId: string): Story => {
     id: `story-${Date.now()}`,
     fileId,
     generatedAt: Date.now(),
-  }
-}
+  };
+};

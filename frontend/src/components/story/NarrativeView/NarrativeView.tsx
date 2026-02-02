@@ -1,7 +1,7 @@
-import type { NarrativeSection } from '@/types'
+import type { NarrativeSection } from '@/types';
 
 interface NarrativeViewProps {
-  sections: NarrativeSection[]
+  sections: NarrativeSection[];
 }
 
 export const NarrativeView = ({ sections }: NarrativeViewProps) => {
@@ -11,9 +11,9 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
       detail: 'bi-info-circle',
       anomaly: 'bi-exclamation-triangle',
       conclusion: 'bi-check-circle',
-    }
-    return icons[type] || 'bi-file-text'
-  }
+    };
+    return icons[type] || 'bi-file-text';
+  };
 
   const getSectionClass = (type: string) => {
     const classes: Record<string, string> = {
@@ -21,9 +21,9 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
       detail: 'border-info',
       anomaly: 'border-warning',
       conclusion: 'border-success',
-    }
-    return classes[type] || 'border-secondary'
-  }
+    };
+    return classes[type] || 'border-secondary';
+  };
 
   return (
     <div className="narrative-view">
@@ -45,9 +45,7 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
                 <small className="text-muted">
                   <strong>Related Data:</strong>
                   {section.relatedData.hosts && (
-                    <span className="ms-2">
-                      Hosts: {section.relatedData.hosts.join(', ')}
-                    </span>
+                    <span className="ms-2">Hosts: {section.relatedData.hosts.join(', ')}</span>
                   )}
                   {section.relatedData.conversations && (
                     <span className="ms-2">
@@ -55,9 +53,7 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
                     </span>
                   )}
                   {section.relatedData.packets && (
-                    <span className="ms-2">
-                      Packets: {section.relatedData.packets.length}
-                    </span>
+                    <span className="ms-2">Packets: {section.relatedData.packets.length}</span>
                   )}
                 </small>
               </div>
@@ -66,5 +62,5 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
         </div>
       ))}
     </div>
-  )
-}
+  );
+};

@@ -1,13 +1,15 @@
-import { Row, Col } from '@govtechsg/sgds-react'
-import { FileUploadZone } from '@components/upload/FileUploadZone'
-import { FileList } from '@components/upload/FileList'
-import { useFileUpload } from '@features/upload/hooks/useFileUpload'
+import { Row, Col } from '@govtechsg/sgds-react';
+import { FileUploadZone } from '@components/upload/FileUploadZone';
+import { FileList } from '@components/upload/FileList';
+import { useFileUpload } from '@features/upload/hooks/useFileUpload';
 
 export const UploadPage = () => {
-  const { uploadFile, isUploading } = useFileUpload()
+  const { uploadFile, isUploading } = useFileUpload();
 
-  const maxSize = parseInt(import.meta.env.VITE_MAX_UPLOAD_SIZE || '100000000')
-  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(',')
+  const maxSize = parseInt(import.meta.env.VITE_MAX_UPLOAD_SIZE || '100000000');
+  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(
+    ','
+  );
 
   return (
     <div className="upload-page">
@@ -35,5 +37,5 @@ export const UploadPage = () => {
         </Col>
       </Row>
     </div>
-  )
-}
+  );
+};

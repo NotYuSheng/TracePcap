@@ -1,1 +1,1 @@
-export { StoryTimeline } from './StoryTimeline'
+export { StoryTimeline } from './StoryTimeline';

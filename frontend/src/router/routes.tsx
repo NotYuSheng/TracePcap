@@ -1,13 +1,13 @@
-import { createBrowserRouter } from 'react-router-dom'
-import { MainLayout } from '@components/common/Layout'
-import { UploadPage } from '@pages/Upload'
-import { AnalysisPage } from '@pages/Analysis'
-import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview'
-import { ConversationPage } from '@pages/Conversation'
-import { StoryPage } from '@pages/Story'
-import { FilterGeneratorPage } from '@pages/FilterGenerator'
-import { NetworkDiagramPage } from '@pages/NetworkDiagram'
-import { NotFoundPage } from '@pages/NotFound'
+import { createBrowserRouter } from 'react-router-dom';
+import { MainLayout } from '@components/common/Layout';
+import { UploadPage } from '@pages/Upload';
+import { AnalysisPage } from '@pages/Analysis';
+import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
+import { ConversationPage } from '@pages/Conversation';
+import { StoryPage } from '@pages/Story';
+import { FilterGeneratorPage } from '@pages/FilterGenerator';
+import { NetworkDiagramPage } from '@pages/NetworkDiagram';
+import { NotFoundPage } from '@pages/NotFound';
 
 export const router = createBrowserRouter([
   {
@@ -50,4 +50,4 @@ export const router = createBrowserRouter([
       },
     ],
   },
-])
+]);

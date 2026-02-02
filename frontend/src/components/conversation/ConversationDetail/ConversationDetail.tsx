@@ -1,26 +1,26 @@
-import type { Conversation, Packet } from '@/types'
-import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters'
+import type { Conversation, Packet } from '@/types';
+import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 
 interface ConversationDetailProps {
-  conversation: Conversation
+  conversation: Conversation;
 }
 
 export const ConversationDetail = ({ conversation }: ConversationDetailProps) => {
-  const [source, destination] = conversation.endpoints
+  const [source, destination] = conversation.endpoints;
 
   const getDirectionIndicator = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
-      return '→' // Outgoing from source
+      return '→'; // Outgoing from source
     }
-    return '←' // Incoming to source
-  }
+    return '←'; // Incoming to source
+  };
 
   const getDirectionClass = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
-      return 'text-primary' // Outgoing
+      return 'text-primary'; // Outgoing
     }
-    return 'text-success' // Incoming
-  }
+    return 'text-success'; // Incoming
+  };
 
   return (
     <div className="conversation-detail">
@@ -33,13 +33,9 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
             <div className="col-md-6">
               <dl className="row mb-0">
                 <dt className="col-sm-4">Source:</dt>
-                <dd className="col-sm-8">
-                  {formatIpPort(source.ip, source.port)}
-                </dd>
+                <dd className="col-sm-8">{formatIpPort(source.ip, source.port)}</dd>
                 <dt className="col-sm-4">Destination:</dt>
-                <dd className="col-sm-8">
-                  {formatIpPort(destination.ip, destination.port)}
-                </dd>
+                <dd className="col-sm-8">{formatIpPort(destination.ip, destination.port)}</dd>
                 <dt className="col-sm-4">Protocol:</dt>
                 <dd className="col-sm-8">
                   <span className="badge bg-primary">{conversation.protocol.name}</span>
@@ -95,7 +91,9 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                         <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
                       </td>
                       <td>
-                        <small>{formatIpPort(packet.destination.ip, packet.destination.port)}</small>
+                        <small>
+                          {formatIpPort(packet.destination.ip, packet.destination.port)}
+                        </small>
                       </td>
                       <td>{packet.size} B</td>
                       <td>
@@ -116,5 +114,5 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

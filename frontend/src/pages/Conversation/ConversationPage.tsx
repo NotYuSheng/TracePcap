@@ -1,81 +1,81 @@
-import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import type { AnalysisData, Conversation } from '@/types'
-import { conversationService } from '@/features/conversation/services/conversationService'
-import { ConversationList } from '@components/conversation/ConversationList'
-import { ConversationDetail } from '@components/conversation/ConversationDetail'
-import { LoadingSpinner } from '@components/common/LoadingSpinner'
-import { ErrorMessage } from '@components/common/ErrorMessage'
-import { Pagination } from '@components/common/Pagination'
+import { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import type { AnalysisData, Conversation } from '@/types';
+import { conversationService } from '@/features/conversation/services/conversationService';
+import { ConversationList } from '@components/conversation/ConversationList';
+import { ConversationDetail } from '@components/conversation/ConversationDetail';
+import { LoadingSpinner } from '@components/common/LoadingSpinner';
+import { ErrorMessage } from '@components/common/ErrorMessage';
+import { Pagination } from '@components/common/Pagination';
 
 interface AnalysisOutletContext {
-  data: AnalysisData
-  fileId: string
+  data: AnalysisData;
+  fileId: string;
 }
 
 export const ConversationPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>()
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(25)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(25);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        setLoading(true)
-        setError(null)
-        const response = await conversationService.getConversations(fileId, currentPage, pageSize)
-        setConversations(response.data)
-        setTotalItems(response.total)
-        setTotalPages(response.totalPages)
+        setLoading(true);
+        setError(null);
+        const response = await conversationService.getConversations(fileId, currentPage, pageSize);
+        setConversations(response.data);
+        setTotalItems(response.total);
+        setTotalPages(response.totalPages);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load conversations')
+        setError(err instanceof Error ? err.message : 'Failed to load conversations');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
     if (fileId) {
-      fetchConversations()
+      fetchConversations();
     }
-  }, [fileId, currentPage, pageSize])
+  }, [fileId, currentPage, pageSize]);
 
   const handleSelectConversation = async (conversation: Conversation) => {
     try {
       // If conversation already has packets, use it directly
       if (conversation.packets && conversation.packets.length > 0) {
-        setSelectedConversation(conversation)
+        setSelectedConversation(conversation);
       } else {
         // Otherwise fetch full conversation details
-        const fullConversation = await conversationService.getConversationDetail(conversation.id)
-        setSelectedConversation(fullConversation)
+        const fullConversation = await conversationService.getConversationDetail(conversation.id);
+        setSelectedConversation(fullConversation);
       }
     } catch (err) {
-      console.error('Failed to load conversation details:', err)
+      console.error('Failed to load conversation details:', err);
       // Fallback to showing basic conversation info
-      setSelectedConversation(conversation)
+      setSelectedConversation(conversation);
     }
-  }
+  };
 
   if (loading) {
-    return <LoadingSpinner size="large" message="Loading conversations..." />
+    return <LoadingSpinner size="large" message="Loading conversations..." />;
   }
 
   if (error) {
-    return <ErrorMessage title="Failed to Load Conversations" message={error} />
+    return <ErrorMessage title="Failed to Load Conversations" message={error} />;
   }
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    setSelectedConversation(null) // Clear selection when changing pages
-  }
+    setCurrentPage(page);
+    setSelectedConversation(null); // Clear selection when changing pages
+  };
 
   return (
     <div className="conversation-page">
@@ -120,5 +120,5 @@ export const ConversationPage = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};

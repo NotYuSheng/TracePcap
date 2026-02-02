@@ -1,91 +1,72 @@
-import { useState, useMemo } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import type { AnalysisData } from '@/types'
-import type { GraphNode } from '@/features/network/types'
-import { useNetworkData } from '@/features/network/hooks/useNetworkData'
-import { NetworkGraph } from '@components/network/NetworkGraph'
-import { NetworkControls } from '@components/network/NetworkControls'
-import { NodeDetails } from '@components/network/NodeDetails'
-import { LoadingSpinner } from '@components/common/LoadingSpinner'
-import { ErrorMessage } from '@components/common/ErrorMessage'
+import { useState, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import type { AnalysisData } from '@/types';
+import type { GraphNode } from '@/features/network/types';
+import { useNetworkData } from '@/features/network/hooks/useNetworkData';
+import { NetworkGraph } from '@components/network/NetworkGraph';
+import { NetworkControls } from '@components/network/NetworkControls';
+import { NodeDetails } from '@components/network/NodeDetails';
+import { LoadingSpinner } from '@components/common/LoadingSpinner';
+import { ErrorMessage } from '@components/common/ErrorMessage';
 
 interface AnalysisOutletContext {
-  data: AnalysisData
-  fileId: string
+  data: AnalysisData;
+  fileId: string;
 }
 
 export const NetworkDiagramPage = () => {
-  const { fileId, data } = useOutletContext<AnalysisOutletContext>()
-  const { nodes, edges, stats, loading, error, refetch } = useNetworkData(
-    fileId,
-    data
-  )
+  const { fileId, data } = useOutletContext<AnalysisOutletContext>();
+  const { nodes, edges, stats, loading, error, refetch } = useNetworkData(fileId, data);
 
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [selectedProtocols, setSelectedProtocols] = useState<string[]>([])
-  const [layoutType, setLayoutType] = useState<
-    'forceDirected2d' | 'hierarchicalTd'
-  >('forceDirected2d')
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [selectedProtocols, setSelectedProtocols] = useState<string[]>([]);
+  const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
+    'forceDirected2d'
+  );
 
   // Initialize protocol filter with all protocols
   useMemo(() => {
     if (stats.protocolBreakdown && selectedProtocols.length === 0) {
-      setSelectedProtocols(Object.keys(stats.protocolBreakdown))
+      setSelectedProtocols(Object.keys(stats.protocolBreakdown));
     }
-  }, [stats.protocolBreakdown])
+  }, [stats.protocolBreakdown]);
 
   // Filter nodes and edges based on selected protocols
   const { filteredNodes, filteredEdges } = useMemo(() => {
     if (selectedProtocols.length === 0) {
-      return { filteredNodes: nodes, filteredEdges: edges }
+      return { filteredNodes: nodes, filteredEdges: edges };
     }
 
     // Filter edges by protocol
-    const filteredEdges = edges.filter((edge) =>
-      selectedProtocols.includes(edge.data.protocol)
-    )
+    const filteredEdges = edges.filter(edge => selectedProtocols.includes(edge.data.protocol));
 
     // Get set of node IDs that have at least one visible edge
-    const visibleNodeIds = new Set<string>()
-    filteredEdges.forEach((edge) => {
-      visibleNodeIds.add(edge.source)
-      visibleNodeIds.add(edge.target)
-    })
+    const visibleNodeIds = new Set<string>();
+    filteredEdges.forEach(edge => {
+      visibleNodeIds.add(edge.source);
+      visibleNodeIds.add(edge.target);
+    });
 
     // Filter nodes to only show those with visible edges
-    const filteredNodes = nodes.filter((node) =>
-      visibleNodeIds.has(node.id)
-    )
+    const filteredNodes = nodes.filter(node => visibleNodeIds.has(node.id));
 
-    return { filteredNodes, filteredEdges }
-  }, [nodes, edges, selectedProtocols])
+    return { filteredNodes, filteredEdges };
+  }, [nodes, edges, selectedProtocols]);
 
   const handleNodeClick = (node: GraphNode) => {
-    setSelectedNode(node)
-  }
+    setSelectedNode(node);
+  };
 
   const handleCloseDetails = () => {
-    setSelectedNode(null)
-  }
+    setSelectedNode(null);
+  };
 
   if (loading) {
-    return (
-      <LoadingSpinner
-        size="large"
-        message="Building network topology..."
-        fullPage
-      />
-    )
+    return <LoadingSpinner size="large" message="Building network topology..." fullPage />;
   }
 
   if (error) {
-    return (
-      <ErrorMessage
-        title="Failed to Load Network Data"
-        message={error}
-        onRetry={refetch}
-      />
-    )
+    return <ErrorMessage title="Failed to Load Network Data" message={error} onRetry={refetch} />;
   }
 
   return (
@@ -104,8 +85,9 @@ export const NetworkDiagramPage = () => {
           {stats.isLimited && (
             <div className="alert alert-warning mt-2 mb-0">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>Performance Limit:</strong> Showing top {stats.displayedConversations} of {stats.totalConversations} conversations by packet count.
-              This prevents browser lag with large captures.
+              <strong>Performance Limit:</strong> Showing top {stats.displayedConversations} of{' '}
+              {stats.totalConversations} conversations by packet count. This prevents browser lag
+              with large captures.
             </div>
           )}
         </div>
@@ -136,15 +118,11 @@ export const NetworkDiagramPage = () => {
 
           {selectedNode && (
             <div className="mt-3">
-              <NodeDetails
-                node={selectedNode}
-                edges={edges}
-                onClose={handleCloseDetails}
-              />
+              <NodeDetails node={selectedNode} edges={edges} onClose={handleCloseDetails} />
             </div>
           )}
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

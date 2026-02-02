@@ -1,1 +1,1 @@
-export { ProtocolBreakdownChart } from './ProtocolBreakdownChart'
+export { ProtocolBreakdownChart } from './ProtocolBreakdownChart';

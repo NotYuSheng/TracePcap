@@ -1,1 +1,1 @@
-export { UploadPage } from './UploadPage'
+export { UploadPage } from './UploadPage';

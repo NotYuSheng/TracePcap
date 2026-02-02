@@ -1,9 +1,9 @@
 /* Import SGDS core styles */
-@import '@govtechsg/sgds/css/sgds.css';
-@import 'bootstrap-icons/font/bootstrap-icons.css';
+@import url('@govtechsg/sgds/css/sgds.css');
+@import url('bootstrap-icons/font/bootstrap-icons.css');
 
 /* Custom overrides */
-@import './sgds-overrides.css';
+@import url('./sgds-overrides.css');
 
 /* Base styles */
 :root {
@@ -23,7 +23,11 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;

@@ -1,15 +1,15 @@
-import { useOutletContext } from 'react-router-dom'
-import type { AnalysisData } from '@/types'
-import { AnalysisSummary } from '@components/analysis/AnalysisSummary'
-import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown'
+import { useOutletContext } from 'react-router-dom';
+import type { AnalysisData } from '@/types';
+import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
+import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
 
 interface AnalysisOutletContext {
-  data: AnalysisData
-  fileId: string
+  data: AnalysisData;
+  fileId: string;
 }
 
 export const AnalysisOverview = () => {
-  const { data } = useOutletContext<AnalysisOutletContext>()
+  const { data } = useOutletContext<AnalysisOutletContext>();
 
   return (
     <div className="analysis-overview">
@@ -21,5 +21,5 @@ export const AnalysisOverview = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};

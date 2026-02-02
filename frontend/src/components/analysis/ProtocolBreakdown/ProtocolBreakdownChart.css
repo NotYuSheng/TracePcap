@@ -19,7 +19,7 @@
   gap: 2rem;
 }
 
-@media (max-width: 992px) {
+@media (width <= 992px) {
   .breakdown-content {
     grid-template-columns: 1fr;
   }
@@ -70,5 +70,7 @@
   font-weight: 600;
   color: #212529;
   z-index: 1;
-  text-shadow: 0 0 2px white, 0 0 4px white;
+  text-shadow:
+    0 0 2px white,
+    0 0 4px white;
 }

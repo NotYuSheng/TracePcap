@@ -4,14 +4,14 @@
  * @returns Formatted string (e.g., "1.5 MB")
  */
 export const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B'
+  if (bytes === 0) return '0 B';
 
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
-}
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+};
 
 /**
  * Format duration in milliseconds to human-readable format
@@ -19,24 +19,24 @@ export const formatBytes = (bytes: number): string => {
  * @returns Formatted string (e.g., "2m 30s")
  */
 export const formatDuration = (ms: number): string => {
-  if (ms < 1000) return `${ms}ms`
+  if (ms < 1000) return `${ms}ms`;
 
-  const seconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
 
   if (hours > 0) {
-    const remainingMinutes = minutes % 60
-    return `${hours}h ${remainingMinutes}m`
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
   }
 
   if (minutes > 0) {
-    const remainingSeconds = seconds % 60
-    return `${minutes}m ${remainingSeconds}s`
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
   }
 
-  return `${seconds}s`
-}
+  return `${seconds}s`;
+};
 
 /**
  * Format timestamp to readable date/time
@@ -44,7 +44,7 @@ export const formatDuration = (ms: number): string => {
  * @returns Formatted string (e.g., "Jan 31, 2026 14:30:45")
  */
 export const formatTimestamp = (timestamp: number): string => {
-  const date = new Date(timestamp)
+  const date = new Date(timestamp);
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -52,8 +52,8 @@ export const formatTimestamp = (timestamp: number): string => {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-  })
-}
+  });
+};
 
 /**
  * Format timestamp to time only
@@ -61,13 +61,13 @@ export const formatTimestamp = (timestamp: number): string => {
  * @returns Formatted string (e.g., "14:30:45")
  */
 export const formatTime = (timestamp: number): string => {
-  const date = new Date(timestamp)
+  const date = new Date(timestamp);
   return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-  })
-}
+  });
+};
 
 /**
  * Format number with thousand separators
@@ -75,8 +75,8 @@ export const formatTime = (timestamp: number): string => {
  * @returns Formatted string (e.g., "125,432")
  */
 export const formatNumber = (num: number): string => {
-  return num.toLocaleString('en-US')
-}
+  return num.toLocaleString('en-US');
+};
 
 /**
  * Format file size from bytes
@@ -84,8 +84,8 @@ export const formatNumber = (num: number): string => {
  * @returns Formatted string
  */
 export const formatFileSize = (size: number): string => {
-  return formatBytes(size)
-}
+  return formatBytes(size);
+};
 
 /**
  * Format protocol name (uppercase)
@@ -93,8 +93,8 @@ export const formatFileSize = (size: number): string => {
  * @returns Uppercase protocol name
  */
 export const formatProtocol = (protocol: string): string => {
-  return protocol.toUpperCase()
-}
+  return protocol.toUpperCase();
+};
 
 /**
  * Format IP address with port
@@ -103,8 +103,8 @@ export const formatProtocol = (protocol: string): string => {
  * @returns Formatted string (e.g., "192.168.1.1:80")
  */
 export const formatIpPort = (ip: string, port?: number): string => {
-  return port ? `${ip}:${port}` : ip
-}
+  return port ? `${ip}:${port}` : ip;
+};
 
 /**
  * Format percentage
@@ -113,5 +113,5 @@ export const formatIpPort = (ip: string, port?: number): string => {
  * @returns Formatted string (e.g., "45.5%")
  */
 export const formatPercentage = (value: number, decimals: number = 1): string => {
-  return `${(value * 100).toFixed(decimals)}%`
-}
+  return `${(value * 100).toFixed(decimals)}%`;
+};

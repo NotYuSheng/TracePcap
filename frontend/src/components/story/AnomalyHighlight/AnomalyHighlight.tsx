@@ -1,8 +1,8 @@
-import type { Highlight } from '@/types'
-import { formatTimestamp } from '@/utils/formatters'
+import type { Highlight } from '@/types';
+import { formatTimestamp } from '@/utils/formatters';
 
 interface AnomalyHighlightProps {
-  highlights: Highlight[]
+  highlights: Highlight[];
 }
 
 export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
@@ -12,9 +12,9 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
       warning: 'alert-warning',
       insight: 'alert-info',
       info: 'alert-primary',
-    }
-    return classes[type] || 'alert-secondary'
-  }
+    };
+    return classes[type] || 'alert-secondary';
+  };
 
   const getHighlightIcon = (type: string) => {
     const icons: Record<string, string> = {
@@ -22,9 +22,9 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
       warning: 'bi-exclamation-triangle',
       insight: 'bi-lightbulb',
       info: 'bi-info-circle',
-    }
-    return icons[type] || 'bi-circle'
-  }
+    };
+    return icons[type] || 'bi-circle';
+  };
 
   const sortedHighlights = [...highlights].sort((a, b) => {
     // Sort by severity: anomaly > warning > insight > info
@@ -33,16 +33,20 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
       warning: 1,
       insight: 2,
       info: 3,
-    }
-    return (severityOrder[a.type] || 4) - (severityOrder[b.type] || 4)
-  })
+    };
+    return (severityOrder[a.type] || 4) - (severityOrder[b.type] || 4);
+  });
 
   return (
     <div className="anomaly-highlight">
       <h5 className="mb-3">Key Highlights</h5>
 
-      {sortedHighlights.map((highlight) => (
-        <div key={highlight.id} className={`alert ${getHighlightClass(highlight.type)} d-flex`} role="alert">
+      {sortedHighlights.map(highlight => (
+        <div
+          key={highlight.id}
+          className={`alert ${getHighlightClass(highlight.type)} d-flex`}
+          role="alert"
+        >
           <div className="flex-shrink-0 me-3">
             <i className={`bi ${getHighlightIcon(highlight.type)} fs-4`}></i>
           </div>
@@ -65,5 +69,5 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};

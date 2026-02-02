@@ -1,9 +1,9 @@
-import type { Conversation, Packet, Session } from '@/types'
+import type { Conversation, Packet, Session } from '@/types';
 
 // Mock packets for a conversation
 const generateMockPackets = (count: number, conversationId: string): Packet[] => {
-  const packets: Packet[] = []
-  const baseTime = Date.now() - 3600000
+  const packets: Packet[] = [];
+  const baseTime = Date.now() - 3600000;
 
   for (let i = 0; i < count; i++) {
     packets.push({
@@ -15,11 +15,11 @@ const generateMockPackets = (count: number, conversationId: string): Packet[] =>
       size: Math.floor(Math.random() * 1500) + 60,
       payload: btoa(`Mock payload data for packet ${i}`),
       flags: i % 2 === 0 ? ['ACK'] : ['PSH', 'ACK'],
-    })
+    });
   }
 
-  return packets
-}
+  return packets;
+};
 
 export const mockConversations: Conversation[] = [
   {
@@ -92,7 +92,7 @@ export const mockConversations: Conversation[] = [
     packets: generateMockPackets(20, 'conv-5'),
     direction: 'unidirectional',
   },
-]
+];
 
 export const mockSessions: Session[] = [
   {
@@ -122,8 +122,8 @@ export const mockSessions: Session[] = [
     totalBytes: 7890123,
     purpose: 'HTTP Web Browsing',
   },
-]
+];
 
 export const getConversationById = (id: string): Conversation | undefined => {
-  return mockConversations.find((conv) => conv.id === id)
-}
+  return mockConversations.find(conv => conv.id === id);
+};

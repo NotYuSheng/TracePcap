@@ -1,14 +1,14 @@
-import { useCallback } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Card } from '@govtechsg/sgds-react'
-import { CloudUpload } from 'lucide-react'
-import './FileUploadZone.css'
+import { useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Card } from '@govtechsg/sgds-react';
+import { CloudUpload } from 'lucide-react';
+import './FileUploadZone.css';
 
 interface FileUploadZoneProps {
-  onFileSelect: (file: File) => void
-  disabled?: boolean
-  maxSize?: number
-  acceptedFileTypes?: string[]
+  onFileSelect: (file: File) => void;
+  disabled?: boolean;
+  maxSize?: number;
+  acceptedFileTypes?: string[];
 }
 
 export const FileUploadZone = ({
@@ -20,22 +20,21 @@ export const FileUploadZone = ({
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        onFileSelect(acceptedFiles[0])
+        onFileSelect(acceptedFiles[0]);
       }
     },
     [onFileSelect]
-  )
+  );
 
-  const { getRootProps, getInputProps, isDragActive, isDragReject, fileRejections } =
-    useDropzone({
-      onDrop,
-      accept: {
-        'application/vnd.tcpdump.pcap': acceptedFileTypes,
-      },
-      maxSize,
-      multiple: false,
-      disabled,
-    })
+  const { getRootProps, getInputProps, isDragActive, isDragReject, fileRejections } = useDropzone({
+    onDrop,
+    accept: {
+      'application/vnd.tcpdump.pcap': acceptedFileTypes,
+    },
+    maxSize,
+    multiple: false,
+    disabled,
+  });
 
   return (
     <Card className="upload-card">
@@ -90,7 +89,7 @@ export const FileUploadZone = ({
               <div key={file.name} className="alert alert-danger text-start">
                 <strong>{file.name}</strong>
                 <ul className="mb-0 mt-2">
-                  {errors.map((e) => (
+                  {errors.map(e => (
                     <li key={e.code}>{e.message}</li>
                   ))}
                 </ul>
@@ -100,5 +99,5 @@ export const FileUploadZone = ({
         )}
       </Card.Body>
     </Card>
-  )
-}
+  );
+};

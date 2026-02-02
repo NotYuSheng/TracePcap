@@ -1,6 +1,6 @@
-import { Link, Outlet } from 'react-router-dom'
-import { Container, Row, Col } from '@govtechsg/sgds-react'
-import { Activity } from 'lucide-react'
+import { Link, Outlet } from 'react-router-dom';
+import { Container, Row, Col } from '@govtechsg/sgds-react';
+import { Activity } from 'lucide-react';
 
 export const MainLayout = () => {
   return (
@@ -27,13 +27,11 @@ export const MainLayout = () => {
         <Container>
           <Row>
             <Col className="text-center text-muted">
-              <small>
-                TracePcap &copy; 2026 - Network Traffic Analysis and Visualization Tool
-              </small>
+              <small>TracePcap &copy; 2026 - Network Traffic Analysis and Visualization Tool</small>
             </Col>
           </Row>
         </Container>
       </footer>
     </div>
-  )
-}
+  );
+};

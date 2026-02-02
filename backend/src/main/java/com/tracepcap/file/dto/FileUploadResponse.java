@@ -1,32 +1,29 @@
 package com.tracepcap.file.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
-/**
- * Response DTO for file upload
- */
+/** Response DTO for file upload */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileUploadResponse {
 
-    private String fileId;
+  private String fileId;
 
-    private String fileName;
+  private String fileName;
 
-    private Long fileSize;
+  private Long fileSize;
 
-    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
-    private LocalDateTime uploadedAt;
+  @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+  private LocalDateTime uploadedAt;
 
-    private String status;
+  private String status;
 
-    private String storageLocation;
+  private String storageLocation;
 }

@@ -1,1 +1,1 @@
-export { AnomalyHighlight } from './AnomalyHighlight'
+export { AnomalyHighlight } from './AnomalyHighlight';

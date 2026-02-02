@@ -1,83 +1,86 @@
-import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import type { AnalysisData, Story, TimelineDataPoint } from '@/types'
-import { storyService } from '@/features/story/services/storyService'
-import { timelineService } from '@/features/timeline/services/timelineService'
-import { NarrativeView } from '@components/story/NarrativeView'
-import { AnomalyHighlight } from '@components/story/AnomalyHighlight'
-import { StoryTimeline } from '@components/story/StoryTimeline'
-import { TrafficTimeline } from '@components/timeline/TrafficTimeline'
-import { LoadingSpinner } from '@components/common/LoadingSpinner'
-import { ErrorMessage } from '@components/common/ErrorMessage'
+import { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
+import { storyService } from '@/features/story/services/storyService';
+import { timelineService } from '@/features/timeline/services/timelineService';
+import { NarrativeView } from '@components/story/NarrativeView';
+import { AnomalyHighlight } from '@components/story/AnomalyHighlight';
+import { StoryTimeline } from '@components/story/StoryTimeline';
+import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
+import { LoadingSpinner } from '@components/common/LoadingSpinner';
+import { ErrorMessage } from '@components/common/ErrorMessage';
 
 interface AnalysisOutletContext {
-  data: AnalysisData
-  fileId: string
+  data: AnalysisData;
+  fileId: string;
 }
 
 export const StoryPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>()
-  const [story, setStory] = useState<Story | null>(null)
-  const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([])
-  const [generating, setGenerating] = useState(false)
-  const [loadingTimeline, setLoadingTimeline] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const [story, setStory] = useState<Story | null>(null);
+  const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [loadingTimeline, setLoadingTimeline] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGenerateStory = async () => {
     try {
-      setGenerating(true)
-      setError(null)
-      const generatedStory = await storyService.generateStory(fileId)
-      setStory(generatedStory)
+      setGenerating(true);
+      setError(null);
+      const generatedStory = await storyService.generateStory(fileId);
+      setStory(generatedStory);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate story')
+      setError(err instanceof Error ? err.message : 'Failed to generate story');
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
-  }
+  };
 
   useEffect(() => {
     // Load timeline data
     const fetchTimeline = async () => {
       try {
-        setLoadingTimeline(true)
-        const data = await timelineService.getTimelineData(fileId)
-        setTimelineData(data)
+        setLoadingTimeline(true);
+        const data = await timelineService.getTimelineData(fileId);
+        setTimelineData(data);
       } catch (err) {
-        console.error('Failed to load timeline:', err)
+        console.error('Failed to load timeline:', err);
       } finally {
-        setLoadingTimeline(false)
+        setLoadingTimeline(false);
       }
-    }
+    };
 
     if (fileId) {
-      fetchTimeline()
+      fetchTimeline();
     }
-  }, [fileId])
+  }, [fileId]);
 
   useEffect(() => {
     // Auto-generate story on page load
     if (fileId && !story) {
-      handleGenerateStory()
+      handleGenerateStory();
     }
-  }, [fileId])
+  }, [fileId]);
 
   // Calculate traffic statistics
-  const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0)
-  const totalBytes = timelineData.reduce((sum, point) => sum + (point.bytes || 0), 0)
-  const avgPackets = timelineData.length > 0 ? Math.round(totalPackets / timelineData.length) : 0
-  const packetCounts = timelineData.map((p) => p.packetCount || 0).filter(n => !isNaN(n))
-  const maxPackets = packetCounts.length > 0 ? Math.max(...packetCounts) : 0
+  const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0);
+  const totalBytes = timelineData.reduce((sum, point) => sum + (point.bytes || 0), 0);
+  const avgPackets = timelineData.length > 0 ? Math.round(totalPackets / timelineData.length) : 0;
+  const packetCounts = timelineData.map(p => p.packetCount || 0).filter(n => !isNaN(n));
+  const maxPackets = packetCounts.length > 0 ? Math.max(...packetCounts) : 0;
 
   if (generating && !story) {
     return (
       <div className="text-center py-5">
-        <LoadingSpinner size="large" message="Generating narrative story... This may take a few moments." />
+        <LoadingSpinner
+          size="large"
+          message="Generating narrative story... This may take a few moments."
+        />
         <p className="text-muted mt-3">
           AI is analyzing the network traffic and creating a comprehensive narrative...
         </p>
       </div>
-    )
+    );
   }
 
   if (error && !story) {
@@ -87,7 +90,7 @@ export const StoryPage = () => {
         message={error}
         onRetry={handleGenerateStory}
       />
-    )
+    );
   }
 
   if (!story) {
@@ -102,7 +105,7 @@ export const StoryPage = () => {
           Generate Story
         </button>
       </div>
-    )
+    );
   }
 
   return (
@@ -215,5 +218,5 @@ export const StoryPage = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -1,40 +1,37 @@
 package com.tracepcap.file.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
-/**
- * DTO for file metadata
- */
+/** DTO for file metadata */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileMetadataDto {
 
-    private String fileId;
+  private String fileId;
 
-    private String fileName;
+  private String fileName;
 
-    private Long fileSize;
+  private Long fileSize;
 
-    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
-    private LocalDateTime uploadedAt;
+  @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+  private LocalDateTime uploadedAt;
 
-    private String status;
+  private String status;
 
-    private Integer packetCount;
+  private Integer packetCount;
 
-    private Long duration;
+  private Long duration;
 
-    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
-    private LocalDateTime startTime;
+  @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+  private LocalDateTime startTime;
 
-    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
-    private LocalDateTime endTime;
+  @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+  private LocalDateTime endTime;
 }

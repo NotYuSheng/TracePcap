@@ -1,1 +1,1 @@
-export { NetworkControls } from './NetworkControls'
+export { NetworkControls } from './NetworkControls';

@@ -2,80 +2,85 @@ package com.tracepcap.analysis.controller;
 
 import com.tracepcap.analysis.dto.TimelineDataDto;
 import com.tracepcap.analysis.service.TimelineService;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-
-/**
- * REST controller for timeline/traffic analysis operations
- */
+/** REST controller for timeline/traffic analysis operations */
 @Slf4j
 @RestController
 @RequestMapping("/api/timeline")
 @RequiredArgsConstructor
 public class TimelineController {
 
-    private final TimelineService timelineService;
+  private final TimelineService timelineService;
 
-    /**
-     * Get timeline data for a file with binned traffic statistics
-     *
-     * @param fileId        The file ID
-     * @param interval      The time interval in seconds for binning (default: 60)
-     * @param maxDataPoints Maximum number of data points to return (optional, uses config default if not provided)
-     * @return List of timeline data points
-     */
-    @GetMapping("/{fileId}")
-    public ResponseEntity<List<TimelineDataDto>> getTimeline(
-            @PathVariable UUID fileId,
-            @RequestParam(defaultValue = "60") Integer interval,
-            @RequestParam(required = false) Integer maxDataPoints) {
-        log.info("GET /api/timeline/{} with interval {}s and maxDataPoints {}", fileId, interval, maxDataPoints);
+  /**
+   * Get timeline data for a file with binned traffic statistics
+   *
+   * @param fileId The file ID
+   * @param interval The time interval in seconds for binning (default: 60)
+   * @param maxDataPoints Maximum number of data points to return (optional, uses config default if
+   *     not provided)
+   * @return List of timeline data points
+   */
+  @GetMapping("/{fileId}")
+  public ResponseEntity<List<TimelineDataDto>> getTimeline(
+      @PathVariable UUID fileId,
+      @RequestParam(defaultValue = "60") Integer interval,
+      @RequestParam(required = false) Integer maxDataPoints) {
+    log.info(
+        "GET /api/timeline/{} with interval {}s and maxDataPoints {}", fileId, interval, maxDataPoints);
 
-        // Validate maxDataPoints if provided
-        if (maxDataPoints != null && (maxDataPoints < 10 || maxDataPoints > 10000)) {
-            throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
-        }
-
-        List<TimelineDataDto> timeline = timelineService.getTimelineData(fileId, interval, maxDataPoints);
-        return ResponseEntity.ok(timeline);
+    // Validate maxDataPoints if provided
+    if (maxDataPoints != null && (maxDataPoints < 10 || maxDataPoints > 10000)) {
+      throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
     }
 
-    /**
-     * Get timeline data for a specific time range
-     *
-     * @param fileId        The file ID
-     * @param start         Start timestamp (ISO 8601 format)
-     * @param end           End timestamp (ISO 8601 format)
-     * @param interval      The time interval in seconds for binning (default: 60)
-     * @param maxDataPoints Maximum number of data points to return (optional, uses config default if not provided)
-     * @return List of timeline data points
-     */
-    @GetMapping("/{fileId}/range")
-    public ResponseEntity<List<TimelineDataDto>> getTimelineRange(
-            @PathVariable UUID fileId,
-            @RequestParam String start,
-            @RequestParam String end,
-            @RequestParam(defaultValue = "60") Integer interval,
-            @RequestParam(required = false) Integer maxDataPoints) {
-        log.info("GET /api/timeline/{}/range from {} to {} with interval {}s and maxDataPoints {}",
-                fileId, start, end, interval, maxDataPoints);
+    List<TimelineDataDto> timeline = timelineService.getTimelineData(fileId, interval, maxDataPoints);
+    return ResponseEntity.ok(timeline);
+  }
 
-        // Validate maxDataPoints if provided
-        if (maxDataPoints != null && (maxDataPoints < 10 || maxDataPoints > 10000)) {
-            throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
-        }
+  /**
+   * Get timeline data for a specific time range
+   *
+   * @param fileId The file ID
+   * @param start Start timestamp (ISO 8601 format)
+   * @param end End timestamp (ISO 8601 format)
+   * @param interval The time interval in seconds for binning (default: 60)
+   * @param maxDataPoints Maximum number of data points to return (optional, uses config default if
+   *     not provided)
+   * @return List of timeline data points
+   */
+  @GetMapping("/{fileId}/range")
+  public ResponseEntity<List<TimelineDataDto>> getTimelineRange(
+      @PathVariable UUID fileId,
+      @RequestParam String start,
+      @RequestParam String end,
+      @RequestParam(defaultValue = "60") Integer interval,
+      @RequestParam(required = false) Integer maxDataPoints) {
+    log.info(
+        "GET /api/timeline/{}/range from {} to {} with interval {}s and maxDataPoints {}",
+        fileId,
+        start,
+        end,
+        interval,
+        maxDataPoints);
 
-        LocalDateTime startTime = LocalDateTime.parse(start);
-        LocalDateTime endTime = LocalDateTime.parse(end);
-
-        List<TimelineDataDto> timeline = timelineService.getTimelineDataForRange(
-                fileId, startTime, endTime, interval, maxDataPoints);
-        return ResponseEntity.ok(timeline);
+    // Validate maxDataPoints if provided
+    if (maxDataPoints != null && (maxDataPoints < 10 || maxDataPoints > 10000)) {
+      throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
     }
+
+    LocalDateTime startTime = LocalDateTime.parse(start);
+    LocalDateTime endTime = LocalDateTime.parse(end);
+
+    List<TimelineDataDto> timeline =
+        timelineService.getTimelineDataForRange(fileId, startTime, endTime, interval, maxDataPoints);
+    return ResponseEntity.ok(timeline);
+  }
 }
