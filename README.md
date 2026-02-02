@@ -237,32 +237,6 @@ The [`sample-files/`](sample-files/) directory contains example PCAP files:
 
 These files can be used to test the application's analysis capabilities.
 
-## Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup
-
-```bash
-# Backend (requires Java 21)
-cd backend
-./mvnw spring-boot:run
-
-# Frontend (requires Node.js 18+)
-cd frontend
-npm install
-npm run dev
-
-# Database
-docker compose up postgres minio -d
-```
-
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
