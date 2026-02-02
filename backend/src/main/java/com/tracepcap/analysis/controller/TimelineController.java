@@ -35,12 +35,21 @@ public class TimelineController {
   @GetMapping("/{fileId}")
   public ResponseEntity<List<TimelineDataDto>> getTimeline(
       @PathVariable UUID fileId,
-      @RequestParam(defaultValue = "60") @Min(value = 1, message = "interval must be at least 1 second") Integer interval,
-      @RequestParam(required = false) @Min(value = 10, message = "maxDataPoints must be at least 10") @Max(value = 10000, message = "maxDataPoints must not exceed 10000") Integer maxDataPoints) {
+      @RequestParam(defaultValue = "60")
+          @Min(value = 1, message = "interval must be at least 1 second")
+          Integer interval,
+      @RequestParam(required = false)
+          @Min(value = 10, message = "maxDataPoints must be at least 10")
+          @Max(value = 10000, message = "maxDataPoints must not exceed 10000")
+          Integer maxDataPoints) {
     log.info(
-        "GET /api/timeline/{} with interval {}s and maxDataPoints {}", fileId, interval, maxDataPoints);
+        "GET /api/timeline/{} with interval {}s and maxDataPoints {}",
+        fileId,
+        interval,
+        maxDataPoints);
 
-    List<TimelineDataDto> timeline = timelineService.getTimelineData(fileId, interval, maxDataPoints);
+    List<TimelineDataDto> timeline =
+        timelineService.getTimelineData(fileId, interval, maxDataPoints);
     return ResponseEntity.ok(timeline);
   }
 
@@ -60,8 +69,13 @@ public class TimelineController {
       @PathVariable UUID fileId,
       @RequestParam String start,
       @RequestParam String end,
-      @RequestParam(defaultValue = "60") @Min(value = 1, message = "interval must be at least 1 second") Integer interval,
-      @RequestParam(required = false) @Min(value = 10, message = "maxDataPoints must be at least 10") @Max(value = 10000, message = "maxDataPoints must not exceed 10000") Integer maxDataPoints) {
+      @RequestParam(defaultValue = "60")
+          @Min(value = 1, message = "interval must be at least 1 second")
+          Integer interval,
+      @RequestParam(required = false)
+          @Min(value = 10, message = "maxDataPoints must be at least 10")
+          @Max(value = 10000, message = "maxDataPoints must not exceed 10000")
+          Integer maxDataPoints) {
 
     LocalDateTime startTime = LocalDateTime.parse(start);
     LocalDateTime endTime = LocalDateTime.parse(end);
@@ -80,7 +94,8 @@ public class TimelineController {
     }
 
     List<TimelineDataDto> timeline =
-        timelineService.getTimelineDataForRange(fileId, startTime, endTime, interval, maxDataPoints);
+        timelineService.getTimelineDataForRange(
+            fileId, startTime, endTime, interval, maxDataPoints);
     return ResponseEntity.ok(timeline);
   }
 }
