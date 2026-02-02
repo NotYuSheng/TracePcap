@@ -119,6 +119,7 @@ public class TimelineService {
 
   /**
    * Generate timeline bins by aggregating conversation data into time intervals
+   * Optimized to O(M) complexity by calculating bin indices directly
    *
    * @param conversations List of conversations
    * @param startTime Start time
@@ -146,17 +147,30 @@ public class TimelineService {
       bins.put(binStart, new TimelineBinData());
     }
 
-    // Distribute conversations into bins
+    // Distribute conversations into bins - O(M) complexity
     for (ConversationEntity conv : conversations) {
       LocalDateTime convStart = conv.getStartTime();
-      LocalDateTime convEnd = conv.getEndTime();
 
-      // For simplicity, we'll attribute the entire conversation to its start time bin
-      // A more sophisticated approach would distribute across multiple bins
-      LocalDateTime binStart = findBinForTimestamp(convStart, binStarts, intervalSecs);
+      // Calculate bin index directly instead of looping through all bins - O(1)
+      long secondsFromStart = ChronoUnit.SECONDS.between(startTime, convStart);
 
-      if (binStart != null && bins.containsKey(binStart)) {
-        TimelineBinData bin = bins.get(binStart);
+      // Skip if conversation starts before our time range
+      if (secondsFromStart < 0) {
+        continue;
+      }
+
+      // Calculate which bin this conversation belongs to
+      long binIndex = secondsFromStart / intervalSecs;
+
+      // Skip if bin index is out of range
+      if (binIndex >= binStarts.size()) {
+        binIndex = binStarts.size() - 1; // Attribute to last bin
+      }
+
+      LocalDateTime binStart = binStarts.get((int) binIndex);
+      TimelineBinData bin = bins.get(binStart);
+
+      if (bin != null) {
         bin.packetCount += conv.getPacketCount();
         bin.bytes += conv.getTotalBytes();
 
@@ -179,32 +193,6 @@ public class TimelineService {
         .collect(Collectors.toList());
   }
 
-  /**
-   * Find the appropriate bin for a given timestamp
-   *
-   * @param timestamp The timestamp to bin
-   * @param binStarts List of bin start times
-   * @param intervalSecs Interval size in seconds
-   * @return The bin start time, or null if not found
-   */
-  private LocalDateTime findBinForTimestamp(
-      LocalDateTime timestamp, List<LocalDateTime> binStarts, Integer intervalSecs) {
-    for (int i = 0; i < binStarts.size(); i++) {
-      LocalDateTime binStart = binStarts.get(i);
-      LocalDateTime binEnd = binStart.plusSeconds(intervalSecs);
-
-      if (!timestamp.isBefore(binStart) && timestamp.isBefore(binEnd)) {
-        return binStart;
-      }
-    }
-
-    // If timestamp is after all bins, return the last bin
-    if (!binStarts.isEmpty() && !timestamp.isBefore(binStarts.get(binStarts.size() - 1))) {
-      return binStarts.get(binStarts.size() - 1);
-    }
-
-    return null;
-  }
 
   /**
    * Calculate optimal interval to respect maxDataPoints limit
@@ -233,7 +221,8 @@ public class TimelineService {
 
     // Calculate duration and expected bin count
     long durationSeconds = ChronoUnit.SECONDS.between(start, end);
-    long expectedBins = durationSeconds / requestedInterval;
+    // Use ceiling division to avoid underestimating bin count
+    long expectedBins = (durationSeconds + requestedInterval - 1) / requestedInterval;
 
     // If within limit, no adjustment needed
     if (expectedBins <= limit) {
@@ -241,7 +230,9 @@ public class TimelineService {
     }
 
     // Calculate minimum interval to stay under limit
-    int adjustedInterval = (int) Math.ceil((double) durationSeconds / limit);
+    // Use long to prevent overflow, then cap at Integer.MAX_VALUE
+    long adjustedIntervalLong = (long) Math.ceil((double) durationSeconds / limit);
+    int adjustedInterval = (int) Math.min(adjustedIntervalLong, (long) Integer.MAX_VALUE);
 
     // Enforce minimum interval constraint
     adjustedInterval = Math.max(adjustedInterval, analysisProperties.getMinTimelineInterval());

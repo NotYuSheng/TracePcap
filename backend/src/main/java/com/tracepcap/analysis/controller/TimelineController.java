@@ -2,16 +2,20 @@ package com.tracepcap.analysis.controller;
 
 import com.tracepcap.analysis.dto.TimelineDataDto;
 import com.tracepcap.analysis.service.TimelineService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /** REST controller for timeline/traffic analysis operations */
 @Slf4j
+@Validated
 @RestController
 @RequestMapping("/api/timeline")
 @RequiredArgsConstructor
@@ -31,20 +35,10 @@ public class TimelineController {
   @GetMapping("/{fileId}")
   public ResponseEntity<List<TimelineDataDto>> getTimeline(
       @PathVariable UUID fileId,
-      @RequestParam(defaultValue = "60") Integer interval,
-      @RequestParam(required = false) Integer maxDataPoints) {
+      @RequestParam(defaultValue = "60") @Min(value = 1, message = "interval must be at least 1 second") Integer interval,
+      @RequestParam(required = false) @Min(value = 10, message = "maxDataPoints must be at least 10") @Max(value = 10000, message = "maxDataPoints must not exceed 10000") Integer maxDataPoints) {
     log.info(
         "GET /api/timeline/{} with interval {}s and maxDataPoints {}", fileId, interval, maxDataPoints);
-
-    // Validate interval parameter
-    if (interval < 1) {
-      throw new IllegalArgumentException("interval must be at least 1 second");
-    }
-
-    // Validate maxDataPoints if provided
-    if (maxDataPoints != null && (maxDataPoints < 10 || maxDataPoints > 10000)) {
-      throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
-    }
 
     List<TimelineDataDto> timeline = timelineService.getTimelineData(fileId, interval, maxDataPoints);
     return ResponseEntity.ok(timeline);
@@ -66,28 +60,19 @@ public class TimelineController {
       @PathVariable UUID fileId,
       @RequestParam String start,
       @RequestParam String end,
-      @RequestParam(defaultValue = "60") Integer interval,
-      @RequestParam(required = false) Integer maxDataPoints) {
-    log.info(
-        "GET /api/timeline/{}/range from {} to {} with interval {}s and maxDataPoints {}",
-        fileId,
-        start,
-        end,
-        interval,
-        maxDataPoints);
-
-    // Validate interval parameter
-    if (interval < 1) {
-      throw new IllegalArgumentException("interval must be at least 1 second");
-    }
-
-    // Validate maxDataPoints if provided
-    if (maxDataPoints != null && (maxDataPoints < 10 || maxDataPoints > 10000)) {
-      throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
-    }
+      @RequestParam(defaultValue = "60") @Min(value = 1, message = "interval must be at least 1 second") Integer interval,
+      @RequestParam(required = false) @Min(value = 10, message = "maxDataPoints must be at least 10") @Max(value = 10000, message = "maxDataPoints must not exceed 10000") Integer maxDataPoints) {
 
     LocalDateTime startTime = LocalDateTime.parse(start);
     LocalDateTime endTime = LocalDateTime.parse(end);
+
+    log.info(
+        "GET /api/timeline/{}/range from {} to {} with interval {}s and maxDataPoints {}",
+        fileId,
+        startTime,
+        endTime,
+        interval,
+        maxDataPoints);
 
     // Validate time range
     if (!startTime.isBefore(endTime)) {

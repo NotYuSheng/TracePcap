@@ -51,16 +51,10 @@ export const timelineService = {
       return mockTimelineData;
     }
 
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (maxDataPoints !== undefined) {
-      params.append('maxDataPoints', maxDataPoints.toString());
-    }
-
-    const queryString = params.toString();
-    const url = `${API_ENDPOINTS.TIMELINE_DATA(fileId)}${queryString ? `?${queryString}` : ''}`;
-
-    const response = await apiClient.get<TimelineApiResponse[]>(url);
+    const response = await apiClient.get<TimelineApiResponse[]>(
+      API_ENDPOINTS.TIMELINE_DATA(fileId),
+      { params: { maxDataPoints } }
+    );
 
     // Transform backend response to frontend format
     return response.data.map(transformTimelineData);
@@ -89,17 +83,15 @@ export const timelineService = {
     const startISO = new Date(start).toISOString();
     const endISO = new Date(end).toISOString();
 
-    // Build query parameters
-    const params = new URLSearchParams({
-      start: startISO,
-      end: endISO,
-    });
-    if (maxDataPoints !== undefined) {
-      params.append('maxDataPoints', maxDataPoints.toString());
-    }
-
     const response = await apiClient.get<TimelineApiResponse[]>(
-      `/api/timeline/${fileId}/range?${params.toString()}`
+      `/api/timeline/${fileId}/range`,
+      {
+        params: {
+          start: startISO,
+          end: endISO,
+          maxDataPoints,
+        },
+      }
     );
 
     // Transform backend response to frontend format
