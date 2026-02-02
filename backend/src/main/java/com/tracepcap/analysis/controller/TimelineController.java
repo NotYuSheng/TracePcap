@@ -34,7 +34,10 @@ public class TimelineController {
       @RequestParam(defaultValue = "60") Integer interval,
       @RequestParam(required = false) Integer maxDataPoints) {
     log.info(
-        "GET /api/timeline/{} with interval {}s and maxDataPoints {}", fileId, interval, maxDataPoints);
+        "GET /api/timeline/{} with interval {}s and maxDataPoints {}",
+        fileId,
+        interval,
+        maxDataPoints);
 
     // Validate interval parameter
     if (interval < 1) {
@@ -46,7 +49,8 @@ public class TimelineController {
       throw new IllegalArgumentException("maxDataPoints must be between 10 and 10000");
     }
 
-    List<TimelineDataDto> timeline = timelineService.getTimelineData(fileId, interval, maxDataPoints);
+    List<TimelineDataDto> timeline =
+        timelineService.getTimelineData(fileId, interval, maxDataPoints);
     return ResponseEntity.ok(timeline);
   }
 
@@ -95,7 +99,8 @@ public class TimelineController {
     }
 
     List<TimelineDataDto> timeline =
-        timelineService.getTimelineDataForRange(fileId, startTime, endTime, interval, maxDataPoints);
+        timelineService.getTimelineDataForRange(
+            fileId, startTime, endTime, interval, maxDataPoints);
     return ResponseEntity.ok(timeline);
   }
 }
