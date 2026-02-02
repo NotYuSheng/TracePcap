@@ -87,7 +87,11 @@ public class TimelineService {
    */
   @Transactional(readOnly = true)
   public List<TimelineDataDto> getTimelineDataForRange(
-      UUID fileId, LocalDateTime startTime, LocalDateTime endTime, Integer interval, Integer maxDataPoints) {
+      UUID fileId,
+      LocalDateTime startTime,
+      LocalDateTime endTime,
+      Integer interval,
+      Integer maxDataPoints) {
     log.info(
         "Generating timeline data for file {} from {} to {} with {}s intervals",
         fileId,
