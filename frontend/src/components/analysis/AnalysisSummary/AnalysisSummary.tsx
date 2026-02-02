@@ -24,6 +24,12 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
 
+    // If more than 48 hours, show in days with 1 decimal place
+    if (hours > 48) {
+      const days = hours / 24;
+      return `${days.toFixed(1)} days`;
+    }
+
     if (hours > 0) return `${hours}h ${minutes % 60}m`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
