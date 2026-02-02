@@ -27,4 +27,4 @@ export const API_ENDPOINTS = {
   // Filter Generator (Not yet implemented in backend)
   GENERATE_FILTER: (fileId: string) => `/filter/generate/${fileId}`,
   EXECUTE_FILTER: (fileId: string) => `/filter/execute/${fileId}`,
-} as const
+} as const;

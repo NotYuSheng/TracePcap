@@ -1,31 +1,31 @@
-import { useMemo } from 'react'
-import type { NetworkStats } from '@/features/network/types'
-import './NetworkControls.css'
+import { useMemo } from 'react';
+import type { NetworkStats } from '@/features/network/types';
+import './NetworkControls.css';
 
 interface NetworkControlsProps {
-  stats: NetworkStats
-  selectedProtocols: string[]
-  onProtocolFilterChange: (protocols: string[]) => void
-  layoutType: 'forceDirected2d' | 'hierarchicalTd'
-  onLayoutChange: (layout: 'forceDirected2d' | 'hierarchicalTd') => void
+  stats: NetworkStats;
+  selectedProtocols: string[];
+  onProtocolFilterChange: (protocols: string[]) => void;
+  layoutType: 'forceDirected2d' | 'hierarchicalTd';
+  onLayoutChange: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
 }
 
 /**
  * Format bytes to human-readable string
  */
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
 }
 
 /**
  * Format number with commas
  */
 function formatNumber(num: number): string {
-  return num.toLocaleString()
+  return num.toLocaleString();
 }
 
 export function NetworkControls({
@@ -37,24 +37,24 @@ export function NetworkControls({
 }: NetworkControlsProps) {
   // Get available protocols from stats
   const availableProtocols = useMemo(() => {
-    return Object.keys(stats.protocolBreakdown).sort()
-  }, [stats.protocolBreakdown])
+    return Object.keys(stats.protocolBreakdown).sort();
+  }, [stats.protocolBreakdown]);
 
   const handleProtocolToggle = (protocol: string) => {
     if (selectedProtocols.includes(protocol)) {
-      onProtocolFilterChange(selectedProtocols.filter((p) => p !== protocol))
+      onProtocolFilterChange(selectedProtocols.filter(p => p !== protocol));
     } else {
-      onProtocolFilterChange([...selectedProtocols, protocol])
+      onProtocolFilterChange([...selectedProtocols, protocol]);
     }
-  }
+  };
 
   const handleSelectAll = () => {
-    onProtocolFilterChange(availableProtocols)
-  }
+    onProtocolFilterChange(availableProtocols);
+  };
 
   const handleDeselectAll = () => {
-    onProtocolFilterChange([])
-  }
+    onProtocolFilterChange([]);
+  };
 
   return (
     <div className="network-controls">
@@ -123,21 +123,15 @@ export function NetworkControls({
           <strong>Filter by Protocol</strong>
         </label>
         <div className="mb-2">
-          <button
-            className="btn btn-sm btn-outline-secondary me-2"
-            onClick={handleSelectAll}
-          >
+          <button className="btn btn-sm btn-outline-secondary me-2" onClick={handleSelectAll}>
             Select All
           </button>
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={handleDeselectAll}
-          >
+          <button className="btn btn-sm btn-outline-secondary" onClick={handleDeselectAll}>
             Deselect All
           </button>
         </div>
         <div className="protocol-filter-list">
-          {availableProtocols.map((protocol) => (
+          {availableProtocols.map(protocol => (
             <div key={protocol} className="form-check">
               <input
                 className="form-check-input"
@@ -146,10 +140,7 @@ export function NetworkControls({
                 checked={selectedProtocols.includes(protocol)}
                 onChange={() => handleProtocolToggle(protocol)}
               />
-              <label
-                className="form-check-label"
-                htmlFor={`protocol-${protocol}`}
-              >
+              <label className="form-check-label" htmlFor={`protocol-${protocol}`}>
                 {protocol}
                 <span className="text-muted ms-2">
                   ({formatNumber(stats.protocolBreakdown[protocol])})
@@ -211,5 +202,5 @@ export function NetworkControls({
         </div>
       </div>
     </div>
-  )
+  );
 }

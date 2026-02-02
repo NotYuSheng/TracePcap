@@ -1,1 +1,1 @@
-export { StoryPage } from './StoryPage'
+export { StoryPage } from './StoryPage';

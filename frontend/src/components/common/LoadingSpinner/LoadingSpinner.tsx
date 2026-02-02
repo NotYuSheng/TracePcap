@@ -1,9 +1,9 @@
-import './LoadingSpinner.css'
+import './LoadingSpinner.css';
 
 interface LoadingSpinnerProps {
-  size?: 'small' | 'medium' | 'large'
-  message?: string
-  fullPage?: boolean
+  size?: 'small' | 'medium' | 'large';
+  message?: string;
+  fullPage?: boolean;
 }
 
 export const LoadingSpinner = ({
@@ -11,7 +11,7 @@ export const LoadingSpinner = ({
   message,
   fullPage = false,
 }: LoadingSpinnerProps) => {
-  const sizeClass = `spinner-${size}`
+  const sizeClass = `spinner-${size}`;
 
   if (fullPage) {
     return (
@@ -21,7 +21,7 @@ export const LoadingSpinner = ({
         </div>
         {message && <p className="loading-message">{message}</p>}
       </div>
-    )
+    );
   }
 
   return (
@@ -31,5 +31,5 @@ export const LoadingSpinner = ({
       </div>
       {message && <p className="loading-message">{message}</p>}
     </div>
-  )
-}
+  );
+};

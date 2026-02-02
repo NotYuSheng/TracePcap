@@ -1,1 +1,1 @@
-export { ConversationPage } from './ConversationPage'
+export { ConversationPage } from './ConversationPage';

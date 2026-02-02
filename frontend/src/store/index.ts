@@ -1,11 +1,11 @@
-import { create } from 'zustand'
-import { devtools, persist } from 'zustand/middleware'
-import { createUploadSlice } from './slices/uploadSlice'
-import type { UploadSlice } from './slices/uploadSlice'
-import { createAnalysisSlice } from './slices/analysisSlice'
-import type { AnalysisSlice } from './slices/analysisSlice'
+import { create } from 'zustand';
+import { devtools, persist } from 'zustand/middleware';
+import { createUploadSlice } from './slices/uploadSlice';
+import type { UploadSlice } from './slices/uploadSlice';
+import { createAnalysisSlice } from './slices/analysisSlice';
+import type { AnalysisSlice } from './slices/analysisSlice';
 
-type StoreState = UploadSlice & AnalysisSlice
+type StoreState = UploadSlice & AnalysisSlice;
 
 export const useStore = create<StoreState>()(
   devtools(
@@ -16,7 +16,7 @@ export const useStore = create<StoreState>()(
       }),
       {
         name: 'tracepcap-storage',
-        partialize: (state) => ({
+        partialize: state => ({
           // Only persist certain parts of state
           recentFiles: state.recentFiles,
           analysisSummaries: state.analysisSummaries,
@@ -27,4 +27,4 @@ export const useStore = create<StoreState>()(
       name: 'TracePcap Store',
     }
   )
-)
+);

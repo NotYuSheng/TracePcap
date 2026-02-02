@@ -1,11 +1,11 @@
-import './UploadProgress.css'
+import './UploadProgress.css';
 
 interface UploadProgressProps {
-  fileName: string
-  progress: number
-  isUploading: boolean
-  error?: string
-  onCancel?: () => void
+  fileName: string;
+  progress: number;
+  isUploading: boolean;
+  error?: string;
+  onCancel?: () => void;
 }
 
 export const UploadProgress = ({
@@ -16,17 +16,17 @@ export const UploadProgress = ({
   onCancel,
 }: UploadProgressProps) => {
   const getStatusText = () => {
-    if (error) return 'Upload failed'
-    if (progress === 100 && isUploading) return 'Processing...'
-    if (progress === 100) return 'Upload complete'
-    return 'Uploading...'
-  }
+    if (error) return 'Upload failed';
+    if (progress === 100 && isUploading) return 'Processing...';
+    if (progress === 100) return 'Upload complete';
+    return 'Uploading...';
+  };
 
   const getStatusClass = () => {
-    if (error) return 'error'
-    if (progress === 100) return 'success'
-    return 'uploading'
-  }
+    if (error) return 'error';
+    if (progress === 100) return 'success';
+    return 'uploading';
+  };
 
   return (
     <div className={`upload-progress ${getStatusClass()}`}>
@@ -37,11 +37,7 @@ export const UploadProgress = ({
         </div>
         <div className="upload-actions">
           {isUploading && progress < 100 && onCancel && (
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-danger"
-              onClick={onCancel}
-            >
+            <button type="button" className="btn btn-sm btn-outline-danger" onClick={onCancel}>
               Cancel
             </button>
           )}
@@ -72,5 +68,5 @@ export const UploadProgress = ({
         {error && <span className="error-text">{error}</span>}
       </div>
     </div>
-  )
-}
+  );
+};

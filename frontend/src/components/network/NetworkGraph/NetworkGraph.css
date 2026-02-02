@@ -5,7 +5,7 @@
   border: 1px solid #dee2e6;
   border-radius: 0.375rem;
   overflow: hidden;
-  background: #ffffff;
+  background: #fff;
 }
 
 .network-graph-empty {
@@ -25,8 +25,8 @@
   right: 20px;
   z-index: 10;
   border: 1px solid #dee2e6;
-  background: #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .reset-camera-btn:hover {

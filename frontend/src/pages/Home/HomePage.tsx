@@ -4,5 +4,5 @@ export const HomePage = () => {
       <h1>TracePcap</h1>
       <p>PCAP File Analysis & Network Traffic Storytelling</p>
     </div>
-  )
-}
+  );
+};

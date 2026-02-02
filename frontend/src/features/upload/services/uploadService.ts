@@ -1,8 +1,8 @@
-import { apiClient } from '@/services/api/client'
-import { API_ENDPOINTS } from '@/services/api/endpoints'
-import type { UploadResponse, UploadProgress } from '../types/upload.types'
+import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
+import type { UploadResponse, UploadProgress } from '../types/upload.types';
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // Mock upload simulation
 const mockUpload = async (
@@ -10,14 +10,14 @@ const mockUpload = async (
   onProgress?: (progress: number) => void
 ): Promise<UploadResponse> => {
   // Simulate upload progress
-  const steps = 10
+  const steps = 10;
   for (let i = 0; i <= steps; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 100))
-    onProgress?.(Math.round((i / steps) * 100))
+    await new Promise(resolve => setTimeout(resolve, 100));
+    onProgress?.(Math.round((i / steps) * 100));
   }
 
   // Generate a unique file ID
-  const fileId = `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const fileId = `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   return {
     fileId,
@@ -25,8 +25,8 @@ const mockUpload = async (
     fileSize: file.size,
     status: 'completed',
     uploadedAt: Date.now(),
-  }
-}
+  };
+};
 
 export const uploadService = {
   /**
@@ -40,26 +40,22 @@ export const uploadService = {
     onProgress?: (progress: number) => void
   ): Promise<UploadResponse> => {
     if (USE_MOCK) {
-      return mockUpload(file, onProgress)
+      return mockUpload(file, onProgress);
     }
 
-    const formData = new FormData()
-    formData.append('file', file)
+    const formData = new FormData();
+    formData.append('file', file);
 
-    const response = await apiClient.post<UploadResponse>(
-      API_ENDPOINTS.UPLOAD_PCAP,
-      formData,
-      {
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            onProgress?.(progress)
-          }
-        },
-      }
-    )
+    const response = await apiClient.post<UploadResponse>(API_ENDPOINTS.UPLOAD_PCAP, formData, {
+      onUploadProgress: progressEvent => {
+        if (progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress?.(progress);
+        }
+      },
+    });
 
-    return response.data
+    return response.data;
   },
 
   /**
@@ -74,19 +70,18 @@ export const uploadService = {
         status: 'completed',
         progress: 100,
         message: 'Analysis complete',
-      }
+      };
     }
 
     // Use FILE_METADATA endpoint to get file status
-    const response = await apiClient.get<UploadResponse>(
-      API_ENDPOINTS.FILE_METADATA(uploadId)
-    )
+    const response = await apiClient.get<UploadResponse>(API_ENDPOINTS.FILE_METADATA(uploadId));
 
     return {
       uploadId: response.data.fileId,
       status: response.data.status as any,
-      progress: response.data.status === 'completed' ? 100 : response.data.status === 'processing' ? 50 : 0,
+      progress:
+        response.data.status === 'completed' ? 100 : response.data.status === 'processing' ? 50 : 0,
       message: `File ${response.data.status}`,
-    }
+    };
   },
-}
+};

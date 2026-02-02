@@ -1,1 +1,1 @@
-export { NetworkDiagramPage } from './NetworkDiagramPage'
+export { NetworkDiagramPage } from './NetworkDiagramPage';

@@ -3,12 +3,12 @@
   border: 2px solid transparent;
   transition: all 0.3s ease;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .upload-card:hover {
   border-color: var(--tracepcap-primary);
-  box-shadow: 0 4px 12px rgba(0, 118, 209, 0.12);
+  box-shadow: 0 4px 12px rgb(0 118 209 / 12%);
 }
 
 .upload-icon {
@@ -20,6 +20,7 @@
   100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-10px);
   }

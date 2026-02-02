@@ -1,1 +1,1 @@
-export { NarrativeView } from './NarrativeView'
+export { NarrativeView } from './NarrativeView';

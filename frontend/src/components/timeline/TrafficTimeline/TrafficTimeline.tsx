@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -8,16 +8,16 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts'
-import type { TimelineDataPoint } from '@/types'
-import { formatTimestamp, formatBytes, formatNumber } from '@/utils/formatters'
+} from 'recharts';
+import type { TimelineDataPoint } from '@/types';
+import { formatTimestamp, formatBytes, formatNumber } from '@/utils/formatters';
 
 interface TrafficTimelineProps {
-  data: TimelineDataPoint[]
+  data: TimelineDataPoint[];
 }
 
 export const TrafficTimeline = ({ data }: TrafficTimelineProps) => {
-  const [viewMode, setViewMode] = useState<'packets' | 'bytes'>('packets')
+  const [viewMode, setViewMode] = useState<'packets' | 'bytes'>('packets');
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -54,16 +54,16 @@ export const TrafficTimeline = ({ data }: TrafficTimelineProps) => {
             </div>
           </div>
         </div>
-      )
+      );
     }
-    return null
-  }
+    return null;
+  };
 
-  const chartData = data.map((point) => ({
+  const chartData = data.map(point => ({
     timestamp: point.timestamp,
     value: viewMode === 'packets' ? point.packetCount : point.bytes,
     protocols: point.protocols,
-  }))
+  }));
 
   return (
     <div className="traffic-timeline">
@@ -88,10 +88,7 @@ export const TrafficTimeline = ({ data }: TrafficTimelineProps) => {
       </div>
 
       <ResponsiveContainer width="100%" height={400}>
-        <AreaChart
-          data={chartData}
-          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-        >
+        <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#0d6efd" stopOpacity={0.8} />
@@ -101,23 +98,21 @@ export const TrafficTimeline = ({ data }: TrafficTimelineProps) => {
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
             dataKey="timestamp"
-            tickFormatter={(ts) => {
-              const date = new Date(ts)
+            tickFormatter={ts => {
+              const date = new Date(ts);
               return date.toLocaleTimeString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit',
-              })
+              });
             }}
           />
           <YAxis
-            tickFormatter={(value) =>
+            tickFormatter={value =>
               viewMode === 'packets' ? formatNumber(value) : formatBytes(value)
             }
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend
-            formatter={() => (viewMode === 'packets' ? 'Packet Count' : 'Bytes')}
-          />
+          <Legend formatter={() => (viewMode === 'packets' ? 'Packet Count' : 'Bytes')} />
           <Area
             type="monotone"
             dataKey="value"
@@ -132,12 +127,12 @@ export const TrafficTimeline = ({ data }: TrafficTimelineProps) => {
         <div className="col-md-12">
           <div className="alert alert-info">
             <small>
-              <strong>Tip:</strong> Hover over the chart to see detailed information about each
-              time period. Switch between packet count and byte size views using the buttons above.
+              <strong>Tip:</strong> Hover over the chart to see detailed information about each time
+              period. Switch between packet count and byte size views using the buttons above.
             </small>
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

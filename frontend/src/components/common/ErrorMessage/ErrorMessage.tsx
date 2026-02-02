@@ -1,16 +1,12 @@
-import './ErrorMessage.css'
+import './ErrorMessage.css';
 
 interface ErrorMessageProps {
-  title?: string
-  message: string
-  onRetry?: () => void
+  title?: string;
+  message: string;
+  onRetry?: () => void;
 }
 
-export const ErrorMessage = ({
-  title = 'Error',
-  message,
-  onRetry,
-}: ErrorMessageProps) => {
+export const ErrorMessage = ({ title = 'Error', message, onRetry }: ErrorMessageProps) => {
   return (
     <div className="error-message-container">
       <div className="alert alert-danger" role="alert">
@@ -28,5 +24,5 @@ export const ErrorMessage = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -1,9 +1,9 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
-import type { ProtocolStats } from '@/types'
-import './ProtocolBreakdownChart.css'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import type { ProtocolStats } from '@/types';
+import './ProtocolBreakdownChart.css';
 
 interface ProtocolBreakdownChartProps {
-  protocolStats: ProtocolStats[]
+  protocolStats: ProtocolStats[];
 }
 
 const COLORS = [
@@ -17,23 +17,23 @@ const COLORS = [
   '#1abc9c', // Teal
   '#e67e22', // Dark orange
   '#95a5a6', // Gray
-]
+];
 
 export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChartProps) => {
   // Format data for the pie chart
-  const chartData = protocolStats.map((stat) => ({
+  const chartData = protocolStats.map(stat => ({
     name: stat.protocol,
     value: stat.count,
     percentage: stat.percentage,
-  }))
+  }));
 
   const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
-  }
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
 
   return (
     <div className="protocol-breakdown">
@@ -48,7 +48,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={(props) => `${((props.percent || 0) * 100).toFixed(1)}%`}
+                label={props => `${((props.percent || 0) * 100).toFixed(1)}%`}
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
@@ -57,9 +57,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(value) => [`${value?.toLocaleString() || 0} packets`]}
-              />
+              <Tooltip formatter={value => [`${value?.toLocaleString() || 0} packets`]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -106,5 +104,5 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

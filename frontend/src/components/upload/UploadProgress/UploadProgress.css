@@ -4,7 +4,7 @@
   padding: 1.5rem;
   margin-top: 1.5rem;
   background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 5%);
 }
 
 .upload-progress.error {

@@ -1,8 +1,8 @@
-import type { StoryTimelineEvent } from '@/types'
-import { formatTimestamp } from '@/utils/formatters'
+import type { StoryTimelineEvent } from '@/types';
+import { formatTimestamp } from '@/utils/formatters';
 
 interface StoryTimelineProps {
-  events: StoryTimelineEvent[]
+  events: StoryTimelineEvent[];
 }
 
 export const StoryTimeline = ({ events }: StoryTimelineProps) => {
@@ -11,20 +11,20 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
       normal: 'text-primary',
       suspicious: 'text-warning',
       critical: 'text-danger',
-    }
-    return classes[type] || 'text-secondary'
-  }
+    };
+    return classes[type] || 'text-secondary';
+  };
 
   const getEventIcon = (type: string) => {
     const icons: Record<string, string> = {
       normal: 'bi-circle-fill',
       suspicious: 'bi-exclamation-circle-fill',
       critical: 'bi-x-circle-fill',
-    }
-    return icons[type] || 'bi-circle'
-  }
+    };
+    return icons[type] || 'bi-circle';
+  };
 
-  const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp)
+  const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
 
   return (
     <div className="story-timeline">
@@ -39,7 +39,9 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
               </div>
               <div className="flex-grow-1">
                 <div className="d-flex justify-content-between align-items-start">
-                  <h6 className={`mb-1 ${event.type === 'suspicious' || event.type === 'critical' ? getEventClass(event.type) : ''}`}>
+                  <h6
+                    className={`mb-1 ${event.type === 'suspicious' || event.type === 'critical' ? getEventClass(event.type) : ''}`}
+                  >
                     {event.title}
                   </h6>
                   <small className="text-muted">{formatTimestamp(event.timestamp)}</small>
@@ -66,7 +68,10 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
               </div>
             </div>
             {index < sortedEvents.length - 1 && (
-              <div className="timeline-connector ms-2 my-2" style={{ height: '30px', borderLeft: '2px solid #dee2e6' }}></div>
+              <div
+                className="timeline-connector ms-2 my-2"
+                style={{ height: '30px', borderLeft: '2px solid #dee2e6' }}
+              ></div>
             )}
           </div>
         ))}
@@ -78,5 +83,5 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};

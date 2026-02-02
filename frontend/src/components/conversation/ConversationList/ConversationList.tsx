@@ -1,19 +1,22 @@
-import { useState } from 'react'
-import type { Conversation } from '@/types'
-import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters'
+import { useState } from 'react';
+import type { Conversation } from '@/types';
+import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
 
 interface ConversationListProps {
-  conversations: Conversation[]
-  onSelectConversation?: (conversation: Conversation) => void
+  conversations: Conversation[];
+  onSelectConversation?: (conversation: Conversation) => void;
 }
 
-export const ConversationList = ({ conversations, onSelectConversation }: ConversationListProps) => {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+export const ConversationList = ({
+  conversations,
+  onSelectConversation,
+}: ConversationListProps) => {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const handleRowClick = (conversation: Conversation) => {
-    setSelectedId(conversation.id)
-    onSelectConversation?.(conversation)
-  }
+    setSelectedId(conversation.id);
+    onSelectConversation?.(conversation);
+  };
 
   const getProtocolBadgeClass = (protocol: string) => {
     const protocolMap: Record<string, string> = {
@@ -25,9 +28,9 @@ export const ConversationList = ({ conversations, onSelectConversation }: Conver
       TLS: 'success',
       ICMP: 'secondary',
       ARP: 'secondary',
-    }
-    return protocolMap[protocol.toUpperCase()] || 'secondary'
-  }
+    };
+    return protocolMap[protocol.toUpperCase()] || 'secondary';
+  };
 
   return (
     <div className="conversation-list">
@@ -45,9 +48,9 @@ export const ConversationList = ({ conversations, onSelectConversation }: Conver
             </tr>
           </thead>
           <tbody>
-            {conversations.map((conversation) => {
-              const [source, destination] = conversation.endpoints
-              const duration = conversation.endTime - conversation.startTime
+            {conversations.map(conversation => {
+              const [source, destination] = conversation.endpoints;
+              const duration = conversation.endTime - conversation.startTime;
 
               return (
                 <tr
@@ -59,9 +62,7 @@ export const ConversationList = ({ conversations, onSelectConversation }: Conver
                   <td>
                     <div className="d-flex flex-column">
                       <span className="fw-semibold">{source.ip}</span>
-                      {source.port && (
-                        <small className="text-muted">:{source.port}</small>
-                      )}
+                      {source.port && <small className="text-muted">:{source.port}</small>}
                     </div>
                   </td>
                   <td>
@@ -73,7 +74,9 @@ export const ConversationList = ({ conversations, onSelectConversation }: Conver
                     </div>
                   </td>
                   <td>
-                    <span className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}>
+                    <span
+                      className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}
+                    >
                       {conversation.protocol.name}
                     </span>
                   </td>
@@ -84,7 +87,7 @@ export const ConversationList = ({ conversations, onSelectConversation }: Conver
                     <small>{formatTimestamp(conversation.startTime)}</small>
                   </td>
                 </tr>
-              )
+              );
             })}
           </tbody>
         </table>
@@ -96,5 +99,5 @@ export const ConversationList = ({ conversations, onSelectConversation }: Conver
         </div>
       )}
     </div>
-  )
-}
+  );
+};

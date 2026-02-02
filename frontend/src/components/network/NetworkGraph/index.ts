@@ -1,1 +1,1 @@
-export { NetworkGraph } from './NetworkGraph'
+export { NetworkGraph } from './NetworkGraph';

@@ -1,4 +1,4 @@
-import type { AnalysisSummary } from '@/types'
+import type { AnalysisSummary } from '@/types';
 
 export const mockAnalysisSummary: AnalysisSummary = {
   fileId: 'mock-file-123',
@@ -157,7 +157,7 @@ export const mockAnalysisSummary: AnalysisSummary = {
       ],
     },
   },
-}
+};
 
 // Generate additional mock summaries for different file IDs
 export const generateMockAnalysis = (fileId: string, fileName: string): AnalysisSummary => {
@@ -166,5 +166,5 @@ export const generateMockAnalysis = (fileId: string, fileName: string): Analysis
     fileId,
     fileName,
     uploadTime: Date.now(),
-  }
-}
+  };
+};

@@ -1,1 +1,1 @@
-export { AnalysisSummary } from './AnalysisSummary'
+export { AnalysisSummary } from './AnalysisSummary';
