@@ -42,10 +42,7 @@ export const timelineService = {
    * @param maxDataPoints - Optional maximum number of data points to return
    * @returns Timeline data points
    */
-  getTimelineData: async (
-    fileId: string,
-    maxDataPoints?: number
-  ): Promise<TimelineDataPoint[]> => {
+  getTimelineData: async (fileId: string, maxDataPoints?: number): Promise<TimelineDataPoint[]> => {
     if (USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 700));
       return mockTimelineData;
