@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Card } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/store';
@@ -9,6 +10,34 @@ export const FileList = () => {
   const recentFiles = useStore(state => state.recentFiles);
   const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
+
+  // Validate files on mount - remove files that no longer exist on backend
+  useEffect(() => {
+    const validateFiles = async () => {
+      const filesToValidate = [...recentFiles]; // Copy array to avoid stale closures
+      for (const file of filesToValidate) {
+        try {
+          const response = await fetch(`http://localhost:8080/api/files/${file.id}`);
+          if (response.status === 404) {
+            // File doesn't exist on backend, remove from localStorage
+            console.log(`File ${file.name} no longer exists on backend, removing from recent files`);
+            removeRecentFile(file.id);
+          } else if (!response.ok) {
+            console.warn(`Unexpected status ${response.status} for file ${file.name}`);
+          }
+        } catch (error) {
+          // Network error or backend down, keep the file in the list
+          console.warn(`Could not validate file ${file.name}:`, error);
+        }
+      }
+    };
+
+    const hasFilesToValidate = recentFiles.length > 0;
+    if (hasFilesToValidate) {
+      validateFiles();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - removeRecentFile is stable
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
