@@ -42,10 +42,7 @@ export const timelineService = {
    * @param maxDataPoints - Optional maximum number of data points to return
    * @returns Timeline data points
    */
-  getTimelineData: async (
-    fileId: string,
-    maxDataPoints?: number
-  ): Promise<TimelineDataPoint[]> => {
+  getTimelineData: async (fileId: string, maxDataPoints?: number): Promise<TimelineDataPoint[]> => {
     if (USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 700));
       return mockTimelineData;
@@ -83,16 +80,13 @@ export const timelineService = {
     const startISO = new Date(start).toISOString();
     const endISO = new Date(end).toISOString();
 
-    const response = await apiClient.get<TimelineApiResponse[]>(
-      `/api/timeline/${fileId}/range`,
-      {
-        params: {
-          start: startISO,
-          end: endISO,
-          maxDataPoints,
-        },
-      }
-    );
+    const response = await apiClient.get<TimelineApiResponse[]>(`/api/timeline/${fileId}/range`, {
+      params: {
+        start: startISO,
+        end: endISO,
+        maxDataPoints,
+      },
+    });
 
     // Transform backend response to frontend format
     return response.data.map(transformTimelineData);
