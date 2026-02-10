@@ -87,7 +87,11 @@ public class TimelineService {
    */
   @Transactional(readOnly = true)
   public List<TimelineDataDto> getTimelineDataForRange(
-      UUID fileId, LocalDateTime startTime, LocalDateTime endTime, Integer interval, Integer maxDataPoints) {
+      UUID fileId,
+      LocalDateTime startTime,
+      LocalDateTime endTime,
+      Integer interval,
+      Integer maxDataPoints) {
     log.info(
         "Generating timeline data for file {} from {} to {} with {}s intervals",
         fileId,
@@ -118,8 +122,8 @@ public class TimelineService {
   }
 
   /**
-   * Generate timeline bins by aggregating conversation data into time intervals
-   * Optimized to O(M) complexity by calculating bin indices directly
+   * Generate timeline bins by aggregating conversation data into time intervals Optimized to O(M)
+   * complexity by calculating bin indices directly
    *
    * @param conversations List of conversations
    * @param startTime Start time
@@ -192,7 +196,6 @@ public class TimelineService {
                     .build())
         .collect(Collectors.toList());
   }
-
 
   /**
    * Calculate optimal interval to respect maxDataPoints limit
