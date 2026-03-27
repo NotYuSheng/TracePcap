@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Card } from '@govtechsg/sgds-react';
+import { Card, Modal } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/store';
 import type { RecentFile } from '@/store/slices/uploadSlice';
@@ -14,15 +14,6 @@ export const FileList = () => {
   const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
   const [pendingDeleteFile, setPendingDeleteFile] = useState<RecentFile | null>(null);
-
-  useEffect(() => {
-    if (!pendingDeleteFile) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPendingDeleteFile(null);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [pendingDeleteFile]);
 
   // Validate files on mount - remove files that no longer exist on backend
   useEffect(() => {
@@ -85,10 +76,6 @@ export const FileList = () => {
       removeRecentFile(pendingDeleteFile.id);
       setPendingDeleteFile(null);
     }
-  };
-
-  const handleCancelDelete = () => {
-    setPendingDeleteFile(null);
   };
 
   return (
@@ -159,57 +146,37 @@ export const FileList = () => {
       </Card>
 
       {/* Delete confirmation modal */}
-      {pendingDeleteFile && (
-        <>
-          <div
-            className="modal fade show d-block"
-            tabIndex={-1}
-            role="dialog"
-            onClick={handleCancelDelete}
+      <Modal
+        show={!!pendingDeleteFile}
+        onHide={() => setPendingDeleteFile(null)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Delete File</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Are you sure you want to remove{' '}
+            <strong>{pendingDeleteFile?.name}</strong> from your recent uploads?
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => setPendingDeleteFile(null)}
           >
-            <div
-              className="modal-dialog modal-dialog-centered"
-              role="document"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Delete File</h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={handleCancelDelete}
-                    aria-label="Close"
-                  />
-                </div>
-                <div className="modal-body">
-                  <p className="mb-0">
-                    Are you sure you want to remove <strong>{pendingDeleteFile.name}</strong> from
-                    your recent uploads?
-                  </p>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={handleCancelDelete}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-danger"
-                    onClick={handleConfirmDelete}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" onClick={handleCancelDelete}></div>
-        </>
-      )}
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-danger"
+            onClick={handleConfirmDelete}
+          >
+            Delete
+          </button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };
