@@ -1,5 +1,12 @@
 import type { Conversation, AnalysisSummary } from '@/types';
-import type { GraphNode, GraphEdge, NetworkGraphData, NetworkStats, NodeMap, NodeType } from '../types';
+import type {
+  GraphNode,
+  GraphEdge,
+  NetworkGraphData,
+  NetworkStats,
+  NodeMap,
+  NodeType,
+} from '../types';
 
 /**
  * Determine node role based on port number
@@ -296,7 +303,10 @@ export function buildNetworkGraph(
     // Track well-known port usage for both endpoints.
     // A node sending FROM a well-known port (e.g. DNS response from :53) is
     // just as valid a signal as one receiving ON a well-known port.
-    for (const [nodeIp, port] of [[dst.ip, dst.port], [src.ip, src.port]] as [string, number][]) {
+    for (const [nodeIp, port] of [
+      [dst.ip, dst.port],
+      [src.ip, src.port],
+    ] as [string, number][]) {
       if (port != null && port < 1024) {
         const portKey = `${port}/${protocol}`;
         if (!serverPorts[nodeIp]) serverPorts[nodeIp] = {};

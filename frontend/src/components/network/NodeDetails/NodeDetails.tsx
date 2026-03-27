@@ -48,17 +48,17 @@ interface NodeTypeDisplay {
 }
 
 const NODE_TYPE_DISPLAY: Record<NodeType, NodeTypeDisplay> = {
-  'dns-server':      { label: 'DNS Server',      icon: 'bi-globe2',         badgeClass: 'bg-warning text-dark' },
-  'web-server':      { label: 'Web Server',       icon: 'bi-server',         badgeClass: 'bg-success' },
-  'ssh-server':      { label: 'SSH Server',       icon: 'bi-terminal',       badgeClass: 'bg-info text-dark' },
-  'ftp-server':      { label: 'FTP Server',       icon: 'bi-folder-symlink', badgeClass: 'bg-secondary' },
-  'mail-server':     { label: 'Mail Server',      icon: 'bi-envelope',       badgeClass: 'bg-danger' },
-  'dhcp-server':     { label: 'DHCP Server',      icon: 'bi-diagram-3',      badgeClass: 'bg-secondary' },
-  'ntp-server':      { label: 'NTP Server',       icon: 'bi-clock',          badgeClass: 'bg-dark' },
-  'database-server': { label: 'Database Server',  icon: 'bi-database',       badgeClass: 'bg-danger' },
-  'router':          { label: 'Router / Gateway', icon: 'bi-router',         badgeClass: 'bg-warning text-dark' },
-  'client':          { label: 'Client',           icon: 'bi-laptop',         badgeClass: 'bg-primary' },
-  'unknown':         { label: 'Unknown',          icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
+  'dns-server': { label: 'DNS Server', icon: 'bi-globe2', badgeClass: 'bg-warning text-dark' },
+  'web-server': { label: 'Web Server', icon: 'bi-server', badgeClass: 'bg-success' },
+  'ssh-server': { label: 'SSH Server', icon: 'bi-terminal', badgeClass: 'bg-info text-dark' },
+  'ftp-server': { label: 'FTP Server', icon: 'bi-folder-symlink', badgeClass: 'bg-secondary' },
+  'mail-server': { label: 'Mail Server', icon: 'bi-envelope', badgeClass: 'bg-danger' },
+  'dhcp-server': { label: 'DHCP Server', icon: 'bi-diagram-3', badgeClass: 'bg-secondary' },
+  'ntp-server': { label: 'NTP Server', icon: 'bi-clock', badgeClass: 'bg-dark' },
+  'database-server': { label: 'Database Server', icon: 'bi-database', badgeClass: 'bg-danger' },
+  router: { label: 'Router / Gateway', icon: 'bi-router', badgeClass: 'bg-warning text-dark' },
+  client: { label: 'Client', icon: 'bi-laptop', badgeClass: 'bg-primary' },
+  unknown: { label: 'Unknown', icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
 };
 
 export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
@@ -119,7 +119,8 @@ export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
 
             {/* Detected Node Type */}
             {(() => {
-              const typeInfo = NODE_TYPE_DISPLAY[node.data.nodeType] ?? NODE_TYPE_DISPLAY['unknown'];
+              const typeInfo =
+                NODE_TYPE_DISPLAY[node.data.nodeType] ?? NODE_TYPE_DISPLAY['unknown'];
               const ev = node.data.nodeTypeEvidence;
               return (
                 <div className="mb-2">
@@ -132,7 +133,8 @@ export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
                   </div>
                   {ev.dominantPort && (
                     <div className="text-muted small mt-1">
-                      {ev.connectionCount} connection{ev.connectionCount !== 1 ? 's' : ''} on port {ev.dominantPort}
+                      {ev.connectionCount} connection{ev.connectionCount !== 1 ? 's' : ''} on port{' '}
+                      {ev.dominantPort}
                     </div>
                   )}
                   {!ev.dominantPort && node.data.nodeType === 'router' && (
