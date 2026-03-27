@@ -1,9 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { TimelineDataPoint } from '@/types';
-import { mockTimelineData, generateTimelineForRange } from '@/mocks/mockTimelineData';
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // Backend response type (what the API actually returns)
 interface TimelineApiResponse {
@@ -19,13 +16,11 @@ const parseDateTime = (dt: string | number[]): number => {
     return new Date(dt).getTime();
   }
   if (Array.isArray(dt) && dt.length >= 6) {
-    // [year, month (1-12), day, hour, min, sec, nano]
     return new Date(dt[0], dt[1] - 1, dt[2], dt[3], dt[4], dt[5]).getTime();
   }
   return Date.now();
 };
 
-// Transform backend response to frontend format
 function transformTimelineData(apiData: TimelineApiResponse): TimelineDataPoint {
   return {
     timestamp: parseDateTime(apiData.timestamp),
@@ -38,35 +33,20 @@ function transformTimelineData(apiData: TimelineApiResponse): TimelineDataPoint 
 export const timelineService = {
   /**
    * Get timeline data for a PCAP file
-   * @param fileId - The file ID to get timeline for
-   * @param maxDataPoints - Optional maximum number of data points to return
-   * @returns Timeline data points
    */
   getTimelineData: async (
     fileId: string,
     maxDataPoints?: number
   ): Promise<TimelineDataPoint[]> => {
-    if (USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 700));
-      return mockTimelineData;
-    }
-
     const response = await apiClient.get<TimelineApiResponse[]>(
       API_ENDPOINTS.TIMELINE_DATA(fileId),
       { params: { maxDataPoints } }
     );
-
-    // Transform backend response to frontend format
     return response.data.map(transformTimelineData);
   },
 
   /**
    * Get timeline data for a specific time range
-   * @param fileId - The file ID
-   * @param start - Start timestamp
-   * @param end - End timestamp
-   * @param maxDataPoints - Optional maximum number of data points to return
-   * @returns Timeline data points for the specified range
    */
   getTimelineRange: async (
     fileId: string,
@@ -74,27 +54,15 @@ export const timelineService = {
     end: number,
     maxDataPoints?: number
   ): Promise<TimelineDataPoint[]> => {
-    if (USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return generateTimelineForRange(start, end);
-    }
-
-    // Convert timestamps to ISO format for backend
     const startISO = new Date(start).toISOString();
     const endISO = new Date(end).toISOString();
 
     const response = await apiClient.get<TimelineApiResponse[]>(
       `/api/timeline/${fileId}/range`,
       {
-        params: {
-          start: startISO,
-          end: endISO,
-          maxDataPoints,
-        },
+        params: { start: startISO, end: endISO, maxDataPoints },
       }
     );
-
-    // Transform backend response to frontend format
     return response.data.map(transformTimelineData);
   },
 };
