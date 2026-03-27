@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { parseDateTime } from '@/utils/dateUtils';
 import type { Conversation } from '@/types';
 
 // Re-use the same API response shape as conversations
@@ -19,13 +20,6 @@ interface SecurityAlertApiResponse {
   durationMs: number;
 }
 
-const parseDateTime = (dt: string | number[]): number => {
-  if (typeof dt === 'string') return new Date(dt).getTime();
-  if (Array.isArray(dt) && dt.length >= 6) {
-    return new Date(dt[0], dt[1] - 1, dt[2], dt[3], dt[4], dt[5]).getTime();
-  }
-  return 0;
-};
 
 export const securityService = {
   getSecurityAlerts: async (fileId: string): Promise<Conversation[]> => {

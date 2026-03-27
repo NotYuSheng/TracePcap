@@ -67,11 +67,11 @@ public class NdpiService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Enrich each ConversationInfo with the app name detected by nDPI.
-   * Conversations nDPI cannot identify are left with appName == null.
+   * Enrich each ConversationInfo with the app name and security risk flags detected by nDPI.
+   * Runs {@code ndpiReader} exactly once and populates both fields in a single pass.
+   * Conversations nDPI cannot identify are left with appName == null and an empty risks list.
    */
-  public void enrichWithAppNames(File pcapFile,
-      List<PcapParserService.ConversationInfo> conversations) {
+  public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
 
     Map<String, FlowData> flowMap = runNdpi(pcapFile);
@@ -79,32 +79,15 @@ public class NdpiService {
 
     for (PcapParserService.ConversationInfo conv : conversations) {
       FlowData data = resolve(flowMap, conv);
-      if (data != null && data.appName() != null) conv.setAppName(data.appName());
+      if (data == null) continue;
+      if (data.appName() != null) conv.setAppName(data.appName());
+      if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
     }
 
-    long enriched = conversations.stream().filter(c -> c.getAppName() != null).count();
-    log.info("nDPI enriched {}/{} conversations with app names", enriched, conversations.size());
-  }
-
-  /**
-   * Enrich each ConversationInfo with nDPI security risk flags.
-   * Reuses the same {@code -v 2} output as {@link #enrichWithAppNames} — no second process.
-   * Conversations with no detected risks are left with an empty list.
-   */
-  public void enrichWithRisks(File pcapFile,
-      List<PcapParserService.ConversationInfo> conversations) {
-    if (conversations.isEmpty()) return;
-
-    Map<String, FlowData> flowMap = runNdpi(pcapFile);
-    if (flowMap.isEmpty()) return;
-
-    for (PcapParserService.ConversationInfo conv : conversations) {
-      FlowData data = resolve(flowMap, conv);
-      if (data != null && !data.risks().isEmpty()) conv.setFlowRisks(data.risks());
-    }
-
-    long withRisks = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
-    log.info("nDPI flagged {}/{} conversations with security risks", withRisks, conversations.size());
+    long enrichedApps  = conversations.stream().filter(c -> c.getAppName() != null).count();
+    long enrichedRisks = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
+    log.info("nDPI enriched {}/{} conversations with app names, {}/{} with security risks",
+        enrichedApps, conversations.size(), enrichedRisks, conversations.size());
   }
 
   // ---------------------------------------------------------------------------

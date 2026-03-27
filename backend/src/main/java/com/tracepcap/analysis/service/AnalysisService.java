@@ -81,9 +81,8 @@ public class AnalysisService {
       PcapParserService.PcapAnalysisResult parseResult =
           pcapParserService.analyzePcapFile(tempFile);
 
-      // Enrich conversations with application names and security risks via nDPI
-      ndpiService.enrichWithAppNames(tempFile, parseResult.getConversations());
-      ndpiService.enrichWithRisks(tempFile, parseResult.getConversations());
+      // Enrich conversations with app names and security risks via nDPI (single subprocess run)
+      ndpiService.enrich(tempFile, parseResult.getConversations());
 
       // Update analysis results
       analysis.setPacketCount(parseResult.getPacketCount());
@@ -393,7 +392,8 @@ public class AnalysisService {
               .dstPort(conv.getDstPort())
               .protocol(conv.getProtocol())
               .appName(conv.getAppName())
-              .flowRisks(Arrays.asList(conv.getFlowRisks()))
+              .flowRisks(conv.getFlowRisks() != null
+                  ? Arrays.asList(conv.getFlowRisks()) : List.of())
               .packetCount(conv.getPacketCount())
               .totalBytes(conv.getTotalBytes())
               .startTime(conv.getStartTime())
