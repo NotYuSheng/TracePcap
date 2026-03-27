@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { isAxiosError } from 'axios';
 import { Card } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/store';
@@ -13,28 +14,28 @@ export const FileList = () => {
   const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
 
-  const recentFilesRef = useRef(recentFiles);
-  const removeRecentFileRef = useRef(removeRecentFile);
-
   // Validate files on mount - remove files that no longer exist on backend
   useEffect(() => {
     const validateFiles = async () => {
-      for (const file of recentFilesRef.current) {
+      const { recentFiles, removeRecentFile } = useStore.getState();
+      for (const file of recentFiles) {
         try {
           await apiClient.get(API_ENDPOINTS.FILE_METADATA(file.id));
         } catch (error: unknown) {
-          const status = (error as { response?: { status?: number } })?.response?.status;
-          if (status === 404) {
-            removeRecentFileRef.current(file.id);
-          } else if (status !== undefined) {
-            console.warn(`Unexpected status ${status} for file ${file.name}`);
+          if (isAxiosError(error)) {
+            const status = error.response?.status;
+            if (status === 404) {
+              removeRecentFile(file.id);
+            } else if (status !== undefined) {
+              console.warn(`Unexpected status ${status} for file ${file.name}`);
+            }
           }
           // Network error or backend down — keep file in list
         }
       }
     };
 
-    if (recentFilesRef.current.length > 0) {
+    if (useStore.getState().recentFiles.length > 0) {
       validateFiles();
     }
   }, []);
