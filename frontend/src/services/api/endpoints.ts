@@ -12,7 +12,7 @@ export const API_ENDPOINTS = {
   FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
   KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,
 
-  // Conversations (Not yet implemented in backend)
+  // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,
 

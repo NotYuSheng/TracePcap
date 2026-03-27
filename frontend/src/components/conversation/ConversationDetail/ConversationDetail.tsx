@@ -97,7 +97,7 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                       </td>
                       <td>{packet.size} B</td>
                       <td>
-                        <small className="text-muted">{packet.protocol.name}</small>
+                        <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
                       </td>
                     </tr>
                   ))

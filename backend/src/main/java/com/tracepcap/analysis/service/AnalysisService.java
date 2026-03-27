@@ -1,12 +1,16 @@
 package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
+import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationResponse;
+import com.tracepcap.analysis.dto.PacketResponse;
 import com.tracepcap.analysis.dto.ProtocolStatsResponse;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
@@ -25,8 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AnalysisService {
 
+  private static final int PACKET_BATCH_SIZE = 1000;
+
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
+  private final PacketRepository packetRepository;
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
@@ -34,6 +41,7 @@ public class AnalysisService {
   @Transactional
   public void reanalyzeFile(UUID fileId) {
     log.info("Forcing re-analysis for file: {}, clearing existing results", fileId);
+    packetRepository.deleteByFileId(fileId);
     conversationRepository.deleteByFileId(fileId);
     analysisResultRepository.deleteByFileId(fileId);
     analyzeFile(fileId);
@@ -99,7 +107,7 @@ public class AnalysisService {
 
       analysisResultRepository.save(analysis);
 
-      // Save conversations
+      // Save conversations and their packets
       for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
         ConversationEntity conversation =
             ConversationEntity.builder()
@@ -114,7 +122,33 @@ public class AnalysisService {
                 .startTime(convInfo.getStartTime())
                 .endTime(convInfo.getEndTime())
                 .build();
-        conversationRepository.save(conversation);
+        ConversationEntity savedConversation = conversationRepository.save(conversation);
+
+        List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
+        if (!packetInfos.isEmpty()) {
+          List<PacketEntity> packetEntities =
+              packetInfos.stream()
+                  .map(
+                      pktInfo ->
+                          PacketEntity.builder()
+                              .file(file)
+                              .conversation(savedConversation)
+                              .packetNumber(pktInfo.getPacketNumber())
+                              .timestamp(pktInfo.getTimestamp())
+                              .srcIp(pktInfo.getSrcIp())
+                              .srcPort(pktInfo.getSrcPort())
+                              .dstIp(pktInfo.getDstIp())
+                              .dstPort(pktInfo.getDstPort())
+                              .protocol(pktInfo.getProtocol())
+                              .packetSize(pktInfo.getPacketSize())
+                              .info(pktInfo.getInfo())
+                              .build())
+                  .collect(Collectors.toList());
+          for (int i = 0; i < packetEntities.size(); i += PACKET_BATCH_SIZE) {
+            int end = Math.min(i + PACKET_BATCH_SIZE, packetEntities.size());
+            packetRepository.saveAll(packetEntities.subList(i, end));
+          }
+        }
       }
 
       // Update file status
@@ -330,6 +364,21 @@ public class AnalysisService {
         .collect(Collectors.toList());
   }
 
+  private PacketResponse toPacketResponse(PacketEntity p) {
+    return PacketResponse.builder()
+        .id(p.getId())
+        .packetNumber(p.getPacketNumber())
+        .timestamp(p.getTimestamp())
+        .srcIp(p.getSrcIp())
+        .srcPort(p.getSrcPort())
+        .dstIp(p.getDstIp())
+        .dstPort(p.getDstPort())
+        .protocol(p.getProtocol())
+        .packetSize(p.getPacketSize())
+        .info(p.getInfo())
+        .build();
+  }
+
   /**
    * Get analysis result entity by file ID (for status checking) Returns null if analysis doesn't
    * exist yet
@@ -337,5 +386,38 @@ public class AnalysisService {
   @Transactional(readOnly = true)
   public AnalysisResultEntity getAnalysisResultByFileId(UUID fileId) {
     return analysisResultRepository.findByFileId(fileId).orElse(null);
+  }
+
+  @Transactional(readOnly = true)
+  public ConversationDetailResponse getConversationDetail(UUID conversationId) {
+    ConversationEntity conversation =
+        conversationRepository
+            .findById(conversationId)
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException("Conversation not found: " + conversationId));
+
+    List<PacketEntity> packets =
+        packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
+
+    Duration duration = Duration.between(conversation.getStartTime(), conversation.getEndTime());
+
+    List<PacketResponse> packetResponses =
+        packets.stream().map(this::toPacketResponse).collect(Collectors.toList());
+
+    return ConversationDetailResponse.builder()
+        .conversationId(conversation.getId())
+        .srcIp(conversation.getSrcIp())
+        .srcPort(conversation.getSrcPort())
+        .dstIp(conversation.getDstIp())
+        .dstPort(conversation.getDstPort())
+        .protocol(conversation.getProtocol())
+        .packetCount(conversation.getPacketCount())
+        .totalBytes(conversation.getTotalBytes())
+        .startTime(conversation.getStartTime())
+        .endTime(conversation.getEndTime())
+        .durationMs(duration.toMillis())
+        .packets(packetResponses)
+        .build();
   }
 }
