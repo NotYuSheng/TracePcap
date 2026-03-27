@@ -51,6 +51,7 @@ export interface AnalysisSummary {
   topConversations: Conversation[];
   uniqueHosts: NetworkEndpoint[];
   detectedApplications?: string[];
+  detectedApplicationsTruncated?: boolean;
   fiveWs?: FiveWsAnalysis;
 }
 

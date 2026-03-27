@@ -41,6 +41,9 @@ export const AnalysisOverview = () => {
           <h5 className="mb-3">
             <i className="bi bi-app-indicator me-2"></i>
             Applications Detected
+            {data.detectedApplicationsTruncated && (
+              <span className="text-muted fs-6 fw-normal ms-2">(showing top {detectedApps.length})</span>
+            )}
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {detectedApps.map(app => (

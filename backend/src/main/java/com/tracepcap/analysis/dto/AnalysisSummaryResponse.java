@@ -29,6 +29,7 @@ public class AnalysisSummaryResponse {
   private List<ConversationSummary> topConversations;
   private List<UniqueHost> uniqueHosts;
   private List<String> detectedApplications;
+  private Boolean detectedApplicationsTruncated;
 
   // Legacy fields for backward compatibility
   private LocalDateTime startTime;
