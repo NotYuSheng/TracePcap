@@ -97,11 +97,11 @@ public class AnalysisController {
     return ResponseEntity.ok(response);
   }
 
-  /** Trigger manual analysis for a file */
+  /** Trigger manual re-analysis for a file, clearing any existing results */
   @PostMapping("/{fileId}/analyze")
   public ResponseEntity<Void> analyzeFile(@PathVariable UUID fileId) {
     log.info("POST /api/analysis/{}/analyze", fileId);
-    analysisService.analyzeFile(fileId);
+    analysisService.reanalyzeFile(fileId);
     return ResponseEntity.accepted().build();
   }
 }
