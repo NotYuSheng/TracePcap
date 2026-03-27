@@ -264,8 +264,12 @@ public class PcapParserService {
   /**
    * Patch all IDB SnapLen fields to 65535 so libpcap 1.10.5+ doesn't reject
    * multi-interface pcapng files where interfaces have different snapshot lengths.
+   *
+   * Uses a stream-copy + memory-mapped in-place patch to avoid loading the
+   * entire file into the heap (important for large captures).
    */
   private File normalizePcapngSnapLen(File pcapFile) {
+    // Quick pcapng magic check — only read 4 bytes
     try (java.io.FileInputStream fis = new java.io.FileInputStream(pcapFile)) {
       byte[] magic = new byte[4];
       if (fis.read(magic) < 4) return pcapFile;
@@ -277,59 +281,61 @@ public class PcapParserService {
     }
 
     try {
-      byte[] data = java.nio.file.Files.readAllBytes(pcapFile.toPath());
-      if (data.length < 12) return pcapFile;
-
-      boolean le = (data[8] & 0xFF) == 0x4D && (data[9] & 0xFF) == 0x3C
-          && (data[10] & 0xFF) == 0x2B && (data[11] & 0xFF) == 0x1A;
-
-      int pos = 0;
-      boolean patched = false;
-      while (pos + 12 <= data.length) {
-        int blockType = readInt32(data, pos, le);
-        int blockLen  = readInt32(data, pos + 4, le);
-        if (blockLen < 12 || pos + blockLen > data.length) break;
-
-        // IDB: type(4) + len(4) + link_type(2) + reserved(2) + snap_len(4)
-        if (blockType == 1 && pos + 16 <= data.length) {
-          writeInt32(data, pos + 12, 65535, le);
-          patched = true;
-        }
-        pos += blockLen;
-      }
-
-      if (!patched) return pcapFile;
-
+      // Stream-copy to temp file so we can patch it without touching the original
       File normalized = File.createTempFile("pcap-normalized-", ".pcapng");
       normalized.deleteOnExit();
-      java.nio.file.Files.write(normalized.toPath(), data);
+      java.nio.file.Files.copy(
+          pcapFile.toPath(), normalized.toPath(),
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+      try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(normalized, "rw");
+           java.nio.channels.FileChannel ch = raf.getChannel()) {
+
+        if (ch.size() < 12) {
+          normalized.delete();
+          return pcapFile;
+        }
+
+        // Read SHB byte-order magic at offset 8 to determine endianness
+        java.nio.ByteBuffer hdr = java.nio.ByteBuffer.allocate(12);
+        ch.read(hdr, 0);
+        hdr.flip();
+        boolean le = (hdr.get(8) & 0xFF) == 0x4D && (hdr.get(9) & 0xFF) == 0x3C
+            && (hdr.get(10) & 0xFF) == 0x2B && (hdr.get(11) & 0xFF) == 0x1A;
+
+        // Memory-map the temp file for in-place patching; the OS pages blocks
+        // on demand so only accessed regions consume physical RAM
+        java.nio.MappedByteBuffer mbb =
+            ch.map(java.nio.channels.FileChannel.MapMode.READ_WRITE, 0, ch.size());
+        mbb.order(le ? java.nio.ByteOrder.LITTLE_ENDIAN : java.nio.ByteOrder.BIG_ENDIAN);
+
+        boolean patched = false;
+        int pos = 0;
+        while (pos + 12 <= mbb.limit()) {
+          int blockType = mbb.getInt(pos);
+          int blockLen  = mbb.getInt(pos + 4);
+          if (blockLen < 12 || pos + blockLen > mbb.limit()) break;
+
+          // IDB: type(4) + len(4) + link_type(2) + reserved(2) + snap_len(4)
+          if (blockType == 1 && pos + 16 <= mbb.limit()) {
+            mbb.putInt(pos + 12, 65535);
+            patched = true;
+          }
+          pos += blockLen;
+        }
+
+        mbb.force();
+
+        if (!patched) {
+          normalized.delete();
+          return pcapFile;
+        }
+      }
+
       return normalized;
     } catch (Exception e) {
       log.warn("Failed to normalize pcapng snaplen: {}", e.getMessage());
       return pcapFile;
-    }
-  }
-
-  private int readInt32(byte[] data, int offset, boolean le) {
-    if (le) {
-      return (data[offset] & 0xFF) | ((data[offset + 1] & 0xFF) << 8)
-          | ((data[offset + 2] & 0xFF) << 16) | ((data[offset + 3] & 0xFF) << 24);
-    }
-    return ((data[offset] & 0xFF) << 24) | ((data[offset + 1] & 0xFF) << 16)
-        | ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
-  }
-
-  private void writeInt32(byte[] data, int offset, int value, boolean le) {
-    if (le) {
-      data[offset]     = (byte)  (value         & 0xFF);
-      data[offset + 1] = (byte) ((value >>  8)  & 0xFF);
-      data[offset + 2] = (byte) ((value >> 16)  & 0xFF);
-      data[offset + 3] = (byte) ((value >> 24)  & 0xFF);
-    } else {
-      data[offset]     = (byte) ((value >> 24)  & 0xFF);
-      data[offset + 1] = (byte) ((value >> 16)  & 0xFF);
-      data[offset + 2] = (byte) ((value >>  8)  & 0xFF);
-      data[offset + 3] = (byte)  (value         & 0xFF);
     }
   }
 
