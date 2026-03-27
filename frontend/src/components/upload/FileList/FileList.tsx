@@ -1,14 +1,44 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { isAxiosError } from 'axios';
 import { Card } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/store';
 import type { RecentFile } from '@/store/slices/uploadSlice';
+import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import './FileList.css';
 
 export const FileList = () => {
   const recentFiles = useStore(state => state.recentFiles);
   const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
+
+  // Validate files on mount - remove files that no longer exist on backend
+  useEffect(() => {
+    const validateFiles = async () => {
+      const { recentFiles, removeRecentFile } = useStore.getState();
+      for (const file of recentFiles) {
+        try {
+          await apiClient.get(API_ENDPOINTS.FILE_METADATA(file.id));
+        } catch (error: unknown) {
+          if (isAxiosError(error)) {
+            const status = error.response?.status;
+            if (status === 404) {
+              removeRecentFile(file.id);
+            } else if (status !== undefined) {
+              console.warn(`Unexpected status ${status} for file ${file.name}`);
+            }
+          }
+          // Network error or backend down — keep file in list
+        }
+      }
+    };
+
+    if (useStore.getState().recentFiles.length > 0) {
+      validateFiles();
+    }
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
