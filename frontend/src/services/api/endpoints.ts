@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
   // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,
+  SECURITY_ALERTS: (fileId: string) => `/files/${fileId}/security-alerts`,
 
   // Timeline (Not yet implemented in backend)
   TIMELINE_DATA: (fileId: string) => `/timeline/${fileId}`,

@@ -493,6 +493,7 @@ public class PcapParserService {
     private Integer dstPort;
     private String protocol;
     private String appName;
+    private List<String> flowRisks = new ArrayList<>();
     private Long packetCount;
     private Long totalBytes;
     private LocalDateTime startTime;

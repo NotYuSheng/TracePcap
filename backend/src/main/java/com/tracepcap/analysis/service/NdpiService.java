@@ -3,6 +3,7 @@ package com.tracepcap.analysis.service;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,23 +15,21 @@ import org.springframework.stereotype.Service;
 
 /**
  * Runs ndpiReader as a subprocess to identify application-layer protocols (e.g. Zoom, WhatsApp,
- * Telegram) for each conversation in a PCAP file.
+ * Telegram) and security risk flags for each conversation in a PCAP file.
  *
  * <p>Uses: {@code ndpiReader -i <file> -v 2}
  *
  * <p>Per-flow lines (from -v 2) look like:
  * <pre>
  *   \t1\tUDP 192.168.1.77:28150 <-> 91.108.8.1:533  [proto: 185/Telegram][Encrypted]...
- *   \t8\tUDP 10.0.0.1:443      <-> 1.2.3.4:1234    [proto: 188.126/QUIC.Google]...
- *   \t3\tUDP [fe80::1]:5353    ->  [ff02::fb]:5353  [proto: 8/MDNS]...
+ *   \t2\tTCP 192.168.0.114:1137 <-> 192.168.0.193:21 [proto: 1/FTP_CONTROL]...[Risk: ** Clear-Text Credentials **** Unsafe Protocol **]...
  * </pre>
  *
- * <p>The app name is extracted from the proto field: {@code N/Name} or {@code N.N/Master.App}.
- * When a dot is present in the name part (e.g. {@code QUIC.Google}), the part after the last dot
- * is used ({@code Google}).
+ * <p>Risk names are extracted from {@code [Risk: ** Name1 **** Name2 **]} blocks and normalised
+ * to lowercase-underscore form (e.g. {@code clear_text_credentials}).
  *
- * <p>Gracefully degrades: if ndpiReader is not available or fails, all appName fields remain null
- * and analysis continues normally.
+ * <p>Gracefully degrades: if ndpiReader is not available or fails, all appName / flowRisks fields
+ * remain at their defaults and analysis continues normally.
  */
 @Slf4j
 @Service
@@ -41,9 +40,6 @@ public class NdpiService {
   /**
    * Matches per-flow lines from {@code ndpiReader -v 2}.
    * Groups: (1) l4proto  (2) srcIp  (3) srcPort  (4) dstIp  (5) dstPort  (6) protoField
-   *
-   * Handles IPv4 (192.168.1.1) and IPv6 ([fe80::1]) addresses,
-   * and both bidirectional (<->) and unidirectional (->) flows.
    */
   private static final Pattern FLOW_LINE = Pattern.compile(
       "\\t\\d+\\t(TCP|UDP)\\s+" +
@@ -52,10 +48,23 @@ public class NdpiService {
       Pattern.CASE_INSENSITIVE
   );
 
+  /** Matches the entire [Risk: ...] block in a flow line. */
+  private static final Pattern RISK_BLOCK = Pattern.compile(
+      "\\[Risk:\\s*(.*?)\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
+  /** Matches individual risk names between ** markers inside a risk block. */
+  private static final Pattern RISK_NAME = Pattern.compile("\\*\\*\\s*([^*]+?)\\s*\\*\\*");
+
   /** Transport-only names that carry no application-layer signal. */
   private static final Set<String> SKIP_PROTOCOLS = Set.of(
       "TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN"
   );
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
 
   /**
    * Enrich each ConversationInfo with the app name detected by nDPI.
@@ -65,38 +74,58 @@ public class NdpiService {
       List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
 
-    Map<String, String> flowToApp = runNdpi(pcapFile);
-    if (flowToApp.isEmpty()) return;
+    Map<String, FlowData> flowMap = runNdpi(pcapFile);
+    if (flowMap.isEmpty()) return;
 
     for (PcapParserService.ConversationInfo conv : conversations) {
-      String key1 = flowKey(conv.getSrcIp(), conv.getSrcPort(),
-                            conv.getDstIp(), conv.getDstPort(), conv.getProtocol());
-      String key2 = flowKey(conv.getDstIp(), conv.getDstPort(),
-                            conv.getSrcIp(), conv.getSrcPort(), conv.getProtocol());
-      String app = flowToApp.get(key1);
-      if (app == null) app = flowToApp.get(key2);
-      if (app != null) conv.setAppName(app);
+      FlowData data = resolve(flowMap, conv);
+      if (data != null && data.appName() != null) conv.setAppName(data.appName());
     }
 
     long enriched = conversations.stream().filter(c -> c.getAppName() != null).count();
     log.info("nDPI enriched {}/{} conversations with app names", enriched, conversations.size());
   }
 
+  /**
+   * Enrich each ConversationInfo with nDPI security risk flags.
+   * Reuses the same {@code -v 2} output as {@link #enrichWithAppNames} — no second process.
+   * Conversations with no detected risks are left with an empty list.
+   */
+  public void enrichWithRisks(File pcapFile,
+      List<PcapParserService.ConversationInfo> conversations) {
+    if (conversations.isEmpty()) return;
+
+    Map<String, FlowData> flowMap = runNdpi(pcapFile);
+    if (flowMap.isEmpty()) return;
+
+    for (PcapParserService.ConversationInfo conv : conversations) {
+      FlowData data = resolve(flowMap, conv);
+      if (data != null && !data.risks().isEmpty()) conv.setFlowRisks(data.risks());
+    }
+
+    long withRisks = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
+    log.info("nDPI flagged {}/{} conversations with security risks", withRisks, conversations.size());
+  }
+
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------
 
-  private Map<String, String> runNdpi(File pcapFile) {
-    Map<String, String> result = new HashMap<>();
+  /** Immutable holder for per-flow nDPI data extracted from one -v 2 line. */
+  private record FlowData(String appName, List<String> risks) {}
 
-    // -v 2 emits one line per flow with the 5-tuple and detected protocol
+  /**
+   * Runs {@code ndpiReader -i <file> -v 2} and returns a map of flow key → FlowData.
+   * Each FlowData contains the detected app name (may be null) and list of risk names.
+   */
+  private Map<String, FlowData> runNdpi(File pcapFile) {
+    Map<String, FlowData> result = new HashMap<>();
+
     ProcessBuilder pb = new ProcessBuilder(NDPI_BINARY, "-i", pcapFile.getAbsolutePath(), "-v", "2");
 
     try {
       Process process = pb.start();
 
-      // Drain stderr on a background thread to avoid blocking stdout reading;
-      // log at DEBUG so diagnostics are available without polluting normal logs.
       Thread stderrDrainer = new Thread(() -> {
         try (BufferedReader err =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
@@ -117,11 +146,11 @@ public class NdpiService {
         }
       }
       process.waitFor();
-      log.debug("nDPI identified {} distinct flows", result.size());
+      log.debug("nDPI parsed {} distinct flows", result.size());
 
     } catch (Exception e) {
       if (isNotFoundError(e)) {
-        log.warn("ndpiReader not found — skipping app identification. Install libndpi-bin to enable.");
+        log.warn("ndpiReader not found — skipping app/risk identification. Install libndpi-bin to enable.");
       } else {
         log.warn("nDPI analysis failed", e);
       }
@@ -131,15 +160,12 @@ public class NdpiService {
   }
 
   /**
-   * Parse one ndpiReader -v 2 flow line into the result map.
+   * Parse one ndpiReader -v 2 flow line into the result map, extracting both app name and risks.
    *
-   * Proto field examples:
-   *   "Telegram"      → Telegram
-   *   "QUIC.Google"   → Google   (take after last dot)
-   *   "TLS.Zoom"      → Zoom
-   *   "MDNS"          → MDNS
+   * <p>Proto field examples: "Telegram" → Telegram, "QUIC.Google" → Google, "MDNS" → MDNS
+   * <p>Risk block example: {@code [Risk: ** Clear-Text Credentials **** Unsafe Protocol **]}
    */
-  private void parseFlowLine(String line, Map<String, String> result) {
+  private void parseFlowLine(String line, Map<String, FlowData> result) {
     Matcher m = FLOW_LINE.matcher(line);
     if (!m.find()) return;
 
@@ -149,15 +175,49 @@ public class NdpiService {
     String dstIp   = stripBrackets(m.group(4));
     int    dstPort = Integer.parseInt(m.group(5));
 
-    // Extract app name from proto field, e.g. "QUIC.Google" → "Google"
+    // App name from proto field
     String protoField = m.group(6).trim();
     int dot = protoField.lastIndexOf('.');
     String appName = dot >= 0 ? protoField.substring(dot + 1) : protoField;
+    if (SKIP_PROTOCOLS.contains(appName)) appName = null;
+    if (appName != null && appName.length() > 50) appName = appName.substring(0, 50);
 
-    if (SKIP_PROTOCOLS.contains(appName)) return;
-    if (appName.length() > 50) appName = appName.substring(0, 50);
+    // Risk names from [Risk: ** Name1 **** Name2 **] block
+    List<String> risks = new ArrayList<>();
+    Matcher rb = RISK_BLOCK.matcher(line);
+    if (rb.find()) {
+      Matcher rn = RISK_NAME.matcher(rb.group(1));
+      while (rn.find()) {
+        risks.add(normaliseRisk(rn.group(1)));
+      }
+    }
 
-    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), appName);
+    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks));
+  }
+
+  /** Lookup flow data trying both directions (src→dst and dst→src). */
+  private FlowData resolve(Map<String, FlowData> flowMap, PcapParserService.ConversationInfo conv) {
+    String key1 = flowKey(conv.getSrcIp(), conv.getSrcPort(),
+                          conv.getDstIp(), conv.getDstPort(), conv.getProtocol());
+    FlowData data = flowMap.get(key1);
+    if (data == null) {
+      String key2 = flowKey(conv.getDstIp(), conv.getDstPort(),
+                            conv.getSrcIp(), conv.getSrcPort(), conv.getProtocol());
+      data = flowMap.get(key2);
+    }
+    return data;
+  }
+
+  /**
+   * Normalise a raw nDPI risk label to lowercase-underscore form.
+   * E.g. "Clear-Text Credentials" → "clear_text_credentials"
+   *      "Known Protocol on Non Standard Port" → "known_protocol_on_non_standard_port"
+   */
+  private String normaliseRisk(String raw) {
+    return raw.trim()
+        .toLowerCase()
+        .replaceAll("[^a-z0-9]+", "_")
+        .replaceAll("^_|_$", "");
   }
 
   /** Remove surrounding IPv6 brackets: [fe80::1] → fe80::1 */

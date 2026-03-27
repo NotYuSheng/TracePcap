@@ -11,6 +11,7 @@ interface ConversationApiResponse {
   dstPort: number | null;
   protocol: string;
   appName?: string | null;
+  flowRisks?: string[] | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[]; // LocalDateTime can be array or ISO string
@@ -66,6 +67,7 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     endpoints: [srcEndpoint, dstEndpoint],
     protocol: getProtocol(apiData.protocol),
     appName: apiData.appName ?? undefined,
+    flowRisks: apiData.flowRisks ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,

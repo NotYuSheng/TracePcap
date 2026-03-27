@@ -30,6 +30,7 @@ export interface Conversation {
   endpoints: [NetworkEndpoint, NetworkEndpoint];
   protocol: Protocol;
   appName?: string;
+  flowRisks: string[];
   startTime: number;
   endTime: number;
   packetCount: number;

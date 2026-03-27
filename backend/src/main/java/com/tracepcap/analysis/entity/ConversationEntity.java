@@ -44,6 +44,9 @@ public class ConversationEntity {
   @Column(name = "app_name", length = 50)
   private String appName;
 
+  @Column(name = "flow_risks", columnDefinition = "text[]")
+  private String[] flowRisks;
+
   @Column(name = "packet_count", nullable = false)
   @Builder.Default
   private Long packetCount = 0L;
