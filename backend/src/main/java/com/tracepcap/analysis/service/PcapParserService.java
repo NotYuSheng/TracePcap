@@ -128,21 +128,37 @@ public class PcapParserService {
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol
-    ProcessBuilder pb = new ProcessBuilder(
-        "tshark", "-r", pcapFile.getAbsolutePath(),
-        "-T", "fields",
-        "-E", "separator=|",
-        "-e", "frame.time_epoch",
-        "-e", "frame.len",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "ipv6.src",
-        "-e", "ipv6.dst",
-        "-e", "tcp.srcport",
-        "-e", "tcp.dstport",
-        "-e", "udp.srcport",
-        "-e", "udp.dstport",
-        "-e", "_ws.col.Protocol");
+    ProcessBuilder pb =
+        new ProcessBuilder(
+            "tshark",
+            "-r",
+            pcapFile.getAbsolutePath(),
+            "-T",
+            "fields",
+            "-E",
+            "separator=|",
+            "-e",
+            "frame.time_epoch",
+            "-e",
+            "frame.len",
+            "-e",
+            "ip.src",
+            "-e",
+            "ip.dst",
+            "-e",
+            "ipv6.src",
+            "-e",
+            "ipv6.dst",
+            "-e",
+            "tcp.srcport",
+            "-e",
+            "tcp.dstport",
+            "-e",
+            "udp.srcport",
+            "-e",
+            "udp.dstport",
+            "-e",
+            "_ws.col.Protocol");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     long packetNumber = 0;
@@ -262,15 +278,18 @@ public class PcapParserService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Patch all IDB SnapLen fields to 65535 so libpcap 1.10.5+ doesn't reject
-   * multi-interface pcapng files where interfaces have different snapshot lengths.
+   * Patch all IDB SnapLen fields to 65535 so libpcap 1.10.5+ doesn't reject multi-interface pcapng
+   * files where interfaces have different snapshot lengths.
    */
   private File normalizePcapngSnapLen(File pcapFile) {
     try (java.io.FileInputStream fis = new java.io.FileInputStream(pcapFile)) {
       byte[] magic = new byte[4];
       if (fis.read(magic) < 4) return pcapFile;
-      boolean isPcapng = (magic[0] & 0xFF) == 0x0A && (magic[1] & 0xFF) == 0x0D
-          && (magic[2] & 0xFF) == 0x0D && (magic[3] & 0xFF) == 0x0A;
+      boolean isPcapng =
+          (magic[0] & 0xFF) == 0x0A
+              && (magic[1] & 0xFF) == 0x0D
+              && (magic[2] & 0xFF) == 0x0D
+              && (magic[3] & 0xFF) == 0x0A;
       if (!isPcapng) return pcapFile;
     } catch (Exception e) {
       return pcapFile;
@@ -280,14 +299,17 @@ public class PcapParserService {
       byte[] data = java.nio.file.Files.readAllBytes(pcapFile.toPath());
       if (data.length < 12) return pcapFile;
 
-      boolean le = (data[8] & 0xFF) == 0x4D && (data[9] & 0xFF) == 0x3C
-          && (data[10] & 0xFF) == 0x2B && (data[11] & 0xFF) == 0x1A;
+      boolean le =
+          (data[8] & 0xFF) == 0x4D
+              && (data[9] & 0xFF) == 0x3C
+              && (data[10] & 0xFF) == 0x2B
+              && (data[11] & 0xFF) == 0x1A;
 
       int pos = 0;
       boolean patched = false;
       while (pos + 12 <= data.length) {
         int blockType = readInt32(data, pos, le);
-        int blockLen  = readInt32(data, pos + 4, le);
+        int blockLen = readInt32(data, pos + 4, le);
         if (blockLen < 12 || pos + blockLen > data.length) break;
 
         // IDB: type(4) + len(4) + link_type(2) + reserved(2) + snap_len(4)
@@ -312,24 +334,28 @@ public class PcapParserService {
 
   private int readInt32(byte[] data, int offset, boolean le) {
     if (le) {
-      return (data[offset] & 0xFF) | ((data[offset + 1] & 0xFF) << 8)
-          | ((data[offset + 2] & 0xFF) << 16) | ((data[offset + 3] & 0xFF) << 24);
+      return (data[offset] & 0xFF)
+          | ((data[offset + 1] & 0xFF) << 8)
+          | ((data[offset + 2] & 0xFF) << 16)
+          | ((data[offset + 3] & 0xFF) << 24);
     }
-    return ((data[offset] & 0xFF) << 24) | ((data[offset + 1] & 0xFF) << 16)
-        | ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+    return ((data[offset] & 0xFF) << 24)
+        | ((data[offset + 1] & 0xFF) << 16)
+        | ((data[offset + 2] & 0xFF) << 8)
+        | (data[offset + 3] & 0xFF);
   }
 
   private void writeInt32(byte[] data, int offset, int value, boolean le) {
     if (le) {
-      data[offset]     = (byte)  (value         & 0xFF);
-      data[offset + 1] = (byte) ((value >>  8)  & 0xFF);
-      data[offset + 2] = (byte) ((value >> 16)  & 0xFF);
-      data[offset + 3] = (byte) ((value >> 24)  & 0xFF);
+      data[offset] = (byte) (value & 0xFF);
+      data[offset + 1] = (byte) ((value >> 8) & 0xFF);
+      data[offset + 2] = (byte) ((value >> 16) & 0xFF);
+      data[offset + 3] = (byte) ((value >> 24) & 0xFF);
     } else {
-      data[offset]     = (byte) ((value >> 24)  & 0xFF);
-      data[offset + 1] = (byte) ((value >> 16)  & 0xFF);
-      data[offset + 2] = (byte) ((value >>  8)  & 0xFF);
-      data[offset + 3] = (byte)  (value         & 0xFF);
+      data[offset] = (byte) ((value >> 24) & 0xFF);
+      data[offset + 1] = (byte) ((value >> 16) & 0xFF);
+      data[offset + 2] = (byte) ((value >> 8) & 0xFF);
+      data[offset + 3] = (byte) (value & 0xFF);
     }
   }
 
@@ -417,9 +443,15 @@ public class PcapParserService {
 
     int cmp = srcIp.compareTo(dstIp);
     if (cmp < 0 || (cmp == 0 && srcPort != null && dstPort != null && srcPort < dstPort)) {
-      ip1 = srcIp; port1 = srcPort; ip2 = dstIp; port2 = dstPort;
+      ip1 = srcIp;
+      port1 = srcPort;
+      ip2 = dstIp;
+      port2 = dstPort;
     } else {
-      ip1 = dstIp; port1 = dstPort; ip2 = srcIp; port2 = srcPort;
+      ip1 = dstIp;
+      port1 = dstPort;
+      ip2 = srcIp;
+      port2 = srcPort;
     }
     return String.format("%s:%s-%s:%s-%s", ip1, port1, ip2, port2, protocol);
   }
