@@ -123,9 +123,10 @@ public class AnalysisService {
                 .dstPort(convInfo.getDstPort())
                 .protocol(convInfo.getProtocol())
                 .appName(convInfo.getAppName())
-                .flowRisks(convInfo.getFlowRisks().isEmpty()
-                    ? null
-                    : convInfo.getFlowRisks().toArray(new String[0]))
+                .flowRisks(
+                    convInfo.getFlowRisks().isEmpty()
+                        ? null
+                        : convInfo.getFlowRisks().toArray(new String[0]))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -365,8 +366,8 @@ public class AnalysisService {
                   .dstPort(conv.getDstPort())
                   .protocol(conv.getProtocol())
                   .appName(conv.getAppName())
-                  .flowRisks(conv.getFlowRisks() != null
-                      ? Arrays.asList(conv.getFlowRisks()) : List.of())
+                  .flowRisks(
+                      conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
                   .packetCount(conv.getPacketCount())
                   .totalBytes(conv.getTotalBytes())
                   .startTime(conv.getStartTime())
@@ -382,25 +383,26 @@ public class AnalysisService {
     List<ConversationEntity> conversations = conversationRepository.findByFileIdWithRisks(fileId);
 
     return conversations.stream()
-        .map(conv -> {
-          Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
-          return ConversationResponse.builder()
-              .conversationId(conv.getId())
-              .srcIp(conv.getSrcIp())
-              .srcPort(conv.getSrcPort())
-              .dstIp(conv.getDstIp())
-              .dstPort(conv.getDstPort())
-              .protocol(conv.getProtocol())
-              .appName(conv.getAppName())
-              .flowRisks(conv.getFlowRisks() != null
-                  ? Arrays.asList(conv.getFlowRisks()) : List.of())
-              .packetCount(conv.getPacketCount())
-              .totalBytes(conv.getTotalBytes())
-              .startTime(conv.getStartTime())
-              .endTime(conv.getEndTime())
-              .durationMs(duration.toMillis())
-              .build();
-        })
+        .map(
+            conv -> {
+              Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+              return ConversationResponse.builder()
+                  .conversationId(conv.getId())
+                  .srcIp(conv.getSrcIp())
+                  .srcPort(conv.getSrcPort())
+                  .dstIp(conv.getDstIp())
+                  .dstPort(conv.getDstPort())
+                  .protocol(conv.getProtocol())
+                  .appName(conv.getAppName())
+                  .flowRisks(
+                      conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
+                  .packetCount(conv.getPacketCount())
+                  .totalBytes(conv.getTotalBytes())
+                  .startTime(conv.getStartTime())
+                  .endTime(conv.getEndTime())
+                  .durationMs(duration.toMillis())
+                  .build();
+            })
         .collect(Collectors.toList());
   }
 
@@ -434,8 +436,7 @@ public class AnalysisService {
         conversationRepository
             .findById(conversationId)
             .orElseThrow(
-                () ->
-                    new ResourceNotFoundException("Conversation not found: " + conversationId));
+                () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
     List<PacketEntity> packets =
         packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
@@ -453,8 +454,10 @@ public class AnalysisService {
         .dstPort(conversation.getDstPort())
         .protocol(conversation.getProtocol())
         .appName(conversation.getAppName())
-        .flowRisks(conversation.getFlowRisks() != null
-            ? Arrays.asList(conversation.getFlowRisks()) : List.of())
+        .flowRisks(
+            conversation.getFlowRisks() != null
+                ? Arrays.asList(conversation.getFlowRisks())
+                : List.of())
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())
