@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Card } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/store';
 import type { RecentFile } from '@/store/slices/uploadSlice';
+import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import './FileList.css';
 
 export const FileList = () => {
@@ -11,33 +13,31 @@ export const FileList = () => {
   const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
 
+  const recentFilesRef = useRef(recentFiles);
+  const removeRecentFileRef = useRef(removeRecentFile);
+
   // Validate files on mount - remove files that no longer exist on backend
   useEffect(() => {
     const validateFiles = async () => {
-      const filesToValidate = [...recentFiles]; // Copy array to avoid stale closures
-      for (const file of filesToValidate) {
+      for (const file of recentFilesRef.current) {
         try {
-          const response = await fetch(`http://localhost:8080/api/files/${file.id}`);
-          if (response.status === 404) {
-            // File doesn't exist on backend, remove from localStorage
-            console.log(`File ${file.name} no longer exists on backend, removing from recent files`);
-            removeRecentFile(file.id);
-          } else if (!response.ok) {
-            console.warn(`Unexpected status ${response.status} for file ${file.name}`);
+          await apiClient.get(API_ENDPOINTS.FILE_METADATA(file.id));
+        } catch (error: unknown) {
+          const status = (error as { response?: { status?: number } })?.response?.status;
+          if (status === 404) {
+            removeRecentFileRef.current(file.id);
+          } else if (status !== undefined) {
+            console.warn(`Unexpected status ${status} for file ${file.name}`);
           }
-        } catch (error) {
-          // Network error or backend down, keep the file in the list
-          console.warn(`Could not validate file ${file.name}:`, error);
+          // Network error or backend down — keep file in list
         }
       }
     };
 
-    const hasFilesToValidate = recentFiles.length > 0;
-    if (hasFilesToValidate) {
+    if (recentFilesRef.current.length > 0) {
       validateFiles();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount - removeRecentFile is stable
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
