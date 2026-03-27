@@ -22,6 +22,7 @@ export const analysisService = {
         { ip: conv.dstIp, port: conv.dstPort || 0 },
       ],
       protocol: { name: conv.protocol, layer: 'Transport' },
+      appName: conv.appName ?? undefined,
       packetCount: conv.packetCount || 0,
       totalBytes: conv.totalBytes || 0,
       startTime: conv.startTime || startTime,

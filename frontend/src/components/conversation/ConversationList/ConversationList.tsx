@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Conversation } from '@/types';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
+import { getAppColor } from '@/utils/appColors';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -12,6 +13,8 @@ export const ConversationList = ({
   onSelectConversation,
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const hasAppNames = conversations.some(c => c.appName);
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -41,6 +44,7 @@ export const ConversationList = ({
               <th>Source</th>
               <th>Destination</th>
               <th>Protocol</th>
+              {hasAppNames && <th>Application</th>}
               <th>Packets</th>
               <th>Bytes</th>
               <th>Duration</th>
@@ -80,6 +84,17 @@ export const ConversationList = ({
                       {conversation.protocol.name}
                     </span>
                   </td>
+                  {hasAppNames && (
+                    <td>
+                      {conversation.appName ? (
+                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                          {conversation.appName}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  )}
                   <td>{conversation.packetCount.toLocaleString()}</td>
                   <td>{formatBytes(conversation.totalBytes)}</td>
                   <td>{formatDuration(duration)}</td>

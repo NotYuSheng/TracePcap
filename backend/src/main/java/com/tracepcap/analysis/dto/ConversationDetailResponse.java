@@ -19,6 +19,7 @@ public class ConversationDetailResponse {
   private String dstIp;
   private Integer dstPort;
   private String protocol;
+  private String appName;
   private Long packetCount;
   private Long totalBytes;
   private LocalDateTime startTime;

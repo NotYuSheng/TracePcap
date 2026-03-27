@@ -41,6 +41,9 @@ public class ConversationEntity {
   @Column(nullable = false, length = 20)
   private String protocol;
 
+  @Column(name = "app_name", length = 50)
+  private String appName;
+
   @Column(name = "packet_count", nullable = false)
   @Builder.Default
   private Long packetCount = 0L;
