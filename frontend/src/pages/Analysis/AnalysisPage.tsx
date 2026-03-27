@@ -5,6 +5,7 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { generateAnalysisReport } from '@/utils/generateAnalysisReport';
 
 export const AnalysisPage = () => {
   const { fileId } = useParams<{ fileId: string }>();
@@ -13,6 +14,8 @@ export const AnalysisPage = () => {
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
   const [activeTab, setActiveTab] = useState('overview');
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportStatus, setExportStatus] = useState('');
 
   const handleReanalyze = async () => {
     if (!fileId) return;
@@ -22,6 +25,17 @@ export const AnalysisPage = () => {
       refetch();
     } finally {
       setReanalyzing(false);
+    }
+  };
+
+  const handleExportReport = async () => {
+    if (!data || !fileId) return;
+    setExporting(true);
+    try {
+      await generateAnalysisReport(data, fileId, setExportStatus);
+    } finally {
+      setExporting(false);
+      setExportStatus('');
     }
   };
 
@@ -73,15 +87,26 @@ export const AnalysisPage = () => {
           <h2>Network Traffic Analysis</h2>
           <p className="text-muted">File ID: {fileId}</p>
         </div>
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={handleReanalyze}
-          disabled={reanalyzing || loading}
-          title="Clear existing analysis and re-parse the PCAP file"
-        >
-          <i className={`bi ${reanalyzing ? 'bi-arrow-clockwise' : 'bi-arrow-repeat'} me-2`}></i>
-          {reanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
-        </button>
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-outline-primary btn-sm"
+            onClick={handleExportReport}
+            disabled={loading || !data || exporting}
+            title="Export full analysis report as PDF"
+          >
+            <i className={`bi ${exporting ? 'bi-arrow-clockwise' : 'bi-file-earmark-pdf'} me-2`}></i>
+            {exporting ? (exportStatus || 'Exporting...') : 'Export Report'}
+          </button>
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={handleReanalyze}
+            disabled={reanalyzing || loading}
+            title="Clear existing analysis and re-parse the PCAP file"
+          >
+            <i className={`bi ${reanalyzing ? 'bi-arrow-clockwise' : 'bi-arrow-repeat'} me-2`}></i>
+            {reanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
+          </button>
+        </div>
       </div>
 
       {/* Navigation Tabs */}
