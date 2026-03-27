@@ -138,6 +138,8 @@ llm:
     temperature: ${LLM_TEMPERATURE:0.7}
     max-tokens: ${LLM_MAX_TOKENS:2000}
     timeout-seconds: ${LLM_TIMEOUT:60}
+  story:
+    max-conversations: ${STORY_MAX_CONVERSATIONS:20}
   retry:
     max-attempts: 3
     backoff-ms: 1000

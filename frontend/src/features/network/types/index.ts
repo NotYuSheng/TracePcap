@@ -52,6 +52,7 @@ export interface GraphEdge {
 
 export interface EdgeData {
   protocol: string;
+  appName?: string;
   packetCount: number;
   totalBytes: number;
   conversationId: string;

@@ -29,6 +29,7 @@ export interface Conversation {
   id: string;
   endpoints: [NetworkEndpoint, NetworkEndpoint];
   protocol: Protocol;
+  appName?: string;
   startTime: number;
   endTime: number;
   packetCount: number;

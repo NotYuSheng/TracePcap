@@ -13,6 +13,8 @@ export const ConversationList = ({
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const hasAppNames = conversations.some(c => c.appName);
+
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
     onSelectConversation?.(conversation);
@@ -41,6 +43,7 @@ export const ConversationList = ({
               <th>Source</th>
               <th>Destination</th>
               <th>Protocol</th>
+              {hasAppNames && <th>Application</th>}
               <th>Packets</th>
               <th>Bytes</th>
               <th>Duration</th>
@@ -80,6 +83,17 @@ export const ConversationList = ({
                       {conversation.protocol.name}
                     </span>
                   </td>
+                  {hasAppNames && (
+                    <td>
+                      {conversation.appName ? (
+                        <span className="badge bg-purple text-white" style={{ backgroundColor: '#6f42c1' }}>
+                          {conversation.appName}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  )}
                   <td>{conversation.packetCount.toLocaleString()}</td>
                   <td>{formatBytes(conversation.totalBytes)}</td>
                   <td>{formatDuration(duration)}</td>

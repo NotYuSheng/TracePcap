@@ -137,14 +137,16 @@ function updateNodeStats(
  */
 function createEdge(conversation: Conversation, srcIp: string, dstIp: string): GraphEdge {
   const protocol = conversation.protocol.name.toUpperCase();
+  const labelName = conversation.appName ?? protocol;
 
   return {
     id: conversation.id,
     source: srcIp,
     target: dstIp,
-    label: `${protocol} (${conversation.packetCount})`,
+    label: `${labelName} (${conversation.packetCount})`,
     data: {
       protocol,
+      appName: conversation.appName,
       packetCount: conversation.packetCount,
       totalBytes: conversation.totalBytes,
       conversationId: conversation.id,
