@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Conversation } from '@/types';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
+import { getAppColor } from '@/utils/appColors';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -86,7 +87,7 @@ export const ConversationList = ({
                   {hasAppNames && (
                     <td>
                       {conversation.appName ? (
-                        <span className="badge bg-purple text-white" style={{ backgroundColor: '#6f42c1' }}>
+                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
                           {conversation.appName}
                         </span>
                       ) : (

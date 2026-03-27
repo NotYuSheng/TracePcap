@@ -91,10 +91,24 @@ public class NdpiService {
 
     // -v 2 emits one line per flow with the 5-tuple and detected protocol
     ProcessBuilder pb = new ProcessBuilder(NDPI_BINARY, "-i", pcapFile.getAbsolutePath(), "-v", "2");
-    pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     try {
       Process process = pb.start();
+
+      // Drain stderr on a background thread to avoid blocking stdout reading;
+      // log at DEBUG so diagnostics are available without polluting normal logs.
+      Thread stderrDrainer = new Thread(() -> {
+        try (BufferedReader err =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+          String line;
+          while ((line = err.readLine()) != null) {
+            log.debug("ndpiReader stderr: {}", line);
+          }
+        } catch (Exception ignored) {}
+      });
+      stderrDrainer.setDaemon(true);
+      stderrDrainer.start();
+
       try (BufferedReader reader =
           new BufferedReader(new InputStreamReader(process.getInputStream()))) {
         String line;
@@ -109,7 +123,7 @@ public class NdpiService {
       if (isNotFoundError(e)) {
         log.warn("ndpiReader not found — skipping app identification. Install libndpi-bin to enable.");
       } else {
-        log.warn("nDPI analysis failed: {}", e.getMessage());
+        log.warn("nDPI analysis failed", e);
       }
     }
 

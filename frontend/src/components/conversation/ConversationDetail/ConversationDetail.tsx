@@ -1,5 +1,6 @@
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
+import { getAppColor } from '@/utils/appColors';
 
 interface ConversationDetailProps {
   conversation: Conversation;
@@ -44,7 +45,7 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      <span className="badge" style={{ backgroundColor: '#6f42c1', color: '#fff' }}>
+                      <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
                         {conversation.appName}
                       </span>
                     </dd>
