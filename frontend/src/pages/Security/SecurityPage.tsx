@@ -112,9 +112,7 @@ export const SecurityPage = () => {
                 </td>
                 <td>
                   <span className="badge bg-secondary">{conv.protocol.name}</span>
-                  {conv.appName && (
-                    <span className="badge bg-info ms-1">{conv.appName}</span>
-                  )}
+                  {conv.appName && <span className="badge bg-info ms-1">{conv.appName}</span>}
                 </td>
                 <td>
                   {conv.flowRisks.map(risk => (

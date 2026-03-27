@@ -87,7 +87,13 @@ export const ConversationList = ({
                   {hasAppNames && (
                     <td>
                       {conversation.appName ? (
-                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: getAppColor(conversation.appName!),
+                            color: '#fff',
+                          }}
+                        >
                           {conversation.appName}
                         </span>
                       ) : (
