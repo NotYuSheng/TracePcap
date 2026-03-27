@@ -28,8 +28,8 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
   return (
     <div className="narrative-view">
       {sections.map((section, index) => (
-        <div key={index} className={`card mb-3 ${getSectionClass(section.type)}`}>
-          <div className="card-header bg-white">
+        <div key={index} className={`card mb-3 overflow-hidden ${getSectionClass(section.type)}`}>
+          <div className="card-header bg-white rounded-top">
             <h5 className="mb-0 d-flex align-items-center">
               <i className={`bi ${getSectionIcon(section.type)} me-2`}></i>
               {section.title}

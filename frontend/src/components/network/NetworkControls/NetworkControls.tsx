@@ -161,47 +161,47 @@ export function NetworkControls({
             <div className="legend-title">Node Types</div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#f39c12' }}></span>
-              <i className="bi bi-globe2 me-1"></i>DNS Server
+              DNS Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#2ecc71' }}></span>
-              <i className="bi bi-server me-1"></i>Web Server
+              Web Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#1abc9c' }}></span>
-              <i className="bi bi-terminal me-1"></i>SSH Server
+              SSH Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#16a085' }}></span>
-              <i className="bi bi-folder-symlink me-1"></i>FTP Server
+              FTP Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#e91e63' }}></span>
-              <i className="bi bi-envelope me-1"></i>Mail Server
+              Mail Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#8e44ad' }}></span>
-              <i className="bi bi-diagram-3 me-1"></i>DHCP Server
+              DHCP Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#6c3483' }}></span>
-              <i className="bi bi-clock me-1"></i>NTP Server
+              NTP Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#e67e22' }}></span>
-              <i className="bi bi-database me-1"></i>Database Server
+              Database Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#d4ac0d' }}></span>
-              <i className="bi bi-router me-1"></i>Router / Gateway
+              Router / Gateway
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#3498db' }}></span>
-              <i className="bi bi-laptop me-1"></i>Client
+              Client
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#e74c3c' }}></span>
-              <i className="bi bi-exclamation-triangle me-1"></i>Anomaly
+              Anomaly
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#95a5a6' }}></span>
