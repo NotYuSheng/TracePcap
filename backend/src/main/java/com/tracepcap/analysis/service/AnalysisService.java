@@ -394,8 +394,7 @@ public class AnalysisService {
         conversationRepository
             .findById(conversationId)
             .orElseThrow(
-                () ->
-                    new ResourceNotFoundException("Conversation not found: " + conversationId));
+                () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
     List<PacketEntity> packets =
         packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
