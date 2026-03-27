@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AnalysisService {
 
+  private static final int PACKET_BATCH_SIZE = 1000;
+
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
@@ -39,6 +41,7 @@ public class AnalysisService {
   @Transactional
   public void reanalyzeFile(UUID fileId) {
     log.info("Forcing re-analysis for file: {}, clearing existing results", fileId);
+    packetRepository.deleteByFileId(fileId);
     conversationRepository.deleteByFileId(fileId);
     analysisResultRepository.deleteByFileId(fileId);
     analyzeFile(fileId);
@@ -123,27 +126,26 @@ public class AnalysisService {
 
         List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
         if (!packetInfos.isEmpty()) {
-          List<PacketEntity> packetEntities = new ArrayList<>();
-          for (PcapParserService.PacketInfo pktInfo : packetInfos) {
-            packetEntities.add(
-                PacketEntity.builder()
-                    .file(file)
-                    .conversation(savedConversation)
-                    .packetNumber(pktInfo.getPacketNumber())
-                    .timestamp(pktInfo.getTimestamp())
-                    .srcIp(pktInfo.getSrcIp())
-                    .srcPort(pktInfo.getSrcPort())
-                    .dstIp(pktInfo.getDstIp())
-                    .dstPort(pktInfo.getDstPort())
-                    .protocol(pktInfo.getProtocol())
-                    .packetSize(pktInfo.getPacketSize())
-                    .info(pktInfo.getInfo())
-                    .build());
-          }
-          // Batch save in chunks of 1000
-          int batchSize = 1000;
-          for (int i = 0; i < packetEntities.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, packetEntities.size());
+          List<PacketEntity> packetEntities =
+              packetInfos.stream()
+                  .map(
+                      pktInfo ->
+                          PacketEntity.builder()
+                              .file(file)
+                              .conversation(savedConversation)
+                              .packetNumber(pktInfo.getPacketNumber())
+                              .timestamp(pktInfo.getTimestamp())
+                              .srcIp(pktInfo.getSrcIp())
+                              .srcPort(pktInfo.getSrcPort())
+                              .dstIp(pktInfo.getDstIp())
+                              .dstPort(pktInfo.getDstPort())
+                              .protocol(pktInfo.getProtocol())
+                              .packetSize(pktInfo.getPacketSize())
+                              .info(pktInfo.getInfo())
+                              .build())
+                  .collect(Collectors.toList());
+          for (int i = 0; i < packetEntities.size(); i += PACKET_BATCH_SIZE) {
+            int end = Math.min(i + PACKET_BATCH_SIZE, packetEntities.size());
             packetRepository.saveAll(packetEntities.subList(i, end));
           }
         }
@@ -362,6 +364,21 @@ public class AnalysisService {
         .collect(Collectors.toList());
   }
 
+  private PacketResponse toPacketResponse(PacketEntity p) {
+    return PacketResponse.builder()
+        .id(p.getId())
+        .packetNumber(p.getPacketNumber())
+        .timestamp(p.getTimestamp())
+        .srcIp(p.getSrcIp())
+        .srcPort(p.getSrcPort())
+        .dstIp(p.getDstIp())
+        .dstPort(p.getDstPort())
+        .protocol(p.getProtocol())
+        .packetSize(p.getPacketSize())
+        .info(p.getInfo())
+        .build();
+  }
+
   /**
    * Get analysis result entity by file ID (for status checking) Returns null if analysis doesn't
    * exist yet
@@ -386,22 +403,7 @@ public class AnalysisService {
     Duration duration = Duration.between(conversation.getStartTime(), conversation.getEndTime());
 
     List<PacketResponse> packetResponses =
-        packets.stream()
-            .map(
-                p ->
-                    PacketResponse.builder()
-                        .id(p.getId())
-                        .packetNumber(p.getPacketNumber())
-                        .timestamp(p.getTimestamp())
-                        .srcIp(p.getSrcIp())
-                        .srcPort(p.getSrcPort())
-                        .dstIp(p.getDstIp())
-                        .dstPort(p.getDstPort())
-                        .protocol(p.getProtocol())
-                        .packetSize(p.getPacketSize())
-                        .info(p.getInfo())
-                        .build())
-            .collect(Collectors.toList());
+        packets.stream().map(this::toPacketResponse).collect(Collectors.toList());
 
     return ConversationDetailResponse.builder()
         .conversationId(conversation.getId())

@@ -42,7 +42,7 @@ const parseDateTime = (dt: string | number[]): number => {
   if (Array.isArray(dt) && dt.length >= 6) {
     return new Date(dt[0], dt[1] - 1, dt[2], dt[3], dt[4], dt[5]).getTime();
   }
-  return Date.now();
+  return 0;
 };
 
 function getProtocol(protocolName: string): Protocol {
@@ -81,6 +81,7 @@ function transformPacket(apiData: PacketApiResponse, protocol: Protocol): Packet
     destination: { ip: apiData.dstIp, port: apiData.dstPort ?? 0 },
     protocol,
     size: apiData.packetSize,
+    info: apiData.info ?? undefined,
     payload: '',
     flags: [],
   };

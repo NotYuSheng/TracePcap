@@ -127,7 +127,7 @@ public class PcapParserService {
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
-    //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol
+    //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info
     ProcessBuilder pb = new ProcessBuilder(
         "tshark", "-r", pcapFile.getAbsolutePath(),
         "-T", "fields",
@@ -142,7 +142,8 @@ public class PcapParserService {
         "-e", "tcp.dstport",
         "-e", "udp.srcport",
         "-e", "udp.dstport",
-        "-e", "_ws.col.Protocol");
+        "-e", "_ws.col.Protocol",
+        "-e", "_ws.col.Info");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     long packetNumber = 0;
@@ -175,6 +176,7 @@ public class PcapParserService {
           String udpDport = firstValue(f[9]);
           String protocolRaw = f[10].isEmpty() ? "OTHER" : firstValue(f[10]).toUpperCase();
           String protocol = protocolRaw.length() > 20 ? protocolRaw.substring(0, 20) : protocolRaw;
+          String info = (f.length > 11 && !f[11].isEmpty()) ? f[11] : protocol;
 
           LocalDateTime timestamp =
               LocalDateTime.ofInstant(
@@ -229,18 +231,9 @@ public class PcapParserService {
             conv.setPacketCount(conv.getPacketCount() + 1);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
-
-            PacketInfo pkt = new PacketInfo();
-            pkt.setPacketNumber(packetNumber);
-            pkt.setTimestamp(timestamp);
-            pkt.setSrcIp(srcIp);
-            pkt.setSrcPort(srcPort);
-            pkt.setDstIp(dstIp);
-            pkt.setDstPort(dstPort);
-            pkt.setProtocol(protocol);
-            pkt.setPacketSize(packetSize);
-            pkt.setInfo(protocol);
-            conv.getPackets().add(pkt);
+            conv.getPackets().add(buildPacketInfo(
+                packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
+                protocol, packetSize, info));
           }
         }
       }
@@ -365,6 +358,7 @@ public class PcapParserService {
     String srcIp = ipPacket.getHeader().getSrcAddr().getHostAddress();
     String dstIp = ipPacket.getHeader().getDstAddr().getHostAddress();
     String protocol;
+    String info;
     Integer srcPort = null;
     Integer dstPort = null;
 
@@ -373,19 +367,32 @@ public class PcapParserService {
       protocol = "TCP";
       srcPort = tcpPacket.getHeader().getSrcPort().valueAsInt();
       dstPort = tcpPacket.getHeader().getDstPort().valueAsInt();
+      TcpPacket.TcpHeader h = tcpPacket.getHeader();
+      List<String> flags = new ArrayList<>();
+      if (h.getSyn()) flags.add("SYN");
+      if (h.getAck()) flags.add("ACK");
+      if (h.getFin()) flags.add("FIN");
+      if (h.getRst()) flags.add("RST");
+      if (h.getPsh()) flags.add("PSH");
+      if (h.getUrg()) flags.add("URG");
+      String flagStr = flags.isEmpty() ? "" : " [" + String.join(", ", flags) + "]";
+      info = srcPort + " \u2192 " + dstPort + flagStr;
       incrementProtocolCount(result, protocol, packetSize);
     } else if (ipPacket.get(UdpPacket.class) != null) {
       UdpPacket udpPacket = ipPacket.get(UdpPacket.class);
       protocol = "UDP";
       srcPort = udpPacket.getHeader().getSrcPort().valueAsInt();
       dstPort = udpPacket.getHeader().getDstPort().valueAsInt();
+      info = srcPort + " \u2192 " + dstPort;
       incrementProtocolCount(result, protocol, packetSize);
     } else if (ipPacket.get(IcmpV4CommonPacket.class) != null) {
       protocol = "ICMP";
+      info = "ICMP";
       incrementProtocolCount(result, protocol, packetSize);
     } else {
       IpNumber ipNumber = ipPacket.getHeader().getProtocol();
       protocol = ipNumber.name();
+      info = protocol;
       incrementProtocolCount(result, protocol, packetSize);
     }
 
@@ -415,7 +422,15 @@ public class PcapParserService {
     conv.setPacketCount(conv.getPacketCount() + 1);
     conv.setTotalBytes(conv.getTotalBytes() + packetSize);
     if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
+    conv.getPackets().add(buildPacketInfo(
+        packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
+        protocol, packetSize, info));
+  }
 
+  private PacketInfo buildPacketInfo(
+      long packetNumber, LocalDateTime timestamp,
+      String srcIp, Integer srcPort, String dstIp, Integer dstPort,
+      String protocol, int packetSize, String info) {
     PacketInfo pkt = new PacketInfo();
     pkt.setPacketNumber(packetNumber);
     pkt.setTimestamp(timestamp);
@@ -425,8 +440,8 @@ public class PcapParserService {
     pkt.setDstPort(dstPort);
     pkt.setProtocol(protocol);
     pkt.setPacketSize(packetSize);
-    pkt.setInfo(protocol);
-    conv.getPackets().add(pkt);
+    pkt.setInfo(info);
+    return pkt;
   }
 
   /** Return the first comma-separated value, or the original string if no comma. */

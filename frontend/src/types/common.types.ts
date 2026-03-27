@@ -6,6 +6,7 @@ export interface Packet {
   destination: NetworkEndpoint;
   protocol: Protocol;
   size: number;
+  info?: string;
   payload: string;
   flags?: string[];
 }
