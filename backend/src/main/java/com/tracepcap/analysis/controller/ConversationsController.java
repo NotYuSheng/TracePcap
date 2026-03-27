@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.controller;
 
+import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.service.AnalysisService;
 import com.tracepcap.common.dto.PagedResponse;
@@ -46,5 +47,15 @@ public class ConversationsController {
         PagedResponse.of(allConversations, page, pageSize);
 
     return ResponseEntity.ok(pagedResponse);
+  }
+
+  /** Get detailed conversation info including all packets */
+  @GetMapping("/detail/{conversationId}")
+  @Operation(summary = "Get conversation details with packet stream")
+  public ResponseEntity<ConversationDetailResponse> getConversationDetail(
+      @PathVariable UUID conversationId) {
+    log.info("GET /api/conversations/detail/{}", conversationId);
+    ConversationDetailResponse detail = analysisService.getConversationDetail(conversationId);
+    return ResponseEntity.ok(detail);
   }
 }

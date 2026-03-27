@@ -78,7 +78,7 @@ public class PcapParserService {
 
           IpPacket ipPacket = packet.get(IpPacket.class);
           if (ipPacket != null) {
-            processIpPacket(ipPacket, packetSize, timestamp, conversationMap, result);
+            processIpPacket(ipPacket, packetSize, timestamp, packetNumber, conversationMap, result);
           } else {
             EthernetPacket etherPacket = packet.get(EthernetPacket.class);
             if (etherPacket != null) {
@@ -229,6 +229,18 @@ public class PcapParserService {
             conv.setPacketCount(conv.getPacketCount() + 1);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
+
+            PacketInfo pkt = new PacketInfo();
+            pkt.setPacketNumber(packetNumber);
+            pkt.setTimestamp(timestamp);
+            pkt.setSrcIp(srcIp);
+            pkt.setSrcPort(srcPort);
+            pkt.setDstIp(dstIp);
+            pkt.setDstPort(dstPort);
+            pkt.setProtocol(protocol);
+            pkt.setPacketSize(packetSize);
+            pkt.setInfo(protocol);
+            conv.getPackets().add(pkt);
           }
         }
       }
@@ -347,6 +359,7 @@ public class PcapParserService {
       IpPacket ipPacket,
       int packetSize,
       LocalDateTime timestamp,
+      long packetNumber,
       Map<String, ConversationInfo> conversationMap,
       PcapAnalysisResult result) {
     String srcIp = ipPacket.getHeader().getSrcAddr().getHostAddress();
@@ -402,6 +415,18 @@ public class PcapParserService {
     conv.setPacketCount(conv.getPacketCount() + 1);
     conv.setTotalBytes(conv.getTotalBytes() + packetSize);
     if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
+
+    PacketInfo pkt = new PacketInfo();
+    pkt.setPacketNumber(packetNumber);
+    pkt.setTimestamp(timestamp);
+    pkt.setSrcIp(srcIp);
+    pkt.setSrcPort(srcPort);
+    pkt.setDstIp(dstIp);
+    pkt.setDstPort(dstPort);
+    pkt.setProtocol(protocol);
+    pkt.setPacketSize(packetSize);
+    pkt.setInfo(protocol);
+    conv.getPackets().add(pkt);
   }
 
   /** Return the first comma-separated value, or the original string if no comma. */
@@ -456,5 +481,19 @@ public class PcapParserService {
     private Long totalBytes;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    private List<PacketInfo> packets = new ArrayList<>();
+  }
+
+  @lombok.Data
+  public static class PacketInfo {
+    private Long packetNumber;
+    private LocalDateTime timestamp;
+    private String srcIp;
+    private Integer srcPort;
+    private String dstIp;
+    private Integer dstPort;
+    private String protocol;
+    private Integer packetSize;
+    private String info;
   }
 }
