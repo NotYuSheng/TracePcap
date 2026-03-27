@@ -32,6 +32,14 @@ public class AnalysisService {
   private final PcapParserService pcapParserService;
 
   @Transactional
+  public void reanalyzeFile(UUID fileId) {
+    log.info("Forcing re-analysis for file: {}, clearing existing results", fileId);
+    conversationRepository.deleteByFileId(fileId);
+    analysisResultRepository.deleteByFileId(fileId);
+    analyzeFile(fileId);
+  }
+
+  @Transactional
   public void analyzeFile(UUID fileId) {
     log.info("Starting analysis for file: {}", fileId);
 

@@ -11,4 +11,6 @@ public interface AnalysisResultRepository extends JpaRepository<AnalysisResultEn
   Optional<AnalysisResultEntity> findByFileId(UUID fileId);
 
   boolean existsByFileId(UUID fileId);
+
+  void deleteByFileId(UUID fileId);
 }

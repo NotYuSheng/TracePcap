@@ -17,8 +17,8 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Install libpcap for PCAP file parsing (required by Pcap4J) and tzdata for timezone
-RUN apk add --no-cache libpcap libpcap-dev tzdata
+# Install libpcap for PCAP file parsing (required by Pcap4J), editcap for pcapng normalization, and tzdata for timezone
+RUN apk add --no-cache libpcap libpcap-dev tzdata tshark
 
 # Set timezone to Singapore
 ENV TZ=Asia/Singapore

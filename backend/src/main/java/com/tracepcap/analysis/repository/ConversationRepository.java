@@ -13,4 +13,6 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
   List<ConversationEntity> findByFileId(UUID fileId);
 
   Page<ConversationEntity> findByFileId(UUID fileId, Pageable pageable);
+
+  void deleteByFileId(UUID fileId);
 }
