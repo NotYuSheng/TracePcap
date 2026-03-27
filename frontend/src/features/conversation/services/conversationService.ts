@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { parseDateTime } from '@/utils/dateUtils';
 import type { Conversation, NetworkEndpoint, Protocol, PaginatedResponse, Packet } from '@/types';
 
 // Backend response types
@@ -11,6 +12,7 @@ interface ConversationApiResponse {
   dstPort: number | null;
   protocol: string;
   appName?: string | null;
+  flowRisks?: string[] | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[]; // LocalDateTime can be array or ISO string
@@ -35,16 +37,6 @@ interface ConversationDetailApiResponse extends ConversationApiResponse {
   packets: PacketApiResponse[];
 }
 
-// Convert LocalDateTime array [year, month, day, hour, min, sec, nano] or ISO string to timestamp
-const parseDateTime = (dt: string | number[]): number => {
-  if (typeof dt === 'string') {
-    return new Date(dt).getTime();
-  }
-  if (Array.isArray(dt) && dt.length >= 6) {
-    return new Date(dt[0], dt[1] - 1, dt[2], dt[3], dt[4], dt[5]).getTime();
-  }
-  return 0;
-};
 
 function getProtocol(protocolName: string): Protocol {
   const name = protocolName.toUpperCase();
@@ -66,6 +58,7 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     endpoints: [srcEndpoint, dstEndpoint],
     protocol: getProtocol(apiData.protocol),
     appName: apiData.appName ?? undefined,
+    flowRisks: apiData.flowRisks ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,

@@ -1,6 +1,7 @@
 package com.tracepcap.analysis.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,7 @@ public class ConversationResponse {
   private Integer dstPort;
   private String protocol;
   private String appName;
+  private List<String> flowRisks;
   private Long packetCount;
   private Long totalBytes;
   private LocalDateTime startTime;

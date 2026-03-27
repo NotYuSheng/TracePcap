@@ -4,6 +4,7 @@ import { UploadPage } from '@pages/Upload';
 import { AnalysisPage } from '@pages/Analysis';
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
 import { ConversationPage } from '@pages/Conversation';
+import { SecurityPage } from '@pages/Security';
 import { StoryPage } from '@pages/Story';
 import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
           {
             path: 'conversations',
             element: <ConversationPage />,
+          },
+          {
+            path: 'security',
+            element: <SecurityPage />,
           },
           {
             path: 'story',

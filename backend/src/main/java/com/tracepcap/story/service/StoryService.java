@@ -195,6 +195,17 @@ public class StoryService {
             - Identifying patterns, anomalies, and security concerns
             - Providing actionable insights
             - Creating a chronological narrative of events
+
+            Security risk guidance:
+            - Conversations tagged with nDPI security risks (shown as [RISKS: ...]) should be
+              treated as the highest-priority findings in the story.
+            - Each risk flag in the Security Alerts section must appear in at least one highlight
+              (type "anomaly" for severe risks such as clear_text_credentials, suspicious_entropy,
+              suspicious_dns_traffic, binary_application_transfer, possible_exploit_detected;
+              type "warning" for certificate/policy issues such as self_signed_certificate,
+              obsolete_tls_version, weak_tls_cipher) and one timeline event
+              (type "critical" or "suspicious" accordingly).
+            - Do NOT invent risks that are not listed in the data.
             """;
   }
 
@@ -206,7 +217,8 @@ public class StoryService {
    *   <li>File metadata (name, size, upload time)</li>
    *   <li>Traffic summary (packet count, bytes, duration, time range)</li>
    *   <li>Protocol breakdown (packet count, bytes, % per protocol)</li>
-   *   <li>Top-N conversations by traffic volume, including app name where detected</li>
+   *   <li>Top-N conversations by traffic volume, including app name and nDPI risk flags where detected</li>
+   *   <li>Security Alerts section listing all conversations with at least one risk flag</li>
    * </ul>
    *
    * <p>Known limitations — data NOT available to the LLM:
@@ -270,12 +282,15 @@ public class StoryService {
         String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
             ? " [" + conv.getAppName() + "]"
             : "";
+        String riskLabel = (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
+            ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]"
+            : "";
         prompt.append(String.format(
-            "%d. %s:%s <-> %s:%s (%s%s, %d packets, %d bytes)\n",
+            "%d. %s:%s <-> %s:%s (%s%s%s, %d packets, %d bytes)\n",
             i + 1,
             conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
             conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
-            conv.getProtocol(), appLabel,
+            conv.getProtocol(), appLabel, riskLabel,
             conv.getPacketCount(),
             conv.getTotalBytes()));
       }
@@ -286,6 +301,27 @@ public class StoryService {
             sorted.size() - maxConversations));
       }
       prompt.append("\n");
+
+      // Security alerts section — includes all at-risk conversations, even those outside top-N
+      List<ConversationEntity> atRisk = conversations.stream()
+          .filter(c -> c.getFlowRisks() != null && c.getFlowRisks().length > 0)
+          .collect(Collectors.toList());
+      if (!atRisk.isEmpty()) {
+        prompt.append(String.format("## Security Alerts (%d conversations with nDPI risk flags)\n",
+            atRisk.size()));
+        for (ConversationEntity conv : atRisk) {
+          String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
+              ? " [" + conv.getAppName() + "]"
+              : "";
+          prompt.append(String.format(
+              "- %s:%s <-> %s:%s (%s%s): %s\n",
+              conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
+              conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
+              conv.getProtocol(), appLabel,
+              String.join(", ", conv.getFlowRisks())));
+        }
+        prompt.append("\n");
+      }
     }
 
     prompt.append("## Analysis Limitations\n");

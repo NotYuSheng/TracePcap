@@ -18,6 +18,7 @@ import com.tracepcap.file.service.StorageService;
 import java.io.File;
 import java.time.Duration;
 import java.util.*;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,8 +81,8 @@ public class AnalysisService {
       PcapParserService.PcapAnalysisResult parseResult =
           pcapParserService.analyzePcapFile(tempFile);
 
-      // Enrich conversations with application names via nDPI
-      ndpiService.enrichWithAppNames(tempFile, parseResult.getConversations());
+      // Enrich conversations with app names and security risks via nDPI (single subprocess run)
+      ndpiService.enrich(tempFile, parseResult.getConversations());
 
       // Update analysis results
       analysis.setPacketCount(parseResult.getPacketCount());
@@ -122,6 +123,9 @@ public class AnalysisService {
                 .dstPort(convInfo.getDstPort())
                 .protocol(convInfo.getProtocol())
                 .appName(convInfo.getAppName())
+                .flowRisks(convInfo.getFlowRisks().isEmpty()
+                    ? null
+                    : convInfo.getFlowRisks().toArray(new String[0]))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -361,6 +365,8 @@ public class AnalysisService {
                   .dstPort(conv.getDstPort())
                   .protocol(conv.getProtocol())
                   .appName(conv.getAppName())
+                  .flowRisks(conv.getFlowRisks() != null
+                      ? Arrays.asList(conv.getFlowRisks()) : List.of())
                   .packetCount(conv.getPacketCount())
                   .totalBytes(conv.getTotalBytes())
                   .startTime(conv.getStartTime())
@@ -368,6 +374,33 @@ public class AnalysisService {
                   .durationMs(duration.toMillis())
                   .build();
             })
+        .collect(Collectors.toList());
+  }
+
+  @Transactional(readOnly = true)
+  public List<ConversationResponse> getSecurityAlerts(UUID fileId) {
+    List<ConversationEntity> conversations = conversationRepository.findByFileIdWithRisks(fileId);
+
+    return conversations.stream()
+        .map(conv -> {
+          Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+          return ConversationResponse.builder()
+              .conversationId(conv.getId())
+              .srcIp(conv.getSrcIp())
+              .srcPort(conv.getSrcPort())
+              .dstIp(conv.getDstIp())
+              .dstPort(conv.getDstPort())
+              .protocol(conv.getProtocol())
+              .appName(conv.getAppName())
+              .flowRisks(conv.getFlowRisks() != null
+                  ? Arrays.asList(conv.getFlowRisks()) : List.of())
+              .packetCount(conv.getPacketCount())
+              .totalBytes(conv.getTotalBytes())
+              .startTime(conv.getStartTime())
+              .endTime(conv.getEndTime())
+              .durationMs(duration.toMillis())
+              .build();
+        })
         .collect(Collectors.toList());
   }
 
@@ -420,6 +453,8 @@ public class AnalysisService {
         .dstPort(conversation.getDstPort())
         .protocol(conversation.getProtocol())
         .appName(conversation.getAppName())
+        .flowRisks(conversation.getFlowRisks() != null
+            ? Arrays.asList(conversation.getFlowRisks()) : List.of())
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())
