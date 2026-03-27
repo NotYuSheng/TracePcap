@@ -1,4 +1,4 @@
-import type { GraphNode, GraphEdge } from '@/features/network/types';
+import type { GraphNode, GraphEdge, NodeType } from '@/features/network/types';
 import './NodeDetails.css';
 
 interface NodeDetailsProps {
@@ -40,6 +40,26 @@ function getRoleBadgeClass(role: string): string {
       return 'bg-light text-dark';
   }
 }
+
+interface NodeTypeDisplay {
+  label: string;
+  icon: string;
+  badgeClass: string;
+}
+
+const NODE_TYPE_DISPLAY: Record<NodeType, NodeTypeDisplay> = {
+  'dns-server':      { label: 'DNS Server',      icon: 'bi-globe2',         badgeClass: 'bg-warning text-dark' },
+  'web-server':      { label: 'Web Server',       icon: 'bi-server',         badgeClass: 'bg-success' },
+  'ssh-server':      { label: 'SSH Server',       icon: 'bi-terminal',       badgeClass: 'bg-info text-dark' },
+  'ftp-server':      { label: 'FTP Server',       icon: 'bi-folder-symlink', badgeClass: 'bg-secondary' },
+  'mail-server':     { label: 'Mail Server',      icon: 'bi-envelope',       badgeClass: 'bg-danger' },
+  'dhcp-server':     { label: 'DHCP Server',      icon: 'bi-diagram-3',      badgeClass: 'bg-secondary' },
+  'ntp-server':      { label: 'NTP Server',       icon: 'bi-clock',          badgeClass: 'bg-dark' },
+  'database-server': { label: 'Database Server',  icon: 'bi-database',       badgeClass: 'bg-danger' },
+  'router':          { label: 'Router / Gateway', icon: 'bi-router',         badgeClass: 'bg-warning text-dark' },
+  'client':          { label: 'Client',           icon: 'bi-laptop',         badgeClass: 'bg-primary' },
+  'unknown':         { label: 'Unknown',          icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
+};
 
 export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
   // Find all edges connected to this node
@@ -96,6 +116,34 @@ export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
                 <div>{node.data.hostname}</div>
               </div>
             )}
+
+            {/* Detected Node Type */}
+            {(() => {
+              const typeInfo = NODE_TYPE_DISPLAY[node.data.nodeType] ?? NODE_TYPE_DISPLAY['unknown'];
+              const ev = node.data.nodeTypeEvidence;
+              return (
+                <div className="mb-2">
+                  <div className="text-muted small mb-1">Detected Type</div>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className={`badge ${typeInfo.badgeClass}`}>
+                      <i className={`bi ${typeInfo.icon} me-1`}></i>
+                      {typeInfo.label}
+                    </span>
+                  </div>
+                  {ev.dominantPort && (
+                    <div className="text-muted small mt-1">
+                      {ev.connectionCount} connection{ev.connectionCount !== 1 ? 's' : ''} on port {ev.dominantPort}
+                    </div>
+                  )}
+                  {!ev.dominantPort && node.data.nodeType === 'router' && (
+                    <div className="text-muted small mt-1">
+                      {ev.distinctPeers} distinct peers observed
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {node.data.isAnomaly && (
               <div className="alert alert-danger py-2 px-2 mb-2">
                 <i className="bi bi-exclamation-triangle me-2"></i>

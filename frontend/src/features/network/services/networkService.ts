@@ -1,5 +1,5 @@
 import type { Conversation, AnalysisSummary } from '@/types';
-import type { GraphNode, GraphEdge, NetworkGraphData, NetworkStats, NodeMap } from '../types';
+import type { GraphNode, GraphEdge, NetworkGraphData, NetworkStats, NodeMap, NodeType } from '../types';
 
 /**
  * Determine node role based on port number
@@ -8,6 +8,75 @@ import type { GraphNode, GraphEdge, NetworkGraphData, NetworkStats, NodeMap } fr
  */
 function determineRole(port: number): 'client' | 'server' {
   return port < 1024 ? 'server' : 'client';
+}
+
+/**
+ * Maps well-known port/protocol combinations to node types.
+ * Key format: "<port>/<PROTOCOL>"
+ */
+const PORT_SERVICE_MAP: Record<string, NodeType> = {
+  '53/UDP': 'dns-server',
+  '53/TCP': 'dns-server',
+  '80/TCP': 'web-server',
+  '443/TCP': 'web-server',
+  '8080/TCP': 'web-server',
+  '8443/TCP': 'web-server',
+  '22/TCP': 'ssh-server',
+  '21/TCP': 'ftp-server',
+  '20/TCP': 'ftp-server',
+  '25/TCP': 'mail-server',
+  '587/TCP': 'mail-server',
+  '465/TCP': 'mail-server',
+  '110/TCP': 'mail-server',
+  '143/TCP': 'mail-server',
+  '993/TCP': 'mail-server',
+  '995/TCP': 'mail-server',
+  '67/UDP': 'dhcp-server',
+  '68/UDP': 'dhcp-server',
+  '123/UDP': 'ntp-server',
+  '3306/TCP': 'database-server',
+  '5432/TCP': 'database-server',
+  '1433/TCP': 'database-server',
+  '1521/TCP': 'database-server',
+  '27017/TCP': 'database-server',
+  '6379/TCP': 'database-server',
+  '9200/TCP': 'database-server',
+};
+
+/** Minimum distinct peers before a non-server node is classified as a router/gateway */
+const ROUTER_PEER_THRESHOLD = 10;
+
+/**
+ * Classify a node type from its inbound port frequency map and distinct peer count.
+ * serverPorts: { "53/UDP": 42, "80/TCP": 1 } — counts of connections received on each port.
+ */
+function classifyNodeType(
+  node: GraphNode,
+  serverPorts: Record<string, number>,
+  distinctPeers: number
+): void {
+  // Find the port/protocol with the most inbound connections
+  let dominantPort: string | null = null;
+  let maxCount = 0;
+
+  for (const [portProto, count] of Object.entries(serverPorts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominantPort = portProto;
+    }
+  }
+
+  if (dominantPort && PORT_SERVICE_MAP[dominantPort]) {
+    node.data.nodeType = PORT_SERVICE_MAP[dominantPort];
+  } else if (distinctPeers >= ROUTER_PEER_THRESHOLD && node.data.role !== 'server') {
+    node.data.nodeType = 'router';
+  } else if (node.data.role === 'client' || node.data.role === 'unknown') {
+    node.data.nodeType = 'client';
+  } else {
+    node.data.nodeType = 'unknown';
+  }
+
+  node.data.nodeTypeEvidence = { dominantPort, connectionCount: maxCount, distinctPeers };
 }
 
 /**
@@ -30,6 +99,8 @@ function createNode(ip: string, hostname?: string, mac?: string): GraphNode {
       protocols: [],
       connections: 0,
       isAnomaly: false,
+      nodeType: 'unknown',
+      nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
     },
   };
 }
@@ -191,6 +262,12 @@ export function buildNetworkGraph(
   const nodeMap: NodeMap = {};
   const edges: GraphEdge[] = [];
 
+  // Per-node tracking for node type classification
+  // serverPorts[ip]["53/UDP"] = count of connections received on that port
+  const serverPorts: Record<string, Record<string, number>> = {};
+  // peerSets[ip] = set of all distinct peer IPs
+  const peerSets: Record<string, Set<string>> = {};
+
   // Limit conversations to top N by packet count for performance
   const limitedConversations =
     conversations.length > maxConversations
@@ -216,8 +293,30 @@ export function buildNetworkGraph(
     updateNodeStats(nodeMap[dst.ip], conv, 'received', protocol);
     finalizeNodeRole(nodeMap[dst.ip], src.port, dst.port);
 
+    // Track well-known port usage for both endpoints.
+    // A node sending FROM a well-known port (e.g. DNS response from :53) is
+    // just as valid a signal as one receiving ON a well-known port.
+    for (const [nodeIp, port] of [[dst.ip, dst.port], [src.ip, src.port]] as [string, number][]) {
+      if (port != null && port < 1024) {
+        const portKey = `${port}/${protocol}`;
+        if (!serverPorts[nodeIp]) serverPorts[nodeIp] = {};
+        serverPorts[nodeIp][portKey] = (serverPorts[nodeIp][portKey] || 0) + 1;
+      }
+    }
+
+    // Track distinct peers for both endpoints
+    if (!peerSets[src.ip]) peerSets[src.ip] = new Set();
+    peerSets[src.ip].add(dst.ip);
+    if (!peerSets[dst.ip]) peerSets[dst.ip] = new Set();
+    peerSets[dst.ip].add(src.ip);
+
     // Create edge
     edges.push(createEdge(conv, src.ip, dst.ip));
+  });
+
+  // Classify node types based on accumulated port/peer data
+  Object.keys(nodeMap).forEach(ip => {
+    classifyNodeType(nodeMap[ip], serverPorts[ip] || {}, peerSets[ip]?.size || 0);
   });
 
   // Mark anomalies if analysis data is available

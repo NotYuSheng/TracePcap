@@ -1,5 +1,24 @@
 // Network Graph Types
 
+export type NodeType =
+  | 'dns-server'
+  | 'web-server'
+  | 'ssh-server'
+  | 'ftp-server'
+  | 'mail-server'
+  | 'dhcp-server'
+  | 'ntp-server'
+  | 'database-server'
+  | 'router'
+  | 'client'
+  | 'unknown';
+
+export interface NodeTypeEvidence {
+  dominantPort: string | null;
+  connectionCount: number;
+  distinctPeers: number;
+}
+
 export interface GraphNode {
   id: string;
   label: string;
@@ -19,6 +38,8 @@ export interface NodeData {
   protocols: string[];
   connections: number;
   isAnomaly: boolean;
+  nodeType: NodeType;
+  nodeTypeEvidence: NodeTypeEvidence;
 }
 
 export interface GraphEdge {
