@@ -202,26 +202,27 @@ public class StoryService {
    * Build user prompt with analysis data.
    *
    * <p>Data included in the prompt:
+   *
    * <ul>
-   *   <li>File metadata (name, size, upload time)</li>
-   *   <li>Traffic summary (packet count, bytes, duration, time range)</li>
-   *   <li>Protocol breakdown (packet count, bytes, % per protocol)</li>
-   *   <li>Top-N conversations by traffic volume, including app name where detected</li>
+   *   <li>File metadata (name, size, upload time)
+   *   <li>Traffic summary (packet count, bytes, duration, time range)
+   *   <li>Protocol breakdown (packet count, bytes, % per protocol)
+   *   <li>Top-N conversations by traffic volume, including app name where detected
    * </ul>
    *
    * <p>Known limitations — data NOT available to the LLM:
+   *
    * <ul>
-   *   <li>Packet-level payloads or raw bytes (not captured during analysis)</li>
-   *   <li>Conversations beyond the configured cap (STORY_MAX_CONVERSATIONS)</li>
-   *   <li>Application-layer content (HTTP bodies, DNS query names, TLS SNI, etc.)</li>
+   *   <li>Packet-level payloads or raw bytes (not captured during analysis)
+   *   <li>Conversations beyond the configured cap (STORY_MAX_CONVERSATIONS)
+   *   <li>Application-layer content (HTTP bodies, DNS query names, TLS SNI, etc.)
    * </ul>
    */
   private String buildUserPrompt(
       FileEntity file, AnalysisResultEntity analysis, List<ConversationEntity> conversations) {
 
-    int maxConversations = llmConfig.getStory() != null
-        ? llmConfig.getStory().getMaxConversations()
-        : 20;
+    int maxConversations =
+        llmConfig.getStory() != null ? llmConfig.getStory().getMaxConversations() : 20;
 
     StringBuilder prompt = new StringBuilder();
     prompt.append("Analyze this network traffic capture and create a comprehensive story:\n\n");
@@ -241,55 +242,70 @@ public class StoryService {
     // Protocol breakdown
     if (analysis.getProtocolStats() != null && !analysis.getProtocolStats().isEmpty()) {
       prompt.append("## Protocol Breakdown\n");
-      analysis.getProtocolStats().forEach((protocol, statsObj) -> {
-        if (statsObj instanceof Map) {
-          @SuppressWarnings("unchecked")
-          Map<String, Object> stats = (Map<String, Object>) statsObj;
-          Object packets = stats.get("packetCount");
-          Object bytes = stats.get("bytes");
-          Object pct = stats.get("percentage");
-          prompt.append(String.format("- %s: %s packets, %s bytes (%.1f%%)\n",
-              protocol, packets, bytes,
-              pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
-        }
-      });
+      analysis
+          .getProtocolStats()
+          .forEach(
+              (protocol, statsObj) -> {
+                if (statsObj instanceof Map) {
+                  @SuppressWarnings("unchecked")
+                  Map<String, Object> stats = (Map<String, Object>) statsObj;
+                  Object packets = stats.get("packetCount");
+                  Object bytes = stats.get("bytes");
+                  Object pct = stats.get("percentage");
+                  prompt.append(
+                      String.format(
+                          "- %s: %s packets, %s bytes (%.1f%%)\n",
+                          protocol,
+                          packets,
+                          bytes,
+                          pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
+                }
+              });
       prompt.append("\n");
     }
 
     // Top-N conversations sorted by traffic volume (most significant first)
     if (!conversations.isEmpty()) {
-      List<ConversationEntity> sorted = conversations.stream()
-          .sorted(Comparator.comparingLong(ConversationEntity::getTotalBytes).reversed())
-          .collect(Collectors.toList());
+      List<ConversationEntity> sorted =
+          conversations.stream()
+              .sorted(Comparator.comparingLong(ConversationEntity::getTotalBytes).reversed())
+              .collect(Collectors.toList());
 
       int shown = Math.min(maxConversations, sorted.size());
       prompt.append(String.format("## Top %d Conversations (by traffic volume)\n", shown));
 
       for (int i = 0; i < shown; i++) {
         ConversationEntity conv = sorted.get(i);
-        String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
-            ? " [" + conv.getAppName() + "]"
-            : "";
-        prompt.append(String.format(
-            "%d. %s:%s <-> %s:%s (%s%s, %d packets, %d bytes)\n",
-            i + 1,
-            conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
-            conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
-            conv.getProtocol(), appLabel,
-            conv.getPacketCount(),
-            conv.getTotalBytes()));
+        String appLabel =
+            (conv.getAppName() != null && !conv.getAppName().isBlank())
+                ? " [" + conv.getAppName() + "]"
+                : "";
+        prompt.append(
+            String.format(
+                "%d. %s:%s <-> %s:%s (%s%s, %d packets, %d bytes)\n",
+                i + 1,
+                conv.getSrcIp(),
+                conv.getSrcPort() != null ? conv.getSrcPort() : "*",
+                conv.getDstIp(),
+                conv.getDstPort() != null ? conv.getDstPort() : "*",
+                conv.getProtocol(),
+                appLabel,
+                conv.getPacketCount(),
+                conv.getTotalBytes()));
       }
 
       if (sorted.size() > maxConversations) {
-        prompt.append(String.format(
-            "... and %d more conversations not shown (increase STORY_MAX_CONVERSATIONS to include them).\n",
-            sorted.size() - maxConversations));
+        prompt.append(
+            String.format(
+                "... and %d more conversations not shown (increase STORY_MAX_CONVERSATIONS to include them).\n",
+                sorted.size() - maxConversations));
       }
       prompt.append("\n");
     }
 
     prompt.append("## Analysis Limitations\n");
-    prompt.append("The following data was NOT available during this analysis — do not infer or hallucinate details about them:\n");
+    prompt.append(
+        "The following data was NOT available during this analysis — do not infer or hallucinate details about them:\n");
     prompt.append("- Packet payloads or raw bytes (not captured)\n");
     prompt.append("- Application-layer content (HTTP bodies, DNS query names, TLS SNI, etc.)\n");
     prompt.append("- Any conversations beyond those listed above\n\n");
