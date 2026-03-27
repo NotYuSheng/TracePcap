@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
@@ -24,10 +24,18 @@ export const NetworkDiagramPage = () => {
     'forceDirected2d'
   );
 
-  // Initialize protocol filter with all protocols
-  useMemo(() => {
-    if (stats.protocolBreakdown && selectedProtocols.length === 0) {
+  // Track if protocols have been initialized to prevent resetting user selections
+  const protocolsInitialized = useRef(false);
+
+  // Initialize protocol filter with all protocols (only once)
+  useEffect(() => {
+    if (
+      !protocolsInitialized.current &&
+      stats.protocolBreakdown &&
+      Object.keys(stats.protocolBreakdown).length > 0
+    ) {
       setSelectedProtocols(Object.keys(stats.protocolBreakdown));
+      protocolsInitialized.current = true;
     }
   }, [stats.protocolBreakdown]);
 

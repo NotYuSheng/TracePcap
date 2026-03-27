@@ -158,22 +158,54 @@ export function NetworkControls({
         </div>
         <div className="card-body p-2">
           <div className="legend-section mb-2">
-            <div className="legend-title">Node Roles</div>
+            <div className="legend-title">Node Types</div>
             <div className="legend-item">
-              <span className="legend-color" style={{ background: '#3498db' }}></span>
-              Client
+              <span className="legend-color" style={{ background: '#f39c12' }}></span>
+              <i className="bi bi-globe2 me-1"></i>DNS Server
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#2ecc71' }}></span>
-              Server
+              <i className="bi bi-server me-1"></i>Web Server
             </div>
             <div className="legend-item">
-              <span className="legend-color" style={{ background: '#9b59b6' }}></span>
-              Both
+              <span className="legend-color" style={{ background: '#1abc9c' }}></span>
+              <i className="bi bi-terminal me-1"></i>SSH Server
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#16a085' }}></span>
+              <i className="bi bi-folder-symlink me-1"></i>FTP Server
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#e91e63' }}></span>
+              <i className="bi bi-envelope me-1"></i>Mail Server
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#8e44ad' }}></span>
+              <i className="bi bi-diagram-3 me-1"></i>DHCP Server
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#6c3483' }}></span>
+              <i className="bi bi-clock me-1"></i>NTP Server
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#e67e22' }}></span>
+              <i className="bi bi-database me-1"></i>Database Server
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#d4ac0d' }}></span>
+              <i className="bi bi-router me-1"></i>Router / Gateway
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#3498db' }}></span>
+              <i className="bi bi-laptop me-1"></i>Client
             </div>
             <div className="legend-item">
               <span className="legend-color" style={{ background: '#e74c3c' }}></span>
-              Anomaly
+              <i className="bi bi-exclamation-triangle me-1"></i>Anomaly
+            </div>
+            <div className="legend-item">
+              <span className="legend-color" style={{ background: '#95a5a6' }}></span>
+              Unknown
             </div>
           </div>
           <div className="legend-section">
