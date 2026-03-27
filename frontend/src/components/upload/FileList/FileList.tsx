@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Card } from '@govtechsg/sgds-react';
+import { Card, Modal } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/store';
 import type { RecentFile } from '@/store/slices/uploadSlice';
@@ -13,6 +13,7 @@ export const FileList = () => {
   const recentFiles = useStore(state => state.recentFiles);
   const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
+  const [pendingDeleteFile, setPendingDeleteFile] = useState<RecentFile | null>(null);
 
   // Validate files on mount - remove files that no longer exist on backend
   useEffect(() => {
@@ -65,75 +66,117 @@ export const FileList = () => {
     navigate(`/analysis/${file.id}`);
   };
 
-  const handleRemoveFile = (fileId: string, e: React.MouseEvent) => {
+  const handleDeleteClick = (file: RecentFile, e: React.MouseEvent) => {
     e.stopPropagation();
-    removeRecentFile(fileId);
+    setPendingDeleteFile(file);
+  };
+
+  const handleConfirmDelete = () => {
+    if (pendingDeleteFile) {
+      removeRecentFile(pendingDeleteFile.id);
+      setPendingDeleteFile(null);
+    }
   };
 
   return (
-    <Card className="file-list-card mt-4">
-      <Card.Header>
-        <h5 className="mb-0">
-          <i className="bi bi-clock-history me-2"></i>
-          Recent Uploads
-        </h5>
-      </Card.Header>
-      <Card.Body className="p-0">
-        {recentFiles.length === 0 ? (
-          <div className="text-center text-muted py-4">
-            <p className="mb-0">No recent uploads. Upload a PCAP file to get started!</p>
-          </div>
-        ) : (
-          <div className="list-group list-group-flush">
-            {recentFiles.map(file => (
-              <div
-                key={file.id}
-                className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleFileClick(file)}
-              >
-                <div className="flex-grow-1">
-                  <div className="d-flex align-items-center gap-2">
-                    <i
-                      className="bi bi-file-earmark-binary text-primary"
-                      style={{ fontSize: '1.2rem' }}
-                    ></i>
-                    <div>
-                      <div className="fw-medium">{file.name}</div>
-                      <small className="text-muted">
-                        {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
-                      </small>
+    <>
+      <Card className="file-list-card mt-4">
+        <Card.Header>
+          <h5 className="mb-0">
+            <i className="bi bi-clock-history me-2"></i>
+            Recent Uploads
+          </h5>
+        </Card.Header>
+        <Card.Body className="p-0">
+          {recentFiles.length === 0 ? (
+            <div className="text-center text-muted py-4">
+              <p className="mb-0">No recent uploads. Upload a PCAP file to get started!</p>
+            </div>
+          ) : (
+            <div className="list-group list-group-flush">
+              {recentFiles.map(file => (
+                <div
+                  key={file.id}
+                  className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => handleFileClick(file)}
+                >
+                  <div className="flex-grow-1">
+                    <div className="d-flex align-items-center gap-2">
+                      <i
+                        className="bi bi-file-earmark-binary text-primary"
+                        style={{ fontSize: '1.2rem' }}
+                      ></i>
+                      <div>
+                        <div className="fw-medium">{file.name}</div>
+                        <small className="text-muted">
+                          {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
+                        </small>
+                      </div>
                     </div>
                   </div>
+                  <div className="d-flex gap-2 align-items-center">
+                    <button
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleFileClick(file);
+                      }}
+                    >
+                      <i className="bi bi-graph-up me-1"></i>
+                      Analyze
+                    </button>
+                    <button
+                      className="btn btn-link btn-sm p-0 text-danger"
+                      onClick={e => handleDeleteClick(file, e)}
+                      title="Delete this file"
+                    >
+                      <i className="bi bi-trash"></i>
+                    </button>
+                  </div>
                 </div>
-                <div className="d-flex gap-2 align-items-center">
-                  <button
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleFileClick(file);
-                    }}
-                  >
-                    <i className="bi bi-graph-up me-1"></i>
-                    Analyze
-                  </button>
-                  <button
-                    className="btn btn-link btn-sm p-0 text-danger"
-                    onClick={e => handleRemoveFile(file.id, e)}
-                    title="Delete this file"
-                  >
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+          <div className="card-footer text-muted small">
+            <AlertCircle size={14} className="me-1" />
+            Files are automatically deleted after 12 hours
           </div>
-        )}
-        <div className="card-footer text-muted small">
-          <AlertCircle size={14} className="me-1" />
-          Files are automatically deleted after 12 hours
-        </div>
-      </Card.Body>
-    </Card>
+        </Card.Body>
+      </Card>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        show={!!pendingDeleteFile}
+        onHide={() => setPendingDeleteFile(null)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Delete File</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Are you sure you want to remove{' '}
+            <strong>{pendingDeleteFile?.name}</strong> from your recent uploads?
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => setPendingDeleteFile(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-danger"
+            onClick={handleConfirmDelete}
+          >
+            Delete
+          </button>
+        </Modal.Footer>
+      </Modal>
+    </>
   );
 };
