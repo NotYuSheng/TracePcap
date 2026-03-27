@@ -11,16 +11,40 @@ interface NetworkGraphProps {
 }
 
 /**
- * Get node color based on role
+ * Get node color based on detected node type (falls back to role-based color)
  */
-function getNodeColor(role: string, isAnomaly: boolean): string {
-  if (isAnomaly) {
+function getNodeColor(nodeData: { role: string; isAnomaly: boolean; nodeType?: string }): string {
+  if (nodeData.isAnomaly) {
     return '#e74c3c'; // Red for anomalies
   }
 
-  switch (role) {
+  switch (nodeData.nodeType) {
+    case 'dns-server':
+      return '#f39c12'; // Amber
+    case 'web-server':
+      return '#2ecc71'; // Green
+    case 'ssh-server':
+      return '#1abc9c'; // Teal
+    case 'ftp-server':
+      return '#16a085'; // Dark Teal
+    case 'mail-server':
+      return '#e91e63'; // Pink
+    case 'dhcp-server':
+      return '#8e44ad'; // Purple
+    case 'ntp-server':
+      return '#6c3483'; // Deep Purple
+    case 'database-server':
+      return '#e67e22'; // Orange
+    case 'router':
+      return '#d4ac0d'; // Gold
     case 'client':
       return '#3498db'; // Blue
+    default:
+      break;
+  }
+
+  // Fallback to role-based colour for unclassified nodes
+  switch (nodeData.role) {
     case 'server':
       return '#2ecc71'; // Green
     case 'both':
@@ -69,7 +93,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   const reagraphNodes = nodes.map(node => ({
     id: node.id,
     label: node.label,
-    fill: getNodeColor(node.data.role, node.data.isAnomaly),
+    fill: getNodeColor(node.data),
     size: Math.max(5, Math.log(node.data.totalBytes + 1) * 2),
     data: node.data,
   }));
