@@ -17,4 +17,6 @@ public interface StoryRepository extends JpaRepository<StoryEntity, UUID> {
    * @return optional story entity
    */
   Optional<StoryEntity> findFirstByFileIdOrderByGeneratedAtDesc(UUID fileId);
+
+  void deleteByFileId(UUID fileId);
 }
