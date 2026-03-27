@@ -45,19 +45,8 @@ public class StoryService {
   public StoryResponse generateStory(UUID fileId) {
     log.info("Generating story for file: {}", fileId);
 
-    // Check if story already exists for this file
-    Optional<StoryEntity> existingStory =
-        storyRepository.findFirstByFileIdOrderByGeneratedAtDesc(fileId);
-    if (existingStory.isPresent()
-        && existingStory.get().getStatus() == StoryEntity.StoryStatus.COMPLETED) {
-      log.info("Story already exists for file: {}, returning cached version", fileId);
-      try {
-        return objectMapper.readValue(existingStory.get().getContent(), StoryResponse.class);
-      } catch (Exception e) {
-        log.warn("Failed to parse existing story, regenerating", e);
-        // Continue to regenerate if parsing fails
-      }
-    }
+    // Delete any existing stories for this file so we always generate fresh
+    storyRepository.deleteByFileId(fileId);
 
     // Verify file exists
     FileEntity file =

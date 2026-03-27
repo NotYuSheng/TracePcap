@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
   // Analysis (Not yet implemented in backend)
   ANALYSIS_SUMMARY: (fileId: string) => `/analysis/${fileId}/summary`,
   PROTOCOL_STATS: (fileId: string) => `/analysis/${fileId}/protocols`,
+  REANALYZE: (fileId: string) => `/analysis/${fileId}/analyze`,
   FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
   KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,
 
