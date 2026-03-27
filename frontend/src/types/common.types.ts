@@ -50,6 +50,7 @@ export interface AnalysisSummary {
   protocolDistribution: ProtocolStats[];
   topConversations: Conversation[];
   uniqueHosts: NetworkEndpoint[];
+  detectedApplications?: string[];
   fiveWs?: FiveWsAnalysis;
 }
 

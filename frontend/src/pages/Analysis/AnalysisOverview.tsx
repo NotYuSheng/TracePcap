@@ -14,6 +14,10 @@ export const AnalysisOverview = () => {
   const { data } = useOutletContext<AnalysisOutletContext>();
 
   const detectedApps = useMemo(() => {
+    if (data.detectedApplications && data.detectedApplications.length > 0) {
+      return data.detectedApplications.map(name => ({ name }));
+    }
+    // Fallback: derive from topConversations (may be incomplete)
     const appMap = new Map<string, { packets: number; bytes: number }>();
     for (const conv of data.topConversations || []) {
       if (!conv.appName) continue;
@@ -26,7 +30,7 @@ export const AnalysisOverview = () => {
     return Array.from(appMap.entries())
       .map(([name, stats]) => ({ name, ...stats }))
       .sort((a, b) => b.bytes - a.bytes);
-  }, [data.topConversations]);
+  }, [data.detectedApplications, data.topConversations]);
 
   return (
     <div className="analysis-overview">
@@ -47,7 +51,7 @@ export const AnalysisOverview = () => {
                   backgroundColor: getAppColor(app.name),
                   color: '#fff',
                 }}
-                title={`${app.packets.toLocaleString()} packets · ${(app.bytes / 1024).toFixed(1)} KB`}
+                title={'packets' in app ? `${app.packets.toLocaleString()} packets · ${(app.bytes / 1024).toFixed(1)} KB` : app.name}
               >
                 {app.name}
               </span>

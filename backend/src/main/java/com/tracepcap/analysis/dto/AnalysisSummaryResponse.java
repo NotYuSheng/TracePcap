@@ -28,6 +28,7 @@ public class AnalysisSummaryResponse {
   private List<ProtocolStat> protocolDistribution;
   private List<ConversationSummary> topConversations;
   private List<UniqueHost> uniqueHosts;
+  private List<String> detectedApplications;
 
   // Legacy fields for backward compatibility
   private LocalDateTime startTime;

@@ -240,6 +240,13 @@ public class AnalysisService {
 
     // Get top conversations
     List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    List<String> detectedApplications =
+        conversations.stream()
+            .map(ConversationEntity::getAppName)
+            .filter(app -> app != null && !app.isBlank())
+            .distinct()
+            .sorted()
+            .collect(Collectors.toList());
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
             .sorted((a, b) -> Long.compare(b.getTotalBytes(), a.getTotalBytes()))
@@ -304,6 +311,7 @@ public class AnalysisService {
         .protocolDistribution(protocolDistribution)
         .topConversations(topConversations)
         .uniqueHosts(uniqueHosts)
+        .detectedApplications(detectedApplications)
         // Legacy fields
         .startTime(analysis.getStartTime())
         .endTime(analysis.getEndTime())
