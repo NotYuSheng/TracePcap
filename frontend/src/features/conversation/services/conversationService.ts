@@ -41,19 +41,17 @@ interface ConversationDetailApiResponse extends ConversationApiResponse {
   packets: PacketApiResponse[];
 }
 
-
 function getProtocol(protocolName: string): Protocol {
   const name = protocolName.toUpperCase();
   const layer =
-    name === 'TCP' || name === 'UDP'
-      ? 'transport'
-      : name === 'ICMP'
-        ? 'network'
-        : 'application';
+    name === 'TCP' || name === 'UDP' ? 'transport' : name === 'ICMP' ? 'network' : 'application';
   return { layer: layer as Protocol['layer'], name };
 }
 
-function transformConversation(apiData: ConversationApiResponse, packets: Packet[] = []): Conversation {
+function transformConversation(
+  apiData: ConversationApiResponse,
+  packets: Packet[] = []
+): Conversation {
   const srcEndpoint: NetworkEndpoint = { ip: apiData.srcIp, port: apiData.srcPort ?? 0 };
   const dstEndpoint: NetworkEndpoint = { ip: apiData.dstIp, port: apiData.dstPort ?? 0 };
 
