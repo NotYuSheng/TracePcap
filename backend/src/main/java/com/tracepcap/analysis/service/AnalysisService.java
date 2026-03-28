@@ -144,9 +144,10 @@ public class AnalysisService {
                 .tlsSubject(convInfo.getTlsSubject())
                 .tlsNotBefore(convInfo.getTlsNotBefore())
                 .tlsNotAfter(convInfo.getTlsNotAfter())
-                .flowRisks(convInfo.getFlowRisks().isEmpty()
-                    ? null
-                    : convInfo.getFlowRisks().toArray(new String[0]))
+                .flowRisks(
+                    convInfo.getFlowRisks().isEmpty()
+                        ? null
+                        : convInfo.getFlowRisks().toArray(new String[0]))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -268,7 +269,8 @@ public class AnalysisService {
         .filter(conv -> conv.getAppName() != null && !conv.getAppName().isBlank())
         .forEach(
             conv -> {
-              long[] stats = appStatsMap.computeIfAbsent(conv.getAppName(), k -> new long[] {0L, 0L});
+              long[] stats =
+                  appStatsMap.computeIfAbsent(conv.getAppName(), k -> new long[] {0L, 0L});
               stats[0] += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
               stats[1] += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
             });
@@ -289,16 +291,17 @@ public class AnalysisService {
     // Aggregate category distribution
     class CategoryAggregate {
       long packetCount = 0L;
-      long totalBytes  = 0L;
+      long totalBytes = 0L;
     }
     Map<String, CategoryAggregate> catStatsMap = new java.util.TreeMap<>();
     conversations.stream()
         .filter(conv -> conv.getCategory() != null && !conv.getCategory().isBlank())
         .forEach(
             conv -> {
-              CategoryAggregate agg = catStatsMap.computeIfAbsent(conv.getCategory(), k -> new CategoryAggregate());
+              CategoryAggregate agg =
+                  catStatsMap.computeIfAbsent(conv.getCategory(), k -> new CategoryAggregate());
               agg.packetCount += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
-              agg.totalBytes  += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
+              agg.totalBytes += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
             });
     long totalCatPackets = catStatsMap.values().stream().mapToLong(a -> a.packetCount).sum();
     List<AnalysisSummaryResponse.CategoryStat> categoryDistribution =
@@ -309,10 +312,14 @@ public class AnalysisService {
                         .category(e.getKey())
                         .count(e.getValue().packetCount)
                         .bytes(e.getValue().totalBytes)
-                        .percentage(totalCatPackets > 0
-                            ? (e.getValue().packetCount * 100.0 / totalCatPackets) : 0.0)
+                        .percentage(
+                            totalCatPackets > 0
+                                ? (e.getValue().packetCount * 100.0 / totalCatPackets)
+                                : 0.0)
                         .build())
-            .sorted(java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount).reversed())
+            .sorted(
+                java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount)
+                    .reversed())
             .collect(Collectors.toList());
 
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
@@ -437,9 +444,8 @@ public class AnalysisService {
 
     Page<ConversationEntity> dbPage = conversationRepository.findAll(spec, pageable);
 
-    List<ConversationResponse> content = dbPage.getContent().stream()
-        .map(this::toConversationResponse)
-        .collect(Collectors.toList());
+    List<ConversationResponse> content =
+        dbPage.getContent().stream().map(this::toConversationResponse).collect(Collectors.toList());
 
     return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
   }
@@ -467,14 +473,15 @@ public class AnalysisService {
       return Sort.unsorted();
     }
     // Map frontend field names to entity field names
-    String field = switch (params.getSortBy()) {
-      case "packets"   -> "packetCount";
-      case "bytes"     -> "totalBytes";
-      case "duration"  -> "startTime"; // duration is computed; proxy with startTime
-      default          -> params.getSortBy(); // srcIp, dstIp, startTime pass through
-    };
-    Sort.Direction dir = "desc".equalsIgnoreCase(params.getSortDir())
-        ? Sort.Direction.DESC : Sort.Direction.ASC;
+    String field =
+        switch (params.getSortBy()) {
+          case "packets" -> "packetCount";
+          case "bytes" -> "totalBytes";
+          case "duration" -> "startTime"; // duration is computed; proxy with startTime
+          default -> params.getSortBy(); // srcIp, dstIp, startTime pass through
+        };
+    Sort.Direction dir =
+        "desc".equalsIgnoreCase(params.getSortDir()) ? Sort.Direction.DESC : Sort.Direction.ASC;
     return Sort.by(dir, field);
   }
 
@@ -510,33 +517,34 @@ public class AnalysisService {
     List<ConversationEntity> conversations = conversationRepository.findByFileIdWithRisks(fileId);
 
     return conversations.stream()
-        .map(conv -> {
-          Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
-          return ConversationResponse.builder()
-              .conversationId(conv.getId())
-              .srcIp(conv.getSrcIp())
-              .srcPort(conv.getSrcPort())
-              .dstIp(conv.getDstIp())
-              .dstPort(conv.getDstPort())
-              .protocol(conv.getProtocol())
-              .appName(conv.getAppName())
-              .category(conv.getCategory())
-              .hostname(conv.getHostname())
-              .ja3Client(conv.getJa3Client())
-              .ja3Server(conv.getJa3Server())
-              .tlsIssuer(conv.getTlsIssuer())
-              .tlsSubject(conv.getTlsSubject())
-              .tlsNotBefore(conv.getTlsNotBefore())
-              .tlsNotAfter(conv.getTlsNotAfter())
-              .flowRisks(conv.getFlowRisks() != null
-                  ? Arrays.asList(conv.getFlowRisks()) : List.of())
-              .packetCount(conv.getPacketCount())
-              .totalBytes(conv.getTotalBytes())
-              .startTime(conv.getStartTime())
-              .endTime(conv.getEndTime())
-              .durationMs(duration.toMillis())
-              .build();
-        })
+        .map(
+            conv -> {
+              Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+              return ConversationResponse.builder()
+                  .conversationId(conv.getId())
+                  .srcIp(conv.getSrcIp())
+                  .srcPort(conv.getSrcPort())
+                  .dstIp(conv.getDstIp())
+                  .dstPort(conv.getDstPort())
+                  .protocol(conv.getProtocol())
+                  .appName(conv.getAppName())
+                  .category(conv.getCategory())
+                  .hostname(conv.getHostname())
+                  .ja3Client(conv.getJa3Client())
+                  .ja3Server(conv.getJa3Server())
+                  .tlsIssuer(conv.getTlsIssuer())
+                  .tlsSubject(conv.getTlsSubject())
+                  .tlsNotBefore(conv.getTlsNotBefore())
+                  .tlsNotAfter(conv.getTlsNotAfter())
+                  .flowRisks(
+                      conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
+                  .packetCount(conv.getPacketCount())
+                  .totalBytes(conv.getTotalBytes())
+                  .startTime(conv.getStartTime())
+                  .endTime(conv.getEndTime())
+                  .durationMs(duration.toMillis())
+                  .build();
+            })
         .collect(Collectors.toList());
   }
 
@@ -572,8 +580,7 @@ public class AnalysisService {
         conversationRepository
             .findById(conversationId)
             .orElseThrow(
-                () ->
-                    new ResourceNotFoundException("Conversation not found: " + conversationId));
+                () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
     List<PacketEntity> packets =
         packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
@@ -599,8 +606,10 @@ public class AnalysisService {
         .tlsSubject(conversation.getTlsSubject())
         .tlsNotBefore(conversation.getTlsNotBefore())
         .tlsNotAfter(conversation.getTlsNotAfter())
-        .flowRisks(conversation.getFlowRisks() != null
-            ? Arrays.asList(conversation.getFlowRisks()) : List.of())
+        .flowRisks(
+            conversation.getFlowRisks() != null
+                ? Arrays.asList(conversation.getFlowRisks())
+                : List.of())
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())
