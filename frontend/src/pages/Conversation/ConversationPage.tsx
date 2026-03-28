@@ -24,22 +24,23 @@ export const ConversationPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { filters, activeFilterCount, setFilters, clearAll } = useConversationFilters();
 
-  const [conversations, setConversations]       = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [selectedIndex, setSelectedIndex]       = useState<number>(-1);
-  const [detailLoading, setDetailLoading]       = useState(false);
-  const [loading, setLoading]                   = useState(true);
-  const [error, setError]                       = useState<string | null>(null);
-  const [totalItems, setTotalItems]             = useState(0);
-  const [totalPages, setTotalPages]             = useState(0);
-  const [fileTypeOptions, setFileTypeOptions]   = useState<string[]>([]);
-  const [riskTypeOptions, setRiskTypeOptions]   = useState<string[]>([]);
-  const [visibleColumns, setVisibleColumns]     = useState<Set<ColumnKey>>(loadVisibleColumns);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [fileTypeOptions, setFileTypeOptions] = useState<string[]>([]);
+  const [riskTypeOptions, setRiskTypeOptions] = useState<string[]>([]);
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
 
   const toggleColumn = useCallback((key: ColumnKey) => {
     setVisibleColumns(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify([...next]));
       return next;
     });
@@ -54,9 +55,9 @@ export const ConversationPage = () => {
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
   useEffect(() => {
-    const srcIp  = searchParams.get('srcIp');
+    const srcIp = searchParams.get('srcIp');
     const peerIp = searchParams.get('peerIp');
-    const app    = searchParams.get('app');
+    const app = searchParams.get('app');
     if (srcIp || peerIp || app) {
       const next = new URLSearchParams(searchParams);
       if (srcIp || peerIp) {
@@ -78,7 +79,8 @@ export const ConversationPage = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    conversationService.getConversations(fileId, filters)
+    conversationService
+      .getConversations(fileId, filters)
       .then(r => {
         if (cancelled) return;
         setConversations(r.data);
@@ -89,8 +91,12 @@ export const ConversationPage = () => {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Failed to load conversations');
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [fileId, filters]);
 
   const openConversation = useCallback(async (conversation: Conversation, index: number) => {
@@ -135,7 +141,9 @@ export const ConversationPage = () => {
 
   useEffect(() => {
     document.body.style.overflow = selectedConversation ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [selectedConversation]);
 
   // Sort: cycle empty → asc → desc → empty
@@ -152,8 +160,11 @@ export const ConversationPage = () => {
   };
 
   // Filter options from the already-loaded analysis summary
-  const protocolOptions = (data.protocolDistribution ?? []).map(p => ({ protocol: p.protocol, count: p.count }));
-  const appOptions      = (data.detectedApplications ?? []).map(a => ({ name: a.name }));
+  const protocolOptions = (data.protocolDistribution ?? []).map(p => ({
+    protocol: p.protocol,
+    count: p.count,
+  }));
+  const appOptions = (data.detectedApplications ?? []).map(a => ({ name: a.name }));
   const categoryOptions = (data.categoryDistribution ?? []).map(c => ({ category: c.category }));
 
   // CSV export URL
@@ -172,7 +183,9 @@ export const ConversationPage = () => {
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h4 className="mb-0">
               Network Conversations
-              <span className="text-muted fs-6 fw-normal ms-2">({totalItems.toLocaleString()})</span>
+              <span className="text-muted fs-6 fw-normal ms-2">
+                ({totalItems.toLocaleString()})
+              </span>
             </h4>
             <a
               href={exportUrl}
@@ -214,7 +227,7 @@ export const ConversationPage = () => {
               ) : (
                 <ConversationList
                   conversations={conversations}
-                  onSelectConversation={(c) => {
+                  onSelectConversation={c => {
                     const idx = conversations.findIndex(x => x.id === c.id);
                     openConversation(c, idx);
                   }}
@@ -231,11 +244,11 @@ export const ConversationPage = () => {
                 <Pagination
                   currentPage={filters.page}
                   totalPages={totalPages}
-                  onPageChange={(page) => setFilters({ page })}
+                  onPageChange={page => setFilters({ page })}
                   pageSize={filters.pageSize}
                   totalItems={totalItems}
                   showPageSizeSelector
-                  onPageSizeChange={(pageSize) => setFilters({ pageSize, page: 1 })}
+                  onPageSizeChange={pageSize => setFilters({ pageSize, page: 1 })}
                 />
               </div>
             )}
@@ -248,7 +261,9 @@ export const ConversationPage = () => {
         <div
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          onClick={e => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
         >
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content">
@@ -285,10 +300,11 @@ export const ConversationPage = () => {
                 />
               </div>
               <div className="modal-body">
-                {detailLoading
-                  ? <LoadingSpinner size="medium" message="Loading conversation..." />
-                  : <ConversationDetail conversation={selectedConversation} />
-                }
+                {detailLoading ? (
+                  <LoadingSpinner size="medium" message="Loading conversation..." />
+                ) : (
+                  <ConversationDetail conversation={selectedConversation} />
+                )}
               </div>
             </div>
           </div>

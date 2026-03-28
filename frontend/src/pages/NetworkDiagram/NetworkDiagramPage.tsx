@@ -52,10 +52,11 @@ export const NetworkDiagramPage = () => {
       const proto = edge.data.protocol.toUpperCase();
       const app = (edge.data.appName ?? '').toUpperCase();
       if (proto === 'HTTP' || app === 'HTTP') keys.add('HTTP');
-      if (proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS')) keys.add('HTTPS');
-      if (proto === 'DNS'  || app === 'DNS')  keys.add('DNS');
-      if (proto === 'TCP')  keys.add('TCP');
-      if (proto === 'UDP')  keys.add('UDP');
+      if (proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS'))
+        keys.add('HTTPS');
+      if (proto === 'DNS' || app === 'DNS') keys.add('DNS');
+      if (proto === 'TCP') keys.add('TCP');
+      if (proto === 'UDP') keys.add('UDP');
     });
     return keys;
   }, [edges]);
@@ -70,7 +71,13 @@ export const NetworkDiagramPage = () => {
         const proto = edge.data.protocol.toUpperCase();
         const app = (edge.data.appName ?? '').toUpperCase();
         return activeLegendProtocols.some(key => {
-          if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+          if (key === 'HTTPS')
+            return (
+              proto === 'HTTPS' ||
+              app.includes('TLS') ||
+              app.includes('SSL') ||
+              app.includes('HTTPS')
+            );
           return proto === key || app.includes(key);
         });
       });
@@ -177,7 +184,12 @@ export const NetworkDiagramPage = () => {
       </div>
 
       {selectedNode && (
-        <NodeDetails node={selectedNode} edges={edges} fileId={fileId} onClose={handleCloseDetails} />
+        <NodeDetails
+          node={selectedNode}
+          edges={edges}
+          fileId={fileId}
+          onClose={handleCloseDetails}
+        />
       )}
     </div>
   );
