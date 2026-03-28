@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
@@ -19,47 +19,91 @@ export const NetworkDiagramPage = () => {
   const { nodes, edges, stats, loading, error, refetch } = useNetworkData(fileId, data);
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [selectedProtocols, setSelectedProtocols] = useState<string[]>([]);
+  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
+  const [activeLegendNodeTypes, setActiveLegendNodeTypes] = useState<string[]>([]);
+
+  const toggleLegendProtocol = (key: string) =>
+    setActiveLegendProtocols(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+
+  const toggleLegendNodeType = (key: string) =>
+    setActiveLegendNodeTypes(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
   const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
     'forceDirected2d'
   );
 
-  // Track if protocols have been initialized to prevent resetting user selections
-  const protocolsInitialized = useRef(false);
+  // Which node type keys actually exist in the data
+  const presentNodeTypes = useMemo(() => {
+    const types = new Set<string>();
+    nodes.forEach(n => {
+      if (n.data.isAnomaly) types.add('anomaly');
+      types.add(n.data.nodeType);
+    });
+    return types;
+  }, [nodes]);
 
-  // Initialize protocol filter with all protocols (only once)
-  useEffect(() => {
-    if (
-      !protocolsInitialized.current &&
-      stats.protocolBreakdown &&
-      Object.keys(stats.protocolBreakdown).length > 0
-    ) {
-      setSelectedProtocols(Object.keys(stats.protocolBreakdown));
-      protocolsInitialized.current = true;
-    }
-  }, [stats.protocolBreakdown]);
+  // Which edge legend keys actually have matching edges
+  const presentEdgeLegendKeys = useMemo(() => {
+    const keys = new Set<string>();
+    edges.forEach(edge => {
+      const proto = edge.data.protocol.toUpperCase();
+      const app = (edge.data.appName ?? '').toUpperCase();
+      if (proto === 'HTTP' || app === 'HTTP') keys.add('HTTP');
+      if (proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS')) keys.add('HTTPS');
+      if (proto === 'DNS'  || app === 'DNS')  keys.add('DNS');
+      if (proto === 'TCP')  keys.add('TCP');
+      if (proto === 'UDP')  keys.add('UDP');
+    });
+    return keys;
+  }, [edges]);
 
-  // Filter nodes and edges based on selected protocols
+  // Filter nodes and edges based on active legend filters
   const { filteredNodes, filteredEdges } = useMemo(() => {
-    if (selectedProtocols.length === 0) {
-      return { filteredNodes: nodes, filteredEdges: edges };
+    let filtered = edges;
+
+    // Apply legend protocol filter — show edges matching ANY selected key
+    if (activeLegendProtocols.length > 0) {
+      filtered = filtered.filter(edge => {
+        const proto = edge.data.protocol.toUpperCase();
+        const app = (edge.data.appName ?? '').toUpperCase();
+        return activeLegendProtocols.some(key => {
+          if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+          return proto === key || app.includes(key);
+        });
+      });
     }
 
-    // Filter edges by protocol
-    const filteredEdges = edges.filter(edge => selectedProtocols.includes(edge.data.protocol));
+    // Apply node type filter — keep edges that touch at least one node matching ANY selected type
+    if (activeLegendNodeTypes.length > 0) {
+      const matchingIds = new Set(
+        nodes
+          .filter(n =>
+            activeLegendNodeTypes.some(key =>
+              key === 'anomaly' ? n.data.isAnomaly : n.data.nodeType === key
+            )
+          )
+          .map(n => n.id)
+      );
+      filtered = filtered.filter(
+        edge => matchingIds.has(edge.source) || matchingIds.has(edge.target)
+      );
+    }
 
     // Get set of node IDs that have at least one visible edge
     const visibleNodeIds = new Set<string>();
-    filteredEdges.forEach(edge => {
+    filtered.forEach(edge => {
       visibleNodeIds.add(edge.source);
       visibleNodeIds.add(edge.target);
     });
 
-    // Filter nodes to only show those with visible edges
-    const filteredNodes = nodes.filter(node => visibleNodeIds.has(node.id));
-
-    return { filteredNodes, filteredEdges };
-  }, [nodes, edges, selectedProtocols]);
+    return {
+      filteredNodes: nodes.filter(node => visibleNodeIds.has(node.id)),
+      filteredEdges: filtered,
+    };
+  }, [nodes, edges, activeLegendProtocols, activeLegendNodeTypes]);
 
   const handleNodeClick = (node: GraphNode) => {
     setSelectedNode(node);
@@ -102,7 +146,7 @@ export const NetworkDiagramPage = () => {
       </div>
 
       <div className="row">
-        <div className={selectedNode ? 'col-lg-8' : 'col-lg-9'}>
+        <div className="col-lg-8">
           <div className="card mb-3">
             <div className="card-body p-0" style={{ height: '600px' }}>
               <NetworkGraph
@@ -115,22 +159,26 @@ export const NetworkDiagramPage = () => {
           </div>
         </div>
 
-        <div className={selectedNode ? 'col-lg-4' : 'col-lg-3'}>
+        <div className="col-lg-4">
           <NetworkControls
             stats={stats}
-            selectedProtocols={selectedProtocols}
-            onProtocolFilterChange={setSelectedProtocols}
             layoutType={layoutType}
             onLayoutChange={setLayoutType}
+            activeLegendProtocols={activeLegendProtocols}
+            onLegendProtocolClick={toggleLegendProtocol}
+            onLegendProtocolClear={() => setActiveLegendProtocols([])}
+            activeLegendNodeTypes={activeLegendNodeTypes}
+            onLegendNodeTypeClick={toggleLegendNodeType}
+            onLegendNodeTypeClear={() => setActiveLegendNodeTypes([])}
+            presentNodeTypes={presentNodeTypes}
+            presentEdgeLegendKeys={presentEdgeLegendKeys}
           />
-
-          {selectedNode && (
-            <div className="mt-3">
-              <NodeDetails node={selectedNode} edges={edges} onClose={handleCloseDetails} />
-            </div>
-          )}
         </div>
       </div>
+
+      {selectedNode && (
+        <NodeDetails node={selectedNode} edges={edges} fileId={fileId} onClose={handleCloseDetails} />
+      )}
     </div>
   );
 };

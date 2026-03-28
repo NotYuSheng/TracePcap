@@ -1,14 +1,43 @@
-import { useMemo } from 'react';
 import type { NetworkStats } from '@/features/network/types';
+import { PROTOCOL_COLORS, NODE_TYPE_COLORS } from '@/features/network/constants';
 import './NetworkControls.css';
 
 interface NetworkControlsProps {
   stats: NetworkStats;
-  selectedProtocols: string[];
-  onProtocolFilterChange: (protocols: string[]) => void;
   layoutType: 'forceDirected2d' | 'hierarchicalTd';
   onLayoutChange: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
+  activeLegendProtocols: string[];
+  onLegendProtocolClick: (key: string) => void;
+  onLegendProtocolClear: () => void;
+  activeLegendNodeTypes: string[];
+  onLegendNodeTypeClick: (key: string) => void;
+  onLegendNodeTypeClear: () => void;
+  presentNodeTypes: Set<string>;
+  presentEdgeLegendKeys: Set<string>;
 }
+
+const EDGE_LEGEND = [
+  { label: 'HTTP',        key: 'HTTP',  color: PROTOCOL_COLORS['HTTP'] },
+  { label: 'HTTPS/TLS',  key: 'HTTPS', color: PROTOCOL_COLORS['HTTPS'] },
+  { label: 'DNS',         key: 'DNS',   color: PROTOCOL_COLORS['DNS'] },
+  { label: 'TCP',         key: 'TCP',   color: PROTOCOL_COLORS['TCP'] },
+  { label: 'UDP',         key: 'UDP',   color: PROTOCOL_COLORS['UDP'] },
+];
+
+const NODE_LEGEND = [
+  { label: 'DNS Server',       key: 'dns-server',      color: NODE_TYPE_COLORS['dns-server'] },
+  { label: 'Web Server',       key: 'web-server',      color: NODE_TYPE_COLORS['web-server'] },
+  { label: 'SSH Server',       key: 'ssh-server',      color: NODE_TYPE_COLORS['ssh-server'] },
+  { label: 'FTP Server',       key: 'ftp-server',      color: NODE_TYPE_COLORS['ftp-server'] },
+  { label: 'Mail Server',      key: 'mail-server',     color: NODE_TYPE_COLORS['mail-server'] },
+  { label: 'DHCP Server',      key: 'dhcp-server',     color: NODE_TYPE_COLORS['dhcp-server'] },
+  { label: 'NTP Server',       key: 'ntp-server',      color: NODE_TYPE_COLORS['ntp-server'] },
+  { label: 'Database Server',  key: 'database-server', color: NODE_TYPE_COLORS['database-server'] },
+  { label: 'Router / Gateway', key: 'router',          color: NODE_TYPE_COLORS['router'] },
+  { label: 'Client',           key: 'client',          color: NODE_TYPE_COLORS['client'] },
+  { label: 'Anomaly',          key: 'anomaly',         color: NODE_TYPE_COLORS['anomaly'] },
+  { label: 'Unknown',          key: 'unknown',         color: NODE_TYPE_COLORS['unknown'] },
+];
 
 /**
  * Format bytes to human-readable string
@@ -30,31 +59,17 @@ function formatNumber(num: number): string {
 
 export function NetworkControls({
   stats,
-  selectedProtocols,
-  onProtocolFilterChange,
   layoutType,
   onLayoutChange,
+  activeLegendProtocols,
+  onLegendProtocolClick,
+  onLegendProtocolClear,
+  activeLegendNodeTypes,
+  onLegendNodeTypeClick,
+  onLegendNodeTypeClear,
+  presentNodeTypes,
+  presentEdgeLegendKeys,
 }: NetworkControlsProps) {
-  // Get available protocols from stats
-  const availableProtocols = useMemo(() => {
-    return Object.keys(stats.protocolBreakdown).sort();
-  }, [stats.protocolBreakdown]);
-
-  const handleProtocolToggle = (protocol: string) => {
-    if (selectedProtocols.includes(protocol)) {
-      onProtocolFilterChange(selectedProtocols.filter(p => p !== protocol));
-    } else {
-      onProtocolFilterChange([...selectedProtocols, protocol]);
-    }
-  };
-
-  const handleSelectAll = () => {
-    onProtocolFilterChange(availableProtocols);
-  };
-
-  const handleDeselectAll = () => {
-    onProtocolFilterChange([]);
-  };
 
   return (
     <div className="network-controls">
@@ -117,39 +132,6 @@ export function NetworkControls({
         </div>
       </div>
 
-      {/* Protocol Filter */}
-      <div className="mb-3">
-        <label className="form-label">
-          <strong>Filter by Protocol</strong>
-        </label>
-        <div className="mb-2">
-          <button className="btn btn-sm btn-outline-secondary me-2" onClick={handleSelectAll}>
-            Select All
-          </button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={handleDeselectAll}>
-            Deselect All
-          </button>
-        </div>
-        <div className="protocol-filter-list">
-          {availableProtocols.map(protocol => (
-            <div key={protocol} className="form-check">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id={`protocol-${protocol}`}
-                checked={selectedProtocols.includes(protocol)}
-                onChange={() => handleProtocolToggle(protocol)}
-              />
-              <label className="form-check-label" htmlFor={`protocol-${protocol}`}>
-                {protocol}
-                <span className="text-muted ms-2">
-                  ({formatNumber(stats.protocolBreakdown[protocol])})
-                </span>
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Legend */}
       <div className="card">
@@ -158,78 +140,58 @@ export function NetworkControls({
         </div>
         <div className="card-body p-2">
           <div className="legend-section mb-2">
-            <div className="legend-title">Node Types</div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#f39c12' }}></span>
-              DNS Server
+            <div className="legend-title d-flex justify-content-between align-items-center">
+              <span>Node Types</span>
+              {activeLegendNodeTypes.length > 0 && (
+                <button
+                  className="btn btn-link btn-sm p-0 text-muted legend-small-text"
+                  onClick={onLegendNodeTypeClear}
+                >
+                  Clear ×
+                </button>
+              )}
             </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#2ecc71' }}></span>
-              Web Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#1abc9c' }}></span>
-              SSH Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#16a085' }}></span>
-              FTP Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#e91e63' }}></span>
-              Mail Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#8e44ad' }}></span>
-              DHCP Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#6c3483' }}></span>
-              NTP Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#e67e22' }}></span>
-              Database Server
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#d4ac0d' }}></span>
-              Router / Gateway
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#3498db' }}></span>
-              Client
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#e74c3c' }}></span>
-              Anomaly
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#95a5a6' }}></span>
-              Unknown
-            </div>
+            <small className="text-muted d-block mb-1 legend-small-text">
+              Click to filter (multi-select)
+            </small>
+            {NODE_LEGEND.filter(({ key }) => presentNodeTypes.has(key)).map(({ label, key, color }) => (
+              <button
+                key={key}
+                className={`legend-item-btn ${activeLegendNodeTypes.includes(key) ? 'active' : ''} ${activeLegendNodeTypes.length > 0 && !activeLegendNodeTypes.includes(key) ? 'dimmed' : ''}`}
+                onClick={() => onLegendNodeTypeClick(key)}
+                title={`${activeLegendNodeTypes.includes(key) ? 'Deselect' : 'Select'} ${label}`}
+              >
+                <span className="legend-color" style={{ background: color }}></span>
+                {label}
+              </button>
+            ))}
           </div>
           <div className="legend-section">
-            <div className="legend-title">Edge Protocols</div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#2ecc71' }}></span>
-              HTTP
+            <div className="legend-title d-flex justify-content-between align-items-center">
+              <span>Edge Protocols</span>
+              {activeLegendProtocols.length > 0 && (
+                <button
+                  className="btn btn-link btn-sm p-0 text-muted legend-small-text"
+                  onClick={onLegendProtocolClear}
+                >
+                  Clear ×
+                </button>
+              )}
             </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#3498db' }}></span>
-              HTTPS/TLS
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#f39c12' }}></span>
-              DNS
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#7f8c8d' }}></span>
-              TCP
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#f1c40f' }}></span>
-              UDP
-            </div>
+            <small className="text-muted d-block mb-1 legend-small-text">
+              Click to filter (multi-select)
+            </small>
+            {EDGE_LEGEND.filter(({ key }) => presentEdgeLegendKeys.has(key)).map(({ label, key, color }) => (
+              <button
+                key={key}
+                className={`legend-item-btn ${activeLegendProtocols.includes(key) ? 'active' : ''} ${activeLegendProtocols.length > 0 && !activeLegendProtocols.includes(key) ? 'dimmed' : ''}`}
+                onClick={() => onLegendProtocolClick(key)}
+                title={`${activeLegendProtocols.includes(key) ? 'Deselect' : 'Select'} ${label}`}
+              >
+                <span className="legend-color" style={{ background: color }}></span>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>

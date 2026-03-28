@@ -64,6 +64,40 @@
   margin-bottom: 0.25rem;
 }
 
+.legend-item-btn {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  text-align: left;
+}
+
+.legend-item-btn:hover {
+  background: #e9ecef;
+  border-color: #dee2e6;
+}
+
+.legend-item-btn.active {
+  background: #e8f4fd;
+  border-color: #90caf9;
+  font-weight: 600;
+}
+
+.legend-item-btn.dimmed {
+  opacity: 0.35;
+}
+
+.legend-small-text {
+  font-size: 0.7rem;
+}
+
 .legend-color {
   display: inline-block;
   width: 16px;

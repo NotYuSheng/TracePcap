@@ -1,6 +1,7 @@
 import { useRef, memo } from 'react';
 import { GraphCanvas, type GraphCanvasRef } from 'reagraph';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
+import { PROTOCOL_COLORS, DEFAULT_EDGE_COLOR, NODE_TYPE_COLORS } from '@/features/network/constants';
 import './NetworkGraph.css';
 
 interface NetworkGraphProps {
@@ -14,43 +15,14 @@ interface NetworkGraphProps {
  * Get node color based on detected node type (falls back to role-based color)
  */
 function getNodeColor(nodeData: { role: string; isAnomaly: boolean; nodeType?: string }): string {
-  if (nodeData.isAnomaly) {
-    return '#e74c3c'; // Red for anomalies
-  }
-
-  switch (nodeData.nodeType) {
-    case 'dns-server':
-      return '#f39c12'; // Amber
-    case 'web-server':
-      return '#2ecc71'; // Green
-    case 'ssh-server':
-      return '#1abc9c'; // Teal
-    case 'ftp-server':
-      return '#16a085'; // Dark Teal
-    case 'mail-server':
-      return '#e91e63'; // Pink
-    case 'dhcp-server':
-      return '#8e44ad'; // Purple
-    case 'ntp-server':
-      return '#6c3483'; // Deep Purple
-    case 'database-server':
-      return '#e67e22'; // Orange
-    case 'router':
-      return '#d4ac0d'; // Gold
-    case 'client':
-      return '#3498db'; // Blue
-    default:
-      break;
-  }
+  if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
+  if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType]) return NODE_TYPE_COLORS[nodeData.nodeType];
 
   // Fallback to role-based colour for unclassified nodes
   switch (nodeData.role) {
-    case 'server':
-      return '#2ecc71'; // Green
-    case 'both':
-      return '#9b59b6'; // Purple
-    default:
-      return '#95a5a6'; // Gray
+    case 'server': return '#2ecc71'; // Green
+    case 'both':   return '#9b59b6'; // Purple
+    default:       return '#95a5a6'; // Gray
   }
 }
 
@@ -58,27 +30,7 @@ function getNodeColor(nodeData: { role: string; isAnomaly: boolean; nodeType?: s
  * Get edge color based on protocol
  */
 function getProtocolColor(protocol: string): string {
-  const protocolUpper = protocol.toUpperCase();
-
-  switch (protocolUpper) {
-    case 'HTTP':
-      return '#2ecc71'; // Green
-    case 'HTTPS':
-    case 'TLS':
-      return '#3498db'; // Blue
-    case 'DNS':
-      return '#f39c12'; // Orange
-    case 'TCP':
-      return '#7f8c8d'; // Gray
-    case 'UDP':
-      return '#f1c40f'; // Yellow
-    case 'ICMP':
-      return '#e67e22'; // Dark Orange
-    case 'ARP':
-      return '#16a085'; // Teal
-    default:
-      return '#95a5a6'; // Light Gray
-  }
+  return PROTOCOL_COLORS[protocol.toUpperCase()] ?? DEFAULT_EDGE_COLOR;
 }
 
 export const NetworkGraph = memo(function NetworkGraph({
@@ -138,6 +90,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   return (
     <div className="network-graph-container">
       <GraphCanvas
+        key={layoutType}
         ref={graphRef}
         nodes={reagraphNodes}
         edges={reagraphEdges}

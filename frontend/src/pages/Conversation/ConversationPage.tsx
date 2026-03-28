@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation } from '@/types';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ConversationList } from '@components/conversation/ConversationList';
@@ -16,6 +16,10 @@ interface AnalysisOutletContext {
 
 export const ConversationPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterSrcIp = searchParams.get('srcIp');
+  const filterPeerIp = searchParams.get('peerIp');
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -98,6 +102,18 @@ export const ConversationPage = () => {
     setSelectedConversation(null);
   };
 
+  const clearIpFilter = () => {
+    setSearchParams({});
+  };
+
+  const displayedConversations = (filterSrcIp && filterPeerIp)
+    ? conversations.filter(c => {
+        const [a, b] = c.endpoints;
+        return (a.ip === filterSrcIp && b.ip === filterPeerIp) ||
+               (a.ip === filterPeerIp && b.ip === filterSrcIp);
+      })
+    : conversations;
+
   if (loading) return <LoadingSpinner size="large" message="Loading conversations..." />;
   if (error) return <ErrorMessage title="Failed to Load Conversations" message={error} />;
 
@@ -110,6 +126,18 @@ export const ConversationPage = () => {
       <div className="row mb-3">
         <div className="col-12">
           <h4>Network Conversations ({totalItems.toLocaleString()})</h4>
+          {filterSrcIp && filterPeerIp && (
+            <div className="alert alert-info py-2 mb-0 mt-2 d-flex align-items-center justify-content-between">
+              <span>
+                <i className="bi bi-funnel me-2"></i>
+                Showing conversations between <strong className="font-monospace mx-1">{filterSrcIp}</strong> and <strong className="font-monospace mx-1">{filterPeerIp}</strong>
+                {displayedConversations.length === 0 && ' — none found on this page'}
+              </span>
+              <button className="btn btn-sm btn-outline-secondary ms-3" onClick={clearIpFilter}>
+                Clear filter ×
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -122,9 +150,9 @@ export const ConversationPage = () => {
             </div>
             <div className="card-body p-0">
               <ConversationList
-                conversations={conversations}
+                conversations={displayedConversations}
                 onSelectConversation={(c) => {
-                  const idx = conversations.findIndex(x => x.id === c.id);
+                  const idx = displayedConversations.findIndex(x => x.id === c.id);
                   openConversation(c, idx);
                 }}
               />
