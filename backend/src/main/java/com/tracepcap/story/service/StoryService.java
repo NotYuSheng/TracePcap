@@ -228,6 +228,31 @@ public class StoryService {
    *   <li>Application-layer content (HTTP bodies, DNS query names, TLS SNI, etc.)</li>
    * </ul>
    */
+  /**
+   * Build a TLS certificate label for a conversation, e.g.:
+   * " [TLS: subject=CN=*.example.com, issuer=CN=Let's Encrypt, expires=2025/06/01 EXPIRED]"
+   * Returns an empty string if no TLS cert data is available.
+   */
+  private String buildTlsCertLabel(ConversationEntity conv) {
+    if (conv.getTlsIssuer() == null && conv.getTlsSubject() == null
+        && conv.getTlsNotAfter() == null) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder(" [TLS:");
+    if (conv.getTlsSubject() != null) sb.append(" subject=").append(conv.getTlsSubject()).append(",");
+    if (conv.getTlsIssuer() != null)  sb.append(" issuer=").append(conv.getTlsIssuer()).append(",");
+    if (conv.getTlsNotAfter() != null) {
+      boolean expired = conv.getTlsNotAfter().isBefore(LocalDateTime.now());
+      sb.append(" expires=").append(conv.getTlsNotAfter().toString());
+      if (expired) sb.append(" EXPIRED");
+    }
+    // trim trailing comma if present
+    int last = sb.length() - 1;
+    if (sb.charAt(last) == ',') sb.deleteCharAt(last);
+    sb.append("]");
+    return sb.toString();
+  }
+
   private String buildUserPrompt(
       FileEntity file, AnalysisResultEntity analysis, List<ConversationEntity> conversations) {
 
@@ -301,12 +326,13 @@ public class StoryService {
         String riskLabel = (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
             ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]"
             : "";
+        String tlsCertLabel = buildTlsCertLabel(conv);
         prompt.append(String.format(
-            "%d. %s:%s <-> %s:%s (%s%s%s%s, %d packets, %d bytes)\n",
+            "%d. %s:%s <-> %s:%s (%s%s%s%s%s, %d packets, %d bytes)\n",
             i + 1,
             conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
             conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
-            conv.getProtocol(), appLabel, catLabel, riskLabel,
+            conv.getProtocol(), appLabel, catLabel, riskLabel, tlsCertLabel,
             conv.getPacketCount(),
             conv.getTotalBytes()));
       }
@@ -343,7 +369,7 @@ public class StoryService {
     prompt.append("## Analysis Limitations\n");
     prompt.append("The following data was NOT available during this analysis — do not infer or hallucinate details about them:\n");
     prompt.append("- Packet payloads or raw bytes (not captured)\n");
-    prompt.append("- Application-layer content (HTTP bodies, DNS query names, TLS SNI, etc.)\n");
+    prompt.append("- Application-layer content (HTTP bodies, DNS query names, etc.)\n");
     prompt.append("- Any conversations beyond those listed above\n\n");
 
     prompt.append("Generate a detailed story analyzing this network traffic. ");

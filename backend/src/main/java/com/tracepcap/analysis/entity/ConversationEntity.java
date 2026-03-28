@@ -22,6 +22,7 @@ public class ConversationEntity {
   public static final int CATEGORY_MAX_LENGTH = 50;
   public static final int HOSTNAME_MAX_LENGTH = 255;
   public static final int JA3_HASH_LENGTH = 32;
+  public static final int PROTOCOL_MAX_LENGTH = 100;
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -43,7 +44,7 @@ public class ConversationEntity {
   @Column(name = "dst_port")
   private Integer dstPort;
 
-  @Column(nullable = false, length = 20)
+  @Column(nullable = false, length = PROTOCOL_MAX_LENGTH)
   private String protocol;
 
   @Column(name = "app_name", length = APP_NAME_MAX_LENGTH)
@@ -63,6 +64,18 @@ public class ConversationEntity {
 
   @Column(name = "ja3_server", length = JA3_HASH_LENGTH)
   private String ja3Server;
+
+  @Column(name = "tls_issuer", columnDefinition = "TEXT")
+  private String tlsIssuer;
+
+  @Column(name = "tls_subject", columnDefinition = "TEXT")
+  private String tlsSubject;
+
+  @Column(name = "tls_not_before")
+  private LocalDateTime tlsNotBefore;
+
+  @Column(name = "tls_not_after")
+  private LocalDateTime tlsNotAfter;
 
   @Column(name = "packet_count", nullable = false)
   @Builder.Default

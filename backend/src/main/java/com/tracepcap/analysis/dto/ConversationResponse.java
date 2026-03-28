@@ -24,6 +24,10 @@ public class ConversationResponse {
   private String hostname;
   private String ja3Client;
   private String ja3Server;
+  private String tlsIssuer;
+  private String tlsSubject;
+  private LocalDateTime tlsNotBefore;
+  private LocalDateTime tlsNotAfter;
   private List<String> flowRisks;
   private Long packetCount;
   private Long totalBytes;
