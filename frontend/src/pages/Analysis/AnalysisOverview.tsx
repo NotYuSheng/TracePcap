@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
@@ -13,26 +12,7 @@ interface AnalysisOutletContext {
 export const AnalysisOverview = () => {
   const { data } = useOutletContext<AnalysisOutletContext>();
 
-  type AppEntry = { name: string; packets?: number; bytes?: number };
-
-  const detectedApps = useMemo((): AppEntry[] => {
-    if (data.detectedApplications && data.detectedApplications.length > 0) {
-      return data.detectedApplications.map(name => ({ name }));
-    }
-    // Fallback: derive from topConversations (may be incomplete)
-    const appMap = new Map<string, { packets: number; bytes: number }>();
-    for (const conv of data.topConversations || []) {
-      if (!conv.appName) continue;
-      const existing = appMap.get(conv.appName) || { packets: 0, bytes: 0 };
-      appMap.set(conv.appName, {
-        packets: existing.packets + conv.packetCount,
-        bytes: existing.bytes + conv.totalBytes,
-      });
-    }
-    return Array.from(appMap.entries())
-      .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
-  }, [data.detectedApplications, data.topConversations]);
+  const detectedApps = data.detectedApplications ?? [];
 
   return (
     <div className="analysis-overview">
@@ -56,7 +36,7 @@ export const AnalysisOverview = () => {
                   backgroundColor: getAppColor(app.name),
                   color: '#fff',
                 }}
-                title={app.packets != null ? `${app.packets.toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB` : app.name}
+                title={`${app.packetCount.toLocaleString()} packets · ${(app.bytes / 1024).toFixed(1)} KB`}
               >
                 {app.name}
               </span>

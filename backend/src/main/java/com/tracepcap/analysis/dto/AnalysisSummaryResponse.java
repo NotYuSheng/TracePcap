@@ -28,7 +28,7 @@ public class AnalysisSummaryResponse {
   private List<ProtocolStat> protocolDistribution;
   private List<ConversationSummary> topConversations;
   private List<UniqueHost> uniqueHosts;
-  private List<String> detectedApplications;
+  private List<DetectedApplication> detectedApplications;
   private Boolean detectedApplicationsTruncated;
 
   // Legacy fields for backward compatibility
@@ -66,6 +66,16 @@ public class AnalysisSummaryResponse {
     private Long endTime;
     private Long packetCount;
     private Long totalBytes;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class DetectedApplication {
+    private String name;
+    private Long packetCount;
+    private Long bytes;
   }
 
   @Data

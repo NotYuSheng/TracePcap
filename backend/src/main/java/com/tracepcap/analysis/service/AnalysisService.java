@@ -247,15 +247,27 @@ public class AnalysisService {
 
     // Get top conversations
     List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
-    List<String> allApps =
-        conversations.stream()
-            .map(ConversationEntity::getAppName)
-            .filter(app -> app != null && !app.isBlank())
-            .distinct()
-            .sorted()
+    Map<String, long[]> appStatsMap = new java.util.TreeMap<>();
+    conversations.stream()
+        .filter(conv -> conv.getAppName() != null && !conv.getAppName().isBlank())
+        .forEach(
+            conv -> {
+              long[] stats = appStatsMap.computeIfAbsent(conv.getAppName(), k -> new long[] {0L, 0L});
+              stats[0] += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
+              stats[1] += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
+            });
+    List<AnalysisSummaryResponse.DetectedApplication> allApps =
+        appStatsMap.entrySet().stream()
+            .map(
+                e ->
+                    AnalysisSummaryResponse.DetectedApplication.builder()
+                        .name(e.getKey())
+                        .packetCount(e.getValue()[0])
+                        .bytes(e.getValue()[1])
+                        .build())
             .collect(Collectors.toList());
     boolean appsTruncated = overviewAppsLimited && allApps.size() > overviewAppsMax;
-    List<String> detectedApplications =
+    List<AnalysisSummaryResponse.DetectedApplication> detectedApplications =
         appsTruncated ? allApps.subList(0, overviewAppsMax) : allApps;
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
