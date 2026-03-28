@@ -247,11 +247,11 @@ export const SecurityPage = () => {
                 </div>
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline-primary ms-2 text-nowrap"
+                  className="btn btn-sm btn-primary ms-2 text-nowrap"
                   title="View this conversation in the Conversations tab"
                   onClick={() => {
                     closeModal();
-                    navigate(`/analysis/${fileId}/conversations?ip=${encodeURIComponent(selectedConversation!.endpoints[0].ip)}`);
+                    navigate(`/analysis/${fileId}/conversations?ip=${encodeURIComponent(selectedConversation!.endpoints[0].ip)}&hasRisks=true`);
                   }}
                 >
                   <i className="bi bi-arrow-right-circle me-1"></i>View in Conversations
