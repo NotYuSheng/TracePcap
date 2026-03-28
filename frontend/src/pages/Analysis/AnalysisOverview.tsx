@@ -17,14 +17,20 @@ const ndpiPopover = (
     <Popover.Body>
       <p className="mb-2">
         Application labels are detected by{' '}
-        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a>{' '}
+        <a
+          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          nDPI
+        </a>{' '}
         using deep packet inspection (DPI) heuristics.
       </p>
       <p className="mb-2">
         DPI is <strong>probabilistic</strong> — binary payloads can occasionally match the wrong
-        protocol's signatures (e.g. a file transfer triggering peer-to-peer heuristics).
-        Encrypted flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints,
-        not payload content.
+        protocol's signatures (e.g. a file transfer triggering peer-to-peer heuristics). Encrypted
+        flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints, not payload
+        content.
       </p>
       <p className="mb-0">
         Treat labels as strong indicators, not definitive classifications. Cross-reference the
@@ -33,7 +39,6 @@ const ndpiPopover = (
     </Popover.Body>
   </Popover>
 );
-
 
 export const AnalysisOverview = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
@@ -51,7 +56,9 @@ export const AnalysisOverview = () => {
             <i className="bi bi-app-indicator me-2"></i>
             Applications Detected
             {data.detectedApplicationsTruncated && (
-              <span className="text-muted fs-6 fw-normal ms-2">(showing top {detectedApps.length})</span>
+              <span className="text-muted fs-6 fw-normal ms-2">
+                (showing top {detectedApps.length})
+              </span>
             )}
             <OverlayTrigger trigger="click" placement="right" overlay={ndpiPopover} rootClose>
               <button
@@ -77,7 +84,11 @@ export const AnalysisOverview = () => {
                     cursor: 'pointer',
                   }}
                   title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
-                  onClick={() => navigate(`/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`
+                    )
+                  }
                 >
                   {app.name}
                 </button>

@@ -2,17 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import '../../conversation/ConversationFilterPanel/ConversationFilterPanel.css';
 
-interface ProtocolStat { protocol: string; count: number }
-
-interface SecurityFilterPanelProps {
-  filters:           ConversationFilters;
-  onFiltersChange:   (update: Partial<ConversationFilters>) => void;
-  onClearAll:        () => void;
-  protocols:         ProtocolStat[];
-  riskTypes:         string[];
-  activeFilterCount: number;
+interface ProtocolStat {
+  protocol: string;
+  count: number;
 }
 
+interface SecurityFilterPanelProps {
+  filters: ConversationFilters;
+  onFiltersChange: (update: Partial<ConversationFilters>) => void;
+  onClearAll: () => void;
+  protocols: ProtocolStat[];
+  riskTypes: string[];
+  activeFilterCount: number;
+}
 
 function formatRiskLabel(risk: string): string {
   return risk.replace(/_/g, ' ');
@@ -30,7 +32,9 @@ export function SecurityFilterPanel({
   const [ipInput, setIpInput] = useState(filters.ip);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setIpInput(filters.ip); }, [filters.ip]);
+  useEffect(() => {
+    setIpInput(filters.ip);
+  }, [filters.ip]);
 
   const handleIpChange = (value: string) => {
     setIpInput(value);
@@ -77,12 +81,13 @@ export function SecurityFilterPanel({
         <div className="card mt-2 filter-panel-body">
           <div className="card-body p-3">
             <div className="row g-3">
-
               {/* IP / Hostname */}
               <div className="col-md-4">
                 <label className="form-label filter-section-label">IP / Hostname</label>
                 <div className="input-group input-group-sm">
-                  <span className="input-group-text"><i className="bi bi-search"></i></span>
+                  <span className="input-group-text">
+                    <i className="bi bi-search"></i>
+                  </span>
                   <input
                     type="text"
                     className="form-control"
@@ -95,7 +100,9 @@ export function SecurityFilterPanel({
                       type="button"
                       className="btn btn-outline-secondary"
                       onClick={() => handleIpChange('')}
-                    >×</button>
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
               </div>
@@ -143,7 +150,11 @@ export function SecurityFilterPanel({
 
             {activeFilterCount > 0 && (
               <div className="mt-3 pt-2 border-top">
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClearAll}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={onClearAll}
+                >
                   <i className="bi bi-x-circle me-1"></i>Clear filters
                 </button>
               </div>
