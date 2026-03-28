@@ -1,7 +1,11 @@
 import { useRef, memo } from 'react';
 import { GraphCanvas, type GraphCanvasRef } from 'reagraph';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { PROTOCOL_COLORS, DEFAULT_EDGE_COLOR, NODE_TYPE_COLORS } from '@/features/network/constants';
+import {
+  PROTOCOL_COLORS,
+  DEFAULT_EDGE_COLOR,
+  NODE_TYPE_COLORS,
+} from '@/features/network/constants';
 import './NetworkGraph.css';
 
 interface NetworkGraphProps {
@@ -16,13 +20,17 @@ interface NetworkGraphProps {
  */
 function getNodeColor(nodeData: { role: string; isAnomaly: boolean; nodeType?: string }): string {
   if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
-  if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType]) return NODE_TYPE_COLORS[nodeData.nodeType];
+  if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType])
+    return NODE_TYPE_COLORS[nodeData.nodeType];
 
   // Fallback to role-based colour for unclassified nodes
   switch (nodeData.role) {
-    case 'server': return '#2ecc71'; // Green
-    case 'both':   return '#9b59b6'; // Purple
-    default:       return '#95a5a6'; // Gray
+    case 'server':
+      return '#2ecc71'; // Green
+    case 'both':
+      return '#9b59b6'; // Purple
+    default:
+      return '#95a5a6'; // Gray
   }
 }
 
