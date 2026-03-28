@@ -22,6 +22,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +46,13 @@ public class AnalysisService {
 
   @Value("${tracepcap.overview.apps-max:100}")
   private int overviewAppsMax;
+
+  // Flush interval: how many conversations to process before flushing the JPA session.
+  // Keeps the Hibernate first-level cache from accumulating unbounded saved entities.
+  private static final int JPA_FLUSH_INTERVAL = 50;
+
+  @PersistenceContext
+  private EntityManager entityManager;
 
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
@@ -125,7 +134,14 @@ public class AnalysisService {
 
       analysisResultRepository.save(analysis);
 
-      // Save conversations and their packets
+      // Save conversations and their packets.
+      // Packets are built and saved in PACKET_BATCH_SIZE chunks per conversation so we
+      // never hold more than one batch of PacketEntity objects in memory at a time.
+      // After each conversation's packets are persisted the source PacketInfo list is
+      // cleared so the parser's heap footprint shrinks progressively during this phase.
+      // Every JPA_FLUSH_INTERVAL conversations we flush+clear the JPA session to prevent
+      // Hibernate's first-level cache from accumulating all saved entities.
+      int convIndex = 0;
       for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
         ConversationEntity conversation =
             ConversationEntity.builder()
@@ -156,30 +172,37 @@ public class AnalysisService {
 
         List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
         if (!packetInfos.isEmpty()) {
-          List<PacketEntity> packetEntities =
-              packetInfos.stream()
-                  .map(
-                      pktInfo ->
-                          PacketEntity.builder()
-                              .file(file)
-                              .conversation(savedConversation)
-                              .packetNumber(pktInfo.getPacketNumber())
-                              .timestamp(pktInfo.getTimestamp())
-                              .srcIp(pktInfo.getSrcIp())
-                              .srcPort(pktInfo.getSrcPort())
-                              .dstIp(pktInfo.getDstIp())
-                              .dstPort(pktInfo.getDstPort())
-                              .protocol(pktInfo.getProtocol())
-                              .packetSize(pktInfo.getPacketSize())
-                              .info(pktInfo.getInfo())
-                              .payload(pktInfo.getPayload())
-                              .detectedFileType(pktInfo.getDetectedFileType())
-                              .build())
-                  .collect(Collectors.toList());
-          for (int i = 0; i < packetEntities.size(); i += PACKET_BATCH_SIZE) {
-            int end = Math.min(i + PACKET_BATCH_SIZE, packetEntities.size());
-            packetRepository.saveAll(packetEntities.subList(i, end));
+          // Build and save one batch at a time — avoids materialising the full PacketEntity list
+          for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
+            int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
+            List<PacketEntity> batch = packetInfos.subList(i, end).stream()
+                .map(pktInfo -> PacketEntity.builder()
+                    .file(file)
+                    .conversation(savedConversation)
+                    .packetNumber(pktInfo.getPacketNumber())
+                    .timestamp(pktInfo.getTimestamp())
+                    .srcIp(pktInfo.getSrcIp())
+                    .srcPort(pktInfo.getSrcPort())
+                    .dstIp(pktInfo.getDstIp())
+                    .dstPort(pktInfo.getDstPort())
+                    .protocol(pktInfo.getProtocol())
+                    .packetSize(pktInfo.getPacketSize())
+                    .info(pktInfo.getInfo())
+                    .payload(pktInfo.getPayload())
+                    .detectedFileType(pktInfo.getDetectedFileType())
+                    .build())
+                .collect(Collectors.toList());
+            packetRepository.saveAll(batch);
           }
+          // Free the parsed packet list — memory is released as each conversation is saved
+          packetInfos.clear();
+        }
+
+        // Periodically flush and clear the JPA session so Hibernate's first-level cache
+        // doesn't accumulate every saved entity for the lifetime of the transaction
+        if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
+          entityManager.flush();
+          entityManager.clear();
         }
       }
 
