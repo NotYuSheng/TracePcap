@@ -20,18 +20,29 @@ WORKDIR /app
 # Install runtime dependencies:
 #   libpcap0.8   — shared lib for Pcap4J (runtime only; -dev headers not needed)
 #   tshark       — fallback parser for multi-interface pcapng
-#   libndpi-bin  — ndpiReader for application-layer identification
+#   libndpi-bin  — ndpiReader for application-layer identification (from ntop repo
+#                  for latest version with H.225 session tracking / H.245 support)
 #   tzdata       — timezone data
-# BuildKit cache mount keeps downloaded .deb files cached across rebuilds,
-# so this layer is fast on subsequent builds even if the Dockerfile changes.
+# ntop's apt repository provides newer nDPI builds than Ubuntu 22.04's 4.2-2.
+# BuildKit cache mount keeps downloaded .deb files cached across rebuilds.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     DEBIAN_FRONTEND=noninteractive apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    libpcap0.8 \
-    tshark \
-    libndpi-bin \
-    tzdata
+        ca-certificates \
+        curl \
+        gnupg && \
+    curl -fsSL https://packages.ntop.org/apt-stable/ntop.key \
+        | gpg --dearmor -o /usr/share/keyrings/ntop-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/ntop-keyring.gpg] https://packages.ntop.org/apt-stable/22.04/ x64/" \
+        > /etc/apt/sources.list.d/ntop.list && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libpcap0.8 \
+        tshark \
+        ndpi \
+        tzdata && \
+    apt-get purge -y --auto-remove curl gnupg
 
 # Set timezone to Singapore
 ENV TZ=Asia/Singapore
