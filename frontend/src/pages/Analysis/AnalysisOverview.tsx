@@ -2,6 +2,7 @@ import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
+import { CategoryBreakdownChart } from '@components/analysis/CategoryBreakdown';
 import { getAppColor } from '@/utils/appColors';
 
 interface AnalysisOutletContext {
@@ -48,6 +49,12 @@ export const AnalysisOverview = () => {
       {data.protocolDistribution && data.protocolDistribution.length > 0 && (
         <div className="mt-4">
           <ProtocolBreakdownChart protocolStats={data.protocolDistribution} />
+        </div>
+      )}
+
+      {data.categoryDistribution && data.categoryDistribution.length > 0 && (
+        <div className="mt-4">
+          <CategoryBreakdownChart categoryStats={data.categoryDistribution} />
         </div>
       )}
     </div>

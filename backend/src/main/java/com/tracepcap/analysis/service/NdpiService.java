@@ -57,6 +57,12 @@ public class NdpiService {
   /** Matches individual risk names between ** markers inside a risk block. */
   private static final Pattern RISK_NAME = Pattern.compile("\\*\\*\\s*([^*]+?)\\s*\\*\\*");
 
+  /** Matches the traffic category field, e.g. [cat: Download/7] → group(1) = "Download". */
+  private static final Pattern CATEGORY = Pattern.compile(
+      "\\[cat:\\s*([^/\\]]+)(?:/\\d+)?\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
   /** Transport-only names that carry no application-layer signal. */
   private static final Set<String> SKIP_PROTOCOLS = Set.of(
       "TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN"
@@ -82,12 +88,15 @@ public class NdpiService {
       if (data == null) continue;
       if (data.appName() != null) conv.setAppName(data.appName());
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
+      if (data.category() != null) conv.setCategory(data.category());
     }
 
-    long enrichedApps  = conversations.stream().filter(c -> c.getAppName() != null).count();
-    long enrichedRisks = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
-    log.info("nDPI enriched {}/{} conversations with app names, {}/{} with security risks",
-        enrichedApps, conversations.size(), enrichedRisks, conversations.size());
+    long enrichedApps       = conversations.stream().filter(c -> c.getAppName() != null).count();
+    long enrichedRisks      = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
+    long enrichedCategories = conversations.stream().filter(c -> c.getCategory() != null).count();
+    log.info("nDPI enriched {}/{} with app names, {}/{} with risks, {}/{} with categories",
+        enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
+        enrichedCategories, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
@@ -95,7 +104,7 @@ public class NdpiService {
   // ---------------------------------------------------------------------------
 
   /** Immutable holder for per-flow nDPI data extracted from one -v 2 line. */
-  private record FlowData(String appName, List<String> risks) {}
+  private record FlowData(String appName, List<String> risks, String category) {}
 
   /**
    * Runs {@code ndpiReader -i <file> -v 2} and returns a map of flow key → FlowData.
@@ -175,7 +184,15 @@ public class NdpiService {
       }
     }
 
-    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks));
+    // Traffic category from [cat: Name/ID] field
+    String category = null;
+    Matcher cm = CATEGORY.matcher(line);
+    if (cm.find()) {
+      category = cm.group(1).trim();
+      if (category.length() > 50) category = category.substring(0, 50);
+    }
+
+    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks, category));
   }
 
   /** Lookup flow data trying both directions (src→dst and dst→src). */

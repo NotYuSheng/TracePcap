@@ -47,6 +47,7 @@ export const analysisService = {
       uniqueHosts,
       detectedApplications: summary.detectedApplications,
       detectedApplicationsTruncated: summary.detectedApplicationsTruncated,
+      categoryDistribution: summary.categoryDistribution,
     };
   },
 
