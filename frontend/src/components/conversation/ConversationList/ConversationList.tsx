@@ -89,7 +89,7 @@ export const ConversationList = ({
       const dx = panMouse.current.x - panOrigin.current.x;
       const dy = panMouse.current.y - panOrigin.current.y;
       if (scrollRef.current && Math.abs(dx) > DEAD) scrollRef.current.scrollLeft += dx * SPD;
-      if (Math.abs(dy) > DEAD) window.scrollBy(0, dy * SPD);
+      if (scrollRef.current && Math.abs(dy) > DEAD) scrollRef.current.scrollTop  += dy * SPD;
       panRaf.current = requestAnimationFrame(panTick.current);
     };
 
