@@ -157,3 +157,6 @@ tracepcap:
     cron: "0 0 * * * ?"  # Run every hour at the top of the hour
     enabled: true
     retention-hours: ${FILE_RETENTION_HOURS:12}  # Files deleted after this many hours
+  overview:
+    apps-limited: ${OVERVIEW_APPS_LIMITED:true}   # true = cap detected apps list; false = show all
+    apps-max: ${OVERVIEW_APPS_MAX:100}            # Max apps shown when apps-limited=true

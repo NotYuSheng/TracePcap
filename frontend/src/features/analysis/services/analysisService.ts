@@ -45,6 +45,8 @@ export const analysisService = {
       protocolDistribution,
       topConversations,
       uniqueHosts,
+      detectedApplications: summary.detectedApplications,
+      detectedApplicationsTruncated: summary.detectedApplicationsTruncated,
     };
   },
 

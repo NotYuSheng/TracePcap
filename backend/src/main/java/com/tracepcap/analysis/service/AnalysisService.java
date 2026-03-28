@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnalysisService {
 
   private static final int PACKET_BATCH_SIZE = 1000;
+
+  @Value("${tracepcap.overview.apps-limited:true}")
+  private boolean overviewAppsLimited;
+
+  @Value("${tracepcap.overview.apps-max:100}")
+  private int overviewAppsMax;
 
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
@@ -240,6 +247,28 @@ public class AnalysisService {
 
     // Get top conversations
     List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    Map<String, long[]> appStatsMap = new java.util.TreeMap<>();
+    conversations.stream()
+        .filter(conv -> conv.getAppName() != null && !conv.getAppName().isBlank())
+        .forEach(
+            conv -> {
+              long[] stats = appStatsMap.computeIfAbsent(conv.getAppName(), k -> new long[] {0L, 0L});
+              stats[0] += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
+              stats[1] += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
+            });
+    List<AnalysisSummaryResponse.DetectedApplication> allApps =
+        appStatsMap.entrySet().stream()
+            .map(
+                e ->
+                    AnalysisSummaryResponse.DetectedApplication.builder()
+                        .name(e.getKey())
+                        .packetCount(e.getValue()[0])
+                        .bytes(e.getValue()[1])
+                        .build())
+            .collect(Collectors.toList());
+    boolean appsTruncated = overviewAppsLimited && allApps.size() > overviewAppsMax;
+    List<AnalysisSummaryResponse.DetectedApplication> detectedApplications =
+        appsTruncated ? allApps.subList(0, overviewAppsMax) : allApps;
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
             .sorted((a, b) -> Long.compare(b.getTotalBytes(), a.getTotalBytes()))
@@ -304,6 +333,8 @@ public class AnalysisService {
         .protocolDistribution(protocolDistribution)
         .topConversations(topConversations)
         .uniqueHosts(uniqueHosts)
+        .detectedApplications(detectedApplications)
+        .detectedApplicationsTruncated(appsTruncated)
         // Legacy fields
         .startTime(analysis.getStartTime())
         .endTime(analysis.getEndTime())

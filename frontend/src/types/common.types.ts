@@ -24,6 +24,12 @@ export interface Protocol {
   version?: string;
 }
 
+export interface DetectedApplication {
+  name: string;
+  packetCount: number;
+  bytes: number;
+}
+
 // Conversation Types
 export interface Conversation {
   id: string;
@@ -50,6 +56,8 @@ export interface AnalysisSummary {
   protocolDistribution: ProtocolStats[];
   topConversations: Conversation[];
   uniqueHosts: NetworkEndpoint[];
+  detectedApplications?: DetectedApplication[];
+  detectedApplicationsTruncated?: boolean;
   fiveWs?: FiveWsAnalysis;
 }
 
