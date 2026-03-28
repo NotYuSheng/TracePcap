@@ -3,6 +3,17 @@
   color: #d4d4d4;
   border-radius: 4px;
   overflow-x: auto;
+  position: relative;
+}
+
+/* Hidden single-line ruler used to measure the exact char width at the pre's font size */
+.hex-ruler {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre;
+  font-family: monospace;
+  font-size: 0.78rem;
 }
 
 .hex-viewer pre {

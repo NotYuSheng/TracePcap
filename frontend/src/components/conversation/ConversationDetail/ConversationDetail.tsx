@@ -153,16 +153,25 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
           <small className="text-muted">Click a row to view hex payload</small>
         </div>
         <div className="card-body p-0">
-          <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            <table className="table table-sm table-striped mb-0">
+          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+            <table className="table table-sm table-striped mb-0" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '4%' }} />   {/* # */}
+                <col style={{ width: '3%' }} />   {/* direction */}
+                <col style={{ width: '16%' }} />  {/* timestamp */}
+                <col style={{ width: '18%' }} />  {/* source */}
+                <col style={{ width: '18%' }} />  {/* destination */}
+                <col style={{ width: '7%' }} />   {/* length */}
+                <col />                           {/* info — takes remaining space */}
+              </colgroup>
               <thead className="sticky-top bg-light">
                 <tr>
-                  <th style={{ width: '60px' }}>#</th>
-                  <th style={{ width: '40px' }}></th>
-                  <th style={{ width: '180px' }}>Timestamp</th>
+                  <th>#</th>
+                  <th></th>
+                  <th>Timestamp</th>
                   <th>Source</th>
                   <th>Destination</th>
-                  <th style={{ width: '100px' }}>Length</th>
+                  <th>Length</th>
                   <th>Info</th>
                 </tr>
               </thead>
@@ -180,19 +189,21 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                         <td className={getDirectionClass(packet)}>
                           <strong>{getDirectionIndicator(packet)}</strong>
                         </td>
-                        <td>
+                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <small>{formatTimestamp(packet.timestamp)}</small>
                         </td>
-                        <td>
+                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={formatIpPort(packet.source.ip, packet.source.port)}>
                           <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
                         </td>
-                        <td>
+                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={formatIpPort(packet.destination.ip, packet.destination.port)}>
                           <small>
                             {formatIpPort(packet.destination.ip, packet.destination.port)}
                           </small>
                         </td>
-                        <td>{packet.size} B</td>
-                        <td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
+                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
                           {hasReadableAscii(packet.payload) && (
                             <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
