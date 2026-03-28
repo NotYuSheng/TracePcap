@@ -48,7 +48,7 @@ public class PacketEntity {
   @Column(name = "dst_port")
   private Integer dstPort;
 
-  @Column(nullable = false, length = 20)
+  @Column(nullable = false, length = 100)
   private String protocol;
 
   @Column(name = "packet_size", nullable = false)
