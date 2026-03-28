@@ -41,7 +41,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libpcap0.8 \
         tshark \
         ndpi \
-        tzdata
+        tzdata && \
+    apt-get purge -y --auto-remove curl gnupg
 
 # Set timezone to Singapore
 ENV TZ=Asia/Singapore

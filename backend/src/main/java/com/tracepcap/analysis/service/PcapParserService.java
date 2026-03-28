@@ -114,7 +114,7 @@ public class PcapParserService {
                 } else if (version == 6) {
                   ipPacket = IpV6Packet.newPacket(raw, 4, raw.length - 4);
                 }
-              } catch (Exception ignored) {}
+              } catch (Exception e) { log.debug("Failed to parse BSD loopback IP packet", e); }
             }
           }
           // DLT=12 (LINKTYPE_RAW): no link-layer header at all — raw IP bytes.
@@ -125,7 +125,7 @@ public class PcapParserService {
               try {
                 if (version == 4) ipPacket = IpV4Packet.newPacket(raw, 0, raw.length);
                 else if (version == 6) ipPacket = IpV6Packet.newPacket(raw, 0, raw.length);
-              } catch (Exception ignored) {}
+              } catch (Exception e) { log.debug("Failed to parse raw IP packet", e); }
             }
           }
           // DLT=113 (Linux cooked / SLL): 16-byte pseudo-header, EtherType at bytes 14-15.
@@ -139,7 +139,7 @@ public class PcapParserService {
                   ipPacket = IpV4Packet.newPacket(raw, 16, raw.length - 16);
                 else if (proto == 0x86DD || version == 6)
                   ipPacket = IpV6Packet.newPacket(raw, 16, raw.length - 16);
-              } catch (Exception ignored) {}
+              } catch (Exception e) { log.debug("Failed to parse Linux SLL IP packet", e); }
             }
           }
           if (ipPacket != null) {
@@ -434,16 +434,18 @@ public class PcapParserService {
       offset += 4;
     }
     int t = etherType & 0xFFFF;
-    if (t <= 1500)        return "LLC";             // 802.3 length field → STP/CDP/VTP/etc.
-    if (t == 0x0806)      return "ARP";
-    if (t == 0x8035)      return "RARP";
-    if (t == 0x88CC)      return "LLDP";
-    if (t == 0x8809)      return "LACP";
-    if (t == 0x8863)      return "PPPoE-Discovery";
-    if (t == 0x8864)      return "PPPoE";
-    if (t == 0x86DD)      return "IPv6";
-    if (t == 0x0800)      return "IPv4";
-    return String.format("VLAN-0x%04X", t);
+    if (t <= 1500) return "LLC"; // 802.3 length field → STP/CDP/VTP/etc.
+    switch (t) {
+      case 0x0800: return "IPv4";
+      case 0x0806: return "ARP";
+      case 0x8035: return "RARP";
+      case 0x86DD: return "IPv6";
+      case 0x8809: return "LACP";
+      case 0x8863: return "PPPoE-Discovery";
+      case 0x8864: return "PPPoE";
+      case 0x88CC: return "LLDP";
+      default:     return String.format("VLAN-0x%04X", t);
+    }
   }
 
   /**
@@ -478,7 +480,7 @@ public class PcapParserService {
     try {
       if (version == 4) return IpV4Packet.newPacket(data, offset, data.length - offset);
       if (version == 6) return IpV6Packet.newPacket(data, offset, data.length - offset);
-    } catch (Exception ignored) {}
+    } catch (Exception e) { log.debug("Failed to parse VLAN-unwrapped IP packet", e); }
     return null;
   }
 
