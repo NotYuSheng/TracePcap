@@ -12,7 +12,9 @@
   cursor: pointer;
   background-color: #e9ecef;
   color: #495057;
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .filter-pill:hover {

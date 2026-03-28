@@ -32,8 +32,15 @@ export const StoryPage = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 500 || msg.includes('500') || msg.toLowerCase().includes('llm') || msg.toLowerCase().includes('connection')) {
-        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
+      if (
+        status === 500 ||
+        msg.includes('500') ||
+        msg.toLowerCase().includes('llm') ||
+        msg.toLowerCase().includes('connection')
+      ) {
+        setError(
+          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
+        );
       } else {
         setError(msg || 'Failed to generate story');
       }
@@ -123,10 +130,22 @@ export const StoryPage = () => {
             <div>
               <h4>Network Traffic Story</h4>
               <ul className="text-muted mb-0 small ps-3">
-                <li>Traffic metadata (IPs, ports, protocols, packet counts) is extracted from the PCAP and sent to the configured LLM</li>
-                <li>nDPI-detected application names, traffic categories, and security risk flags are included when available</li>
-                <li>Only the top <strong>N</strong> conversations by volume are included (configurable via <code>STORY_MAX_CONVERSATIONS</code>)</li>
-                <li><strong>Limitations:</strong> packet payloads, HTTP bodies, DNS query names, and TLS SNI are not available — the LLM cannot see actual content</li>
+                <li>
+                  Traffic metadata (IPs, ports, protocols, packet counts) is extracted from the PCAP
+                  and sent to the configured LLM
+                </li>
+                <li>
+                  nDPI-detected application names, traffic categories, and security risk flags are
+                  included when available
+                </li>
+                <li>
+                  Only the top <strong>N</strong> conversations by volume are included (configurable
+                  via <code>STORY_MAX_CONVERSATIONS</code>)
+                </li>
+                <li>
+                  <strong>Limitations:</strong> packet payloads, HTTP bodies, DNS query names, and
+                  TLS SNI are not available — the LLM cannot see actual content
+                </li>
               </ul>
             </div>
             <button
