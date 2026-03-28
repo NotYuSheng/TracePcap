@@ -2,6 +2,26 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import type { CategoryStat } from '@/types';
 import { getCategoryColor } from '@/utils/appColors';
 import { formatBytes } from '@/utils/formatters';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+
+const categoryInfoPopover = (
+  <Popover id="category-info" style={{ maxWidth: '310px' }}>
+    <Popover.Header>About category detection</Popover.Header>
+    <Popover.Body>
+      <p className="mb-2">
+        Categories are assigned by <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a> by
+        first identifying the application (e.g. YouTube → <em>Media</em>, Google → <em>Web</em>),
+        then mapping it to a category.
+      </p>
+      <p className="mb-0">
+        Because application detection uses deep packet inspection heuristics, it is
+        <strong> probabilistic</strong> — binary payloads can occasionally match the wrong
+        signature. A misidentified application will produce an incorrect category.
+        Treat category labels as strong indicators, not definitive classifications.
+      </p>
+    </Popover.Body>
+  </Popover>
+);
 
 interface CategoryBreakdownChartProps {
   categoryStats: CategoryStat[];
@@ -17,7 +37,19 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
 
   return (
     <div className="protocol-breakdown">
-      <h3 className="breakdown-title">Category Distribution</h3>
+      <h3 className="breakdown-title d-flex align-items-center gap-2">
+        Category Distribution
+        <OverlayTrigger trigger="click" placement="right" overlay={categoryInfoPopover} rootClose>
+          <button
+            type="button"
+            className="btn btn-link p-0 text-muted"
+            style={{ lineHeight: 1 }}
+            aria-label="About category detection accuracy"
+          >
+            <i className="bi bi-info-circle fs-6"></i>
+          </button>
+        </OverlayTrigger>
+      </h3>
 
       <div className="breakdown-content">
         <div className="breakdown-chart">

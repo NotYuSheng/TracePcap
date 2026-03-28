@@ -139,7 +139,7 @@ public class NdpiService {
     for (PcapParserService.ConversationInfo conv : conversations) {
       FlowData data = resolve(flowMap, conv);
       if (data == null) continue;
-      if (data.appName() != null) conv.setAppName(data.appName());
+      if (data.appName() != null) conv.setAppName(correctMisclassification(data.appName(), conv.getSrcPort(), conv.getDstPort(), conv.getProtocol()));
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
       if (data.hostname() != null) conv.setHostname(data.hostname());
@@ -370,6 +370,39 @@ public class NdpiService {
         ip, port, ip2, port2, proto != null ? proto.toUpperCase() : "");
   }
 
+
+  // Port constants for IANA-registered protocol assignments used in misclassification corrections
+  private static final int PORT_UFTP  = 1044; // IANA: UDP — UFTP (Unicast File Transfer Protocol)
+  private static final int PORT_H225  = 1720; // IANA: TCP — H.225 call signaling
+
+  /**
+   * Corrects known nDPI misclassifications using port and transport-layer heuristics.
+   *
+   * <p>Known cases:
+   * <ul>
+   *   <li>UFTP (UDP port 1044, IANA-registered) misclassified as BitTorrent — binary file-transfer
+   *       payload triggers BitTorrent DPI heuristics in nDPI 5.0.0</li>
+   *   <li>H.225/H.245 (TCP port 1720) misclassified as Cassandra — belt-and-suspenders guard
+   *       for older nDPI builds where this is not yet fixed natively</li>
+   *   <li>nDPI reports all H.323 suite flows as "H323" without distinguishing sub-protocols:
+   *       <ul>
+   *         <li>H.225 call signaling always uses TCP port 1720 (IANA-registered)</li>
+   *         <li>H.245 media control always uses dynamically negotiated TCP ports</li>
+   *       </ul>
+   *       H.323 RAS (UDP port 1719, gatekeeper) is left as-is.</li>
+   * </ul>
+   */
+  private static String correctMisclassification(String appName, Integer srcPort, Integer dstPort, String transport) {
+    boolean isTcp = "TCP".equalsIgnoreCase(transport);
+    boolean isUdp = "UDP".equalsIgnoreCase(transport);
+    boolean onPort1044 = Integer.valueOf(PORT_UFTP).equals(srcPort) || Integer.valueOf(PORT_UFTP).equals(dstPort);
+    boolean onPort1720 = Integer.valueOf(PORT_H225).equals(srcPort) || Integer.valueOf(PORT_H225).equals(dstPort);
+    if ("BitTorrent".equalsIgnoreCase(appName) && isUdp && onPort1044) return "UFTP";
+    if ("Cassandra".equalsIgnoreCase(appName)  && isTcp && onPort1720) return "H225";
+    if ("H323".equalsIgnoreCase(appName)       && isTcp && onPort1720) return "H225";
+    if ("H323".equalsIgnoreCase(appName)       && isTcp)               return "H245";
+    return appName;
+  }
 
   private boolean isNotFoundError(Exception e) {
     String msg = e.getMessage();

@@ -1,10 +1,26 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { ProtocolStats } from '@/types';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './ProtocolBreakdownChart.css';
 
 interface ProtocolBreakdownChartProps {
   protocolStats: ProtocolStats[];
 }
+
+const protocolInfoPopover = (
+  <Popover id="protocol-info" style={{ maxWidth: '300px' }}>
+    <Popover.Header>Protocol distribution</Popover.Header>
+    <Popover.Body>
+      <p className="mb-0">
+        Shows the breakdown of <strong>transport-layer protocols</strong> (TCP, UDP, ICMP, ARP,
+        etc.) read directly from IP packet headers — no heuristics involved. The counts
+        accurately reflect what is declared in each packet's header. Note that tunnelled traffic
+        (e.g. GRE, VXLAN, IP-in-IP) will appear as its outer transport protocol, not the
+        encapsulated inner protocol.
+      </p>
+    </Popover.Body>
+  </Popover>
+);
 
 const COLORS = [
   '#0076d1', // Primary blue
@@ -37,7 +53,19 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
 
   return (
     <div className="protocol-breakdown">
-      <h3 className="breakdown-title">Protocol Distribution</h3>
+      <h3 className="breakdown-title d-flex align-items-center gap-2">
+        Protocol Distribution
+        <OverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover} rootClose>
+          <button
+            type="button"
+            className="btn btn-link p-0 text-muted"
+            style={{ lineHeight: 1 }}
+            aria-label="About protocol detection accuracy"
+          >
+            <i className="bi bi-info-circle fs-6"></i>
+          </button>
+        </OverlayTrigger>
+      </h3>
 
       <div className="breakdown-content">
         <div className="breakdown-chart">
