@@ -2,6 +2,7 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import type { Conversation, NetworkEndpoint, Protocol, PaginatedResponse, Packet } from '@/types';
+import type { ConversationFilters } from '../types';
 
 // Backend response types
 interface ConversationApiResponse {
@@ -23,7 +24,7 @@ interface ConversationApiResponse {
   flowRisks?: string[] | null;
   packetCount: number;
   totalBytes: number;
-  startTime: string | number[]; // LocalDateTime can be array or ISO string
+  startTime: string | number[];
   endTime: string | number[];
   durationMs: number;
 }
@@ -103,23 +104,31 @@ function transformPacket(apiData: PacketApiResponse, protocol: Protocol): Packet
 
 export const conversationService = {
   /**
-   * Get conversations for a PCAP file with pagination
+   * Get conversations for a PCAP file with structured filtering, sorting, and pagination.
    */
   getConversations: async (
     fileId: string,
-    page: number = 1,
-    pageSize: number = 25,
-    search?: string
+    filters: ConversationFilters
   ): Promise<PaginatedResponse<Conversation>> => {
+    const params: Record<string, string> = {
+      page:     String(filters.page),
+      pageSize: String(filters.pageSize),
+    };
+    if (filters.ip)                   params.ip         = filters.ip;
+    if (filters.protocols.length > 0) params.protocols  = filters.protocols.join(',');
+    if (filters.apps.length > 0)      params.apps       = filters.apps.join(',');
+    if (filters.categories.length > 0)params.categories = filters.categories.join(',');
+    if (filters.hasRisks)             params.hasRisks   = 'true';
+    if (filters.sortBy)               params.sortBy     = filters.sortBy;
+    if (filters.sortBy)               params.sortDir    = filters.sortDir;
+
     const response = await apiClient.get<{
       data: ConversationApiResponse[];
       page: number;
       pageSize: number;
       total: number;
       totalPages: number;
-    }>(API_ENDPOINTS.CONVERSATIONS(fileId), {
-      params: { page, pageSize, ...(search ? { search } : {}) },
-    });
+    }>(API_ENDPOINTS.CONVERSATIONS(fileId), { params });
 
     return {
       data: response.data.data.map(c => transformConversation(c)),
@@ -131,7 +140,23 @@ export const conversationService = {
   },
 
   /**
-   * Get detailed conversation info including the full packet stream
+   * Build a URL for the CSV export endpoint with the current filters.
+   */
+  getExportUrl: (fileId: string, filters: ConversationFilters): string => {
+    const params = new URLSearchParams();
+    if (filters.ip)                   params.set('ip',         filters.ip);
+    if (filters.protocols.length > 0) params.set('protocols',  filters.protocols.join(','));
+    if (filters.apps.length > 0)      params.set('apps',       filters.apps.join(','));
+    if (filters.categories.length > 0)params.set('categories', filters.categories.join(','));
+    if (filters.hasRisks)             params.set('hasRisks',   'true');
+    if (filters.sortBy)               params.set('sortBy',     filters.sortBy);
+    if (filters.sortBy)               params.set('sortDir',    filters.sortDir);
+    const qs = params.toString();
+    return `/api/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
+  },
+
+  /**
+   * Get detailed conversation info including the full packet stream.
    */
   getConversationDetail: async (conversationId: string): Promise<Conversation> => {
     const response = await apiClient.get<ConversationDetailApiResponse>(

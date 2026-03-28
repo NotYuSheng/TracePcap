@@ -2,6 +2,7 @@ package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
+import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.dto.PacketResponse;
 import com.tracepcap.analysis.dto.ProtocolStatsResponse;
@@ -11,6 +12,7 @@ import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
@@ -23,6 +25,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -422,53 +428,75 @@ public class AnalysisService {
   }
 
   @Transactional(readOnly = true)
-  public List<ConversationResponse> getConversations(UUID fileId, String search) {
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+  public PagedResponse<ConversationResponse> getConversations(
+      UUID fileId, int page, int pageSize, ConversationFilterParams params) {
 
-    if (search != null && !search.isBlank()) {
-      String q = search.trim().toLowerCase();
-      conversations = conversations.stream()
-          .filter(c ->
-              (c.getAppName() != null && c.getAppName().toLowerCase().contains(q)) ||
-              (c.getProtocol() != null && c.getProtocol().toLowerCase().contains(q)) ||
-              (c.getSrcIp() != null && c.getSrcIp().toLowerCase().contains(q)) ||
-              (c.getDstIp() != null && c.getDstIp().toLowerCase().contains(q)) ||
-              (c.getHostname() != null && c.getHostname().toLowerCase().contains(q))
-          )
-          .toList();
-    }
+    Sort sort = buildSort(params);
+    PageRequest pageable = PageRequest.of(page - 1, pageSize, sort);
+    Specification<ConversationEntity> spec = ConversationRepository.buildSpec(fileId, params);
 
-    return conversations.stream()
-        .map(
-            conv -> {
-              Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+    Page<ConversationEntity> dbPage = conversationRepository.findAll(spec, pageable);
 
-              return ConversationResponse.builder()
-                  .conversationId(conv.getId())
-                  .srcIp(conv.getSrcIp())
-                  .srcPort(conv.getSrcPort())
-                  .dstIp(conv.getDstIp())
-                  .dstPort(conv.getDstPort())
-                  .protocol(conv.getProtocol())
-                  .appName(conv.getAppName())
-                  .category(conv.getCategory())
-                  .hostname(conv.getHostname())
-                  .ja3Client(conv.getJa3Client())
-                  .ja3Server(conv.getJa3Server())
-                  .tlsIssuer(conv.getTlsIssuer())
-                  .tlsSubject(conv.getTlsSubject())
-                  .tlsNotBefore(conv.getTlsNotBefore())
-                  .tlsNotAfter(conv.getTlsNotAfter())
-                  .flowRisks(conv.getFlowRisks() != null
-                      ? Arrays.asList(conv.getFlowRisks()) : List.of())
-                  .packetCount(conv.getPacketCount())
-                  .totalBytes(conv.getTotalBytes())
-                  .startTime(conv.getStartTime())
-                  .endTime(conv.getEndTime())
-                  .durationMs(duration.toMillis())
-                  .build();
-            })
+    List<ConversationResponse> content = dbPage.getContent().stream()
+        .map(this::toConversationResponse)
         .collect(Collectors.toList());
+
+    return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
+  }
+
+  /** Also used by the CSV export — returns ALL matching rows without pagination. */
+  @Transactional(readOnly = true)
+  public List<ConversationResponse> getConversationsForExport(
+      UUID fileId, ConversationFilterParams params) {
+
+    Sort sort = buildSort(params);
+    Specification<ConversationEntity> spec = ConversationRepository.buildSpec(fileId, params);
+    return conversationRepository.findAll(spec, sort).stream()
+        .map(this::toConversationResponse)
+        .collect(Collectors.toList());
+  }
+
+  private Sort buildSort(ConversationFilterParams params) {
+    if (params == null || params.getSortBy() == null || params.getSortBy().isBlank()) {
+      return Sort.unsorted();
+    }
+    // Map frontend field names to entity field names
+    String field = switch (params.getSortBy()) {
+      case "packets"   -> "packetCount";
+      case "bytes"     -> "totalBytes";
+      case "duration"  -> "startTime"; // duration is computed; proxy with startTime
+      default          -> params.getSortBy(); // srcIp, dstIp, startTime pass through
+    };
+    Sort.Direction dir = "desc".equalsIgnoreCase(params.getSortDir())
+        ? Sort.Direction.DESC : Sort.Direction.ASC;
+    return Sort.by(dir, field);
+  }
+
+  private ConversationResponse toConversationResponse(ConversationEntity conv) {
+    Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+    return ConversationResponse.builder()
+        .conversationId(conv.getId())
+        .srcIp(conv.getSrcIp())
+        .srcPort(conv.getSrcPort())
+        .dstIp(conv.getDstIp())
+        .dstPort(conv.getDstPort())
+        .protocol(conv.getProtocol())
+        .appName(conv.getAppName())
+        .category(conv.getCategory())
+        .hostname(conv.getHostname())
+        .ja3Client(conv.getJa3Client())
+        .ja3Server(conv.getJa3Server())
+        .tlsIssuer(conv.getTlsIssuer())
+        .tlsSubject(conv.getTlsSubject())
+        .tlsNotBefore(conv.getTlsNotBefore())
+        .tlsNotAfter(conv.getTlsNotAfter())
+        .flowRisks(conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
+        .packetCount(conv.getPacketCount())
+        .totalBytes(conv.getTotalBytes())
+        .startTime(conv.getStartTime())
+        .endTime(conv.getEndTime())
+        .durationMs(duration.toMillis())
+        .build();
   }
 
   @Transactional(readOnly = true)

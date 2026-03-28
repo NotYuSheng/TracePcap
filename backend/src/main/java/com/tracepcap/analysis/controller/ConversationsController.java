@@ -1,11 +1,17 @@
 package com.tracepcap.analysis.controller;
 
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
+import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.service.AnalysisService;
 import com.tracepcap.common.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -22,33 +28,89 @@ public class ConversationsController {
 
   private final AnalysisService analysisService;
 
-  /** Get conversations for a file with optional pagination */
+  private static final DateTimeFormatter CSV_DT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+  /** Get conversations for a file with optional filtering, sorting, and pagination */
   @GetMapping("/{fileId}")
-  @Operation(summary = "Get conversations with pagination support")
+  @Operation(summary = "Get conversations with filtering, sorting, and pagination")
   public ResponseEntity<PagedResponse<ConversationResponse>> getConversations(
       @PathVariable UUID fileId,
-      @Parameter(description = "Page number (1-indexed)") @RequestParam(defaultValue = "1")
-          int page,
-      @Parameter(description = "Number of items per page") @RequestParam(defaultValue = "25")
-          int pageSize,
-      @Parameter(description = "Filter by app name, protocol, IP or hostname")
-          @RequestParam(required = false) String search) {
+      @Parameter(description = "Page number (1-indexed)") @RequestParam(defaultValue = "1") int page,
+      @Parameter(description = "Number of items per page") @RequestParam(defaultValue = "25") int pageSize,
+      @Parameter(description = "Filter by IP address or hostname (src, dst, or hostname contains)") @RequestParam(required = false) String ip,
+      @Parameter(description = "Comma-separated list of protocols to include") @RequestParam(required = false) String protocols,
+      @Parameter(description = "Comma-separated list of application names to include") @RequestParam(required = false) String apps,
+      @Parameter(description = "Comma-separated list of categories to include") @RequestParam(required = false) String categories,
+      @Parameter(description = "When true, only conversations with flow risks are returned") @RequestParam(required = false) Boolean hasRisks,
+      @Parameter(description = "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime") @RequestParam(required = false) String sortBy,
+      @Parameter(description = "Sort direction: asc (default) or desc") @RequestParam(required = false) String sortDir,
+      @Parameter(description = "Legacy alias for ip param") @RequestParam(required = false) String search) {
 
-    log.info("GET /api/conversations/{} - page: {}, pageSize: {}, search: {}", fileId, page, pageSize, search);
+    if (page < 1) page = 1;
+    if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
-    // Validate pagination parameters
-    if (page < 1) {
-      page = 1;
+    // Backward compat: old ?search= param maps to ip filter
+    String resolvedIp = (ip != null) ? ip : search;
+
+    ConversationFilterParams params = ConversationFilterParams.builder()
+        .ip(resolvedIp)
+        .protocols(splitComma(protocols))
+        .apps(splitComma(apps))
+        .categories(splitComma(categories))
+        .hasRisks(hasRisks)
+        .sortBy(sortBy)
+        .sortDir(sortDir)
+        .build();
+
+    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, sortBy:{} {}",
+        fileId, page, pageSize, resolvedIp, protocols, apps, categories, hasRisks, sortBy, sortDir);
+
+    return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
+  }
+
+  /** Export all matching conversations as CSV (no pagination, same filters as listing) */
+  @GetMapping("/{fileId}/export")
+  @Operation(summary = "Export filtered conversations as CSV")
+  public void exportConversations(
+      @PathVariable UUID fileId,
+      @RequestParam(required = false) String ip,
+      @RequestParam(required = false) String protocols,
+      @RequestParam(required = false) String apps,
+      @RequestParam(required = false) String categories,
+      @RequestParam(required = false) Boolean hasRisks,
+      @RequestParam(required = false) String sortBy,
+      @RequestParam(required = false) String sortDir,
+      HttpServletResponse response) throws IOException {
+
+    ConversationFilterParams params = ConversationFilterParams.builder()
+        .ip(ip)
+        .protocols(splitComma(protocols))
+        .apps(splitComma(apps))
+        .categories(splitComma(categories))
+        .hasRisks(hasRisks)
+        .sortBy(sortBy)
+        .sortDir(sortDir)
+        .build();
+
+    List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
+
+    response.setContentType("text/csv");
+    response.setHeader("Content-Disposition", "attachment; filename=\"conversations.csv\"");
+
+    PrintWriter writer = response.getWriter();
+    writer.println("srcIp,srcPort,dstIp,dstPort,protocol,appName,category,hostname,packetCount,totalBytes,durationMs,startTime,endTime,flowRisks");
+    for (ConversationResponse r : rows) {
+      writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,\"%s\"%n",
+          nvl(r.getSrcIp()), nvl(r.getSrcPort()),
+          nvl(r.getDstIp()), nvl(r.getDstPort()),
+          nvl(r.getProtocol()), nvl(r.getAppName()),
+          nvl(r.getCategory()), nvl(r.getHostname()),
+          r.getPacketCount(), r.getTotalBytes(), r.getDurationMs(),
+          r.getStartTime() != null ? CSV_DT.format(r.getStartTime()) : "",
+          r.getEndTime()   != null ? CSV_DT.format(r.getEndTime())   : "",
+          r.getFlowRisks() != null ? String.join("; ", r.getFlowRisks()) : "");
     }
-    if (pageSize < 1 || pageSize > 100) {
-      pageSize = 25; // Default to 25 if invalid
-    }
-
-    List<ConversationResponse> allConversations = analysisService.getConversations(fileId, search);
-    PagedResponse<ConversationResponse> pagedResponse =
-        PagedResponse.of(allConversations, page, pageSize);
-
-    return ResponseEntity.ok(pagedResponse);
+    writer.flush();
   }
 
   /** Get detailed conversation info including all packets */
@@ -57,7 +119,18 @@ public class ConversationsController {
   public ResponseEntity<ConversationDetailResponse> getConversationDetail(
       @PathVariable UUID conversationId) {
     log.info("GET /api/conversations/detail/{}", conversationId);
-    ConversationDetailResponse detail = analysisService.getConversationDetail(conversationId);
-    return ResponseEntity.ok(detail);
+    return ResponseEntity.ok(analysisService.getConversationDetail(conversationId));
+  }
+
+  private static List<String> splitComma(String value) {
+    if (value == null || value.isBlank()) return List.of();
+    return Arrays.stream(value.split(","))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .toList();
+  }
+
+  private static String nvl(Object value) {
+    return value == null ? "" : value.toString();
   }
 }

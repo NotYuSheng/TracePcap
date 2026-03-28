@@ -18,7 +18,22 @@ public class PagedResponse<T> {
   private long total;
   private int totalPages;
 
-  /** Create a paged response from a list and pagination parameters */
+  /**
+   * Create a paged response when DB has already done filtering/pagination.
+   * The content list is used as-is; total comes from the DB count.
+   */
+  public static <T> PagedResponse<T> of(List<T> content, long total, int page, int pageSize) {
+    int totalPages = pageSize > 0 ? (int) Math.ceil((double) total / pageSize) : 0;
+    return PagedResponse.<T>builder()
+        .data(content)
+        .page(page)
+        .pageSize(pageSize)
+        .total(total)
+        .totalPages(totalPages)
+        .build();
+  }
+
+  /** Create a paged response from a full in-memory list (slices it here). */
   public static <T> PagedResponse<T> of(List<T> allData, int page, int pageSize) {
     long total = allData.size();
     int totalPages = (int) Math.ceil((double) total / pageSize);
