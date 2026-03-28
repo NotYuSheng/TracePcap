@@ -94,6 +94,10 @@
   opacity: 0.35;
 }
 
+.legend-small-text {
+  font-size: 0.7rem;
+}
+
 .legend-color {
   display: inline-block;
   width: 16px;

@@ -96,7 +96,7 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
               <i className={`bi ${typeInfo.icon} me-2`}></i>
               {node.data.ip}
               {node.data.hostname && (
-                <small className="text-muted ms-2 fw-normal" style={{ fontSize: '0.85rem' }}>
+                <small className="text-muted ms-2 fw-normal node-details-hostname">
                   ({node.data.hostname})
                 </small>
               )}
@@ -136,12 +136,12 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                       {typeInfo.label}
                     </span>
                     {ev.dominantPort && (
-                      <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+                      <div className="text-muted mt-1 node-details-evidence">
                         {ev.connectionCount} conn. on port {ev.dominantPort}
                       </div>
                     )}
                     {!ev.dominantPort && node.data.nodeType === 'router' && (
-                      <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+                      <div className="text-muted mt-1 node-details-evidence">
                         {ev.distinctPeers} distinct peers
                       </div>
                     )}
@@ -201,7 +201,7 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                     {peers.map(([ip, info]) => (
                       <tr
                         key={ip}
-                        style={{ cursor: 'pointer' }}
+                        className="node-details-peer-row"
                         title="Click to view conversations"
                         onClick={() => {
                           onClose();
@@ -212,7 +212,7 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                       >
                         <td className="font-monospace small">
                           {ip}
-                          <i className="bi bi-arrow-right-circle ms-1 text-muted" style={{ fontSize: '0.7rem' }}></i>
+                          <i className="bi bi-arrow-right-circle ms-1 text-muted node-details-peer-icon"></i>
                         </td>
                         <td>
                           {Array.from(info.apps).map(app => (

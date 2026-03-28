@@ -1,4 +1,5 @@
 import type { NetworkStats } from '@/features/network/types';
+import { PROTOCOL_COLORS, NODE_TYPE_COLORS } from '@/features/network/constants';
 import './NetworkControls.css';
 
 interface NetworkControlsProps {
@@ -16,26 +17,26 @@ interface NetworkControlsProps {
 }
 
 const EDGE_LEGEND = [
-  { label: 'HTTP',      key: 'HTTP',  color: '#2ecc71' },
-  { label: 'HTTPS/TLS', key: 'HTTPS', color: '#3498db' },
-  { label: 'DNS',       key: 'DNS',   color: '#f39c12' },
-  { label: 'TCP',       key: 'TCP',   color: '#7f8c8d' },
-  { label: 'UDP',       key: 'UDP',   color: '#f1c40f' },
+  { label: 'HTTP',        key: 'HTTP',  color: PROTOCOL_COLORS['HTTP'] },
+  { label: 'HTTPS/TLS',  key: 'HTTPS', color: PROTOCOL_COLORS['HTTPS'] },
+  { label: 'DNS',         key: 'DNS',   color: PROTOCOL_COLORS['DNS'] },
+  { label: 'TCP',         key: 'TCP',   color: PROTOCOL_COLORS['TCP'] },
+  { label: 'UDP',         key: 'UDP',   color: PROTOCOL_COLORS['UDP'] },
 ];
 
 const NODE_LEGEND = [
-  { label: 'DNS Server',      key: 'dns-server',      color: '#f39c12' },
-  { label: 'Web Server',      key: 'web-server',      color: '#2ecc71' },
-  { label: 'SSH Server',      key: 'ssh-server',      color: '#1abc9c' },
-  { label: 'FTP Server',      key: 'ftp-server',      color: '#16a085' },
-  { label: 'Mail Server',     key: 'mail-server',     color: '#e91e63' },
-  { label: 'DHCP Server',     key: 'dhcp-server',     color: '#8e44ad' },
-  { label: 'NTP Server',      key: 'ntp-server',      color: '#6c3483' },
-  { label: 'Database Server', key: 'database-server', color: '#e67e22' },
-  { label: 'Router / Gateway',key: 'router',          color: '#d4ac0d' },
-  { label: 'Client',          key: 'client',          color: '#3498db' },
-  { label: 'Anomaly',         key: 'anomaly',         color: '#e74c3c' },
-  { label: 'Unknown',         key: 'unknown',         color: '#95a5a6' },
+  { label: 'DNS Server',       key: 'dns-server',      color: NODE_TYPE_COLORS['dns-server'] },
+  { label: 'Web Server',       key: 'web-server',      color: NODE_TYPE_COLORS['web-server'] },
+  { label: 'SSH Server',       key: 'ssh-server',      color: NODE_TYPE_COLORS['ssh-server'] },
+  { label: 'FTP Server',       key: 'ftp-server',      color: NODE_TYPE_COLORS['ftp-server'] },
+  { label: 'Mail Server',      key: 'mail-server',     color: NODE_TYPE_COLORS['mail-server'] },
+  { label: 'DHCP Server',      key: 'dhcp-server',     color: NODE_TYPE_COLORS['dhcp-server'] },
+  { label: 'NTP Server',       key: 'ntp-server',      color: NODE_TYPE_COLORS['ntp-server'] },
+  { label: 'Database Server',  key: 'database-server', color: NODE_TYPE_COLORS['database-server'] },
+  { label: 'Router / Gateway', key: 'router',          color: NODE_TYPE_COLORS['router'] },
+  { label: 'Client',           key: 'client',          color: NODE_TYPE_COLORS['client'] },
+  { label: 'Anomaly',          key: 'anomaly',         color: NODE_TYPE_COLORS['anomaly'] },
+  { label: 'Unknown',          key: 'unknown',         color: NODE_TYPE_COLORS['unknown'] },
 ];
 
 /**
@@ -143,15 +144,14 @@ export function NetworkControls({
               <span>Node Types</span>
               {activeLegendNodeTypes.length > 0 && (
                 <button
-                  className="btn btn-link btn-sm p-0 text-muted"
-                  style={{ fontSize: '0.7rem' }}
+                  className="btn btn-link btn-sm p-0 text-muted legend-small-text"
                   onClick={onLegendNodeTypeClear}
                 >
                   Clear ×
                 </button>
               )}
             </div>
-            <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
+            <small className="text-muted d-block mb-1 legend-small-text">
               Click to filter (multi-select)
             </small>
             {NODE_LEGEND.filter(({ key }) => presentNodeTypes.has(key)).map(({ label, key, color }) => (
@@ -171,15 +171,14 @@ export function NetworkControls({
               <span>Edge Protocols</span>
               {activeLegendProtocols.length > 0 && (
                 <button
-                  className="btn btn-link btn-sm p-0 text-muted"
-                  style={{ fontSize: '0.7rem' }}
+                  className="btn btn-link btn-sm p-0 text-muted legend-small-text"
                   onClick={onLegendProtocolClear}
                 >
                   Clear ×
                 </button>
               )}
             </div>
-            <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
+            <small className="text-muted d-block mb-1 legend-small-text">
               Click to filter (multi-select)
             </small>
             {EDGE_LEGEND.filter(({ key }) => presentEdgeLegendKeys.has(key)).map(({ label, key, color }) => (

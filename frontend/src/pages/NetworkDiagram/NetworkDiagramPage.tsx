@@ -71,7 +71,7 @@ export const NetworkDiagramPage = () => {
         const app = (edge.data.appName ?? '').toUpperCase();
         return activeLegendProtocols.some(key => {
           if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
-          return proto === key || app === key || app.startsWith(key + ' ');
+          return proto === key || app.includes(key);
         });
       });
     }

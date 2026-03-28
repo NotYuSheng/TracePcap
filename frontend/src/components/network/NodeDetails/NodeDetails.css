@@ -66,3 +66,19 @@
 .text-monospace {
   font-family: monospace;
 }
+
+.node-details-hostname {
+  font-size: 0.85rem;
+}
+
+.node-details-evidence {
+  font-size: 0.75rem;
+}
+
+.node-details-peer-row {
+  cursor: pointer;
+}
+
+.node-details-peer-icon {
+  font-size: 0.7rem;
+}
