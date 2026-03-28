@@ -148,7 +148,7 @@ llm:
 tracepcap:
   analysis:
     batch-size: 1000
-    timeout-seconds: 300
+    timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:300}
     max-concurrent-analyses: 3
     max-timeline-data-points: 1000
     min-timeline-interval: 1
