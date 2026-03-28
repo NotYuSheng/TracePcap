@@ -3,14 +3,12 @@ import { Row, Col } from '@govtechsg/sgds-react';
 import { FileUploadZone } from '@components/upload/FileUploadZone';
 import { FileList } from '@components/upload/FileList';
 import { useFileUpload } from '@features/upload/hooks/useFileUpload';
-import { SignaturesModal } from '@components/signatures/SignaturesModal';
 
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
 
 export const UploadPage = () => {
   const { uploadFile, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
-  const [showSignatures, setShowSignatures] = useState(false);
 
   const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(',');
 
@@ -30,13 +28,6 @@ export const UploadPage = () => {
             <p className="text-muted">
               Upload your network capture files for detailed analysis and visualization
             </p>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => setShowSignatures(true)}
-            >
-              <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
-            </button>
           </div>
 
           <Row className="justify-content-center">
@@ -53,8 +44,6 @@ export const UploadPage = () => {
           <FileList />
         </Col>
       </Row>
-
-      <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
     </div>
   );
 };
