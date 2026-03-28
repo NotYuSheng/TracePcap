@@ -24,23 +24,3 @@
 .conv-table-scroll::-webkit-scrollbar-track { background: #f1f3f5; border-radius: 3px; }
 .conv-table-scroll::-webkit-scrollbar-thumb { background-color: #adb5bd; border-radius: 3px; }
 
-/* Middle-click pan indicator — fixed at the origin point */
-.conv-pan-indicator {
-  position: fixed;
-  transform: translate(-50%, -50%);
-  width: 20px;
-  height: 20px;
-  pointer-events: none;
-  z-index: 9999;
-  /* Four-arrow crosshair using CSS */
-  background:
-    /* vertical bar */
-    linear-gradient(#555, #555) center/2px 100%,
-    /* horizontal bar */
-    linear-gradient(#555, #555) center/100% 2px,
-    /* white centre dot */
-    radial-gradient(circle, #fff 3px, transparent 3px);
-  background-repeat: no-repeat;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1.5px #555, 0 0 0 3px rgba(255,255,255,0.7);
-}
