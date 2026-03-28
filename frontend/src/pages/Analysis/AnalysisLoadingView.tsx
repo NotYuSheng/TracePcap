@@ -64,9 +64,6 @@ export const AnalysisLoadingView = ({ fileId }: Props) => {
     ? Math.min(95, (elapsed / estimatedSeconds) * 100)
     : null;
 
-  const remaining =
-    estimatedSeconds != null ? Math.max(0, estimatedSeconds - elapsed) : null;
-
   return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
       <div className="text-center" style={{ maxWidth: 480, width: '100%' }}>
@@ -109,13 +106,10 @@ export const AnalysisLoadingView = ({ fileId }: Props) => {
             <i className="bi bi-stopwatch me-1" />
             Elapsed: <strong className="text-body">{formatDuration(elapsed)}</strong>
           </span>
-          {remaining != null && remaining > 0 && (
+          {estimatedSeconds != null && (
             <span>
-              Est. remaining: <strong className="text-body">~{formatDuration(remaining)}</strong>
+              Est. time: <strong className="text-body">~{formatDuration(estimatedSeconds)}</strong>
             </span>
-          )}
-          {remaining != null && remaining <= 0 && (
-            <span className="text-muted">Almost done…</span>
           )}
         </div>
 

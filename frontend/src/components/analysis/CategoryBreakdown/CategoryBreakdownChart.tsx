@@ -35,6 +35,9 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
     color: getCategoryColor(stat.category),
   }));
 
+  // Legend rows depend on number of items; each row ≈ 24 px, ~3 items per row at typical widths.
+  const chartHeight = Math.max(300, 240 + Math.ceil(chartData.length / 3) * 24);
+
   return (
     <div className="protocol-breakdown">
       <h3 className="breakdown-title d-flex align-items-center gap-2">
@@ -53,7 +56,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
 
       <div className="breakdown-content">
         <div className="breakdown-chart">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <PieChart>
               <Pie
                 data={chartData}
