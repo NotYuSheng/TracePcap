@@ -12,6 +12,9 @@ public class ConversationFilterParams {
   /** Free-text match against srcIp, dstIp, or hostname (case-insensitive contains). */
   private final String ip;
 
+  /** Exact match against srcPort or dstPort. Null = no filter. */
+  private final Integer port;
+
   /** Restrict to conversations whose protocol is in this list. Empty = no filter. */
   private final List<String> protocols;
 

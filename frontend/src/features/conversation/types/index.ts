@@ -11,6 +11,7 @@ export type SortDir = 'asc' | 'desc';
 
 export interface ConversationFilters {
   ip: string;
+  port: string;
   protocols: string[];
   apps: string[];
   categories: string[];

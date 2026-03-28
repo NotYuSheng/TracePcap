@@ -3,6 +3,7 @@ package com.tracepcap.analysis.repository;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
@@ -108,6 +109,14 @@ public interface ConversationRepository
         ));
       }
 
+      // Port exact match (srcPort OR dstPort)
+      if (params.getPort() != null) {
+        predicates.add(cb.or(
+            cb.equal(root.get("srcPort"), params.getPort()),
+            cb.equal(root.get("dstPort"), params.getPort())
+        ));
+      }
+
       // Protocol multi-value
       if (params.getProtocols() != null && !params.getProtocols().isEmpty()) {
         predicates.add(root.get("protocol").in(params.getProtocols()));
@@ -128,14 +137,11 @@ public interface ConversationRepository
         predicates.add(cb.isNotNull(root.get("flowRisks")));
       }
 
-      // Risk type filter — conversation must contain at least one of the specified risk strings.
-      // array_position returns the 1-based index of the element or NULL if absent; IS NOT NULL
-      // gives an exact element match and avoids false positives from substring matching.
+      // Risk type filter — use isMember for idiomatic JPA element-in-array check.
+      // Generates a query that can leverage a GIN index on the flow_risks column.
       if (params.getRiskTypes() != null && !params.getRiskTypes().isEmpty()) {
         List<Predicate> riskPreds = params.getRiskTypes().stream()
-            .map(rt -> cb.isNotNull(cb.function(
-                "array_position", Integer.class,
-                root.get("flowRisks"), cb.literal(rt))))
+            .map(rt -> cb.isMember(rt, root.get("flowRisks")))
             .collect(java.util.stream.Collectors.toList());
         predicates.add(cb.or(riskPreds.toArray(new Predicate[0])));
       }
