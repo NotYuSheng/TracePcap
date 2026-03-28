@@ -117,10 +117,10 @@ export const StoryPage = () => {
             <div>
               <h4>Network Traffic Story</h4>
               <ul className="text-muted mb-0 small ps-3">
-                <li>Traffic metadata (IPs, ports, protocols, packet counts) is extracted from the PCAP and sent to the configured LLM</li>
-                <li>nDPI-detected application names, traffic categories, and security risk flags are included when available</li>
-                <li>Only the top <strong>N</strong> conversations by volume are included (configurable via <code>STORY_MAX_CONVERSATIONS</code>)</li>
-                <li><strong>Limitations:</strong> packet payloads, HTTP bodies, DNS query names, and TLS SNI are not available — the LLM cannot see actual content</li>
+                <li>File metadata, traffic summary, protocol breakdown, and category distribution are always included</li>
+                <li>The top <strong>N</strong> conversations by volume are included, with nDPI app names, categories, TLS certificate details, and risk flags (configurable via <code>STORY_MAX_CONVERSATIONS</code>, default 20)</li>
+                <li>Security alerts list up to <strong>N</strong> at-risk conversations — the LLM is told the total count even when the list is truncated</li>
+                <li><strong>Not sent to the LLM:</strong> packet payloads, HTTP bodies, DNS query names, TLS SNI, and conversations beyond the configured cap</li>
               </ul>
             </div>
             <button
