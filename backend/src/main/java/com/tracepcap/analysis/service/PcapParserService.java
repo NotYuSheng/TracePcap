@@ -441,6 +441,7 @@ public class PcapParserService {
       String srcIp, Integer srcPort, String dstIp, Integer dstPort,
       String protocol, int packetSize, String info, String payloadHex,
       byte[] appLayerBytes) {
+
     PacketInfo pkt = new PacketInfo();
     pkt.setPacketNumber(packetNumber);
     pkt.setTimestamp(timestamp);
@@ -452,7 +453,7 @@ public class PcapParserService {
     pkt.setPacketSize(packetSize);
     pkt.setInfo(info);
     pkt.setPayload(payloadHex);
-    pkt.setDetectedFileType(FileSignatureDetector.detect(extractPayloadHex(appLayerBytes)));
+    pkt.setDetectedFileType(FileSignatureDetector.detect(appLayerBytes));
     return pkt;
   }
 

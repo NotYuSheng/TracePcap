@@ -1,75 +1,95 @@
 package com.tracepcap.analysis.service;
 
+import java.io.ByteArrayInputStream;
+import java.util.Map;
+import org.apache.tika.Tika;
+
 /**
- * Detects file types from the leading bytes of a packet payload (stored as a lowercase hex string).
- *
- * <p>Signatures are checked in declaration order; the first match wins. Sources:
- * https://en.wikipedia.org/wiki/List_of_file_signatures
+ * Detects file types from the leading bytes of a packet's application-layer payload using Apache
+ * Tika's magic-byte detection.
  */
 public final class FileSignatureDetector {
 
   private FileSignatureDetector() {}
 
-  private record Signature(String hexPrefix, String label) {}
+  private static final Tika TIKA = new Tika();
+
+  /** Maps Tika MIME types to short human-readable badge labels. */
+  private static final Map<String, String> MIME_LABELS = Map.ofEntries(
+    // Archives
+    Map.entry("application/zip",              "ZIP"),
+    Map.entry("application/x-7z-compressed",  "7-ZIP"),
+    Map.entry("application/x-rar-compressed", "RAR"),
+    Map.entry("application/x-gzip",           "GZIP"),
+    Map.entry("application/gzip",             "GZIP"),
+    Map.entry("application/x-bzip2",          "BZIP2"),
+    Map.entry("application/x-xz",             "XZ"),
+    Map.entry("application/x-tar",            "TAR"),
+    // Executables
+    Map.entry("application/x-msdownload",     "EXE/DLL"),
+    Map.entry("application/x-dosexec",        "EXE/DLL"),
+    Map.entry("application/x-elf",            "ELF"),
+    Map.entry("application/java-vm",          "CLASS"),
+    Map.entry("application/x-sharedlib",      "ELF"),
+    // Documents
+    Map.entry("application/pdf",              "PDF"),
+    Map.entry("application/msword",           "DOC"),
+    Map.entry("application/vnd.ms-excel",     "XLS"),
+    Map.entry("application/vnd.ms-powerpoint","PPT"),
+    Map.entry("application/vnd.openxmlformats-officedocument.wordprocessingml.document",   "DOCX"),
+    Map.entry("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",         "XLSX"),
+    Map.entry("application/vnd.openxmlformats-officedocument.presentationml.presentation", "PPTX"),
+    Map.entry("application/vnd.oasis.opendocument.text",        "ODT"),
+    Map.entry("application/vnd.oasis.opendocument.spreadsheet", "ODS"),
+    // Images
+    Map.entry("image/png",  "PNG"),
+    Map.entry("image/jpeg", "JPEG"),
+    Map.entry("image/gif",  "GIF"),
+    Map.entry("image/bmp",  "BMP"),
+    Map.entry("image/tiff", "TIFF"),
+    Map.entry("image/webp", "WEBP"),
+    Map.entry("image/vnd.adobe.photoshop", "PSD"),
+    // Audio / Video
+    Map.entry("audio/mpeg",       "MP3"),
+    Map.entry("audio/ogg",        "OGG"),
+    Map.entry("audio/x-flac",     "FLAC"),
+    Map.entry("audio/flac",       "FLAC"),
+    Map.entry("audio/wav",        "WAV"),
+    Map.entry("video/mp4",        "MP4"),
+    Map.entry("video/x-msvideo",  "AVI"),
+    Map.entry("video/quicktime",  "MOV"),
+    Map.entry("video/x-matroska", "MKV"),
+    // Database
+    Map.entry("application/x-sqlite3", "SQLITE"),
+    // Java
+    Map.entry("application/java-archive", "JAR")
+  );
 
   /**
-   * Signatures to match against the start of the payload hex string. Longer/more-specific patterns
-   * are listed first so they take priority over shorter ones that share the same prefix.
-   * All hex prefixes must be lowercase.
-   */
-  private static final Signature[] SIGNATURES = {
-    // ── Archives ────────────────────────────────────────────────────────────
-    new Signature("377abcaf271c",    "7-ZIP"),
-    new Signature("526172211a0700",  "RAR"),
-    new Signature("526172211a0701",  "RAR5"),
-    new Signature("504b0304",        "ZIP"),   // also DOCX / XLSX / ODT / JAR etc.
-    new Signature("1f8b",            "GZIP"),
-    new Signature("425a68",          "BZIP2"),
-    new Signature("fd377a585a00",    "XZ"),
-    // ── Executables / binaries ───────────────────────────────────────────────
-    new Signature("4d5a",            "EXE/DLL"),  // Windows PE (MZ)
-    new Signature("7f454c46",        "ELF"),      // Linux/Unix ELF
-    new Signature("cafebabe",        "CLASS"),    // Java class file (also Mach-O fat binary)
-    new Signature("feedface",        "MACHO32"),  // Mach-O 32-bit LE
-    new Signature("feedfacf",        "MACHO64"),  // Mach-O 64-bit LE
-    new Signature("cefaedfe",        "MACHO32"),  // Mach-O 32-bit BE
-    new Signature("cffaedfe",        "MACHO64"),  // Mach-O 64-bit BE
-    // ── Documents ────────────────────────────────────────────────────────────
-    new Signature("25504446",        "PDF"),      // %PDF
-    new Signature("d0cf11e0a1b11ae1","DOC/XLS"),  // MS Office legacy (OLE2)
-    // ── Images ───────────────────────────────────────────────────────────────
-    new Signature("89504e470d0a1a0a","PNG"),
-    new Signature("ffd8ff",          "JPEG"),
-    new Signature("47494638",        "GIF"),      // GIF87a / GIF89a
-    new Signature("424d",            "BMP"),
-    new Signature("49492a00",        "TIFF"),     // little-endian
-    new Signature("4d4d002a",        "TIFF"),     // big-endian
-    new Signature("38425053",        "PSD"),
-    new Signature("52494646",        "RIFF"),     // WAV / AVI / WebP
-    // ── Media ────────────────────────────────────────────────────────────────
-    new Signature("494433",          "MP3"),      // ID3-tagged
-    new Signature("fffb",            "MP3"),
-    new Signature("fff3",            "MP3"),
-    new Signature("fff2",            "MP3"),
-    new Signature("4f676753",        "OGG"),
-    new Signature("664c6143",        "FLAC"),
-    // ── Database / data ──────────────────────────────────────────────────────
-    new Signature("53514c69746533",  "SQLITE"),   // SQLite3
-    // ── Scripts / text (common transfer indicators) ──────────────────────────
-    new Signature("efbbbf",          "UTF8-BOM"),
-  };
-
-  /**
-   * Returns a short file-type label (e.g. {@code "PDF"}, {@code "EXE/DLL"}) if the start of
-   * {@code payloadHex} matches a known signature, or {@code null} if no match is found.
+   * Returns a short human-readable label (e.g. {@code "PDF"}, {@code "EXE/DLL"}) for the file
+   * type detected from {@code appLayerBytes}, or {@code null} if the type is unknown or
+   * unrecognised.
    *
-   * @param payloadHex lowercase hex string of the application-layer payload (may be null or empty)
+   * @param appLayerBytes raw bytes of the application-layer payload (may be null or empty)
    */
-  public static String detect(String payloadHex) {
-    if (payloadHex == null || payloadHex.length() < 4) return null;
-    for (Signature sig : SIGNATURES) {
-      if (payloadHex.startsWith(sig.hexPrefix())) return sig.label();
+  public static String detect(byte[] appLayerBytes) {
+    if (appLayerBytes == null || appLayerBytes.length == 0) return null;
+    try {
+      String mime = TIKA.detect(new ByteArrayInputStream(appLayerBytes));
+      if (mime == null || mime.equals("application/octet-stream")
+          || mime.equals("text/plain") || mime.equals("application/x-www-form-urlencoded")) {
+        return null;
+      }
+      String label = MIME_LABELS.get(mime);
+      // Fall back to a tidied version of the subtype if no explicit mapping exists
+      if (label == null) {
+        String subtype = mime.contains("/") ? mime.substring(mime.indexOf('/') + 1) : mime;
+        subtype = subtype.replaceAll("^(x-|vnd\\.)", "").toUpperCase();
+        label = subtype.length() <= 12 ? subtype : null;
+      }
+      return label;
+    } catch (Exception e) {
+      return null;
     }
-    return null;
   }
 }
