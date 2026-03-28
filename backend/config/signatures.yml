@@ -4,16 +4,16 @@
 # conversation's risk flags, making it visible in the Risk Type filter and security
 # alerts alongside nDPI's built-in detections.
 #
-# Rules are reloaded on every file analysis — no restart required after editing.
+# Rules are reloaded on every file analysis - no restart required after editing.
 #
 # Match fields (all optional; a rule fires when ALL specified fields match):
-#   ip       — exact match against source OR destination IP
-#   cidr     — CIDR range match against source OR destination IP  (e.g. 10.0.0.0/8)
-#   srcPort  — exact source port match
-#   dstPort  — exact destination port match
-#   ja3      — exact match against JA3 client OR server fingerprint hash
-#   hostname — exact or wildcard SNI hostname  (e.g. *.evil.com)
-#   app      — case-insensitive match against nDPI application name  (e.g. TOR)
+#   ip       - exact match against source OR destination IP
+#   cidr     - CIDR range match against source OR destination IP  (e.g. 10.0.0.0/8)
+#   srcPort  - exact source port match
+#   dstPort  - exact destination port match
+#   ja3      - exact match against JA3 client OR server fingerprint hash
+#   hostname - exact or wildcard SNI hostname  (e.g. *.evil.com)
+#   app      - case-insensitive match against nDPI application name  (e.g. TOR)
 #
 # The `name` field becomes the risk tag shown in the UI (use underscores, no spaces).
 # The `description` and `severity` fields are for documentation only.
@@ -61,7 +61,7 @@ signatures: []
 #    severity: high
 
 #  - name: smb_from_internet
-#    description: SMB (port 445) from a non-RFC1918 source — potential lateral movement
+#    description: SMB (port 445) from a non-RFC1918 source - potential lateral movement
 #    match:
 #      srcPort: 445
 #    severity: medium

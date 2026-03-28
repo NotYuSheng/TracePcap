@@ -36,8 +36,9 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
       } else {
         setSaved(true);
       }
-    } catch {
-      setError('Failed to save signatures file.');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setError(axiosErr?.response?.data?.error ?? 'Failed to save signatures file.');
     } finally {
       setSaving(false);
     }
