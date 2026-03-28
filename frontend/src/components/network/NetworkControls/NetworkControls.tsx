@@ -8,7 +8,17 @@ interface NetworkControlsProps {
   onProtocolFilterChange: (protocols: string[]) => void;
   layoutType: 'forceDirected2d' | 'hierarchicalTd';
   onLayoutChange: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
+  activeLegendProtocol: string | null;
+  onLegendProtocolClick: (key: string | null) => void;
 }
+
+const EDGE_LEGEND = [
+  { label: 'HTTP',      key: 'HTTP',  color: '#2ecc71' },
+  { label: 'HTTPS/TLS', key: 'HTTPS', color: '#3498db' },
+  { label: 'DNS',       key: 'DNS',   color: '#f39c12' },
+  { label: 'TCP',       key: 'TCP',   color: '#7f8c8d' },
+  { label: 'UDP',       key: 'UDP',   color: '#f1c40f' },
+];
 
 /**
  * Format bytes to human-readable string
@@ -34,6 +44,8 @@ export function NetworkControls({
   onProtocolFilterChange,
   layoutType,
   onLayoutChange,
+  activeLegendProtocol,
+  onLegendProtocolClick,
 }: NetworkControlsProps) {
   // Get available protocols from stats
   const availableProtocols = useMemo(() => {
@@ -209,27 +221,32 @@ export function NetworkControls({
             </div>
           </div>
           <div className="legend-section">
-            <div className="legend-title">Edge Protocols</div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#2ecc71' }}></span>
-              HTTP
+            <div className="legend-title d-flex justify-content-between align-items-center">
+              <span>Edge Protocols</span>
+              {activeLegendProtocol && (
+                <button
+                  className="btn btn-link btn-sm p-0 text-muted"
+                  style={{ fontSize: '0.7rem' }}
+                  onClick={() => onLegendProtocolClick(null)}
+                >
+                  Clear filter ×
+                </button>
+              )}
             </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#3498db' }}></span>
-              HTTPS/TLS
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#f39c12' }}></span>
-              DNS
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#7f8c8d' }}></span>
-              TCP
-            </div>
-            <div className="legend-item">
-              <span className="legend-color" style={{ background: '#f1c40f' }}></span>
-              UDP
-            </div>
+            <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
+              Click to isolate
+            </small>
+            {EDGE_LEGEND.map(({ label, key, color }) => (
+              <button
+                key={key}
+                className={`legend-item-btn ${activeLegendProtocol === key ? 'active' : ''} ${activeLegendProtocol && activeLegendProtocol !== key ? 'dimmed' : ''}`}
+                onClick={() => onLegendProtocolClick(activeLegendProtocol === key ? null : key)}
+                title={`Show only ${label} traffic`}
+              >
+                <span className="legend-color" style={{ background: color }}></span>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>

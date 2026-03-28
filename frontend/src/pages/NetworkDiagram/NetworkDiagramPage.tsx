@@ -20,6 +20,7 @@ export const NetworkDiagramPage = () => {
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [selectedProtocols, setSelectedProtocols] = useState<string[]>([]);
+  const [activeLegendProtocol, setActiveLegendProtocol] = useState<string | null>(null);
   const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
     'forceDirected2d'
   );
@@ -39,27 +40,39 @@ export const NetworkDiagramPage = () => {
     }
   }, [stats.protocolBreakdown]);
 
-  // Filter nodes and edges based on selected protocols
+  // Filter nodes and edges based on selected protocols and active legend filter
   const { filteredNodes, filteredEdges } = useMemo(() => {
-    if (selectedProtocols.length === 0) {
-      return { filteredNodes: nodes, filteredEdges: edges };
+    let filtered = edges;
+
+    // Apply protocol checkbox filter
+    if (selectedProtocols.length > 0) {
+      filtered = filtered.filter(edge => selectedProtocols.includes(edge.data.protocol));
     }
 
-    // Filter edges by protocol
-    const filteredEdges = edges.filter(edge => selectedProtocols.includes(edge.data.protocol));
+    // Apply legend protocol isolate filter (matches transport protocol OR app name)
+    if (activeLegendProtocol) {
+      const key = activeLegendProtocol.toUpperCase();
+      filtered = filtered.filter(edge => {
+        const proto = edge.data.protocol.toUpperCase();
+        const app = (edge.data.appName ?? '').toUpperCase();
+        // HTTPS key also matches TLS/SSL app names
+        if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+        return proto === key || app === key || app.startsWith(key + ' ');
+      });
+    }
 
     // Get set of node IDs that have at least one visible edge
     const visibleNodeIds = new Set<string>();
-    filteredEdges.forEach(edge => {
+    filtered.forEach(edge => {
       visibleNodeIds.add(edge.source);
       visibleNodeIds.add(edge.target);
     });
 
-    // Filter nodes to only show those with visible edges
-    const filteredNodes = nodes.filter(node => visibleNodeIds.has(node.id));
-
-    return { filteredNodes, filteredEdges };
-  }, [nodes, edges, selectedProtocols]);
+    return {
+      filteredNodes: nodes.filter(node => visibleNodeIds.has(node.id)),
+      filteredEdges: filtered,
+    };
+  }, [nodes, edges, selectedProtocols, activeLegendProtocol]);
 
   const handleNodeClick = (node: GraphNode) => {
     setSelectedNode(node);
@@ -122,6 +135,8 @@ export const NetworkDiagramPage = () => {
             onProtocolFilterChange={setSelectedProtocols}
             layoutType={layoutType}
             onLayoutChange={setLayoutType}
+            activeLegendProtocol={activeLegendProtocol}
+            onLegendProtocolClick={setActiveLegendProtocol}
           />
 
           {selectedNode && (
