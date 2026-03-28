@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
@@ -19,35 +19,15 @@ export const NetworkDiagramPage = () => {
   const { nodes, edges, stats, loading, error, refetch } = useNetworkData(fileId, data);
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [selectedProtocols, setSelectedProtocols] = useState<string[]>([]);
   const [activeLegendProtocol, setActiveLegendProtocol] = useState<string | null>(null);
+  const [activeLegendNodeType, setActiveLegendNodeType] = useState<string | null>(null);
   const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
     'forceDirected2d'
   );
 
-  // Track if protocols have been initialized to prevent resetting user selections
-  const protocolsInitialized = useRef(false);
-
-  // Initialize protocol filter with all protocols (only once)
-  useEffect(() => {
-    if (
-      !protocolsInitialized.current &&
-      stats.protocolBreakdown &&
-      Object.keys(stats.protocolBreakdown).length > 0
-    ) {
-      setSelectedProtocols(Object.keys(stats.protocolBreakdown));
-      protocolsInitialized.current = true;
-    }
-  }, [stats.protocolBreakdown]);
-
-  // Filter nodes and edges based on selected protocols and active legend filter
+  // Filter nodes and edges based on active legend filters
   const { filteredNodes, filteredEdges } = useMemo(() => {
     let filtered = edges;
-
-    // Apply protocol checkbox filter
-    if (selectedProtocols.length > 0) {
-      filtered = filtered.filter(edge => selectedProtocols.includes(edge.data.protocol));
-    }
 
     // Apply legend protocol isolate filter (matches transport protocol OR app name)
     if (activeLegendProtocol) {
@@ -61,6 +41,23 @@ export const NetworkDiagramPage = () => {
       });
     }
 
+    // Apply node type isolate filter — keep edges that touch at least one matching node,
+    // then include both endpoints so the connected context is visible.
+    if (activeLegendNodeType) {
+      const matchingIds = new Set(
+        nodes
+          .filter(n =>
+            activeLegendNodeType === 'anomaly'
+              ? n.data.isAnomaly
+              : n.data.nodeType === activeLegendNodeType
+          )
+          .map(n => n.id)
+      );
+      filtered = filtered.filter(
+        edge => matchingIds.has(edge.source) || matchingIds.has(edge.target)
+      );
+    }
+
     // Get set of node IDs that have at least one visible edge
     const visibleNodeIds = new Set<string>();
     filtered.forEach(edge => {
@@ -72,7 +69,7 @@ export const NetworkDiagramPage = () => {
       filteredNodes: nodes.filter(node => visibleNodeIds.has(node.id)),
       filteredEdges: filtered,
     };
-  }, [nodes, edges, selectedProtocols, activeLegendProtocol]);
+  }, [nodes, edges, activeLegendProtocol, activeLegendNodeType]);
 
   const handleNodeClick = (node: GraphNode) => {
     setSelectedNode(node);
@@ -131,12 +128,12 @@ export const NetworkDiagramPage = () => {
         <div className={selectedNode ? 'col-lg-4' : 'col-lg-3'}>
           <NetworkControls
             stats={stats}
-            selectedProtocols={selectedProtocols}
-            onProtocolFilterChange={setSelectedProtocols}
             layoutType={layoutType}
             onLayoutChange={setLayoutType}
             activeLegendProtocol={activeLegendProtocol}
             onLegendProtocolClick={setActiveLegendProtocol}
+            activeLegendNodeType={activeLegendNodeType}
+            onLegendNodeTypeClick={setActiveLegendNodeType}
           />
 
           {selectedNode && (
