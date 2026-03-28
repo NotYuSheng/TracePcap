@@ -5,10 +5,12 @@ interface NetworkControlsProps {
   stats: NetworkStats;
   layoutType: 'forceDirected2d' | 'hierarchicalTd';
   onLayoutChange: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
-  activeLegendProtocol: string | null;
-  onLegendProtocolClick: (key: string | null) => void;
-  activeLegendNodeType: string | null;
-  onLegendNodeTypeClick: (key: string | null) => void;
+  activeLegendProtocols: string[];
+  onLegendProtocolClick: (key: string) => void;
+  onLegendProtocolClear: () => void;
+  activeLegendNodeTypes: string[];
+  onLegendNodeTypeClick: (key: string) => void;
+  onLegendNodeTypeClear: () => void;
   presentNodeTypes: Set<string>;
   presentEdgeLegendKeys: Set<string>;
 }
@@ -58,10 +60,12 @@ export function NetworkControls({
   stats,
   layoutType,
   onLayoutChange,
-  activeLegendProtocol,
+  activeLegendProtocols,
   onLegendProtocolClick,
-  activeLegendNodeType,
+  onLegendProtocolClear,
+  activeLegendNodeTypes,
   onLegendNodeTypeClick,
+  onLegendNodeTypeClear,
   presentNodeTypes,
   presentEdgeLegendKeys,
 }: NetworkControlsProps) {
@@ -137,25 +141,25 @@ export function NetworkControls({
           <div className="legend-section mb-2">
             <div className="legend-title d-flex justify-content-between align-items-center">
               <span>Node Types</span>
-              {activeLegendNodeType && (
+              {activeLegendNodeTypes.length > 0 && (
                 <button
                   className="btn btn-link btn-sm p-0 text-muted"
                   style={{ fontSize: '0.7rem' }}
-                  onClick={() => onLegendNodeTypeClick(null)}
+                  onClick={onLegendNodeTypeClear}
                 >
-                  Clear filter ×
+                  Clear ×
                 </button>
               )}
             </div>
             <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
-              Click to isolate
+              Click to filter (multi-select)
             </small>
             {NODE_LEGEND.filter(({ key }) => presentNodeTypes.has(key)).map(({ label, key, color }) => (
               <button
                 key={key}
-                className={`legend-item-btn ${activeLegendNodeType === key ? 'active' : ''} ${activeLegendNodeType && activeLegendNodeType !== key ? 'dimmed' : ''}`}
-                onClick={() => onLegendNodeTypeClick(activeLegendNodeType === key ? null : key)}
-                title={`Show only ${label} nodes and their connections`}
+                className={`legend-item-btn ${activeLegendNodeTypes.includes(key) ? 'active' : ''} ${activeLegendNodeTypes.length > 0 && !activeLegendNodeTypes.includes(key) ? 'dimmed' : ''}`}
+                onClick={() => onLegendNodeTypeClick(key)}
+                title={`${activeLegendNodeTypes.includes(key) ? 'Deselect' : 'Select'} ${label}`}
               >
                 <span className="legend-color" style={{ background: color }}></span>
                 {label}
@@ -165,25 +169,25 @@ export function NetworkControls({
           <div className="legend-section">
             <div className="legend-title d-flex justify-content-between align-items-center">
               <span>Edge Protocols</span>
-              {activeLegendProtocol && (
+              {activeLegendProtocols.length > 0 && (
                 <button
                   className="btn btn-link btn-sm p-0 text-muted"
                   style={{ fontSize: '0.7rem' }}
-                  onClick={() => onLegendProtocolClick(null)}
+                  onClick={onLegendProtocolClear}
                 >
-                  Clear filter ×
+                  Clear ×
                 </button>
               )}
             </div>
             <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
-              Click to isolate
+              Click to filter (multi-select)
             </small>
             {EDGE_LEGEND.filter(({ key }) => presentEdgeLegendKeys.has(key)).map(({ label, key, color }) => (
               <button
                 key={key}
-                className={`legend-item-btn ${activeLegendProtocol === key ? 'active' : ''} ${activeLegendProtocol && activeLegendProtocol !== key ? 'dimmed' : ''}`}
-                onClick={() => onLegendProtocolClick(activeLegendProtocol === key ? null : key)}
-                title={`Show only ${label} traffic`}
+                className={`legend-item-btn ${activeLegendProtocols.includes(key) ? 'active' : ''} ${activeLegendProtocols.length > 0 && !activeLegendProtocols.includes(key) ? 'dimmed' : ''}`}
+                onClick={() => onLegendProtocolClick(key)}
+                title={`${activeLegendProtocols.includes(key) ? 'Deselect' : 'Select'} ${label}`}
               >
                 <span className="legend-color" style={{ background: color }}></span>
                 {label}

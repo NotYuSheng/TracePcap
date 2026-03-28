@@ -19,8 +19,18 @@ export const NetworkDiagramPage = () => {
   const { nodes, edges, stats, loading, error, refetch } = useNetworkData(fileId, data);
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [activeLegendProtocol, setActiveLegendProtocol] = useState<string | null>(null);
-  const [activeLegendNodeType, setActiveLegendNodeType] = useState<string | null>(null);
+  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
+  const [activeLegendNodeTypes, setActiveLegendNodeTypes] = useState<string[]>([]);
+
+  const toggleLegendProtocol = (key: string) =>
+    setActiveLegendProtocols(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+
+  const toggleLegendNodeType = (key: string) =>
+    setActiveLegendNodeTypes(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
   const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
     'forceDirected2d'
   );
@@ -54,27 +64,26 @@ export const NetworkDiagramPage = () => {
   const { filteredNodes, filteredEdges } = useMemo(() => {
     let filtered = edges;
 
-    // Apply legend protocol isolate filter (matches transport protocol OR app name)
-    if (activeLegendProtocol) {
-      const key = activeLegendProtocol.toUpperCase();
+    // Apply legend protocol filter — show edges matching ANY selected key
+    if (activeLegendProtocols.length > 0) {
       filtered = filtered.filter(edge => {
         const proto = edge.data.protocol.toUpperCase();
         const app = (edge.data.appName ?? '').toUpperCase();
-        // HTTPS key also matches TLS/SSL app names
-        if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
-        return proto === key || app === key || app.startsWith(key + ' ');
+        return activeLegendProtocols.some(key => {
+          if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+          return proto === key || app === key || app.startsWith(key + ' ');
+        });
       });
     }
 
-    // Apply node type isolate filter — keep edges that touch at least one matching node,
-    // then include both endpoints so the connected context is visible.
-    if (activeLegendNodeType) {
+    // Apply node type filter — keep edges that touch at least one node matching ANY selected type
+    if (activeLegendNodeTypes.length > 0) {
       const matchingIds = new Set(
         nodes
           .filter(n =>
-            activeLegendNodeType === 'anomaly'
-              ? n.data.isAnomaly
-              : n.data.nodeType === activeLegendNodeType
+            activeLegendNodeTypes.some(key =>
+              key === 'anomaly' ? n.data.isAnomaly : n.data.nodeType === key
+            )
           )
           .map(n => n.id)
       );
@@ -94,7 +103,7 @@ export const NetworkDiagramPage = () => {
       filteredNodes: nodes.filter(node => visibleNodeIds.has(node.id)),
       filteredEdges: filtered,
     };
-  }, [nodes, edges, activeLegendProtocol, activeLegendNodeType]);
+  }, [nodes, edges, activeLegendProtocols, activeLegendNodeTypes]);
 
   const handleNodeClick = (node: GraphNode) => {
     setSelectedNode(node);
@@ -155,10 +164,12 @@ export const NetworkDiagramPage = () => {
             stats={stats}
             layoutType={layoutType}
             onLayoutChange={setLayoutType}
-            activeLegendProtocol={activeLegendProtocol}
-            onLegendProtocolClick={setActiveLegendProtocol}
-            activeLegendNodeType={activeLegendNodeType}
-            onLegendNodeTypeClick={setActiveLegendNodeType}
+            activeLegendProtocols={activeLegendProtocols}
+            onLegendProtocolClick={toggleLegendProtocol}
+            onLegendProtocolClear={() => setActiveLegendProtocols([])}
+            activeLegendNodeTypes={activeLegendNodeTypes}
+            onLegendNodeTypeClick={toggleLegendNodeType}
+            onLegendNodeTypeClear={() => setActiveLegendNodeTypes([])}
             presentNodeTypes={presentNodeTypes}
             presentEdgeLegendKeys={presentEdgeLegendKeys}
           />
