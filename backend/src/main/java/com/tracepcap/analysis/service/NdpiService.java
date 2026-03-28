@@ -139,7 +139,7 @@ public class NdpiService {
     for (PcapParserService.ConversationInfo conv : conversations) {
       FlowData data = resolve(flowMap, conv);
       if (data == null) continue;
-      if (data.appName() != null) conv.setAppName(correctMisclassification(data.appName(), conv.getSrcPort(), conv.getDstPort()));
+      if (data.appName() != null) conv.setAppName(correctMisclassification(data.appName(), conv.getSrcPort(), conv.getDstPort(), conv.getProtocol()));
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
       if (data.hostname() != null) conv.setHostname(data.hostname());
@@ -372,9 +372,7 @@ public class NdpiService {
 
 
   /**
-   * Corrects known nDPI misclassifications using port-based heuristics as a belt-and-suspenders
-   * guard. nDPI's DPI engine occasionally triggers on binary payload patterns that match a
-   * different protocol's signatures (e.g. UFTP binary transfers matching BitTorrent heuristics).
+   * Corrects known nDPI misclassifications using port and transport-layer heuristics.
    *
    * <p>Known cases:
    * <ul>
@@ -383,13 +381,22 @@ public class NdpiService {
    *       (upstream bug: https://github.com/ntop/nDPI/issues/XXXX)</li>
    *   <li>H.225/H.245 (TCP port 1720) misclassified as Cassandra — belt-and-suspenders guard
    *       for older nDPI builds where this is not yet fixed natively</li>
+   *   <li>nDPI reports all H.323 suite flows as "H323" without distinguishing sub-protocols:
+   *       <ul>
+   *         <li>H.225 call signaling always uses TCP port 1720 (IANA-registered)</li>
+   *         <li>H.245 media control always uses dynamically negotiated TCP ports</li>
+   *       </ul>
+   *       H.323 RAS (UDP port 1719, gatekeeper) is left as-is.</li>
    * </ul>
    */
-  private static String correctMisclassification(String appName, Integer srcPort, Integer dstPort) {
+  private static String correctMisclassification(String appName, Integer srcPort, Integer dstPort, String transport) {
     int sp = srcPort  != null ? srcPort  : 0;
     int dp = dstPort  != null ? dstPort  : 0;
+    boolean isTcp = "TCP".equalsIgnoreCase(transport);
     if ("BitTorrent".equalsIgnoreCase(appName) && (sp == 1044 || dp == 1044)) return "UFTP";
     if ("Cassandra".equalsIgnoreCase(appName)  && (sp == 1720 || dp == 1720)) return "H225";
+    if ("H323".equalsIgnoreCase(appName) && isTcp && (sp == 1720 || dp == 1720)) return "H225";
+    if ("H323".equalsIgnoreCase(appName) && isTcp) return "H245";
     return appName;
   }
 
