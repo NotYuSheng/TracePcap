@@ -153,7 +153,7 @@ export const SecurityPage = () => {
   const packetHints = selectedConversation
     ? selectedConversation.flowRisks
         .map(r => RISK_PACKET_HINTS[r])
-        .filter(Boolean) as string[]
+        .filter((hint): hint is string => Boolean(hint))
     : [];
 
   return (
@@ -183,6 +183,9 @@ export const SecurityPage = () => {
               <tr
                 key={conv.id}
                 onClick={() => openConversation(conv, idx)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openConversation(conv, idx); }}
+                tabIndex={0}
+                role="button"
                 style={{ cursor: 'pointer' }}
                 className={selectedConversation?.id === conv.id ? 'table-active' : undefined}
               >
@@ -223,6 +226,9 @@ export const SecurityPage = () => {
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="security-modal-title"
         >
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content">
@@ -232,7 +238,7 @@ export const SecurityPage = () => {
                   <button className="btn btn-sm btn-outline-secondary" onClick={handlePrev} disabled={selectedIndex <= 0} title="Previous">
                     ‹ Prev
                   </button>
-                  <h5 className="modal-title text-truncate mb-0 font-monospace small">{modalTitle}</h5>
+                  <h5 id="security-modal-title" className="modal-title text-truncate mb-0 font-monospace small">{modalTitle}</h5>
                   <button className="btn btn-sm btn-outline-secondary" onClick={handleNext} disabled={selectedIndex >= alerts.length - 1} title="Next">
                     Next ›
                   </button>
