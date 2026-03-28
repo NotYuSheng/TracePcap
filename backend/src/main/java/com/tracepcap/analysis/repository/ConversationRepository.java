@@ -8,6 +8,7 @@ import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -21,6 +22,8 @@ public interface ConversationRepository
             JpaSpecificationExecutor<ConversationEntity> {
 
   List<ConversationEntity> findByFileId(UUID fileId);
+
+  long countByFileId(UUID fileId);
 
   void deleteByFileId(UUID fileId);
 
@@ -37,6 +40,39 @@ public interface ConversationRepository
               + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0",
       nativeQuery = true)
   List<ConversationEntity> findByFileIdWithRisks(@Param("fileId") UUID fileId);
+
+  /** Returns the top-N conversations for a file, ordered by total bytes descending. */
+  @Query("SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId ORDER BY c.totalBytes DESC")
+  List<ConversationEntity> findTopByFileIdOrderByTotalBytesDesc(
+      @Param("fileId") UUID fileId, Pageable pageable);
+
+  /**
+   * Returns at-risk conversations for a file, capped to a limit.
+   * Uses native query because JPQL cannot express array_length.
+   */
+  @Query(
+      value =
+          "SELECT * FROM conversations WHERE file_id = :fileId"
+              + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0"
+              + " LIMIT :lim",
+      nativeQuery = true)
+  List<ConversationEntity> findAtRiskByFileIdLimited(
+      @Param("fileId") UUID fileId, @Param("lim") int lim);
+
+  /** Total count of at-risk conversations for a file (used for prompt summary line). */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM conversations WHERE file_id = :fileId"
+              + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0",
+      nativeQuery = true)
+  long countAtRiskByFileId(@Param("fileId") UUID fileId);
+
+  /** Aggregated category → total packet count for a file (avoids loading full entities). */
+  @Query(
+      "SELECT c.category, SUM(c.packetCount) FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId AND c.category IS NOT NULL AND c.category <> ''"
+          + " GROUP BY c.category ORDER BY SUM(c.packetCount) DESC")
+  List<Object[]> findCategoryDistributionByFileId(@Param("fileId") UUID fileId);
 
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
   static Specification<ConversationEntity> buildSpec(
