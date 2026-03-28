@@ -1,0 +1,28 @@
+.hex-viewer {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.hex-viewer pre {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.hex-viewer .hex-offset {
+  color: #858585;
+}
+
+.hex-viewer .hex-bytes {
+  color: #9cdcfe;
+}
+
+.hex-viewer .hex-ascii {
+  color: #ce9178;
+}
+
+.hex-viewer .hex-truncated {
+  color: #858585;
+}

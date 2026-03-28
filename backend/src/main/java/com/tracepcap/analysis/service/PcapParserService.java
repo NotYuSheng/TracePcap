@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class PcapParserService {
 
+  private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+
   public PcapAnalysisResult analyzePcapFile(File pcapFile) {
     log.info("Starting PCAP analysis for file: {}", pcapFile.getName());
 
@@ -456,11 +458,13 @@ public class PcapParserService {
   private String extractPayloadHex(byte[] raw) {
     if (raw == null || raw.length == 0) return null;
     int limit = Math.min(raw.length, PacketEntity.PAYLOAD_BYTE_LIMIT);
-    StringBuilder sb = new StringBuilder(limit * 2);
+    char[] hexChars = new char[limit * 2];
     for (int i = 0; i < limit; i++) {
-      sb.append(String.format("%02x", raw[i] & 0xFF));
+      int v = raw[i] & 0xFF;
+      hexChars[i * 2]     = HEX_ARRAY[v >>> 4];
+      hexChars[i * 2 + 1] = HEX_ARRAY[v & 0x0F];
     }
-    return sb.toString();
+    return new String(hexChars);
   }
 
   /** Return the first comma-separated value, or the original string if no comma. */

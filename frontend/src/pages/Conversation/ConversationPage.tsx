@@ -56,7 +56,8 @@ export const ConversationPage = () => {
         const full = await conversationService.getConversationDetail(conversation.id);
         setSelectedConversation(full);
       }
-    } catch {
+    } catch (err) {
+      console.error('Failed to load conversation details:', err);
       setSelectedConversation(conversation);
     } finally {
       setDetailLoading(false);
@@ -65,14 +66,14 @@ export const ConversationPage = () => {
 
   const closeModal = useCallback(() => setSelectedConversation(null), []);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (selectedIndex > 0) openConversation(conversations[selectedIndex - 1], selectedIndex - 1);
-  };
+  }, [selectedIndex, conversations, openConversation]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (selectedIndex < conversations.length - 1)
       openConversation(conversations[selectedIndex + 1], selectedIndex + 1);
-  };
+  }, [selectedIndex, conversations, openConversation]);
 
   // ESC closes modal; arrow keys navigate
   useEffect(() => {
@@ -84,8 +85,7 @@ export const ConversationPage = () => {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closeModal, selectedIndex, conversations, selectedConversation]);
+  }, [closeModal, selectedConversation, handlePrev, handleNext]);
 
   // Prevent background scroll while modal is open
   useEffect(() => {

@@ -8,6 +8,8 @@ interface ConversationDetailProps {
   conversation: Conversation;
 }
 
+const PRINTABLE_ASCII_THRESHOLD = 0.3;
+
 /** Returns true if more than 30% of the payload bytes are printable ASCII (0x20–0x7e). */
 function hasReadableAscii(hex: string): boolean {
   if (!hex || hex.length < 4) return false;
@@ -17,7 +19,7 @@ function hasReadableAscii(hex: string): boolean {
     const byte = parseInt(hex.slice(i, i + 2), 16);
     if (byte >= 0x20 && byte <= 0x7e) printable++;
   }
-  return printable / total > 0.3;
+  return printable / total > PRINTABLE_ASCII_THRESHOLD;
 }
 
 export const ConversationDetail = ({ conversation }: ConversationDetailProps) => {
