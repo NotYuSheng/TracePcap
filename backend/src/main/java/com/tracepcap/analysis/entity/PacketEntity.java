@@ -63,7 +63,7 @@ public class PacketEntity {
   @Column(columnDefinition = "TEXT")
   private String payload;
 
-  @Column(name = "detected_file_type", length = 32)
+  @Column(name = "detected_file_type", length = 100)
   private String detectedFileType;
 
   @CreationTimestamp
