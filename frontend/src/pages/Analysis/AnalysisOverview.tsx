@@ -37,7 +37,7 @@ export const AnalysisOverview = () => {
                   backgroundColor: getAppColor(app.name),
                   color: '#fff',
                 }}
-                title={`${app.packetCount.toLocaleString()} packets · ${(app.bytes / 1024).toFixed(1)} KB`}
+                title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB`}
               >
                 {app.name}
               </span>
