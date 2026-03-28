@@ -9,6 +9,8 @@ interface NetworkControlsProps {
   onLegendProtocolClick: (key: string | null) => void;
   activeLegendNodeType: string | null;
   onLegendNodeTypeClick: (key: string | null) => void;
+  presentNodeTypes: Set<string>;
+  presentEdgeLegendKeys: Set<string>;
 }
 
 const EDGE_LEGEND = [
@@ -60,6 +62,8 @@ export function NetworkControls({
   onLegendProtocolClick,
   activeLegendNodeType,
   onLegendNodeTypeClick,
+  presentNodeTypes,
+  presentEdgeLegendKeys,
 }: NetworkControlsProps) {
 
   return (
@@ -146,7 +150,7 @@ export function NetworkControls({
             <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
               Click to isolate
             </small>
-            {NODE_LEGEND.map(({ label, key, color }) => (
+            {NODE_LEGEND.filter(({ key }) => presentNodeTypes.has(key)).map(({ label, key, color }) => (
               <button
                 key={key}
                 className={`legend-item-btn ${activeLegendNodeType === key ? 'active' : ''} ${activeLegendNodeType && activeLegendNodeType !== key ? 'dimmed' : ''}`}
@@ -174,7 +178,7 @@ export function NetworkControls({
             <small className="text-muted d-block mb-1" style={{ fontSize: '0.7rem' }}>
               Click to isolate
             </small>
-            {EDGE_LEGEND.map(({ label, key, color }) => (
+            {EDGE_LEGEND.filter(({ key }) => presentEdgeLegendKeys.has(key)).map(({ label, key, color }) => (
               <button
                 key={key}
                 className={`legend-item-btn ${activeLegendProtocol === key ? 'active' : ''} ${activeLegendProtocol && activeLegendProtocol !== key ? 'dimmed' : ''}`}

@@ -25,6 +25,31 @@ export const NetworkDiagramPage = () => {
     'forceDirected2d'
   );
 
+  // Which node type keys actually exist in the data
+  const presentNodeTypes = useMemo(() => {
+    const types = new Set<string>();
+    nodes.forEach(n => {
+      if (n.data.isAnomaly) types.add('anomaly');
+      types.add(n.data.nodeType);
+    });
+    return types;
+  }, [nodes]);
+
+  // Which edge legend keys actually have matching edges
+  const presentEdgeLegendKeys = useMemo(() => {
+    const keys = new Set<string>();
+    edges.forEach(edge => {
+      const proto = edge.data.protocol.toUpperCase();
+      const app = (edge.data.appName ?? '').toUpperCase();
+      if (proto === 'HTTP' || app === 'HTTP') keys.add('HTTP');
+      if (proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS')) keys.add('HTTPS');
+      if (proto === 'DNS'  || app === 'DNS')  keys.add('DNS');
+      if (proto === 'TCP')  keys.add('TCP');
+      if (proto === 'UDP')  keys.add('UDP');
+    });
+    return keys;
+  }, [edges]);
+
   // Filter nodes and edges based on active legend filters
   const { filteredNodes, filteredEdges } = useMemo(() => {
     let filtered = edges;
@@ -134,6 +159,8 @@ export const NetworkDiagramPage = () => {
             onLegendProtocolClick={setActiveLegendProtocol}
             activeLegendNodeType={activeLegendNodeType}
             onLegendNodeTypeClick={setActiveLegendNodeType}
+            presentNodeTypes={presentNodeTypes}
+            presentEdgeLegendKeys={presentEdgeLegendKeys}
           />
 
           {selectedNode && (
