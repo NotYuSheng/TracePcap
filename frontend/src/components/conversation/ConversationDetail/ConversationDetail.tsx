@@ -50,7 +50,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: getAppColor(conversation.appName!),
+                          color: '#fff',
+                        }}
+                      >
                         {conversation.appName}
                       </span>
                     </dd>
@@ -100,7 +106,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Cert Valid To:</dt>
                     <dd className="col-sm-8">
-                      <small className={conversation.tlsNotAfter < Date.now() ? 'text-danger fw-semibold' : undefined}>
+                      <small
+                        className={
+                          conversation.tlsNotAfter < Date.now()
+                            ? 'text-danger fw-semibold'
+                            : undefined
+                        }
+                      >
                         {formatTimestamp(conversation.tlsNotAfter)}
                         {conversation.tlsNotAfter < Date.now() && (
                           <span className="ms-1 badge bg-danger">Expired</span>

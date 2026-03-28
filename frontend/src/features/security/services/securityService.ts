@@ -20,7 +20,6 @@ interface SecurityAlertApiResponse {
   durationMs: number;
 }
 
-
 export const securityService = {
   getSecurityAlerts: async (fileId: string): Promise<Conversation[]> => {
     const response = await apiClient.get<SecurityAlertApiResponse[]>(
