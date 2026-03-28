@@ -65,71 +65,65 @@ export const ConversationList = ({
     updateTopBarWidth();
   }, [conversations, visibleColumns, updateTopBarWidth]);
 
-  // Middle-click auto-scroll — mimics browser native behaviour.
-  // One middle-click enters pan mode; distance from origin drives speed.
-  // Another click or Escape exits.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+  // Pan state in refs — no re-renders, always current in the rAF loop
+  const panActive = useRef(false);
+  const panOrigin = useRef({ x: 0, y: 0 });
+  const panMouse  = useRef({ x: 0, y: 0 });
+  const panRaf    = useRef(0);
+  const panDot    = useRef<HTMLDivElement | null>(null);
+  const panTick   = useRef<() => void>(() => {});
 
-    let active = false;
-    let originX = 0, originY = 0;
-    let mouseX = 0, mouseY = 0;
-    let rafId = 0;
-    let dot: HTMLDivElement | null = null;
-
-    const DEAD = 8;   // px dead-zone radius
-    const SPD  = 0.1; // multiplier: px scrolled per frame per px of offset
-
-    const enter = (e: MouseEvent) => {
-      if (e.button !== 1) return;
-      e.preventDefault();          // suppress browser's own (broken) indicator
-      if (active) { leave(); return; }
-      active = true;
-      originX = mouseX = e.clientX;
-      originY = mouseY = e.clientY;
-      el.style.cursor = 'all-scroll';
-
-      dot = document.createElement('div');
-      dot.className = 'conv-pan-dot';
-      dot.style.cssText = `left:${e.clientX}px;top:${e.clientY}px`;
-      document.body.appendChild(dot);
-
-      const tick = () => {
-        if (!active) return;
-        const dx = mouseX - originX;
-        const dy = mouseY - originY;
-        if (Math.abs(dx) > DEAD) el.scrollLeft  += dx * SPD;
-        if (Math.abs(dy) > DEAD) window.scrollBy(0, dy * SPD);
-        rafId = requestAnimationFrame(tick);
-      };
-      rafId = requestAnimationFrame(tick);
-    };
-
-    const leave = () => {
-      if (!active) return;
-      active = false;
-      el.style.cursor = '';
-      cancelAnimationFrame(rafId);
-      dot?.remove(); dot = null;
-    };
-
-    const track  = (e: MouseEvent) => { mouseX = e.clientX; mouseY = e.clientY; };
-    const click  = (e: MouseEvent) => { if (active && e.button !== 1) leave(); };
-    const keyup  = (e: KeyboardEvent) => { if (e.key === 'Escape') leave(); };
-
-    el.addEventListener('mousedown', enter);
-    window.addEventListener('mousemove', track);
-    window.addEventListener('mousedown', click);
-    window.addEventListener('keydown', keyup);
-    return () => {
-      leave();
-      el.removeEventListener('mousedown', enter);
-      window.removeEventListener('mousemove', track);
-      window.removeEventListener('mousedown', click);
-      window.removeEventListener('keydown', keyup);
-    };
+  const stopPan = useCallback(() => {
+    panActive.current = false;
+    if (scrollRef.current) scrollRef.current.style.cursor = '';
+    cancelAnimationFrame(panRaf.current);
+    panDot.current?.remove();
+    panDot.current = null;
   }, []);
+
+  // Define the tick loop once and store in ref; window listeners use same ref
+  useEffect(() => {
+    const DEAD = 8, SPD = 0.1;
+    panTick.current = () => {
+      if (!panActive.current) return;
+      const dx = panMouse.current.x - panOrigin.current.x;
+      const dy = panMouse.current.y - panOrigin.current.y;
+      if (scrollRef.current && Math.abs(dx) > DEAD) scrollRef.current.scrollLeft += dx * SPD;
+      if (Math.abs(dy) > DEAD) window.scrollBy(0, dy * SPD);
+      panRaf.current = requestAnimationFrame(panTick.current);
+    };
+
+    const onMove  = (e: MouseEvent) => { panMouse.current = { x: e.clientX, y: e.clientY }; };
+    const onClick = (e: MouseEvent) => { if (panActive.current && e.button !== 1) stopPan(); };
+    const onKey   = (e: KeyboardEvent) => { if (e.key === 'Escape') stopPan(); };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mousedown', onClick);
+    window.addEventListener('keydown',   onKey);
+    return () => {
+      stopPan();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mousedown', onClick);
+      window.removeEventListener('keydown',   onKey);
+    };
+  }, [stopPan]);
+
+  const handleMiddleDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    if (panActive.current) { stopPan(); return; }
+    panActive.current = true;
+    panOrigin.current = { x: e.clientX, y: e.clientY };
+    panMouse.current  = { x: e.clientX, y: e.clientY };
+    if (scrollRef.current) scrollRef.current.style.cursor = 'all-scroll';
+    const dot = document.createElement('div');
+    dot.className = 'conv-pan-dot';
+    dot.style.left = `${e.clientX}px`;
+    dot.style.top  = `${e.clientY}px`;
+    document.body.appendChild(dot);
+    panDot.current = dot;
+    panRaf.current = requestAnimationFrame(panTick.current);
+  }, [stopPan]);
 
   const hasAppNames   = conversations.some(c => c.appName);
   const hasCategories = conversations.some(c => c.category);
@@ -176,6 +170,7 @@ export const ConversationList = ({
         ref={scrollRef}
         className={`conv-table-scroll${scrolledEnd ? ' scrolled-end' : ''}`}
         onScroll={handleScroll}
+        onMouseDown={handleMiddleDown}
       >
         <table className="table table-hover">
           <thead>
