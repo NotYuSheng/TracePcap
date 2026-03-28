@@ -27,7 +27,7 @@ export const HexViewer = ({ hex, truncated }: HexViewerProps) => {
       <pre>
         {rows.map((row, rowIdx) => {
           const offset = (rowIdx * BYTES_PER_ROW).toString(16).padStart(4, '0');
-          const left  = row.slice(0, 8).join(' ');
+          const left = row.slice(0, 8).join(' ');
           const right = row.slice(8).join(' ');
           const hex16 = right ? `${left}  ${right}` : left;
           const padded = hex16.padEnd(BYTES_PER_ROW * 3, ' ');

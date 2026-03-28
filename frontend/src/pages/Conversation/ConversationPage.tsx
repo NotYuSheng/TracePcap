@@ -90,7 +90,9 @@ export const ConversationPage = () => {
   // Prevent background scroll while modal is open
   useEffect(() => {
     document.body.style.overflow = selectedConversation ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [selectedConversation]);
 
   const handlePageChange = (page: number) => {
@@ -123,7 +125,7 @@ export const ConversationPage = () => {
             <div className="card-body p-0">
               <ConversationList
                 conversations={conversations}
-                onSelectConversation={(c) => {
+                onSelectConversation={c => {
                   const idx = conversations.findIndex(x => x.id === c.id);
                   openConversation(c, idx);
                 }}
@@ -149,11 +151,12 @@ export const ConversationPage = () => {
         <div
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          onClick={e => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
         >
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content">
-
               <div className="modal-header">
                 <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
                   <button
@@ -188,12 +191,12 @@ export const ConversationPage = () => {
               </div>
 
               <div className="modal-body">
-                {detailLoading
-                  ? <LoadingSpinner size="medium" message="Loading conversation..." />
-                  : <ConversationDetail conversation={selectedConversation} />
-                }
+                {detailLoading ? (
+                  <LoadingSpinner size="medium" message="Loading conversation..." />
+                ) : (
+                  <ConversationDetail conversation={selectedConversation} />
+                )}
               </div>
-
             </div>
           </div>
         </div>

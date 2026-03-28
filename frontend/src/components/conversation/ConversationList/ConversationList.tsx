@@ -96,7 +96,13 @@ export const ConversationList = ({
                   {hasAppNames && (
                     <td>
                       {conversation.appName ? (
-                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: getAppColor(conversation.appName!),
+                            color: '#fff',
+                          }}
+                        >
                           {conversation.appName}
                         </span>
                       ) : (
@@ -107,7 +113,15 @@ export const ConversationList = ({
                   {hasCategories && (
                     <td>
                       {conversation.category ? (
-                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: getAppColor(conversation.category),
+                            color: '#fff',
+                          }}
+                        >
+                          {conversation.category}
+                        </span>
                       ) : (
                         <span className="text-muted">—</span>
                       )}
