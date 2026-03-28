@@ -23,4 +23,5 @@ public class PacketResponse {
   private Integer packetSize;
   private String info;
   private String payload;
+  private String detectedFileType;
 }

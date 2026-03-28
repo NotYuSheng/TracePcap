@@ -63,6 +63,9 @@ public class PacketEntity {
   @Column(columnDefinition = "TEXT")
   private String payload;
 
+  @Column(name = "detected_file_type", length = 32)
+  private String detectedFileType;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;

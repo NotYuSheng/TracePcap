@@ -448,6 +448,7 @@ public class PcapParserService {
     pkt.setPacketSize(packetSize);
     pkt.setInfo(info);
     pkt.setPayload(payloadHex);
+    pkt.setDetectedFileType(FileSignatureDetector.detect(payloadHex));
     return pkt;
   }
 
@@ -545,5 +546,7 @@ public class PcapParserService {
     private String info;
     /** First {@link PacketEntity#PAYLOAD_BYTE_LIMIT} bytes as a lowercase hex string, or null. */
     private String payload;
+    /** File type detected from magic bytes, or null if unknown. */
+    private String detectedFileType;
   }
 }

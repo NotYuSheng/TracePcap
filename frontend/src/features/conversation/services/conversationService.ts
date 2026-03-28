@@ -40,6 +40,7 @@ interface PacketApiResponse {
   packetSize: number;
   info: string | null;
   payload: string | null;
+  detectedFileType?: string | null;
 }
 
 interface ConversationDetailApiResponse extends ConversationApiResponse {
@@ -95,6 +96,7 @@ function transformPacket(apiData: PacketApiResponse, protocol: Protocol): Packet
     size: apiData.packetSize,
     info: apiData.info ?? undefined,
     payload: apiData.payload ?? '',
+    detectedFileType: apiData.detectedFileType ?? undefined,
     flags: [],
   };
 }
