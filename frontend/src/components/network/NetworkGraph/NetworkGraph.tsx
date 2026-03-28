@@ -138,6 +138,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   return (
     <div className="network-graph-container">
       <GraphCanvas
+        key={layoutType}
         ref={graphRef}
         nodes={reagraphNodes}
         edges={reagraphEdges}
