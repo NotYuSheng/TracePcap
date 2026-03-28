@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ConversationFilters } from '@/features/conversation/types';
+import { COLUMN_DEFS } from '@/features/conversation/constants';
+import type { ColumnKey } from '@/features/conversation/constants';
 import { getAppColor } from '@/utils/appColors';
 import './ConversationFilterPanel.css';
 
@@ -16,6 +18,8 @@ interface ConversationFilterPanelProps {
   categories:        CategoryStat[];
   fileTypes:         string[];
   activeFilterCount: number;
+  visibleColumns:    Set<ColumnKey>;
+  onToggleColumn:    (key: ColumnKey) => void;
 }
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -41,6 +45,8 @@ export function ConversationFilterPanel({
   categories,
   fileTypes,
   activeFilterCount,
+  visibleColumns,
+  onToggleColumn,
 }: ConversationFilterPanelProps) {
   const [isOpen, setIsOpen] = useState(activeFilterCount > 0);
   const [ipInput, setIpInput] = useState(filters.ip);
@@ -241,6 +247,29 @@ export function ConversationFilterPanel({
                 </div>
               </div>
             </div>
+
+              {/* Column visibility */}
+              <div className="col-12">
+                <label className="form-label filter-section-label">
+                  <i className="bi bi-layout-three-columns me-1"></i>Columns
+                </label>
+                <div className="d-flex flex-wrap gap-2">
+                  {COLUMN_DEFS.map(({ key, label }) => (
+                    <div key={key} className="form-check form-check-inline mb-0">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id={`col-${key}`}
+                        checked={visibleColumns.has(key)}
+                        onChange={() => onToggleColumn(key)}
+                      />
+                      <label className="form-check-label small" htmlFor={`col-${key}`}>
+                        {label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
             {/* Active filter chips */}
             {activeFilterCount > 0 && (

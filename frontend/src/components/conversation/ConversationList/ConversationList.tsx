@@ -1,34 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
+import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
 import { getAppColor } from '@/utils/appColors';
 import './ConversationList.css';
-
-type ColumnKey = 'source' | 'destination' | 'protocol' | 'appName' | 'category' | 'risks' | 'packets' | 'bytes' | 'duration' | 'startTime';
-
-const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
-  { key: 'source',      label: 'Source',      defaultVisible: true  },
-  { key: 'destination', label: 'Destination', defaultVisible: true  },
-  { key: 'protocol',    label: 'Protocol',    defaultVisible: false },
-  { key: 'appName',     label: 'Application', defaultVisible: true  },
-  { key: 'category',    label: 'Category',    defaultVisible: true  },
-  { key: 'risks',       label: 'Risks',       defaultVisible: true  },
-  { key: 'packets',     label: 'Packets',     defaultVisible: true  },
-  { key: 'bytes',       label: 'Bytes',       defaultVisible: true  },
-  { key: 'duration',    label: 'Duration',    defaultVisible: true  },
-  { key: 'startTime',   label: 'Start Time',  defaultVisible: true  },
-];
-
-const STORAGE_KEY = 'conv-visible-columns';
-
-function loadVisibleColumns(): Set<ColumnKey> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return new Set(JSON.parse(stored) as ColumnKey[]);
-  } catch { /* ignore */ }
-  return new Set(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key));
-}
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -37,6 +13,7 @@ interface ConversationListProps {
   sortDir: SortDir;
   onSort: (field: SortField) => void;
   onRiskFilterClick?: () => void;
+  visibleColumns: Set<ColumnKey>;
 }
 
 export const ConversationList = ({
@@ -46,40 +23,17 @@ export const ConversationList = ({
   sortDir,
   onSort,
   onRiskFilterClick,
+  visibleColumns,
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrolledEnd, setScrolledEnd] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const scrollRef   = useRef<HTMLDivElement>(null);
+  const topBarRef   = useRef<HTMLDivElement>(null);
+  const topInnerRef = useRef<HTMLDivElement>(null);
+  const syncingRef  = useRef(false);
 
   const col = (key: ColumnKey) => visibleColumns.has(key);
 
-  const toggleColumn = (key: ColumnKey) => {
-    setVisibleColumns(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  };
-
-  // Close picker on outside click
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node))
-        setPickerOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [pickerOpen]);
-  const scrollRef    = useRef<HTMLDivElement>(null);
-  const topBarRef    = useRef<HTMLDivElement>(null);
-  const topInnerRef  = useRef<HTMLDivElement>(null);
-  const syncingRef   = useRef(false); // prevent echo between the two scroll handlers
-
-  // Keep the top phantom bar width in sync with the table's scroll width
   const updateTopBarWidth = useCallback(() => {
     const table = scrollRef.current?.querySelector('table');
     if (topInnerRef.current && table) {
@@ -107,67 +61,108 @@ export const ConversationList = ({
     }
   }, []);
 
-  // Set top bar width once on mount and whenever conversations change
   useEffect(() => {
     updateTopBarWidth();
-  }, [conversations, updateTopBarWidth]);
+  }, [conversations, visibleColumns, updateTopBarWidth]);
 
-  // Middle-click auto-scroll (panning) on the table scroll container
+  // Persistent middle-click auto-scroll — like native browser auto-scroll.
+  // Middle-click once to enter pan mode; mouse position relative to the origin
+  // point drives continuous scrolling (further = faster). Any click exits.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    let isPanning = false;
+    let panMode = false;
     let originX = 0;
     let originY = 0;
+    let currentX = 0;
+    let currentY = 0;
     let rafId = 0;
+    let indicator: HTMLDivElement | null = null;
 
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 1) return;   // middle button only
+    const DEAD_ZONE = 8;    // px from origin before scrolling starts
+    const SPEED = 0.12;     // scroll px per animation frame per px of offset
+
+    const showIndicator = (x: number, y: number) => {
+      indicator = document.createElement('div');
+      indicator.className = 'conv-pan-indicator';
+      indicator.style.left = `${x}px`;
+      indicator.style.top = `${y}px`;
+      document.body.appendChild(indicator);
+    };
+
+    const hideIndicator = () => {
+      indicator?.remove();
+      indicator = null;
+    };
+
+    const animate = () => {
+      if (!panMode) return;
+      const dx = currentX - originX;
+      const dy = currentY - originY;
+      if (Math.abs(dx) > DEAD_ZONE || Math.abs(dy) > DEAD_ZONE) {
+        el.scrollLeft += dx * SPEED;
+        el.scrollTop  += dy * SPEED;
+      }
+      rafId = requestAnimationFrame(animate);
+    };
+
+    const enterPan = (e: MouseEvent) => {
+      if (e.button !== 1) return;
       e.preventDefault();
-      isPanning = true;
-      originX = e.clientX;
-      originY = e.clientY;
+      if (panMode) { exitPan(); return; }   // second middle-click exits
+      panMode = true;
+      originX = currentX = e.clientX;
+      originY = currentY = e.clientY;
       el.style.cursor = 'all-scroll';
+      showIndicator(e.clientX, e.clientY);
+      rafId = requestAnimationFrame(animate);
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!isPanning) return;
-      const dx = e.clientX - originX;
-      const dy = e.clientY - originY;
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        el.scrollLeft -= dx * 0.4;
-        el.scrollTop  -= dy * 0.4;
-        originX = e.clientX;
-        originY = e.clientY;
-      });
+      currentX = e.clientX;
+      currentY = e.clientY;
     };
 
-    const stopPan = () => {
-      if (!isPanning) return;
-      isPanning = false;
+    const onAnyClick = (e: MouseEvent) => {
+      // Middle mousedown handled by enterPan; left/right clicks exit pan mode
+      if (panMode && e.button !== 1) exitPan();
+    };
+
+    const exitPan = () => {
+      if (!panMode) return;
+      panMode = false;
       el.style.cursor = '';
       cancelAnimationFrame(rafId);
+      hideIndicator();
     };
 
-    el.addEventListener('mousedown', onMouseDown);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exitPan();
+    };
+
+    // Suppress the browser's native auto-scroll indicator
+    const onAuxClick = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
+
+    el.addEventListener('mousedown', enterPan);
+    el.addEventListener('mousedown', onAnyClick);
+    el.addEventListener('auxclick', onAuxClick);
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', stopPan);
-    // Prevent the browser's native middle-click scroll indicator
-    el.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+    window.addEventListener('keydown', onKeyDown);
 
     return () => {
-      el.removeEventListener('mousedown', onMouseDown);
+      exitPan();
+      el.removeEventListener('mousedown', enterPan);
+      el.removeEventListener('mousedown', onAnyClick);
+      el.removeEventListener('auxclick', onAuxClick);
       window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', stopPan);
-      cancelAnimationFrame(rafId);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, []);
 
-  const hasAppNames  = conversations.some(c => c.appName);
+  const hasAppNames   = conversations.some(c => c.appName);
   const hasCategories = conversations.some(c => c.category);
-  const hasRisks     = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
+  const hasRisks      = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -187,20 +182,13 @@ export const ConversationList = ({
     const icon = !isActive
       ? 'bi-arrow-down-up text-muted'
       : sortDir === 'asc' ? 'bi-sort-up' : 'bi-sort-down';
-    const nextDir: SortDir = isActive && sortDir === 'asc' ? 'desc' : 'asc';
     const handleClick = () => {
-      // Cycle: inactive → asc, asc → desc, desc → clear
       if (!isActive) onSort(field);
-      else if (sortDir === 'asc') onSort(field);   // triggers desc in parent via sortDir flip
-      else onSort('' as SortField);                // clear
+      else if (sortDir === 'asc') onSort(field);
+      else onSort('' as SortField);
     };
-    // Let parent manage direction; just toggle or clear
-    void nextDir;
     return (
-      <th
-        onClick={handleClick}
-        style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
-      >
+      <th onClick={handleClick} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {label} <i className={`bi ${icon} ms-1`}></i>
       </th>
     );
@@ -208,36 +196,11 @@ export const ConversationList = ({
 
   return (
     <div className="conversation-list">
-      {/* Column picker */}
-      <div className="conv-column-picker" ref={pickerRef}>
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-secondary conv-column-btn"
-          onClick={() => setPickerOpen(o => !o)}
-          title="Show/hide columns"
-        >
-          <i className="bi bi-layout-three-columns me-1"></i>Columns
-        </button>
-        {pickerOpen && (
-          <div className="conv-column-dropdown">
-            {COLUMN_DEFS.map(({ key, label }) => (
-              <label key={key} className="conv-column-item">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.has(key)}
-                  onChange={() => toggleColumn(key)}
-                />
-                <span>{label}</span>
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Top phantom scrollbar — mirrors the bottom scroll position */}
+      {/* Top phantom scrollbar */}
       <div ref={topBarRef} className="conv-top-scrollbar" onScroll={handleTopScroll}>
         <div ref={topInnerRef} className="conv-top-scrollbar-inner" />
       </div>
+
       <div
         ref={scrollRef}
         className={`conv-table-scroll${scrolledEnd ? ' scrolled-end' : ''}`}
@@ -262,7 +225,6 @@ export const ConversationList = ({
             {conversations.map(conversation => {
               const [source, destination] = conversation.endpoints;
               const duration = conversation.endTime - conversation.startTime;
-
               return (
                 <tr
                   key={conversation.id}
@@ -280,13 +242,9 @@ export const ConversationList = ({
                     <td>
                       <div>
                         <span className="fw-semibold">{destination.ip}</span>
-                        {destination.port > 0 && (
-                          <small className="text-muted">:{destination.port}</small>
-                        )}
+                        {destination.port > 0 && <small className="text-muted">:{destination.port}</small>}
                       </div>
-                      {conversation.hostname && (
-                        <small className="text-info">{conversation.hostname}</small>
-                      )}
+                      {conversation.hostname && <small className="text-info">{conversation.hostname}</small>}
                     </td>
                   )}
                   {col('protocol') && (
@@ -298,30 +256,16 @@ export const ConversationList = ({
                   )}
                   {col('appName') && hasAppNames && (
                     <td>
-                      {conversation.appName ? (
-                        <span
-                          className="badge"
-                          style={{ backgroundColor: getAppColor(conversation.appName), color: '#fff' }}
-                        >
-                          {conversation.appName}
-                        </span>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
+                      {conversation.appName
+                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName), color: '#fff' }}>{conversation.appName}</span>
+                        : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('category') && hasCategories && (
                     <td>
-                      {conversation.category ? (
-                        <span
-                          className="badge"
-                          style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}
-                        >
-                          {conversation.category}
-                        </span>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
+                      {conversation.category
+                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
+                        : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('risks') && hasRisks && (
@@ -340,9 +284,7 @@ export const ConversationList = ({
                             </span>
                           ))}
                         </div>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
+                      ) : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('packets')   && <td>{conversation.packetCount.toLocaleString()}</td>}

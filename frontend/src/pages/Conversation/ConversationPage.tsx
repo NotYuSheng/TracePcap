@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation } from '@/types';
 import type { SortField } from '@/features/conversation/types';
+import { loadVisibleColumns, COLUMN_STORAGE_KEY } from '@/features/conversation/constants';
+import type { ColumnKey } from '@/features/conversation/constants';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ConversationList } from '@components/conversation/ConversationList';
@@ -31,6 +33,16 @@ export const ConversationPage = () => {
   const [totalItems, setTotalItems]             = useState(0);
   const [totalPages, setTotalPages]             = useState(0);
   const [fileTypeOptions, setFileTypeOptions]   = useState<string[]>([]);
+  const [visibleColumns, setVisibleColumns]     = useState<Set<ColumnKey>>(loadVisibleColumns);
+
+  const toggleColumn = useCallback((key: ColumnKey) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
 
   // Fetch available file types once per file
   useEffect(() => {
@@ -179,6 +191,8 @@ export const ConversationPage = () => {
             categories={categoryOptions}
             fileTypes={fileTypeOptions}
             activeFilterCount={activeFilterCount}
+            visibleColumns={visibleColumns}
+            onToggleColumn={toggleColumn}
           />
         </div>
       </div>
@@ -204,6 +218,7 @@ export const ConversationPage = () => {
                   sortDir={filters.sortDir}
                   onSort={handleSort}
                   onRiskFilterClick={() => setFilters({ hasRisks: true })}
+                  visibleColumns={visibleColumns}
                 />
               )}
             </div>
