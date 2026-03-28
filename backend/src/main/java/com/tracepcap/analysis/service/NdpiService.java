@@ -72,13 +72,13 @@ public class NdpiService {
 
   /** Matches the JA3 client fingerprint, e.g. [JA3C: abcdef...] → group(1) = hash. */
   private static final Pattern JA3C = Pattern.compile(
-      "\\[JA3C:\\s*([0-9a-f]{32})\\]",
+      "\\[JA3C:\\s*([0-9a-f]{" + ConversationEntity.JA3_HASH_LENGTH + "})\\]",
       Pattern.CASE_INSENSITIVE
   );
 
   /** Matches the JA3S server fingerprint, e.g. [JA3S: abcdef...] → group(1) = hash. */
   private static final Pattern JA3S = Pattern.compile(
-      "\\[JA3S:\\s*([0-9a-f]{32})\\]",
+      "\\[JA3S:\\s*([0-9a-f]{" + ConversationEntity.JA3_HASH_LENGTH + "})\\]",
       Pattern.CASE_INSENSITIVE
   );
 
@@ -118,7 +118,7 @@ public class NdpiService {
     long enrichedCategories = conversations.stream().filter(c -> c.getCategory() != null).count();
     long enrichedHostnames  = conversations.stream().filter(c -> c.getHostname() != null).count();
     long enrichedJa3        = conversations.stream().filter(c -> c.getJa3Client() != null).count();
-    log.info("nDPI enriched {}/{} with app names, {}/{} with risks, {}/{} with categories, {}/{} with hostnames, {}/{} with JA3",
+    log.info("nDPI enriched apps: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}",
         enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
         enrichedCategories, conversations.size(), enrichedHostnames, conversations.size(),
         enrichedJa3, conversations.size());
@@ -230,13 +230,8 @@ public class NdpiService {
     }
 
     // JA3 client/server fingerprint hashes
-    String ja3Client = null;
-    Matcher jcm = JA3C.matcher(line);
-    if (jcm.find()) ja3Client = jcm.group(1).toLowerCase();
-
-    String ja3Server = null;
-    Matcher jsm = JA3S.matcher(line);
-    if (jsm.find()) ja3Server = jsm.group(1).toLowerCase();
+    String ja3Client = extractHash(JA3C, line);
+    String ja3Server = extractHash(JA3S, line);
 
     result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto),
         new FlowData(appName, risks, category, hostname, ja3Client, ja3Server));
@@ -253,6 +248,12 @@ public class NdpiService {
       data = flowMap.get(key2);
     }
     return data;
+  }
+
+  /** Extract and lowercase a single captured group from a pattern match, or return null. */
+  private String extractHash(Pattern pattern, String line) {
+    Matcher m = pattern.matcher(line);
+    return m.find() ? m.group(1).toLowerCase() : null;
   }
 
   /**
