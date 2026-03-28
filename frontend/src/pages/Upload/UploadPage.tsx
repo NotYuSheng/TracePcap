@@ -16,7 +16,7 @@ export const UploadPage = () => {
     fetch('/api/system/limits')
       .then(r => r.json())
       .then(data => { if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes); })
-      .catch(() => { /* keep default */ });
+      .catch((err) => { console.error('Failed to fetch upload limits, using default.', err); });
   }, []);
 
   return (

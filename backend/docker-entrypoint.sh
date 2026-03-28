@@ -16,13 +16,13 @@ if [ "$TIMEOUT" -gt 900 ]; then TIMEOUT=900; fi
 
 echo "TracePcap backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
-echo "  JVM heap (-Xmx)      = ${JVM_HEAP_MB} MB"
+echo "  JVM heap (-Xms/-Xmx) = ${JVM_HEAP_MB} MB"
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"
 echo "  Analysis timeout     = ${TIMEOUT} s"
 
 exec java \
   -Xmx${JVM_HEAP_MB}m \
-  -Xms512m \
+  -Xms${JVM_HEAP_MB}m \
   -DMAX_UPLOAD_SIZE_BYTES=${MAX_UPLOAD_BYTES} \
   -DANALYSIS_TIMEOUT_SECONDS=${TIMEOUT} \
   -jar app.jar
