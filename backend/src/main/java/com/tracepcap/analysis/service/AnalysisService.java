@@ -61,6 +61,7 @@ public class AnalysisService {
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
   private final NdpiService ndpiService;
+  private final CustomSignatureService customSignatureService;
 
   @Transactional
   public void reanalyzeFile(UUID fileId) {
@@ -105,6 +106,9 @@ public class AnalysisService {
 
       // Enrich conversations with app names and security risks via nDPI (single subprocess run)
       ndpiService.enrich(tempFile, parseResult.getConversations());
+
+      // Apply custom user-defined signature rules (appends matched rule names to flowRisks)
+      customSignatureService.applySignatures(parseResult.getConversations());
 
       // Update analysis results
       analysis.setPacketCount(parseResult.getPacketCount());

@@ -85,6 +85,8 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
       # Timezone Configuration
       TZ: Asia/Singapore
+    volumes:
+      - ./signatures.yml:/app/signatures.yml
     depends_on:
       postgres:
         condition: service_healthy
