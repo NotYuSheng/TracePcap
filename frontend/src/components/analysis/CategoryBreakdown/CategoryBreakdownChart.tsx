@@ -3,6 +3,10 @@ import type { CategoryStat } from '@/types';
 import { getAppColor } from '@/utils/appColors';
 import { formatBytes } from '@/utils/formatters';
 
+interface CategoryBreakdownChartProps {
+  categoryStats: CategoryStat[];
+}
+
 export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChartProps) => {
   const chartData = categoryStats.map(stat => ({
     name: stat.category,
