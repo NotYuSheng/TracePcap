@@ -94,7 +94,9 @@ export const ConversationPage = () => {
   // Prevent background scroll while modal is open
   useEffect(() => {
     document.body.style.overflow = selectedConversation ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [selectedConversation]);
 
   const handlePageChange = (page: number) => {
@@ -106,13 +108,16 @@ export const ConversationPage = () => {
     setSearchParams({});
   };
 
-  const displayedConversations = (filterSrcIp && filterPeerIp)
-    ? conversations.filter(c => {
-        const [a, b] = c.endpoints;
-        return (a.ip === filterSrcIp && b.ip === filterPeerIp) ||
-               (a.ip === filterPeerIp && b.ip === filterSrcIp);
-      })
-    : conversations;
+  const displayedConversations =
+    filterSrcIp && filterPeerIp
+      ? conversations.filter(c => {
+          const [a, b] = c.endpoints;
+          return (
+            (a.ip === filterSrcIp && b.ip === filterPeerIp) ||
+            (a.ip === filterPeerIp && b.ip === filterSrcIp)
+          );
+        })
+      : conversations;
 
   if (loading) return <LoadingSpinner size="large" message="Loading conversations..." />;
   if (error) return <ErrorMessage title="Failed to Load Conversations" message={error} />;
@@ -130,7 +135,9 @@ export const ConversationPage = () => {
             <div className="alert alert-info py-2 mb-0 mt-2 d-flex align-items-center justify-content-between">
               <span>
                 <i className="bi bi-funnel me-2"></i>
-                Showing conversations between <strong className="font-monospace mx-1">{filterSrcIp}</strong> and <strong className="font-monospace mx-1">{filterPeerIp}</strong>
+                Showing conversations between{' '}
+                <strong className="font-monospace mx-1">{filterSrcIp}</strong> and{' '}
+                <strong className="font-monospace mx-1">{filterPeerIp}</strong>
                 {displayedConversations.length === 0 && ' — none found on this page'}
               </span>
               <button className="btn btn-sm btn-outline-secondary ms-3" onClick={clearIpFilter}>
@@ -151,7 +158,7 @@ export const ConversationPage = () => {
             <div className="card-body p-0">
               <ConversationList
                 conversations={displayedConversations}
-                onSelectConversation={(c) => {
+                onSelectConversation={c => {
                   const idx = displayedConversations.findIndex(x => x.id === c.id);
                   openConversation(c, idx);
                 }}
@@ -177,11 +184,12 @@ export const ConversationPage = () => {
         <div
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          onClick={e => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
         >
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content">
-
               <div className="modal-header">
                 <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
                   <button
@@ -216,12 +224,12 @@ export const ConversationPage = () => {
               </div>
 
               <div className="modal-body">
-                {detailLoading
-                  ? <LoadingSpinner size="medium" message="Loading conversation..." />
-                  : <ConversationDetail conversation={selectedConversation} />
-                }
+                {detailLoading ? (
+                  <LoadingSpinner size="medium" message="Loading conversation..." />
+                ) : (
+                  <ConversationDetail conversation={selectedConversation} />
+                )}
               </div>
-
             </div>
           </div>
         </div>
