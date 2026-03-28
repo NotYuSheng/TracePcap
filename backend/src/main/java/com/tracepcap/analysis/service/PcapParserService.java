@@ -83,7 +83,8 @@ public class PcapParserService {
 
           IpPacket ipPacket = packet.get(IpPacket.class);
           if (ipPacket != null) {
-            processIpPacket(ipPacket, packetSize, timestamp, packetNumber, payloadHex, conversationMap, result);
+            processIpPacket(
+                ipPacket, packetSize, timestamp, packetNumber, payloadHex, conversationMap, result);
           } else {
             EthernetPacket etherPacket = packet.get(EthernetPacket.class);
             if (etherPacket != null) {
@@ -133,22 +134,39 @@ public class PcapParserService {
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info
-    ProcessBuilder pb = new ProcessBuilder(
-        "tshark", "-r", pcapFile.getAbsolutePath(),
-        "-T", "fields",
-        "-E", "separator=|",
-        "-e", "frame.time_epoch",
-        "-e", "frame.len",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "ipv6.src",
-        "-e", "ipv6.dst",
-        "-e", "tcp.srcport",
-        "-e", "tcp.dstport",
-        "-e", "udp.srcport",
-        "-e", "udp.dstport",
-        "-e", "_ws.col.Protocol",
-        "-e", "_ws.col.Info");
+    ProcessBuilder pb =
+        new ProcessBuilder(
+            "tshark",
+            "-r",
+            pcapFile.getAbsolutePath(),
+            "-T",
+            "fields",
+            "-E",
+            "separator=|",
+            "-e",
+            "frame.time_epoch",
+            "-e",
+            "frame.len",
+            "-e",
+            "ip.src",
+            "-e",
+            "ip.dst",
+            "-e",
+            "ipv6.src",
+            "-e",
+            "ipv6.dst",
+            "-e",
+            "tcp.srcport",
+            "-e",
+            "tcp.dstport",
+            "-e",
+            "udp.srcport",
+            "-e",
+            "udp.dstport",
+            "-e",
+            "_ws.col.Protocol",
+            "-e",
+            "_ws.col.Info");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     long packetNumber = 0;
@@ -236,9 +254,20 @@ public class PcapParserService {
             conv.setPacketCount(conv.getPacketCount() + 1);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
-            conv.getPackets().add(buildPacketInfo(
-                packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-                protocol, packetSize, info, null, null)); // payload/app bytes not available via tshark path
+            conv.getPackets()
+                .add(
+                    buildPacketInfo(
+                        packetNumber,
+                        timestamp,
+                        srcIp,
+                        srcPort,
+                        dstIp,
+                        dstPort,
+                        protocol,
+                        packetSize,
+                        info,
+                        null,
+                        null)); // payload/app bytes not available via tshark path
           }
         }
       }
@@ -272,19 +301,22 @@ public class PcapParserService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Patch all IDB SnapLen fields to 65535 so libpcap 1.10.5+ doesn't reject
-   * multi-interface pcapng files where interfaces have different snapshot lengths.
+   * Patch all IDB SnapLen fields to 65535 so libpcap 1.10.5+ doesn't reject multi-interface pcapng
+   * files where interfaces have different snapshot lengths.
    *
-   * Uses a stream-copy + memory-mapped in-place patch to avoid loading the
-   * entire file into the heap (important for large captures).
+   * <p>Uses a stream-copy + memory-mapped in-place patch to avoid loading the entire file into the
+   * heap (important for large captures).
    */
   private File normalizePcapngSnapLen(File pcapFile) {
     // Quick pcapng magic check — only read 4 bytes
     try (java.io.FileInputStream fis = new java.io.FileInputStream(pcapFile)) {
       byte[] magic = new byte[4];
       if (fis.read(magic) < 4) return pcapFile;
-      boolean isPcapng = (magic[0] & 0xFF) == 0x0A && (magic[1] & 0xFF) == 0x0D
-          && (magic[2] & 0xFF) == 0x0D && (magic[3] & 0xFF) == 0x0A;
+      boolean isPcapng =
+          (magic[0] & 0xFF) == 0x0A
+              && (magic[1] & 0xFF) == 0x0D
+              && (magic[2] & 0xFF) == 0x0D
+              && (magic[3] & 0xFF) == 0x0A;
       if (!isPcapng) return pcapFile;
     } catch (Exception e) {
       return pcapFile;
@@ -295,11 +327,12 @@ public class PcapParserService {
       File normalized = File.createTempFile("pcap-normalized-", ".pcapng");
       normalized.deleteOnExit();
       java.nio.file.Files.copy(
-          pcapFile.toPath(), normalized.toPath(),
+          pcapFile.toPath(),
+          normalized.toPath(),
           java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
       try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(normalized, "rw");
-           java.nio.channels.FileChannel ch = raf.getChannel()) {
+          java.nio.channels.FileChannel ch = raf.getChannel()) {
 
         if (ch.size() < 12) {
           normalized.delete();
@@ -310,8 +343,11 @@ public class PcapParserService {
         java.nio.ByteBuffer hdr = java.nio.ByteBuffer.allocate(12);
         ch.read(hdr, 0);
         hdr.flip();
-        boolean le = (hdr.get(8) & 0xFF) == 0x4D && (hdr.get(9) & 0xFF) == 0x3C
-            && (hdr.get(10) & 0xFF) == 0x2B && (hdr.get(11) & 0xFF) == 0x1A;
+        boolean le =
+            (hdr.get(8) & 0xFF) == 0x4D
+                && (hdr.get(9) & 0xFF) == 0x3C
+                && (hdr.get(10) & 0xFF) == 0x2B
+                && (hdr.get(11) & 0xFF) == 0x1A;
 
         // Memory-map the temp file for in-place patching; the OS pages blocks
         // on demand so only accessed regions consume physical RAM
@@ -323,7 +359,7 @@ public class PcapParserService {
         int pos = 0;
         while (pos + 12 <= mbb.limit()) {
           int blockType = mbb.getInt(pos);
-          int blockLen  = mbb.getInt(pos + 4);
+          int blockLen = mbb.getInt(pos + 4);
           if (blockLen < 12 || pos + blockLen > mbb.limit()) break;
 
           // IDB: type(4) + len(4) + link_type(2) + reserved(2) + snap_len(4)
@@ -431,15 +467,33 @@ public class PcapParserService {
     conv.setPacketCount(conv.getPacketCount() + 1);
     conv.setTotalBytes(conv.getTotalBytes() + packetSize);
     if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
-    conv.getPackets().add(buildPacketInfo(
-        packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-        protocol, packetSize, info, payloadHex, appLayerBytes));
+    conv.getPackets()
+        .add(
+            buildPacketInfo(
+                packetNumber,
+                timestamp,
+                srcIp,
+                srcPort,
+                dstIp,
+                dstPort,
+                protocol,
+                packetSize,
+                info,
+                payloadHex,
+                appLayerBytes));
   }
 
   private PacketInfo buildPacketInfo(
-      long packetNumber, LocalDateTime timestamp,
-      String srcIp, Integer srcPort, String dstIp, Integer dstPort,
-      String protocol, int packetSize, String info, String payloadHex,
+      long packetNumber,
+      LocalDateTime timestamp,
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort,
+      String protocol,
+      int packetSize,
+      String info,
+      String payloadHex,
       byte[] appLayerBytes) {
 
     PacketInfo pkt = new PacketInfo();
@@ -467,7 +521,7 @@ public class PcapParserService {
     char[] hexChars = new char[limit * 2];
     for (int i = 0; i < limit; i++) {
       int v = raw[i] & 0xFF;
-      hexChars[i * 2]     = HEX_ARRAY[v >>> 4];
+      hexChars[i * 2] = HEX_ARRAY[v >>> 4];
       hexChars[i * 2 + 1] = HEX_ARRAY[v & 0x0F];
     }
     return new String(hexChars);
@@ -492,9 +546,15 @@ public class PcapParserService {
 
     int cmp = srcIp.compareTo(dstIp);
     if (cmp < 0 || (cmp == 0 && srcPort != null && dstPort != null && srcPort < dstPort)) {
-      ip1 = srcIp; port1 = srcPort; ip2 = dstIp; port2 = dstPort;
+      ip1 = srcIp;
+      port1 = srcPort;
+      ip2 = dstIp;
+      port2 = dstPort;
     } else {
-      ip1 = dstIp; port1 = dstPort; ip2 = srcIp; port2 = srcPort;
+      ip1 = dstIp;
+      port1 = dstPort;
+      ip2 = srcIp;
+      port2 = srcPort;
     }
     return String.format("%s:%s-%s:%s-%s", ip1, port1, ip2, port2, protocol);
   }
@@ -549,8 +609,10 @@ public class PcapParserService {
     private String protocol;
     private Integer packetSize;
     private String info;
+
     /** First {@link PacketEntity#PAYLOAD_BYTE_LIMIT} bytes as a lowercase hex string, or null. */
     private String payload;
+
     /** File type detected from magic bytes, or null if unknown. */
     private String detectedFileType;
   }

@@ -19,6 +19,9 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
   void deleteByFileId(UUID fileId);
 
   /** Returns only conversations that have at least one risk flag. */
-  @Query(value = "SELECT * FROM conversations WHERE file_id = :fileId AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0", nativeQuery = true)
+  @Query(
+      value =
+          "SELECT * FROM conversations WHERE file_id = :fileId AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0",
+      nativeQuery = true)
   List<ConversationEntity> findByFileIdWithRisks(@Param("fileId") UUID fileId);
 }
