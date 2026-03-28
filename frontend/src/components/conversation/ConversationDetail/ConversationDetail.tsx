@@ -36,7 +36,12 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                 <dt className="col-sm-4">Source:</dt>
                 <dd className="col-sm-8">{formatIpPort(source.ip, source.port)}</dd>
                 <dt className="col-sm-4">Destination:</dt>
-                <dd className="col-sm-8">{formatIpPort(destination.ip, destination.port)}</dd>
+                <dd className="col-sm-8">
+                  {formatIpPort(destination.ip, destination.port)}
+                  {conversation.hostname && (
+                    <small className="text-info d-block">{conversation.hostname}</small>
+                  )}
+                </dd>
                 <dt className="col-sm-4">Protocol:</dt>
                 <dd className="col-sm-8">
                   <span className="badge bg-primary">{conversation.protocol.name}</span>

@@ -50,6 +50,9 @@ public class ConversationEntity {
   @Column(name = "category", length = 50)
   private String category;
 
+  @Column(name = "hostname", length = 255)
+  private String hostname;
+
   @Column(name = "packet_count", nullable = false)
   @Builder.Default
   private Long packetCount = 0L;

@@ -131,6 +131,7 @@ public class AnalysisService {
                 .protocol(convInfo.getProtocol())
                 .appName(convInfo.getAppName())
                 .category(convInfo.getCategory())
+                .hostname(convInfo.getHostname())
                 .flowRisks(convInfo.getFlowRisks().isEmpty()
                     ? null
                     : convInfo.getFlowRisks().toArray(new String[0]))
@@ -314,6 +315,7 @@ public class AnalysisService {
                         .dstPort(conv.getDstPort())
                         .protocol(conv.getProtocol())
                         .appName(conv.getAppName())
+                        .hostname(conv.getHostname())
                         .startTime(
                             conv.getStartTime() != null
                                 ? conv.getStartTime()
@@ -429,6 +431,7 @@ public class AnalysisService {
                   .protocol(conv.getProtocol())
                   .appName(conv.getAppName())
                   .category(conv.getCategory())
+                  .hostname(conv.getHostname())
                   .flowRisks(conv.getFlowRisks() != null
                       ? Arrays.asList(conv.getFlowRisks()) : List.of())
                   .packetCount(conv.getPacketCount())
@@ -457,6 +460,7 @@ public class AnalysisService {
               .protocol(conv.getProtocol())
               .appName(conv.getAppName())
               .category(conv.getCategory())
+              .hostname(conv.getHostname())
               .flowRisks(conv.getFlowRisks() != null
                   ? Arrays.asList(conv.getFlowRisks()) : List.of())
               .packetCount(conv.getPacketCount())
@@ -519,6 +523,7 @@ public class AnalysisService {
         .protocol(conversation.getProtocol())
         .appName(conversation.getAppName())
         .category(conversation.getCategory())
+        .hostname(conversation.getHostname())
         .flowRisks(conversation.getFlowRisks() != null
             ? Arrays.asList(conversation.getFlowRisks()) : List.of())
         .packetCount(conversation.getPacketCount())

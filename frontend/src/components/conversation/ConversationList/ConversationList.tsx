@@ -77,6 +77,9 @@ export const ConversationList = ({
                       {destination.port && (
                         <small className="text-muted">:{destination.port}</small>
                       )}
+                      {conversation.hostname && (
+                        <small className="text-info">{conversation.hostname}</small>
+                      )}
                     </div>
                   </td>
                   <td>
