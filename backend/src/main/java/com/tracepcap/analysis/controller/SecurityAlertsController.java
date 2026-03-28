@@ -20,13 +20,12 @@ public class SecurityAlertsController {
   private final AnalysisService analysisService;
 
   /**
-   * Returns all conversations for the given file that have at least one nDPI risk flag.
-   * Returns an empty list for PCAPs with no detected risks.
+   * Returns all conversations for the given file that have at least one nDPI risk flag. Returns an
+   * empty list for PCAPs with no detected risks.
    */
   @GetMapping("/{fileId}/security-alerts")
   @Operation(summary = "Get conversations with nDPI security risk flags")
-  public ResponseEntity<List<ConversationResponse>> getSecurityAlerts(
-      @PathVariable UUID fileId) {
+  public ResponseEntity<List<ConversationResponse>> getSecurityAlerts(@PathVariable UUID fileId) {
     log.info("GET /api/files/{}/security-alerts", fileId);
     return ResponseEntity.ok(analysisService.getSecurityAlerts(fileId));
   }
