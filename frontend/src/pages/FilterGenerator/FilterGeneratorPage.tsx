@@ -101,11 +101,11 @@ export const FilterGeneratorPage = () => {
         errorMsg.includes('Failed to generate')
       ) {
         setError(
-          '🔴 LLM Service Unavailable: The AI service at http://100.64.0.1:1234 is not responding. Please start LM Studio or another OpenAI-compatible LLM server, then try again.'
+          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
         );
       } else if (errorMsg.includes('timeout') || errorMsg.includes('ECONNREFUSED')) {
         setError(
-          "🔴 Connection Failed: Cannot reach the LLM service. Make sure it's running on http://100.64.0.1:1234"
+          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
         );
       } else {
         setError(`❌ Error: ${errorMsg || 'Failed to generate filter'}`);

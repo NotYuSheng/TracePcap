@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation } from '@/types';
+import type { SortField } from '@/features/conversation/types';
+import { loadVisibleColumns, COLUMN_STORAGE_KEY } from '@/features/conversation/constants';
+import type { ColumnKey } from '@/features/conversation/constants';
+import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ConversationList } from '@components/conversation/ConversationList';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
+import { ConversationFilterPanel } from '@components/conversation/ConversationFilterPanel';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { Pagination } from '@components/common/Pagination';
@@ -15,40 +20,76 @@ interface AnalysisOutletContext {
 }
 
 export const ConversationPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const { fileId, data } = useOutletContext<AnalysisOutletContext>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const filterSrcIp = searchParams.get('srcIp');
-  const filterPeerIp = searchParams.get('peerIp');
+  const { filters, activeFilterCount, setFilters, clearAll } = useConversationFilters();
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations]       = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex]       = useState<number>(-1);
+  const [detailLoading, setDetailLoading]       = useState(false);
+  const [loading, setLoading]                   = useState(true);
+  const [error, setError]                       = useState<string | null>(null);
+  const [totalItems, setTotalItems]             = useState(0);
+  const [totalPages, setTotalPages]             = useState(0);
+  const [fileTypeOptions, setFileTypeOptions]   = useState<string[]>([]);
+  const [visibleColumns, setVisibleColumns]     = useState<Set<ColumnKey>>(loadVisibleColumns);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(25);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const toggleColumn = useCallback((key: ColumnKey) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
 
+  // Fetch available file types once per file
   useEffect(() => {
-    const fetchConversations = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await conversationService.getConversations(fileId, currentPage, pageSize);
-        setConversations(response.data);
-        setTotalItems(response.total);
-        setTotalPages(response.totalPages);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load conversations');
-      } finally {
-        setLoading(false);
+    if (!fileId) return;
+    conversationService.getFileTypes(fileId).then(setFileTypeOptions).catch(() => {});
+  }, [fileId]);
+
+  // One-shot migration of legacy URL params from NodeDetails and Overview navigation
+  useEffect(() => {
+    const srcIp  = searchParams.get('srcIp');
+    const peerIp = searchParams.get('peerIp');
+    const app    = searchParams.get('app');
+    if (srcIp || peerIp || app) {
+      const next = new URLSearchParams(searchParams);
+      if (srcIp || peerIp) {
+        next.set('ip', srcIp ?? peerIp ?? '');
+        next.delete('srcIp');
+        next.delete('peerIp');
       }
-    };
-    if (fileId) fetchConversations();
-  }, [fileId, currentPage, pageSize]);
+      if (app) {
+        next.set('apps', app);
+        next.delete('app');
+      }
+      setSearchParams(next, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch conversations whenever filters change
+  useEffect(() => {
+    if (!fileId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    conversationService.getConversations(fileId, filters)
+      .then(r => {
+        if (cancelled) return;
+        setConversations(r.data);
+        setTotalItems(r.total);
+        setTotalPages(r.totalPages);
+      })
+      .catch(e => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Failed to load conversations');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [fileId, filters]);
 
   const openConversation = useCallback(async (conversation: Conversation, index: number) => {
     setSelectedIndex(index);
@@ -79,7 +120,6 @@ export const ConversationPage = () => {
       openConversation(conversations[selectedIndex + 1], selectedIndex + 1);
   }, [selectedIndex, conversations, openConversation]);
 
-  // ESC closes modal; arrow keys navigate
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeModal();
@@ -91,53 +131,70 @@ export const ConversationPage = () => {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [closeModal, selectedConversation, handlePrev, handleNext]);
 
-  // Prevent background scroll while modal is open
   useEffect(() => {
     document.body.style.overflow = selectedConversation ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [selectedConversation]);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    setSelectedConversation(null);
+  // Sort: cycle empty → asc → desc → empty
+  const handleSort = (field: SortField) => {
+    if (!field) {
+      setFilters({ sortBy: '', sortDir: 'asc' });
+    } else if (filters.sortBy !== field) {
+      setFilters({ sortBy: field, sortDir: 'asc' });
+    } else if (filters.sortDir === 'asc') {
+      setFilters({ sortBy: field, sortDir: 'desc' });
+    } else {
+      setFilters({ sortBy: '', sortDir: 'asc' });
+    }
   };
 
-  const clearIpFilter = () => {
-    setSearchParams({});
-  };
+  // Filter options from the already-loaded analysis summary
+  const protocolOptions = (data.protocolDistribution ?? []).map(p => ({ protocol: p.protocol, count: p.count }));
+  const appOptions      = (data.detectedApplications ?? []).map(a => ({ name: a.name }));
+  const categoryOptions = (data.categoryDistribution ?? []).map(c => ({ category: c.category }));
 
-  const displayedConversations = (filterSrcIp && filterPeerIp)
-    ? conversations.filter(c => {
-        const [a, b] = c.endpoints;
-        return (a.ip === filterSrcIp && b.ip === filterPeerIp) ||
-               (a.ip === filterPeerIp && b.ip === filterSrcIp);
-      })
-    : conversations;
-
-  if (loading) return <LoadingSpinner size="large" message="Loading conversations..." />;
-  if (error) return <ErrorMessage title="Failed to Load Conversations" message={error} />;
+  // CSV export URL
+  const exportUrl = conversationService.getExportUrl(fileId, filters);
 
   const modalTitle = selectedConversation
     ? `${formatIpPort(selectedConversation.endpoints[0].ip, selectedConversation.endpoints[0].port)} ↔ ${formatIpPort(selectedConversation.endpoints[1].ip, selectedConversation.endpoints[1].port)}`
     : '';
 
+  if (error) return <ErrorMessage title="Failed to Load Conversations" message={error} />;
+
   return (
     <div className="conversation-page">
       <div className="row mb-3">
         <div className="col-12">
-          <h4>Network Conversations ({totalItems.toLocaleString()})</h4>
-          {filterSrcIp && filterPeerIp && (
-            <div className="alert alert-info py-2 mb-0 mt-2 d-flex align-items-center justify-content-between">
-              <span>
-                <i className="bi bi-funnel me-2"></i>
-                Showing conversations between <strong className="font-monospace mx-1">{filterSrcIp}</strong> and <strong className="font-monospace mx-1">{filterPeerIp}</strong>
-                {displayedConversations.length === 0 && ' — none found on this page'}
-              </span>
-              <button className="btn btn-sm btn-outline-secondary ms-3" onClick={clearIpFilter}>
-                Clear filter ×
-              </button>
-            </div>
-          )}
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h4 className="mb-0">
+              Network Conversations
+              <span className="text-muted fs-6 fw-normal ms-2">({totalItems.toLocaleString()})</span>
+            </h4>
+            <a
+              href={exportUrl}
+              download="conversations.csv"
+              className="btn btn-sm btn-outline-secondary"
+              title="Export current filtered results as CSV"
+            >
+              <i className="bi bi-download me-1"></i>
+              Export CSV
+            </a>
+          </div>
+
+          <ConversationFilterPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+            onClearAll={clearAll}
+            protocols={protocolOptions}
+            apps={appOptions}
+            categories={categoryOptions}
+            fileTypes={fileTypeOptions}
+            activeFilterCount={activeFilterCount}
+            visibleColumns={visibleColumns}
+            onToggleColumn={toggleColumn}
+          />
         </div>
       </div>
 
@@ -145,26 +202,37 @@ export const ConversationPage = () => {
         <div className="col-12">
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
-              <h6 className="mb-0">All Conversations</h6>
+              <h6 className="mb-0">Conversations</h6>
               <small className="text-muted">Click a row to view details</small>
             </div>
             <div className="card-body p-0">
-              <ConversationList
-                conversations={displayedConversations}
-                onSelectConversation={(c) => {
-                  const idx = displayedConversations.findIndex(x => x.id === c.id);
-                  openConversation(c, idx);
-                }}
-              />
+              {loading ? (
+                <LoadingSpinner size="medium" message="Loading conversations..." />
+              ) : (
+                <ConversationList
+                  conversations={conversations}
+                  onSelectConversation={(c) => {
+                    const idx = conversations.findIndex(x => x.id === c.id);
+                    openConversation(c, idx);
+                  }}
+                  sortBy={filters.sortBy}
+                  sortDir={filters.sortDir}
+                  onSort={handleSort}
+                  onRiskFilterClick={() => setFilters({ hasRisks: true })}
+                  visibleColumns={visibleColumns}
+                />
+              )}
             </div>
             {totalPages > 1 && (
               <div className="card-footer">
                 <Pagination
-                  currentPage={currentPage}
+                  currentPage={filters.page}
                   totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                  pageSize={pageSize}
+                  onPageChange={(page) => setFilters({ page })}
+                  pageSize={filters.pageSize}
                   totalItems={totalItems}
+                  showPageSizeSelector
+                  onPageSizeChange={(pageSize) => setFilters({ pageSize, page: 1 })}
                 />
               </div>
             )}
@@ -172,7 +240,7 @@ export const ConversationPage = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Conversation detail modal */}
       {selectedConversation && (
         <div
           className="modal fade show d-block"
@@ -181,7 +249,6 @@ export const ConversationPage = () => {
         >
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content">
-
               <div className="modal-header">
                 <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
                   <button
@@ -214,14 +281,12 @@ export const ConversationPage = () => {
                   title="Close (Esc)"
                 />
               </div>
-
               <div className="modal-body">
                 {detailLoading
                   ? <LoadingSpinner size="medium" message="Loading conversation..." />
                   : <ConversationDetail conversation={selectedConversation} />
                 }
               </div>
-
             </div>
           </div>
         </div>
