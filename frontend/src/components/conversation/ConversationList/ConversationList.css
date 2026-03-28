@@ -1,8 +1,34 @@
-/* Scroll container with right-edge fade hint */
+/* Top phantom scrollbar — sits above the table, synced via JS */
+.conv-top-scrollbar {
+  overflow-x: scroll;
+  overflow-y: hidden;
+  height: 12px;          /* just enough room for the scrollbar track */
+  scrollbar-width: thin;
+  scrollbar-color: #adb5bd transparent;
+}
+
+.conv-top-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.conv-top-scrollbar::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 3px;
+}
+
+.conv-top-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #adb5bd;
+  border-radius: 3px;
+}
+
+/* Inner div — its width is set to match table.scrollWidth via JS */
+.conv-top-scrollbar-inner {
+  height: 1px;
+}
+
+/* Bottom scroll container */
 .conv-table-scroll {
-  position: relative;
   overflow-x: auto;
-  /* Always show a thin scrollbar so users know the table is scrollable */
   scrollbar-width: thin;
   scrollbar-color: #adb5bd transparent;
 }
@@ -12,27 +38,11 @@
 }
 
 .conv-table-scroll::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f3f5;
+  border-radius: 3px;
 }
 
 .conv-table-scroll::-webkit-scrollbar-thumb {
   background-color: #adb5bd;
   border-radius: 3px;
-}
-
-/* Right-edge fade — hidden when .scrolled-end is applied */
-.conv-table-scroll::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 48px;
-  height: 100%;
-  background: linear-gradient(to right, transparent, rgba(255,255,255,0.85));
-  pointer-events: none;
-  transition: opacity 0.2s;
-}
-
-.conv-table-scroll.scrolled-end::after {
-  opacity: 0;
 }

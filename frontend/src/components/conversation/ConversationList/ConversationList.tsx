@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
@@ -24,12 +24,95 @@ export const ConversationList = ({
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrolledEnd, setScrolledEnd] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef    = useRef<HTMLDivElement>(null);
+  const topBarRef    = useRef<HTMLDivElement>(null);
+  const topInnerRef  = useRef<HTMLDivElement>(null);
+  const syncingRef   = useRef(false); // prevent echo between the two scroll handlers
+
+  // Keep the top phantom bar width in sync with the table's scroll width
+  const updateTopBarWidth = useCallback(() => {
+    const table = scrollRef.current?.querySelector('table');
+    if (topInnerRef.current && table) {
+      topInnerRef.current.style.width = `${table.scrollWidth}px`;
+    }
+  }, []);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     setScrolledEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+    if (!syncingRef.current && topBarRef.current) {
+      syncingRef.current = true;
+      topBarRef.current.scrollLeft = el.scrollLeft;
+      syncingRef.current = false;
+    }
+    updateTopBarWidth();
+  }, [updateTopBarWidth]);
+
+  const handleTopScroll = useCallback(() => {
+    if (!syncingRef.current && scrollRef.current && topBarRef.current) {
+      syncingRef.current = true;
+      scrollRef.current.scrollLeft = topBarRef.current.scrollLeft;
+      syncingRef.current = false;
+    }
+  }, []);
+
+  // Set top bar width once on mount and whenever conversations change
+  useEffect(() => {
+    updateTopBarWidth();
+  }, [conversations, updateTopBarWidth]);
+
+  // Middle-click auto-scroll (panning) on the table scroll container
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let isPanning = false;
+    let originX = 0;
+    let originY = 0;
+    let rafId = 0;
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 1) return;   // middle button only
+      e.preventDefault();
+      isPanning = true;
+      originX = e.clientX;
+      originY = e.clientY;
+      el.style.cursor = 'all-scroll';
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
+      const dx = e.clientX - originX;
+      const dy = e.clientY - originY;
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        el.scrollLeft -= dx * 0.4;
+        el.scrollTop  -= dy * 0.4;
+        originX = e.clientX;
+        originY = e.clientY;
+      });
+    };
+
+    const stopPan = () => {
+      if (!isPanning) return;
+      isPanning = false;
+      el.style.cursor = '';
+      cancelAnimationFrame(rafId);
+    };
+
+    el.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', stopPan);
+    // Prevent the browser's native middle-click scroll indicator
+    el.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', stopPan);
+      cancelAnimationFrame(rafId);
+    };
   }, []);
 
   const hasAppNames  = conversations.some(c => c.appName);
@@ -75,6 +158,10 @@ export const ConversationList = ({
 
   return (
     <div className="conversation-list">
+      {/* Top phantom scrollbar — mirrors the bottom scroll position */}
+      <div ref={topBarRef} className="conv-top-scrollbar" onScroll={handleTopScroll}>
+        <div ref={topInnerRef} className="conv-top-scrollbar-inner" />
+      </div>
       <div
         ref={scrollRef}
         className={`conv-table-scroll${scrolledEnd ? ' scrolled-end' : ''}`}
