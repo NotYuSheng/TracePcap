@@ -21,6 +21,7 @@ public class ConversationEntity {
   public static final int APP_NAME_MAX_LENGTH = 50;
   public static final int CATEGORY_MAX_LENGTH = 50;
   public static final int HOSTNAME_MAX_LENGTH = 255;
+  public static final int JA3_HASH_LENGTH = 32;
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -56,6 +57,12 @@ public class ConversationEntity {
 
   @Column(name = "hostname", length = HOSTNAME_MAX_LENGTH)
   private String hostname;
+
+  @Column(name = "ja3_client", length = JA3_HASH_LENGTH)
+  private String ja3Client;
+
+  @Column(name = "ja3_server", length = JA3_HASH_LENGTH)
+  private String ja3Server;
 
   @Column(name = "packet_count", nullable = false)
   @Builder.Default

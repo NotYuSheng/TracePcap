@@ -132,6 +132,8 @@ public class AnalysisService {
                 .appName(convInfo.getAppName())
                 .category(convInfo.getCategory())
                 .hostname(convInfo.getHostname())
+                .ja3Client(convInfo.getJa3Client())
+                .ja3Server(convInfo.getJa3Server())
                 .flowRisks(convInfo.getFlowRisks().isEmpty()
                     ? null
                     : convInfo.getFlowRisks().toArray(new String[0]))
@@ -432,6 +434,8 @@ public class AnalysisService {
                   .appName(conv.getAppName())
                   .category(conv.getCategory())
                   .hostname(conv.getHostname())
+                  .ja3Client(conv.getJa3Client())
+                  .ja3Server(conv.getJa3Server())
                   .flowRisks(conv.getFlowRisks() != null
                       ? Arrays.asList(conv.getFlowRisks()) : List.of())
                   .packetCount(conv.getPacketCount())
@@ -461,6 +465,8 @@ public class AnalysisService {
               .appName(conv.getAppName())
               .category(conv.getCategory())
               .hostname(conv.getHostname())
+              .ja3Client(conv.getJa3Client())
+              .ja3Server(conv.getJa3Server())
               .flowRisks(conv.getFlowRisks() != null
                   ? Arrays.asList(conv.getFlowRisks()) : List.of())
               .packetCount(conv.getPacketCount())
@@ -524,6 +530,8 @@ public class AnalysisService {
         .appName(conversation.getAppName())
         .category(conversation.getCategory())
         .hostname(conversation.getHostname())
+        .ja3Client(conversation.getJa3Client())
+        .ja3Server(conversation.getJa3Server())
         .flowRisks(conversation.getFlowRisks() != null
             ? Arrays.asList(conversation.getFlowRisks()) : List.of())
         .packetCount(conversation.getPacketCount())

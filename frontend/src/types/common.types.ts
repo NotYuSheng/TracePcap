@@ -45,6 +45,8 @@ export interface Conversation {
   appName?: string;
   category?: string;
   hostname?: string;
+  ja3Client?: string;
+  ja3Server?: string;
   flowRisks: string[];
   startTime: number;
   endTime: number;

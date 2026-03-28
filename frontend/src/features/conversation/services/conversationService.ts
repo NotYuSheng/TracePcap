@@ -14,6 +14,8 @@ interface ConversationApiResponse {
   appName?: string | null;
   category?: string | null;
   hostname?: string | null;
+  ja3Client?: string | null;
+  ja3Server?: string | null;
   flowRisks?: string[] | null;
   packetCount: number;
   totalBytes: number;
@@ -62,6 +64,8 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     appName: apiData.appName ?? undefined,
     category: apiData.category ?? undefined,
     hostname: apiData.hostname ?? undefined,
+    ja3Client: apiData.ja3Client ?? undefined,
+    ja3Server: apiData.ja3Server ?? undefined,
     flowRisks: apiData.flowRisks ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
