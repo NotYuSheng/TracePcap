@@ -1,10 +1,29 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { ProtocolStats } from '@/types';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './ProtocolBreakdownChart.css';
 
 interface ProtocolBreakdownChartProps {
   protocolStats: ProtocolStats[];
 }
+
+const protocolInfoPopover = (
+  <Popover id="protocol-info" style={{ maxWidth: '300px' }}>
+    <Popover.Header>About protocol detection</Popover.Header>
+    <Popover.Body>
+      <p className="mb-2">
+        Transport-layer protocols (TCP, UDP, ICMP, ARP) are identified from packet headers and
+        are highly reliable.
+      </p>
+      <p className="mb-0">
+        Application-layer protocols (HTTP, TLS, DNS, etc.) are detected by nDPI's DPI engine
+        using port numbers, handshake patterns, and payload heuristics. Tunnelled or
+        non-standard-port traffic may be labelled by its transport rather than its application
+        protocol.
+      </p>
+    </Popover.Body>
+  </Popover>
+);
 
 const COLORS = [
   '#0076d1', // Primary blue
@@ -37,7 +56,19 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
 
   return (
     <div className="protocol-breakdown">
-      <h3 className="breakdown-title">Protocol Distribution</h3>
+      <h3 className="breakdown-title d-flex align-items-center gap-2">
+        Protocol Distribution
+        <OverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover} rootClose>
+          <button
+            type="button"
+            className="btn btn-link p-0 text-muted"
+            style={{ lineHeight: 1 }}
+            aria-label="About protocol detection accuracy"
+          >
+            <i className="bi bi-info-circle fs-6"></i>
+          </button>
+        </OverlayTrigger>
+      </h3>
 
       <div className="breakdown-content">
         <div className="breakdown-chart">

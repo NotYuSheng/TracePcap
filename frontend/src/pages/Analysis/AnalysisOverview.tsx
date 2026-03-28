@@ -4,11 +4,36 @@ import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
 import { CategoryBreakdownChart } from '@components/analysis/CategoryBreakdown';
 import { getAppColor, getTextColor } from '@/utils/appColors';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
   fileId: string;
 }
+
+const ndpiPopover = (
+  <Popover id="ndpi-app-info" style={{ maxWidth: '320px' }}>
+    <Popover.Header>About application detection</Popover.Header>
+    <Popover.Body>
+      <p className="mb-2">
+        Application labels are detected by{' '}
+        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noreferrer">nDPI</a>{' '}
+        using deep packet inspection (DPI) heuristics.
+      </p>
+      <p className="mb-2">
+        DPI is <strong>probabilistic</strong> — binary payloads can occasionally match the wrong
+        protocol's signatures (e.g. a file transfer triggering peer-to-peer heuristics).
+        Encrypted flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints,
+        not payload content.
+      </p>
+      <p className="mb-0">
+        Treat labels as strong indicators, not definitive classifications. Cross-reference the
+        destination IP/port and raw packet payload if a label looks unexpected.
+      </p>
+    </Popover.Body>
+  </Popover>
+);
+
 
 export const AnalysisOverview = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
@@ -22,12 +47,22 @@ export const AnalysisOverview = () => {
 
       {detectedApps.length > 0 && (
         <div className="mt-4">
-          <h5 className="mb-3">
+          <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-app-indicator me-2"></i>
             Applications Detected
             {data.detectedApplicationsTruncated && (
               <span className="text-muted fs-6 fw-normal ms-2">(showing top {detectedApps.length})</span>
             )}
+            <OverlayTrigger trigger="click" placement="right" overlay={ndpiPopover} rootClose>
+              <button
+                type="button"
+                className="btn btn-link p-0 text-muted"
+                style={{ lineHeight: 1 }}
+                aria-label="About application detection accuracy"
+              >
+                <i className="bi bi-info-circle fs-6"></i>
+              </button>
+            </OverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {detectedApps.map(app => (
@@ -60,18 +95,6 @@ export const AnalysisOverview = () => {
           <CategoryBreakdownChart categoryStats={data.categoryDistribution} />
         </div>
       )}
-
-      <div className="alert alert-info mt-4 mb-0 small" role="note">
-        <i className="bi bi-info-circle me-2"></i>
-        <strong>About application detection:</strong> Application and category labels are
-        detected by <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noreferrer">nDPI</a> using
-        deep packet inspection heuristics. DPI is probabilistic — some flows may be misclassified,
-        especially when payload patterns resemble another protocol (e.g. binary file transfers
-        matching peer-to-peer signatures). Encrypted traffic (TLS/QUIC) is identified by metadata
-        such as SNI, JA3 fingerprints, and port, not payload content. Treat labels as strong
-        indicators, not definitive classifications. If you see an unexpected application label,
-        cross-reference the destination IP/port and raw packet payload for confirmation.
-      </div>
     </div>
   );
 };
