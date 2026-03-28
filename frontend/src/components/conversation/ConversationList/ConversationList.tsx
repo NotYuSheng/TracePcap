@@ -101,8 +101,8 @@ export const ConversationList = ({
       const dx = currentX - originX;
       const dy = currentY - originY;
       if (Math.abs(dx) > DEAD_ZONE || Math.abs(dy) > DEAD_ZONE) {
-        el.scrollLeft += dx * SPEED;
-        el.scrollTop  += dy * SPEED;
+        el.scrollLeft += dx * SPEED;       // horizontal: table container
+        window.scrollBy(0, dy * SPEED);    // vertical: page
       }
       rafId = requestAnimationFrame(animate);
     };
