@@ -14,6 +14,7 @@ interface ConversationFilterPanelProps {
   protocols:         ProtocolStat[];
   apps:              AppStat[];
   categories:        CategoryStat[];
+  fileTypes:         string[];
   activeFilterCount: number;
 }
 
@@ -38,6 +39,7 @@ export function ConversationFilterPanel({
   protocols,
   apps,
   categories,
+  fileTypes,
   activeFilterCount,
 }: ConversationFilterPanelProps) {
   const [isOpen, setIsOpen] = useState(activeFilterCount > 0);
@@ -79,6 +81,13 @@ export function ConversationFilterPanel({
       ? filters.categories.filter(c => c !== cat)
       : [...filters.categories, cat];
     onFiltersChange({ categories: next });
+  };
+
+  const toggleFileType = (ft: string) => {
+    const next = filters.fileTypes.includes(ft)
+      ? filters.fileTypes.filter(f => f !== ft)
+      : [...filters.fileTypes, ft];
+    onFiltersChange({ fileTypes: next });
   };
 
   return (
@@ -194,6 +203,27 @@ export function ConversationFilterPanel({
                 </div>
               )}
 
+              {/* File type pills */}
+              {fileTypes.length > 0 && (
+                <div className="col-12">
+                  <label className="form-label filter-section-label">
+                    <i className="bi bi-file-earmark me-1"></i>File Types
+                  </label>
+                  <div className="d-flex flex-wrap gap-1">
+                    {fileTypes.map(ft => (
+                      <button
+                        key={ft}
+                        type="button"
+                        className={`badge rounded-pill border-0 filter-pill ${filters.fileTypes.includes(ft) ? 'active' : ''}`}
+                        onClick={() => toggleFileType(ft)}
+                      >
+                        {ft}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Security risks toggle */}
               <div className="col-md-4 d-flex align-items-end">
                 <div className="form-check mb-0">
@@ -231,6 +261,9 @@ export function ConversationFilterPanel({
                 {filters.hasRisks && (
                   <Chip label="Risks only" onRemove={() => onFiltersChange({ hasRisks: false })} />
                 )}
+                {filters.fileTypes.map(ft => (
+                  <Chip key={ft} label={ft} onRemove={() => toggleFileType(ft)} />
+                ))}
               </div>
             )}
           </div>

@@ -2,7 +2,9 @@ package com.tracepcap.analysis.repository;
 
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.entity.PacketEntity;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +23,12 @@ public interface ConversationRepository
   List<ConversationEntity> findByFileId(UUID fileId);
 
   void deleteByFileId(UUID fileId);
+
+  /** Returns the distinct detected file types present in packets for the given file. */
+  @Query("SELECT DISTINCT p.detectedFileType FROM PacketEntity p"
+      + " WHERE p.file.id = :fileId AND p.detectedFileType IS NOT NULL"
+      + " ORDER BY p.detectedFileType")
+  List<String> findDistinctFileTypesByFileId(@Param("fileId") UUID fileId);
 
   /** Returns only conversations that have at least one risk flag. */
   @Query(
@@ -72,6 +80,18 @@ public interface ConversationRepository
       // Has flow risks
       if (Boolean.TRUE.equals(params.getHasRisks())) {
         predicates.add(cb.isNotNull(root.get("flowRisks")));
+      }
+
+      // File type multi-value — EXISTS subquery against packets table
+      if (params.getFileTypes() != null && !params.getFileTypes().isEmpty()) {
+        Subquery<UUID> sub = query.subquery(UUID.class);
+        var packet = sub.from(PacketEntity.class);
+        sub.select(packet.get("conversation").get("id"))
+            .where(cb.and(
+                cb.equal(packet.get("conversation").get("id"), root.get("id")),
+                packet.get("detectedFileType").in(params.getFileTypes())
+            ));
+        predicates.add(cb.exists(sub));
       }
 
       return cb.and(predicates.toArray(new Predicate[0]));

@@ -444,6 +444,12 @@ public class AnalysisService {
     return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
   }
 
+  /** Returns distinct detected file types found in packets for the given file. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctFileTypes(UUID fileId) {
+    return conversationRepository.findDistinctFileTypesByFileId(fileId);
+  }
+
   /** Also used by the CSV export — returns ALL matching rows without pagination. */
   @Transactional(readOnly = true)
   public List<ConversationResponse> getConversationsForExport(

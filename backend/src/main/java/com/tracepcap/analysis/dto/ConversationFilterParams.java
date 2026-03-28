@@ -25,6 +25,12 @@ public class ConversationFilterParams {
   private final Boolean hasRisks;
 
   /**
+   * Restrict to conversations that contain at least one packet with a detected file type in this
+   * list. Empty = no filter.
+   */
+  private final List<String> fileTypes;
+
+  /**
    * Entity field to sort by. Accepted values: srcIp, dstIp, packetCount, totalBytes, startTime.
    * Null or blank = default DB ordering.
    */

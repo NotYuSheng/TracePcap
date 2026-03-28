@@ -5,6 +5,31 @@ import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters
 import { getAppColor } from '@/utils/appColors';
 import './ConversationList.css';
 
+type ColumnKey = 'source' | 'destination' | 'protocol' | 'appName' | 'category' | 'risks' | 'packets' | 'bytes' | 'duration' | 'startTime';
+
+const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
+  { key: 'source',      label: 'Source',      defaultVisible: true  },
+  { key: 'destination', label: 'Destination', defaultVisible: true  },
+  { key: 'protocol',    label: 'Protocol',    defaultVisible: false },
+  { key: 'appName',     label: 'Application', defaultVisible: true  },
+  { key: 'category',    label: 'Category',    defaultVisible: true  },
+  { key: 'risks',       label: 'Risks',       defaultVisible: true  },
+  { key: 'packets',     label: 'Packets',     defaultVisible: true  },
+  { key: 'bytes',       label: 'Bytes',       defaultVisible: true  },
+  { key: 'duration',    label: 'Duration',    defaultVisible: true  },
+  { key: 'startTime',   label: 'Start Time',  defaultVisible: true  },
+];
+
+const STORAGE_KEY = 'conv-visible-columns';
+
+function loadVisibleColumns(): Set<ColumnKey> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return new Set(JSON.parse(stored) as ColumnKey[]);
+  } catch { /* ignore */ }
+  return new Set(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key));
+}
+
 interface ConversationListProps {
   conversations: Conversation[];
   onSelectConversation?: (conversation: Conversation) => void;
@@ -24,6 +49,31 @@ export const ConversationList = ({
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrolledEnd, setScrolledEnd] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  const col = (key: ColumnKey) => visibleColumns.has(key);
+
+  const toggleColumn = (key: ColumnKey) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node))
+        setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pickerOpen]);
   const scrollRef    = useRef<HTMLDivElement>(null);
   const topBarRef    = useRef<HTMLDivElement>(null);
   const topInnerRef  = useRef<HTMLDivElement>(null);
@@ -158,6 +208,32 @@ export const ConversationList = ({
 
   return (
     <div className="conversation-list">
+      {/* Column picker */}
+      <div className="conv-column-picker" ref={pickerRef}>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary conv-column-btn"
+          onClick={() => setPickerOpen(o => !o)}
+          title="Show/hide columns"
+        >
+          <i className="bi bi-layout-three-columns me-1"></i>Columns
+        </button>
+        {pickerOpen && (
+          <div className="conv-column-dropdown">
+            {COLUMN_DEFS.map(({ key, label }) => (
+              <label key={key} className="conv-column-item">
+                <input
+                  type="checkbox"
+                  checked={visibleColumns.has(key)}
+                  onChange={() => toggleColumn(key)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Top phantom scrollbar — mirrors the bottom scroll position */}
       <div ref={topBarRef} className="conv-top-scrollbar" onScroll={handleTopScroll}>
         <div ref={topInnerRef} className="conv-top-scrollbar-inner" />
@@ -170,16 +246,16 @@ export const ConversationList = ({
         <table className="table table-hover">
           <thead>
             <tr>
-              <SortableHeader field="srcIp"      label="Source" />
-              <SortableHeader field="dstIp"      label="Destination" />
-              <th>Protocol</th>
-              {hasAppNames   && <th>Application</th>}
-              {hasCategories && <th>Category</th>}
-              {hasRisks      && <th>Risks</th>}
-              <SortableHeader field="packets"    label="Packets" />
-              <SortableHeader field="bytes"      label="Bytes" />
-              <SortableHeader field="duration"   label="Duration" />
-              <SortableHeader field="startTime"  label="Start Time" />
+              {col('source')      && <SortableHeader field="srcIp"     label="Source" />}
+              {col('destination') && <SortableHeader field="dstIp"     label="Destination" />}
+              {col('protocol')    && <th>Protocol</th>}
+              {col('appName')  && hasAppNames   && <th>Application</th>}
+              {col('category') && hasCategories && <th>Category</th>}
+              {col('risks')    && hasRisks      && <th>Risks</th>}
+              {col('packets')     && <SortableHeader field="packets"   label="Packets" />}
+              {col('bytes')       && <SortableHeader field="bytes"     label="Bytes" />}
+              {col('duration')    && <SortableHeader field="duration"  label="Duration" />}
+              {col('startTime')   && <SortableHeader field="startTime" label="Start Time" />}
             </tr>
           </thead>
           <tbody>
@@ -194,27 +270,33 @@ export const ConversationList = ({
                   className={selectedId === conversation.id ? 'table-active' : ''}
                   style={{ cursor: 'pointer' }}
                 >
-                  <td>
-                    <span className="fw-semibold">{source.ip}</span>
-                    {source.port > 0 && <small className="text-muted">:{source.port}</small>}
-                  </td>
-                  <td>
-                    <div>
-                      <span className="fw-semibold">{destination.ip}</span>
-                      {destination.port > 0 && (
-                        <small className="text-muted">:{destination.port}</small>
+                  {col('source') && (
+                    <td>
+                      <span className="fw-semibold">{source.ip}</span>
+                      {source.port > 0 && <small className="text-muted">:{source.port}</small>}
+                    </td>
+                  )}
+                  {col('destination') && (
+                    <td>
+                      <div>
+                        <span className="fw-semibold">{destination.ip}</span>
+                        {destination.port > 0 && (
+                          <small className="text-muted">:{destination.port}</small>
+                        )}
+                      </div>
+                      {conversation.hostname && (
+                        <small className="text-info">{conversation.hostname}</small>
                       )}
-                    </div>
-                    {conversation.hostname && (
-                      <small className="text-info">{conversation.hostname}</small>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}>
-                      {conversation.protocol.name}
-                    </span>
-                  </td>
-                  {hasAppNames && (
+                    </td>
+                  )}
+                  {col('protocol') && (
+                    <td>
+                      <span className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}>
+                        {conversation.protocol.name}
+                      </span>
+                    </td>
+                  )}
+                  {col('appName') && hasAppNames && (
                     <td>
                       {conversation.appName ? (
                         <span
@@ -228,7 +310,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {hasCategories && (
+                  {col('category') && hasCategories && (
                     <td>
                       {conversation.category ? (
                         <span
@@ -242,7 +324,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {hasRisks && (
+                  {col('risks') && hasRisks && (
                     <td>
                       {conversation.flowRisks && conversation.flowRisks.length > 0 ? (
                         <div className="d-flex flex-wrap gap-1">
@@ -263,10 +345,10 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  <td>{conversation.packetCount.toLocaleString()}</td>
-                  <td>{formatBytes(conversation.totalBytes)}</td>
-                  <td>{formatDuration(duration)}</td>
-                  <td><small>{formatTimestamp(conversation.startTime)}</small></td>
+                  {col('packets')   && <td>{conversation.packetCount.toLocaleString()}</td>}
+                  {col('bytes')     && <td>{formatBytes(conversation.totalBytes)}</td>}
+                  {col('duration')  && <td>{formatDuration(duration)}</td>}
+                  {col('startTime') && <td><small>{formatTimestamp(conversation.startTime)}</small></td>}
                 </tr>
               );
             })}

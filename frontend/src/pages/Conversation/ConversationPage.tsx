@@ -30,6 +30,13 @@ export const ConversationPage = () => {
   const [error, setError]                       = useState<string | null>(null);
   const [totalItems, setTotalItems]             = useState(0);
   const [totalPages, setTotalPages]             = useState(0);
+  const [fileTypeOptions, setFileTypeOptions]   = useState<string[]>([]);
+
+  // Fetch available file types once per file
+  useEffect(() => {
+    if (!fileId) return;
+    conversationService.getFileTypes(fileId).then(setFileTypeOptions).catch(() => {});
+  }, [fileId]);
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
   useEffect(() => {
@@ -170,6 +177,7 @@ export const ConversationPage = () => {
             protocols={protocolOptions}
             apps={appOptions}
             categories={categoryOptions}
+            fileTypes={fileTypeOptions}
             activeFilterCount={activeFilterCount}
           />
         </div>

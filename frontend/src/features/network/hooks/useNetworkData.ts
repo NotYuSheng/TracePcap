@@ -48,7 +48,7 @@ export function useNetworkData(
       // For network visualization, fetch all conversations (use large page size)
       const response = await conversationService.getConversations(fileId, {
         ip: '', protocols: [], apps: [], categories: [],
-        hasRisks: false, sortBy: '', sortDir: 'asc',
+        hasRisks: false, fileTypes: [], sortBy: '', sortDir: 'asc',
         page: 1, pageSize: 10000,
       });
       const conversations = response.data;

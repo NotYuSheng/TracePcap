@@ -42,6 +42,7 @@ public class ConversationsController {
       @Parameter(description = "Comma-separated list of application names to include") @RequestParam(required = false) String apps,
       @Parameter(description = "Comma-separated list of categories to include") @RequestParam(required = false) String categories,
       @Parameter(description = "When true, only conversations with flow risks are returned") @RequestParam(required = false) Boolean hasRisks,
+      @Parameter(description = "Comma-separated list of detected file types to include") @RequestParam(required = false) String fileTypes,
       @Parameter(description = "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime") @RequestParam(required = false) String sortBy,
       @Parameter(description = "Sort direction: asc (default) or desc") @RequestParam(required = false) String sortDir,
       @Parameter(description = "Legacy alias for ip param") @RequestParam(required = false) String search) {
@@ -58,14 +59,22 @@ public class ConversationsController {
         .apps(splitComma(apps))
         .categories(splitComma(categories))
         .hasRisks(hasRisks)
+        .fileTypes(splitComma(fileTypes))
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();
 
-    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, sortBy:{} {}",
-        fileId, page, pageSize, resolvedIp, protocols, apps, categories, hasRisks, sortBy, sortDir);
+    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, sortBy:{} {}",
+        fileId, page, pageSize, resolvedIp, protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir);
 
     return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
+  }
+
+  /** Returns the distinct detected file types found in packets for this file. */
+  @GetMapping("/{fileId}/file-types")
+  @Operation(summary = "List distinct detected file types for a file")
+  public ResponseEntity<List<String>> getFileTypes(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(analysisService.getDistinctFileTypes(fileId));
   }
 
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
@@ -78,6 +87,7 @@ public class ConversationsController {
       @RequestParam(required = false) String apps,
       @RequestParam(required = false) String categories,
       @RequestParam(required = false) Boolean hasRisks,
+      @RequestParam(required = false) String fileTypes,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
       HttpServletResponse response) throws IOException {
@@ -88,6 +98,7 @@ public class ConversationsController {
         .apps(splitComma(apps))
         .categories(splitComma(categories))
         .hasRisks(hasRisks)
+        .fileTypes(splitComma(fileTypes))
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

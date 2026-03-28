@@ -15,6 +15,7 @@ export interface ConversationFilters {
   apps: string[];
   categories: string[];
   hasRisks: boolean;
+  fileTypes: string[];
   sortBy: SortField;
   sortDir: SortDir;
   page: number;

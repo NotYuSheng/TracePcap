@@ -119,6 +119,7 @@ export const conversationService = {
     if (filters.apps.length > 0)      params.apps       = filters.apps.join(',');
     if (filters.categories.length > 0)params.categories = filters.categories.join(',');
     if (filters.hasRisks)             params.hasRisks   = 'true';
+    if (filters.fileTypes.length > 0) params.fileTypes  = filters.fileTypes.join(',');
     if (filters.sortBy)               params.sortBy     = filters.sortBy;
     if (filters.sortBy)               params.sortDir    = filters.sortDir;
 
@@ -149,10 +150,21 @@ export const conversationService = {
     if (filters.apps.length > 0)      params.set('apps',       filters.apps.join(','));
     if (filters.categories.length > 0)params.set('categories', filters.categories.join(','));
     if (filters.hasRisks)             params.set('hasRisks',   'true');
+    if (filters.fileTypes.length > 0) params.set('fileTypes',  filters.fileTypes.join(','));
     if (filters.sortBy)               params.set('sortBy',     filters.sortBy);
     if (filters.sortBy)               params.set('sortDir',    filters.sortDir);
     const qs = params.toString();
     return `/api/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
+  },
+
+  /**
+   * Returns distinct detected file types present in packets for the given file.
+   */
+  getFileTypes: async (fileId: string): Promise<string[]> => {
+    const response = await apiClient.get<string[]>(
+      `/api/conversations/${fileId}/file-types`
+    );
+    return response.data;
   },
 
   /**
