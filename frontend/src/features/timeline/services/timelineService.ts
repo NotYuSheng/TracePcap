@@ -34,10 +34,7 @@ export const timelineService = {
   /**
    * Get timeline data for a PCAP file
    */
-  getTimelineData: async (
-    fileId: string,
-    maxDataPoints?: number
-  ): Promise<TimelineDataPoint[]> => {
+  getTimelineData: async (fileId: string, maxDataPoints?: number): Promise<TimelineDataPoint[]> => {
     const response = await apiClient.get<TimelineApiResponse[]>(
       API_ENDPOINTS.TIMELINE_DATA(fileId),
       { params: { maxDataPoints } }
@@ -57,12 +54,9 @@ export const timelineService = {
     const startISO = new Date(start).toISOString();
     const endISO = new Date(end).toISOString();
 
-    const response = await apiClient.get<TimelineApiResponse[]>(
-      `/api/timeline/${fileId}/range`,
-      {
-        params: { start: startISO, end: endISO, maxDataPoints },
-      }
-    );
+    const response = await apiClient.get<TimelineApiResponse[]>(`/api/timeline/${fileId}/range`, {
+      params: { start: startISO, end: endISO, maxDataPoints },
+    });
     return response.data.map(transformTimelineData);
   },
 };

@@ -59,11 +59,13 @@ export const HexViewer = ({ hex, truncated }: HexViewerProps) => {
   return (
     <div className="hex-viewer p-2" ref={containerRef}>
       {/* Invisible ruler — measures the exact monospace char width at this font size */}
-      <span ref={rulerRef} className="hex-ruler" aria-hidden>XX </span>
+      <span ref={rulerRef} className="hex-ruler" aria-hidden>
+        XX{' '}
+      </span>
       <pre>
         {rows.map((row, rowIdx) => {
           const offset = (rowIdx * bytesPerRow).toString(16).padStart(4, '0');
-          const left  = row.slice(0, half).join(' ');
+          const left = row.slice(0, half).join(' ');
           const right = row.slice(half).join(' ');
           const hexStr = right ? `${left}  ${right}` : left;
           const padded = hexStr.padEnd(bytesPerRow * 3, ' ');
