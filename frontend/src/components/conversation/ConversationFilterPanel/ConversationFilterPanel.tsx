@@ -22,19 +22,6 @@ interface ConversationFilterPanelProps {
   onToggleColumn:    (key: ColumnKey) => void;
 }
 
-function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  return (
-    <span className="badge bg-primary d-flex align-items-center gap-1 filter-chip">
-      {label}
-      <button
-        type="button"
-        className="btn-close btn-close-white filter-chip-close"
-        onClick={onRemove}
-        aria-label={`Remove ${label} filter`}
-      />
-    </span>
-  );
-}
 
 export function ConversationFilterPanel({
   filters,
@@ -107,11 +94,6 @@ export function ConversationFilterPanel({
           )}
           <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
         </button>
-        {activeFilterCount > 0 && (
-          <button type="button" className="btn btn-link btn-sm text-muted p-0" onClick={onClearAll}>
-            Clear all
-          </button>
-        )}
       </div>
 
       {/* Collapsible panel */}
@@ -269,28 +251,11 @@ export function ConversationFilterPanel({
                 </div>
               </div>
 
-            {/* Active filter chips */}
             {activeFilterCount > 0 && (
-              <div className="d-flex flex-wrap gap-1 mt-3 pt-2 border-top">
-                <small className="text-muted me-1 align-self-center">Active:</small>
-                {filters.ip && (
-                  <Chip label={`IP: ${filters.ip}`} onRemove={() => onFiltersChange({ ip: '' })} />
-                )}
-                {filters.protocols.map(p => (
-                  <Chip key={p} label={p} onRemove={() => toggleProtocol(p)} />
-                ))}
-                {filters.apps.map(a => (
-                  <Chip key={a} label={a} onRemove={() => toggleApp(a)} />
-                ))}
-                {filters.categories.map(c => (
-                  <Chip key={c} label={c} onRemove={() => toggleCategory(c)} />
-                ))}
-                {filters.hasRisks && (
-                  <Chip label="Risks only" onRemove={() => onFiltersChange({ hasRisks: false })} />
-                )}
-                {filters.fileTypes.map(ft => (
-                  <Chip key={ft} label={ft} onRemove={() => toggleFileType(ft)} />
-                ))}
+              <div className="mt-3 pt-2 border-top">
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClearAll}>
+                  <i className="bi bi-x-circle me-1"></i>Clear filters
+                </button>
               </div>
             )}
           </div>

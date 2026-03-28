@@ -120,6 +120,7 @@ export const conversationService = {
     if (filters.categories.length > 0)params.categories = filters.categories.join(',');
     if (filters.hasRisks)             params.hasRisks   = 'true';
     if (filters.fileTypes.length > 0) params.fileTypes  = filters.fileTypes.join(',');
+    if (filters.riskTypes.length > 0) params.riskTypes  = filters.riskTypes.join(',');
     if (filters.sortBy)               params.sortBy     = filters.sortBy;
     if (filters.sortBy)               params.sortDir    = filters.sortDir;
 
@@ -151,10 +152,21 @@ export const conversationService = {
     if (filters.categories.length > 0)params.set('categories', filters.categories.join(','));
     if (filters.hasRisks)             params.set('hasRisks',   'true');
     if (filters.fileTypes.length > 0) params.set('fileTypes',  filters.fileTypes.join(','));
+    if (filters.riskTypes.length > 0) params.set('riskTypes',  filters.riskTypes.join(','));
     if (filters.sortBy)               params.set('sortBy',     filters.sortBy);
     if (filters.sortBy)               params.set('sortDir',    filters.sortDir);
     const qs = params.toString();
     return `/api/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
+  },
+
+  /**
+   * Returns distinct nDPI risk type strings present in at-risk conversations for the given file.
+   */
+  getRiskTypes: async (fileId: string): Promise<string[]> => {
+    const response = await apiClient.get<string[]>(
+      API_ENDPOINTS.RISK_TYPES(fileId)
+    );
+    return response.data;
   },
 
   /**

@@ -43,6 +43,7 @@ public class ConversationsController {
       @Parameter(description = "Comma-separated list of categories to include") @RequestParam(required = false) String categories,
       @Parameter(description = "When true, only conversations with flow risks are returned") @RequestParam(required = false) Boolean hasRisks,
       @Parameter(description = "Comma-separated list of detected file types to include") @RequestParam(required = false) String fileTypes,
+      @Parameter(description = "Comma-separated list of nDPI risk types to include") @RequestParam(required = false) String riskTypes,
       @Parameter(description = "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime") @RequestParam(required = false) String sortBy,
       @Parameter(description = "Sort direction: asc (default) or desc") @RequestParam(required = false) String sortDir,
       @Parameter(description = "Legacy alias for ip param") @RequestParam(required = false) String search) {
@@ -50,10 +51,10 @@ public class ConversationsController {
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
-    ConversationFilterParams params = buildFilterParams(ip, protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir, search);
+    ConversationFilterParams params = buildFilterParams(ip, protocols, apps, categories, hasRisks, fileTypes, riskTypes, sortBy, sortDir, search);
 
-    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, sortBy:{} {}",
-        fileId, page, pageSize, params.getIp(), protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir);
+    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
+        fileId, page, pageSize, params.getIp(), protocols, apps, categories, hasRisks, fileTypes, riskTypes, sortBy, sortDir);
 
     return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
   }
@@ -63,6 +64,13 @@ public class ConversationsController {
   @Operation(summary = "List distinct detected file types for a file")
   public ResponseEntity<List<String>> getFileTypes(@PathVariable UUID fileId) {
     return ResponseEntity.ok(analysisService.getDistinctFileTypes(fileId));
+  }
+
+  /** Returns the distinct nDPI risk type strings present in at-risk conversations for this file. */
+  @GetMapping("/{fileId}/risk-types")
+  @Operation(summary = "List distinct nDPI risk types for a file")
+  public ResponseEntity<List<String>> getRiskTypes(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(analysisService.getDistinctRiskTypes(fileId));
   }
 
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
@@ -76,12 +84,13 @@ public class ConversationsController {
       @RequestParam(required = false) String categories,
       @RequestParam(required = false) Boolean hasRisks,
       @RequestParam(required = false) String fileTypes,
+      @RequestParam(required = false) String riskTypes,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
       @RequestParam(required = false) String search,
       HttpServletResponse response) throws IOException {
 
-    ConversationFilterParams params = buildFilterParams(ip, protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir, search);
+    ConversationFilterParams params = buildFilterParams(ip, protocols, apps, categories, hasRisks, fileTypes, riskTypes, sortBy, sortDir, search);
     List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -116,7 +125,8 @@ public class ConversationsController {
   /** Shared helper — builds a {@link ConversationFilterParams} from raw request parameters. */
   private static ConversationFilterParams buildFilterParams(
       String ip, String protocols, String apps, String categories,
-      Boolean hasRisks, String fileTypes, String sortBy, String sortDir, String search) {
+      Boolean hasRisks, String fileTypes, String riskTypes,
+      String sortBy, String sortDir, String search) {
     // Backward compat: legacy ?search= param maps to the ip filter
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
@@ -126,6 +136,7 @@ public class ConversationsController {
         .categories(splitComma(categories))
         .hasRisks(hasRisks)
         .fileTypes(splitComma(fileTypes))
+        .riskTypes(splitComma(riskTypes))
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

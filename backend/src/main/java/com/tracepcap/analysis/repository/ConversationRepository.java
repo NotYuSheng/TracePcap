@@ -74,6 +74,16 @@ public interface ConversationRepository
           + " GROUP BY c.category ORDER BY SUM(c.packetCount) DESC")
   List<Object[]> findCategoryDistributionByFileId(@Param("fileId") UUID fileId);
 
+  /** Returns the distinct risk type strings present across all at-risk conversations for a file. */
+  @Query(
+      value =
+          "SELECT DISTINCT unnest(flow_risks) AS risk_type"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0"
+              + " ORDER BY risk_type",
+      nativeQuery = true)
+  List<String> findDistinctRiskTypesByFileId(@Param("fileId") UUID fileId);
+
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
   static Specification<ConversationEntity> buildSpec(
       UUID fileId, ConversationFilterParams params) {
@@ -116,6 +126,18 @@ public interface ConversationRepository
       // Has flow risks
       if (Boolean.TRUE.equals(params.getHasRisks())) {
         predicates.add(cb.isNotNull(root.get("flowRisks")));
+      }
+
+      // Risk type filter — conversation must contain at least one of the specified risk strings.
+      // array_position returns the 1-based index of the element or NULL if absent; IS NOT NULL
+      // gives an exact element match and avoids false positives from substring matching.
+      if (params.getRiskTypes() != null && !params.getRiskTypes().isEmpty()) {
+        List<Predicate> riskPreds = params.getRiskTypes().stream()
+            .map(rt -> cb.isNotNull(cb.function(
+                "array_position", Integer.class,
+                root.get("flowRisks"), cb.literal(rt))))
+            .collect(java.util.stream.Collectors.toList());
+        predicates.add(cb.or(riskPreds.toArray(new Predicate[0])));
       }
 
       // File type multi-value — EXISTS subquery against packets table
