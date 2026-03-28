@@ -1,15 +1,23 @@
+import { useState, useEffect } from 'react';
 import { Row, Col } from '@govtechsg/sgds-react';
 import { FileUploadZone } from '@components/upload/FileUploadZone';
 import { FileList } from '@components/upload/FileList';
 import { useFileUpload } from '@features/upload/hooks/useFileUpload';
 
+const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
+
 export const UploadPage = () => {
   const { uploadFile, isUploading } = useFileUpload();
+  const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
 
-  const maxSize = parseInt(import.meta.env.VITE_MAX_UPLOAD_SIZE || '100000000');
-  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(
-    ','
-  );
+  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(',');
+
+  useEffect(() => {
+    fetch('/api/system/limits')
+      .then(r => r.json())
+      .then(data => { if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes); })
+      .catch((err) => { console.error('Failed to fetch upload limits, using default.', err); });
+  }, []);
 
   return (
     <div className="upload-page">
@@ -27,7 +35,7 @@ export const UploadPage = () => {
               <FileUploadZone
                 onFileSelect={uploadFile}
                 disabled={isUploading}
-                maxSize={maxSize}
+                maxSize={maxUploadBytes}
                 acceptedFileTypes={acceptedTypes}
               />
             </Col>

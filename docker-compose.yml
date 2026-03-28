@@ -74,8 +74,9 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: tracepcap-files
-      # Upload Configuration (from .env) - single source of truth
-      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-536870912}
+      # Memory allocation — all limits (JVM heap, max upload, timeouts) are derived
+      # from this single value in the container entrypoint script
+      APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
       # LLM Configuration (OpenAI API Format)
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-https://api.openai.com/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
@@ -99,8 +100,8 @@ services:
       dockerfile: ./nginx/Dockerfile
     container_name: tracepcap-nginx
     environment:
-      # Upload Configuration (from .env)
-      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-536870912}
+      # Memory allocation — nginx body limit and timeouts derived from this
+      APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
       # Timezone Configuration
       TZ: Asia/Singapore
     ports:

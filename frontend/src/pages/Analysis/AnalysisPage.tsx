@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
-import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
+import { AnalysisLoadingView } from './AnalysisLoadingView';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 
@@ -53,7 +53,7 @@ export const AnalysisPage = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner size="large" message="Loading analysis data..." fullPage />;
+    return <AnalysisLoadingView fileId={fileId!} />;
   }
 
   if (error) {

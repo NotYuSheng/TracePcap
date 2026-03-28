@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,16 +62,13 @@ public class StoryService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Analysis not found for file: " + fileId));
 
-    // Get conversations
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
-
     // Generate story ID upfront
     UUID storyId = UUID.randomUUID();
     LocalDateTime generatedAt = LocalDateTime.now();
 
     try {
       // Generate story content using LLM
-      String storyContent = generateStoryContent(file, analysis, conversations);
+      String storyContent = generateStoryContent(file, analysis);
 
       // Parse LLM response
       StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
@@ -133,12 +131,9 @@ public class StoryService {
   }
 
   /** Generate story content using LLM */
-  private String generateStoryContent(
-      FileEntity file, AnalysisResultEntity analysis, List<ConversationEntity> conversations) {
-
+  private String generateStoryContent(FileEntity file, AnalysisResultEntity analysis) {
     String systemPrompt = buildSystemPrompt();
-    String userPrompt = buildUserPrompt(file, analysis, conversations);
-
+    String userPrompt = buildUserPrompt(file, analysis);
     return llmClient.generateCompletion(systemPrompt, userPrompt);
   }
 
@@ -247,12 +242,28 @@ public class StoryService {
     return " [TLS: " + String.join(", ", parts) + "]";
   }
 
-  private String buildUserPrompt(
-      FileEntity file, AnalysisResultEntity analysis, List<ConversationEntity> conversations) {
+  private String buildUserPrompt(FileEntity file, AnalysisResultEntity analysis) {
 
     int maxConversations = llmConfig.getStory() != null
         ? llmConfig.getStory().getMaxConversations()
         : 20;
+    // Security alerts are capped at the same limit to keep the prompt within context-window budget.
+    // The total count is still reported so the LLM knows the full scope.
+    int maxAlerts = maxConversations;
+
+    UUID fileId = file.getId();
+
+    // Fetch only what we need — never load the full conversation table
+    List<ConversationEntity> topConversations = conversationRepository
+        .findTopByFileIdOrderByTotalBytesDesc(fileId, PageRequest.of(0, maxConversations));
+    long totalConversations = conversationRepository.countByFileId(fileId);
+
+    List<Object[]> categoryRows = conversationRepository.findCategoryDistributionByFileId(fileId);
+
+    long totalAtRisk = conversationRepository.countAtRiskByFileId(fileId);
+    List<ConversationEntity> atRiskSample = totalAtRisk > 0
+        ? conversationRepository.findAtRiskByFileIdLimited(fileId, maxAlerts)
+        : Collections.emptyList();
 
     StringBuilder prompt = new StringBuilder();
     prompt.append("Analyze this network traffic capture and create a comprehensive story:\n\n");
@@ -267,7 +278,8 @@ public class StoryService {
     prompt.append(String.format("- Total Bytes: %d\n", analysis.getTotalBytes()));
     prompt.append(String.format("- Duration: %d ms\n", analysis.getDurationMs()));
     prompt.append(String.format("- Start Time: %s\n", analysis.getStartTime()));
-    prompt.append(String.format("- End Time: %s\n\n", analysis.getEndTime()));
+    prompt.append(String.format("- End Time: %s\n", analysis.getEndTime()));
+    prompt.append(String.format("- Total Conversations: %d\n\n", totalConversations));
 
     // Protocol breakdown
     if (analysis.getProtocolStats() != null && !analysis.getProtocolStats().isEmpty()) {
@@ -277,8 +289,8 @@ public class StoryService {
           @SuppressWarnings("unchecked")
           Map<String, Object> stats = (Map<String, Object>) statsObj;
           Object packets = stats.get("packetCount");
-          Object bytes = stats.get("bytes");
-          Object pct = stats.get("percentage");
+          Object bytes   = stats.get("bytes");
+          Object pct     = stats.get("percentage");
           prompt.append(String.format("- %s: %s packets, %s bytes (%.1f%%)\n",
               protocol, packets, bytes,
               pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
@@ -287,39 +299,27 @@ public class StoryService {
       prompt.append("\n");
     }
 
-    // Category distribution (nDPI traffic categories)
-    Map<String, Long> catPackets = new java.util.TreeMap<>();
-    conversations.stream()
-        .filter(c -> c.getCategory() != null && !c.getCategory().isBlank())
-        .forEach(c -> catPackets.merge(c.getCategory(),
-            c.getPacketCount() != null ? c.getPacketCount() : 0L, Long::sum));
-    if (!catPackets.isEmpty()) {
+    // Category distribution — aggregated at DB level, no entity loading
+    if (!categoryRows.isEmpty()) {
       prompt.append("## Traffic Category Breakdown\n");
-      catPackets.forEach((cat, packets) ->
-          prompt.append(String.format("- %s: %d packets\n", cat, packets)));
+      for (Object[] row : categoryRows) {
+        prompt.append(String.format("- %s: %s packets\n", row[0], row[1]));
+      }
       prompt.append("\n");
     }
 
-    // Top-N conversations sorted by traffic volume (most significant first)
-    if (!conversations.isEmpty()) {
-      List<ConversationEntity> sorted = conversations.stream()
-          .sorted(Comparator.comparingLong(ConversationEntity::getTotalBytes).reversed())
-          .collect(Collectors.toList());
-
-      int shown = Math.min(maxConversations, sorted.size());
-      prompt.append(String.format("## Top %d Conversations (by traffic volume)\n", shown));
-
-      for (int i = 0; i < shown; i++) {
-        ConversationEntity conv = sorted.get(i);
-        String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
-            ? " [" + conv.getAppName() + "]"
-            : "";
-        String catLabel = (conv.getCategory() != null && !conv.getCategory().isBlank())
-            ? " [CAT: " + conv.getCategory() + "]"
-            : "";
+    // Top-N conversations by volume
+    if (!topConversations.isEmpty()) {
+      prompt.append(String.format("## Top %d Conversations (by traffic volume, %d total)\n",
+          topConversations.size(), totalConversations));
+      for (int i = 0; i < topConversations.size(); i++) {
+        ConversationEntity conv = topConversations.get(i);
+        String appLabel  = (conv.getAppName() != null && !conv.getAppName().isBlank())
+            ? " [" + conv.getAppName() + "]" : "";
+        String catLabel  = (conv.getCategory() != null && !conv.getCategory().isBlank())
+            ? " [CAT: " + conv.getCategory() + "]" : "";
         String riskLabel = (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
-            ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]"
-            : "";
+            ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]" : "";
         String tlsCertLabel = buildTlsCertLabel(conv);
         prompt.append(String.format(
             "%d. %s:%s <-> %s:%s (%s%s%s%s%s, %d packets, %d bytes)\n",
@@ -327,37 +327,36 @@ public class StoryService {
             conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
             conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
             conv.getProtocol(), appLabel, catLabel, riskLabel, tlsCertLabel,
-            conv.getPacketCount(),
-            conv.getTotalBytes()));
+            conv.getPacketCount(), conv.getTotalBytes()));
       }
-
-      if (sorted.size() > maxConversations) {
+      if (totalConversations > maxConversations) {
         prompt.append(String.format(
-            "... and %d more conversations not shown (increase STORY_MAX_CONVERSATIONS to include them).\n",
-            sorted.size() - maxConversations));
+            "... and %d more conversations not shown (increase STORY_MAX_CONVERSATIONS to include more).\n",
+            totalConversations - maxConversations));
       }
       prompt.append("\n");
+    }
 
-      // Security alerts section — includes all at-risk conversations, even those outside top-N
-      List<ConversationEntity> atRisk = conversations.stream()
-          .filter(c -> c.getFlowRisks() != null && c.getFlowRisks().length > 0)
-          .collect(Collectors.toList());
-      if (!atRisk.isEmpty()) {
-        prompt.append(String.format("## Security Alerts (%d conversations with nDPI risk flags)\n",
-            atRisk.size()));
-        for (ConversationEntity conv : atRisk) {
-          String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
-              ? " [" + conv.getAppName() + "]"
-              : "";
-          prompt.append(String.format(
-              "- %s:%s <-> %s:%s (%s%s): %s\n",
-              conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
-              conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
-              conv.getProtocol(), appLabel,
-              String.join(", ", conv.getFlowRisks())));
-        }
-        prompt.append("\n");
+    // Security alerts — capped to avoid blowing the context window
+    if (totalAtRisk > 0) {
+      prompt.append(String.format(
+          "## Security Alerts (%d total conversations with nDPI risk flags; showing top %d)\n",
+          totalAtRisk, atRiskSample.size()));
+      for (ConversationEntity conv : atRiskSample) {
+        String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
+            ? " [" + conv.getAppName() + "]" : "";
+        prompt.append(String.format(
+            "- %s:%s <-> %s:%s (%s%s): %s\n",
+            conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
+            conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
+            conv.getProtocol(), appLabel,
+            String.join(", ", conv.getFlowRisks())));
       }
+      if (totalAtRisk > maxAlerts) {
+        prompt.append(String.format(
+            "... and %d more at-risk conversations not shown.\n", totalAtRisk - maxAlerts));
+      }
+      prompt.append("\n");
     }
 
     prompt.append("## Analysis Limitations\n");

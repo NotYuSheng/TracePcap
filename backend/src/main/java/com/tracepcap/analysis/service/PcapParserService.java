@@ -71,7 +71,18 @@ public class PcapParserService {
 
       try {
         while (true) {
-          Packet packet = handle.getNextPacketEx();
+          Packet packet;
+          try {
+            packet = handle.getNextPacketEx();
+          } catch (EOFException e) {
+            break; // normal end of capture
+          } catch (RuntimeException e) {
+            // Pcap4J failed to decode this packet (e.g. malformed/truncated GTPv1 tunnel).
+            // Skip it and keep processing the rest of the file.
+            log.debug("Skipping malformed packet #{}: {}", packetNumber + 1, e.getMessage());
+            packetNumber++;
+            continue;
+          }
           packetNumber++;
 
           long timestampSec = handle.getTimestamp().getTime() / 1000;
@@ -162,8 +173,6 @@ public class PcapParserService {
             }
           }
         }
-      } catch (EOFException e) {
-        // Normal end of file
       } catch (java.util.concurrent.TimeoutException e) {
         log.warn("Unexpected timeout reading PCAP file after {} packets", result.getPacketCount());
       }

@@ -28,7 +28,9 @@ spring:
         format_sql: true
         use_sql_comments: true
         jdbc:
-          batch_size: 20
+          batch_size: 1000
+        order_inserts: true
+        order_updates: true
     open-in-view: false
 
   # Flyway Migration
@@ -148,7 +150,7 @@ llm:
 tracepcap:
   analysis:
     batch-size: 1000
-    timeout-seconds: 300
+    timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:300}
     max-concurrent-analyses: 3
     max-timeline-data-points: 1000
     min-timeline-interval: 1
