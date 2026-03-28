@@ -498,6 +498,10 @@ public class PcapParserService {
     private String hostname;
     private String ja3Client;
     private String ja3Server;
+    private String tlsIssuer;
+    private String tlsSubject;
+    private LocalDateTime tlsNotBefore;
+    private LocalDateTime tlsNotAfter;
     private Long packetCount;
     private Long totalBytes;
     private LocalDateTime startTime;

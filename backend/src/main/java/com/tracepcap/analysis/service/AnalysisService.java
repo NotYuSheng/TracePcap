@@ -134,6 +134,10 @@ public class AnalysisService {
                 .hostname(convInfo.getHostname())
                 .ja3Client(convInfo.getJa3Client())
                 .ja3Server(convInfo.getJa3Server())
+                .tlsIssuer(convInfo.getTlsIssuer())
+                .tlsSubject(convInfo.getTlsSubject())
+                .tlsNotBefore(convInfo.getTlsNotBefore())
+                .tlsNotAfter(convInfo.getTlsNotAfter())
                 .flowRisks(convInfo.getFlowRisks().isEmpty()
                     ? null
                     : convInfo.getFlowRisks().toArray(new String[0]))
@@ -436,6 +440,10 @@ public class AnalysisService {
                   .hostname(conv.getHostname())
                   .ja3Client(conv.getJa3Client())
                   .ja3Server(conv.getJa3Server())
+                  .tlsIssuer(conv.getTlsIssuer())
+                  .tlsSubject(conv.getTlsSubject())
+                  .tlsNotBefore(conv.getTlsNotBefore())
+                  .tlsNotAfter(conv.getTlsNotAfter())
                   .flowRisks(conv.getFlowRisks() != null
                       ? Arrays.asList(conv.getFlowRisks()) : List.of())
                   .packetCount(conv.getPacketCount())
@@ -467,6 +475,10 @@ public class AnalysisService {
               .hostname(conv.getHostname())
               .ja3Client(conv.getJa3Client())
               .ja3Server(conv.getJa3Server())
+              .tlsIssuer(conv.getTlsIssuer())
+              .tlsSubject(conv.getTlsSubject())
+              .tlsNotBefore(conv.getTlsNotBefore())
+              .tlsNotAfter(conv.getTlsNotAfter())
               .flowRisks(conv.getFlowRisks() != null
                   ? Arrays.asList(conv.getFlowRisks()) : List.of())
               .packetCount(conv.getPacketCount())
@@ -532,6 +544,10 @@ public class AnalysisService {
         .hostname(conversation.getHostname())
         .ja3Client(conversation.getJa3Client())
         .ja3Server(conversation.getJa3Server())
+        .tlsIssuer(conversation.getTlsIssuer())
+        .tlsSubject(conversation.getTlsSubject())
+        .tlsNotBefore(conversation.getTlsNotBefore())
+        .tlsNotAfter(conversation.getTlsNotAfter())
         .flowRisks(conversation.getFlowRisks() != null
             ? Arrays.asList(conversation.getFlowRisks()) : List.of())
         .packetCount(conversation.getPacketCount())

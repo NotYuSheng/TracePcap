@@ -47,6 +47,10 @@ export interface Conversation {
   hostname?: string;
   ja3Client?: string;
   ja3Server?: string;
+  tlsIssuer?: string;
+  tlsSubject?: string;
+  tlsNotBefore?: number;
+  tlsNotAfter?: number;
   flowRisks: string[];
   startTime: number;
   endTime: number;

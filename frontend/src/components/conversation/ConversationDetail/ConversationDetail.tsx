@@ -72,6 +72,43 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                     </dd>
                   </>
                 )}
+                {conversation.tlsIssuer && (
+                  <>
+                    <dt className="col-sm-4">TLS Issuer:</dt>
+                    <dd className="col-sm-8">
+                      <small>{conversation.tlsIssuer}</small>
+                    </dd>
+                  </>
+                )}
+                {conversation.tlsSubject && (
+                  <>
+                    <dt className="col-sm-4">TLS Subject:</dt>
+                    <dd className="col-sm-8">
+                      <small>{conversation.tlsSubject}</small>
+                    </dd>
+                  </>
+                )}
+                {conversation.tlsNotBefore != null && (
+                  <>
+                    <dt className="col-sm-4">Cert Valid From:</dt>
+                    <dd className="col-sm-8">
+                      <small>{formatTimestamp(conversation.tlsNotBefore)}</small>
+                    </dd>
+                  </>
+                )}
+                {conversation.tlsNotAfter != null && (
+                  <>
+                    <dt className="col-sm-4">Cert Valid To:</dt>
+                    <dd className="col-sm-8">
+                      <small className={conversation.tlsNotAfter < Date.now() ? 'text-danger fw-semibold' : undefined}>
+                        {formatTimestamp(conversation.tlsNotAfter)}
+                        {conversation.tlsNotAfter < Date.now() && (
+                          <span className="ms-1 badge bg-danger">Expired</span>
+                        )}
+                      </small>
+                    </dd>
+                  </>
+                )}
               </dl>
             </div>
             <div className="col-md-6">

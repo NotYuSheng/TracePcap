@@ -4,6 +4,8 @@ import com.tracepcap.analysis.entity.ConversationEntity;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,6 +84,34 @@ public class NdpiService {
       Pattern.CASE_INSENSITIVE
   );
 
+  /** Matches TLS certificate issuer DN, e.g. [Issuer: CN=...] → group(1) = DN string. */
+  private static final Pattern TLS_ISSUER = Pattern.compile(
+      "\\[Issuer:\\s*([^\\]]+)\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
+  /** Matches TLS certificate subject DN, e.g. [Subject: CN=...] → group(1) = DN string. */
+  private static final Pattern TLS_SUBJECT = Pattern.compile(
+      "\\[Subject:\\s*([^\\]]+)\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
+  /** Matches TLS certificate not-before date, e.g. [NotBefore: 2020/01/01 00:00:00] → group(1). */
+  private static final Pattern TLS_NOT_BEFORE = Pattern.compile(
+      "\\[NotBefore:\\s*([^\\]]+)\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
+  /** Matches TLS certificate not-after date, e.g. [NotAfter: 2021/01/01 00:00:00] → group(1). */
+  private static final Pattern TLS_NOT_AFTER = Pattern.compile(
+      "\\[NotAfter:\\s*([^\\]]+)\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
+  /** nDPI prints TLS validity dates as {@code yyyy/MM/dd HH:mm:ss} (UTC). */
+  private static final DateTimeFormatter NDPI_DATE_FMT =
+      DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+
   /** Transport-only names that carry no application-layer signal. */
   private static final Set<String> SKIP_PROTOCOLS = Set.of(
       "TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN"
@@ -111,6 +141,10 @@ public class NdpiService {
       if (data.hostname() != null) conv.setHostname(data.hostname());
       if (data.ja3Client() != null) conv.setJa3Client(data.ja3Client());
       if (data.ja3Server() != null) conv.setJa3Server(data.ja3Server());
+      if (data.tlsIssuer() != null) conv.setTlsIssuer(data.tlsIssuer());
+      if (data.tlsSubject() != null) conv.setTlsSubject(data.tlsSubject());
+      if (data.tlsNotBefore() != null) conv.setTlsNotBefore(data.tlsNotBefore());
+      if (data.tlsNotAfter() != null) conv.setTlsNotAfter(data.tlsNotAfter());
     }
 
     long enrichedApps       = conversations.stream().filter(c -> c.getAppName() != null).count();
@@ -118,10 +152,11 @@ public class NdpiService {
     long enrichedCategories = conversations.stream().filter(c -> c.getCategory() != null).count();
     long enrichedHostnames  = conversations.stream().filter(c -> c.getHostname() != null).count();
     long enrichedJa3        = conversations.stream().filter(c -> c.getJa3Client() != null).count();
-    log.info("nDPI enriched apps: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}",
+    long enrichedTlsCert    = conversations.stream().filter(c -> c.getTlsIssuer() != null).count();
+    log.info("nDPI enriched apps: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}, TLS certs: {}/{}",
         enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
         enrichedCategories, conversations.size(), enrichedHostnames, conversations.size(),
-        enrichedJa3, conversations.size());
+        enrichedJa3, conversations.size(), enrichedTlsCert, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
@@ -130,7 +165,9 @@ public class NdpiService {
 
   /** Immutable holder for per-flow nDPI data extracted from one -v 2 line. */
   private record FlowData(String appName, List<String> risks, String category, String hostname,
-                          String ja3Client, String ja3Server) {}
+                          String ja3Client, String ja3Server,
+                          String tlsIssuer, String tlsSubject,
+                          LocalDateTime tlsNotBefore, LocalDateTime tlsNotAfter) {}
 
   /**
    * Runs {@code ndpiReader -i <file> -v 2} and returns a map of flow key → FlowData.
@@ -233,8 +270,15 @@ public class NdpiService {
     String ja3Client = extractHash(JA3C, line);
     String ja3Server = extractHash(JA3S, line);
 
+    // TLS certificate metadata
+    String tlsIssuer = extractText(TLS_ISSUER, line);
+    String tlsSubject = extractText(TLS_SUBJECT, line);
+    LocalDateTime tlsNotBefore = parseTlsDate(extractText(TLS_NOT_BEFORE, line));
+    LocalDateTime tlsNotAfter  = parseTlsDate(extractText(TLS_NOT_AFTER, line));
+
     result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto),
-        new FlowData(appName, risks, category, hostname, ja3Client, ja3Server));
+        new FlowData(appName, risks, category, hostname, ja3Client, ja3Server,
+                     tlsIssuer, tlsSubject, tlsNotBefore, tlsNotAfter));
   }
 
   /** Lookup flow data trying both directions (src→dst and dst→src). */
@@ -254,6 +298,23 @@ public class NdpiService {
   private String extractHash(Pattern pattern, String line) {
     Matcher m = pattern.matcher(line);
     return m.find() ? m.group(1).toLowerCase() : null;
+  }
+
+  /** Extract and trim a single captured group from a pattern match, or return null. */
+  private String extractText(Pattern pattern, String line) {
+    Matcher m = pattern.matcher(line);
+    return m.find() ? m.group(1).trim() : null;
+  }
+
+  /** Parse a TLS validity date string (e.g. {@code 2020/01/01 00:00:00}) to LocalDateTime. */
+  private LocalDateTime parseTlsDate(String raw) {
+    if (raw == null) return null;
+    try {
+      return LocalDateTime.parse(raw, NDPI_DATE_FMT);
+    } catch (java.time.format.DateTimeParseException e) {
+      log.debug("Could not parse TLS date '{}': {}", raw, e.getMessage());
+      return null;
+    }
   }
 
   /**

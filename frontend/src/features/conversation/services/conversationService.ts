@@ -16,6 +16,10 @@ interface ConversationApiResponse {
   hostname?: string | null;
   ja3Client?: string | null;
   ja3Server?: string | null;
+  tlsIssuer?: string | null;
+  tlsSubject?: string | null;
+  tlsNotBefore?: string | number[] | null;
+  tlsNotAfter?: string | number[] | null;
   flowRisks?: string[] | null;
   packetCount: number;
   totalBytes: number;
@@ -66,6 +70,10 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     hostname: apiData.hostname ?? undefined,
     ja3Client: apiData.ja3Client ?? undefined,
     ja3Server: apiData.ja3Server ?? undefined,
+    tlsIssuer: apiData.tlsIssuer ?? undefined,
+    tlsSubject: apiData.tlsSubject ?? undefined,
+    tlsNotBefore: apiData.tlsNotBefore != null ? parseDateTime(apiData.tlsNotBefore) : undefined,
+    tlsNotAfter: apiData.tlsNotAfter != null ? parseDateTime(apiData.tlsNotAfter) : undefined,
     flowRisks: apiData.flowRisks ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
