@@ -30,7 +30,13 @@ export const StoryPage = () => {
       const generatedStory = await storyService.generateStory(fileId);
       setStory(generatedStory);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate story');
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 500 || msg.includes('500') || msg.toLowerCase().includes('llm') || msg.toLowerCase().includes('connection')) {
+        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
+      } else {
+        setError(msg || 'Failed to generate story');
+      }
     } finally {
       setGenerating(false);
     }
