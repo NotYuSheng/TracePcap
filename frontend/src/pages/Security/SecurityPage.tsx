@@ -247,7 +247,7 @@ export const SecurityPage = () => {
                 </div>
                 <button
                   type="button"
-                  className="btn btn-sm btn-primary ms-2 text-nowrap"
+                  className="btn btn-sm btn-outline-secondary ms-2 text-nowrap"
                   title="View this conversation in the Conversations tab"
                   onClick={() => {
                     closeModal();
