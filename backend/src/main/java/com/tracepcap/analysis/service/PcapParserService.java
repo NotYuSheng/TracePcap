@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.entity.PacketEntity;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -19,6 +20,8 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class PcapParserService {
+
+  private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
 
   public PcapAnalysisResult analyzePcapFile(File pcapFile) {
     log.info("Starting PCAP analysis for file: {}", pcapFile.getName());
@@ -76,9 +79,11 @@ public class PcapParserService {
           int packetSize = packet.length();
           result.setTotalBytes(result.getTotalBytes() + packetSize);
 
+          String payloadHex = extractPayloadHex(packet.getRawData());
+
           IpPacket ipPacket = packet.get(IpPacket.class);
           if (ipPacket != null) {
-            processIpPacket(ipPacket, packetSize, timestamp, packetNumber, conversationMap, result);
+            processIpPacket(ipPacket, packetSize, timestamp, packetNumber, payloadHex, conversationMap, result);
           } else {
             EthernetPacket etherPacket = packet.get(EthernetPacket.class);
             if (etherPacket != null) {
@@ -233,7 +238,7 @@ public class PcapParserService {
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
             conv.getPackets().add(buildPacketInfo(
                 packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-                protocol, packetSize, info));
+                protocol, packetSize, info, null)); // payload not available via tshark path
           }
         }
       }
@@ -353,6 +358,7 @@ public class PcapParserService {
       int packetSize,
       LocalDateTime timestamp,
       long packetNumber,
+      String payloadHex,
       Map<String, ConversationInfo> conversationMap,
       PcapAnalysisResult result) {
     String srcIp = ipPacket.getHeader().getSrcAddr().getHostAddress();
@@ -424,13 +430,13 @@ public class PcapParserService {
     if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
     conv.getPackets().add(buildPacketInfo(
         packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-        protocol, packetSize, info));
+        protocol, packetSize, info, payloadHex));
   }
 
   private PacketInfo buildPacketInfo(
       long packetNumber, LocalDateTime timestamp,
       String srcIp, Integer srcPort, String dstIp, Integer dstPort,
-      String protocol, int packetSize, String info) {
+      String protocol, int packetSize, String info, String payloadHex) {
     PacketInfo pkt = new PacketInfo();
     pkt.setPacketNumber(packetNumber);
     pkt.setTimestamp(timestamp);
@@ -441,7 +447,24 @@ public class PcapParserService {
     pkt.setProtocol(protocol);
     pkt.setPacketSize(packetSize);
     pkt.setInfo(info);
+    pkt.setPayload(payloadHex);
     return pkt;
+  }
+
+  /**
+   * Convert the first {@link PacketEntity#PAYLOAD_BYTE_LIMIT} bytes of raw packet data to a
+   * lowercase hex string, or return {@code null} if the input is null or empty.
+   */
+  private String extractPayloadHex(byte[] raw) {
+    if (raw == null || raw.length == 0) return null;
+    int limit = Math.min(raw.length, PacketEntity.PAYLOAD_BYTE_LIMIT);
+    char[] hexChars = new char[limit * 2];
+    for (int i = 0; i < limit; i++) {
+      int v = raw[i] & 0xFF;
+      hexChars[i * 2]     = HEX_ARRAY[v >>> 4];
+      hexChars[i * 2 + 1] = HEX_ARRAY[v & 0x0F];
+    }
+    return new String(hexChars);
   }
 
   /** Return the first comma-separated value, or the original string if no comma. */
@@ -520,5 +543,7 @@ public class PcapParserService {
     private String protocol;
     private Integer packetSize;
     private String info;
+    /** First {@link PacketEntity#PAYLOAD_BYTE_LIMIT} bytes as a lowercase hex string, or null. */
+    private String payload;
   }
 }

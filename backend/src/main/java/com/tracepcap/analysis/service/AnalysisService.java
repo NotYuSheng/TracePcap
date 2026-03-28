@@ -166,6 +166,7 @@ public class AnalysisService {
                               .protocol(pktInfo.getProtocol())
                               .packetSize(pktInfo.getPacketSize())
                               .info(pktInfo.getInfo())
+                              .payload(pktInfo.getPayload())
                               .build())
                   .collect(Collectors.toList());
           for (int i = 0; i < packetEntities.size(); i += PACKET_BATCH_SIZE) {
@@ -503,6 +504,7 @@ public class AnalysisService {
         .protocol(p.getProtocol())
         .packetSize(p.getPacketSize())
         .info(p.getInfo())
+        .payload(p.getPayload())
         .build();
   }
 

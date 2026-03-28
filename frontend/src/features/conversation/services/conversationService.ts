@@ -39,6 +39,7 @@ interface PacketApiResponse {
   protocol: string;
   packetSize: number;
   info: string | null;
+  payload: string | null;
 }
 
 interface ConversationDetailApiResponse extends ConversationApiResponse {
@@ -93,7 +94,7 @@ function transformPacket(apiData: PacketApiResponse, protocol: Protocol): Packet
     protocol,
     size: apiData.packetSize,
     info: apiData.info ?? undefined,
-    payload: '',
+    payload: apiData.payload ?? '',
     flags: [],
   };
 }

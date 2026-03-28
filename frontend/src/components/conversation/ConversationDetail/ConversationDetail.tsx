@@ -1,13 +1,33 @@
+import { useState } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import { getAppColor } from '@/utils/appColors';
+import { HexViewer } from '../HexViewer/HexViewer';
 
 interface ConversationDetailProps {
   conversation: Conversation;
 }
 
+const PRINTABLE_ASCII_THRESHOLD = 0.3;
+
+/** Returns true if more than 30% of the payload bytes are printable ASCII (0x20–0x7e). */
+function hasReadableAscii(hex: string): boolean {
+  if (!hex || hex.length < 4) return false;
+  let printable = 0;
+  const total = hex.length / 2;
+  for (let i = 0; i < hex.length; i += 2) {
+    const byte = parseInt(hex.slice(i, i + 2), 16);
+    if (byte >= 0x20 && byte <= 0x7e) printable++;
+  }
+  return printable / total > PRINTABLE_ASCII_THRESHOLD;
+}
+
 export const ConversationDetail = ({ conversation }: ConversationDetailProps) => {
   const [source, destination] = conversation.endpoints;
+  const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
+
+  const togglePacket = (id: string) =>
+    setExpandedPacketId(prev => (prev === id ? null : id));
 
   const getDirectionIndicator = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
@@ -128,8 +148,9 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
       </div>
 
       <div className="card">
-        <div className="card-header">
+        <div className="card-header d-flex justify-content-between align-items-center">
           <h6 className="mb-0">Packet Stream ({conversation.packets?.length || 0} packets)</h6>
+          <small className="text-muted">Click a row to view hex payload</small>
         </div>
         <div className="card-body p-0">
           <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
@@ -148,27 +169,51 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
               <tbody>
                 {conversation.packets && conversation.packets.length > 0 ? (
                   conversation.packets.map((packet, index) => (
-                    <tr key={packet.id}>
-                      <td className="text-muted">{index + 1}</td>
-                      <td className={getDirectionClass(packet)}>
-                        <strong>{getDirectionIndicator(packet)}</strong>
-                      </td>
-                      <td>
-                        <small>{formatTimestamp(packet.timestamp)}</small>
-                      </td>
-                      <td>
-                        <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
-                      </td>
-                      <td>
-                        <small>
-                          {formatIpPort(packet.destination.ip, packet.destination.port)}
-                        </small>
-                      </td>
-                      <td>{packet.size} B</td>
-                      <td>
-                        <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
-                      </td>
-                    </tr>
+                    <>
+                      <tr
+                        key={packet.id}
+                        onClick={() => togglePacket(packet.id)}
+                        style={{ cursor: packet.payload ? 'pointer' : 'default' }}
+                        className={expandedPacketId === packet.id ? 'table-active' : undefined}
+                      >
+                        <td className="text-muted">{index + 1}</td>
+                        <td className={getDirectionClass(packet)}>
+                          <strong>{getDirectionIndicator(packet)}</strong>
+                        </td>
+                        <td>
+                          <small>{formatTimestamp(packet.timestamp)}</small>
+                        </td>
+                        <td>
+                          <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
+                        </td>
+                        <td>
+                          <small>
+                            {formatIpPort(packet.destination.ip, packet.destination.port)}
+                          </small>
+                        </td>
+                        <td>{packet.size} B</td>
+                        <td>
+                          <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
+                          {hasReadableAscii(packet.payload) && (
+                            <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedPacketId === packet.id && (
+                        <tr key={`${packet.id}-hex`}>
+                          <td colSpan={7} className="p-2">
+                            {packet.payload ? (
+                              <HexViewer
+                                hex={packet.payload}
+                                truncated={packet.payload.length >= 2048}
+                              />
+                            ) : (
+                              <p className="text-muted small mb-0">No payload data available.</p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))
                 ) : (
                   <tr>
