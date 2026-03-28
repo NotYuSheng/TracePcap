@@ -9,17 +9,13 @@ interface ProtocolBreakdownChartProps {
 
 const protocolInfoPopover = (
   <Popover id="protocol-info" style={{ maxWidth: '300px' }}>
-    <Popover.Header>About protocol detection</Popover.Header>
+    <Popover.Header>Protocol distribution</Popover.Header>
     <Popover.Body>
-      <p className="mb-2">
-        Transport-layer protocols (TCP, UDP, ICMP, ARP) are identified from packet headers and
-        are highly reliable.
-      </p>
       <p className="mb-0">
-        Application-layer protocols (HTTP, TLS, DNS, etc.) are detected by nDPI's DPI engine
-        using port numbers, handshake patterns, and payload heuristics. Tunnelled or
-        non-standard-port traffic may be labelled by its transport rather than its application
-        protocol.
+        Shows the breakdown of <strong>transport-layer protocols</strong> (TCP, UDP, ICMP, ARP,
+        etc.) derived directly from IP packet headers. These are deterministic — no heuristics
+        involved. For application-layer identification (HTTP, TLS, DNS, etc.) see the
+        Applications Detected section above.
       </p>
     </Popover.Body>
   </Popover>
