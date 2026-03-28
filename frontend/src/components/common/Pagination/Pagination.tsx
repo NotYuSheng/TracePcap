@@ -43,22 +43,10 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <div className="pagination-container">
-      <div className="pagination-info">
-        Showing {startItem} to {endItem} of {totalItems} items
-      </div>
-
-      <div className="pagination-controls">
-        <SgdsPagination
-          dataLength={totalItems}
-          currentPage={currentPage}
-          itemsPerPage={pageSize}
-          setCurrentPage={setCurrentPage}
-          size="sm"
-          limit={5}
-          ellipsisOn
-          ellipsisJump={2}
-          directionVariant="icon-text"
-        />
+      <div className="pagination-meta">
+        <span className="pagination-info">
+          Showing {startItem} to {endItem} of {totalItems} items
+        </span>
 
         {showPageSizeSelector && onPageSizeChange && (
           <div className="page-size-selector">
@@ -80,6 +68,18 @@ export const Pagination: React.FC<PaginationProps> = ({
           </div>
         )}
       </div>
+
+      <SgdsPagination
+        dataLength={totalItems}
+        currentPage={currentPage}
+        itemsPerPage={pageSize}
+        setCurrentPage={setCurrentPage}
+        size="sm"
+        limit={5}
+        ellipsisOn
+        ellipsisJump={2}
+        directionVariant="icon-text"
+      />
     </div>
   );
 };

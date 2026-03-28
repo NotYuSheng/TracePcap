@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
 import { getAppColor } from '@/utils/appColors';
+import './ConversationList.css';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -22,6 +23,14 @@ export const ConversationList = ({
   onRiskFilterClick,
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [scrolledEnd, setScrolledEnd] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setScrolledEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+  }, []);
 
   const hasAppNames  = conversations.some(c => c.appName);
   const hasCategories = conversations.some(c => c.category);
@@ -66,7 +75,11 @@ export const ConversationList = ({
 
   return (
     <div className="conversation-list">
-      <div className="table-responsive">
+      <div
+        ref={scrollRef}
+        className={`conv-table-scroll${scrolledEnd ? ' scrolled-end' : ''}`}
+        onScroll={handleScroll}
+      >
         <table className="table table-hover">
           <thead>
             <tr>

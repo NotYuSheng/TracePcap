@@ -1,0 +1,38 @@
+/* Scroll container with right-edge fade hint */
+.conv-table-scroll {
+  position: relative;
+  overflow-x: auto;
+  /* Always show a thin scrollbar so users know the table is scrollable */
+  scrollbar-width: thin;
+  scrollbar-color: #adb5bd transparent;
+}
+
+.conv-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.conv-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conv-table-scroll::-webkit-scrollbar-thumb {
+  background-color: #adb5bd;
+  border-radius: 3px;
+}
+
+/* Right-edge fade — hidden when .scrolled-end is applied */
+.conv-table-scroll::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.85));
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.conv-table-scroll.scrolled-end::after {
+  opacity: 0;
+}
