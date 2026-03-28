@@ -45,7 +45,9 @@ export const analysisService = {
       protocolDistribution,
       topConversations,
       uniqueHosts,
-      detectedApplications: summary.detectedApplications,
+      detectedApplications: (summary.detectedApplications || []).map((item: any) =>
+        typeof item === 'string' ? { name: item, packetCount: 0, bytes: 0 } : item
+      ),
       detectedApplicationsTruncated: summary.detectedApplicationsTruncated,
       categoryDistribution: summary.categoryDistribution,
     };
