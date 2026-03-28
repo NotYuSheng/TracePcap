@@ -18,8 +18,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConversationRepository
-    extends JpaRepository<ConversationEntity, UUID>,
-            JpaSpecificationExecutor<ConversationEntity> {
+    extends JpaRepository<ConversationEntity, UUID>, JpaSpecificationExecutor<ConversationEntity> {
 
   List<ConversationEntity> findByFileId(UUID fileId);
 
@@ -28,9 +27,10 @@ public interface ConversationRepository
   void deleteByFileId(UUID fileId);
 
   /** Returns the distinct detected file types present in packets for the given file. */
-  @Query("SELECT DISTINCT p.detectedFileType FROM PacketEntity p"
-      + " WHERE p.file.id = :fileId AND p.detectedFileType IS NOT NULL"
-      + " ORDER BY p.detectedFileType")
+  @Query(
+      "SELECT DISTINCT p.detectedFileType FROM PacketEntity p"
+          + " WHERE p.file.id = :fileId AND p.detectedFileType IS NOT NULL"
+          + " ORDER BY p.detectedFileType")
   List<String> findDistinctFileTypesByFileId(@Param("fileId") UUID fileId);
 
   /** Returns only conversations that have at least one risk flag. */
@@ -47,8 +47,8 @@ public interface ConversationRepository
       @Param("fileId") UUID fileId, Pageable pageable);
 
   /**
-   * Returns at-risk conversations for a file, capped to a limit.
-   * Uses native query because JPQL cannot express array_length.
+   * Returns at-risk conversations for a file, capped to a limit. Uses native query because JPQL
+   * cannot express array_length.
    */
   @Query(
       value =
@@ -75,8 +75,7 @@ public interface ConversationRepository
   List<Object[]> findCategoryDistributionByFileId(@Param("fileId") UUID fileId);
 
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
-  static Specification<ConversationEntity> buildSpec(
-      UUID fileId, ConversationFilterParams params) {
+  static Specification<ConversationEntity> buildSpec(UUID fileId, ConversationFilterParams params) {
 
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
@@ -91,11 +90,11 @@ public interface ConversationRepository
       // IP / hostname free-text
       if (params.getIp() != null && !params.getIp().isBlank()) {
         String pattern = "%" + params.getIp().trim().toLowerCase() + "%";
-        predicates.add(cb.or(
-            cb.like(cb.lower(root.get("srcIp")),    pattern),
-            cb.like(cb.lower(root.get("dstIp")),    pattern),
-            cb.like(cb.lower(cb.coalesce(root.get("hostname"), "")), pattern)
-        ));
+        predicates.add(
+            cb.or(
+                cb.like(cb.lower(root.get("srcIp")), pattern),
+                cb.like(cb.lower(root.get("dstIp")), pattern),
+                cb.like(cb.lower(cb.coalesce(root.get("hostname"), "")), pattern)));
       }
 
       // Protocol multi-value
@@ -123,10 +122,10 @@ public interface ConversationRepository
         Subquery<UUID> sub = query.subquery(UUID.class);
         var packet = sub.from(PacketEntity.class);
         sub.select(packet.get("conversation").get("id"))
-            .where(cb.and(
-                cb.equal(packet.get("conversation").get("id"), root.get("id")),
-                packet.get("detectedFileType").in(params.getFileTypes())
-            ));
+            .where(
+                cb.and(
+                    cb.equal(packet.get("conversation").get("id"), root.get("id")),
+                    packet.get("detectedFileType").in(params.getFileTypes())));
         predicates.add(cb.exists(sub));
       }
 
