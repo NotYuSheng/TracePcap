@@ -50,14 +50,15 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Create a non-root user
 RUN groupadd -r spring && useradd -r -g spring spring
+
+# Copy entrypoint script and make executable while still root
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 USER spring:spring
 
 # Copy the built JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
-
-# Copy entrypoint script that derives JVM heap, upload limit and timeouts from APP_MEMORY_MB
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
 
 # Expose the application port
 EXPOSE 8080
