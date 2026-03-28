@@ -146,18 +146,14 @@ export const FileList = () => {
       </Card>
 
       {/* Delete confirmation modal */}
-      <Modal
-        show={!!pendingDeleteFile}
-        onHide={() => setPendingDeleteFile(null)}
-        centered
-      >
+      <Modal show={!!pendingDeleteFile} onHide={() => setPendingDeleteFile(null)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Delete File</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Are you sure you want to remove{' '}
-            <strong>{pendingDeleteFile?.name}</strong> from your recent uploads?
+            Are you sure you want to remove <strong>{pendingDeleteFile?.name}</strong> from your
+            recent uploads?
           </p>
         </Modal.Body>
         <Modal.Footer>
@@ -168,11 +164,7 @@ export const FileList = () => {
           >
             Cancel
           </button>
-          <button
-            type="button"
-            className="btn btn-outline-danger"
-            onClick={handleConfirmDelete}
-          >
+          <button type="button" className="btn btn-outline-danger" onClick={handleConfirmDelete}>
             Delete
           </button>
         </Modal.Footer>

@@ -50,7 +50,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: getAppColor(conversation.appName!),
+                          color: '#fff',
+                        }}
+                      >
                         {conversation.appName}
                       </span>
                     </dd>
