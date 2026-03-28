@@ -342,6 +342,10 @@ public class AnalysisService {
             .sorted(java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount).reversed())
             .collect(Collectors.toList());
 
+    long securityAlertCount = conversations.stream()
+        .filter(conv -> conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
+        .count();
+
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
             .sorted((a, b) -> Long.compare(b.getTotalBytes(), a.getTotalBytes()))
@@ -371,6 +375,8 @@ public class AnalysisService {
                                 : null)
                         .packetCount(conv.getPacketCount())
                         .totalBytes(conv.getTotalBytes())
+                        .flowRisks(conv.getFlowRisks() != null
+                            ? Arrays.asList(conv.getFlowRisks()) : List.of())
                         .build())
             .collect(Collectors.toList());
 
@@ -406,6 +412,7 @@ public class AnalysisService {
             startTimeMs != null && endTimeMs != null ? List.of(startTimeMs, endTimeMs) : List.of())
         .protocolDistribution(protocolDistribution)
         .topConversations(topConversations)
+        .securityAlertCount(securityAlertCount)
         .uniqueHosts(uniqueHosts)
         .detectedApplications(detectedApplications)
         .detectedApplicationsTruncated(appsTruncated)

@@ -88,6 +88,20 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                     </dd>
                   </>
                 )}
+                {conversation.flowRisks && conversation.flowRisks.length > 0 && (
+                  <>
+                    <dt className="col-sm-4">Security Flags:</dt>
+                    <dd className="col-sm-8">
+                      <div className="d-flex flex-wrap gap-1">
+                        {conversation.flowRisks.map(risk => (
+                          <span key={risk} className="badge bg-warning text-dark" style={{ fontSize: '0.75rem' }}>
+                            <i className="bi bi-shield-exclamation me-1"></i>{risk}
+                          </span>
+                        ))}
+                      </div>
+                    </dd>
+                  </>
+                )}
                 {conversation.ja3Client && (
                   <>
                     <dt className="col-sm-4">JA3 Client:</dt>

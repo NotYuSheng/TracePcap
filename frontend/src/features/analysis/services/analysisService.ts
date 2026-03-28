@@ -27,6 +27,7 @@ export const analysisService = {
       totalBytes: conv.totalBytes || 0,
       startTime: conv.startTime || startTime,
       endTime: conv.endTime || endTime,
+      flowRisks: conv.flowRisks ?? [],
     }));
 
     const uniqueHosts = (summary.uniqueHosts || []).map((host: any) => ({
@@ -50,6 +51,7 @@ export const analysisService = {
       ),
       detectedApplicationsTruncated: summary.detectedApplicationsTruncated,
       categoryDistribution: summary.categoryDistribution,
+      securityAlertCount: summary.securityAlertCount,
     };
   },
 

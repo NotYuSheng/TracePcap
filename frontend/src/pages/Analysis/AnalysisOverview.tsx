@@ -87,6 +87,36 @@ export const AnalysisOverview = () => {
         </div>
       )}
 
+      {(data.securityAlertCount ?? 0) > 0 && (
+        <div className="mt-4">
+          <h5 className="mb-3">
+            <i className="bi bi-shield-exclamation me-2 text-warning"></i>
+            Security Alerts
+          </h5>
+          <div
+            className="alert alert-warning d-flex align-items-center justify-content-between py-2 mb-2"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate(`/analysis/${fileId}/conversations?hasRisks=true`)}
+          >
+            <span>
+              <strong>{data.securityAlertCount}</strong> conversation{data.securityAlertCount !== 1 ? 's' : ''} flagged with security risks
+            </span>
+            <span className="text-muted small">View in Conversations &rarr;</span>
+          </div>
+          {data.topConversations.filter(c => c.flowRisks && c.flowRisks.length > 0).map(conv => (
+            <div key={conv.id} className="d-flex align-items-center gap-2 mb-1 small">
+              <span className="text-muted font-monospace">
+                {conv.endpoints[0].ip}:{conv.endpoints[0].port} &rarr; {conv.endpoints[1].ip}:{conv.endpoints[1].port}
+              </span>
+              <span className="text-muted">·</span>
+              {conv.flowRisks!.map(risk => (
+                <span key={risk} className="badge bg-warning text-dark" style={{ fontSize: '0.7rem' }}>{risk}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
       {data.protocolDistribution && data.protocolDistribution.length > 0 && (
         <div className="mt-4">
           <ProtocolBreakdownChart protocolStats={data.protocolDistribution} />

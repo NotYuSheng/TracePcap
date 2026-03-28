@@ -76,6 +76,7 @@ export interface AnalysisSummary {
   detectedApplicationsTruncated?: boolean;
   categoryDistribution?: CategoryStat[];
   fiveWs?: FiveWsAnalysis;
+  securityAlertCount?: number;
 }
 
 // Alias for backward compatibility
