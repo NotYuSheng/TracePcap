@@ -100,7 +100,7 @@ export const ConversationList = ({
                   {hasCategories && (
                     <td>
                       {conversation.category ? (
-                        <span className="badge bg-secondary">{conversation.category}</span>
+                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
                       ) : (
                         <span className="text-muted">—</span>
                       )}

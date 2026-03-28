@@ -272,28 +272,32 @@ public class AnalysisService {
         appsTruncated ? allApps.subList(0, overviewAppsMax) : allApps;
 
     // Aggregate category distribution
-    Map<String, long[]> catStatsMap = new java.util.TreeMap<>();
+    class CategoryAggregate {
+      long packetCount = 0L;
+      long totalBytes  = 0L;
+    }
+    Map<String, CategoryAggregate> catStatsMap = new java.util.TreeMap<>();
     conversations.stream()
         .filter(conv -> conv.getCategory() != null && !conv.getCategory().isBlank())
         .forEach(
             conv -> {
-              long[] stats = catStatsMap.computeIfAbsent(conv.getCategory(), k -> new long[] {0L, 0L});
-              stats[0] += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
-              stats[1] += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
+              CategoryAggregate agg = catStatsMap.computeIfAbsent(conv.getCategory(), k -> new CategoryAggregate());
+              agg.packetCount += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
+              agg.totalBytes  += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
             });
-    long totalCatPackets = catStatsMap.values().stream().mapToLong(s -> s[0]).sum();
+    long totalCatPackets = catStatsMap.values().stream().mapToLong(a -> a.packetCount).sum();
     List<AnalysisSummaryResponse.CategoryStat> categoryDistribution =
         catStatsMap.entrySet().stream()
             .map(
                 e ->
                     AnalysisSummaryResponse.CategoryStat.builder()
                         .category(e.getKey())
-                        .count(e.getValue()[0])
-                        .bytes(e.getValue()[1])
+                        .count(e.getValue().packetCount)
+                        .bytes(e.getValue().totalBytes)
                         .percentage(totalCatPackets > 0
-                            ? (e.getValue()[0] * 100.0 / totalCatPackets) : 0.0)
+                            ? (e.getValue().packetCount * 100.0 / totalCatPackets) : 0.0)
                         .build())
-            .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+            .sorted(java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount).reversed())
             .collect(Collectors.toList());
 
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =

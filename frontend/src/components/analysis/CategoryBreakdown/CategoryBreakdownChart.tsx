@@ -1,36 +1,14 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { CategoryStat } from '@/types';
-
-interface CategoryBreakdownChartProps {
-  categoryStats: CategoryStat[];
-}
-
-const COLORS = [
-  '#0076d1',
-  '#5925dc',
-  '#2ecc71',
-  '#f39c12',
-  '#e74c3c',
-  '#3498db',
-  '#9b59b6',
-  '#1abc9c',
-  '#e67e22',
-  '#95a5a6',
-];
-
-const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-};
+import { getAppColor } from '@/utils/appColors';
+import { formatBytes } from '@/utils/formatters';
 
 export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChartProps) => {
   const chartData = categoryStats.map(stat => ({
     name: stat.category,
     value: stat.count,
     percentage: stat.percentage,
+    color: getAppColor(stat.category),
   }));
 
   return (
@@ -51,8 +29,8 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
                 fill="#8884d8"
                 dataKey="value"
               >
-                {chartData.map((_item, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                {chartData.map((item, index) => (
+                  <Cell key={`cell-${index}`} fill={item.color} />
                 ))}
               </Pie>
               <Tooltip formatter={value => [`${value?.toLocaleString() || 0} packets`]} />
@@ -72,12 +50,12 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
               </tr>
             </thead>
             <tbody>
-              {categoryStats.map((stat, index) => (
+              {categoryStats.map(stat => (
                 <tr key={stat.category}>
                   <td>
                     <span
                       className="protocol-indicator"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      style={{ backgroundColor: getAppColor(stat.category) }}
                     ></span>
                     {stat.category}
                   </td>
@@ -89,7 +67,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
                         className="percentage-fill"
                         style={{
                           width: `${stat.percentage}%`,
-                          backgroundColor: COLORS[index % COLORS.length],
+                          backgroundColor: getAppColor(stat.category),
                         }}
                       ></div>
                       <span className="percentage-text">{stat.percentage.toFixed(1)}%</span>
