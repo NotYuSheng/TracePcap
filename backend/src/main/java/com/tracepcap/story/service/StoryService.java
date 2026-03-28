@@ -234,23 +234,17 @@ public class StoryService {
    * Returns an empty string if no TLS cert data is available.
    */
   private String buildTlsCertLabel(ConversationEntity conv) {
-    if (conv.getTlsIssuer() == null && conv.getTlsSubject() == null
-        && conv.getTlsNotAfter() == null) {
-      return "";
-    }
-    StringBuilder sb = new StringBuilder(" [TLS:");
-    if (conv.getTlsSubject() != null) sb.append(" subject=").append(conv.getTlsSubject()).append(",");
-    if (conv.getTlsIssuer() != null)  sb.append(" issuer=").append(conv.getTlsIssuer()).append(",");
+    List<String> parts = new ArrayList<>();
+    if (conv.getTlsSubject() != null) parts.add("subject=" + conv.getTlsSubject());
+    if (conv.getTlsIssuer() != null)  parts.add("issuer=" + conv.getTlsIssuer());
     if (conv.getTlsNotAfter() != null) {
       boolean expired = conv.getTlsNotAfter().isBefore(LocalDateTime.now());
-      sb.append(" expires=").append(conv.getTlsNotAfter().toString());
-      if (expired) sb.append(" EXPIRED");
+      String expiryPart = "expires=" + conv.getTlsNotAfter();
+      if (expired) expiryPart += " EXPIRED";
+      parts.add(expiryPart);
     }
-    // trim trailing comma if present
-    int last = sb.length() - 1;
-    if (sb.charAt(last) == ',') sb.deleteCharAt(last);
-    sb.append("]");
-    return sb.toString();
+    if (parts.isEmpty()) return "";
+    return " [TLS: " + String.join(", ", parts) + "]";
   }
 
   private String buildUserPrompt(

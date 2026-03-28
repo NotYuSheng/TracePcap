@@ -311,7 +311,7 @@ public class NdpiService {
     if (raw == null) return null;
     try {
       return LocalDateTime.parse(raw, NDPI_DATE_FMT);
-    } catch (Exception e) {
+    } catch (java.time.format.DateTimeParseException e) {
       log.debug("Could not parse TLS date '{}': {}", raw, e.getMessage());
       return null;
     }
