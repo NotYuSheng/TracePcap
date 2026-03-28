@@ -1,26 +1,23 @@
-const APP_COLORS: Record<string, string> = {
-  Zoom: '#2D8CFF',
-  WhatsApp: '#25D366',
-  Telegram: '#2AABEE',
-  Signal: '#3A76F0',
-  Discord: '#5865F2',
-  Teams: '#6264A7',
-  Skype: '#00AFF0',
-  Viber: '#7360F2',
-  WeChat: '#07C160',
-  YouTube: '#FF0000',
-  Netflix: '#E50914',
-  Spotify: '#1DB954',
-  TikTok: '#010101',
-  Instagram: '#E1306C',
-  Facebook: '#1877F2',
-  Twitter: '#1DA1F2',
-};
+import ColorHash from 'color-hash';
 
-const DEFAULT_APP_COLOR = '#6f42c1';
+const colorHash = new ColorHash({ lightness: 0.45, saturation: 0.6 });
 
 export function getAppColor(appName: string): string {
-  return APP_COLORS[appName] ?? DEFAULT_APP_COLOR;
+  return colorHash.hex(appName);
 }
 
-export { APP_COLORS };
+export function getCategoryColor(category: string): string {
+  return colorHash.hex(category);
+}
+
+/**
+ * Returns '#000' or '#fff' depending on which has better contrast
+ * against the given hex background colour (uses WCAG relative luminance).
+ */
+export function getTextColor(hexBackground: string): string {
+  const r = parseInt(hexBackground.slice(1, 3), 16);
+  const g = parseInt(hexBackground.slice(3, 5), 16);
+  const b = parseInt(hexBackground.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000' : '#fff';
+}

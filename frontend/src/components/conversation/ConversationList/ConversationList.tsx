@@ -3,7 +3,8 @@ import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
-import { getAppColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor } from '@/utils/appColors';
+import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
 
 interface ConversationListProps {
@@ -134,13 +135,6 @@ export const ConversationList = ({
     onSelectConversation?.(conversation);
   };
 
-  const getProtocolBadgeClass = (protocol: string) => {
-    const protocolMap: Record<string, string> = {
-      TCP: 'primary', UDP: 'info', HTTP: 'success', HTTPS: 'success',
-      DNS: 'warning', TLS: 'success', ICMP: 'secondary', ARP: 'secondary',
-    };
-    return protocolMap[protocol.toUpperCase()] || 'secondary';
-  };
 
   const SortableHeader = ({ field, label }: { field: SortField; label: string }) => {
     const isActive = sortBy === field;
@@ -215,23 +209,25 @@ export const ConversationList = ({
                   )}
                   {col('protocol') && (
                     <td>
-                      <span className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}>
-                        {conversation.protocol.name}
-                      </span>
+                      {(() => { const bg = getProtocolColor(conversation.protocol.name); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>
+                          {conversation.protocol.name}
+                        </span>
+                      ); })()}
                     </td>
                   )}
                   {col('appName') && hasAppNames && (
                     <td>
-                      {conversation.appName
-                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName), color: '#fff' }}>{conversation.appName}</span>
-                        : <span className="text-muted">—</span>}
+                      {conversation.appName ? (() => { const bg = getAppColor(conversation.appName); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
+                      ); })() : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('category') && hasCategories && (
                     <td>
-                      {conversation.category
-                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
-                        : <span className="text-muted">—</span>}
+                      {conversation.category ? (() => { const bg = getCategoryColor(conversation.category); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.category}</span>
+                      ); })() : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('risks') && hasRisks && (
