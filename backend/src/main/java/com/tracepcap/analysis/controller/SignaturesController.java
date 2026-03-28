@@ -20,7 +20,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 @RequestMapping("/api/signatures")
 public class SignaturesController {
 
-  @Value("${tracepcap.signatures.path:/app/signatures.yml}")
+  @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
 
   /** Returns the raw YAML content of the signatures file. */

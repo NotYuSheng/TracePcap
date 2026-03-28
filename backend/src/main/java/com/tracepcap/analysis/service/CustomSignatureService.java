@@ -39,7 +39,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 @Service
 public class CustomSignatureService {
 
-  @Value("${tracepcap.signatures.path:/app/signatures.yml}")
+  @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
 
   /**
