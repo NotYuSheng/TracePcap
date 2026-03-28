@@ -70,6 +70,18 @@ public class NdpiService {
       Pattern.CASE_INSENSITIVE
   );
 
+  /** Matches the JA3 client fingerprint, e.g. [JA3C: abcdef...] → group(1) = hash. */
+  private static final Pattern JA3C = Pattern.compile(
+      "\\[JA3C:\\s*([0-9a-f]{32})\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
+  /** Matches the JA3S server fingerprint, e.g. [JA3S: abcdef...] → group(1) = hash. */
+  private static final Pattern JA3S = Pattern.compile(
+      "\\[JA3S:\\s*([0-9a-f]{32})\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
   /** Transport-only names that carry no application-layer signal. */
   private static final Set<String> SKIP_PROTOCOLS = Set.of(
       "TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN"
@@ -97,15 +109,19 @@ public class NdpiService {
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
       if (data.hostname() != null) conv.setHostname(data.hostname());
+      if (data.ja3Client() != null) conv.setJa3Client(data.ja3Client());
+      if (data.ja3Server() != null) conv.setJa3Server(data.ja3Server());
     }
 
     long enrichedApps       = conversations.stream().filter(c -> c.getAppName() != null).count();
     long enrichedRisks      = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
     long enrichedCategories = conversations.stream().filter(c -> c.getCategory() != null).count();
     long enrichedHostnames  = conversations.stream().filter(c -> c.getHostname() != null).count();
-    log.info("nDPI enriched {}/{} with app names, {}/{} with risks, {}/{} with categories, {}/{} with hostnames",
+    long enrichedJa3        = conversations.stream().filter(c -> c.getJa3Client() != null).count();
+    log.info("nDPI enriched {}/{} with app names, {}/{} with risks, {}/{} with categories, {}/{} with hostnames, {}/{} with JA3",
         enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
-        enrichedCategories, conversations.size(), enrichedHostnames, conversations.size());
+        enrichedCategories, conversations.size(), enrichedHostnames, conversations.size(),
+        enrichedJa3, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
@@ -113,7 +129,8 @@ public class NdpiService {
   // ---------------------------------------------------------------------------
 
   /** Immutable holder for per-flow nDPI data extracted from one -v 2 line. */
-  private record FlowData(String appName, List<String> risks, String category, String hostname) {}
+  private record FlowData(String appName, List<String> risks, String category, String hostname,
+                          String ja3Client, String ja3Server) {}
 
   /**
    * Runs {@code ndpiReader -i <file> -v 2} and returns a map of flow key → FlowData.
@@ -212,7 +229,17 @@ public class NdpiService {
         hostname = hostname.substring(0, ConversationEntity.HOSTNAME_MAX_LENGTH);
     }
 
-    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks, category, hostname));
+    // JA3 client/server fingerprint hashes
+    String ja3Client = null;
+    Matcher jcm = JA3C.matcher(line);
+    if (jcm.find()) ja3Client = jcm.group(1).toLowerCase();
+
+    String ja3Server = null;
+    Matcher jsm = JA3S.matcher(line);
+    if (jsm.find()) ja3Server = jsm.group(1).toLowerCase();
+
+    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto),
+        new FlowData(appName, risks, category, hostname, ja3Client, ja3Server));
   }
 
   /** Lookup flow data trying both directions (src→dst and dst→src). */

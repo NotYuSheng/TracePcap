@@ -56,6 +56,22 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                     </dd>
                   </>
                 )}
+                {conversation.ja3Client && (
+                  <>
+                    <dt className="col-sm-4">JA3 Client:</dt>
+                    <dd className="col-sm-8">
+                      <code className="small">{conversation.ja3Client}</code>
+                    </dd>
+                  </>
+                )}
+                {conversation.ja3Server && (
+                  <>
+                    <dt className="col-sm-4">JA3S Server:</dt>
+                    <dd className="col-sm-8">
+                      <code className="small">{conversation.ja3Server}</code>
+                    </dd>
+                  </>
+                )}
               </dl>
             </div>
             <div className="col-md-6">

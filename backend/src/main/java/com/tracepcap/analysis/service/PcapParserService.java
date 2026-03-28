@@ -496,6 +496,8 @@ public class PcapParserService {
     private List<String> flowRisks = new ArrayList<>();
     private String category;
     private String hostname;
+    private String ja3Client;
+    private String ja3Server;
     private Long packetCount;
     private Long totalBytes;
     private LocalDateTime startTime;
