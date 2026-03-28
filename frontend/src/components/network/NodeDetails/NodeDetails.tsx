@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge, NodeType } from '@/features/network/types';
 import './NodeDetails.css';
 
 interface NodeDetailsProps {
   node: GraphNode;
   edges: GraphEdge[];
+  fileId: string;
   onClose: () => void;
 }
 
@@ -43,7 +45,8 @@ const NODE_TYPE_DISPLAY: Record<NodeType, { label: string; icon: string; badgeCl
   'unknown':         { label: 'Unknown',          icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
 };
 
-export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
+export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) {
+  const navigate = useNavigate();
   // ESC closes the modal
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -196,8 +199,21 @@ export function NodeDetails({ node, edges, onClose }: NodeDetailsProps) {
                   </thead>
                   <tbody>
                     {peers.map(([ip, info]) => (
-                      <tr key={ip}>
-                        <td className="font-monospace small">{ip}</td>
+                      <tr
+                        key={ip}
+                        style={{ cursor: 'pointer' }}
+                        title="Click to view conversations"
+                        onClick={() => {
+                          onClose();
+                          navigate(
+                            `/analysis/${fileId}/conversations?srcIp=${node.data.ip}&peerIp=${ip}`
+                          );
+                        }}
+                      >
+                        <td className="font-monospace small">
+                          {ip}
+                          <i className="bi bi-arrow-right-circle ms-1 text-muted" style={{ fontSize: '0.7rem' }}></i>
+                        </td>
                         <td>
                           {Array.from(info.apps).map(app => (
                             <span key={app} className="badge bg-light text-dark me-1 border">{app}</span>
