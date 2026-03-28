@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.entity.ConversationEntity;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -180,7 +181,8 @@ public class NdpiService {
     int dot = protoField.lastIndexOf('.');
     String appName = dot >= 0 ? protoField.substring(dot + 1) : protoField;
     if (SKIP_PROTOCOLS.contains(appName)) appName = null;
-    if (appName != null && appName.length() > 50) appName = appName.substring(0, 50);
+    if (appName != null && appName.length() > ConversationEntity.APP_NAME_MAX_LENGTH)
+      appName = appName.substring(0, ConversationEntity.APP_NAME_MAX_LENGTH);
 
     // Risk names from [Risk: ** Name1 **** Name2 **] block
     List<String> risks = new ArrayList<>();
@@ -197,7 +199,8 @@ public class NdpiService {
     Matcher cm = CATEGORY.matcher(line);
     if (cm.find()) {
       category = cm.group(1).trim();
-      if (category.length() > 50) category = category.substring(0, 50);
+      if (category.length() > ConversationEntity.CATEGORY_MAX_LENGTH)
+        category = category.substring(0, ConversationEntity.CATEGORY_MAX_LENGTH);
     }
 
     // Hostname/SNI from [Hostname/SNI: host] field
@@ -205,7 +208,8 @@ public class NdpiService {
     Matcher hm = HOSTNAME.matcher(line);
     if (hm.find()) {
       hostname = hm.group(1).trim();
-      if (hostname.length() > 255) hostname = hostname.substring(0, 255);
+      if (hostname.length() > ConversationEntity.HOSTNAME_MAX_LENGTH)
+        hostname = hostname.substring(0, ConversationEntity.HOSTNAME_MAX_LENGTH);
     }
 
     result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks, category, hostname));

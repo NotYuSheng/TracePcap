@@ -67,16 +67,20 @@ export const ConversationList = ({
                 >
                   <td>
                     <div className="d-flex flex-column">
-                      <span className="fw-semibold">{source.ip}</span>
-                      {source.port && <small className="text-muted">:{source.port}</small>}
+                      <div>
+                        <span className="fw-semibold">{source.ip}</span>
+                        {source.port && <small className="text-muted">:{source.port}</small>}
+                      </div>
                     </div>
                   </td>
                   <td>
                     <div className="d-flex flex-column">
-                      <span className="fw-semibold">{destination.ip}</span>
-                      {destination.port && (
-                        <small className="text-muted">:{destination.port}</small>
-                      )}
+                      <div>
+                        <span className="fw-semibold">{destination.ip}</span>
+                        {destination.port && (
+                          <small className="text-muted">:{destination.port}</small>
+                        )}
+                      </div>
                       {conversation.hostname && (
                         <small className="text-info">{conversation.hostname}</small>
                       )}
