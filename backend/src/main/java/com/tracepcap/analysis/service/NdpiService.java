@@ -371,14 +371,17 @@ public class NdpiService {
   }
 
 
+  // Port constants for IANA-registered protocol assignments used in misclassification corrections
+  private static final int PORT_UFTP  = 1044; // IANA: UDP — UFTP (Unicast File Transfer Protocol)
+  private static final int PORT_H225  = 1720; // IANA: TCP — H.225 call signaling
+
   /**
    * Corrects known nDPI misclassifications using port and transport-layer heuristics.
    *
    * <p>Known cases:
    * <ul>
    *   <li>UFTP (UDP port 1044, IANA-registered) misclassified as BitTorrent — binary file-transfer
-   *       payload triggers BitTorrent DPI heuristics in nDPI 5.0.0
-   *       (upstream bug: https://github.com/ntop/nDPI/issues/XXXX)</li>
+   *       payload triggers BitTorrent DPI heuristics in nDPI 5.0.0</li>
    *   <li>H.225/H.245 (TCP port 1720) misclassified as Cassandra — belt-and-suspenders guard
    *       for older nDPI builds where this is not yet fixed natively</li>
    *   <li>nDPI reports all H.323 suite flows as "H323" without distinguishing sub-protocols:
@@ -390,13 +393,14 @@ public class NdpiService {
    * </ul>
    */
   private static String correctMisclassification(String appName, Integer srcPort, Integer dstPort, String transport) {
-    int sp = srcPort  != null ? srcPort  : 0;
-    int dp = dstPort  != null ? dstPort  : 0;
     boolean isTcp = "TCP".equalsIgnoreCase(transport);
-    if ("BitTorrent".equalsIgnoreCase(appName) && (sp == 1044 || dp == 1044)) return "UFTP";
-    if ("Cassandra".equalsIgnoreCase(appName)  && (sp == 1720 || dp == 1720)) return "H225";
-    if ("H323".equalsIgnoreCase(appName) && isTcp && (sp == 1720 || dp == 1720)) return "H225";
-    if ("H323".equalsIgnoreCase(appName) && isTcp) return "H245";
+    boolean isUdp = "UDP".equalsIgnoreCase(transport);
+    boolean onPort1044 = Integer.valueOf(PORT_UFTP).equals(srcPort) || Integer.valueOf(PORT_UFTP).equals(dstPort);
+    boolean onPort1720 = Integer.valueOf(PORT_H225).equals(srcPort) || Integer.valueOf(PORT_H225).equals(dstPort);
+    if ("BitTorrent".equalsIgnoreCase(appName) && isUdp && onPort1044) return "UFTP";
+    if ("Cassandra".equalsIgnoreCase(appName)  && isTcp && onPort1720) return "H225";
+    if ("H323".equalsIgnoreCase(appName)       && isTcp && onPort1720) return "H225";
+    if ("H323".equalsIgnoreCase(appName)       && isTcp)               return "H245";
     return appName;
   }
 

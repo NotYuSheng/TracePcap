@@ -17,7 +17,7 @@ const ndpiPopover = (
     <Popover.Body>
       <p className="mb-2">
         Application labels are detected by{' '}
-        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noreferrer">nDPI</a>{' '}
+        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a>{' '}
         using deep packet inspection (DPI) heuristics.
       </p>
       <p className="mb-2">
@@ -65,21 +65,24 @@ export const AnalysisOverview = () => {
             </OverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
-            {detectedApps.map(app => (
-              <button
-                key={app.name}
-                className="badge rounded-pill px-3 py-2 fs-6 border-0"
-                style={{
-                  backgroundColor: getAppColor(app.name),
-                  color: getTextColor(getAppColor(app.name)),
-                  cursor: 'pointer',
-                }}
-                title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
-                onClick={() => navigate(`/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`)}
-              >
-                {app.name}
-              </button>
-            ))}
+            {detectedApps.map(app => {
+              const appColor = getAppColor(app.name);
+              return (
+                <button
+                  key={app.name}
+                  className="badge rounded-pill px-3 py-2 fs-6 border-0"
+                  style={{
+                    backgroundColor: appColor,
+                    color: getTextColor(appColor),
+                    cursor: 'pointer',
+                  }}
+                  title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
+                  onClick={() => navigate(`/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`)}
+                >
+                  {app.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

@@ -9,7 +9,7 @@ const categoryInfoPopover = (
     <Popover.Header>About category detection</Popover.Header>
     <Popover.Body>
       <p className="mb-2">
-        Categories are assigned by <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noreferrer">nDPI</a> by
+        Categories are assigned by <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a> by
         first identifying the application (e.g. YouTube → <em>Media</em>, Google → <em>Web</em>),
         then mapping it to a category.
       </p>
