@@ -1,6 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { CategoryStat } from '@/types';
-import { getAppColor } from '@/utils/appColors';
+import { getCategoryColor } from '@/utils/appColors';
 import { formatBytes } from '@/utils/formatters';
 
 interface CategoryBreakdownChartProps {
@@ -12,7 +12,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
     name: stat.category,
     value: stat.count,
     percentage: stat.percentage,
-    color: getAppColor(stat.category),
+    color: getCategoryColor(stat.category),
   }));
 
   return (
@@ -59,7 +59,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
                   <td>
                     <span
                       className="protocol-indicator"
-                      style={{ backgroundColor: getAppColor(stat.category) }}
+                      style={{ backgroundColor: getCategoryColor(stat.category) }}
                     ></span>
                     {stat.category}
                   </td>
@@ -71,7 +71,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
                         className="percentage-fill"
                         style={{
                           width: `${stat.percentage}%`,
-                          backgroundColor: getAppColor(stat.category),
+                          backgroundColor: getCategoryColor(stat.category),
                         }}
                       ></div>
                       <span className="percentage-text">{stat.percentage.toFixed(1)}%</span>

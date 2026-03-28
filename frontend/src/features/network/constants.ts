@@ -15,6 +15,10 @@ export const PROTOCOL_COLORS: Record<string, string> = {
 
 export const DEFAULT_EDGE_COLOR = '#95a5a6';
 
+export function getProtocolColor(protocol: string): string {
+  return PROTOCOL_COLORS[protocol.toUpperCase()] ?? DEFAULT_EDGE_COLOR;
+}
+
 /**
  * Single source of truth for node type colors used in
  * NetworkGraph (node fill) and NetworkControls (legend).

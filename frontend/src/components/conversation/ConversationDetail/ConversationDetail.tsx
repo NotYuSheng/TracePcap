@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import { getAppColor } from '@/utils/appColors';
+import { getProtocolColor } from '@/features/network/constants';
 import { HexViewer } from '../HexViewer/HexViewer';
 
 interface ConversationDetailProps {
@@ -64,7 +65,7 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                 </dd>
                 <dt className="col-sm-4">Protocol:</dt>
                 <dd className="col-sm-8">
-                  <span className="badge bg-primary">{conversation.protocol.name}</span>
+                  <span className="badge" style={{ backgroundColor: getProtocolColor(conversation.protocol.name), color: '#fff' }}>{conversation.protocol.name}</span>
                 </dd>
                 {conversation.appName && (
                   <>

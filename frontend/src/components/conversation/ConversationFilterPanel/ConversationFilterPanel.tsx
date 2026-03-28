@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
-import { getAppColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor } from '@/utils/appColors';
 import './ConversationFilterPanel.css';
 
 interface ProtocolStat  { protocol: string; count: number }
@@ -195,6 +195,11 @@ export function ConversationFilterPanel({
                         key={category}
                         type="button"
                         className={`badge rounded-pill border-0 filter-pill ${filters.categories.includes(category) ? 'active' : ''}`}
+                        style={{
+                          backgroundColor: filters.categories.includes(category)
+                            ? getCategoryColor(category)
+                            : undefined,
+                        }}
                         onClick={() => toggleCategory(category)}
                       >
                         {category}

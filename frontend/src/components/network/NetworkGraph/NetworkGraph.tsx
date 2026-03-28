@@ -1,7 +1,7 @@
 import { useRef, memo } from 'react';
 import { GraphCanvas, type GraphCanvasRef } from 'reagraph';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { PROTOCOL_COLORS, DEFAULT_EDGE_COLOR, NODE_TYPE_COLORS } from '@/features/network/constants';
+import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
 import './NetworkGraph.css';
 
 interface NetworkGraphProps {
@@ -26,12 +26,6 @@ function getNodeColor(nodeData: { role: string; isAnomaly: boolean; nodeType?: s
   }
 }
 
-/**
- * Get edge color based on protocol
- */
-function getProtocolColor(protocol: string): string {
-  return PROTOCOL_COLORS[protocol.toUpperCase()] ?? DEFAULT_EDGE_COLOR;
-}
 
 export const NetworkGraph = memo(function NetworkGraph({
   nodes,
