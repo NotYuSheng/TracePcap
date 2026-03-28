@@ -23,6 +23,7 @@ export function useConversationFilters() {
     categories: splitComma(searchParams.get('categories')),
     hasRisks:   searchParams.get('hasRisks') === 'true',
     fileTypes:  splitComma(searchParams.get('fileTypes')),
+    riskTypes:  splitComma(searchParams.get('riskTypes')),
     sortBy:     (searchParams.get('sortBy') ?? '') as SortField,
     sortDir:    (searchParams.get('sortDir') ?? 'asc') as SortDir,
     page:       Math.max(1, parseInt(searchParams.get('page') ?? '1')),
@@ -36,6 +37,7 @@ export function useConversationFilters() {
     filters.categories.length > 0,
     filters.hasRisks,
     filters.fileTypes.length > 0,
+    filters.riskTypes.length > 0,
   ].filter(Boolean).length, [filters]);
 
   // setFilters reads from the prev URLSearchParams inside the setter callback
@@ -51,6 +53,7 @@ export function useConversationFilters() {
         categories: splitComma(prev.get('categories')),
         hasRisks:   prev.get('hasRisks') === 'true',
         fileTypes:  splitComma(prev.get('fileTypes')),
+        riskTypes:  splitComma(prev.get('riskTypes')),
         sortBy:     (prev.get('sortBy') ?? '') as SortField,
         sortDir:    (prev.get('sortDir') ?? 'asc') as SortDir,
         page:       Math.max(1, parseInt(prev.get('page') ?? '1')),
@@ -70,6 +73,7 @@ export function useConversationFilters() {
       set('categories', joinComma(merged.categories));
       set('hasRisks',   merged.hasRisks ? 'true' : undefined);
       set('fileTypes',  joinComma(merged.fileTypes));
+      set('riskTypes',  joinComma(merged.riskTypes));
       set('sortBy',     merged.sortBy || undefined);
       set('sortDir',    merged.sortBy ? merged.sortDir : undefined);
       set('page',       newPage > 1 ? String(newPage) : undefined);

@@ -473,6 +473,12 @@ public class AnalysisService {
     return conversationRepository.findDistinctFileTypesByFileId(fileId);
   }
 
+  /** Returns distinct nDPI risk type strings present in at-risk conversations for the given file. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctRiskTypes(UUID fileId) {
+    return conversationRepository.findDistinctRiskTypesByFileId(fileId);
+  }
+
   /** Also used by the CSV export — returns ALL matching rows without pagination. */
   @Transactional(readOnly = true)
   public List<ConversationResponse> getConversationsForExport(

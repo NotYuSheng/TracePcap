@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData, Conversation } from '@/types';
-import { securityService } from '@/features/security/services/securityService';
+import type { SortField } from '@/features/conversation/types';
+import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
+import { SecurityFilterPanel } from '@components/security/SecurityFilterPanel';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
+import { Pagination } from '@components/common/Pagination';
 import { formatIpPort } from '@/utils/formatters';
 
 interface AnalysisOutletContext {
@@ -66,32 +69,47 @@ function formatBytes(bytes: number): string {
 }
 
 export const SecurityPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const { fileId, data } = useOutletContext<AnalysisOutletContext>();
   const navigate = useNavigate();
-  const [alerts, setAlerts] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { filters, setFilters, clearAll } = useConversationFilters();
+
+  const [alerts, setAlerts]               = useState<Conversation[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState<string | null>(null);
+  const [totalItems, setTotalItems]       = useState(0);
+  const [totalPages, setTotalPages]       = useState(0);
+  const [riskTypeOptions, setRiskTypeOptions] = useState<string[]>([]);
 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Fetch available risk types once per file
   useEffect(() => {
     if (!fileId) return;
-    const fetch = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await securityService.getSecurityAlerts(fileId);
-        setAlerts(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load security alerts');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
+    conversationService.getRiskTypes(fileId).then(setRiskTypeOptions).catch(() => {});
   }, [fileId]);
+
+  // Fetch security alerts (always hasRisks: true) whenever filters change
+  useEffect(() => {
+    if (!fileId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    conversationService.getConversations(fileId, { ...filters, hasRisks: true })
+      .then(r => {
+        if (cancelled) return;
+        setAlerts(r.data);
+        setTotalItems(r.total);
+        setTotalPages(r.totalPages);
+      })
+      .catch(e => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Failed to load security alerts');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [fileId, filters]);
 
   const openConversation = useCallback(async (conv: Conversation, index: number) => {
     setSelectedIndex(index);
@@ -133,92 +151,155 @@ export const SecurityPage = () => {
     return () => { document.body.style.overflow = ''; };
   }, [selectedConversation]);
 
-  if (loading) return <LoadingSpinner size="large" message="Scanning for security alerts..." />;
-  if (error) return <ErrorMessage title="Failed to Load Security Alerts" message={error} />;
+  const protocolOptions = (data.protocolDistribution ?? []).map(p => ({ protocol: p.protocol, count: p.count }));
 
-  if (alerts.length === 0) {
+  const handleSort = (field: SortField) => {
+    if (filters.sortBy !== field) {
+      setFilters({ sortBy: field, sortDir: 'asc' });
+    } else if (filters.sortDir === 'asc') {
+      setFilters({ sortBy: field, sortDir: 'desc' });
+    } else {
+      setFilters({ sortBy: '', sortDir: 'asc' });
+    }
+  };
+
+  const SortableHeader = ({ field, label }: { field: SortField; label: string }) => {
+    const isActive = filters.sortBy === field;
+    const icon = !isActive
+      ? 'bi-arrow-down-up text-muted'
+      : filters.sortDir === 'asc' ? 'bi-sort-up' : 'bi-sort-down';
     return (
-      <div className="security-page text-center py-5">
-        <i className="bi bi-shield-check display-3 text-success mb-3 d-block"></i>
-        <h5>No security issues detected</h5>
-        <p className="text-muted">nDPI found no risk flags in any conversation for this PCAP.</p>
-      </div>
+      <th onClick={() => handleSort(field)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {label} <i className={`bi ${icon} ms-1`}></i>
+      </th>
     );
-  }
+  };
+
+  // activeFilterCount excludes hasRisks (always true on this page) and fields not shown in this panel
+  const securityFilterCount = [
+    filters.ip,
+    filters.protocols.length > 0,
+    filters.riskTypes.length > 0,
+  ].filter(Boolean).length;
 
   const modalTitle = selectedConversation
     ? `${formatIpPort(selectedConversation.endpoints[0].ip, selectedConversation.endpoints[0].port)} ↔ ${formatIpPort(selectedConversation.endpoints[1].ip, selectedConversation.endpoints[1].port)}`
     : '';
 
-  // Collect any packet-level hints for the selected conversation's risks
   const packetHints = selectedConversation
     ? selectedConversation.flowRisks
         .map(r => RISK_PACKET_HINTS[r])
         .filter((hint): hint is string => Boolean(hint))
     : [];
 
+  if (error) return <ErrorMessage title="Failed to Load Security Alerts" message={error} />;
+
   return (
     <div className="security-page">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4>
           <i className="bi bi-shield-exclamation text-danger me-2"></i>
-          Security Alerts ({alerts.length})
+          Security Alerts
+          <span className="text-muted fs-6 fw-normal ms-2">({totalItems.toLocaleString()})</span>
         </h4>
-        <small className="text-muted">Click a row to inspect packets</small>
+        <a
+          href={conversationService.getExportUrl(fileId, { ...filters, hasRisks: true })}
+          download="security-alerts.csv"
+          className="btn btn-sm btn-outline-secondary"
+          title="Export current filtered results as CSV"
+        >
+          <i className="bi bi-download me-1"></i>Export CSV
+        </a>
       </div>
 
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th>Source</th>
-              <th>Destination</th>
-              <th>Protocol</th>
-              <th>Risk Flags</th>
-              <th>Packets</th>
-              <th>Bytes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {alerts.map((conv, idx) => (
-              <tr
-                key={conv.id}
-                onClick={() => openConversation(conv, idx)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openConversation(conv, idx); }}
-                tabIndex={0}
-                role="button"
-                style={{ cursor: 'pointer' }}
-                className={selectedConversation?.id === conv.id ? 'table-active' : undefined}
-              >
-                <td className="font-monospace small">
-                  {conv.endpoints[0].ip}:{conv.endpoints[0].port}
-                </td>
-                <td className="font-monospace small">
-                  {conv.endpoints[1].ip}:{conv.endpoints[1].port}
-                </td>
-                <td>
-                  <span className="badge bg-secondary">{conv.protocol.name}</span>
-                  {conv.appName && (
-                    <span className="badge bg-info ms-1">{conv.appName}</span>
-                  )}
-                </td>
-                <td>
-                  {conv.flowRisks.map(risk => (
-                    <span
-                      key={risk}
-                      className={riskBadgeClass(risk)}
-                      title={RISK_DESCRIPTIONS[risk] ?? risk}
+      <SecurityFilterPanel
+        filters={filters}
+        onFiltersChange={setFilters}
+        onClearAll={clearAll}
+        protocols={protocolOptions}
+        riskTypes={riskTypeOptions}
+        activeFilterCount={securityFilterCount}
+      />
+
+      <div className="card overflow-hidden">
+        <div className="card-body p-0">
+          {loading ? (
+            <LoadingSpinner size="medium" message="Scanning for security alerts..." />
+          ) : alerts.length === 0 ? (
+            <div className="text-center py-5">
+              <i className="bi bi-shield-check display-3 text-success mb-3 d-block"></i>
+              <h5>No security issues detected</h5>
+              <p className="text-muted">nDPI found no risk flags matching the current filters.</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <SortableHeader field="srcIp"     label="Source" />
+                    <SortableHeader field="dstIp"     label="Destination" />
+                    <th>Protocol</th>
+                    <th>Risk Flags</th>
+                    <SortableHeader field="packets"   label="Packets" />
+                    <SortableHeader field="bytes"     label="Bytes" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {alerts.map((conv, idx) => (
+                    <tr
+                      key={conv.id}
+                      onClick={() => openConversation(conv, idx)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openConversation(conv, idx); }}
+                      tabIndex={0}
+                      role="button"
+                      style={{ cursor: 'pointer' }}
+                      className={selectedConversation?.id === conv.id ? 'table-active' : undefined}
                     >
-                      {formatRiskLabel(risk)}
-                    </span>
+                      <td className="font-monospace small">
+                        {conv.endpoints[0].ip}:{conv.endpoints[0].port}
+                      </td>
+                      <td className="font-monospace small">
+                        {conv.endpoints[1].ip}:{conv.endpoints[1].port}
+                      </td>
+                      <td>
+                        <span className="badge bg-secondary">{conv.protocol.name}</span>
+                        {conv.appName && (
+                          <span className="badge bg-info ms-1">{conv.appName}</span>
+                        )}
+                      </td>
+                      <td>
+                        {conv.flowRisks.map(risk => (
+                          <span
+                            key={risk}
+                            className={riskBadgeClass(risk)}
+                            title={RISK_DESCRIPTIONS[risk] ?? risk}
+                          >
+                            {formatRiskLabel(risk)}
+                          </span>
+                        ))}
+                      </td>
+                      <td>{conv.packetCount.toLocaleString()}</td>
+                      <td>{formatBytes(conv.totalBytes)}</td>
+                    </tr>
                   ))}
-                </td>
-                <td>{conv.packetCount.toLocaleString()}</td>
-                <td>{formatBytes(conv.totalBytes)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        {totalPages > 1 && (
+          <div className="card-footer">
+            <Pagination
+              currentPage={filters.page}
+              totalPages={totalPages}
+              onPageChange={(page) => setFilters({ page })}
+              pageSize={filters.pageSize}
+              totalItems={totalItems}
+              showPageSizeSelector
+              onPageSizeChange={(pageSize) => setFilters({ pageSize, page: 1 })}
+            />
+          </div>
+        )}
       </div>
 
       {/* Conversation detail modal */}
