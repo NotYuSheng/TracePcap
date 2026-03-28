@@ -8,6 +8,7 @@ export interface Packet {
   size: number;
   info?: string;
   payload: string;
+  detectedFileType?: string;
   flags?: string[];
 }
 

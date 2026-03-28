@@ -197,6 +197,9 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                           {hasReadableAscii(packet.payload) && (
                             <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
                           )}
+                          {packet.detectedFileType && (
+                            <span className="badge bg-info text-dark ms-1" style={{ fontSize: '0.65rem' }} title={`Magic bytes match: ${packet.detectedFileType}`}>{packet.detectedFileType}</span>
+                          )}
                         </td>
                       </tr>
                       {expandedPacketId === packet.id && (

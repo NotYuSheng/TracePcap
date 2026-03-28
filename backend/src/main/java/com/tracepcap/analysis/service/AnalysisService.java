@@ -167,6 +167,7 @@ public class AnalysisService {
                               .packetSize(pktInfo.getPacketSize())
                               .info(pktInfo.getInfo())
                               .payload(pktInfo.getPayload())
+                              .detectedFileType(pktInfo.getDetectedFileType())
                               .build())
                   .collect(Collectors.toList());
           for (int i = 0; i < packetEntities.size(); i += PACKET_BATCH_SIZE) {
@@ -505,6 +506,7 @@ public class AnalysisService {
         .packetSize(p.getPacketSize())
         .info(p.getInfo())
         .payload(p.getPayload())
+        .detectedFileType(p.getDetectedFileType())
         .build();
   }
 
