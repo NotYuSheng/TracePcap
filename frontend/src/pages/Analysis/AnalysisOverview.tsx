@@ -13,7 +13,9 @@ interface AnalysisOutletContext {
 export const AnalysisOverview = () => {
   const { data } = useOutletContext<AnalysisOutletContext>();
 
-  const detectedApps = useMemo(() => {
+  type AppEntry = { name: string; packets?: number; bytes?: number };
+
+  const detectedApps = useMemo((): AppEntry[] => {
     if (data.detectedApplications && data.detectedApplications.length > 0) {
       return data.detectedApplications.map(name => ({ name }));
     }
@@ -29,7 +31,7 @@ export const AnalysisOverview = () => {
     }
     return Array.from(appMap.entries())
       .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => b.bytes - a.bytes);
+      .sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
   }, [data.detectedApplications, data.topConversations]);
 
   return (
@@ -54,7 +56,7 @@ export const AnalysisOverview = () => {
                   backgroundColor: getAppColor(app.name),
                   color: '#fff',
                 }}
-                title={'packets' in app ? `${app.packets.toLocaleString()} packets · ${(app.bytes / 1024).toFixed(1)} KB` : app.name}
+                title={app.packets != null ? `${app.packets.toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB` : app.name}
               >
                 {app.name}
               </span>
