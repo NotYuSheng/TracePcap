@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
-import { getAppColor, getCategoryColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor } from '@/utils/appColors';
 import './ConversationFilterPanel.css';
 
 interface ProtocolStat  { protocol: string; count: number }
@@ -166,21 +166,20 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <label className="form-label filter-section-label">Application</label>
                   <div className="d-flex flex-wrap gap-1 filter-pill-scroll">
-                    {apps.map(({ name }) => (
-                      <button
-                        key={name}
-                        type="button"
-                        className={`badge rounded-pill border-0 filter-pill ${filters.apps.includes(name) ? 'active' : ''}`}
-                        style={{
-                          backgroundColor: filters.apps.includes(name)
-                            ? getAppColor(name)
-                            : undefined,
-                        }}
-                        onClick={() => toggleApp(name)}
-                      >
-                        {name}
-                      </button>
-                    ))}
+                    {apps.map(({ name }) => {
+                      const bg = filters.apps.includes(name) ? getAppColor(name) : undefined;
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          className={`badge rounded-pill border-0 filter-pill ${filters.apps.includes(name) ? 'active' : ''}`}
+                          style={{ backgroundColor: bg, color: bg ? getTextColor(bg) : undefined }}
+                          onClick={() => toggleApp(name)}
+                        >
+                          {name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -190,21 +189,20 @@ export function ConversationFilterPanel({
                 <div className="col-md-8">
                   <label className="form-label filter-section-label">Category</label>
                   <div className="d-flex flex-wrap gap-1">
-                    {categories.map(({ category }) => (
-                      <button
-                        key={category}
-                        type="button"
-                        className={`badge rounded-pill border-0 filter-pill ${filters.categories.includes(category) ? 'active' : ''}`}
-                        style={{
-                          backgroundColor: filters.categories.includes(category)
-                            ? getCategoryColor(category)
-                            : undefined,
-                        }}
-                        onClick={() => toggleCategory(category)}
-                      >
-                        {category}
-                      </button>
-                    ))}
+                    {categories.map(({ category }) => {
+                      const bg = filters.categories.includes(category) ? getCategoryColor(category) : undefined;
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          className={`badge rounded-pill border-0 filter-pill ${filters.categories.includes(category) ? 'active' : ''}`}
+                          style={{ backgroundColor: bg, color: bg ? getTextColor(bg) : undefined }}
+                          onClick={() => toggleCategory(category)}
+                        >
+                          {category}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

@@ -3,7 +3,7 @@ import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
-import { getAppColor, getCategoryColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
 
@@ -209,23 +209,25 @@ export const ConversationList = ({
                   )}
                   {col('protocol') && (
                     <td>
-                      <span className="badge" style={{ backgroundColor: getProtocolColor(conversation.protocol.name), color: '#fff' }}>
-                        {conversation.protocol.name}
-                      </span>
+                      {(() => { const bg = getProtocolColor(conversation.protocol.name); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>
+                          {conversation.protocol.name}
+                        </span>
+                      ); })()}
                     </td>
                   )}
                   {col('appName') && hasAppNames && (
                     <td>
-                      {conversation.appName
-                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName), color: '#fff' }}>{conversation.appName}</span>
-                        : <span className="text-muted">—</span>}
+                      {conversation.appName ? (() => { const bg = getAppColor(conversation.appName); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
+                      ); })() : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('category') && hasCategories && (
                     <td>
-                      {conversation.category
-                        ? <span className="badge" style={{ backgroundColor: getCategoryColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
-                        : <span className="text-muted">—</span>}
+                      {conversation.category ? (() => { const bg = getCategoryColor(conversation.category); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.category}</span>
+                      ); })() : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('risks') && hasRisks && (
