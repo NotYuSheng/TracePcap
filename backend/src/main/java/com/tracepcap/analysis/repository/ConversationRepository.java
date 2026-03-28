@@ -128,16 +128,14 @@ public interface ConversationRepository
         predicates.add(cb.isNotNull(root.get("flowRisks")));
       }
 
-      // Risk type filter — conversation must contain at least one of the specified risk strings
+      // Risk type filter — conversation must contain at least one of the specified risk strings.
+      // array_position returns the 1-based index of the element or NULL if absent; IS NOT NULL
+      // gives an exact element match and avoids false positives from substring matching.
       if (params.getRiskTypes() != null && !params.getRiskTypes().isEmpty()) {
-        // array_to_string(flow_risks, ',') produces a comma-delimited string we can LIKE-match.
-        // Risk type names never contain SQL wildcard chars so no escaping is needed.
-        jakarta.persistence.criteria.Expression<String> risksStr = cb.function(
-            "array_to_string", String.class,
-            root.get("flowRisks"), cb.literal(",")
-        );
         List<Predicate> riskPreds = params.getRiskTypes().stream()
-            .map(rt -> cb.like(risksStr, "%" + rt + "%"))
+            .map(rt -> cb.isNotNull(cb.function(
+                "array_position", Integer.class,
+                root.get("flowRisks"), cb.literal(rt))))
             .collect(java.util.stream.Collectors.toList());
         predicates.add(cb.or(riskPreds.toArray(new Predicate[0])));
       }

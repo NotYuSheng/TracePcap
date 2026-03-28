@@ -87,7 +87,7 @@ export const SecurityPage = () => {
   // Fetch available risk types once per file
   useEffect(() => {
     if (!fileId) return;
-    conversationService.getRiskTypes(fileId).then(setRiskTypeOptions).catch(() => {});
+    conversationService.getRiskTypes(fileId).then(setRiskTypeOptions).catch(console.error);
   }, [fileId]);
 
   // Fetch security alerts (always hasRisks: true) whenever filters change
