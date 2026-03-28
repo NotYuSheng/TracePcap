@@ -162,7 +162,7 @@ export const conversationService = {
    */
   getFileTypes: async (fileId: string): Promise<string[]> => {
     const response = await apiClient.get<string[]>(
-      `/api/conversations/${fileId}/file-types`
+      `/conversations/${fileId}/file-types`
     );
     return response.data;
   },
