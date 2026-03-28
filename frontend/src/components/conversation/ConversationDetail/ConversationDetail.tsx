@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import { getAppColor, getTextColor } from '@/utils/appColors';
@@ -11,13 +11,14 @@ interface ConversationDetailProps {
 
 const PRINTABLE_ASCII_THRESHOLD = 0.3;
 
-/** Returns true if more than 30% of the payload bytes are printable ASCII (0x20–0x7e). */
+/** Returns true if more than 30% of the first 256 bytes are printable ASCII (0x20–0x7e). */
 function hasReadableAscii(hex: string): boolean {
   if (!hex || hex.length < 4) return false;
+  const sample = hex.slice(0, 512); // check at most 256 bytes
   let printable = 0;
-  const total = hex.length / 2;
-  for (let i = 0; i < hex.length; i += 2) {
-    const byte = parseInt(hex.slice(i, i + 2), 16);
+  const total = sample.length / 2;
+  for (let i = 0; i < sample.length; i += 2) {
+    const byte = parseInt(sample.slice(i, i + 2), 16);
     if (byte >= 0x20 && byte <= 0x7e) printable++;
   }
   return printable / total > PRINTABLE_ASCII_THRESHOLD;
@@ -26,6 +27,14 @@ function hasReadableAscii(hex: string): boolean {
 export const ConversationDetail = ({ conversation }: ConversationDetailProps) => {
   const [source, destination] = conversation.endpoints;
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
+
+  const asciiPacketIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of conversation.packets ?? []) {
+      if (hasReadableAscii(p.payload)) ids.add(p.id);
+    }
+    return ids;
+  }, [conversation.packets]);
 
   const togglePacket = (id: string) =>
     setExpandedPacketId(prev => (prev === id ? null : id));
@@ -208,7 +217,7 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                         <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
                         <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
-                          {hasReadableAscii(packet.payload) && (
+                          {asciiPacketIds.has(packet.id) && (
                             <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
                           )}
                           {packet.detectedFileType && (

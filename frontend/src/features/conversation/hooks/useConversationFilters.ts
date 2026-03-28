@@ -18,6 +18,7 @@ export function useConversationFilters() {
   // This prevents ConversationPage's useEffect from firing on every render.
   const filters = useMemo((): ConversationFilters => ({
     ip:         searchParams.get('ip') ?? '',
+    port:       searchParams.get('port') ?? '',
     protocols:  splitComma(searchParams.get('protocols')),
     apps:       splitComma(searchParams.get('apps')),
     categories: splitComma(searchParams.get('categories')),
@@ -32,6 +33,7 @@ export function useConversationFilters() {
 
   const activeFilterCount = useMemo(() => [
     filters.ip,
+    filters.port,
     filters.protocols.length > 0,
     filters.apps.length > 0,
     filters.categories.length > 0,
@@ -48,6 +50,7 @@ export function useConversationFilters() {
 
       const cur: ConversationFilters = {
         ip:         prev.get('ip') ?? '',
+        port:       prev.get('port') ?? '',
         protocols:  splitComma(prev.get('protocols')),
         apps:       splitComma(prev.get('apps')),
         categories: splitComma(prev.get('categories')),
@@ -68,6 +71,7 @@ export function useConversationFilters() {
       };
 
       set('ip',         merged.ip || undefined);
+      set('port',       merged.port || undefined);
       set('protocols',  joinComma(merged.protocols));
       set('apps',       joinComma(merged.apps));
       set('categories', joinComma(merged.categories));

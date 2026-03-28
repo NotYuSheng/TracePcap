@@ -33,6 +33,7 @@ export const ConversationPage = () => {
   const [totalItems, setTotalItems]             = useState(0);
   const [totalPages, setTotalPages]             = useState(0);
   const [fileTypeOptions, setFileTypeOptions]   = useState<string[]>([]);
+  const [riskTypeOptions, setRiskTypeOptions]   = useState<string[]>([]);
   const [visibleColumns, setVisibleColumns]     = useState<Set<ColumnKey>>(loadVisibleColumns);
 
   const toggleColumn = useCallback((key: ColumnKey) => {
@@ -44,10 +45,11 @@ export const ConversationPage = () => {
     });
   }, []);
 
-  // Fetch available file types once per file
+  // Fetch available file types and risk types once per file
   useEffect(() => {
     if (!fileId) return;
-    conversationService.getFileTypes(fileId).then(setFileTypeOptions).catch(() => {});
+    conversationService.getFileTypes(fileId).then(setFileTypeOptions).catch(console.error);
+    conversationService.getRiskTypes(fileId).then(setRiskTypeOptions).catch(console.error);
   }, [fileId]);
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
@@ -191,6 +193,7 @@ export const ConversationPage = () => {
             apps={appOptions}
             categories={categoryOptions}
             fileTypes={fileTypeOptions}
+            riskTypes={riskTypeOptions}
             activeFilterCount={activeFilterCount}
             visibleColumns={visibleColumns}
             onToggleColumn={toggleColumn}

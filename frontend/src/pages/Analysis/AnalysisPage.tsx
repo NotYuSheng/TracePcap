@@ -30,8 +30,6 @@ export const AnalysisPage = () => {
     const path = location.pathname;
     if (path.includes('/conversations')) {
       setActiveTab('conversations');
-    } else if (path.includes('/security')) {
-      setActiveTab('security');
     } else if (path.includes('/story')) {
       setActiveTab('story');
     } else if (path.includes('/filter-generator')) {
@@ -104,15 +102,6 @@ export const AnalysisPage = () => {
           >
             <i className="bi bi-arrow-left-right me-2"></i>
             Conversations
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'security' ? 'active' : ''}`}
-            onClick={() => handleTabChange('security')}
-          >
-            <i className="bi bi-shield-exclamation me-2"></i>
-            Security
           </button>
         </li>
         <li className="nav-item">
