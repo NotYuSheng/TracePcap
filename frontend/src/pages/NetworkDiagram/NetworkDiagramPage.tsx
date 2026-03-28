@@ -146,7 +146,7 @@ export const NetworkDiagramPage = () => {
       </div>
 
       <div className="row">
-        <div className={selectedNode ? 'col-lg-8' : 'col-lg-9'}>
+        <div className="col-lg-9">
           <div className="card mb-3">
             <div className="card-body p-0" style={{ height: '600px' }}>
               <NetworkGraph
@@ -159,7 +159,7 @@ export const NetworkDiagramPage = () => {
           </div>
         </div>
 
-        <div className={selectedNode ? 'col-lg-4' : 'col-lg-3'}>
+        <div className="col-lg-3">
           <NetworkControls
             stats={stats}
             layoutType={layoutType}
@@ -173,14 +173,12 @@ export const NetworkDiagramPage = () => {
             presentNodeTypes={presentNodeTypes}
             presentEdgeLegendKeys={presentEdgeLegendKeys}
           />
-
-          {selectedNode && (
-            <div className="mt-3">
-              <NodeDetails node={selectedNode} edges={edges} onClose={handleCloseDetails} />
-            </div>
-          )}
         </div>
       </div>
+
+      {selectedNode && (
+        <NodeDetails node={selectedNode} edges={edges} onClose={handleCloseDetails} />
+      )}
     </div>
   );
 };
