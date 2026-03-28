@@ -65,6 +65,72 @@ export const ConversationList = ({
     updateTopBarWidth();
   }, [conversations, visibleColumns, updateTopBarWidth]);
 
+  // Middle-click auto-scroll — mimics browser native behaviour.
+  // One middle-click enters pan mode; distance from origin drives speed.
+  // Another click or Escape exits.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let active = false;
+    let originX = 0, originY = 0;
+    let mouseX = 0, mouseY = 0;
+    let rafId = 0;
+    let dot: HTMLDivElement | null = null;
+
+    const DEAD = 8;   // px dead-zone radius
+    const SPD  = 0.1; // multiplier: px scrolled per frame per px of offset
+
+    const enter = (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();          // suppress browser's own (broken) indicator
+      if (active) { leave(); return; }
+      active = true;
+      originX = mouseX = e.clientX;
+      originY = mouseY = e.clientY;
+      el.style.cursor = 'all-scroll';
+
+      dot = document.createElement('div');
+      dot.className = 'conv-pan-dot';
+      dot.style.cssText = `left:${e.clientX}px;top:${e.clientY}px`;
+      document.body.appendChild(dot);
+
+      const tick = () => {
+        if (!active) return;
+        const dx = mouseX - originX;
+        const dy = mouseY - originY;
+        if (Math.abs(dx) > DEAD) el.scrollLeft  += dx * SPD;
+        if (Math.abs(dy) > DEAD) window.scrollBy(0, dy * SPD);
+        rafId = requestAnimationFrame(tick);
+      };
+      rafId = requestAnimationFrame(tick);
+    };
+
+    const leave = () => {
+      if (!active) return;
+      active = false;
+      el.style.cursor = '';
+      cancelAnimationFrame(rafId);
+      dot?.remove(); dot = null;
+    };
+
+    const track  = (e: MouseEvent) => { mouseX = e.clientX; mouseY = e.clientY; };
+    const click  = (e: MouseEvent) => { if (active && e.button !== 1) leave(); };
+    const keyup  = (e: KeyboardEvent) => { if (e.key === 'Escape') leave(); };
+
+    el.addEventListener('mousedown', enter);
+    window.addEventListener('mousemove', track);
+    window.addEventListener('mousedown', click);
+    window.addEventListener('keydown', keyup);
+    return () => {
+      leave();
+      el.removeEventListener('mousedown', enter);
+      window.removeEventListener('mousemove', track);
+      window.removeEventListener('mousedown', click);
+      window.removeEventListener('keydown', keyup);
+    };
+  }, []);
+
   const hasAppNames   = conversations.some(c => c.appName);
   const hasCategories = conversations.some(c => c.category);
   const hasRisks      = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
