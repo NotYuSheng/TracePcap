@@ -13,9 +13,10 @@ const protocolInfoPopover = (
     <Popover.Body>
       <p className="mb-0">
         Shows the breakdown of <strong>transport-layer protocols</strong> (TCP, UDP, ICMP, ARP,
-        etc.) read directly from IP packet headers. This is deterministic — no heuristics or
-        guesswork involved. Every packet's protocol is stated explicitly in its header and
-        cannot be misidentified.
+        etc.) read directly from IP packet headers — no heuristics involved. The counts
+        accurately reflect what is declared in each packet's header. Note that tunnelled traffic
+        (e.g. GRE, VXLAN, IP-in-IP) will appear as its outer transport protocol, not the
+        encapsulated inner protocol.
       </p>
     </Popover.Body>
   </Popover>
