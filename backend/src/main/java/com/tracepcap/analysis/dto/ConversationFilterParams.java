@@ -37,9 +37,8 @@ public class ConversationFilterParams {
   private final List<String> riskTypes;
 
   /**
-   * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp},
-   * {@code packets}, {@code bytes}, {@code duration}, {@code startTime}.
-   * Null or blank = default DB ordering.
+   * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp}, {@code packets},
+   * {@code bytes}, {@code duration}, {@code startTime}. Null or blank = default DB ordering.
    */
   private final String sortBy;
 
