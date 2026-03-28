@@ -27,10 +27,10 @@ export const ConversationList = ({
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrolledEnd, setScrolledEnd] = useState(false);
-  const scrollRef   = useRef<HTMLDivElement>(null);
-  const topBarRef   = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const topBarRef = useRef<HTMLDivElement>(null);
   const topInnerRef = useRef<HTMLDivElement>(null);
-  const syncingRef  = useRef(false);
+  const syncingRef = useRef(false);
 
   const col = (key: ColumnKey) => visibleColumns.has(key);
 
@@ -68,10 +68,10 @@ export const ConversationList = ({
   // Pan state in refs — no re-renders, always current in the rAF loop
   const panActive = useRef(false);
   const panOrigin = useRef({ x: 0, y: 0 });
-  const panMouse  = useRef({ x: 0, y: 0 });
-  const panRaf    = useRef(0);
-  const panDot    = useRef<HTMLDivElement | null>(null);
-  const panTick   = useRef<() => void>(() => {});
+  const panMouse = useRef({ x: 0, y: 0 });
+  const panRaf = useRef(0);
+  const panDot = useRef<HTMLDivElement | null>(null);
+  const panTick = useRef<() => void>(() => {});
 
   const stopPan = useCallback(() => {
     panActive.current = false;
@@ -83,51 +83,64 @@ export const ConversationList = ({
 
   // Define the tick loop once and store in ref; window listeners use same ref
   useEffect(() => {
-    const DEAD = 8, SPD = 0.1;
+    const DEAD = 8,
+      SPD = 0.1;
     panTick.current = () => {
       if (!panActive.current) return;
       const dx = panMouse.current.x - panOrigin.current.x;
       const dy = panMouse.current.y - panOrigin.current.y;
       if (scrollRef.current && Math.abs(dx) > DEAD) scrollRef.current.scrollLeft += dx * SPD;
-      if (scrollRef.current && Math.abs(dy) > DEAD) scrollRef.current.scrollTop  += dy * SPD;
+      if (scrollRef.current && Math.abs(dy) > DEAD) scrollRef.current.scrollTop += dy * SPD;
       panRaf.current = requestAnimationFrame(panTick.current);
     };
 
-    const onMove  = (e: MouseEvent) => { panMouse.current = { x: e.clientX, y: e.clientY }; };
-    const onClick = (e: MouseEvent) => { if (panActive.current && e.button !== 1) stopPan(); };
-    const onKey   = (e: KeyboardEvent) => { if (e.key === 'Escape') stopPan(); };
+    const onMove = (e: MouseEvent) => {
+      panMouse.current = { x: e.clientX, y: e.clientY };
+    };
+    const onClick = (e: MouseEvent) => {
+      if (panActive.current && e.button !== 1) stopPan();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') stopPan();
+    };
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mousedown', onClick);
-    window.addEventListener('keydown',   onKey);
+    window.addEventListener('keydown', onKey);
     return () => {
       stopPan();
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mousedown', onClick);
-      window.removeEventListener('keydown',   onKey);
+      window.removeEventListener('keydown', onKey);
     };
   }, [stopPan]);
 
-  const handleMiddleDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 1) return;
-    e.preventDefault();
-    if (panActive.current) { stopPan(); return; }
-    panActive.current = true;
-    panOrigin.current = { x: e.clientX, y: e.clientY };
-    panMouse.current  = { x: e.clientX, y: e.clientY };
-    if (scrollRef.current) scrollRef.current.style.cursor = 'all-scroll';
-    const dot = document.createElement('div');
-    dot.className = 'conv-pan-dot';
-    dot.style.left = `${e.clientX}px`;
-    dot.style.top  = `${e.clientY}px`;
-    document.body.appendChild(dot);
-    panDot.current = dot;
-    panRaf.current = requestAnimationFrame(panTick.current);
-  }, [stopPan]);
+  const handleMiddleDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      if (panActive.current) {
+        stopPan();
+        return;
+      }
+      panActive.current = true;
+      panOrigin.current = { x: e.clientX, y: e.clientY };
+      panMouse.current = { x: e.clientX, y: e.clientY };
+      if (scrollRef.current) scrollRef.current.style.cursor = 'all-scroll';
+      const dot = document.createElement('div');
+      dot.className = 'conv-pan-dot';
+      dot.style.left = `${e.clientX}px`;
+      dot.style.top = `${e.clientY}px`;
+      document.body.appendChild(dot);
+      panDot.current = dot;
+      panRaf.current = requestAnimationFrame(panTick.current);
+    },
+    [stopPan]
+  );
 
-  const hasAppNames   = conversations.some(c => c.appName);
+  const hasAppNames = conversations.some(c => c.appName);
   const hasCategories = conversations.some(c => c.category);
-  const hasRisks      = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
+  const hasRisks = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -136,8 +149,14 @@ export const ConversationList = ({
 
   const getProtocolBadgeClass = (protocol: string) => {
     const protocolMap: Record<string, string> = {
-      TCP: 'primary', UDP: 'info', HTTP: 'success', HTTPS: 'success',
-      DNS: 'warning', TLS: 'success', ICMP: 'secondary', ARP: 'secondary',
+      TCP: 'primary',
+      UDP: 'info',
+      HTTP: 'success',
+      HTTPS: 'success',
+      DNS: 'warning',
+      TLS: 'success',
+      ICMP: 'secondary',
+      ARP: 'secondary',
     };
     return protocolMap[protocol.toUpperCase()] || 'secondary';
   };
@@ -146,14 +165,19 @@ export const ConversationList = ({
     const isActive = sortBy === field;
     const icon = !isActive
       ? 'bi-arrow-down-up text-muted'
-      : sortDir === 'asc' ? 'bi-sort-up' : 'bi-sort-down';
+      : sortDir === 'asc'
+        ? 'bi-sort-up'
+        : 'bi-sort-down';
     const handleClick = () => {
       if (!isActive) onSort(field);
       else if (sortDir === 'asc') onSort(field);
       else onSort('' as SortField);
     };
     return (
-      <th onClick={handleClick} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th
+        onClick={handleClick}
+        style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+      >
         {label} <i className={`bi ${icon} ms-1`}></i>
       </th>
     );
@@ -175,16 +199,16 @@ export const ConversationList = ({
         <table className="table table-hover">
           <thead>
             <tr>
-              {col('source')      && <SortableHeader field="srcIp"     label="Source" />}
-              {col('destination') && <SortableHeader field="dstIp"     label="Destination" />}
-              {col('protocol')    && <th>Protocol</th>}
-              {col('appName')  && hasAppNames   && <th>Application</th>}
+              {col('source') && <SortableHeader field="srcIp" label="Source" />}
+              {col('destination') && <SortableHeader field="dstIp" label="Destination" />}
+              {col('protocol') && <th>Protocol</th>}
+              {col('appName') && hasAppNames && <th>Application</th>}
               {col('category') && hasCategories && <th>Category</th>}
-              {col('risks')    && hasRisks      && <th>Risks</th>}
-              {col('packets')     && <SortableHeader field="packets"   label="Packets" />}
-              {col('bytes')       && <SortableHeader field="bytes"     label="Bytes" />}
-              {col('duration')    && <SortableHeader field="duration"  label="Duration" />}
-              {col('startTime')   && <SortableHeader field="startTime" label="Start Time" />}
+              {col('risks') && hasRisks && <th>Risks</th>}
+              {col('packets') && <SortableHeader field="packets" label="Packets" />}
+              {col('bytes') && <SortableHeader field="bytes" label="Bytes" />}
+              {col('duration') && <SortableHeader field="duration" label="Duration" />}
+              {col('startTime') && <SortableHeader field="startTime" label="Start Time" />}
             </tr>
           </thead>
           <tbody>
@@ -208,30 +232,56 @@ export const ConversationList = ({
                     <td>
                       <div>
                         <span className="fw-semibold">{destination.ip}</span>
-                        {destination.port > 0 && <small className="text-muted">:{destination.port}</small>}
+                        {destination.port > 0 && (
+                          <small className="text-muted">:{destination.port}</small>
+                        )}
                       </div>
-                      {conversation.hostname && <small className="text-info">{conversation.hostname}</small>}
+                      {conversation.hostname && (
+                        <small className="text-info">{conversation.hostname}</small>
+                      )}
                     </td>
                   )}
                   {col('protocol') && (
                     <td>
-                      <span className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}>
+                      <span
+                        className={`badge bg-${getProtocolBadgeClass(conversation.protocol.name)}`}
+                      >
                         {conversation.protocol.name}
                       </span>
                     </td>
                   )}
                   {col('appName') && hasAppNames && (
                     <td>
-                      {conversation.appName
-                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName), color: '#fff' }}>{conversation.appName}</span>
-                        : <span className="text-muted">—</span>}
+                      {conversation.appName ? (
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: getAppColor(conversation.appName),
+                            color: '#fff',
+                          }}
+                        >
+                          {conversation.appName}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
                     </td>
                   )}
                   {col('category') && hasCategories && (
                     <td>
-                      {conversation.category
-                        ? <span className="badge" style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
-                        : <span className="text-muted">—</span>}
+                      {conversation.category ? (
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: getAppColor(conversation.category),
+                            color: '#fff',
+                          }}
+                        >
+                          {conversation.category}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
                     </td>
                   )}
                   {col('risks') && hasRisks && (
@@ -244,19 +294,28 @@ export const ConversationList = ({
                               className="badge bg-warning text-dark"
                               style={{ cursor: 'pointer', fontSize: '0.7rem' }}
                               title="Click to filter by security risks"
-                              onClick={e => { e.stopPropagation(); onRiskFilterClick?.(); }}
+                              onClick={e => {
+                                e.stopPropagation();
+                                onRiskFilterClick?.();
+                              }}
                             >
                               {risk}
                             </span>
                           ))}
                         </div>
-                      ) : <span className="text-muted">—</span>}
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
                     </td>
                   )}
-                  {col('packets')   && <td>{conversation.packetCount.toLocaleString()}</td>}
-                  {col('bytes')     && <td>{formatBytes(conversation.totalBytes)}</td>}
-                  {col('duration')  && <td>{formatDuration(duration)}</td>}
-                  {col('startTime') && <td><small>{formatTimestamp(conversation.startTime)}</small></td>}
+                  {col('packets') && <td>{conversation.packetCount.toLocaleString()}</td>}
+                  {col('bytes') && <td>{formatBytes(conversation.totalBytes)}</td>}
+                  {col('duration') && <td>{formatDuration(duration)}</td>}
+                  {col('startTime') && (
+                    <td>
+                      <small>{formatTimestamp(conversation.startTime)}</small>
+                    </td>
+                  )}
                 </tr>
               );
             })}

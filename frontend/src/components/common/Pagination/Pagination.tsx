@@ -29,7 +29,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
   // SGDS requires a React state setter; wrap our callback to be compatible
-  const setCurrentPage: React.Dispatch<React.SetStateAction<number>> = (value) => {
+  const setCurrentPage: React.Dispatch<React.SetStateAction<number>> = value => {
     const newPage = typeof value === 'function' ? value(currentPage) : value;
     onPageChange(newPage);
   };

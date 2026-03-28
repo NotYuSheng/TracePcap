@@ -26,29 +26,37 @@ const CRITICAL_RISKS = new Set([
 
 /** Human-readable descriptions for known nDPI risk flags. */
 const RISK_DESCRIPTIONS: Record<string, string> = {
-  clear_text_credentials:       'Username/password sent without encryption — check ASCII-badged packets in the stream for credentials.',
-  suspicious_entropy:           'Payload entropy suggests encryption or compression over an unexpected protocol.',
-  suspicious_dns_traffic:       'Unusual DNS query patterns that may indicate tunnelling or C2 beaconing.',
-  binary_application_transfer:  'Executable or binary file transferred — potential malware delivery.',
-  possible_exploit_detected:    'Payload pattern matches a known exploit signature.',
-  xss_attack:                   'Cross-site scripting payload detected in HTTP traffic.',
-  sql_injection:                'SQL injection attempt detected in HTTP request.',
-  rce_injection:                'Remote code execution payload detected.',
-  self_signed_certificate:      'TLS certificate is self-signed and not issued by a trusted CA.',
-  obsolete_tls_version:         'Connection uses an outdated TLS version (e.g. TLS 1.0/1.1).',
-  weak_tls_cipher:              'Negotiated cipher suite is considered cryptographically weak.',
-  tls_certificate_expired:      'Server certificate validity period has passed.',
-  unsafe_protocol:              'Protocol known to transmit data without encryption (e.g. FTP, Telnet, HTTP).',
-  known_protocol_on_non_standard_port: 'A well-known protocol is running on an unexpected port — possible evasion.',
-  desktop_or_file_sharing:      'File or desktop sharing protocol detected.',
+  clear_text_credentials:
+    'Username/password sent without encryption — check ASCII-badged packets in the stream for credentials.',
+  suspicious_entropy:
+    'Payload entropy suggests encryption or compression over an unexpected protocol.',
+  suspicious_dns_traffic:
+    'Unusual DNS query patterns that may indicate tunnelling or C2 beaconing.',
+  binary_application_transfer:
+    'Executable or binary file transferred — potential malware delivery.',
+  possible_exploit_detected: 'Payload pattern matches a known exploit signature.',
+  xss_attack: 'Cross-site scripting payload detected in HTTP traffic.',
+  sql_injection: 'SQL injection attempt detected in HTTP request.',
+  rce_injection: 'Remote code execution payload detected.',
+  self_signed_certificate: 'TLS certificate is self-signed and not issued by a trusted CA.',
+  obsolete_tls_version: 'Connection uses an outdated TLS version (e.g. TLS 1.0/1.1).',
+  weak_tls_cipher: 'Negotiated cipher suite is considered cryptographically weak.',
+  tls_certificate_expired: 'Server certificate validity period has passed.',
+  unsafe_protocol: 'Protocol known to transmit data without encryption (e.g. FTP, Telnet, HTTP).',
+  known_protocol_on_non_standard_port:
+    'A well-known protocol is running on an unexpected port — possible evasion.',
+  desktop_or_file_sharing: 'File or desktop sharing protocol detected.',
 };
 
 /** Hint shown inside the modal for risks that have packet-level indicators. */
 const RISK_PACKET_HINTS: Partial<Record<string, string>> = {
-  clear_text_credentials: '💡 Look for packets with the yellow ASCII badge — they likely contain the cleartext credentials.',
-  unsafe_protocol:        '💡 This protocol sends data unencrypted. ASCII-badged packets may reveal transferred content.',
-  xss_attack:             '💡 Open ASCII-badged packets to inspect the HTTP payload containing the XSS string.',
-  sql_injection:          '💡 Open ASCII-badged packets to inspect the HTTP request containing the SQL payload.',
+  clear_text_credentials:
+    '💡 Look for packets with the yellow ASCII badge — they likely contain the cleartext credentials.',
+  unsafe_protocol:
+    '💡 This protocol sends data unencrypted. ASCII-badged packets may reveal transferred content.',
+  xss_attack: '💡 Open ASCII-badged packets to inspect the HTTP payload containing the XSS string.',
+  sql_injection:
+    '💡 Open ASCII-badged packets to inspect the HTTP request containing the SQL payload.',
 };
 
 function riskBadgeClass(risk: string): string {
@@ -114,7 +122,8 @@ export const SecurityPage = () => {
   }, [selectedIndex, alerts, openConversation]);
 
   const handleNext = useCallback(() => {
-    if (selectedIndex < alerts.length - 1) openConversation(alerts[selectedIndex + 1], selectedIndex + 1);
+    if (selectedIndex < alerts.length - 1)
+      openConversation(alerts[selectedIndex + 1], selectedIndex + 1);
   }, [selectedIndex, alerts, openConversation]);
 
   useEffect(() => {
@@ -130,7 +139,9 @@ export const SecurityPage = () => {
 
   useEffect(() => {
     document.body.style.overflow = selectedConversation ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [selectedConversation]);
 
   if (loading) return <LoadingSpinner size="large" message="Scanning for security alerts..." />;
@@ -184,7 +195,9 @@ export const SecurityPage = () => {
               <tr
                 key={conv.id}
                 onClick={() => openConversation(conv, idx)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openConversation(conv, idx); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') openConversation(conv, idx);
+                }}
                 tabIndex={0}
                 role="button"
                 style={{ cursor: 'pointer' }}
@@ -198,9 +211,7 @@ export const SecurityPage = () => {
                 </td>
                 <td>
                   <span className="badge bg-secondary">{conv.protocol.name}</span>
-                  {conv.appName && (
-                    <span className="badge bg-info ms-1">{conv.appName}</span>
-                  )}
+                  {conv.appName && <span className="badge bg-info ms-1">{conv.appName}</span>}
                 </td>
                 <td>
                   {conv.flowRisks.map(risk => (
@@ -226,24 +237,42 @@ export const SecurityPage = () => {
         <div
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          onClick={e => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="security-modal-title"
         >
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content">
-
               <div className="modal-header">
                 <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-                  <button className="btn btn-sm btn-outline-secondary" onClick={handlePrev} disabled={selectedIndex <= 0} title="Previous">
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={handlePrev}
+                    disabled={selectedIndex <= 0}
+                    title="Previous"
+                  >
                     ‹ Prev
                   </button>
-                  <h5 id="security-modal-title" className="modal-title text-truncate mb-0 font-monospace small">{modalTitle}</h5>
-                  <button className="btn btn-sm btn-outline-secondary" onClick={handleNext} disabled={selectedIndex >= alerts.length - 1} title="Next">
+                  <h5
+                    id="security-modal-title"
+                    className="modal-title text-truncate mb-0 font-monospace small"
+                  >
+                    {modalTitle}
+                  </h5>
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={handleNext}
+                    disabled={selectedIndex >= alerts.length - 1}
+                    title="Next"
+                  >
                     Next ›
                   </button>
-                  <span className="text-muted small text-nowrap">{selectedIndex + 1} / {alerts.length}</span>
+                  <span className="text-muted small text-nowrap">
+                    {selectedIndex + 1} / {alerts.length}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -251,29 +280,38 @@ export const SecurityPage = () => {
                   title="View this conversation in the Conversations tab"
                   onClick={() => {
                     closeModal();
-                    navigate(`/analysis/${fileId}/conversations?ip=${encodeURIComponent(selectedConversation!.endpoints[0].ip)}&hasRisks=true`);
+                    navigate(
+                      `/analysis/${fileId}/conversations?ip=${encodeURIComponent(selectedConversation!.endpoints[0].ip)}&hasRisks=true`
+                    );
                   }}
                 >
                   <i className="bi bi-arrow-right-circle me-1"></i>View in Conversations
                 </button>
-                <button type="button" className="btn-close ms-3" onClick={closeModal} title="Close (Esc)" />
+                <button
+                  type="button"
+                  className="btn-close ms-3"
+                  onClick={closeModal}
+                  title="Close (Esc)"
+                />
               </div>
 
               {packetHints.length > 0 && (
                 <div className="px-3 pt-2">
                   {packetHints.map((hint, i) => (
-                    <div key={i} className="alert alert-warning py-2 mb-2 small">{hint}</div>
+                    <div key={i} className="alert alert-warning py-2 mb-2 small">
+                      {hint}
+                    </div>
                   ))}
                 </div>
               )}
 
               <div className="modal-body">
-                {detailLoading
-                  ? <LoadingSpinner size="medium" message="Loading conversation..." />
-                  : <ConversationDetail conversation={selectedConversation} />
-                }
+                {detailLoading ? (
+                  <LoadingSpinner size="medium" message="Loading conversation..." />
+                ) : (
+                  <ConversationDetail conversation={selectedConversation} />
+                )}
               </div>
-
             </div>
           </div>
         </div>

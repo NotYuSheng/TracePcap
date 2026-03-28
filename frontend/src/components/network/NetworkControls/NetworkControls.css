@@ -75,7 +75,9 @@
   border-radius: 0.25rem;
   padding: 0.2rem 0.4rem;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
   text-align: left;
 }
 

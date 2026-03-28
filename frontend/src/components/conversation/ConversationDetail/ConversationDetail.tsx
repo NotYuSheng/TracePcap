@@ -26,8 +26,7 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
   const [source, destination] = conversation.endpoints;
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
 
-  const togglePacket = (id: string) =>
-    setExpandedPacketId(prev => (prev === id ? null : id));
+  const togglePacket = (id: string) => setExpandedPacketId(prev => (prev === id ? null : id));
 
   const getDirectionIndicator = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
@@ -70,7 +69,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: getAppColor(conversation.appName!),
+                          color: '#fff',
+                        }}
+                      >
                         {conversation.appName}
                       </span>
                     </dd>
@@ -120,7 +125,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Cert Valid To:</dt>
                     <dd className="col-sm-8">
-                      <small className={conversation.tlsNotAfter < Date.now() ? 'text-danger fw-semibold' : undefined}>
+                      <small
+                        className={
+                          conversation.tlsNotAfter < Date.now()
+                            ? 'text-danger fw-semibold'
+                            : undefined
+                        }
+                      >
                         {formatTimestamp(conversation.tlsNotAfter)}
                         {conversation.tlsNotAfter < Date.now() && (
                           <span className="ms-1 badge bg-danger">Expired</span>
@@ -154,15 +165,18 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
         </div>
         <div className="card-body p-0">
           <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            <table className="table table-sm table-striped mb-0" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <table
+              className="table table-sm table-striped mb-0"
+              style={{ tableLayout: 'fixed', width: '100%' }}
+            >
               <colgroup>
-                <col style={{ width: '4%' }} />   {/* # */}
-                <col style={{ width: '3%' }} />   {/* direction */}
-                <col style={{ width: '16%' }} />  {/* timestamp */}
-                <col style={{ width: '18%' }} />  {/* source */}
-                <col style={{ width: '18%' }} />  {/* destination */}
-                <col style={{ width: '7%' }} />   {/* length */}
-                <col />                           {/* info — takes remaining space */}
+                <col style={{ width: '4%' }} /> {/* # */}
+                <col style={{ width: '3%' }} /> {/* direction */}
+                <col style={{ width: '16%' }} /> {/* timestamp */}
+                <col style={{ width: '18%' }} /> {/* source */}
+                <col style={{ width: '18%' }} /> {/* destination */}
+                <col style={{ width: '7%' }} /> {/* length */}
+                <col /> {/* info — takes remaining space */}
               </colgroup>
               <thead className="sticky-top bg-light">
                 <tr>
@@ -189,27 +203,64 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                         <td className={getDirectionClass(packet)}>
                           <strong>{getDirectionIndicator(packet)}</strong>
                         </td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           <small>{formatTimestamp(packet.timestamp)}</small>
                         </td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={formatIpPort(packet.source.ip, packet.source.port)}>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={formatIpPort(packet.source.ip, packet.source.port)}
+                        >
                           <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
                         </td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={formatIpPort(packet.destination.ip, packet.destination.port)}>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={formatIpPort(packet.destination.ip, packet.destination.port)}
+                        >
                           <small>
                             {formatIpPort(packet.destination.ip, packet.destination.port)}
                           </small>
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <small className="text-muted">
+                            {packet.info ?? packet.protocol.name}
+                          </small>
                           {hasReadableAscii(packet.payload) && (
-                            <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
+                            <span
+                              className="badge bg-warning text-dark ms-1"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              ASCII
+                            </span>
                           )}
                           {packet.detectedFileType && (
-                            <span className="badge bg-info text-dark ms-1" style={{ fontSize: '0.65rem' }} title={`Magic bytes match: ${packet.detectedFileType}`}>{packet.detectedFileType}</span>
+                            <span
+                              className="badge bg-info text-dark ms-1"
+                              style={{ fontSize: '0.65rem' }}
+                              title={`Magic bytes match: ${packet.detectedFileType}`}
+                            >
+                              {packet.detectedFileType}
+                            </span>
                           )}
                         </td>
                       </tr>

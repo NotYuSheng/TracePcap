@@ -5,21 +5,28 @@ import type { ColumnKey } from '@/features/conversation/constants';
 import { getAppColor } from '@/utils/appColors';
 import './ConversationFilterPanel.css';
 
-interface ProtocolStat  { protocol: string; count: number }
-interface AppStat        { name: string }
-interface CategoryStat   { category: string }
+interface ProtocolStat {
+  protocol: string;
+  count: number;
+}
+interface AppStat {
+  name: string;
+}
+interface CategoryStat {
+  category: string;
+}
 
 interface ConversationFilterPanelProps {
-  filters:           ConversationFilters;
-  onFiltersChange:   (update: Partial<ConversationFilters>) => void;
-  onClearAll:        () => void;
-  protocols:         ProtocolStat[];
-  apps:              AppStat[];
-  categories:        CategoryStat[];
-  fileTypes:         string[];
+  filters: ConversationFilters;
+  onFiltersChange: (update: Partial<ConversationFilters>) => void;
+  onClearAll: () => void;
+  protocols: ProtocolStat[];
+  apps: AppStat[];
+  categories: CategoryStat[];
+  fileTypes: string[];
   activeFilterCount: number;
-  visibleColumns:    Set<ColumnKey>;
-  onToggleColumn:    (key: ColumnKey) => void;
+  visibleColumns: Set<ColumnKey>;
+  onToggleColumn: (key: ColumnKey) => void;
 }
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -53,7 +60,9 @@ export function ConversationFilterPanel({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync ip input when filters change externally (e.g. URL navigation)
-  useEffect(() => { setIpInput(filters.ip); }, [filters.ip]);
+  useEffect(() => {
+    setIpInput(filters.ip);
+  }, [filters.ip]);
 
   const handleIpChange = (value: string) => {
     setIpInput(value);
@@ -119,12 +128,13 @@ export function ConversationFilterPanel({
         <div className="card mt-2 filter-panel-body">
           <div className="card-body p-3">
             <div className="row g-3">
-
               {/* IP / Hostname */}
               <div className="col-md-4">
                 <label className="form-label filter-section-label">IP / Hostname</label>
                 <div className="input-group input-group-sm">
-                  <span className="input-group-text"><i className="bi bi-search"></i></span>
+                  <span className="input-group-text">
+                    <i className="bi bi-search"></i>
+                  </span>
                   <input
                     type="text"
                     className="form-control"
@@ -137,7 +147,9 @@ export function ConversationFilterPanel({
                       type="button"
                       className="btn btn-outline-secondary"
                       onClick={() => handleIpChange('')}
-                    >×</button>
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
               </div>
@@ -243,28 +255,28 @@ export function ConversationFilterPanel({
               </div>
             </div>
 
-              {/* Column visibility */}
-              <div className="col-12">
-                <label className="form-label filter-section-label">
-                  <i className="bi bi-layout-three-columns me-1"></i>Columns
-                </label>
-                <div className="d-flex flex-wrap gap-2">
-                  {COLUMN_DEFS.map(({ key, label }) => (
-                    <div key={key} className="form-check form-check-inline mb-0">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id={`col-${key}`}
-                        checked={visibleColumns.has(key)}
-                        onChange={() => onToggleColumn(key)}
-                      />
-                      <label className="form-check-label small" htmlFor={`col-${key}`}>
-                        {label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
+            {/* Column visibility */}
+            <div className="col-12">
+              <label className="form-label filter-section-label">
+                <i className="bi bi-layout-three-columns me-1"></i>Columns
+              </label>
+              <div className="d-flex flex-wrap gap-2">
+                {COLUMN_DEFS.map(({ key, label }) => (
+                  <div key={key} className="form-check form-check-inline mb-0">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id={`col-${key}`}
+                      checked={visibleColumns.has(key)}
+                      onChange={() => onToggleColumn(key)}
+                    />
+                    <label className="form-check-label small" htmlFor={`col-${key}`}>
+                      {label}
+                    </label>
+                  </div>
+                ))}
               </div>
+            </div>
 
             {/* Active filter chips */}
             {activeFilterCount > 0 && (
