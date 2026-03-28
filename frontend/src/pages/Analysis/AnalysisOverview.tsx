@@ -2,6 +2,7 @@ import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
+import { CategoryBreakdownChart } from '@components/analysis/CategoryBreakdown';
 import { getAppColor } from '@/utils/appColors';
 
 interface AnalysisOutletContext {
@@ -36,7 +37,7 @@ export const AnalysisOverview = () => {
                   backgroundColor: getAppColor(app.name),
                   color: '#fff',
                 }}
-                title={`${app.packetCount.toLocaleString()} packets · ${(app.bytes / 1024).toFixed(1)} KB`}
+                title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB`}
               >
                 {app.name}
               </span>
@@ -48,6 +49,12 @@ export const AnalysisOverview = () => {
       {data.protocolDistribution && data.protocolDistribution.length > 0 && (
         <div className="mt-4">
           <ProtocolBreakdownChart protocolStats={data.protocolDistribution} />
+        </div>
+      )}
+
+      {data.categoryDistribution && data.categoryDistribution.length > 0 && (
+        <div className="mt-4">
+          <CategoryBreakdownChart categoryStats={data.categoryDistribution} />
         </div>
       )}
     </div>

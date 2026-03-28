@@ -15,6 +15,7 @@ export const ConversationList = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const hasAppNames = conversations.some(c => c.appName);
+  const hasCategories = conversations.some(c => c.category);
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -45,6 +46,7 @@ export const ConversationList = ({
               <th>Destination</th>
               <th>Protocol</th>
               {hasAppNames && <th>Application</th>}
+              {hasCategories && <th>Category</th>}
               <th>Packets</th>
               <th>Bytes</th>
               <th>Duration</th>
@@ -90,6 +92,15 @@ export const ConversationList = ({
                         <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
                           {conversation.appName}
                         </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  )}
+                  {hasCategories && (
+                    <td>
+                      {conversation.category ? (
+                        <span className="badge" style={{ backgroundColor: getAppColor(conversation.category), color: '#fff' }}>{conversation.category}</span>
                       ) : (
                         <span className="text-muted">—</span>
                       )}

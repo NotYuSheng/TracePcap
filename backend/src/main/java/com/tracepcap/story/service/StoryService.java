@@ -268,6 +268,19 @@ public class StoryService {
       prompt.append("\n");
     }
 
+    // Category distribution (nDPI traffic categories)
+    Map<String, Long> catPackets = new java.util.TreeMap<>();
+    conversations.stream()
+        .filter(c -> c.getCategory() != null && !c.getCategory().isBlank())
+        .forEach(c -> catPackets.merge(c.getCategory(),
+            c.getPacketCount() != null ? c.getPacketCount() : 0L, Long::sum));
+    if (!catPackets.isEmpty()) {
+      prompt.append("## Traffic Category Breakdown\n");
+      catPackets.forEach((cat, packets) ->
+          prompt.append(String.format("- %s: %d packets\n", cat, packets)));
+      prompt.append("\n");
+    }
+
     // Top-N conversations sorted by traffic volume (most significant first)
     if (!conversations.isEmpty()) {
       List<ConversationEntity> sorted = conversations.stream()
@@ -282,15 +295,18 @@ public class StoryService {
         String appLabel = (conv.getAppName() != null && !conv.getAppName().isBlank())
             ? " [" + conv.getAppName() + "]"
             : "";
+        String catLabel = (conv.getCategory() != null && !conv.getCategory().isBlank())
+            ? " [CAT: " + conv.getCategory() + "]"
+            : "";
         String riskLabel = (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
             ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]"
             : "";
         prompt.append(String.format(
-            "%d. %s:%s <-> %s:%s (%s%s%s, %d packets, %d bytes)\n",
+            "%d. %s:%s <-> %s:%s (%s%s%s%s, %d packets, %d bytes)\n",
             i + 1,
             conv.getSrcIp(), conv.getSrcPort() != null ? conv.getSrcPort() : "*",
             conv.getDstIp(), conv.getDstPort() != null ? conv.getDstPort() : "*",
-            conv.getProtocol(), appLabel, riskLabel,
+            conv.getProtocol(), appLabel, catLabel, riskLabel,
             conv.getPacketCount(),
             conv.getTotalBytes()));
       }

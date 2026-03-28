@@ -116,9 +116,12 @@ export const StoryPage = () => {
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4>Network Traffic Story</h4>
-              <p className="text-muted mb-0">
-                AI-generated narrative analysis with traffic visualization
-              </p>
+              <ul className="text-muted mb-0 small ps-3">
+                <li>Traffic metadata (IPs, ports, protocols, packet counts) is extracted from the PCAP and sent to the configured LLM</li>
+                <li>nDPI-detected application names, traffic categories, and security risk flags are included when available</li>
+                <li>Only the top <strong>N</strong> conversations by volume are included (configurable via <code>STORY_MAX_CONVERSATIONS</code>)</li>
+                <li><strong>Limitations:</strong> packet payloads, HTTP bodies, DNS query names, and TLS SNI are not available — the LLM cannot see actual content</li>
+              </ul>
             </div>
             <button
               className="btn btn-outline-primary btn-sm"

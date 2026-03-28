@@ -20,6 +20,7 @@ public class ConversationResponse {
   private Integer dstPort;
   private String protocol;
   private String appName;
+  private String category;
   private List<String> flowRisks;
   private Long packetCount;
   private Long totalBytes;

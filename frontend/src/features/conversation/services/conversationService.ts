@@ -12,6 +12,7 @@ interface ConversationApiResponse {
   dstPort: number | null;
   protocol: string;
   appName?: string | null;
+  category?: string | null;
   flowRisks?: string[] | null;
   packetCount: number;
   totalBytes: number;
@@ -58,6 +59,7 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     endpoints: [srcEndpoint, dstEndpoint],
     protocol: getProtocol(apiData.protocol),
     appName: apiData.appName ?? undefined,
+    category: apiData.category ?? undefined,
     flowRisks: apiData.flowRisks ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),

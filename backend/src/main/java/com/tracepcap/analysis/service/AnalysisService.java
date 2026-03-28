@@ -130,6 +130,7 @@ public class AnalysisService {
                 .dstPort(convInfo.getDstPort())
                 .protocol(convInfo.getProtocol())
                 .appName(convInfo.getAppName())
+                .category(convInfo.getCategory())
                 .flowRisks(convInfo.getFlowRisks().isEmpty()
                     ? null
                     : convInfo.getFlowRisks().toArray(new String[0]))
@@ -269,6 +270,36 @@ public class AnalysisService {
     boolean appsTruncated = overviewAppsLimited && allApps.size() > overviewAppsMax;
     List<AnalysisSummaryResponse.DetectedApplication> detectedApplications =
         appsTruncated ? allApps.subList(0, overviewAppsMax) : allApps;
+
+    // Aggregate category distribution
+    class CategoryAggregate {
+      long packetCount = 0L;
+      long totalBytes  = 0L;
+    }
+    Map<String, CategoryAggregate> catStatsMap = new java.util.TreeMap<>();
+    conversations.stream()
+        .filter(conv -> conv.getCategory() != null && !conv.getCategory().isBlank())
+        .forEach(
+            conv -> {
+              CategoryAggregate agg = catStatsMap.computeIfAbsent(conv.getCategory(), k -> new CategoryAggregate());
+              agg.packetCount += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
+              agg.totalBytes  += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
+            });
+    long totalCatPackets = catStatsMap.values().stream().mapToLong(a -> a.packetCount).sum();
+    List<AnalysisSummaryResponse.CategoryStat> categoryDistribution =
+        catStatsMap.entrySet().stream()
+            .map(
+                e ->
+                    AnalysisSummaryResponse.CategoryStat.builder()
+                        .category(e.getKey())
+                        .count(e.getValue().packetCount)
+                        .bytes(e.getValue().totalBytes)
+                        .percentage(totalCatPackets > 0
+                            ? (e.getValue().packetCount * 100.0 / totalCatPackets) : 0.0)
+                        .build())
+            .sorted(java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount).reversed())
+            .collect(Collectors.toList());
+
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
             .sorted((a, b) -> Long.compare(b.getTotalBytes(), a.getTotalBytes()))
@@ -335,6 +366,7 @@ public class AnalysisService {
         .uniqueHosts(uniqueHosts)
         .detectedApplications(detectedApplications)
         .detectedApplicationsTruncated(appsTruncated)
+        .categoryDistribution(categoryDistribution)
         // Legacy fields
         .startTime(analysis.getStartTime())
         .endTime(analysis.getEndTime())
@@ -396,6 +428,7 @@ public class AnalysisService {
                   .dstPort(conv.getDstPort())
                   .protocol(conv.getProtocol())
                   .appName(conv.getAppName())
+                  .category(conv.getCategory())
                   .flowRisks(conv.getFlowRisks() != null
                       ? Arrays.asList(conv.getFlowRisks()) : List.of())
                   .packetCount(conv.getPacketCount())
@@ -423,6 +456,7 @@ public class AnalysisService {
               .dstPort(conv.getDstPort())
               .protocol(conv.getProtocol())
               .appName(conv.getAppName())
+              .category(conv.getCategory())
               .flowRisks(conv.getFlowRisks() != null
                   ? Arrays.asList(conv.getFlowRisks()) : List.of())
               .packetCount(conv.getPacketCount())
@@ -484,6 +518,7 @@ public class AnalysisService {
         .dstPort(conversation.getDstPort())
         .protocol(conversation.getProtocol())
         .appName(conversation.getAppName())
+        .category(conversation.getCategory())
         .flowRisks(conversation.getFlowRisks() != null
             ? Arrays.asList(conversation.getFlowRisks()) : List.of())
         .packetCount(conversation.getPacketCount())

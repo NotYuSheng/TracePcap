@@ -30,12 +30,20 @@ export interface DetectedApplication {
   bytes: number;
 }
 
+export interface CategoryStat {
+  category: string;
+  count: number;
+  percentage: number;
+  bytes: number;
+}
+
 // Conversation Types
 export interface Conversation {
   id: string;
   endpoints: [NetworkEndpoint, NetworkEndpoint];
   protocol: Protocol;
   appName?: string;
+  category?: string;
   flowRisks: string[];
   startTime: number;
   endTime: number;
@@ -58,6 +66,7 @@ export interface AnalysisSummary {
   uniqueHosts: NetworkEndpoint[];
   detectedApplications?: DetectedApplication[];
   detectedApplicationsTruncated?: boolean;
+  categoryDistribution?: CategoryStat[];
   fiveWs?: FiveWsAnalysis;
 }
 
