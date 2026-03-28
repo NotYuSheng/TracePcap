@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData, Conversation } from '@/types';
 import { securityService } from '@/features/security/services/securityService';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -67,6 +67,7 @@ function formatBytes(bytes: number): string {
 
 export const SecurityPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -244,6 +245,17 @@ export const SecurityPage = () => {
                   </button>
                   <span className="text-muted small text-nowrap">{selectedIndex + 1} / {alerts.length}</span>
                 </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary ms-2 text-nowrap"
+                  title="View this conversation in the Conversations tab"
+                  onClick={() => {
+                    closeModal();
+                    navigate(`/analysis/${fileId}/conversations?ip=${encodeURIComponent(selectedConversation!.endpoints[0].ip)}`);
+                  }}
+                >
+                  <i className="bi bi-arrow-right-circle me-1"></i>View in Conversations
+                </button>
                 <button type="button" className="btn-close ms-3" onClick={closeModal} title="Close (Esc)" />
               </div>
 
