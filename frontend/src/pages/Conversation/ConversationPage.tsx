@@ -101,7 +101,8 @@ export const ConversationPage = () => {
         const full = await conversationService.getConversationDetail(conversation.id);
         setSelectedConversation(full);
       }
-    } catch {
+    } catch (err) {
+      console.error('Failed to load conversation details:', err);
       setSelectedConversation(conversation);
     } finally {
       setDetailLoading(false);

@@ -50,22 +50,10 @@ public class ConversationsController {
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
-    // Backward compat: old ?search= param maps to ip filter
-    String resolvedIp = (ip != null) ? ip : search;
-
-    ConversationFilterParams params = ConversationFilterParams.builder()
-        .ip(resolvedIp)
-        .protocols(splitComma(protocols))
-        .apps(splitComma(apps))
-        .categories(splitComma(categories))
-        .hasRisks(hasRisks)
-        .fileTypes(splitComma(fileTypes))
-        .sortBy(sortBy)
-        .sortDir(sortDir)
-        .build();
+    ConversationFilterParams params = buildFilterParams(ip, protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir, search);
 
     log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, sortBy:{} {}",
-        fileId, page, pageSize, resolvedIp, protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir);
+        fileId, page, pageSize, params.getIp(), protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir);
 
     return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
   }
@@ -90,19 +78,10 @@ public class ConversationsController {
       @RequestParam(required = false) String fileTypes,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
+      @RequestParam(required = false) String search,
       HttpServletResponse response) throws IOException {
 
-    ConversationFilterParams params = ConversationFilterParams.builder()
-        .ip(ip)
-        .protocols(splitComma(protocols))
-        .apps(splitComma(apps))
-        .categories(splitComma(categories))
-        .hasRisks(hasRisks)
-        .fileTypes(splitComma(fileTypes))
-        .sortBy(sortBy)
-        .sortDir(sortDir)
-        .build();
-
+    ConversationFilterParams params = buildFilterParams(ip, protocols, apps, categories, hasRisks, fileTypes, sortBy, sortDir, search);
     List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -111,15 +90,16 @@ public class ConversationsController {
     PrintWriter writer = response.getWriter();
     writer.println("srcIp,srcPort,dstIp,dstPort,protocol,appName,category,hostname,packetCount,totalBytes,durationMs,startTime,endTime,flowRisks");
     for (ConversationResponse r : rows) {
-      writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,\"%s\"%n",
-          nvl(r.getSrcIp()), nvl(r.getSrcPort()),
-          nvl(r.getDstIp()), nvl(r.getDstPort()),
-          nvl(r.getProtocol()), nvl(r.getAppName()),
-          nvl(r.getCategory()), nvl(r.getHostname()),
+      String flowRisksValue = r.getFlowRisks() != null ? String.join("; ", r.getFlowRisks()) : "";
+      writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,%s%n",
+          escapeCsv(r.getSrcIp()), escapeCsv(r.getSrcPort()),
+          escapeCsv(r.getDstIp()), escapeCsv(r.getDstPort()),
+          escapeCsv(r.getProtocol()), escapeCsv(r.getAppName()),
+          escapeCsv(r.getCategory()), escapeCsv(r.getHostname()),
           r.getPacketCount(), r.getTotalBytes(), r.getDurationMs(),
-          r.getStartTime() != null ? CSV_DT.format(r.getStartTime()) : "",
-          r.getEndTime()   != null ? CSV_DT.format(r.getEndTime())   : "",
-          r.getFlowRisks() != null ? String.join("; ", r.getFlowRisks()) : "");
+          r.getStartTime() != null ? escapeCsv(CSV_DT.format(r.getStartTime())) : "",
+          r.getEndTime()   != null ? escapeCsv(CSV_DT.format(r.getEndTime()))   : "",
+          escapeCsv(flowRisksValue));
     }
     writer.flush();
   }
@@ -133,6 +113,24 @@ public class ConversationsController {
     return ResponseEntity.ok(analysisService.getConversationDetail(conversationId));
   }
 
+  /** Shared helper — builds a {@link ConversationFilterParams} from raw request parameters. */
+  private static ConversationFilterParams buildFilterParams(
+      String ip, String protocols, String apps, String categories,
+      Boolean hasRisks, String fileTypes, String sortBy, String sortDir, String search) {
+    // Backward compat: legacy ?search= param maps to the ip filter
+    String resolvedIp = (ip != null) ? ip : search;
+    return ConversationFilterParams.builder()
+        .ip(resolvedIp)
+        .protocols(splitComma(protocols))
+        .apps(splitComma(apps))
+        .categories(splitComma(categories))
+        .hasRisks(hasRisks)
+        .fileTypes(splitComma(fileTypes))
+        .sortBy(sortBy)
+        .sortDir(sortDir)
+        .build();
+  }
+
   private static List<String> splitComma(String value) {
     if (value == null || value.isBlank()) return List.of();
     return Arrays.stream(value.split(","))
@@ -141,7 +139,17 @@ public class ConversationsController {
         .toList();
   }
 
-  private static String nvl(Object value) {
-    return value == null ? "" : value.toString();
+  /**
+   * Escapes a value for safe inclusion in a CSV field.
+   * Fields containing commas, double-quotes, or newlines are wrapped in double-quotes,
+   * and any embedded double-quotes are doubled per RFC 4180.
+   */
+  private static String escapeCsv(Object value) {
+    if (value == null) return "";
+    String s = value.toString();
+    if (s.contains(",") || s.contains("\"") || s.contains("\n") || s.contains("\r")) {
+      return "\"" + s.replace("\"", "\"\"") + "\"";
+    }
+    return s;
   }
 }

@@ -55,11 +55,6 @@ export function ConversationFilterPanel({
   // Sync ip input when filters change externally (e.g. URL navigation)
   useEffect(() => { setIpInput(filters.ip); }, [filters.ip]);
 
-  // Auto-open if filters are active on mount
-  useEffect(() => {
-    if (activeFilterCount > 0) setIsOpen(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleIpChange = (value: string) => {
     setIpInput(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);

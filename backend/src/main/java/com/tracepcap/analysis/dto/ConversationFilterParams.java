@@ -31,7 +31,8 @@ public class ConversationFilterParams {
   private final List<String> fileTypes;
 
   /**
-   * Entity field to sort by. Accepted values: srcIp, dstIp, packetCount, totalBytes, startTime.
+   * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp},
+   * {@code packets}, {@code bytes}, {@code duration}, {@code startTime}.
    * Null or blank = default DB ordering.
    */
   private final String sortBy;
