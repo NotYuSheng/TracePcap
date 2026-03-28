@@ -59,6 +59,15 @@ public class PcapParserService {
 
     try (PcapHandle handle = Pcaps.openOffline(pcapFile.getAbsolutePath())) {
       long packetNumber = 0;
+      int dltValue = handle.getDlt().value();
+      // DLT=0  (BSD null/loopback): 4-byte AF header precedes IP.
+      // DLT=12 (LINKTYPE_RAW):      no link header — raw IP bytes start at offset 0.
+      // DLT=113 (Linux cooked SLL): 16-byte pseudo-header [2 pkt_type][2 hatype][2 halen]
+      //                             [8 addr][2 protocol] precedes IP.
+      // pcap4j's static factory does not decode these link types, so we handle manually.
+      boolean isBsdLoopback = (dltValue == 0);
+      boolean isRawIp       = (dltValue == 12);
+      boolean isLinuxSll    = (dltValue == 113);
 
       try {
         while (true) {
@@ -82,13 +91,72 @@ public class PcapParserService {
           String payloadHex = extractPayloadHex(packet.getRawData());
 
           IpPacket ipPacket = packet.get(IpPacket.class);
+          // 802.1Q / QinQ VLAN frames: pcap4j 1.8.x does not register Dot1qVlanTagPacket
+          // in the static EtherType factory, so the VLAN payload is left as UnknownPacket
+          // and packet.get(IpPacket.class) returns null.  Unwrap manually via raw bytes.
+          if (ipPacket == null) {
+            EthernetPacket etherPacket = packet.get(EthernetPacket.class);
+            if (etherPacket != null && etherPacket.getPayload() != null) {
+              short outerEtherType = etherPacket.getHeader().getType().value();
+              byte[] payloadRaw = etherPacket.getPayload().getRawData();
+              ipPacket = unwrapVlanToIp(outerEtherType, payloadRaw);
+            }
+          }
+          // BSD null/loopback: raw data is [4-byte AF][IP packet...].
+          // Skip the AF header and parse the rest directly as IPv4 or IPv6.
+          if (ipPacket == null && isBsdLoopback) {
+            byte[] raw = packet.getRawData();
+            if (raw != null && raw.length > 4) {
+              int version = (raw[4] >> 4) & 0x0F;
+              try {
+                if (version == 4) {
+                  ipPacket = IpV4Packet.newPacket(raw, 4, raw.length - 4);
+                } else if (version == 6) {
+                  ipPacket = IpV6Packet.newPacket(raw, 4, raw.length - 4);
+                }
+              } catch (Exception ignored) {}
+            }
+          }
+          // DLT=12 (LINKTYPE_RAW): no link-layer header at all — raw IP bytes.
+          if (ipPacket == null && isRawIp) {
+            byte[] raw = packet.getRawData();
+            if (raw != null && raw.length > 0) {
+              int version = (raw[0] >> 4) & 0x0F;
+              try {
+                if (version == 4) ipPacket = IpV4Packet.newPacket(raw, 0, raw.length);
+                else if (version == 6) ipPacket = IpV6Packet.newPacket(raw, 0, raw.length);
+              } catch (Exception ignored) {}
+            }
+          }
+          // DLT=113 (Linux cooked / SLL): 16-byte pseudo-header, EtherType at bytes 14-15.
+          if (ipPacket == null && isLinuxSll) {
+            byte[] raw = packet.getRawData();
+            if (raw != null && raw.length > 16) {
+              int proto   = ((raw[14] & 0xFF) << 8) | (raw[15] & 0xFF);
+              int version = (raw[16] >> 4) & 0x0F;
+              try {
+                if (proto == 0x0800 || version == 4)
+                  ipPacket = IpV4Packet.newPacket(raw, 16, raw.length - 16);
+                else if (proto == 0x86DD || version == 6)
+                  ipPacket = IpV6Packet.newPacket(raw, 16, raw.length - 16);
+              } catch (Exception ignored) {}
+            }
+          }
           if (ipPacket != null) {
             processIpPacket(ipPacket, packetSize, timestamp, packetNumber, payloadHex, conversationMap, result);
           } else {
             EthernetPacket etherPacket = packet.get(EthernetPacket.class);
             if (etherPacket != null) {
-              EtherType etherType = etherPacket.getHeader().getType();
-              incrementProtocolCount(result, etherType.name(), packetSize);
+              short outerEtherType = etherPacket.getHeader().getType().value();
+              String protoName;
+              if ((outerEtherType == (short) 0x8100 || outerEtherType == (short) 0x88A8)
+                  && etherPacket.getPayload() != null) {
+                protoName = resolveVlanInnerProtocolName(
+                    outerEtherType, etherPacket.getPayload().getRawData());
+              } else {
+                protoName = etherPacket.getHeader().getType().name();
+              }
+              incrementProtocolCount(result, protoName, packetSize);
             } else {
               incrementProtocolCount(result, "OTHER", packetSize);
             }
@@ -352,6 +420,67 @@ public class PcapParserService {
   // ---------------------------------------------------------------------------
   // Shared helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Peels VLAN layers and returns a human-readable protocol name for the inner EtherType.
+   * Used for non-IP VLAN-encapsulated frames (ARP, STP/LLC, LLDP, etc.) so they appear with
+   * a meaningful protocol name instead of "IEEE 802.1Q VLAN-tagged frames".
+   */
+  private String resolveVlanInnerProtocolName(short etherType, byte[] data) {
+    int offset = 0;
+    while ((etherType == (short) 0x8100 || etherType == (short) 0x88A8)
+        && data != null && data.length - offset >= 4) {
+      etherType = (short) (((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF));
+      offset += 4;
+    }
+    int t = etherType & 0xFFFF;
+    if (t <= 1500)        return "LLC";             // 802.3 length field → STP/CDP/VTP/etc.
+    if (t == 0x0806)      return "ARP";
+    if (t == 0x8035)      return "RARP";
+    if (t == 0x88CC)      return "LLDP";
+    if (t == 0x8809)      return "LACP";
+    if (t == 0x8863)      return "PPPoE-Discovery";
+    if (t == 0x8864)      return "PPPoE";
+    if (t == 0x86DD)      return "IPv6";
+    if (t == 0x0800)      return "IPv4";
+    return String.format("VLAN-0x%04X", t);
+  }
+
+  /**
+   * Unwraps encapsulation layers from raw Ethernet payload bytes and returns the enclosed IP
+   * packet, or {@code null} if the payload does not contain an IP packet.
+   *
+   * <p>Handled chains (in order):
+   * <ol>
+   *   <li>802.1Q VLAN (0x8100) / QinQ (0x88A8) — each layer is 4 bytes [TCI][inner EtherType]
+   *   <li>PPPoE session (0x8864) — 8-byte header [ver+type][code][session][length][PPP proto]
+   *       where PPP proto 0x0021=IPv4, 0x0057=IPv6
+   *   <li>Direct IPv4 or IPv6 packet
+   * </ol>
+   */
+  private IpPacket unwrapVlanToIp(short etherType, byte[] data) {
+    int offset = 0;
+    // Peel 802.1Q (0x8100) and 802.1ad/QinQ (0x88A8) VLAN layers
+    while ((etherType == (short) 0x8100 || etherType == (short) 0x88A8)
+        && data != null && data.length - offset >= 4) {
+      etherType = (short) (((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF));
+      offset += 4;
+    }
+    // Peel PPPoE session header (common in DSL/VLAN captures):
+    // [1 ver+type=0x11][1 code=0x00][2 session-id][2 payload-len][2 PPP-proto][IP...]
+    if (etherType == (short) 0x8864 && data != null && data.length - offset >= 8) {
+      int pppProto = ((data[offset + 6] & 0xFF) << 8) | (data[offset + 7] & 0xFF);
+      offset += 8;
+      if (pppProto != 0x0021 && pppProto != 0x0057) return null; // not IPv4/IPv6
+    }
+    if (data == null || data.length <= offset) return null;
+    int version = (data[offset] >> 4) & 0x0F;
+    try {
+      if (version == 4) return IpV4Packet.newPacket(data, offset, data.length - offset);
+      if (version == 6) return IpV6Packet.newPacket(data, offset, data.length - offset);
+    } catch (Exception ignored) {}
+    return null;
+  }
 
   private void processIpPacket(
       IpPacket ipPacket,

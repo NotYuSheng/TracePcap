@@ -43,9 +43,13 @@ public class NdpiService {
   /**
    * Matches per-flow lines from {@code ndpiReader -v 2}.
    * Groups: (1) l4proto  (2) srcIp  (3) srcPort  (4) dstIp  (5) dstPort  (6) protoField
+   *
+   * <p>The l4proto group now accepts any word token (not just TCP/UDP) so that non-TCP/UDP
+   * protocols such as IGMP, GRE, OSPF, SCTP are also captured.
+   * For non-TCP/UDP flows ndpiReader emits port 0; those are treated as null (no port).
    */
   private static final Pattern FLOW_LINE = Pattern.compile(
-      "\\t\\d+\\t(TCP|UDP)\\s+" +
+      "\\t\\d+\\t(\\w+)\\s+" +
       "(\\[?[\\w:.]+]?):(\\d+)\\s+(?:<->|->)\\s+(\\[?[\\w:.]+]?):(\\d+)" +
       ".*?\\[proto:\\s*[\\d.]+/([^\\]]+)\\]",
       Pattern.CASE_INSENSITIVE
@@ -224,11 +228,15 @@ public class NdpiService {
     Matcher m = FLOW_LINE.matcher(line);
     if (!m.find()) return;
 
-    String l4proto = m.group(1).toUpperCase();
-    String srcIp   = stripBrackets(m.group(2));
-    int    srcPort = Integer.parseInt(m.group(3));
-    String dstIp   = stripBrackets(m.group(4));
-    int    dstPort = Integer.parseInt(m.group(5));
+    String l4proto    = m.group(1).toUpperCase();
+    String srcIp      = stripBrackets(m.group(2));
+    int    srcPortInt = Integer.parseInt(m.group(3));
+    String dstIp      = stripBrackets(m.group(4));
+    int    dstPortInt = Integer.parseInt(m.group(5));
+    // Non-TCP/UDP protocols (e.g. IGMP, PIM, GRE) have no ports; ndpiReader emits 0.
+    boolean isTcpUdp  = "TCP".equals(l4proto) || "UDP".equals(l4proto);
+    Integer srcPort   = (!isTcpUdp && srcPortInt == 0) ? null : srcPortInt;
+    Integer dstPort   = (!isTcpUdp && dstPortInt == 0) ? null : dstPortInt;
 
     // App name from proto field
     String protoField = m.group(6).trim();
@@ -276,9 +284,14 @@ public class NdpiService {
     LocalDateTime tlsNotBefore = parseTlsDate(extractText(TLS_NOT_BEFORE, line));
     LocalDateTime tlsNotAfter  = parseTlsDate(extractText(TLS_NOT_AFTER, line));
 
-    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto),
-        new FlowData(appName, risks, category, hostname, ja3Client, ja3Server,
-                     tlsIssuer, tlsSubject, tlsNotBefore, tlsNotAfter));
+    FlowData data = new FlowData(appName, risks, category, hostname, ja3Client, ja3Server,
+                                 tlsIssuer, tlsSubject, tlsNotBefore, tlsNotAfter);
+    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), data);
+    // Also index portless flows by IP pair so resolve() can find them even when the l4proto
+    // name used by ndpiReader (e.g. "IGMP") differs from pcap4j's IpNumber name (e.g. "IGMP").
+    if (srcPort == null) {
+      result.putIfAbsent(ipPairKey(srcIp, dstIp), data);
+    }
   }
 
   /** Lookup flow data trying both directions (src→dst and dst→src). */
@@ -290,6 +303,11 @@ public class NdpiService {
       String key2 = flowKey(conv.getDstIp(), conv.getDstPort(),
                             conv.getSrcIp(), conv.getSrcPort(), conv.getProtocol());
       data = flowMap.get(key2);
+    }
+    // IP-pair fallback for portless protocols (IGMP, PIM, GRE, OSPF…) where the l4proto
+    // string from ndpiReader may differ from pcap4j's IpNumber name.
+    if (data == null && conv.getSrcPort() == null && conv.getDstPort() == null) {
+      data = flowMap.get(ipPairKey(conv.getSrcIp(), conv.getDstIp()));
     }
     return data;
   }
@@ -337,10 +355,21 @@ public class NdpiService {
     return ip;
   }
 
+  /**
+   * Canonical key for portless flows keyed only by IP pair (direction-independent).
+   * Used as a fallback when the l4proto name in ndpiReader output differs from pcap4j's name.
+   */
+  private String ipPairKey(String ip1, String ip2) {
+    return ip1.compareTo(ip2) <= 0
+        ? "IPPAIR:" + ip1 + "<->" + ip2
+        : "IPPAIR:" + ip2 + "<->" + ip1;
+  }
+
   private String flowKey(String ip, Integer port, String ip2, Integer port2, String proto) {
     return String.format("%s:%s->%s:%s/%s",
         ip, port, ip2, port2, proto != null ? proto.toUpperCase() : "");
   }
+
 
   private boolean isNotFoundError(Exception e) {
     String msg = e.getMessage();
