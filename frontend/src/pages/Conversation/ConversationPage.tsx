@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation } from '@/types';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -17,8 +17,24 @@ interface AnalysisOutletContext {
 export const ConversationPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-driven filters (from external navigation)
   const filterSrcIp = searchParams.get('srcIp');
   const filterPeerIp = searchParams.get('peerIp');
+  const urlApp = searchParams.get('app');
+
+  // Search bar state — initialised from URL ?app= param
+  const [search, setSearch] = useState(urlApp ?? '');
+  const [activeSearch, setActiveSearch] = useState(urlApp ?? '');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // When URL app param changes (e.g. navigating from Overview), sync search bar
+  useEffect(() => {
+    if (urlApp !== null) {
+      setSearch(urlApp);
+      setActiveSearch(urlApp);
+    }
+  }, [urlApp]);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -37,7 +53,7 @@ export const ConversationPage = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await conversationService.getConversations(fileId, currentPage, pageSize);
+        const response = await conversationService.getConversations(fileId, currentPage, pageSize, activeSearch || undefined);
         setConversations(response.data);
         setTotalItems(response.total);
         setTotalPages(response.totalPages);
@@ -48,7 +64,7 @@ export const ConversationPage = () => {
       }
     };
     if (fileId) fetchConversations();
-  }, [fileId, currentPage, pageSize]);
+  }, [fileId, currentPage, pageSize, activeSearch]);
 
   const openConversation = useCallback(async (conversation: Conversation, index: number) => {
     setSelectedIndex(index);
@@ -102,10 +118,22 @@ export const ConversationPage = () => {
     setSelectedConversation(null);
   };
 
-  const clearIpFilter = () => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    setActiveSearch(search);
+    // Clear URL params when user types a manual search
     setSearchParams({});
   };
 
+  const handleSearchClear = () => {
+    setSearch('');
+    setActiveSearch('');
+    setCurrentPage(1);
+    setSearchParams({});
+  };
+
+  // IP-pair filter (from node details navigation) — applied client-side on top of server results
   const displayedConversations = (filterSrcIp && filterPeerIp)
     ? conversations.filter(c => {
         const [a, b] = c.endpoints;
@@ -125,7 +153,51 @@ export const ConversationPage = () => {
     <div className="conversation-page">
       <div className="row mb-3">
         <div className="col-12">
-          <h4>Network Conversations ({totalItems.toLocaleString()})</h4>
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <h4 className="mb-0">
+              Network Conversations ({totalItems.toLocaleString()})
+            </h4>
+          </div>
+
+          {/* Search bar */}
+          <form onSubmit={handleSearchSubmit} className="d-flex gap-2 mb-2">
+            <div className="input-group">
+              <span className="input-group-text"><i className="bi bi-search"></i></span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="form-control"
+                placeholder="Filter by app, protocol, IP or hostname…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {(search || activeSearch) && (
+                <button type="button" className="btn btn-outline-secondary" onClick={handleSearchClear} title="Clear filter">
+                  ×
+                </button>
+              )}
+            </div>
+            <button type="submit" className="btn btn-primary text-nowrap">Apply</button>
+          </form>
+
+          {/* Active search badge */}
+          {activeSearch && (
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <small className="text-muted">Filtered by:</small>
+              <span className="badge bg-primary">
+                {activeSearch}
+                <button
+                  type="button"
+                  className="btn-close btn-close-white ms-1"
+                  style={{ fontSize: '0.6rem' }}
+                  onClick={handleSearchClear}
+                  aria-label="Clear filter"
+                />
+              </span>
+            </div>
+          )}
+
+          {/* IP-pair filter banner (from node details navigation) */}
           {filterSrcIp && filterPeerIp && (
             <div className="alert alert-info py-2 mb-0 mt-2 d-flex align-items-center justify-content-between">
               <span>
@@ -133,7 +205,7 @@ export const ConversationPage = () => {
                 Showing conversations between <strong className="font-monospace mx-1">{filterSrcIp}</strong> and <strong className="font-monospace mx-1">{filterPeerIp}</strong>
                 {displayedConversations.length === 0 && ' — none found on this page'}
               </span>
-              <button className="btn btn-sm btn-outline-secondary ms-3" onClick={clearIpFilter}>
+              <button className="btn btn-sm btn-outline-secondary ms-3" onClick={() => setSearchParams({})}>
                 Clear filter ×
               </button>
             </div>

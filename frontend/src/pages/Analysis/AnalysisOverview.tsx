@@ -1,4 +1,4 @@
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
@@ -11,7 +11,8 @@ interface AnalysisOutletContext {
 }
 
 export const AnalysisOverview = () => {
-  const { data } = useOutletContext<AnalysisOutletContext>();
+  const { data, fileId } = useOutletContext<AnalysisOutletContext>();
+  const navigate = useNavigate();
 
   const detectedApps = data.detectedApplications ?? [];
 
@@ -30,17 +31,19 @@ export const AnalysisOverview = () => {
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {detectedApps.map(app => (
-              <span
+              <button
                 key={app.name}
-                className="badge rounded-pill px-3 py-2 fs-6"
+                className="badge rounded-pill px-3 py-2 fs-6 border-0"
                 style={{
                   backgroundColor: getAppColor(app.name),
                   color: '#fff',
+                  cursor: 'pointer',
                 }}
-                title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB`}
+                title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
+                onClick={() => navigate(`/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`)}
               >
                 {app.name}
-              </span>
+              </button>
             ))}
           </div>
         </div>

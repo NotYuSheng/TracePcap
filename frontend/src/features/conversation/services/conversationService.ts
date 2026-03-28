@@ -108,7 +108,8 @@ export const conversationService = {
   getConversations: async (
     fileId: string,
     page: number = 1,
-    pageSize: number = 25
+    pageSize: number = 25,
+    search?: string
   ): Promise<PaginatedResponse<Conversation>> => {
     const response = await apiClient.get<{
       data: ConversationApiResponse[];
@@ -117,7 +118,7 @@ export const conversationService = {
       total: number;
       totalPages: number;
     }>(API_ENDPOINTS.CONVERSATIONS(fileId), {
-      params: { page, pageSize },
+      params: { page, pageSize, ...(search ? { search } : {}) },
     });
 
     return {

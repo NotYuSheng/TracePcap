@@ -30,9 +30,11 @@ public class ConversationsController {
       @Parameter(description = "Page number (1-indexed)") @RequestParam(defaultValue = "1")
           int page,
       @Parameter(description = "Number of items per page") @RequestParam(defaultValue = "25")
-          int pageSize) {
+          int pageSize,
+      @Parameter(description = "Filter by app name, protocol, IP or hostname")
+          @RequestParam(required = false) String search) {
 
-    log.info("GET /api/conversations/{} - page: {}, pageSize: {}", fileId, page, pageSize);
+    log.info("GET /api/conversations/{} - page: {}, pageSize: {}, search: {}", fileId, page, pageSize, search);
 
     // Validate pagination parameters
     if (page < 1) {
@@ -42,7 +44,7 @@ public class ConversationsController {
       pageSize = 25; // Default to 25 if invalid
     }
 
-    List<ConversationResponse> allConversations = analysisService.getConversations(fileId);
+    List<ConversationResponse> allConversations = analysisService.getConversations(fileId, search);
     PagedResponse<ConversationResponse> pagedResponse =
         PagedResponse.of(allConversations, page, pageSize);
 

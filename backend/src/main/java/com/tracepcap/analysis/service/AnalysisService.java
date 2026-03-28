@@ -422,8 +422,21 @@ public class AnalysisService {
   }
 
   @Transactional(readOnly = true)
-  public List<ConversationResponse> getConversations(UUID fileId) {
+  public List<ConversationResponse> getConversations(UUID fileId, String search) {
     List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+
+    if (search != null && !search.isBlank()) {
+      String q = search.trim().toLowerCase();
+      conversations = conversations.stream()
+          .filter(c ->
+              (c.getAppName() != null && c.getAppName().toLowerCase().contains(q)) ||
+              (c.getProtocol() != null && c.getProtocol().toLowerCase().contains(q)) ||
+              (c.getSrcIp() != null && c.getSrcIp().toLowerCase().contains(q)) ||
+              (c.getDstIp() != null && c.getDstIp().toLowerCase().contains(q)) ||
+              (c.getHostname() != null && c.getHostname().toLowerCase().contains(q))
+          )
+          .toList();
+    }
 
     return conversations.stream()
         .map(
