@@ -238,7 +238,7 @@ public class PcapParserService {
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
             conv.getPackets().add(buildPacketInfo(
                 packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-                protocol, packetSize, info, null)); // payload not available via tshark path
+                protocol, packetSize, info, null, null)); // payload/app bytes not available via tshark path
           }
         }
       }
@@ -368,6 +368,7 @@ public class PcapParserService {
     Integer srcPort = null;
     Integer dstPort = null;
 
+    byte[] appLayerBytes = null;
     TcpPacket tcpPacket = ipPacket.get(TcpPacket.class);
     if (tcpPacket != null) {
       protocol = "TCP";
@@ -384,6 +385,7 @@ public class PcapParserService {
       String flagStr = flags.isEmpty() ? "" : " [" + String.join(", ", flags) + "]";
       info = srcPort + " \u2192 " + dstPort + flagStr;
       incrementProtocolCount(result, protocol, packetSize);
+      if (tcpPacket.getPayload() != null) appLayerBytes = tcpPacket.getPayload().getRawData();
     } else if (ipPacket.get(UdpPacket.class) != null) {
       UdpPacket udpPacket = ipPacket.get(UdpPacket.class);
       protocol = "UDP";
@@ -391,6 +393,7 @@ public class PcapParserService {
       dstPort = udpPacket.getHeader().getDstPort().valueAsInt();
       info = srcPort + " \u2192 " + dstPort;
       incrementProtocolCount(result, protocol, packetSize);
+      if (udpPacket.getPayload() != null) appLayerBytes = udpPacket.getPayload().getRawData();
     } else if (ipPacket.get(IcmpV4CommonPacket.class) != null) {
       protocol = "ICMP";
       info = "ICMP";
@@ -430,13 +433,14 @@ public class PcapParserService {
     if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
     conv.getPackets().add(buildPacketInfo(
         packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-        protocol, packetSize, info, payloadHex));
+        protocol, packetSize, info, payloadHex, appLayerBytes));
   }
 
   private PacketInfo buildPacketInfo(
       long packetNumber, LocalDateTime timestamp,
       String srcIp, Integer srcPort, String dstIp, Integer dstPort,
-      String protocol, int packetSize, String info, String payloadHex) {
+      String protocol, int packetSize, String info, String payloadHex,
+      byte[] appLayerBytes) {
     PacketInfo pkt = new PacketInfo();
     pkt.setPacketNumber(packetNumber);
     pkt.setTimestamp(timestamp);
@@ -448,7 +452,7 @@ public class PcapParserService {
     pkt.setPacketSize(packetSize);
     pkt.setInfo(info);
     pkt.setPayload(payloadHex);
-    pkt.setDetectedFileType(FileSignatureDetector.detect(payloadHex));
+    pkt.setDetectedFileType(FileSignatureDetector.detect(extractPayloadHex(appLayerBytes)));
     return pkt;
   }
 
