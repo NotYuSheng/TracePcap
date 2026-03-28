@@ -139,7 +139,7 @@ public class NdpiService {
     for (PcapParserService.ConversationInfo conv : conversations) {
       FlowData data = resolve(flowMap, conv);
       if (data == null) continue;
-      if (data.appName() != null) conv.setAppName(data.appName());
+      if (data.appName() != null) conv.setAppName(correctMisclassification(data.appName(), conv.getSrcPort(), conv.getDstPort()));
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
       if (data.hostname() != null) conv.setHostname(data.hostname());
@@ -370,6 +370,28 @@ public class NdpiService {
         ip, port, ip2, port2, proto != null ? proto.toUpperCase() : "");
   }
 
+
+  /**
+   * Corrects known nDPI misclassifications using port-based heuristics as a belt-and-suspenders
+   * guard. nDPI's DPI engine occasionally triggers on binary payload patterns that match a
+   * different protocol's signatures (e.g. UFTP binary transfers matching BitTorrent heuristics).
+   *
+   * <p>Known cases:
+   * <ul>
+   *   <li>UFTP (UDP port 1044, IANA-registered) misclassified as BitTorrent — binary file-transfer
+   *       payload triggers BitTorrent DPI heuristics in nDPI 5.0.0
+   *       (upstream bug: https://github.com/ntop/nDPI/issues/XXXX)</li>
+   *   <li>H.225/H.245 (TCP port 1720) misclassified as Cassandra — belt-and-suspenders guard
+   *       for older nDPI builds where this is not yet fixed natively</li>
+   * </ul>
+   */
+  private static String correctMisclassification(String appName, Integer srcPort, Integer dstPort) {
+    int sp = srcPort  != null ? srcPort  : 0;
+    int dp = dstPort  != null ? dstPort  : 0;
+    if ("BitTorrent".equalsIgnoreCase(appName) && (sp == 1044 || dp == 1044)) return "UFTP";
+    if ("Cassandra".equalsIgnoreCase(appName)  && (sp == 1720 || dp == 1720)) return "H225";
+    return appName;
+  }
 
   private boolean isNotFoundError(Exception e) {
     String msg = e.getMessage();

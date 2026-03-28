@@ -3,7 +3,7 @@ import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
 import { CategoryBreakdownChart } from '@components/analysis/CategoryBreakdown';
-import { getAppColor } from '@/utils/appColors';
+import { getAppColor, getTextColor } from '@/utils/appColors';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -36,7 +36,7 @@ export const AnalysisOverview = () => {
                 className="badge rounded-pill px-3 py-2 fs-6 border-0"
                 style={{
                   backgroundColor: getAppColor(app.name),
-                  color: '#fff',
+                  color: getTextColor(getAppColor(app.name)),
                   cursor: 'pointer',
                 }}
                 title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
@@ -60,6 +60,18 @@ export const AnalysisOverview = () => {
           <CategoryBreakdownChart categoryStats={data.categoryDistribution} />
         </div>
       )}
+
+      <div className="alert alert-info mt-4 mb-0 small" role="note">
+        <i className="bi bi-info-circle me-2"></i>
+        <strong>About application detection:</strong> Application and category labels are
+        detected by <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noreferrer">nDPI</a> using
+        deep packet inspection heuristics. DPI is probabilistic — some flows may be misclassified,
+        especially when payload patterns resemble another protocol (e.g. binary file transfers
+        matching peer-to-peer signatures). Encrypted traffic (TLS/QUIC) is identified by metadata
+        such as SNI, JA3 fingerprints, and port, not payload content. Treat labels as strong
+        indicators, not definitive classifications. If you see an unexpected application label,
+        cross-reference the destination IP/port and raw packet payload for confirmation.
+      </div>
     </div>
   );
 };
