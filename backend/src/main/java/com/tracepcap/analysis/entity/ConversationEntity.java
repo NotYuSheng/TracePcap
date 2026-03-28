@@ -18,6 +18,10 @@ import org.hibernate.annotations.CreationTimestamp;
 @AllArgsConstructor
 public class ConversationEntity {
 
+  public static final int APP_NAME_MAX_LENGTH = 50;
+  public static final int CATEGORY_MAX_LENGTH = 50;
+  public static final int HOSTNAME_MAX_LENGTH = 255;
+
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
@@ -41,14 +45,17 @@ public class ConversationEntity {
   @Column(nullable = false, length = 20)
   private String protocol;
 
-  @Column(name = "app_name", length = 50)
+  @Column(name = "app_name", length = APP_NAME_MAX_LENGTH)
   private String appName;
 
   @Column(name = "flow_risks", columnDefinition = "text[]")
   private String[] flowRisks;
 
-  @Column(name = "category", length = 50)
+  @Column(name = "category", length = CATEGORY_MAX_LENGTH)
   private String category;
+
+  @Column(name = "hostname", length = HOSTNAME_MAX_LENGTH)
+  private String hostname;
 
   @Column(name = "packet_count", nullable = false)
   @Builder.Default

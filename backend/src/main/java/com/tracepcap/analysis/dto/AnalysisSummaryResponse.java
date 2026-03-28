@@ -63,6 +63,7 @@ public class AnalysisSummaryResponse {
     private Integer dstPort;
     private String protocol;
     private String appName;
+    private String hostname;
     private Long startTime;
     private Long endTime;
     private Long packetCount;

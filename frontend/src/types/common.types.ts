@@ -44,6 +44,7 @@ export interface Conversation {
   protocol: Protocol;
   appName?: string;
   category?: string;
+  hostname?: string;
   flowRisks: string[];
   startTime: number;
   endTime: number;

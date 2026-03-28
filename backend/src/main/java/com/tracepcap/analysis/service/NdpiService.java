@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.entity.ConversationEntity;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -63,6 +64,12 @@ public class NdpiService {
       Pattern.CASE_INSENSITIVE
   );
 
+  /** Matches the hostname/SNI field, e.g. [Hostname/SNI: zoom.us] → group(1) = "zoom.us". */
+  private static final Pattern HOSTNAME = Pattern.compile(
+      "\\[Hostname/SNI:\\s*([^\\]]+)\\]",
+      Pattern.CASE_INSENSITIVE
+  );
+
   /** Transport-only names that carry no application-layer signal. */
   private static final Set<String> SKIP_PROTOCOLS = Set.of(
       "TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN"
@@ -89,14 +96,16 @@ public class NdpiService {
       if (data.appName() != null) conv.setAppName(data.appName());
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
+      if (data.hostname() != null) conv.setHostname(data.hostname());
     }
 
     long enrichedApps       = conversations.stream().filter(c -> c.getAppName() != null).count();
     long enrichedRisks      = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
     long enrichedCategories = conversations.stream().filter(c -> c.getCategory() != null).count();
-    log.info("nDPI enriched {}/{} with app names, {}/{} with risks, {}/{} with categories",
+    long enrichedHostnames  = conversations.stream().filter(c -> c.getHostname() != null).count();
+    log.info("nDPI enriched {}/{} with app names, {}/{} with risks, {}/{} with categories, {}/{} with hostnames",
         enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
-        enrichedCategories, conversations.size());
+        enrichedCategories, conversations.size(), enrichedHostnames, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
@@ -104,7 +113,7 @@ public class NdpiService {
   // ---------------------------------------------------------------------------
 
   /** Immutable holder for per-flow nDPI data extracted from one -v 2 line. */
-  private record FlowData(String appName, List<String> risks, String category) {}
+  private record FlowData(String appName, List<String> risks, String category, String hostname) {}
 
   /**
    * Runs {@code ndpiReader -i <file> -v 2} and returns a map of flow key → FlowData.
@@ -172,7 +181,8 @@ public class NdpiService {
     int dot = protoField.lastIndexOf('.');
     String appName = dot >= 0 ? protoField.substring(dot + 1) : protoField;
     if (SKIP_PROTOCOLS.contains(appName)) appName = null;
-    if (appName != null && appName.length() > 50) appName = appName.substring(0, 50);
+    if (appName != null && appName.length() > ConversationEntity.APP_NAME_MAX_LENGTH)
+      appName = appName.substring(0, ConversationEntity.APP_NAME_MAX_LENGTH);
 
     // Risk names from [Risk: ** Name1 **** Name2 **] block
     List<String> risks = new ArrayList<>();
@@ -189,10 +199,20 @@ public class NdpiService {
     Matcher cm = CATEGORY.matcher(line);
     if (cm.find()) {
       category = cm.group(1).trim();
-      if (category.length() > 50) category = category.substring(0, 50);
+      if (category.length() > ConversationEntity.CATEGORY_MAX_LENGTH)
+        category = category.substring(0, ConversationEntity.CATEGORY_MAX_LENGTH);
     }
 
-    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks, category));
+    // Hostname/SNI from [Hostname/SNI: host] field
+    String hostname = null;
+    Matcher hm = HOSTNAME.matcher(line);
+    if (hm.find()) {
+      hostname = hm.group(1).trim();
+      if (hostname.length() > ConversationEntity.HOSTNAME_MAX_LENGTH)
+        hostname = hostname.substring(0, ConversationEntity.HOSTNAME_MAX_LENGTH);
+    }
+
+    result.put(flowKey(srcIp, srcPort, dstIp, dstPort, l4proto), new FlowData(appName, risks, category, hostname));
   }
 
   /** Lookup flow data trying both directions (src→dst and dst→src). */
