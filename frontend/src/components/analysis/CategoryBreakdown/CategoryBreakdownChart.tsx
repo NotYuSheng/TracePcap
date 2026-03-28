@@ -5,14 +5,19 @@ import { formatBytes } from '@/utils/formatters';
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 
 const categoryInfoPopover = (
-  <Popover id="category-info" style={{ maxWidth: '300px' }}>
+  <Popover id="category-info" style={{ maxWidth: '310px' }}>
     <Popover.Header>About category detection</Popover.Header>
     <Popover.Body>
+      <p className="mb-2">
+        Categories are assigned by <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noreferrer">nDPI</a> by
+        first identifying the application (e.g. YouTube → <em>Media</em>, Google → <em>Web</em>),
+        then mapping it to a category.
+      </p>
       <p className="mb-0">
-        Categories are assigned by <strong>nDPI</strong> based on its application detection
-        (e.g. YouTube → Media, Google → Web). They inherit the same probabilistic limitations —
-        a misidentified application will produce an incorrect category. Treat as indicative,
-        not definitive.
+        Because application detection uses deep packet inspection heuristics, it is
+        <strong> probabilistic</strong> — binary payloads can occasionally match the wrong
+        signature. A misidentified application will produce an incorrect category.
+        Treat category labels as strong indicators, not definitive classifications.
       </p>
     </Popover.Body>
   </Popover>

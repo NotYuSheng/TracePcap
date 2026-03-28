@@ -13,9 +13,9 @@ const protocolInfoPopover = (
     <Popover.Body>
       <p className="mb-0">
         Shows the breakdown of <strong>transport-layer protocols</strong> (TCP, UDP, ICMP, ARP,
-        etc.) derived directly from IP packet headers. These are deterministic — no heuristics
-        involved. For application-layer identification (HTTP, TLS, DNS, etc.) see the
-        Applications Detected section above.
+        etc.) read directly from IP packet headers. This is deterministic — no heuristics or
+        guesswork involved. Every packet's protocol is stated explicitly in its header and
+        cannot be misidentified.
       </p>
     </Popover.Body>
   </Popover>
