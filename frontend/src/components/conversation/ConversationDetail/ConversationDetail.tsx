@@ -26,8 +26,7 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
   const [source, destination] = conversation.endpoints;
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
 
-  const togglePacket = (id: string) =>
-    setExpandedPacketId(prev => (prev === id ? null : id));
+  const togglePacket = (id: string) => setExpandedPacketId(prev => (prev === id ? null : id));
 
   const getDirectionIndicator = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
@@ -70,7 +69,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      <span className="badge" style={{ backgroundColor: getAppColor(conversation.appName!), color: '#fff' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: getAppColor(conversation.appName!),
+                          color: '#fff',
+                        }}
+                      >
                         {conversation.appName}
                       </span>
                     </dd>
@@ -120,7 +125,13 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                   <>
                     <dt className="col-sm-4">Cert Valid To:</dt>
                     <dd className="col-sm-8">
-                      <small className={conversation.tlsNotAfter < Date.now() ? 'text-danger fw-semibold' : undefined}>
+                      <small
+                        className={
+                          conversation.tlsNotAfter < Date.now()
+                            ? 'text-danger fw-semibold'
+                            : undefined
+                        }
+                      >
                         {formatTimestamp(conversation.tlsNotAfter)}
                         {conversation.tlsNotAfter < Date.now() && (
                           <span className="ms-1 badge bg-danger">Expired</span>
@@ -193,9 +204,16 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                         </td>
                         <td>{packet.size} B</td>
                         <td>
-                          <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
+                          <small className="text-muted">
+                            {packet.info ?? packet.protocol.name}
+                          </small>
                           {hasReadableAscii(packet.payload) && (
-                            <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
+                            <span
+                              className="badge bg-warning text-dark ms-1"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              ASCII
+                            </span>
                           )}
                         </td>
                       </tr>
