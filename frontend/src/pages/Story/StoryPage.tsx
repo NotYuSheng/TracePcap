@@ -61,12 +61,6 @@ export const StoryPage = () => {
     }
   }, [fileId]);
 
-  useEffect(() => {
-    // Auto-generate story on page load
-    if (fileId && !story) {
-      handleGenerateStory();
-    }
-  }, [fileId]);
 
   // Calculate traffic statistics
   const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0);

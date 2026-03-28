@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 /** LLM API configuration (OpenAI-compatible format) */
@@ -40,6 +41,11 @@ public class LlmConfig {
 
   @Bean
   public RestTemplate llmRestTemplate() {
-    return new RestTemplate();
+    int timeoutMs = (api != null && api.getTimeoutSeconds() != null)
+        ? api.getTimeoutSeconds() * 1000 : 60_000;
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(timeoutMs);
+    factory.setReadTimeout(timeoutMs);
+    return new RestTemplate(factory);
   }
 }
