@@ -2,7 +2,10 @@ package com.tracepcap.analysis.service;
 
 import java.io.ByteArrayInputStream;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+
+@Slf4j
 
 /**
  * Detects file types from the leading bytes of a packet's application-layer payload using Apache
@@ -89,6 +92,7 @@ public final class FileSignatureDetector {
       }
       return label;
     } catch (Exception e) {
+      log.warn("File signature detection failed", e);
       return null;
     }
   }
