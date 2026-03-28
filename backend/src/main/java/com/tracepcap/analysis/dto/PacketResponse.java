@@ -22,4 +22,5 @@ public class PacketResponse {
   private String protocol;
   private Integer packetSize;
   private String info;
+  private String payload;
 }

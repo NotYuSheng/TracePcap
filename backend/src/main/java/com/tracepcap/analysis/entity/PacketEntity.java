@@ -57,6 +57,12 @@ public class PacketEntity {
   @Column(columnDefinition = "TEXT")
   private String info;
 
+  /** First {@value #PAYLOAD_BYTE_LIMIT} bytes of the raw frame, stored as a lowercase hex string. */
+  public static final int PAYLOAD_BYTE_LIMIT = 1024;
+
+  @Column(columnDefinition = "TEXT")
+  private String payload;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
