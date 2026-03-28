@@ -29,6 +29,17 @@ export const useAnalysisData = (fileId: string) => {
       setLoading(true);
       setError(null);
 
+      // Fetch the backend-configured analysis timeout (derived from APP_MEMORY_MB).
+      // Falls back to 5 minutes if the endpoint is unreachable.
+      let analysisTimeoutMs = 5 * 60 * 1000;
+      try {
+        const limitsRes = await fetch('/api/system/limits');
+        if (limitsRes.ok) {
+          const limits = await limitsRes.json();
+          if (limits.analysisTimeoutMs) analysisTimeoutMs = limits.analysisTimeoutMs;
+        }
+      } catch { /* keep default */ }
+
       // Poll analysis endpoint using HTTP status codes
       const pollStatus = async () => {
         try {
@@ -85,7 +96,7 @@ export const useAnalysisData = (fileId: string) => {
       // Set up polling every 2 seconds
       pollInterval = setInterval(pollStatus, 2000);
 
-      // Timeout after 60 seconds
+      // Timeout after backend-configured analysis timeout
       setTimeout(() => {
         if (pollInterval) {
           clearInterval(pollInterval);
@@ -94,7 +105,7 @@ export const useAnalysisData = (fileId: string) => {
             setLoading(false);
           }
         }
-      }, 60000);
+      }, analysisTimeoutMs);
     };
 
     checkStatusAndFetch();

@@ -15,15 +15,19 @@ public class SystemController {
   @Value("${MAX_UPLOAD_SIZE_BYTES:536870912}")
   private long maxUploadSizeBytes;
 
+  @Value("${ANALYSIS_TIMEOUT_SECONDS:300}")
+  private int analysisTimeoutSeconds;
+
   /**
-   * Returns the effective upload size limit so the frontend can display it without
-   * baking a value in at build time. Derived at container startup from APP_MEMORY_MB.
+   * Returns runtime limits derived from APP_MEMORY_MB so the frontend never needs
+   * build-time baked values. Consumed by the upload page and the analysis polling hook.
    */
   @GetMapping("/limits")
   public ResponseEntity<Map<String, Object>> getLimits() {
     return ResponseEntity.ok(Map.of(
-        "maxUploadBytes", maxUploadSizeBytes,
-        "maxUploadMb",    maxUploadSizeBytes / 1024 / 1024
+        "maxUploadBytes",    maxUploadSizeBytes,
+        "maxUploadMb",       maxUploadSizeBytes / 1024 / 1024,
+        "analysisTimeoutMs", (long) analysisTimeoutSeconds * 1000
     ));
   }
 }
