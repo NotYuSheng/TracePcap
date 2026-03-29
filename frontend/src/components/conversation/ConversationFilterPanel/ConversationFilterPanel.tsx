@@ -3,7 +3,7 @@ import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
-import { getAppColor, getCategoryColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getL7ProtocolColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationFilterPanel.css';
 
@@ -240,7 +240,7 @@ export function ConversationFilterPanel({
                   <div className="d-flex flex-wrap gap-1">
                     {l7Protocols.map(proto => {
                       const isActive = filters.l7Protocols.includes(proto);
-                      const bg = getProtocolColor(proto);
+                      const bg = getL7ProtocolColor(proto);
                       return (
                         <button
                           key={proto}

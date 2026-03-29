@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
-import { getAppColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
+import { getAppColor, getL7ProtocolColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { HexViewer } from '../HexViewer/HexViewer';
 
@@ -83,7 +83,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                   <>
                     <dt className="col-sm-4">L7 Protocol:</dt>
                     <dd className="col-sm-8">
-                      {(() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
+                      {(() => { const bg = getL7ProtocolColor(conversation.tsharkProtocol!); return (
                         <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.tsharkProtocol}</span>
                       ); })()}
                     </dd>
