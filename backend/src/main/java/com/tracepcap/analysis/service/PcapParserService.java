@@ -29,24 +29,43 @@ public class PcapParserService {
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info |
     //         tcp.payload | udp.payload
-    ProcessBuilder pb = new ProcessBuilder(
-        "tshark", "-r", pcapFile.getAbsolutePath(),
-        "-T", "fields",
-        "-E", "separator=|",
-        "-e", "frame.time_epoch",
-        "-e", "frame.len",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "ipv6.src",
-        "-e", "ipv6.dst",
-        "-e", "tcp.srcport",
-        "-e", "tcp.dstport",
-        "-e", "udp.srcport",
-        "-e", "udp.dstport",
-        "-e", "_ws.col.Protocol",
-        "-e", "_ws.col.Info",
-        "-e", "tcp.payload",
-        "-e", "udp.payload");
+    ProcessBuilder pb =
+        new ProcessBuilder(
+            "tshark",
+            "-r",
+            pcapFile.getAbsolutePath(),
+            "-T",
+            "fields",
+            "-E",
+            "separator=|",
+            "-e",
+            "frame.time_epoch",
+            "-e",
+            "frame.len",
+            "-e",
+            "ip.src",
+            "-e",
+            "ip.dst",
+            "-e",
+            "ipv6.src",
+            "-e",
+            "ipv6.dst",
+            "-e",
+            "tcp.srcport",
+            "-e",
+            "tcp.dstport",
+            "-e",
+            "udp.srcport",
+            "-e",
+            "udp.dstport",
+            "-e",
+            "_ws.col.Protocol",
+            "-e",
+            "_ws.col.Info",
+            "-e",
+            "tcp.payload",
+            "-e",
+            "udp.payload");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     long packetNumber = 0;
@@ -143,9 +162,19 @@ public class PcapParserService {
               tsharkPayload = f[13]; // udp.payload
             }
             String payloadHex = parseTsharkPayloadHex(tsharkPayload);
-            conv.getPackets().add(buildPacketInfo(
-                packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
-                protocol, packetSize, info, payloadHex));
+            conv.getPackets()
+                .add(
+                    buildPacketInfo(
+                        packetNumber,
+                        timestamp,
+                        srcIp,
+                        srcPort,
+                        dstIp,
+                        dstPort,
+                        protocol,
+                        packetSize,
+                        info,
+                        payloadHex));
           }
         }
       }
@@ -179,9 +208,16 @@ public class PcapParserService {
   // ---------------------------------------------------------------------------
 
   private PacketInfo buildPacketInfo(
-      long packetNumber, LocalDateTime timestamp,
-      String srcIp, Integer srcPort, String dstIp, Integer dstPort,
-      String protocol, int packetSize, String info, String payloadHex) {
+      long packetNumber,
+      LocalDateTime timestamp,
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort,
+      String protocol,
+      int packetSize,
+      String info,
+      String payloadHex) {
 
     PacketInfo pkt = new PacketInfo();
     pkt.setPacketNumber(packetNumber);
@@ -219,8 +255,9 @@ public class PcapParserService {
     if (len % 2 != 0) len--; // drop incomplete trailing nibble
     byte[] data = new byte[len / 2];
     for (int i = 0; i < len; i += 2) {
-      data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-          | Character.digit(hex.charAt(i + 1), 16));
+      data[i / 2] =
+          (byte)
+              ((Character.digit(hex.charAt(i), 16) << 4) | Character.digit(hex.charAt(i + 1), 16));
     }
     return data;
   }
@@ -244,9 +281,15 @@ public class PcapParserService {
 
     int cmp = srcIp.compareTo(dstIp);
     if (cmp < 0 || (cmp == 0 && srcPort != null && dstPort != null && srcPort < dstPort)) {
-      ip1 = srcIp; port1 = srcPort; ip2 = dstIp; port2 = dstPort;
+      ip1 = srcIp;
+      port1 = srcPort;
+      ip2 = dstIp;
+      port2 = dstPort;
     } else {
-      ip1 = dstIp; port1 = dstPort; ip2 = srcIp; port2 = srcPort;
+      ip1 = dstIp;
+      port1 = dstPort;
+      ip2 = srcIp;
+      port2 = srcPort;
     }
     return String.format("%s:%s-%s:%s-%s", ip1, port1, ip2, port2, protocol);
   }
@@ -304,8 +347,10 @@ public class PcapParserService {
     private String protocol;
     private Integer packetSize;
     private String info;
+
     /** First {@link PacketEntity#PAYLOAD_BYTE_LIMIT} bytes as a lowercase hex string, or null. */
     private String payload;
+
     /** File type detected from magic bytes, or null if unknown. */
     private String detectedFileType;
   }
