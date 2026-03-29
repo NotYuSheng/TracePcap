@@ -61,6 +61,7 @@ public class AnalysisService {
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
   private final NdpiService ndpiService;
+  private final TsharkEnrichmentService tsharkEnrichmentService;
   private final CustomSignatureService customSignatureService;
 
   @Transactional
@@ -107,7 +108,11 @@ public class AnalysisService {
       // Enrich conversations with app names and security risks via nDPI (single subprocess run)
       ndpiService.enrich(tempFile, parseResult.getConversations());
 
-      // Apply custom user-defined signature rules (appends matched rule names to flowRisks)
+      // Enrich with Wireshark dissector-based protocol detection; fills appName when nDPI is
+      // null/generic and stores the raw tshark label for mismatch detection in the UI
+      tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
+
+      // Apply custom user-defined signature rules (appends matched rule names to customSignatures)
       customSignatureService.applySignatures(parseResult.getConversations());
 
       // Update analysis results
@@ -156,6 +161,7 @@ public class AnalysisService {
                 .dstPort(convInfo.getDstPort())
                 .protocol(convInfo.getProtocol())
                 .appName(convInfo.getAppName())
+                .tsharkProtocol(convInfo.getTsharkProtocol())
                 .category(convInfo.getCategory())
                 .hostname(convInfo.getHostname())
                 .ja3Client(convInfo.getJa3Client())
@@ -547,6 +553,7 @@ public class AnalysisService {
         .dstPort(conv.getDstPort())
         .protocol(conv.getProtocol())
         .appName(conv.getAppName())
+        .tsharkProtocol(conv.getTsharkProtocol())
         .category(conv.getCategory())
         .hostname(conv.getHostname())
         .ja3Client(conv.getJa3Client())
@@ -653,6 +660,7 @@ public class AnalysisService {
         .dstPort(conversation.getDstPort())
         .protocol(conversation.getProtocol())
         .appName(conversation.getAppName())
+        .tsharkProtocol(conversation.getTsharkProtocol())
         .category(conversation.getCategory())
         .hostname(conversation.getHostname())
         .ja3Client(conversation.getJa3Client())

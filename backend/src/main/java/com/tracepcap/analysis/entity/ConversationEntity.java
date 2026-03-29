@@ -50,6 +50,9 @@ public class ConversationEntity {
   @Column(name = "app_name", length = APP_NAME_MAX_LENGTH)
   private String appName;
 
+  @Column(name = "tshark_protocol", length = APP_NAME_MAX_LENGTH)
+  private String tsharkProtocol;
+
   @Column(name = "flow_risks", columnDefinition = "text[]")
   private String[] flowRisks;
 

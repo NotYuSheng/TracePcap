@@ -44,6 +44,7 @@ export interface Conversation {
   endpoints: [NetworkEndpoint, NetworkEndpoint];
   protocol: Protocol;
   appName?: string;
+  tsharkProtocol?: string;
   category?: string;
   hostname?: string;
   ja3Client?: string;

@@ -222,9 +222,24 @@ export const ConversationList = ({
                   )}
                   {col('appName') && hasAppNames && (
                     <td>
-                      {conversation.appName ? (() => { const bg = getAppColor(conversation.appName); return (
-                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
-                      ); })() : <span className="text-muted">—</span>}
+                      {conversation.appName ? (() => {
+                        const bg = getAppColor(conversation.appName);
+                        const hasMismatch = !!conversation.tsharkProtocol &&
+                          conversation.appName.toLowerCase() !==
+                          conversation.tsharkProtocol.replace(/^TLSv[\d.]+$/i, 'TLS').toLowerCase();
+                        return (
+                          <span className="d-flex align-items-center gap-1 flex-wrap">
+                            <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
+                            {hasMismatch && (
+                              <i
+                                className="bi bi-exclamation-triangle-fill"
+                                style={{ color: '#fd7e14', fontSize: '0.8rem' }}
+                                title={`Wireshark detected "${conversation.tsharkProtocol}" — differs from nDPI`}
+                              />
+                            )}
+                          </span>
+                        );
+                      })() : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('category') && hasCategories && (

@@ -662,6 +662,7 @@ public class PcapParserService {
     private Integer dstPort;
     private String protocol;
     private String appName;
+    private String tsharkProtocol;
     private List<String> flowRisks = new ArrayList<>();
     private List<String> customSignatures = new ArrayList<>();
     private String category;

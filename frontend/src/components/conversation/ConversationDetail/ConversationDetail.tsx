@@ -79,13 +79,36 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.protocol.name}</span>
                   ); })()}
                 </dd>
-                {conversation.appName && (
+                {(conversation.appName || conversation.tsharkProtocol) && (
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      {(() => { const bg = getAppColor(conversation.appName!); return (
-                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
-                      ); })()}
+                      <div className="d-flex flex-wrap align-items-center gap-2">
+                        {conversation.appName && (() => {
+                          const bg = getAppColor(conversation.appName!);
+                          return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
+                        })()}
+                        {conversation.tsharkProtocol && (() => {
+                          const hasMismatch = !!conversation.appName &&
+                            conversation.appName.toLowerCase() !==
+                            conversation.tsharkProtocol!.replace(/^TLSv[\d.]+$/i, 'TLS').toLowerCase();
+                          return (
+                            <span className="text-muted small d-flex align-items-center gap-1">
+                              <i className="bi bi-eye" title="Wireshark dissector detection"></i>
+                              Wireshark: <strong>{conversation.tsharkProtocol}</strong>
+                              {hasMismatch && (
+                                <span
+                                  className="badge"
+                                  style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.7rem' }}
+                                  title={`nDPI identified "${conversation.appName}" but Wireshark identified "${conversation.tsharkProtocol}" — may indicate protocol tunnelling or a misclassification`}
+                                >
+                                  <i className="bi bi-exclamation-triangle-fill me-1"></i>mismatch
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </dd>
                   </>
                 )}
