@@ -10,6 +10,8 @@ export function getCategoryColor(category: string): string {
   return colorHash.hex(category);
 }
 
+export const getL7ProtocolColor = getCategoryColor;
+
 const SEVERITY_COLORS: Record<string, { bg: string; text: string }> = {
   critical: { bg: '#dc3545', text: '#fff' },
   high:     { bg: '#fd7e14', text: '#fff' },

@@ -3,7 +3,7 @@ import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
-import { getAppColor, getCategoryColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getL7ProtocolColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
 
@@ -223,7 +223,7 @@ export const ConversationList = ({
                   )}
                   {col('tsharkProtocol') && hasL7Protocols && (
                     <td>
-                      {conversation.tsharkProtocol ? (() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
+                      {conversation.tsharkProtocol ? (() => { const bg = getL7ProtocolColor(conversation.tsharkProtocol!); return (
                         <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>
                           {conversation.tsharkProtocol}
                         </span>

@@ -4,8 +4,7 @@ import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
 import { CategoryBreakdownChart } from '@components/analysis/CategoryBreakdown';
-import { getAppColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
-import { getProtocolColor } from '@/features/network/constants';
+import { getAppColor, getL7ProtocolColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 
@@ -173,7 +172,7 @@ export const AnalysisOverview = () => {
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {data.detectedL7Protocols.map(proto => {
-              const bg = getProtocolColor(proto);
+              const bg = getL7ProtocolColor(proto);
               return (
                 <button
                   key={proto}
