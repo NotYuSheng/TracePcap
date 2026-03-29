@@ -121,7 +121,9 @@ public class TsharkEnrichmentService {
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
           String line;
           while ((line = err.readLine()) != null) log.debug("tshark stderr: {}", line);
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+          log.debug("Error draining tshark stderr", e);
+        }
       });
       errDrainer.setDaemon(true);
       errDrainer.start();
@@ -226,7 +228,11 @@ public class TsharkEnrichmentService {
    */
   private String canonicalKey(String ip1, Integer port1, String ip2, Integer port2, String proto) {
     int cmp = ip1.compareTo(ip2);
-    boolean swap = cmp > 0 || (cmp == 0 && port1 != null && port2 != null && port1 > port2);
+    if (cmp == 0) {
+      // Null-safe port comparison: treat null as smaller than any valid port number.
+      cmp = Integer.compare(port1 == null ? -1 : port1, port2 == null ? -1 : port2);
+    }
+    boolean swap = cmp > 0;
     return swap
         ? flowKey(ip2, port2, ip1, port1, proto)
         : flowKey(ip1, port1, ip2, port2, proto);

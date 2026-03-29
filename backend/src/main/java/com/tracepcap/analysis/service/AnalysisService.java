@@ -108,8 +108,8 @@ public class AnalysisService {
       // Enrich conversations with app names and security risks via nDPI (single subprocess run)
       ndpiService.enrich(tempFile, parseResult.getConversations());
 
-      // Enrich with Wireshark dissector-based protocol detection; fills appName when nDPI is
-      // null/generic and stores the raw tshark label for mismatch detection in the UI
+      // Enrich with Wireshark dissector-based protocol detection; stores the L7 protocol
+      // label in tsharkProtocol for complementary display in the UI alongside nDPI results.
       tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
 
       // Apply custom user-defined signature rules (appends matched rule names to customSignatures)
@@ -162,7 +162,6 @@ public class AnalysisService {
                 .protocol(convInfo.getProtocol())
                 .appName(convInfo.getAppName())
                 .tsharkProtocol(convInfo.getTsharkProtocol())
-                .ndpiProtocol(convInfo.getNdpiProtocol())
                 .category(convInfo.getCategory())
                 .hostname(convInfo.getHostname())
                 .ja3Client(convInfo.getJa3Client())
@@ -563,7 +562,6 @@ public class AnalysisService {
         .protocol(conv.getProtocol())
         .appName(conv.getAppName())
         .tsharkProtocol(conv.getTsharkProtocol())
-        .ndpiProtocol(conv.getNdpiProtocol())
         .category(conv.getCategory())
         .hostname(conv.getHostname())
         .ja3Client(conv.getJa3Client())
@@ -671,7 +669,6 @@ public class AnalysisService {
         .protocol(conversation.getProtocol())
         .appName(conversation.getAppName())
         .tsharkProtocol(conversation.getTsharkProtocol())
-        .ndpiProtocol(conversation.getNdpiProtocol())
         .category(conversation.getCategory())
         .hostname(conversation.getHostname())
         .ja3Client(conversation.getJa3Client())
