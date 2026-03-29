@@ -14,13 +14,21 @@ TIMEOUT=$(( MEM * 45 / 100 ))
 if [ "$TIMEOUT" -lt 300 ]; then TIMEOUT=300; fi
 if [ "$TIMEOUT" -gt 900 ]; then TIMEOUT=900; fi
 
+# Ensure signatures.yml exists and is writable by the spring user.
+# Runs as root so it can fix ownership regardless of how the named volume was seeded.
+if [ ! -f /app/config/signatures.yml ] && [ -f /app/config-defaults/signatures.yml ]; then
+  cp /app/config-defaults/signatures.yml /app/config/signatures.yml
+fi
+chown spring:spring /app/config/signatures.yml 2>/dev/null || true
+chmod 664 /app/config/signatures.yml 2>/dev/null || true
+
 echo "TracePcap backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
 echo "  JVM heap (-Xms/-Xmx) = ${JVM_HEAP_MB} MB"
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"
 echo "  Analysis timeout     = ${TIMEOUT} s"
 
-exec java \
+exec gosu spring java \
   -Xmx${JVM_HEAP_MB}m \
   -Xms${JVM_HEAP_MB}m \
   -DMAX_UPLOAD_SIZE_BYTES=${MAX_UPLOAD_BYTES} \

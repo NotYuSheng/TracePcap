@@ -20,6 +20,7 @@ public class ConversationResponse {
   private Integer dstPort;
   private String protocol;
   private String appName;
+  private String tsharkProtocol;
   private String category;
   private String hostname;
   private String ja3Client;

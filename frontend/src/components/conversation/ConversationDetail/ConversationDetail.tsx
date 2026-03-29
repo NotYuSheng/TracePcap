@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
-import { getAppColor, getTextColor, getSeverityColor } from '@/utils/appColors';
+import { getAppColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { HexViewer } from '../HexViewer/HexViewer';
 
@@ -73,19 +73,30 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <small className="text-info d-block">{conversation.hostname}</small>
                   )}
                 </dd>
-                <dt className="col-sm-4">Protocol:</dt>
+                <dt className="col-sm-4">L4 Protocol:</dt>
                 <dd className="col-sm-8">
                   {(() => { const bg = getProtocolColor(conversation.protocol.name); return (
                     <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.protocol.name}</span>
                   ); })()}
                 </dd>
+                {conversation.tsharkProtocol && (
+                  <>
+                    <dt className="col-sm-4">L7 Protocol:</dt>
+                    <dd className="col-sm-8">
+                      {(() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.tsharkProtocol}</span>
+                      ); })()}
+                    </dd>
+                  </>
+                )}
                 {conversation.appName && (
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      {(() => { const bg = getAppColor(conversation.appName!); return (
-                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
-                      ); })()}
+                      {(() => {
+                        const bg = getAppColor(conversation.appName!);
+                        return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
+                      })()}
                     </dd>
                   </>
                 )}
@@ -95,8 +106,8 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <dd className="col-sm-8">
                       <div className="d-flex flex-wrap gap-1">
                         {conversation.flowRisks.map(risk => (
-                          <span key={risk} className="badge" style={{ backgroundColor: '#ffc107', color: '#212529' }}>
-                            <i className="bi bi-shield-exclamation me-1"></i>{risk}
+                          <span key={risk} className="badge" style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, whiteSpace: 'nowrap' }}>
+                            {risk}
                           </span>
                         ))}
                       </div>
@@ -111,7 +122,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                         {conversation.customSignatures.map(rule => {
                           const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                           return (
-                          <span key={rule} className="badge" style={{ backgroundColor: bg, color: text }}>
+                          <span key={rule} className="badge" style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}>
                             {rule.replace(/_/g, ' ')}
                           </span>
                           );

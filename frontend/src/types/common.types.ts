@@ -44,6 +44,7 @@ export interface Conversation {
   endpoints: [NetworkEndpoint, NetworkEndpoint];
   protocol: Protocol;
   appName?: string;
+  tsharkProtocol?: string;
   category?: string;
   hostname?: string;
   ja3Client?: string;
@@ -75,6 +76,7 @@ export interface AnalysisSummary {
   uniqueHosts: NetworkEndpoint[];
   detectedApplications?: DetectedApplication[];
   detectedApplicationsTruncated?: boolean;
+  detectedL7Protocols?: string[];
   categoryDistribution?: CategoryStat[];
   fiveWs?: FiveWsAnalysis;
   securityAlertCount?: number;

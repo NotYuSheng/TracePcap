@@ -57,7 +57,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
   return (
     <div className="protocol-breakdown">
       <h3 className="breakdown-title d-flex align-items-center gap-2">
-        Protocol Distribution
+        L4 Protocol Distribution
         <OverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover} rootClose>
           <button
             type="button"

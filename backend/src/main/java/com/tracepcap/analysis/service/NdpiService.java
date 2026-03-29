@@ -157,7 +157,7 @@ public class NdpiService {
     long enrichedHostnames  = conversations.stream().filter(c -> c.getHostname() != null).count();
     long enrichedJa3        = conversations.stream().filter(c -> c.getJa3Client() != null).count();
     long enrichedTlsCert    = conversations.stream().filter(c -> c.getTlsIssuer() != null).count();
-    log.info("nDPI enriched apps: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}, TLS certs: {}/{}",
+    log.info("nDPI identified protocols: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}, TLS certs: {}/{}",
         enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
         enrichedCategories, conversations.size(), enrichedHostnames, conversations.size(),
         enrichedJa3, conversations.size(), enrichedTlsCert, conversations.size());

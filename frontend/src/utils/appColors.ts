@@ -13,9 +13,12 @@ export function getCategoryColor(category: string): string {
 const SEVERITY_COLORS: Record<string, { bg: string; text: string }> = {
   critical: { bg: '#dc3545', text: '#fff' },
   high:     { bg: '#fd7e14', text: '#fff' },
-  medium:   { bg: '#ffc107', text: '#212529' },
+  medium:   { bg: '#e67e22', text: '#fff' },
   low:      { bg: '#6f42c1', text: '#fff' },
 };
+
+/** Distinct colour for nDPI built-in risk flags — clearly different from custom signature severities. */
+export const RISK_BADGE = { bg: '#ffc107', text: '#212529' };
 
 export function getSeverityColor(severity: string): { bg: string; text: string } {
   return SEVERITY_COLORS[severity?.toLowerCase()] ?? SEVERITY_COLORS.low;

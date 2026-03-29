@@ -3,7 +3,7 @@ import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
-import { getAppColor, getCategoryColor, getTextColor, getSeverityColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
 
@@ -24,7 +24,6 @@ export const ConversationList = ({
   sortBy,
   sortDir,
   onSort,
-  onRiskFilterClick,
   visibleColumns,
   signatureSeverities = {},
 }: ConversationListProps) => {
@@ -129,6 +128,7 @@ export const ConversationList = ({
   }, [stopPan]);
 
   const hasAppNames       = conversations.some(c => c.appName);
+  const hasL7Protocols    = conversations.some(c => c.tsharkProtocol);
   const hasCategories     = conversations.some(c => c.category);
   const hasRisks          = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
   const hasCustomRules    = conversations.some(c => c.customSignatures && c.customSignatures.length > 0);
@@ -174,8 +174,9 @@ export const ConversationList = ({
             <tr>
               {col('source')      && <SortableHeader field="srcIp"     label="Source" />}
               {col('destination') && <SortableHeader field="dstIp"     label="Destination" />}
-              {col('protocol')    && <th>Protocol</th>}
-              {col('appName')  && hasAppNames   && <th>Application</th>}
+              {col('protocol')         && <th style={{ whiteSpace: 'nowrap' }}>L4 Protocol</th>}
+              {col('tsharkProtocol') && hasL7Protocols  && <th style={{ whiteSpace: 'nowrap' }}>L7 Protocol</th>}
+              {col('appName')        && hasAppNames      && <th>Application</th>}
               {col('category') && hasCategories && <th>Category</th>}
               {col('risks')    && hasRisks      && <th>Risks</th>}
               {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
@@ -220,11 +221,21 @@ export const ConversationList = ({
                       ); })()}
                     </td>
                   )}
+                  {col('tsharkProtocol') && hasL7Protocols && (
+                    <td>
+                      {conversation.tsharkProtocol ? (() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>
+                          {conversation.tsharkProtocol}
+                        </span>
+                      ); })() : <span className="text-muted">—</span>}
+                    </td>
+                  )}
                   {col('appName') && hasAppNames && (
                     <td>
-                      {conversation.appName ? (() => { const bg = getAppColor(conversation.appName); return (
-                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
-                      ); })() : <span className="text-muted">—</span>}
+                      {conversation.appName ? (() => {
+                        const bg = getAppColor(conversation.appName);
+                        return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
+                      })() : <span className="text-muted">—</span>}
                     </td>
                   )}
                   {col('category') && hasCategories && (
@@ -242,9 +253,7 @@ export const ConversationList = ({
                             <span
                               key={risk}
                               className="badge"
-                              style={{ backgroundColor: '#ffc107', color: '#212529', cursor: 'pointer' }}
-                              title="Click to filter by security risks"
-                              onClick={e => { e.stopPropagation(); onRiskFilterClick?.(); }}
+                              style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, whiteSpace: 'nowrap' }}
                             >
                               {risk}
                             </span>
@@ -260,7 +269,7 @@ export const ConversationList = ({
                           {conversation.customSignatures.map(rule => {
                             const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                             return (
-                              <span key={rule} className="badge" style={{ backgroundColor: bg, color: text }}>
+                              <span key={rule} className="badge" style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}>
                                 {rule.replace(/_/g, ' ')}
                               </span>
                             );
