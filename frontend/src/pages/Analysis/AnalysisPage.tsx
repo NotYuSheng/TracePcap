@@ -3,8 +3,6 @@ import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { AnalysisLoadingView } from './AnalysisLoadingView';
-import { apiClient } from '@/services/api/client';
-import { API_ENDPOINTS } from '@/services/api/endpoints';
 
 export const AnalysisPage = () => {
   const { fileId } = useParams<{ fileId: string }>();
@@ -12,18 +10,6 @@ export const AnalysisPage = () => {
   const location = useLocation();
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
   const [activeTab, setActiveTab] = useState('overview');
-  const [reanalyzing, setReanalyzing] = useState(false);
-
-  const handleReanalyze = async () => {
-    if (!fileId) return;
-    setReanalyzing(true);
-    try {
-      await apiClient.post(API_ENDPOINTS.REANALYZE(fileId));
-      refetch();
-    } finally {
-      setReanalyzing(false);
-    }
-  };
 
   useEffect(() => {
     // Determine active tab from URL
@@ -68,20 +54,9 @@ export const AnalysisPage = () => {
 
   return (
     <div className="analysis-page">
-      <div className="analysis-header mb-4 d-flex justify-content-between align-items-start">
-        <div>
-          <h2>Network Traffic Analysis</h2>
-          <p className="text-muted">File ID: {fileId}</p>
-        </div>
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={handleReanalyze}
-          disabled={reanalyzing || loading}
-          title="Clear existing analysis and re-parse the PCAP file"
-        >
-          <i className={`bi ${reanalyzing ? 'bi-arrow-clockwise' : 'bi-arrow-repeat'} me-2`}></i>
-          {reanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
-        </button>
+      <div className="analysis-header mb-4">
+        <h2>Network Traffic Analysis</h2>
+        <p className="text-muted">File ID: {fileId}</p>
       </div>
 
       {/* Navigation Tabs */}

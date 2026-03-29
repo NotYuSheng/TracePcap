@@ -96,12 +96,4 @@ public class AnalysisController {
     ProtocolStatsResponse response = analysisService.getProtocolStats(fileId);
     return ResponseEntity.ok(response);
   }
-
-  /** Trigger manual re-analysis for a file, clearing any existing results */
-  @PostMapping("/{fileId}/analyze")
-  public ResponseEntity<Void> analyzeFile(@PathVariable UUID fileId) {
-    log.info("POST /api/analysis/{}/analyze", fileId);
-    analysisService.reanalyzeFile(fileId);
-    return ResponseEntity.accepted().build();
-  }
 }
