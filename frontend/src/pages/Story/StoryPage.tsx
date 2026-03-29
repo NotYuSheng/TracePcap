@@ -32,8 +32,15 @@ export const StoryPage = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 500 || msg.includes('500') || msg.toLowerCase().includes('llm') || msg.toLowerCase().includes('connection')) {
-        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
+      if (
+        status === 500 ||
+        msg.includes('500') ||
+        msg.toLowerCase().includes('llm') ||
+        msg.toLowerCase().includes('connection')
+      ) {
+        setError(
+          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
+        );
       } else {
         setError(msg || 'Failed to generate story');
       }
@@ -60,7 +67,6 @@ export const StoryPage = () => {
       fetchTimeline();
     }
   }, [fileId]);
-
 
   // Calculate traffic statistics
   const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0);
@@ -117,10 +123,23 @@ export const StoryPage = () => {
             <div>
               <h4>Network Traffic Story</h4>
               <ul className="text-muted mb-0 small ps-3">
-                <li>File metadata, traffic summary, protocol breakdown, and category distribution are always included</li>
-                <li>The top <strong>N</strong> conversations by volume are included, with nDPI app names, categories, TLS certificate details, and risk flags (configurable via <code>STORY_MAX_CONVERSATIONS</code>, default 20)</li>
-                <li>Security alerts list up to <strong>N</strong> at-risk conversations — the LLM is told the total count even when the list is truncated</li>
-                <li><strong>Not sent to the LLM:</strong> packet payloads, HTTP bodies, DNS query names, TLS SNI, and conversations beyond the configured cap</li>
+                <li>
+                  File metadata, traffic summary, protocol breakdown, and category distribution are
+                  always included
+                </li>
+                <li>
+                  The top <strong>N</strong> conversations by volume are included, with nDPI app
+                  names, categories, TLS certificate details, and risk flags (configurable via{' '}
+                  <code>STORY_MAX_CONVERSATIONS</code>, default 20)
+                </li>
+                <li>
+                  Security alerts list up to <strong>N</strong> at-risk conversations — the LLM is
+                  told the total count even when the list is truncated
+                </li>
+                <li>
+                  <strong>Not sent to the LLM:</strong> packet payloads, HTTP bodies, DNS query
+                  names, TLS SNI, and conversations beyond the configured cap
+                </li>
               </ul>
             </div>
             <button
