@@ -13,23 +13,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Runs tshark as a subprocess to obtain Wireshark's dissector-based protocol label for each
- * conversation, stored in {@code tsharkProtocol}. Complements nDPI's application identification.
+ * Runs tshark as a subprocess to obtain Wireshark's dissector-based protocol label and HTTP
+ * User-Agent strings for each conversation in a single pass.
  *
- * <p>Uses: {@code tshark -r <file> -T fields -e ip.src -e ip.dst ... -e _ws.col.Protocol}
+ * <p>Uses: {@code tshark -r <file> -T fields -e ip.src -e ip.dst ... -e _ws.col.Protocol
+ * -e http.user_agent}
  *
  * <p>Responsibility split:
  * <ul>
  *   <li>nDPI ({@link NdpiService}) — sets {@code appName} and {@code category}
  *       (application-layer identification, e.g. "YouTube", "WhatsApp")</li>
- *   <li>tshark (this service) — sets {@code tsharkProtocol} only (protocol-layer label,
- *       e.g. "TLS", "HTTP", "QUIC")</li>
+ *   <li>tshark (this service) — sets {@code tsharkProtocol} (protocol-layer label,
+ *       e.g. "TLS", "HTTP", "QUIC") and {@code httpUserAgents}</li>
  * </ul>
  *
  * <p>Both values are shown in the UI as complementary information.
  *
- * <p>Gracefully degrades: if tshark is not available, all {@code tsharkProtocol} fields remain
- * null and analysis continues normally.
+ * <p>Gracefully degrades: if tshark is not available, all {@code tsharkProtocol} and
+ * {@code httpUserAgents} fields remain null and analysis continues normally.
  */
 @Slf4j
 @Service
@@ -70,65 +71,73 @@ public class TsharkEnrichmentService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Enriches each conversation with Wireshark's dissector-based protocol label, stored in
-   * {@code tsharkProtocol}. Does not modify {@code appName} — that is owned by nDPI.
+   * Enriches each conversation with Wireshark's dissector-based protocol label
+   * ({@code tsharkProtocol}) and any HTTP User-Agent strings ({@code httpUserAgents}).
+   * Both are extracted in a single tshark pass. Does not modify {@code appName} — that is
+   * owned by nDPI.
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
 
     Map<String, Map<String, Integer>> flowFreq   = new HashMap<>();
     Map<String, Map<String, Integer>> ipPairFreq = new HashMap<>();
+    Map<String, Set<String>>          userAgentMap = new HashMap<>();
 
-    runTshark(pcapFile, flowFreq, ipPairFreq);
+    runTshark(pcapFile, flowFreq, ipPairFreq, userAgentMap);
 
-    int enriched = 0;
-    for (PcapParserService.ConversationInfo conv : conversations) {
-      Map<String, Integer> freq = lookupFreq(conv, flowFreq, ipPairFreq);
-      String detected = (freq != null) ? selectBestProtocol(freq) : null;
-      if (detected != null) {
-        conv.setTsharkProtocol(detected);
-        enriched++;
-      }
-    }
-    log.info("tshark enrichment: set tsharkProtocol on {}/{} conversations",
-        enriched, conversations.size());
-
-    // Second pass: extract HTTP User-Agent headers
-    Map<String, Set<String>> userAgentMap = new HashMap<>();
-    runTsharkUserAgents(pcapFile, userAgentMap);
-
-    int uaEnriched = 0;
+    int protoEnriched = 0;
+    int uaEnriched    = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
       String key = canonicalKey(conv.getSrcIp(), conv.getSrcPort(),
                                 conv.getDstIp(), conv.getDstPort(),
                                 conv.getProtocol());
+
+      Map<String, Integer> freq = lookupFreq(conv, flowFreq, ipPairFreq);
+      String detected = (freq != null) ? selectBestProtocol(freq) : null;
+      if (detected != null) {
+        conv.setTsharkProtocol(detected);
+        protoEnriched++;
+      }
+
       Set<String> agents = userAgentMap.get(key);
       if (agents != null && !agents.isEmpty()) {
         conv.setHttpUserAgents(new ArrayList<>(agents));
         uaEnriched++;
       }
     }
-    log.info("tshark enrichment: set httpUserAgents on {}/{} conversations",
-        uaEnriched, conversations.size());
+    log.info("tshark enrichment: tsharkProtocol set on {}/{} conversations, "
+        + "httpUserAgents set on {}/{} conversations",
+        protoEnriched, conversations.size(), uaEnriched, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------
 
+  /**
+   * Runs a single tshark pass that collects both protocol-frequency data and HTTP User-Agent
+   * values for every packet in the file.
+   *
+   * <p>Field order (0-indexed):
+   * 0=ip.src, 1=ip.dst, 2=ipv6.src, 3=ipv6.dst,
+   * 4=tcp.srcport, 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport,
+   * 8=ip.proto, 9=ipv6.nxt, 10=_ws.col.Protocol, 11=http.user_agent
+   */
   private void runTshark(File pcapFile,
                          Map<String, Map<String, Integer>> flowFreq,
-                         Map<String, Map<String, Integer>> ipPairFreq) {
+                         Map<String, Map<String, Integer>> ipPairFreq,
+                         Map<String, Set<String>> userAgentMap) {
     ProcessBuilder pb = new ProcessBuilder(
         TSHARK_BINARY, "-r", pcapFile.getAbsolutePath(),
         "-T", "fields",
         "-E", "separator=\t",
-        "-e", "ip.src",      "-e", "ip.dst",
-        "-e", "ipv6.src",    "-e", "ipv6.dst",
-        "-e", "tcp.srcport", "-e", "tcp.dstport",
-        "-e", "udp.srcport", "-e", "udp.dstport",
-        "-e", "ip.proto",    "-e", "ipv6.nxt",
-        "-e", "_ws.col.Protocol"
+        "-e", "ip.src",          "-e", "ip.dst",
+        "-e", "ipv6.src",        "-e", "ipv6.dst",
+        "-e", "tcp.srcport",     "-e", "tcp.dstport",
+        "-e", "udp.srcport",     "-e", "udp.dstport",
+        "-e", "ip.proto",        "-e", "ipv6.nxt",
+        "-e", "_ws.col.Protocol",
+        "-e", "http.user_agent"
     );
     pb.redirectErrorStream(false);
 
@@ -152,111 +161,33 @@ public class TsharkEnrichmentService {
           new BufferedReader(new InputStreamReader(process.getInputStream()))) {
         String line;
         while ((line = reader.readLine()) != null) {
-          parseLine(line, flowFreq, ipPairFreq);
+          parseLine(line, flowFreq, ipPairFreq, userAgentMap);
         }
       }
       process.waitFor();
-      log.debug("tshark protocol scan complete: {} distinct flow keys", flowFreq.size());
+      log.debug("tshark scan complete: {} distinct flow keys", flowFreq.size());
 
     } catch (Exception e) {
       if (isNotFound(e)) {
         log.warn("tshark not found — skipping Wireshark protocol enrichment.");
       } else {
-        log.warn("tshark protocol enrichment failed: {}", e.getMessage());
+        log.warn("tshark enrichment failed: {}", e.getMessage());
       }
     }
   }
 
   /**
-   * Runs tshark to collect HTTP User-Agent header values per conversation flow.
-   *
-   * <p>Field order (0-indexed):
-   * 0=ip.src, 1=ip.dst, 2=ipv6.src, 3=ipv6.dst,
-   * 4=tcp.srcport, 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport,
-   * 8=ip.proto, 9=ipv6.nxt, 10=http.user_agent
-   */
-  private void runTsharkUserAgents(File pcapFile, Map<String, Set<String>> userAgentMap) {
-    ProcessBuilder pb = new ProcessBuilder(
-        TSHARK_BINARY, "-r", pcapFile.getAbsolutePath(),
-        "-Y", "http.user_agent",
-        "-T", "fields",
-        "-E", "separator=\t",
-        "-e", "ip.src",      "-e", "ip.dst",
-        "-e", "ipv6.src",    "-e", "ipv6.dst",
-        "-e", "tcp.srcport", "-e", "tcp.dstport",
-        "-e", "udp.srcport", "-e", "udp.dstport",
-        "-e", "ip.proto",    "-e", "ipv6.nxt",
-        "-e", "http.user_agent"
-    );
-    pb.redirectErrorStream(false);
-
-    try {
-      Process process = pb.start();
-
-      Thread errDrainer = new Thread(() -> {
-        try (BufferedReader err =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-          String line;
-          while ((line = err.readLine()) != null) log.debug("tshark ua stderr: {}", line);
-        } catch (Exception e) {
-          log.debug("Error draining tshark ua stderr", e);
-        }
-      });
-      errDrainer.setDaemon(true);
-      errDrainer.start();
-
-      try (BufferedReader reader =
-          new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          parseUserAgentLine(line, userAgentMap);
-        }
-      }
-      process.waitFor();
-      log.debug("tshark user-agent scan complete: {} distinct flow keys", userAgentMap.size());
-
-    } catch (Exception e) {
-      if (isNotFound(e)) {
-        log.warn("tshark not found — skipping HTTP User-Agent extraction.");
-      } else {
-        log.warn("tshark HTTP User-Agent extraction failed: {}", e.getMessage());
-      }
-    }
-  }
-
-  private void parseUserAgentLine(String line, Map<String, Set<String>> userAgentMap) {
-    String[] f = line.split("\t", -1);
-    if (f.length < 11) return;
-
-    String srcIp = !f[0].isEmpty() ? f[0] : (!f[2].isEmpty() ? f[2] : null);
-    String dstIp = !f[1].isEmpty() ? f[1] : (!f[3].isEmpty() ? f[3] : null);
-    if (srcIp == null || dstIp == null) return;
-
-    Integer srcPort = parsePort(!f[4].isEmpty() ? f[4] : f[6]);
-    Integer dstPort = parsePort(!f[5].isEmpty() ? f[5] : f[7]);
-
-    String protoNum = !f[8].isEmpty() ? f[8] : f[9];
-    String proto = IP_PROTO.getOrDefault(protoNum,
-        protoNum.isEmpty() ? "UNKNOWN" : protoNum.toUpperCase());
-
-    String userAgent = f[10].trim();
-    if (userAgent.isEmpty()) return;
-
-    String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
-    userAgentMap.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(userAgent);
-  }
-
-  /**
-   * Parse one tshark tab-separated output line into the frequency maps.
+   * Parse one tshark tab-separated output line into the frequency and user-agent maps.
    *
    * <p>Field order matches the {@code -e} arguments above (0-indexed):
    * 0=ip.src, 1=ip.dst, 2=ipv6.src, 3=ipv6.dst,
    * 4=tcp.srcport, 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport,
-   * 8=ip.proto, 9=ipv6.nxt, 10=_ws.col.Protocol
+   * 8=ip.proto, 9=ipv6.nxt, 10=_ws.col.Protocol, 11=http.user_agent
    */
   private void parseLine(String line,
                          Map<String, Map<String, Integer>> flowFreq,
-                         Map<String, Map<String, Integer>> ipPairFreq) {
+                         Map<String, Map<String, Integer>> ipPairFreq,
+                         Map<String, Set<String>> userAgentMap) {
     String[] f = line.split("\t", -1);
     if (f.length < 11) return;
 
@@ -275,16 +206,25 @@ public class TsharkEnrichmentService {
         protoNum.isEmpty() ? "UNKNOWN" : protoNum.toUpperCase());
 
     String displayProto = f[10].trim();
-    if (displayProto.isEmpty()) return;
+    if (!displayProto.isEmpty()) {
+      // Use a canonical (direction-independent) key so both A→B and B→A packets merge
+      String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
+      flowFreq.computeIfAbsent(key, k -> new HashMap<>()).merge(displayProto, 1, Integer::sum);
 
-    // Use a canonical (direction-independent) key so both A→B and B→A packets merge
-    String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
-    flowFreq.computeIfAbsent(key, k -> new HashMap<>()).merge(displayProto, 1, Integer::sum);
+      // Portless fallback (ICMP, OSPF, GRE, etc.)
+      if (srcPort == null && dstPort == null) {
+        ipPairFreq.computeIfAbsent(ipPairKey(srcIp, dstIp), k -> new HashMap<>())
+                  .merge(displayProto, 1, Integer::sum);
+      }
+    }
 
-    // Portless fallback (ICMP, OSPF, GRE, etc.)
-    if (srcPort == null && dstPort == null) {
-      ipPairFreq.computeIfAbsent(ipPairKey(srcIp, dstIp), k -> new HashMap<>())
-                .merge(displayProto, 1, Integer::sum);
+    // HTTP User-Agent (field 11 — present only for HTTP packets)
+    if (f.length > 11) {
+      String userAgent = f[11].trim();
+      if (!userAgent.isEmpty()) {
+        String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
+        userAgentMap.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(userAgent);
+      }
     }
   }
 
