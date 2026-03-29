@@ -18,8 +18,7 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
 # Install runtime dependencies:
-#   libpcap0.8   — shared lib for Pcap4J (runtime only; -dev headers not needed)
-#   tshark       — fallback parser for multi-interface pcapng
+#   tshark       — PCAP/pcapng parser
 #   libndpi-bin  — ndpiReader for application-layer identification (from ntop repo
 #                  for latest version with H.225 session tracking / H.245 support)
 #   tzdata       — timezone data
@@ -38,7 +37,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         > /etc/apt/sources.list.d/ntop.list && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        libpcap0.8 \
         tshark \
         ndpi \
         tzdata \
