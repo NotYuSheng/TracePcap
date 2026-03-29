@@ -1,10 +1,12 @@
+import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import { AnalysisSummary } from '@components/analysis/AnalysisSummary';
 import { ProtocolBreakdownChart } from '@components/analysis/ProtocolBreakdown';
 import { CategoryBreakdownChart } from '@components/analysis/CategoryBreakdown';
-import { getAppColor, getTextColor } from '@/utils/appColors';
+import { getAppColor, getTextColor, getSeverityColor } from '@/utils/appColors';
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { conversationService } from '@/features/conversation/services/conversationService';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -38,6 +40,15 @@ const ndpiPopover = (
 export const AnalysisOverview = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
   const navigate = useNavigate();
+  const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    conversationService.getSignatureRules().then(rules => {
+      const map: Record<string, string> = {};
+      rules.forEach(r => { map[r.name] = r.severity; });
+      setSignatureSeverities(map);
+    }).catch(console.error);
+  }, []);
 
   const detectedApps = data.detectedApplications ?? [];
 
@@ -84,6 +95,53 @@ export const AnalysisOverview = () => {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {((data.securityAlertCount ?? 0) > 0 || (data.triggeredCustomRules && data.triggeredCustomRules.length > 0)) && (
+        <div className="mt-4">
+          <h5 className="mb-3">
+            <i className="bi bi-shield-exclamation me-2 text-warning"></i>
+            Security Alerts
+          </h5>
+          {(data.securityAlertCount ?? 0) > 0 && (
+            <div
+              className="alert alert-warning d-flex align-items-center justify-content-between py-2 mb-2"
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/analysis/${fileId}/conversations?hasRisks=true`)}
+            >
+              <span>
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>{data.securityAlertCount}</strong> conversation{data.securityAlertCount !== 1 ? 's' : ''} flagged with security risks
+              </span>
+              <span className="text-muted small">View in Conversations &rarr;</span>
+            </div>
+          )}
+          {data.triggeredCustomRules && data.triggeredCustomRules.length > 0 && (
+            <div className="card border-0" style={{ backgroundColor: 'rgba(111,66,193,0.08)' }}>
+              <div className="card-body py-2 px-3">
+                <div className="d-flex align-items-center flex-wrap gap-2">
+                  <span className="small fw-semibold me-1" style={{ color: '#6f42c1' }}>
+                    Custom Rules Triggered:
+                  </span>
+                  {data.triggeredCustomRules.map(rule => {
+                    const { bg, text } = getSeverityColor(signatureSeverities[rule]);
+                    return (
+                      <span
+                        key={rule}
+                        className="badge"
+                        style={{ backgroundColor: bg, color: text, cursor: 'pointer' }}
+                        title="Click to filter conversations by this rule"
+                        onClick={() => navigate(`/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}`)}
+                      >
+                        {rule.replace(/_/g, ' ')}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

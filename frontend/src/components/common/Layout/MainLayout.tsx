@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { Container, Row, Col } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
+import { SignaturesModal } from '@components/signatures/SignaturesModal';
 
 export const MainLayout = () => {
+  const [showSignatures, setShowSignatures] = useState(false);
+
   return (
     <div className="main-layout">
       <header className="main-header">
@@ -17,9 +21,17 @@ export const MainLayout = () => {
                 </div>
               </div>
             </Link>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setShowSignatures(true)}
+            >
+              <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
+            </button>
           </div>
         </Container>
       </header>
+      <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
       <main className="main-content">
         <Outlet />
       </main>

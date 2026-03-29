@@ -85,6 +85,8 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
       # Timezone Configuration
       TZ: Asia/Singapore
+    volumes:
+      - config_data:/app/config
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,6 +117,8 @@ volumes:
   postgres_data:
     driver: local
   minio_data:
+    driver: local
+  config_data:
     driver: local
 
 networks:

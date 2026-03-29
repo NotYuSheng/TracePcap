@@ -1,6 +1,6 @@
 export type ColumnKey =
   | 'source' | 'destination' | 'protocol'
-  | 'appName' | 'category' | 'risks'
+  | 'appName' | 'category' | 'risks' | 'customRules'
   | 'packets' | 'bytes' | 'duration' | 'startTime';
 
 export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
@@ -10,13 +10,14 @@ export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boole
   { key: 'appName',     label: 'Application', defaultVisible: true  },
   { key: 'category',    label: 'Category',    defaultVisible: true  },
   { key: 'risks',       label: 'Risks',       defaultVisible: true  },
-  { key: 'packets',     label: 'Packets',     defaultVisible: true  },
-  { key: 'bytes',       label: 'Bytes',       defaultVisible: true  },
-  { key: 'duration',    label: 'Duration',    defaultVisible: true  },
+  { key: 'customRules', label: 'Custom Rules', defaultVisible: true  },
+  { key: 'packets',     label: 'Packets',     defaultVisible: false },
+  { key: 'bytes',       label: 'Bytes',       defaultVisible: false },
+  { key: 'duration',    label: 'Duration',    defaultVisible: false },
   { key: 'startTime',   label: 'Start Time',  defaultVisible: true  },
 ];
 
-export const COLUMN_STORAGE_KEY = 'conv-visible-columns';
+export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v2';
 
 export function loadVisibleColumns(): Set<ColumnKey> {
   try {

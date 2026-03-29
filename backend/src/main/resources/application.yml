@@ -162,3 +162,5 @@ tracepcap:
   overview:
     apps-limited: ${OVERVIEW_APPS_LIMITED:true}   # true = cap detected apps list; false = show all
     apps-max: ${OVERVIEW_APPS_MAX:100}            # Max apps shown when apps-limited=true
+  signatures:
+    path: ${SIGNATURES_PATH:/app/config/signatures.yml}  # Path to the custom signatures YAML file

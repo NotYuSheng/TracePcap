@@ -10,6 +10,17 @@ export function getCategoryColor(category: string): string {
   return colorHash.hex(category);
 }
 
+const SEVERITY_COLORS: Record<string, { bg: string; text: string }> = {
+  critical: { bg: '#dc3545', text: '#fff' },
+  high:     { bg: '#fd7e14', text: '#fff' },
+  medium:   { bg: '#ffc107', text: '#212529' },
+  low:      { bg: '#6f42c1', text: '#fff' },
+};
+
+export function getSeverityColor(severity: string): { bg: string; text: string } {
+  return SEVERITY_COLORS[severity?.toLowerCase()] ?? SEVERITY_COLORS.low;
+}
+
 /**
  * Returns '#000' or '#fff' depending on which has better contrast
  * against the given hex background colour (uses WCAG relative luminance).

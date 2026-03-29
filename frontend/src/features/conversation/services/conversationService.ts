@@ -22,6 +22,7 @@ interface ConversationApiResponse {
   tlsNotBefore?: string | number[] | null;
   tlsNotAfter?: string | number[] | null;
   flowRisks?: string[] | null;
+  customSignatures?: string[] | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[];
@@ -78,6 +79,7 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     tlsNotBefore: apiData.tlsNotBefore != null ? parseDateTime(apiData.tlsNotBefore) : undefined,
     tlsNotAfter: apiData.tlsNotAfter != null ? parseDateTime(apiData.tlsNotAfter) : undefined,
     flowRisks: apiData.flowRisks ?? [],
+    customSignatures: apiData.customSignatures ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
@@ -121,9 +123,10 @@ export const conversationService = {
     if (filters.categories.length > 0)params.categories = filters.categories.join(',');
     if (filters.hasRisks)             params.hasRisks   = 'true';
     if (filters.fileTypes.length > 0) params.fileTypes  = filters.fileTypes.join(',');
-    if (filters.riskTypes.length > 0) params.riskTypes  = filters.riskTypes.join(',');
-    if (filters.sortBy)               params.sortBy     = filters.sortBy;
-    if (filters.sortBy)               params.sortDir    = filters.sortDir;
+    if (filters.riskTypes.length > 0)        params.riskTypes        = filters.riskTypes.join(',');
+    if (filters.customSignatures.length > 0) params.customSignatures = filters.customSignatures.join(',');
+    if (filters.sortBy)                      params.sortBy           = filters.sortBy;
+    if (filters.sortBy)                      params.sortDir          = filters.sortDir;
 
     const response = await apiClient.get<{
       data: ConversationApiResponse[];
@@ -154,11 +157,30 @@ export const conversationService = {
     if (filters.categories.length > 0)params.set('categories', filters.categories.join(','));
     if (filters.hasRisks)             params.set('hasRisks',   'true');
     if (filters.fileTypes.length > 0) params.set('fileTypes',  filters.fileTypes.join(','));
-    if (filters.riskTypes.length > 0) params.set('riskTypes',  filters.riskTypes.join(','));
-    if (filters.sortBy)               params.set('sortBy',     filters.sortBy);
-    if (filters.sortBy)               params.set('sortDir',    filters.sortDir);
+    if (filters.riskTypes.length > 0)        params.set('riskTypes',        filters.riskTypes.join(','));
+    if (filters.customSignatures.length > 0) params.set('customSignatures', filters.customSignatures.join(','));
+    if (filters.sortBy)                      params.set('sortBy',           filters.sortBy);
+    if (filters.sortBy)                      params.set('sortDir',          filters.sortDir);
     const qs = params.toString();
     return `/api/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
+  },
+
+  /**
+   * Returns distinct custom signature rule names triggered for the given file.
+   */
+  getCustomSignatures: async (fileId: string): Promise<string[]> => {
+    const response = await apiClient.get<string[]>(
+      `/conversations/${fileId}/custom-signatures`
+    );
+    return response.data;
+  },
+
+  /**
+   * Returns configured signature rules with their severity from signatures.yml.
+   */
+  getSignatureRules: async (): Promise<{ name: string; severity: string }[]> => {
+    const response = await apiClient.get<{ name: string; severity: string }[]>('/signatures/rules');
+    return response.data;
   },
 
   /**

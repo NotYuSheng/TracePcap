@@ -27,6 +27,8 @@ public class AnalysisSummaryResponse {
   // Protocol and conversation data
   private List<ProtocolStat> protocolDistribution;
   private List<ConversationSummary> topConversations;
+  private Long securityAlertCount;
+  private List<String> triggeredCustomRules;
   private List<UniqueHost> uniqueHosts;
   private List<DetectedApplication> detectedApplications;
   private Boolean detectedApplicationsTruncated;
@@ -68,6 +70,8 @@ public class AnalysisSummaryResponse {
     private Long endTime;
     private Long packetCount;
     private Long totalBytes;
+    private List<String> flowRisks;
+    private List<String> customSignatures;
   }
 
   @Data

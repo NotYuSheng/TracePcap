@@ -53,6 +53,9 @@ public class ConversationEntity {
   @Column(name = "flow_risks", columnDefinition = "text[]")
   private String[] flowRisks;
 
+  @Column(name = "custom_signatures", columnDefinition = "text[]")
+  private String[] customSignatures;
+
   @Column(name = "category", length = CATEGORY_MAX_LENGTH)
   private String category;
 

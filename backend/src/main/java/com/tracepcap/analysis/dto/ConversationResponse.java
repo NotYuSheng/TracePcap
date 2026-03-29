@@ -29,6 +29,7 @@ public class ConversationResponse {
   private LocalDateTime tlsNotBefore;
   private LocalDateTime tlsNotAfter;
   private List<String> flowRisks;
+  private List<String> customSignatures;
   private Long packetCount;
   private Long totalBytes;
   private LocalDateTime startTime;
