@@ -9,6 +9,4 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PacketRepository extends JpaRepository<PacketEntity, UUID> {
   List<PacketEntity> findByConversationIdOrderByPacketNumberAsc(UUID conversationId);
-
-  void deleteByFileId(UUID fileId);
 }

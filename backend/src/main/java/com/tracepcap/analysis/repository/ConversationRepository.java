@@ -26,8 +26,6 @@ public interface ConversationRepository
 
   long countByFileId(UUID fileId);
 
-  void deleteByFileId(UUID fileId);
-
   /** Returns the distinct detected file types present in packets for the given file. */
   @Query("SELECT DISTINCT p.detectedFileType FROM PacketEntity p"
       + " WHERE p.file.id = :fileId AND p.detectedFileType IS NOT NULL"
