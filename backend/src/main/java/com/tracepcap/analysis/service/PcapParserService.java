@@ -1,6 +1,7 @@
 package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.PacketEntity;
+import com.tracepcap.common.TsharkHexUtil;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -142,7 +143,7 @@ public class PcapParserService {
             } else if (f.length > 13 && !f[13].isEmpty()) {
               tsharkPayload = f[13]; // udp.payload
             }
-            String payloadHex = parseTsharkPayloadHex(tsharkPayload);
+            String payloadHex = TsharkHexUtil.toHex(tsharkPayload, PacketEntity.PAYLOAD_BYTE_LIMIT);
             conv.getPackets().add(buildPacketInfo(
                 packetNumber, timestamp, srcIp, srcPort, dstIp, dstPort,
                 protocol, packetSize, info, payloadHex));
@@ -194,36 +195,10 @@ public class PcapParserService {
     pkt.setPacketSize(packetSize);
     pkt.setInfo(info);
     pkt.setPayload(payloadHex);
-    pkt.setDetectedFileType(FileSignatureDetector.detect(hexToBytes(payloadHex)));
+    pkt.setDetectedFileType(FileSignatureDetector.detect(TsharkHexUtil.toBytes(payloadHex)));
     return pkt;
   }
 
-  /**
-   * Convert a tshark colon-separated hex payload (e.g. "48:54:54:50") to a plain lowercase hex
-   * string truncated to {@link PacketEntity#PAYLOAD_BYTE_LIMIT} bytes, or {@code null} if empty.
-   */
-  private String parseTsharkPayloadHex(String tsharkHex) {
-    if (tsharkHex == null || tsharkHex.isEmpty()) return null;
-    String plain = tsharkHex.replace(":", "").toLowerCase();
-    int maxChars = PacketEntity.PAYLOAD_BYTE_LIMIT * 2;
-    return plain.length() > maxChars ? plain.substring(0, maxChars) : plain;
-  }
-
-  /**
-   * Decode a plain lowercase hex string to a byte array, or return {@code null} if the input is
-   * null or empty. Used to feed the payload into {@link FileSignatureDetector}.
-   */
-  private byte[] hexToBytes(String hex) {
-    if (hex == null || hex.isEmpty()) return null;
-    int len = hex.length();
-    if (len % 2 != 0) len--; // drop incomplete trailing nibble
-    byte[] data = new byte[len / 2];
-    for (int i = 0; i < len; i += 2) {
-      data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-          | Character.digit(hex.charAt(i + 1), 16));
-    }
-    return data;
-  }
 
   /** Return the first comma-separated value, or the original string if no comma. */
   private String firstValue(String s) {

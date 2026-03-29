@@ -154,7 +154,9 @@ public class LlmClient {
           && response.getBody().getChoices() != null
           && !response.getBody().getChoices().isEmpty()) {
 
-        String content = response.getBody().getChoices().get(0).getMessage().getContent();
+        var choice = response.getBody().getChoices().get(0);
+        String content = choice.getMessage() != null ? choice.getMessage().getContent() : null;
+        if (content == null) throw new RuntimeException("Empty response from LLM API");
         log.info("Successfully received LLM response, length: {}", content.length());
         return content;
       }
