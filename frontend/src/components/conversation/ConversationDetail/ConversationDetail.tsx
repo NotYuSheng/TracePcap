@@ -279,10 +279,11 @@ export const ConversationDetail = ({
               <colgroup>
                 <col style={{ width: '4%' }} /> {/* # */}
                 <col style={{ width: '3%' }} /> {/* direction */}
-                <col style={{ width: '16%' }} /> {/* timestamp */}
-                <col style={{ width: '18%' }} /> {/* source */}
-                <col style={{ width: '18%' }} /> {/* destination */}
-                <col style={{ width: '7%' }} /> {/* length */}
+                <col style={{ width: '14%' }} /> {/* timestamp */}
+                <col style={{ width: '16%' }} /> {/* source */}
+                <col style={{ width: '16%' }} /> {/* destination */}
+                <col style={{ width: '6%' }} /> {/* length */}
+                <col style={{ width: '8%' }} /> {/* file type */}
                 <col /> {/* info — takes remaining space */}
               </colgroup>
               <thead className="sticky-top bg-light">
@@ -293,6 +294,7 @@ export const ConversationDetail = ({
                   <th>Source</th>
                   <th>Destination</th>
                   <th>Length</th>
+                  <th>File Type</th>
                   <th>Info</th>
                 </tr>
               </thead>
@@ -342,6 +344,19 @@ export const ConversationDetail = ({
                           </small>
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
+                        <td>
+                          {packet.detectedFileType ? (
+                            <span
+                              className="badge bg-info text-dark"
+                              style={{ fontSize: '0.65rem' }}
+                              title={`Magic bytes match: ${packet.detectedFileType}`}
+                            >
+                              {packet.detectedFileType}
+                            </span>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
                         <td
                           style={{
                             overflow: 'hidden',
@@ -360,20 +375,11 @@ export const ConversationDetail = ({
                               ASCII
                             </span>
                           )}
-                          {packet.detectedFileType && (
-                            <span
-                              className="badge bg-info text-dark ms-1"
-                              style={{ fontSize: '0.65rem' }}
-                              title={`Magic bytes match: ${packet.detectedFileType}`}
-                            >
-                              {packet.detectedFileType}
-                            </span>
-                          )}
                         </td>
                       </tr>
                       {expandedPacketId === packet.id && (
                         <tr key={`${packet.id}-hex`}>
-                          <td colSpan={7} className="p-2">
+                          <td colSpan={8} className="p-2">
                             {packet.payload ? (
                               <HexViewer
                                 hex={packet.payload}
@@ -389,7 +395,7 @@ export const ConversationDetail = ({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="text-center text-muted py-3">
+                    <td colSpan={8} className="text-center text-muted py-3">
                       No packet details available
                     </td>
                   </tr>

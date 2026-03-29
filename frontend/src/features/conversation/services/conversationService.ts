@@ -25,6 +25,7 @@ interface ConversationApiResponse {
   flowRisks?: string[] | null;
   customSignatures?: string[] | null;
   httpUserAgents?: string[] | null;
+  detectedFileTypes?: string[] | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[];
@@ -82,6 +83,7 @@ function transformConversation(
     flowRisks: apiData.flowRisks ?? [],
     customSignatures: apiData.customSignatures ?? [],
     httpUserAgents: apiData.httpUserAgents ?? [],
+    detectedFileTypes: apiData.detectedFileTypes ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
