@@ -11,28 +11,30 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Loads custom detection rules from {@code signatures.yml} and applies them to each conversation
- * after nDPI enrichment. Matched rule names are appended to the conversation's {@code customSignatures}
- * list, making them visible in the UI alongside nDPI's built-in risk flags.
+ * after nDPI enrichment. Matched rule names are appended to the conversation's {@code
+ * customSignatures} list, making them visible in the UI alongside nDPI's built-in risk flags.
  *
  * <p>The file is reloaded on every analysis run so admins can update rules without restarting the
  * application.
  *
  * <p>Supported match fields (all optional; a rule fires when ALL specified fields match):
+ *
  * <ul>
- *   <li>{@code ip}      — exact match against srcIp OR dstIp</li>
- *   <li>{@code cidr}    — CIDR range match against srcIp OR dstIp (e.g. {@code 10.0.0.0/8})</li>
- *   <li>{@code srcPort} — exact match against source port</li>
- *   <li>{@code dstPort} — exact match against destination port</li>
- *   <li>{@code ja3}     — exact match against ja3Client OR ja3Server</li>
- *   <li>{@code hostname}— exact or wildcard match against SNI hostname (e.g. {@code *.evil.com})</li>
- *   <li>{@code app}      — case-insensitive match against nDPI appName</li>
- *   <li>{@code protocol} — case-insensitive match against transport/network protocol (e.g. TCP, UDP, ICMP)</li>
+ *   <li>{@code ip} — exact match against srcIp OR dstIp
+ *   <li>{@code cidr} — CIDR range match against srcIp OR dstIp (e.g. {@code 10.0.0.0/8})
+ *   <li>{@code srcPort} — exact match against source port
+ *   <li>{@code dstPort} — exact match against destination port
+ *   <li>{@code ja3} — exact match against ja3Client OR ja3Server
+ *   <li>{@code hostname}— exact or wildcard match against SNI hostname (e.g. {@code *.evil.com})
+ *   <li>{@code app} — case-insensitive match against nDPI appName
+ *   <li>{@code protocol} — case-insensitive match against transport/network protocol (e.g. TCP,
+ *       UDP, ICMP)
  * </ul>
  */
 @Slf4j
@@ -69,7 +71,10 @@ public class CustomSignatureService {
       }
     }
     if (matchCount > 0) {
-      log.info("Custom signatures: {} match(es) across {} conversations", matchCount, conversations.size());
+      log.info(
+          "Custom signatures: {} match(es) across {} conversations",
+          matchCount,
+          conversations.size());
     }
   }
 
@@ -77,7 +82,9 @@ public class CustomSignatureService {
   // Internal helpers
   // -------------------------------------------------------------------------
 
-  /** Load and parse the signatures file. Returns an empty list if the file is missing or invalid. */
+  /**
+   * Load and parse the signatures file. Returns an empty list if the file is missing or invalid.
+   */
   @SuppressWarnings("unchecked")
   private List<Map<String, Object>> loadRules() {
     File file = new File(signaturesPath);
@@ -159,7 +166,8 @@ public class CustomSignatureService {
     // protocol — case-insensitive match against transport/network protocol (e.g. TCP, UDP, ICMP)
     if (match.containsKey("protocol")) {
       String protocol = String.valueOf(match.get("protocol"));
-      if (conv.getProtocol() == null || !protocol.equalsIgnoreCase(conv.getProtocol())) return false;
+      if (conv.getProtocol() == null || !protocol.equalsIgnoreCase(conv.getProtocol()))
+        return false;
     }
 
     return true;
@@ -201,8 +209,8 @@ public class CustomSignatureService {
 
   /**
    * Matches a hostname against a pattern. Supports a leading wildcard: {@code *.example.com}
-   * matches any subdomain at any depth (e.g. {@code foo.example.com},
-   * {@code foo.bar.example.com}) as well as the apex domain itself ({@code example.com}).
+   * matches any subdomain at any depth (e.g. {@code foo.example.com}, {@code foo.bar.example.com})
+   * as well as the apex domain itself ({@code example.com}).
    */
   private boolean hostnameMatches(String hostname, String pattern) {
     if (hostname == null || pattern == null) return false;

@@ -1,9 +1,9 @@
 package com.tracepcap.filter.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.tracepcap.common.TsharkHexUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tracepcap.common.TsharkHexUtil;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.service.FileService;
 import com.tracepcap.file.service.StorageService;
@@ -33,8 +33,8 @@ public class FilterService {
   private static final int MAX_GENERATION_RETRIES = 3;
 
   /**
-   * Validate a Wireshark display filter by running tshark against the PCAP file.
-   * tshark exits non-zero and prints to stderr when the filter expression is invalid.
+   * Validate a Wireshark display filter by running tshark against the PCAP file. tshark exits
+   * non-zero and prints to stderr when the filter expression is invalid.
    */
   private ValidationResult validateDisplayFilter(String displayFilter, File pcapFile) {
     if (displayFilter == null || displayFilter.trim().isEmpty()) {
@@ -42,10 +42,9 @@ public class FilterService {
     }
 
     try {
-      ProcessBuilder pb = new ProcessBuilder(
-          "tshark", "-r", pcapFile.getAbsolutePath(),
-          "-Y", displayFilter.trim(),
-          "-c", "1");
+      ProcessBuilder pb =
+          new ProcessBuilder(
+              "tshark", "-r", pcapFile.getAbsolutePath(), "-Y", displayFilter.trim(), "-c", "1");
       pb.redirectErrorStream(true);
       Process process = pb.start();
 
@@ -65,7 +64,8 @@ public class FilterService {
 
       // Extract the first error line from tshark output
       String errorMsg = output.toString().trim();
-      String firstLine = errorMsg.contains("\n") ? errorMsg.substring(0, errorMsg.indexOf('\n')) : errorMsg;
+      String firstLine =
+          errorMsg.contains("\n") ? errorMsg.substring(0, errorMsg.indexOf('\n')) : errorMsg;
       log.warn("Display filter validation failed for '{}': {}", displayFilter, firstLine);
       return new ValidationResult(false, "Invalid filter syntax: " + firstLine);
 
@@ -75,7 +75,9 @@ public class FilterService {
     }
   }
 
-  /** Generate a Wireshark display filter from natural language using LLM with validation and retry */
+  /**
+   * Generate a Wireshark display filter from natural language using LLM with validation and retry
+   */
   public FilterGenerationResponse generateFilter(UUID fileId, String naturalLanguageQuery) {
     log.info("Generating filter for file {} with query: {}", fileId, naturalLanguageQuery);
 
@@ -120,7 +122,8 @@ public class FilterService {
                     Include suggestions only if there are alternative approaches or refinements.
                     """;
 
-      String userPrompt = String.format("Create a Wireshark display filter for: %s", naturalLanguageQuery);
+      String userPrompt =
+          String.format("Create a Wireshark display filter for: %s", naturalLanguageQuery);
       FilterGenerationResponse response = null;
       String lastValidationError = null;
 
@@ -206,12 +209,17 @@ public class FilterService {
     }
   }
 
-  /** Execute a Wireshark display filter on a PCAP file and return matching packets with pagination */
+  /**
+   * Execute a Wireshark display filter on a PCAP file and return matching packets with pagination
+   */
   public FilterExecutionResponse executeFilter(
       UUID fileId, String filterExpression, int page, int pageSize) {
     log.info(
         "Executing filter on file {}: {} (page: {}, pageSize: {})",
-        fileId, filterExpression, page, pageSize);
+        fileId,
+        filterExpression,
+        page,
+        pageSize);
 
     long startTime = System.currentTimeMillis();
     FileEntity fileEntity = fileService.getFileById(fileId);
@@ -247,7 +255,10 @@ public class FilterService {
 
       log.info(
           "Filter execution completed: {} total matches, returning {} for page {}/{}",
-          totalMatches, pagePackets.size(), page, totalPages);
+          totalMatches,
+          pagePackets.size(),
+          page,
+          totalPages);
 
       return FilterExecutionResponse.builder()
           .packets(pagePackets)
@@ -277,29 +288,53 @@ public class FilterService {
     // Fields: epoch | len | ip.src | ip.dst | tcp.sport | tcp.dport | udp.sport | udp.dport |
     //         protocol | info | tcp.flags.syn | tcp.flags.ack | tcp.flags.fin |
     //         tcp.flags.rst | tcp.flags.psh | tcp.flags.urg | tcp.payload | udp.payload
-    ProcessBuilder pb = new ProcessBuilder(
-        "tshark", "-r", pcapFile.getAbsolutePath(),
-        "-Y", displayFilter,
-        "-T", "fields",
-        "-E", "separator=|",
-        "-e", "frame.time_epoch",
-        "-e", "frame.len",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "tcp.srcport",
-        "-e", "tcp.dstport",
-        "-e", "udp.srcport",
-        "-e", "udp.dstport",
-        "-e", "_ws.col.Protocol",
-        "-e", "_ws.col.Info",
-        "-e", "tcp.flags.syn",
-        "-e", "tcp.flags.ack",
-        "-e", "tcp.flags.fin",
-        "-e", "tcp.flags.rst",
-        "-e", "tcp.flags.push",
-        "-e", "tcp.flags.urg",
-        "-e", "tcp.payload",
-        "-e", "udp.payload");
+    ProcessBuilder pb =
+        new ProcessBuilder(
+            "tshark",
+            "-r",
+            pcapFile.getAbsolutePath(),
+            "-Y",
+            displayFilter,
+            "-T",
+            "fields",
+            "-E",
+            "separator=|",
+            "-e",
+            "frame.time_epoch",
+            "-e",
+            "frame.len",
+            "-e",
+            "ip.src",
+            "-e",
+            "ip.dst",
+            "-e",
+            "tcp.srcport",
+            "-e",
+            "tcp.dstport",
+            "-e",
+            "udp.srcport",
+            "-e",
+            "udp.dstport",
+            "-e",
+            "_ws.col.Protocol",
+            "-e",
+            "_ws.col.Info",
+            "-e",
+            "tcp.flags.syn",
+            "-e",
+            "tcp.flags.ack",
+            "-e",
+            "tcp.flags.fin",
+            "-e",
+            "tcp.flags.rst",
+            "-e",
+            "tcp.flags.push",
+            "-e",
+            "tcp.flags.urg",
+            "-e",
+            "tcp.payload",
+            "-e",
+            "udp.payload");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     try {
@@ -372,9 +407,15 @@ public class FilterService {
       // Derive layer from protocol
       String proto = protocolRaw;
       String layer;
-      if (proto.equals("HTTP") || proto.equals("HTTPS") || proto.equals("DNS")
-          || proto.equals("SSH") || proto.equals("FTP") || proto.equals("SMTP")
-          || proto.equals("IMAP") || proto.equals("POP") || proto.equals("TLS")) {
+      if (proto.equals("HTTP")
+          || proto.equals("HTTPS")
+          || proto.equals("DNS")
+          || proto.equals("SSH")
+          || proto.equals("FTP")
+          || proto.equals("SMTP")
+          || proto.equals("IMAP")
+          || proto.equals("POP")
+          || proto.equals("TLS")) {
         layer = "application";
       } else if (proto.equals("TCP") || proto.equals("UDP")) {
         layer = "transport";
@@ -431,7 +472,12 @@ public class FilterService {
       this.errorMessage = errorMessage;
     }
 
-    boolean isValid() { return valid; }
-    String getErrorMessage() { return errorMessage; }
+    boolean isValid() {
+      return valid;
+    }
+
+    String getErrorMessage() {
+      return errorMessage;
+    }
   }
 }
