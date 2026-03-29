@@ -35,28 +35,79 @@ public class ConversationsController {
   @Operation(summary = "Get conversations with filtering, sorting, and pagination")
   public ResponseEntity<PagedResponse<ConversationResponse>> getConversations(
       @PathVariable UUID fileId,
-      @Parameter(description = "Page number (1-indexed)") @RequestParam(defaultValue = "1") int page,
-      @Parameter(description = "Number of items per page") @RequestParam(defaultValue = "25") int pageSize,
-      @Parameter(description = "Filter by IP address or hostname (src, dst, or hostname contains)") @RequestParam(required = false) String ip,
-      @Parameter(description = "Filter by port number (src or dst)") @RequestParam(required = false) Integer port,
-      @Parameter(description = "Comma-separated list of protocols to include") @RequestParam(required = false) String protocols,
-      @Parameter(description = "Comma-separated list of application names to include") @RequestParam(required = false) String apps,
-      @Parameter(description = "Comma-separated list of categories to include") @RequestParam(required = false) String categories,
-      @Parameter(description = "When true, only conversations with flow risks are returned") @RequestParam(required = false) Boolean hasRisks,
-      @Parameter(description = "Comma-separated list of detected file types to include") @RequestParam(required = false) String fileTypes,
-      @Parameter(description = "Comma-separated list of nDPI risk types to include") @RequestParam(required = false) String riskTypes,
-      @Parameter(description = "Comma-separated list of custom signature rule names to include") @RequestParam(required = false) String customSignatures,
-      @Parameter(description = "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime") @RequestParam(required = false) String sortBy,
-      @Parameter(description = "Sort direction: asc (default) or desc") @RequestParam(required = false) String sortDir,
-      @Parameter(description = "Legacy alias for ip param") @RequestParam(required = false) String search) {
+      @Parameter(description = "Page number (1-indexed)") @RequestParam(defaultValue = "1")
+          int page,
+      @Parameter(description = "Number of items per page") @RequestParam(defaultValue = "25")
+          int pageSize,
+      @Parameter(description = "Filter by IP address or hostname (src, dst, or hostname contains)")
+          @RequestParam(required = false)
+          String ip,
+      @Parameter(description = "Filter by port number (src or dst)") @RequestParam(required = false)
+          Integer port,
+      @Parameter(description = "Comma-separated list of protocols to include")
+          @RequestParam(required = false)
+          String protocols,
+      @Parameter(description = "Comma-separated list of application names to include")
+          @RequestParam(required = false)
+          String apps,
+      @Parameter(description = "Comma-separated list of categories to include")
+          @RequestParam(required = false)
+          String categories,
+      @Parameter(description = "When true, only conversations with flow risks are returned")
+          @RequestParam(required = false)
+          Boolean hasRisks,
+      @Parameter(description = "Comma-separated list of detected file types to include")
+          @RequestParam(required = false)
+          String fileTypes,
+      @Parameter(description = "Comma-separated list of nDPI risk types to include")
+          @RequestParam(required = false)
+          String riskTypes,
+      @Parameter(description = "Comma-separated list of custom signature rule names to include")
+          @RequestParam(required = false)
+          String customSignatures,
+      @Parameter(
+              description = "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime")
+          @RequestParam(required = false)
+          String sortBy,
+      @Parameter(description = "Sort direction: asc (default) or desc")
+          @RequestParam(required = false)
+          String sortDir,
+      @Parameter(description = "Legacy alias for ip param") @RequestParam(required = false)
+          String search) {
 
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
-    ConversationFilterParams params = buildFilterParams(ip, port, protocols, apps, categories, hasRisks, fileTypes, riskTypes, customSignatures, sortBy, sortDir, search);
+    ConversationFilterParams params =
+        buildFilterParams(
+            ip,
+            port,
+            protocols,
+            apps,
+            categories,
+            hasRisks,
+            fileTypes,
+            riskTypes,
+            customSignatures,
+            sortBy,
+            sortDir,
+            search);
 
-    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
-        fileId, page, pageSize, params.getIp(), port, protocols, apps, categories, hasRisks, fileTypes, riskTypes, sortBy, sortDir);
+    log.info(
+        "GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
+        fileId,
+        page,
+        pageSize,
+        params.getIp(),
+        port,
+        protocols,
+        apps,
+        categories,
+        hasRisks,
+        fileTypes,
+        riskTypes,
+        sortBy,
+        sortDir);
 
     return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
   }
@@ -99,28 +150,52 @@ public class ConversationsController {
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
       @RequestParam(required = false) String search,
-      HttpServletResponse response) throws IOException {
+      HttpServletResponse response)
+      throws IOException {
 
-    ConversationFilterParams params = buildFilterParams(ip, port, protocols, apps, categories, hasRisks, fileTypes, riskTypes, customSignatures, sortBy, sortDir, search);
+    ConversationFilterParams params =
+        buildFilterParams(
+            ip,
+            port,
+            protocols,
+            apps,
+            categories,
+            hasRisks,
+            fileTypes,
+            riskTypes,
+            customSignatures,
+            sortBy,
+            sortDir,
+            search);
     List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
     response.setHeader("Content-Disposition", "attachment; filename=\"conversations.csv\"");
 
     PrintWriter writer = response.getWriter();
-    writer.println("srcIp,srcPort,dstIp,dstPort,protocol,appName,category,hostname,packetCount,totalBytes,durationMs,startTime,endTime,flowRisks,customSignatures");
+    writer.println(
+        "srcIp,srcPort,dstIp,dstPort,protocol,appName,category,hostname,packetCount,totalBytes,durationMs,startTime,endTime,flowRisks,customSignatures");
     for (ConversationResponse r : rows) {
       String flowRisksValue = r.getFlowRisks() != null ? String.join("; ", r.getFlowRisks()) : "";
-      String customSigsValue = r.getCustomSignatures() != null ? String.join("; ", r.getCustomSignatures()) : "";
-      writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,%s,%s%n",
-          escapeCsv(r.getSrcIp()), escapeCsv(r.getSrcPort()),
-          escapeCsv(r.getDstIp()), escapeCsv(r.getDstPort()),
-          escapeCsv(r.getProtocol()), escapeCsv(r.getAppName()),
-          escapeCsv(r.getCategory()), escapeCsv(r.getHostname()),
-          r.getPacketCount(), r.getTotalBytes(), r.getDurationMs(),
+      String customSigsValue =
+          r.getCustomSignatures() != null ? String.join("; ", r.getCustomSignatures()) : "";
+      writer.printf(
+          "%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,%s,%s%n",
+          escapeCsv(r.getSrcIp()),
+          escapeCsv(r.getSrcPort()),
+          escapeCsv(r.getDstIp()),
+          escapeCsv(r.getDstPort()),
+          escapeCsv(r.getProtocol()),
+          escapeCsv(r.getAppName()),
+          escapeCsv(r.getCategory()),
+          escapeCsv(r.getHostname()),
+          r.getPacketCount(),
+          r.getTotalBytes(),
+          r.getDurationMs(),
           r.getStartTime() != null ? escapeCsv(CSV_DT.format(r.getStartTime())) : "",
-          r.getEndTime()   != null ? escapeCsv(CSV_DT.format(r.getEndTime()))   : "",
-          escapeCsv(flowRisksValue), escapeCsv(customSigsValue));
+          r.getEndTime() != null ? escapeCsv(CSV_DT.format(r.getEndTime())) : "",
+          escapeCsv(flowRisksValue),
+          escapeCsv(customSigsValue));
     }
     writer.flush();
   }
@@ -136,9 +211,18 @@ public class ConversationsController {
 
   /** Shared helper — builds a {@link ConversationFilterParams} from raw request parameters. */
   private static ConversationFilterParams buildFilterParams(
-      String ip, Integer port, String protocols, String apps, String categories,
-      Boolean hasRisks, String fileTypes, String riskTypes, String customSignatures,
-      String sortBy, String sortDir, String search) {
+      String ip,
+      Integer port,
+      String protocols,
+      String apps,
+      String categories,
+      Boolean hasRisks,
+      String fileTypes,
+      String riskTypes,
+      String customSignatures,
+      String sortBy,
+      String sortDir,
+      String search) {
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
         .ip(resolvedIp)
@@ -157,16 +241,12 @@ public class ConversationsController {
 
   private static List<String> splitComma(String value) {
     if (value == null || value.isBlank()) return List.of();
-    return Arrays.stream(value.split(","))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .toList();
+    return Arrays.stream(value.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 
   /**
-   * Escapes a value for safe inclusion in a CSV field.
-   * Fields containing commas, double-quotes, or newlines are wrapped in double-quotes,
-   * and any embedded double-quotes are doubled per RFC 4180.
+   * Escapes a value for safe inclusion in a CSV field. Fields containing commas, double-quotes, or
+   * newlines are wrapped in double-quotes, and any embedded double-quotes are doubled per RFC 4180.
    */
   private static String escapeCsv(Object value) {
     if (value == null) return "";
