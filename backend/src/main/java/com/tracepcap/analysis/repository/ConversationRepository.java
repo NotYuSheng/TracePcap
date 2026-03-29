@@ -3,7 +3,6 @@ package com.tracepcap.analysis.repository;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
-import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
@@ -19,8 +18,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConversationRepository
-    extends JpaRepository<ConversationEntity, UUID>,
-            JpaSpecificationExecutor<ConversationEntity> {
+    extends JpaRepository<ConversationEntity, UUID>, JpaSpecificationExecutor<ConversationEntity> {
 
   List<ConversationEntity> findByFileId(UUID fileId);
 
@@ -29,9 +27,10 @@ public interface ConversationRepository
   void deleteByFileId(UUID fileId);
 
   /** Returns the distinct detected file types present in packets for the given file. */
-  @Query("SELECT DISTINCT p.detectedFileType FROM PacketEntity p"
-      + " WHERE p.file.id = :fileId AND p.detectedFileType IS NOT NULL"
-      + " ORDER BY p.detectedFileType")
+  @Query(
+      "SELECT DISTINCT p.detectedFileType FROM PacketEntity p"
+          + " WHERE p.file.id = :fileId AND p.detectedFileType IS NOT NULL"
+          + " ORDER BY p.detectedFileType")
   List<String> findDistinctFileTypesByFileId(@Param("fileId") UUID fileId);
 
   /** Returns only conversations that have at least one risk flag. */
@@ -48,8 +47,8 @@ public interface ConversationRepository
       @Param("fileId") UUID fileId, Pageable pageable);
 
   /**
-   * Returns at-risk conversations for a file, capped to a limit.
-   * Uses native query because JPQL cannot express array_length.
+   * Returns at-risk conversations for a file, capped to a limit. Uses native query because JPQL
+   * cannot express array_length.
    */
   @Query(
       value =
@@ -96,8 +95,7 @@ public interface ConversationRepository
   List<String> findDistinctCustomSignaturesByFileId(@Param("fileId") UUID fileId);
 
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
-  static Specification<ConversationEntity> buildSpec(
-      UUID fileId, ConversationFilterParams params) {
+  static Specification<ConversationEntity> buildSpec(UUID fileId, ConversationFilterParams params) {
 
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
@@ -112,19 +110,19 @@ public interface ConversationRepository
       // IP / hostname free-text
       if (params.getIp() != null && !params.getIp().isBlank()) {
         String pattern = "%" + params.getIp().trim().toLowerCase() + "%";
-        predicates.add(cb.or(
-            cb.like(cb.lower(root.get("srcIp")),    pattern),
-            cb.like(cb.lower(root.get("dstIp")),    pattern),
-            cb.like(cb.lower(cb.coalesce(root.get("hostname"), "")), pattern)
-        ));
+        predicates.add(
+            cb.or(
+                cb.like(cb.lower(root.get("srcIp")), pattern),
+                cb.like(cb.lower(root.get("dstIp")), pattern),
+                cb.like(cb.lower(cb.coalesce(root.get("hostname"), "")), pattern)));
       }
 
       // Port exact match (srcPort OR dstPort)
       if (params.getPort() != null) {
-        predicates.add(cb.or(
-            cb.equal(root.get("srcPort"), params.getPort()),
-            cb.equal(root.get("dstPort"), params.getPort())
-        ));
+        predicates.add(
+            cb.or(
+                cb.equal(root.get("srcPort"), params.getPort()),
+                cb.equal(root.get("dstPort"), params.getPort())));
       }
 
       // Protocol multi-value
@@ -149,29 +147,41 @@ public interface ConversationRepository
 
       // Has flow risks or custom signature matches
       if (Boolean.TRUE.equals(params.getHasRisks())) {
-        predicates.add(cb.or(
-            cb.isNotNull(root.get("flowRisks")),
-            cb.isNotNull(root.get("customSignatures"))
-        ));
+        predicates.add(
+            cb.or(cb.isNotNull(root.get("flowRisks")), cb.isNotNull(root.get("customSignatures"))));
       }
 
       // Risk type filter (nDPI flow risks)
       if (params.getRiskTypes() != null && !params.getRiskTypes().isEmpty()) {
-        List<Predicate> riskPreds = params.getRiskTypes().stream()
-            .map(rt -> cb.greaterThan(
-                cb.function("array_position", Integer.class, root.get("flowRisks"), cb.literal(rt)),
-                0))
-            .collect(java.util.stream.Collectors.toList());
+        List<Predicate> riskPreds =
+            params.getRiskTypes().stream()
+                .map(
+                    rt ->
+                        cb.greaterThan(
+                            cb.function(
+                                "array_position",
+                                Integer.class,
+                                root.get("flowRisks"),
+                                cb.literal(rt)),
+                            0))
+                .collect(java.util.stream.Collectors.toList());
         predicates.add(cb.or(riskPreds.toArray(new Predicate[0])));
       }
 
       // Custom signature filter
       if (params.getCustomSignatures() != null && !params.getCustomSignatures().isEmpty()) {
-        List<Predicate> sigPreds = params.getCustomSignatures().stream()
-            .map(sig -> cb.greaterThan(
-                cb.function("array_position", Integer.class, root.get("customSignatures"), cb.literal(sig)),
-                0))
-            .collect(java.util.stream.Collectors.toList());
+        List<Predicate> sigPreds =
+            params.getCustomSignatures().stream()
+                .map(
+                    sig ->
+                        cb.greaterThan(
+                            cb.function(
+                                "array_position",
+                                Integer.class,
+                                root.get("customSignatures"),
+                                cb.literal(sig)),
+                            0))
+                .collect(java.util.stream.Collectors.toList());
         predicates.add(cb.or(sigPreds.toArray(new Predicate[0])));
       }
 
@@ -180,10 +190,10 @@ public interface ConversationRepository
         Subquery<UUID> sub = query.subquery(UUID.class);
         var packet = sub.from(PacketEntity.class);
         sub.select(packet.get("conversation").get("id"))
-            .where(cb.and(
-                cb.equal(packet.get("conversation").get("id"), root.get("id")),
-                packet.get("detectedFileType").in(params.getFileTypes())
-            ));
+            .where(
+                cb.and(
+                    cb.equal(packet.get("conversation").get("id"), root.get("id")),
+                    packet.get("detectedFileType").in(params.getFileTypes())));
         predicates.add(cb.exists(sub));
       }
 
