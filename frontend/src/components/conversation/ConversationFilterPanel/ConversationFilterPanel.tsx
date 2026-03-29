@@ -3,7 +3,7 @@ import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
-import { getAppColor, getCategoryColor, getTextColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor, getSeverityColor } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationFilterPanel.css';
 
@@ -18,8 +18,10 @@ interface ConversationFilterPanelProps {
   protocols:         ProtocolStat[];
   apps:              AppStat[];
   categories:        CategoryStat[];
-  fileTypes:         string[];
-  riskTypes:         string[];
+  fileTypes:               string[];
+  riskTypes:               string[];
+  customSignatureOptions:  string[];
+  signatureSeverities?:    Record<string, string>;
   activeFilterCount: number;
   visibleColumns:    Set<ColumnKey>;
   onToggleColumn:    (key: ColumnKey) => void;
@@ -73,6 +75,8 @@ export function ConversationFilterPanel({
   categories,
   fileTypes,
   riskTypes,
+  customSignatureOptions,
+  signatureSeverities = {},
   activeFilterCount,
   visibleColumns,
   onToggleColumn,
@@ -187,7 +191,6 @@ export function ConversationFilterPanel({
                     onChange={e => onFiltersChange({ hasRisks: e.target.checked })}
                   />
                   <label className="form-check-label small d-inline-flex align-items-center" htmlFor="hasRisksCheck">
-                    <i className="bi bi-shield-exclamation text-warning me-1"></i>
                     Security risks only
                     <InfoPopover id="info-risks" title="Security risks" body="Shows only conversations flagged with at least one nDPI risk indicator, such as unsafe protocols, clear-text credentials, or suspicious traffic patterns." />
                   </label>
@@ -285,7 +288,7 @@ export function ConversationFilterPanel({
               {fileTypes.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
-                    label={<><i className="bi bi-file-earmark me-1"></i>File Types</>}
+                    label="File Types"
                     info={<InfoPopover id="info-filetypes" title="File Types" body="Shows only conversations containing at least one packet where a file signature (magic bytes) was detected in the payload — e.g. PDF, ZIP, PNG." />}
                     onSelectAll={() => onFiltersChange({ fileTypes })}
                     onDeselectAll={() => onFiltersChange({ fileTypes: [] })}
@@ -314,7 +317,7 @@ export function ConversationFilterPanel({
               {riskTypes.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
-                    label={<><i className="bi bi-shield-exclamation me-1"></i>Risk Type</>}
+                    label="Risk Type"
                     info={<InfoPopover id="info-risktype" title="Risk Type" body="Filter by nDPI risk flags assigned to a conversation. Examples: clear-text credentials, unsafe protocols, known malicious signatures." />}
                     onSelectAll={() => onFiltersChange({ riskTypes })}
                     onDeselectAll={() => onFiltersChange({ riskTypes: [] })}
@@ -322,13 +325,12 @@ export function ConversationFilterPanel({
                   <div className="d-flex flex-wrap gap-1">
                     {riskTypes.map(rt => {
                       const isActive = filters.riskTypes.includes(rt);
-                      const bg = getAppColor(rt);
                       return (
                         <button
                           key={rt}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                          style={isActive ? { backgroundColor: '#ffc107', color: '#212529' } : undefined}
                           onClick={() => toggle('riskTypes', rt, filters.riskTypes)}
                         >
                           {rt.replace(/_/g, ' ')}
@@ -339,8 +341,65 @@ export function ConversationFilterPanel({
                 </div>
               )}
 
+              {/* Custom signature rule pills */}
+              {customSignatureOptions.length > 0 && (
+                <div className="col-12">
+                  <PillSectionHeader
+                    label="Custom Rules"
+                    info={<InfoPopover id="info-customrules" title="Custom Rules" body="Filter by your own custom detection rules defined in signatures.yml. Only rules that matched at least one conversation in this file are shown." />}
+                    onSelectAll={() => onFiltersChange({ customSignatures: customSignatureOptions })}
+                    onDeselectAll={() => onFiltersChange({ customSignatures: [] })}
+                  />
+                  <div className="d-flex flex-wrap gap-1 mb-2">
+                    {customSignatureOptions.map(rule => {
+                      const isActive = filters.customSignatures.includes(rule);
+                      const { bg, text } = getSeverityColor(signatureSeverities[rule]);
+                      return (
+                        <button
+                          key={rule}
+                          type="button"
+                          className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
+                          style={isActive ? { backgroundColor: bg, color: text } : undefined}
+                          onClick={() => toggle('customSignatures', rule, filters.customSignatures)}
+                        >
+                          {rule.replace(/_/g, ' ')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="d-flex flex-wrap gap-2 align-items-center" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                    <span>Severity:</span>
+                    {([['critical','#dc3545','#fff'],['high','#fd7e14','#fff'],['medium','#ffc107','#212529'],['low','#6f42c1','#fff']] as const).map(([label, bg, text]) => {
+                      const rulesOfSeverity = customSignatureOptions.filter(r => (signatureSeverities[r] ?? 'low').toLowerCase() === label);
+                      if (rulesOfSeverity.length === 0) return null;
+                      const allSelected = rulesOfSeverity.every(r => filters.customSignatures.includes(r));
+                      const handleClick = () => {
+                        if (allSelected) {
+                          onFiltersChange({ customSignatures: filters.customSignatures.filter(r => !rulesOfSeverity.includes(r)) });
+                        } else {
+                          const next = [...new Set([...filters.customSignatures, ...rulesOfSeverity])];
+                          onFiltersChange({ customSignatures: next });
+                        }
+                      };
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          className="badge border-0"
+                          style={{ backgroundColor: allSelected ? bg : undefined, color: allSelected ? text : undefined, fontWeight: 400, cursor: 'pointer', opacity: allSelected ? 1 : 0.6 }}
+                          onClick={handleClick}
+                          title={allSelected ? `Deselect all ${label} rules` : `Select all ${label} rules`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Column visibility */}
-              <div className="col-12 pt-1 border-top mt-1">
+              <div className="col-12 pt-1 border-top mt-3">
                 <label className="filter-section-label d-block mb-2">
                   <i className="bi bi-layout-three-columns me-1"></i>Columns
                 </label>

@@ -18,6 +18,7 @@ export interface ConversationFilters {
   hasRisks: boolean;
   fileTypes: string[];
   riskTypes: string[];
+  customSignatures: string[];
   sortBy: SortField;
   sortDir: SortDir;
   page: number;

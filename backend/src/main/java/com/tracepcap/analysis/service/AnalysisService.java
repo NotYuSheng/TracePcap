@@ -167,6 +167,9 @@ public class AnalysisService {
                 .flowRisks(convInfo.getFlowRisks().isEmpty()
                     ? null
                     : convInfo.getFlowRisks().toArray(new String[0]))
+                .customSignatures(convInfo.getCustomSignatures().isEmpty()
+                    ? null
+                    : convInfo.getCustomSignatures().toArray(new String[0]))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -343,8 +346,16 @@ public class AnalysisService {
             .collect(Collectors.toList());
 
     long securityAlertCount = conversations.stream()
-        .filter(conv -> conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
+        .filter(conv -> (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
+            || (conv.getCustomSignatures() != null && conv.getCustomSignatures().length > 0))
         .count();
+
+    List<String> triggeredCustomRules = conversations.stream()
+        .filter(conv -> conv.getCustomSignatures() != null && conv.getCustomSignatures().length > 0)
+        .flatMap(conv -> Arrays.stream(conv.getCustomSignatures()))
+        .distinct()
+        .sorted()
+        .collect(Collectors.toList());
 
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
@@ -377,6 +388,8 @@ public class AnalysisService {
                         .totalBytes(conv.getTotalBytes())
                         .flowRisks(conv.getFlowRisks() != null
                             ? Arrays.asList(conv.getFlowRisks()) : List.of())
+                        .customSignatures(conv.getCustomSignatures() != null
+                            ? Arrays.asList(conv.getCustomSignatures()) : List.of())
                         .build())
             .collect(Collectors.toList());
 
@@ -413,6 +426,7 @@ public class AnalysisService {
         .protocolDistribution(protocolDistribution)
         .topConversations(topConversations)
         .securityAlertCount(securityAlertCount)
+        .triggeredCustomRules(triggeredCustomRules)
         .uniqueHosts(uniqueHosts)
         .detectedApplications(detectedApplications)
         .detectedApplicationsTruncated(appsTruncated)
@@ -490,6 +504,11 @@ public class AnalysisService {
     return conversationRepository.findDistinctRiskTypesByFileId(fileId);
   }
 
+  @Transactional(readOnly = true)
+  public List<String> getDistinctCustomSignatures(UUID fileId) {
+    return conversationRepository.findDistinctCustomSignaturesByFileId(fileId);
+  }
+
   /** Also used by the CSV export — returns ALL matching rows without pagination. */
   @Transactional(readOnly = true)
   public List<ConversationResponse> getConversationsForExport(
@@ -537,6 +556,7 @@ public class AnalysisService {
         .tlsNotBefore(conv.getTlsNotBefore())
         .tlsNotAfter(conv.getTlsNotAfter())
         .flowRisks(conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
+        .customSignatures(conv.getCustomSignatures() != null ? Arrays.asList(conv.getCustomSignatures()) : List.of())
         .packetCount(conv.getPacketCount())
         .totalBytes(conv.getTotalBytes())
         .startTime(conv.getStartTime())
@@ -570,6 +590,8 @@ public class AnalysisService {
               .tlsNotAfter(conv.getTlsNotAfter())
               .flowRisks(conv.getFlowRisks() != null
                   ? Arrays.asList(conv.getFlowRisks()) : List.of())
+              .customSignatures(conv.getCustomSignatures() != null
+                  ? Arrays.asList(conv.getCustomSignatures()) : List.of())
               .packetCount(conv.getPacketCount())
               .totalBytes(conv.getTotalBytes())
               .startTime(conv.getStartTime())
@@ -641,6 +663,8 @@ public class AnalysisService {
         .tlsNotAfter(conversation.getTlsNotAfter())
         .flowRisks(conversation.getFlowRisks() != null
             ? Arrays.asList(conversation.getFlowRisks()) : List.of())
+        .customSignatures(conversation.getCustomSignatures() != null
+            ? Arrays.asList(conversation.getCustomSignatures()) : List.of())
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())

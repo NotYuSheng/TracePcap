@@ -24,44 +24,44 @@ signatures: []
 
 # Uncomment and edit the examples below to add your own rules:
 
-#  - name: known_c2_ip
-#    description: Known command-and-control server
-#    match:
-#      ip: "203.0.113.42"
-#    severity: high
+ - name: known_c2_ip
+   description: Known command-and-control server
+   match:
+     ip: "203.0.113.42"
+   severity: high
 
-#  - name: flagged_subnet
-#    description: Traffic to/from a suspicious CIDR range
-#    match:
-#      cidr: "198.51.100.0/24"
-#    severity: medium
+ - name: flagged_subnet
+   description: Traffic to/from a suspicious CIDR range
+   match:
+     cidr: "198.51.100.0/24"
+   severity: medium
 
-#  - name: suspicious_outbound_port
-#    description: Outbound connection on a port commonly used by reverse shells
-#    match:
-#      dstPort: 4444
-#    severity: high
+ - name: suspicious_outbound_port
+   description: Outbound connection on a port commonly used by reverse shells
+   match:
+     dstPort: 4444
+   severity: high
 
-#  - name: malicious_ja3_fingerprint
-#    description: TLS client hello matching a known malware fingerprint
-#    match:
-#      ja3: "a0e9f5d64349fb13191bc781f81f42e1"
-#    severity: high
+ - name: malicious_ja3_fingerprint
+   description: TLS client hello matching a known malware fingerprint
+   match:
+     ja3: "a0e9f5d64349fb13191bc781f81f42e1"
+   severity: high
 
-#  - name: blocked_domain
-#    description: Wildcard match on a known malicious domain
-#    match:
-#      hostname: "*.malware.example.com"
-#    severity: high
+ - name: blocked_domain
+   description: Wildcard match on a known malicious domain
+   match:
+     hostname: "*.malware.example.com"
+   severity: high
 
-#  - name: tor_usage
-#    description: Traffic identified as TOR by nDPI
-#    match:
-#      app: "TOR"
-#    severity: high
+ - name: tor_usage
+   description: Traffic identified as TOR by nDPI
+   match:
+     app: "TOR"
+   severity: high
 
-#  - name: smb_from_internet
-#    description: SMB (port 445) from a non-RFC1918 source — potential lateral movement
-#    match:
-#      srcPort: 445
-#    severity: medium
+ - name: smb_from_internet
+   description: SMB (port 445) from a non-RFC1918 source — potential lateral movement
+   match:
+     srcPort: 445
+   severity: medium

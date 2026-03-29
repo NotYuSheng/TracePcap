@@ -3,7 +3,7 @@ import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
-import { getAppColor, getCategoryColor, getTextColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor, getSeverityColor } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
 
@@ -15,6 +15,7 @@ interface ConversationListProps {
   onSort: (field: SortField) => void;
   onRiskFilterClick?: () => void;
   visibleColumns: Set<ColumnKey>;
+  signatureSeverities?: Record<string, string>;
 }
 
 export const ConversationList = ({
@@ -25,6 +26,7 @@ export const ConversationList = ({
   onSort,
   onRiskFilterClick,
   visibleColumns,
+  signatureSeverities = {},
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrolledEnd, setScrolledEnd] = useState(false);
@@ -126,9 +128,10 @@ export const ConversationList = ({
     panRaf.current = requestAnimationFrame(panTick.current);
   }, [stopPan]);
 
-  const hasAppNames   = conversations.some(c => c.appName);
-  const hasCategories = conversations.some(c => c.category);
-  const hasRisks      = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
+  const hasAppNames       = conversations.some(c => c.appName);
+  const hasCategories     = conversations.some(c => c.category);
+  const hasRisks          = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
+  const hasCustomRules    = conversations.some(c => c.customSignatures && c.customSignatures.length > 0);
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -175,6 +178,7 @@ export const ConversationList = ({
               {col('appName')  && hasAppNames   && <th>Application</th>}
               {col('category') && hasCategories && <th>Category</th>}
               {col('risks')    && hasRisks      && <th>Risks</th>}
+              {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
               {col('packets')     && <SortableHeader field="packets"   label="Packets" />}
               {col('bytes')       && <SortableHeader field="bytes"     label="Bytes" />}
               {col('duration')    && <SortableHeader field="duration"  label="Duration" />}
@@ -233,18 +237,34 @@ export const ConversationList = ({
                   {col('risks') && hasRisks && (
                     <td>
                       {conversation.flowRisks && conversation.flowRisks.length > 0 ? (
-                        <div className="d-flex flex-wrap gap-1">
+                        <div className="d-inline-flex flex-wrap gap-1">
                           {conversation.flowRisks.map(risk => (
                             <span
                               key={risk}
-                              className="badge bg-warning text-dark"
-                              style={{ cursor: 'pointer', fontSize: '0.7rem' }}
+                              className="badge"
+                              style={{ backgroundColor: '#ffc107', color: '#212529', cursor: 'pointer' }}
                               title="Click to filter by security risks"
                               onClick={e => { e.stopPropagation(); onRiskFilterClick?.(); }}
                             >
                               {risk}
                             </span>
                           ))}
+                        </div>
+                      ) : <span className="text-muted">—</span>}
+                    </td>
+                  )}
+                  {col('customRules') && hasCustomRules && (
+                    <td>
+                      {conversation.customSignatures && conversation.customSignatures.length > 0 ? (
+                        <div className="d-inline-flex flex-wrap gap-1">
+                          {conversation.customSignatures.map(rule => {
+                            const { bg, text } = getSeverityColor(signatureSeverities[rule]);
+                            return (
+                              <span key={rule} className="badge" style={{ backgroundColor: bg, color: text }}>
+                                {rule.replace(/_/g, ' ')}
+                              </span>
+                            );
+                          })}
                         </div>
                       ) : <span className="text-muted">—</span>}
                     </td>

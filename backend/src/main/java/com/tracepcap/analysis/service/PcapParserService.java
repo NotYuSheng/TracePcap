@@ -663,6 +663,7 @@ public class PcapParserService {
     private String protocol;
     private String appName;
     private List<String> flowRisks = new ArrayList<>();
+    private List<String> customSignatures = new ArrayList<>();
     private String category;
     private String hostname;
     private String ja3Client;

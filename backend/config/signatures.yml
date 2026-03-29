@@ -1,8 +1,8 @@
 # TracePcap Custom Signatures
 # ============================
 # Add your own detection rules here. Each matched rule appends its `name` to the
-# conversation's risk flags, making it visible in the Risk Type filter and security
-# alerts alongside nDPI's built-in detections.
+# conversation's custom rules, making it visible in the Custom Rules filter and
+# security alerts.
 #
 # Rules are reloaded on every file analysis - no restart required after editing.
 #
@@ -14,58 +14,115 @@
 #   ja3      - exact match against JA3 client OR server fingerprint hash
 #   hostname - exact or wildcard SNI hostname  (e.g. *.evil.com)
 #   app      - case-insensitive match against nDPI application name  (e.g. TOR)
+#   protocol - case-insensitive match against transport protocol     (e.g. TCP, UDP, ICMP)
 #
-# The `name` field becomes the risk tag shown in the UI (use underscores, no spaces).
-# The `description` and `severity` fields are for documentation only.
+# Severity levels (for documentation only — use colors in the UI):
+#   low | medium | high | critical
 #
-# To add rules: replace "signatures: []" below with "signatures:" and add
-# list items indented under it, as shown in the commented examples.
-#
+# The `name` field becomes the tag shown in the UI (use underscores, no spaces).
+# All rules below were written against teams.pcap as a demonstration.
 # ----------------------------------------------------------------------------
 
-signatures: []
+signatures:
 
-# Example (replace signatures: [] with signatures: then uncomment rules):
-#
-# signatures:
-#   - name: known_c2_ip
-#     description: Known command-and-control server
-#     match:
-#       ip: "203.0.113.42"
-#     severity: high
-#
-#   - name: flagged_subnet
-#     description: Traffic to/from a suspicious CIDR range
-#     match:
-#       cidr: "198.51.100.0/24"
-#     severity: medium
-#
-#   - name: suspicious_outbound_port
-#     description: Outbound connection on a port commonly used by reverse shells
-#     match:
-#       dstPort: 4444
-#     severity: high
-#
-#   - name: malicious_ja3_fingerprint
-#     description: TLS client hello matching a known malware fingerprint
-#     match:
-#       ja3: "a0e9f5d64349fb13191bc781f81f42e1"
-#     severity: high
-#
-#   - name: blocked_domain
-#     description: Wildcard match on a known malicious domain
-#     match:
-#       hostname: "*.malware.example.com"
-#     severity: high
-#
-#   - name: tor_usage
-#     description: Traffic identified as TOR by nDPI
-#     match:
-#       app: "TOR"
-#     severity: high
-#
-#   - name: smb_from_internet
-#     description: SMB (port 445) from a non-RFC1918 source - potential lateral movement
-#     match:
-#       srcPort: 445
-#     severity: medium
+  # --- ip: exact match against a single IP address ---
+  # Flags any conversation involving a known Dropbox telemetry server IP.
+  - name: dropbox_telemetry_server
+    description: Direct contact with a known Dropbox telemetry IP
+    severity: low
+    match:
+      ip: "162.125.19.131"
+
+  # --- cidr: match any IP within a subnet ---
+  # Catches all traffic to Microsoft Azure's Teams/365 IP range.
+  - name: microsoft_azure_traffic
+    description: Traffic to/from Microsoft Azure IP range used by Teams and M365
+    severity: low
+    match:
+      cidr: "52.114.0.0/16"
+
+  # --- dstPort: flag connections to a specific destination port ---
+  # Teams uses port 4434 for media relay — flag it for inspection.
+  - name: teams_media_relay_port
+    description: Connection to Teams media relay port 4434
+    severity: low
+    match:
+      dstPort: 4434
+
+  # --- srcPort: flag traffic originating from a specific source port ---
+  # DHCP servers respond from port 67; unexpected hosts doing this may be rogue.
+  - name: rogue_dhcp_server
+    description: Traffic sourced from port 67 — potential rogue DHCP server
+    severity: high
+    match:
+      srcPort: 67
+
+  # --- hostname: exact SNI hostname match ---
+  # Microsoft telemetry pipeline — flag for data-exfil awareness.
+  - name: microsoft_telemetry_pipeline
+    description: TLS SNI to Microsoft Aria telemetry collection endpoint
+    severity: medium
+    match:
+      hostname: "mobile.pipe.aria.microsoft.com"
+
+  # --- hostname: wildcard match (leading *.) ---
+  # Catches any subdomain of microsoft.com for broad visibility.
+  - name: microsoft_domain_traffic
+    description: Any conversation with an SNI hostname under *.microsoft.com
+    severity: low
+    match:
+      hostname: "*.microsoft.com"
+
+  # --- app: nDPI application name match ---
+  # Flag all Telegram traffic for policy enforcement.
+  - name: telegram_usage
+    description: Traffic identified as Telegram by nDPI deep packet inspection
+    severity: medium
+    match:
+      app: "Telegram"
+
+  # --- protocol: transport-layer protocol match ---
+  # Flag all ICMP — useful for detecting ping sweeps or covert channels.
+  - name: icmp_detected
+    description: Any ICMP conversation — review for ping sweeps or tunnelling
+    severity: low
+    match:
+      protocol: ICMP
+
+  # --- app + protocol: combined AND condition ---
+  # DNS should only run over UDP on port 53; TCP DNS may indicate zone transfers.
+  - name: dns_over_tcp
+    description: DNS running over TCP — possible zone transfer or DNS tunnelling
+    severity: medium
+    match:
+      app: "DNS"
+      protocol: TCP
+
+  # --- dstPort + protocol: combined AND condition ---
+  # HTTPS over UDP (QUIC) — flag for environments that disallow QUIC.
+  - name: quic_https
+    description: HTTPS traffic over UDP (likely QUIC) — may bypass TLS inspection proxies
+    severity: medium
+    match:
+      dstPort: 443
+      protocol: UDP
+
+  # --- ja3: fingerprint match ---
+  # nDPI 5.x outputs JA3S (server-hello hash); JA3C (client-hello) was removed.
+  # JA3S string: 771,53, — ServerHello selecting AES-256-SHA with no extensions.
+  # Matches the crafted TLS exchange in demo_all_rules.pcap.
+  # In production, replace with hashes from a threat-intel feed (e.g. ja3er.com).
+  - name: suspected_meterpreter_tls
+    description: TLS exchange matching a suspicious JA3S fingerprint (demo)
+    severity: critical
+    match:
+      ja3: "82f0d8a75fa483d1cfe4b7085b784d7e"
+
+  # --- ip + dstPort: multi-field AND condition ---
+  # Specific known Teams router IP on its signalling port.
+  - name: teams_trouter_signalling
+    description: Direct connection to a known Teams trouter relay IP on port 443
+    severity: low
+    match:
+      ip: "52.114.252.8"
+      dstPort: 443

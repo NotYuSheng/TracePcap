@@ -32,7 +32,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  *   <li>{@code dstPort} — exact match against destination port</li>
  *   <li>{@code ja3}     — exact match against ja3Client OR ja3Server</li>
  *   <li>{@code hostname}— exact or wildcard match against SNI hostname (e.g. {@code *.evil.com})</li>
- *   <li>{@code app}     — case-insensitive match against nDPI appName</li>
+ *   <li>{@code app}      — case-insensitive match against nDPI appName</li>
+ *   <li>{@code protocol} — case-insensitive match against transport/network protocol (e.g. TCP, UDP, ICMP)</li>
  * </ul>
  */
 @Slf4j
@@ -61,8 +62,8 @@ public class CustomSignatureService {
         if (match == null || match.isEmpty()) continue;
 
         if (matches(conv, match)) {
-          if (!conv.getFlowRisks().contains(name)) {
-            conv.getFlowRisks().add(name);
+          if (!conv.getCustomSignatures().contains(name)) {
+            conv.getCustomSignatures().add(name);
             matchCount++;
           }
         }
@@ -154,6 +155,12 @@ public class CustomSignatureService {
     if (match.containsKey("app")) {
       String app = (String) match.get("app");
       if (conv.getAppName() == null || !app.equalsIgnoreCase(conv.getAppName())) return false;
+    }
+
+    // protocol — case-insensitive match against transport/network protocol (e.g. TCP, UDP, ICMP)
+    if (match.containsKey("protocol")) {
+      String protocol = (String) match.get("protocol");
+      if (conv.getProtocol() == null || !protocol.equalsIgnoreCase(conv.getProtocol())) return false;
     }
 
     return true;

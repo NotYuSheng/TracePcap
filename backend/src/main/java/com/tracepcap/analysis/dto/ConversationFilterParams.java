@@ -40,6 +40,12 @@ public class ConversationFilterParams {
   private final List<String> riskTypes;
 
   /**
+   * Restrict to conversations whose custom_signatures array contains at least one of the given
+   * rule name strings (OR match). Empty = no filter.
+   */
+  private final List<String> customSignatures;
+
+  /**
    * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp},
    * {@code packets}, {@code bytes}, {@code duration}, {@code startTime}.
    * Null or blank = default DB ordering.

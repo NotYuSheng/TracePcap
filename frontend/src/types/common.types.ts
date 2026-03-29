@@ -53,6 +53,7 @@ export interface Conversation {
   tlsNotBefore?: number;
   tlsNotAfter?: number;
   flowRisks: string[];
+  customSignatures: string[];
   startTime: number;
   endTime: number;
   packetCount: number;
@@ -77,6 +78,7 @@ export interface AnalysisSummary {
   categoryDistribution?: CategoryStat[];
   fiveWs?: FiveWsAnalysis;
   securityAlertCount?: number;
+  triggeredCustomRules?: string[];
 }
 
 // Alias for backward compatibility

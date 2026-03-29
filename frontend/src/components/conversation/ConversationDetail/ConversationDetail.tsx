@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
-import { getAppColor, getTextColor } from '@/utils/appColors';
+import { getAppColor, getTextColor, getSeverityColor } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { HexViewer } from '../HexViewer/HexViewer';
 
 interface ConversationDetailProps {
   conversation: Conversation;
+  signatureSeverities?: Record<string, string>;
 }
 
 const PRINTABLE_ASCII_THRESHOLD = 0.3;
@@ -24,7 +25,7 @@ function hasReadableAscii(hex: string): boolean {
   return printable / total > PRINTABLE_ASCII_THRESHOLD;
 }
 
-export const ConversationDetail = ({ conversation }: ConversationDetailProps) => {
+export const ConversationDetail = ({ conversation, signatureSeverities = {} }: ConversationDetailProps) => {
   const [source, destination] = conversation.endpoints;
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
 
@@ -94,10 +95,27 @@ export const ConversationDetail = ({ conversation }: ConversationDetailProps) =>
                     <dd className="col-sm-8">
                       <div className="d-flex flex-wrap gap-1">
                         {conversation.flowRisks.map(risk => (
-                          <span key={risk} className="badge bg-warning text-dark" style={{ fontSize: '0.75rem' }}>
+                          <span key={risk} className="badge" style={{ backgroundColor: '#ffc107', color: '#212529' }}>
                             <i className="bi bi-shield-exclamation me-1"></i>{risk}
                           </span>
                         ))}
+                      </div>
+                    </dd>
+                  </>
+                )}
+                {conversation.customSignatures && conversation.customSignatures.length > 0 && (
+                  <>
+                    <dt className="col-sm-4">Custom Rules:</dt>
+                    <dd className="col-sm-8">
+                      <div className="d-flex flex-wrap gap-1">
+                        {conversation.customSignatures.map(rule => {
+                          const { bg, text } = getSeverityColor(signatureSeverities[rule]);
+                          return (
+                          <span key={rule} className="badge" style={{ backgroundColor: bg, color: text }}>
+                            {rule.replace(/_/g, ' ')}
+                          </span>
+                          );
+                        })}
                       </div>
                     </dd>
                   </>

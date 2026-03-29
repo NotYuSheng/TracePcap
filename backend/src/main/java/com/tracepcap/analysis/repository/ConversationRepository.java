@@ -85,6 +85,16 @@ public interface ConversationRepository
       nativeQuery = true)
   List<String> findDistinctRiskTypesByFileId(@Param("fileId") UUID fileId);
 
+  /** Returns the distinct custom signature rule names triggered for a file. */
+  @Query(
+      value =
+          "SELECT DISTINCT unnest(custom_signatures) AS rule_name"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " AND custom_signatures IS NOT NULL AND array_length(custom_signatures, 1) > 0"
+              + " ORDER BY rule_name",
+      nativeQuery = true)
+  List<String> findDistinctCustomSignaturesByFileId(@Param("fileId") UUID fileId);
+
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
   static Specification<ConversationEntity> buildSpec(
       UUID fileId, ConversationFilterParams params) {
@@ -132,18 +142,32 @@ public interface ConversationRepository
         predicates.add(root.get("category").in(params.getCategories()));
       }
 
-      // Has flow risks
+      // Has flow risks or custom signature matches
       if (Boolean.TRUE.equals(params.getHasRisks())) {
-        predicates.add(cb.isNotNull(root.get("flowRisks")));
+        predicates.add(cb.or(
+            cb.isNotNull(root.get("flowRisks")),
+            cb.isNotNull(root.get("customSignatures"))
+        ));
       }
 
-      // Risk type filter — use isMember for idiomatic JPA element-in-array check.
-      // Generates a query that can leverage a GIN index on the flow_risks column.
+      // Risk type filter (nDPI flow risks)
       if (params.getRiskTypes() != null && !params.getRiskTypes().isEmpty()) {
         List<Predicate> riskPreds = params.getRiskTypes().stream()
-            .map(rt -> cb.isMember(rt, root.get("flowRisks")))
+            .map(rt -> cb.greaterThan(
+                cb.function("array_position", Integer.class, root.get("flowRisks"), cb.literal(rt)),
+                0))
             .collect(java.util.stream.Collectors.toList());
         predicates.add(cb.or(riskPreds.toArray(new Predicate[0])));
+      }
+
+      // Custom signature filter
+      if (params.getCustomSignatures() != null && !params.getCustomSignatures().isEmpty()) {
+        List<Predicate> sigPreds = params.getCustomSignatures().stream()
+            .map(sig -> cb.greaterThan(
+                cb.function("array_position", Integer.class, root.get("customSignatures"), cb.literal(sig)),
+                0))
+            .collect(java.util.stream.Collectors.toList());
+        predicates.add(cb.or(sigPreds.toArray(new Predicate[0])));
       }
 
       // File type multi-value — EXISTS subquery against packets table
