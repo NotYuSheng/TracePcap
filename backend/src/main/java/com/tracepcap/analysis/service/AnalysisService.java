@@ -506,8 +506,13 @@ public class AnalysisService {
 
     Page<ConversationEntity> dbPage = conversationRepository.findAll(spec, pageable);
 
+    List<UUID> convIds = dbPage.getContent().stream().map(ConversationEntity::getId).toList();
+    Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
+
     List<ConversationResponse> content =
-        dbPage.getContent().stream().map(this::toConversationResponse).collect(Collectors.toList());
+        dbPage.getContent().stream()
+            .map(c -> toConversationResponse(c, fileTypeMap))
+            .collect(Collectors.toList());
 
     return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
   }
@@ -538,8 +543,13 @@ public class AnalysisService {
 
     Sort sort = buildSort(params);
     Specification<ConversationEntity> spec = ConversationRepository.buildSpec(fileId, params);
-    return conversationRepository.findAll(spec, sort).stream()
-        .map(this::toConversationResponse)
+    List<ConversationEntity> entities = conversationRepository.findAll(spec, sort);
+
+    List<UUID> convIds = entities.stream().map(ConversationEntity::getId).toList();
+    Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
+
+    return entities.stream()
+        .map(c -> toConversationResponse(c, fileTypeMap))
         .collect(Collectors.toList());
   }
 
@@ -560,7 +570,19 @@ public class AnalysisService {
     return Sort.by(dir, field);
   }
 
-  private ConversationResponse toConversationResponse(ConversationEntity conv) {
+  private Map<UUID, List<String>> buildFileTypeMap(List<UUID> ids) {
+    if (ids.isEmpty()) return Map.of();
+    return packetRepository.findFileTypesByConversationIds(ids).stream()
+        .collect(
+            Collectors.groupingBy(
+                row -> (UUID) row[0],
+                Collectors.mapping(
+                    row -> (String) row[1],
+                    Collectors.collectingAndThen(Collectors.toSet(), List::copyOf))));
+  }
+
+  private ConversationResponse toConversationResponse(
+      ConversationEntity conv, Map<UUID, List<String>> fileTypeMap) {
     Duration duration =
         (conv.getStartTime() != null && conv.getEndTime() != null)
             ? Duration.between(conv.getStartTime(), conv.getEndTime())
@@ -585,12 +607,17 @@ public class AnalysisService {
         .flowRisks(toList(conv.getFlowRisks()))
         .customSignatures(toList(conv.getCustomSignatures()))
         .httpUserAgents(toList(conv.getHttpUserAgents()))
+        .detectedFileTypes(fileTypeMap.getOrDefault(conv.getId(), List.of()))
         .packetCount(conv.getPacketCount())
         .totalBytes(conv.getTotalBytes())
         .startTime(conv.getStartTime())
         .endTime(conv.getEndTime())
         .durationMs(duration.toMillis())
         .build();
+  }
+
+  private ConversationResponse toConversationResponse(ConversationEntity conv) {
+    return toConversationResponse(conv, Map.of());
   }
 
   @Transactional(readOnly = true)

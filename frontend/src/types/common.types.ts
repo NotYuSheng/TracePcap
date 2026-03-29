@@ -56,6 +56,7 @@ export interface Conversation {
   flowRisks: string[];
   customSignatures: string[];
   httpUserAgents: string[];
+  detectedFileTypes: string[];
   startTime: number;
   endTime: number;
   packetCount: number;
