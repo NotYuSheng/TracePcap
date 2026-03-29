@@ -128,6 +128,7 @@ export const ConversationList = ({
   }, [stopPan]);
 
   const hasAppNames       = conversations.some(c => c.appName);
+  const hasL7Protocols    = conversations.some(c => c.tsharkProtocol);
   const hasCategories     = conversations.some(c => c.category);
   const hasRisks          = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
   const hasCustomRules    = conversations.some(c => c.customSignatures && c.customSignatures.length > 0);
@@ -173,8 +174,9 @@ export const ConversationList = ({
             <tr>
               {col('source')      && <SortableHeader field="srcIp"     label="Source" />}
               {col('destination') && <SortableHeader field="dstIp"     label="Destination" />}
-              {col('protocol')    && <th>Protocol</th>}
-              {col('appName')  && hasAppNames   && <th>Application</th>}
+              {col('protocol')         && <th style={{ whiteSpace: 'nowrap' }}>L4 Protocol</th>}
+              {col('tsharkProtocol') && hasL7Protocols  && <th style={{ whiteSpace: 'nowrap' }}>L7 Protocol</th>}
+              {col('appName')        && hasAppNames      && <th>Application</th>}
               {col('category') && hasCategories && <th>Category</th>}
               {col('risks')    && hasRisks      && <th>Risks</th>}
               {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
@@ -219,26 +221,20 @@ export const ConversationList = ({
                       ); })()}
                     </td>
                   )}
+                  {col('tsharkProtocol') && hasL7Protocols && (
+                    <td>
+                      {conversation.tsharkProtocol ? (() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>
+                          {conversation.tsharkProtocol}
+                        </span>
+                      ); })() : <span className="text-muted">—</span>}
+                    </td>
+                  )}
                   {col('appName') && hasAppNames && (
                     <td>
                       {conversation.appName ? (() => {
                         const bg = getAppColor(conversation.appName);
-                        const normProto = (p: string) =>
-                          p.trim().replace(/^TLSv[\d.]+$/i, 'TLS').replace(/^SSLv[\d.]+$/i, 'SSL').toLowerCase();
-                        const hasMismatch = !!conversation.tsharkProtocol && !!conversation.ndpiProtocol &&
-                          normProto(conversation.tsharkProtocol) !== normProto(conversation.ndpiProtocol);
-                        return (
-                          <>
-                            <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
-                            {hasMismatch && (
-                              <i
-                                className="bi bi-exclamation-triangle-fill ms-1"
-                                style={{ color: '#fd7e14', fontSize: '0.8rem' }}
-                                title={`Wireshark: "${conversation.tsharkProtocol}" vs nDPI: "${conversation.ndpiProtocol}" — click row to investigate`}
-                              />
-                            )}
-                          </>
-                        );
+                        return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
                       })() : <span className="text-muted">—</span>}
                     </td>
                   )}

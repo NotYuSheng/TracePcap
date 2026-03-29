@@ -13,6 +13,7 @@ export interface ConversationFilters {
   ip: string;
   port: string;
   protocols: string[];
+  l7Protocols: string[];
   apps: string[];
   categories: string[];
   hasRisks: boolean;

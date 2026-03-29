@@ -12,10 +12,6 @@ interface ConversationDetailProps {
 
 const PRINTABLE_ASCII_THRESHOLD = 0.3;
 
-/** Normalise protocol name for mismatch comparison (strips TLS version suffixes, lowercases). */
-const normaliseProto = (p: string) =>
-  p.trim().replace(/^TLSv[\d.]+$/i, 'TLS').replace(/^SSLv[\d.]+$/i, 'SSL').toLowerCase();
-
 /** Returns true if more than 30% of the first 256 bytes are printable ASCII (0x20–0x7e). */
 function hasReadableAscii(hex: string): boolean {
   if (!hex || hex.length < 4) return false;
@@ -77,47 +73,30 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <small className="text-info d-block">{conversation.hostname}</small>
                   )}
                 </dd>
-                <dt className="col-sm-4">Protocol:</dt>
+                <dt className="col-sm-4">L4 Protocol:</dt>
                 <dd className="col-sm-8">
                   {(() => { const bg = getProtocolColor(conversation.protocol.name); return (
                     <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.protocol.name}</span>
                   ); })()}
                 </dd>
-                {(conversation.appName || conversation.tsharkProtocol || conversation.ndpiProtocol) && (
+                {conversation.tsharkProtocol && (
+                  <>
+                    <dt className="col-sm-4">L7 Protocol:</dt>
+                    <dd className="col-sm-8">
+                      {(() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
+                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.tsharkProtocol}</span>
+                      ); })()}
+                    </dd>
+                  </>
+                )}
+                {conversation.appName && (
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      {conversation.appName && (() => {
+                      {(() => {
                         const bg = getAppColor(conversation.appName!);
                         return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
                       })()}
-                      {(conversation.tsharkProtocol || conversation.ndpiProtocol) && (
-                        <div className="d-flex flex-column gap-1 mt-1">
-                          {conversation.tsharkProtocol && (() => {
-                            const hasMismatch = !!conversation.ndpiProtocol &&
-                              normaliseProto(conversation.tsharkProtocol!) !== normaliseProto(conversation.ndpiProtocol!);
-                            return (
-                              <span className="text-muted small">
-                                Wireshark: <strong>{conversation.tsharkProtocol}</strong>
-                                {hasMismatch && (
-                                  <span
-                                    className="badge ms-1"
-                                    style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.7rem' }}
-                                    title={`Wireshark: "${conversation.tsharkProtocol}" vs nDPI: "${conversation.ndpiProtocol}" — may indicate tunnelling or misclassification`}
-                                  >
-                                    mismatch
-                                  </span>
-                                )}
-                              </span>
-                            );
-                          })()}
-                          {conversation.ndpiProtocol && (
-                            <span className="text-muted small">
-                              nDPI: <strong>{conversation.ndpiProtocol}</strong>
-                            </span>
-                          )}
-                        </div>
-                      )}
                     </dd>
                   </>
                 )}

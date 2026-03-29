@@ -235,15 +235,11 @@ TracePcap supports user-defined detection rules that are matched against every c
 
 ### How it works
 
-Rules are stored in `config/signatures.yml` and mounted as a Docker named volume (`config_data`). The file is reloaded on every analysis run — no restart required after editing.
+Rules live inside a Docker named volume (`config_data`) at `/app/config/signatures.yml` inside the backend container. The file is reloaded on every analysis run — no restart required after editing.
 
-You can edit rules in two ways:
+Click **Custom Detection Rules** in the navbar to open the built-in YAML editor. Changes are saved immediately — no restart required.
 
-- **In the browser** — click **Custom Detection Rules** in the navbar to open the YAML editor modal
-- **On the host** — edit the file and copy it into the running container:
-  ```bash
-  docker cp config/signatures.yml tracepcap-backend:/app/config/signatures.yml
-  ```
+> **`signatures.sample.yml`** in the repo root is a reference template with demo rules covering every match field. Paste it into the browser editor to get started.
 
 ### Rule format
 
@@ -318,7 +314,7 @@ signatures:
       ja3: "a0e9f5d64349fb13191bc781f81f42e1"
 ```
 
-A full set of 12 demo rules covering every match field type is available in [`backend/config/signatures.yml`](backend/config/signatures.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP file that triggers all 12 rules at once.
+A full set of 12 demo rules covering every match field type is available in [`signatures.sample.yml`](signatures.sample.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP file that triggers all 12 rules at once.
 
 ## Sample Files
 

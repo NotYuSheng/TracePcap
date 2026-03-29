@@ -20,6 +20,7 @@ export function useConversationFilters() {
     ip:         searchParams.get('ip') ?? '',
     port:       searchParams.get('port') ?? '',
     protocols:  splitComma(searchParams.get('protocols')),
+    l7Protocols: splitComma(searchParams.get('l7Protocols')),
     apps:       splitComma(searchParams.get('apps')),
     categories: splitComma(searchParams.get('categories')),
     hasRisks:   searchParams.get('hasRisks') === 'true',
@@ -36,6 +37,7 @@ export function useConversationFilters() {
     filters.ip,
     filters.port,
     filters.protocols.length > 0,
+    filters.l7Protocols.length > 0,
     filters.apps.length > 0,
     filters.categories.length > 0,
     filters.hasRisks,
@@ -54,6 +56,7 @@ export function useConversationFilters() {
         ip:         prev.get('ip') ?? '',
         port:       prev.get('port') ?? '',
         protocols:  splitComma(prev.get('protocols')),
+        l7Protocols: splitComma(prev.get('l7Protocols')),
         apps:       splitComma(prev.get('apps')),
         categories: splitComma(prev.get('categories')),
         hasRisks:   prev.get('hasRisks') === 'true',
@@ -75,8 +78,9 @@ export function useConversationFilters() {
 
       set('ip',         merged.ip || undefined);
       set('port',       merged.port || undefined);
-      set('protocols',  joinComma(merged.protocols));
-      set('apps',       joinComma(merged.apps));
+      set('protocols',   joinComma(merged.protocols));
+      set('l7Protocols', joinComma(merged.l7Protocols));
+      set('apps',        joinComma(merged.apps));
       set('categories', joinComma(merged.categories));
       set('hasRisks',   merged.hasRisks ? 'true' : undefined);
       set('fileTypes',  joinComma(merged.fileTypes));

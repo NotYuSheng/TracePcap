@@ -323,6 +323,13 @@ public class AnalysisService {
     List<AnalysisSummaryResponse.DetectedApplication> detectedApplications =
         appsTruncated ? allApps.subList(0, overviewAppsMax) : allApps;
 
+    List<String> detectedL7Protocols = conversations.stream()
+        .map(ConversationEntity::getTsharkProtocol)
+        .filter(p -> p != null && !p.isBlank())
+        .distinct()
+        .sorted()
+        .collect(Collectors.toList());
+
     // Aggregate category distribution
     class CategoryAggregate {
       long packetCount = 0L;
@@ -437,6 +444,7 @@ public class AnalysisService {
         .uniqueHosts(uniqueHosts)
         .detectedApplications(detectedApplications)
         .detectedApplicationsTruncated(appsTruncated)
+        .detectedL7Protocols(detectedL7Protocols)
         .categoryDistribution(categoryDistribution)
         // Legacy fields
         .startTime(analysis.getStartTime())

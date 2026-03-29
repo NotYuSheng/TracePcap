@@ -41,7 +41,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libpcap0.8 \
         tshark \
         ndpi \
-        tzdata && \
+        tzdata \
+        gosu && \
     apt-get purge -y --auto-remove curl gnupg
 
 # Set timezone to Singapore
@@ -51,22 +52,21 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Create a non-root user
 RUN groupadd -r spring && useradd -r -g spring spring
 
-# Create the config directory owned by spring so named volume writes succeed
-RUN mkdir -p /app/config && chown spring:spring /app/config
+# Create config directories owned by spring
+RUN mkdir -p /app/config /app/config-defaults && chown spring:spring /app/config /app/config-defaults
 
 # Copy entrypoint script and make executable while still root
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-USER spring:spring
-
 # Copy the built JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Copy the default signatures file into the image.
-# Docker initialises named volumes from the container directory on first start,
-# so this file will be available and writable by the spring user out of the box.
+# Copy the default signatures file into both locations:
+# - /app/config/signatures.yml  — picked up by Docker on first-time named volume init
+# - /app/config-defaults/       — fallback used by entrypoint if volume file is missing
 COPY --chown=spring:spring config/signatures.yml /app/config/signatures.yml
+COPY --chown=spring:spring config/signatures.yml /app/config-defaults/signatures.yml
 
 # Expose the application port
 EXPOSE 8080

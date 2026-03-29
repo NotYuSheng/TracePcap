@@ -77,6 +77,7 @@ export interface AnalysisSummary {
   uniqueHosts: NetworkEndpoint[];
   detectedApplications?: DetectedApplication[];
   detectedApplicationsTruncated?: boolean;
+  detectedL7Protocols?: string[];
   categoryDistribution?: CategoryStat[];
   fiveWs?: FiveWsAnalysis;
   securityAlertCount?: number;

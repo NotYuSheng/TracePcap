@@ -18,6 +18,9 @@ public class ConversationFilterParams {
   /** Restrict to conversations whose protocol is in this list. Empty = no filter. */
   private final List<String> protocols;
 
+  /** Restrict to conversations whose tsharkProtocol is in this list. Empty = no filter. */
+  private final List<String> l7Protocols;
+
   /** Restrict to conversations whose appName is in this list. Empty = no filter. */
   private final List<String> apps;
 

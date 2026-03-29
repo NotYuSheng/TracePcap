@@ -1,0 +1,125 @@
+# TracePcap Custom Signatures — Sample File
+# ==========================================
+# This file contains demo rules written against demo_all_rules.pcap.
+# Every rule below will trigger on that file, covering all supported match fields.
+#
+# To use: paste this into the Custom Detection Rules editor in the browser,
+# then upload demo_all_rules.pcap to see all rules fire.
+#
+# Match fields (all optional; a rule fires when ALL specified fields match):
+#   ip       - exact match against source OR destination IP          (e.g. "203.0.113.42")
+#   cidr     - CIDR range match against source OR destination IP     (e.g. "10.0.0.0/8")
+#   srcPort  - exact source port match                               (e.g. 67)
+#   dstPort  - exact destination port match                          (e.g. 4444)
+#   ja3      - exact match against JA3S fingerprint hash             (e.g. "82f0d8a75fa483d1cfe4b7085b784d7e")
+#   hostname - exact or wildcard SNI hostname                        (e.g. "*.evil.com")
+#              wildcard matches any subdomain at any depth
+#   app      - case-insensitive nDPI application name                (e.g. "Telegram", "TOR", "DNS")
+#   protocol - case-insensitive transport protocol                   (e.g. "TCP", "UDP", "ICMP")
+#
+# Severity colors in the UI:
+#   critical -> red   | high -> orange   | medium -> amber   | low -> purple
+# ----------------------------------------------------------------------------
+
+signatures:
+
+  # --- ip: exact match against a single IP address ---
+  # Flags any conversation involving a known Dropbox telemetry server IP.
+  - name: dropbox_telemetry_server
+    description: Direct contact with a known Dropbox telemetry IP
+    severity: low
+    match:
+      ip: "162.125.19.131"
+
+  # --- cidr: match any IP within a subnet ---
+  # Catches all traffic to Microsoft Azure's Teams/365 IP range.
+  - name: microsoft_azure_traffic
+    description: Traffic to/from Microsoft Azure IP range used by Teams and M365
+    severity: low
+    match:
+      cidr: "52.114.0.0/16"
+
+  # --- dstPort: flag connections to a specific destination port ---
+  # Teams uses port 4434 for media relay — flag it for inspection.
+  - name: teams_media_relay_port
+    description: Connection to Teams media relay port 4434
+    severity: low
+    match:
+      dstPort: 4434
+
+  # --- srcPort: flag traffic originating from a specific source port ---
+  # DHCP servers respond from port 67; unexpected hosts doing this may be rogue.
+  - name: rogue_dhcp_server
+    description: Traffic sourced from port 67 — potential rogue DHCP server
+    severity: high
+    match:
+      srcPort: 67
+
+  # --- hostname: exact SNI hostname match ---
+  # Microsoft telemetry pipeline — flag for data-exfil awareness.
+  - name: microsoft_telemetry_pipeline
+    description: TLS SNI to Microsoft Aria telemetry collection endpoint
+    severity: medium
+    match:
+      hostname: "mobile.pipe.aria.microsoft.com"
+
+  # --- hostname: wildcard match (leading *.) ---
+  # Catches any subdomain of microsoft.com for broad visibility.
+  - name: microsoft_domain_traffic
+    description: Any conversation with an SNI hostname under *.microsoft.com
+    severity: low
+    match:
+      hostname: "*.microsoft.com"
+
+  # --- app: nDPI application name match ---
+  # Flag all Telegram traffic for policy enforcement.
+  - name: telegram_usage
+    description: Traffic identified as Telegram by nDPI deep packet inspection
+    severity: medium
+    match:
+      app: "Telegram"
+
+  # --- protocol: transport-layer protocol match ---
+  # Flag all ICMP — useful for detecting ping sweeps or covert channels.
+  - name: icmp_detected
+    description: Any ICMP conversation — review for ping sweeps or tunnelling
+    severity: low
+    match:
+      protocol: ICMP
+
+  # --- app + protocol: combined AND condition ---
+  # DNS should only run over UDP on port 53; TCP DNS may indicate zone transfers.
+  - name: dns_over_tcp
+    description: DNS running over TCP — possible zone transfer or DNS tunnelling
+    severity: medium
+    match:
+      app: "DNS"
+      protocol: TCP
+
+  # --- dstPort + protocol: combined AND condition ---
+  # HTTPS over UDP (QUIC) — flag for environments that disallow QUIC.
+  - name: quic_https
+    description: HTTPS traffic over UDP (likely QUIC) — may bypass TLS inspection proxies
+    severity: medium
+    match:
+      dstPort: 443
+      protocol: UDP
+
+  # --- ja3: fingerprint match ---
+  # JA3S string: 771,53, — ServerHello selecting AES-256-SHA with no extensions.
+  # Matches the crafted TLS exchange in demo_all_rules.pcap.
+  # In production, replace with hashes from a threat-intel feed (e.g. ja3er.com).
+  - name: suspected_meterpreter_tls
+    description: TLS exchange matching a suspicious JA3S fingerprint (demo)
+    severity: critical
+    match:
+      ja3: "82f0d8a75fa483d1cfe4b7085b784d7e"
+
+  # --- ip + dstPort: multi-field AND condition ---
+  # Specific known Teams router IP on its signalling port.
+  - name: teams_trouter_signalling
+    description: Direct connection to a known Teams trouter relay IP on port 443
+    severity: low
+    match:
+      ip: "52.114.252.8"
+      dstPort: 443

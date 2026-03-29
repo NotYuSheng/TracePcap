@@ -32,6 +32,7 @@ public class AnalysisSummaryResponse {
   private List<UniqueHost> uniqueHosts;
   private List<DetectedApplication> detectedApplications;
   private Boolean detectedApplicationsTruncated;
+  private List<String> detectedL7Protocols;
   private List<CategoryStat> categoryDistribution;
 
   // Legacy fields for backward compatibility

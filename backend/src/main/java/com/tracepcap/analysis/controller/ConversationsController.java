@@ -39,7 +39,8 @@ public class ConversationsController {
       @Parameter(description = "Number of items per page") @RequestParam(defaultValue = "25") int pageSize,
       @Parameter(description = "Filter by IP address or hostname (src, dst, or hostname contains)") @RequestParam(required = false) String ip,
       @Parameter(description = "Filter by port number (src or dst)") @RequestParam(required = false) Integer port,
-      @Parameter(description = "Comma-separated list of protocols to include") @RequestParam(required = false) String protocols,
+      @Parameter(description = "Comma-separated list of L4 protocols to include") @RequestParam(required = false) String protocols,
+      @Parameter(description = "Comma-separated list of L7 protocols (tshark) to include") @RequestParam(required = false) String l7Protocols,
       @Parameter(description = "Comma-separated list of application names to include") @RequestParam(required = false) String apps,
       @Parameter(description = "Comma-separated list of categories to include") @RequestParam(required = false) String categories,
       @Parameter(description = "When true, only conversations with flow risks are returned") @RequestParam(required = false) Boolean hasRisks,
@@ -53,10 +54,10 @@ public class ConversationsController {
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 25;
 
-    ConversationFilterParams params = buildFilterParams(ip, port, protocols, apps, categories, hasRisks, fileTypes, riskTypes, customSignatures, sortBy, sortDir, search);
+    ConversationFilterParams params = buildFilterParams(ip, port, protocols, l7Protocols, apps, categories, hasRisks, fileTypes, riskTypes, customSignatures, sortBy, sortDir, search);
 
-    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
-        fileId, page, pageSize, params.getIp(), port, protocols, apps, categories, hasRisks, fileTypes, riskTypes, sortBy, sortDir);
+    log.info("GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, l7Protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
+        fileId, page, pageSize, params.getIp(), port, protocols, l7Protocols, apps, categories, hasRisks, fileTypes, riskTypes, sortBy, sortDir);
 
     return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
   }
@@ -90,6 +91,7 @@ public class ConversationsController {
       @RequestParam(required = false) String ip,
       @RequestParam(required = false) Integer port,
       @RequestParam(required = false) String protocols,
+      @RequestParam(required = false) String l7Protocols,
       @RequestParam(required = false) String apps,
       @RequestParam(required = false) String categories,
       @RequestParam(required = false) Boolean hasRisks,
@@ -101,7 +103,7 @@ public class ConversationsController {
       @RequestParam(required = false) String search,
       HttpServletResponse response) throws IOException {
 
-    ConversationFilterParams params = buildFilterParams(ip, port, protocols, apps, categories, hasRisks, fileTypes, riskTypes, customSignatures, sortBy, sortDir, search);
+    ConversationFilterParams params = buildFilterParams(ip, port, protocols, l7Protocols, apps, categories, hasRisks, fileTypes, riskTypes, customSignatures, sortBy, sortDir, search);
     List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -136,7 +138,7 @@ public class ConversationsController {
 
   /** Shared helper — builds a {@link ConversationFilterParams} from raw request parameters. */
   private static ConversationFilterParams buildFilterParams(
-      String ip, Integer port, String protocols, String apps, String categories,
+      String ip, Integer port, String protocols, String l7Protocols, String apps, String categories,
       Boolean hasRisks, String fileTypes, String riskTypes, String customSignatures,
       String sortBy, String sortDir, String search) {
     String resolvedIp = (ip != null) ? ip : search;
@@ -144,6 +146,7 @@ public class ConversationsController {
         .ip(resolvedIp)
         .port(port)
         .protocols(splitComma(protocols))
+        .l7Protocols(splitComma(l7Protocols))
         .apps(splitComma(apps))
         .categories(splitComma(categories))
         .hasRisks(hasRisks)

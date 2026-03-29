@@ -16,6 +16,7 @@ interface ConversationFilterPanelProps {
   onFiltersChange:   (update: Partial<ConversationFilters>) => void;
   onClearAll:        () => void;
   protocols:         ProtocolStat[];
+  l7Protocols:       string[];
   apps:              AppStat[];
   categories:        CategoryStat[];
   fileTypes:               string[];
@@ -71,6 +72,7 @@ export function ConversationFilterPanel({
   onFiltersChange,
   onClearAll,
   protocols,
+  l7Protocols,
   apps,
   categories,
   fileTypes,
@@ -201,8 +203,8 @@ export function ConversationFilterPanel({
               {protocols.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
-                    label="Protocol"
-                    info={<InfoPopover id="info-protocol" title="Protocol" body="Filter by transport or network protocol (e.g. TCP, UDP, ICMP). Select multiple to show any of them." />}
+                    label="L4 Protocol"
+                    info={<InfoPopover id="info-protocol" title="L4 Protocol" body="Filter by Layer 4 transport protocol (e.g. TCP, UDP, ICMP). Select multiple to show any of them." />}
                     onSelectAll={() => onFiltersChange({ protocols: protocols.map(p => p.protocol) })}
                     onDeselectAll={() => onFiltersChange({ protocols: [] })}
                   />
@@ -226,12 +228,41 @@ export function ConversationFilterPanel({
                 </div>
               )}
 
+              {/* L7 Protocol pills */}
+              {l7Protocols.length > 0 && (
+                <div className="col-12">
+                  <PillSectionHeader
+                    label="L7 Protocol"
+                    info={<InfoPopover id="info-l7protocol" title="L7 Protocol" body="Layer 7 application-layer protocol identified by Wireshark's deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them." />}
+                    onSelectAll={() => onFiltersChange({ l7Protocols })}
+                    onDeselectAll={() => onFiltersChange({ l7Protocols: [] })}
+                  />
+                  <div className="d-flex flex-wrap gap-1">
+                    {l7Protocols.map(proto => {
+                      const isActive = filters.l7Protocols.includes(proto);
+                      const bg = getProtocolColor(proto);
+                      return (
+                        <button
+                          key={proto}
+                          type="button"
+                          className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
+                          style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                          onClick={() => toggle('l7Protocols', proto, filters.l7Protocols)}
+                        >
+                          {proto}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Application pills */}
               {apps.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
                     label="Application"
-                    info={<InfoPopover id="info-app" title="Application" body={<>Application layer protocol detected by nDPI deep packet inspection. <strong>Detection accuracy may vary</strong> — treat results as indicative, not definitive.</>} />}
+                    info={<InfoPopover id="info-app" title="Application" body={<>Application or service identified by <strong>nDPI</strong> deep packet inspection (e.g. YouTube, WhatsApp). <strong>Detection accuracy may vary</strong> — treat results as indicative, not definitive.</>} />}
                     onSelectAll={() => onFiltersChange({ apps: apps.map(a => a.name) })}
                     onDeselectAll={() => onFiltersChange({ apps: [] })}
                   />

@@ -256,6 +256,7 @@ export const ConversationPage = () => {
             onFiltersChange={setFilters}
             onClearAll={clearAll}
             protocols={protocolOptions}
+            l7Protocols={data.detectedL7Protocols ?? []}
             apps={appOptions}
             categories={categoryOptions}
             fileTypes={fileTypeOptions}

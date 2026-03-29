@@ -132,6 +132,11 @@ public interface ConversationRepository
         predicates.add(root.get("protocol").in(params.getProtocols()));
       }
 
+      // L7 Protocol multi-value
+      if (params.getL7Protocols() != null && !params.getL7Protocols().isEmpty()) {
+        predicates.add(root.get("tsharkProtocol").in(params.getL7Protocols()));
+      }
+
       // Application multi-value
       if (params.getApps() != null && !params.getApps().isEmpty()) {
         predicates.add(root.get("appName").in(params.getApps()));

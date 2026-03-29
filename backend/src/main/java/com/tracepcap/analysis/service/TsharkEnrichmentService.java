@@ -11,17 +11,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Runs tshark as a subprocess to obtain Wireshark's dissector-based protocol detection for each
- * conversation, complementing nDPI's heuristic classification.
+ * Runs tshark as a subprocess to obtain Wireshark's dissector-based protocol label for each
+ * conversation, stored in {@code tsharkProtocol}. Complements nDPI's application identification.
  *
  * <p>Uses: {@code tshark -r <file> -T fields -e ip.src -e ip.dst ... -e _ws.col.Protocol}
  *
- * <p>Results are stored in {@link PcapParserService.ConversationInfo#tsharkProtocol}. When nDPI
- * returns null or a bare transport-layer name (TCP/UDP/Unknown), the tshark protocol is also
- * promoted to {@code appName} so the conversation has at least one useful label.
+ * <p>Responsibility split:
+ * <ul>
+ *   <li>nDPI ({@link NdpiService}) — sets {@code appName} and {@code category}
+ *       (application-layer identification, e.g. "YouTube", "WhatsApp")</li>
+ *   <li>tshark (this service) — sets {@code tsharkProtocol} only (protocol-layer label,
+ *       e.g. "TLS", "HTTP", "QUIC")</li>
+ * </ul>
  *
- * <p>When both nDPI and tshark return distinct specific values the discrepancy is surfaced in the
- * UI (see {@code ConversationDetail} and {@code ConversationList}).
+ * <p>Both values are shown in the UI as complementary information.
  *
  * <p>Gracefully degrades: if tshark is not available, all {@code tsharkProtocol} fields remain
  * null and analysis continues normally.
@@ -42,11 +45,6 @@ public class TsharkEnrichmentService {
       "OSPF", "PIM", "VRRP", "IGMP", "IGMPV2", "IGMPV3",
       "ETHERNET", "ETH", "ARP", "IPV4", "IPV6", "VLAN", "LLC",
       "STP", "RSTP", "CDP", "LLDP", "SLL", "DATA", "FRAME", "RAW"
-  );
-
-  /** nDPI appName values we consider too generic to keep when tshark has something better. */
-  private static final Set<String> NDPI_GENERIC = Set.of(
-      "TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN"
   );
 
   /** ip.proto number → transport protocol name. */
@@ -70,13 +68,8 @@ public class TsharkEnrichmentService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Enriches each conversation with Wireshark's protocol label and resolves the winning
-   * {@code appName}.
-   *
-   * <p>Priority: tshark (deterministic dissectors) > nDPI (heuristic, stored in
-   * {@code ndpiProtocol}). If tshark cannot identify a flow, nDPI's result is promoted to
-   * {@code appName} as a fallback. Both raw detections are always preserved so the UI can
-   * show a mismatch indicator when the engines disagree.
+   * Enriches each conversation with Wireshark's dissector-based protocol label, stored in
+   * {@code tsharkProtocol}. Does not modify {@code appName} — that is owned by nDPI.
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
@@ -86,31 +79,17 @@ public class TsharkEnrichmentService {
 
     runTshark(pcapFile, flowFreq, ipPairFreq);
 
-    int tsharkWon = 0, ndpiFallback = 0, mismatches = 0;
+    int enriched = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
       Map<String, Integer> freq = lookupFreq(conv, flowFreq, ipPairFreq);
       String detected = (freq != null) ? selectBestProtocol(freq) : null;
-
       if (detected != null) {
         conv.setTsharkProtocol(detected);
-        conv.setAppName(detected);          // tshark always wins
-        tsharkWon++;
-
-        String ndpi = conv.getNdpiProtocol();
-        if (ndpi != null && !normalise(detected).equals(normalise(ndpi))) {
-          mismatches++;
-        }
-      } else {
-        // tshark found nothing — fall back to nDPI
-        String ndpi = conv.getNdpiProtocol();
-        if (ndpi != null && !NDPI_GENERIC.contains(ndpi)) {
-          conv.setAppName(ndpi);
-          ndpiFallback++;
-        }
+        enriched++;
       }
     }
-    log.info("tshark enrichment: tshark won={}, nDPI fallback={}, mismatches={} (out of {} conversations)",
-        tsharkWon, ndpiFallback, mismatches, conversations.size());
+    log.info("tshark enrichment: set tsharkProtocol on {}/{} conversations",
+        enriched, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
@@ -262,18 +241,6 @@ public class TsharkEnrichmentService {
     return ip1.compareTo(ip2) <= 0
         ? "IPPAIR:" + ip1 + "<->" + ip2
         : "IPPAIR:" + ip2 + "<->" + ip1;
-  }
-
-  /**
-   * Normalises a protocol name for mismatch comparison:
-   * strips TLS version suffixes (TLSv1.3 → TLS), lowercases, trims spaces.
-   */
-  private String normalise(String proto) {
-    if (proto == null) return "";
-    return proto.trim()
-        .replaceAll("(?i)^TLSv\\d+(\\.\\d+)?$", "TLS")
-        .replaceAll("(?i)^SSLv\\d+(\\.\\d+)?$", "SSL")
-        .toLowerCase();
   }
 
   private Integer parsePort(String s) {
