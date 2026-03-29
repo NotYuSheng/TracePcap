@@ -200,24 +200,21 @@ public class CustomSignatureService {
   }
 
   /**
-   * Matches a hostname against a pattern. Supports a single leading wildcard: {@code *.example.com}
-   * matches {@code foo.example.com} and {@code example.com} but not {@code foo.bar.example.com}.
+   * Matches a hostname against a pattern. Supports a leading wildcard: {@code *.example.com}
+   * matches any subdomain at any depth (e.g. {@code foo.example.com},
+   * {@code foo.bar.example.com}) as well as the apex domain itself ({@code example.com}).
    */
   private boolean hostnameMatches(String hostname, String pattern) {
     if (hostname == null || pattern == null) return false;
     if (!pattern.startsWith("*.")) {
       return pattern.equalsIgnoreCase(hostname);
     }
-    // Wildcard: strip the "*." and match exactly one subdomain label.
-    // e.g. "*.example.com" matches "foo.example.com" and "example.com"
-    // but NOT "foo.bar.example.com" (two labels before the suffix).
+    // Wildcard: strip the "*." and check that hostname ends with the remainder,
+    // preceded by a "." or equal to it (covers the apex domain itself).
+    // Matches any depth: "*.example.com" matches "a.example.com", "a.b.example.com", etc.
     String suffix = pattern.substring(2).toLowerCase();
     String h = hostname.toLowerCase();
-    if (h.equals(suffix)) return true; // apex match: "example.com"
-    if (!h.endsWith("." + suffix)) return false;
-    // Ensure the prefix before ".suffix" contains no further dots (one label only)
-    String prefix = h.substring(0, h.length() - suffix.length() - 1);
-    return !prefix.contains(".");
+    return h.equals(suffix) || h.endsWith("." + suffix);
   }
 
   private int toInt(Object value) {
