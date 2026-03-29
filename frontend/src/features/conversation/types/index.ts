@@ -1,11 +1,4 @@
-export type SortField =
-  | 'srcIp'
-  | 'dstIp'
-  | 'packets'
-  | 'bytes'
-  | 'duration'
-  | 'startTime'
-  | '';
+export type SortField = 'srcIp' | 'dstIp' | 'packets' | 'bytes' | 'duration' | 'startTime' | '';
 
 export type SortDir = 'asc' | 'desc';
 
