@@ -170,12 +170,9 @@ public class AnalysisService {
                 .tlsSubject(convInfo.getTlsSubject())
                 .tlsNotBefore(convInfo.getTlsNotBefore())
                 .tlsNotAfter(convInfo.getTlsNotAfter())
-                .flowRisks(convInfo.getFlowRisks().isEmpty()
-                    ? null
-                    : convInfo.getFlowRisks().toArray(new String[0]))
-                .customSignatures(convInfo.getCustomSignatures().isEmpty()
-                    ? null
-                    : convInfo.getCustomSignatures().toArray(new String[0]))
+                .flowRisks(toNullableArray(convInfo.getFlowRisks()))
+                .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
+                .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -570,8 +567,9 @@ public class AnalysisService {
         .tlsSubject(conv.getTlsSubject())
         .tlsNotBefore(conv.getTlsNotBefore())
         .tlsNotAfter(conv.getTlsNotAfter())
-        .flowRisks(conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
-        .customSignatures(conv.getCustomSignatures() != null ? Arrays.asList(conv.getCustomSignatures()) : List.of())
+        .flowRisks(toList(conv.getFlowRisks()))
+        .customSignatures(toList(conv.getCustomSignatures()))
+        .httpUserAgents(toList(conv.getHttpUserAgents()))
         .packetCount(conv.getPacketCount())
         .totalBytes(conv.getTotalBytes())
         .startTime(conv.getStartTime())
@@ -603,10 +601,9 @@ public class AnalysisService {
               .tlsSubject(conv.getTlsSubject())
               .tlsNotBefore(conv.getTlsNotBefore())
               .tlsNotAfter(conv.getTlsNotAfter())
-              .flowRisks(conv.getFlowRisks() != null
-                  ? Arrays.asList(conv.getFlowRisks()) : List.of())
-              .customSignatures(conv.getCustomSignatures() != null
-                  ? Arrays.asList(conv.getCustomSignatures()) : List.of())
+              .flowRisks(toList(conv.getFlowRisks()))
+              .customSignatures(toList(conv.getCustomSignatures()))
+              .httpUserAgents(toList(conv.getHttpUserAgents()))
               .packetCount(conv.getPacketCount())
               .totalBytes(conv.getTotalBytes())
               .startTime(conv.getStartTime())
@@ -677,10 +674,9 @@ public class AnalysisService {
         .tlsSubject(conversation.getTlsSubject())
         .tlsNotBefore(conversation.getTlsNotBefore())
         .tlsNotAfter(conversation.getTlsNotAfter())
-        .flowRisks(conversation.getFlowRisks() != null
-            ? Arrays.asList(conversation.getFlowRisks()) : List.of())
-        .customSignatures(conversation.getCustomSignatures() != null
-            ? Arrays.asList(conversation.getCustomSignatures()) : List.of())
+        .flowRisks(toList(conversation.getFlowRisks()))
+        .customSignatures(toList(conversation.getCustomSignatures()))
+        .httpUserAgents(toList(conversation.getHttpUserAgents()))
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())
@@ -688,5 +684,18 @@ public class AnalysisService {
         .durationMs(duration.toMillis())
         .packets(packetResponses)
         .build();
+  }
+
+  /** Converts a nullable String array to an immutable list; returns empty list for null. */
+  private static List<String> toList(String[] arr) {
+    return arr != null ? Arrays.asList(arr) : List.of();
+  }
+
+  /**
+   * Converts a list to a String array for PostgreSQL array storage.
+   * Returns null for empty lists so the DB column stores NULL rather than an empty array.
+   */
+  private static String[] toNullableArray(List<String> list) {
+    return (list == null || list.isEmpty()) ? null : list.toArray(new String[0]);
   }
 }
