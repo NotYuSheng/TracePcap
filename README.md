@@ -267,7 +267,7 @@ A rule fires when **all** specified match fields are satisfied. All fields are o
 | `srcPort` | number | Exact source port | `67` |
 | `dstPort` | number | Exact destination port | `4444` |
 | `ja3` | string | Exact JA3S fingerprint hash (nDPI 5.x) | `"82f0d8a75fa483d1cfe4b7085b784d7e"` |
-| `hostname` | string | Exact or wildcard SNI hostname | `"*.evil.com"` |
+| `hostname` | string | Exact or wildcard SNI hostname — `*.evil.com` matches any subdomain at any depth | `"*.evil.com"` |
 | `app` | string | Case-insensitive nDPI application name | `"Telegram"`, `"TOR"`, `"SIP"`, `"RTP"` |
 | `protocol` | string | Case-insensitive transport protocol | `"TCP"`, `"UDP"`, `"ICMP"` |
 

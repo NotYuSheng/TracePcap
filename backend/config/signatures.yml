@@ -12,7 +12,7 @@
 #   srcPort  - exact source port match
 #   dstPort  - exact destination port match
 #   ja3      - exact match against JA3 client OR server fingerprint hash
-#   hostname - exact or wildcard SNI hostname  (e.g. *.evil.com)
+#   hostname - exact or wildcard SNI hostname  (e.g. *.evil.com matches any subdomain at any depth)
 #   app      - case-insensitive match against nDPI application name  (e.g. TOR)
 #   protocol - case-insensitive match against transport protocol     (e.g. TCP, UDP, ICMP)
 #
