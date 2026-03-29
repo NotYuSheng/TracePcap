@@ -224,9 +224,10 @@ export const ConversationList = ({
                     <td>
                       {conversation.appName ? (() => {
                         const bg = getAppColor(conversation.appName);
-                        const hasMismatch = !!conversation.tsharkProtocol &&
-                          conversation.appName.toLowerCase() !==
-                          conversation.tsharkProtocol.replace(/^TLSv[\d.]+$/i, 'TLS').toLowerCase();
+                        const normProto = (p: string) =>
+                          p.trim().replace(/^TLSv[\d.]+$/i, 'TLS').replace(/^SSLv[\d.]+$/i, 'SSL').toLowerCase();
+                        const hasMismatch = !!conversation.tsharkProtocol && !!conversation.ndpiProtocol &&
+                          normProto(conversation.tsharkProtocol) !== normProto(conversation.ndpiProtocol);
                         return (
                           <span className="d-flex align-items-center gap-1 flex-wrap">
                             <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
@@ -234,7 +235,7 @@ export const ConversationList = ({
                               <i
                                 className="bi bi-exclamation-triangle-fill"
                                 style={{ color: '#fd7e14', fontSize: '0.8rem' }}
-                                title={`Wireshark detected "${conversation.tsharkProtocol}" — differs from nDPI`}
+                                title={`Wireshark: "${conversation.tsharkProtocol}" vs nDPI: "${conversation.ndpiProtocol}" — click row to investigate`}
                               />
                             )}
                           </span>

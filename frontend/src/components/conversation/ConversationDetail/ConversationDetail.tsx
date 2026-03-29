@@ -12,6 +12,10 @@ interface ConversationDetailProps {
 
 const PRINTABLE_ASCII_THRESHOLD = 0.3;
 
+/** Normalise protocol name for mismatch comparison (strips TLS version suffixes, lowercases). */
+const normaliseProto = (p: string) =>
+  p.trim().replace(/^TLSv[\d.]+$/i, 'TLS').replace(/^SSLv[\d.]+$/i, 'SSL').toLowerCase();
+
 /** Returns true if more than 30% of the first 256 bytes are printable ASCII (0x20–0x7e). */
 function hasReadableAscii(hex: string): boolean {
   if (!hex || hex.length < 4) return false;
@@ -79,7 +83,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.protocol.name}</span>
                   ); })()}
                 </dd>
-                {(conversation.appName || conversation.tsharkProtocol) && (
+                {(conversation.appName || conversation.tsharkProtocol || conversation.ndpiProtocol) && (
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
@@ -88,19 +92,20 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                           const bg = getAppColor(conversation.appName!);
                           return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
                         })()}
+                      </div>
+                      <div className="d-flex flex-column gap-1 mt-1">
                         {conversation.tsharkProtocol && (() => {
-                          const hasMismatch = !!conversation.appName &&
-                            conversation.appName.toLowerCase() !==
-                            conversation.tsharkProtocol!.replace(/^TLSv[\d.]+$/i, 'TLS').toLowerCase();
+                          const hasMismatch = !!conversation.ndpiProtocol &&
+                            normaliseProto(conversation.tsharkProtocol!) !== normaliseProto(conversation.ndpiProtocol!);
                           return (
                             <span className="text-muted small d-flex align-items-center gap-1">
-                              <i className="bi bi-eye" title="Wireshark dissector detection"></i>
+                              <i className="bi bi-eye" title="Wireshark dissector detection (deterministic)"></i>
                               Wireshark: <strong>{conversation.tsharkProtocol}</strong>
                               {hasMismatch && (
                                 <span
                                   className="badge"
                                   style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.7rem' }}
-                                  title={`nDPI identified "${conversation.appName}" but Wireshark identified "${conversation.tsharkProtocol}" — may indicate protocol tunnelling or a misclassification`}
+                                  title={`Wireshark identified "${conversation.tsharkProtocol}" but nDPI identified "${conversation.ndpiProtocol}" — may indicate tunnelling or misclassification`}
                                 >
                                   <i className="bi bi-exclamation-triangle-fill me-1"></i>mismatch
                                 </span>
@@ -108,6 +113,12 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                             </span>
                           );
                         })()}
+                        {conversation.ndpiProtocol && (
+                          <span className="text-muted small d-flex align-items-center gap-1">
+                            <i className="bi bi-cpu" title="nDPI heuristic detection"></i>
+                            nDPI: <strong>{conversation.ndpiProtocol}</strong>
+                          </span>
+                        )}
                       </div>
                     </dd>
                   </>

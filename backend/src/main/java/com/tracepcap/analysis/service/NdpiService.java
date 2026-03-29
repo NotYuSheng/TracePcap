@@ -139,7 +139,9 @@ public class NdpiService {
     for (PcapParserService.ConversationInfo conv : conversations) {
       FlowData data = resolve(flowMap, conv);
       if (data == null) continue;
-      if (data.appName() != null) conv.setAppName(correctMisclassification(data.appName(), conv.getSrcPort(), conv.getDstPort(), conv.getProtocol()));
+      // Store nDPI's detection in ndpiProtocol; appName is resolved later by TsharkEnrichmentService
+      // (tshark wins; nDPI is the fallback when tshark cannot identify the flow)
+      if (data.appName() != null) conv.setNdpiProtocol(correctMisclassification(data.appName(), conv.getSrcPort(), conv.getDstPort(), conv.getProtocol()));
       if (!data.risks().isEmpty()) conv.setFlowRisks(data.risks());
       if (data.category() != null) conv.setCategory(data.category());
       if (data.hostname() != null) conv.setHostname(data.hostname());
@@ -151,13 +153,13 @@ public class NdpiService {
       if (data.tlsNotAfter() != null) conv.setTlsNotAfter(data.tlsNotAfter());
     }
 
-    long enrichedApps       = conversations.stream().filter(c -> c.getAppName() != null).count();
+    long enrichedApps       = conversations.stream().filter(c -> c.getNdpiProtocol() != null).count();
     long enrichedRisks      = conversations.stream().filter(c -> !c.getFlowRisks().isEmpty()).count();
     long enrichedCategories = conversations.stream().filter(c -> c.getCategory() != null).count();
     long enrichedHostnames  = conversations.stream().filter(c -> c.getHostname() != null).count();
     long enrichedJa3        = conversations.stream().filter(c -> c.getJa3Client() != null).count();
     long enrichedTlsCert    = conversations.stream().filter(c -> c.getTlsIssuer() != null).count();
-    log.info("nDPI enriched apps: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}, TLS certs: {}/{}",
+    log.info("nDPI identified protocols: {}/{}, risks: {}/{}, categories: {}/{}, hostnames: {}/{}, JA3: {}/{}, TLS certs: {}/{}",
         enrichedApps, conversations.size(), enrichedRisks, conversations.size(),
         enrichedCategories, conversations.size(), enrichedHostnames, conversations.size(),
         enrichedJa3, conversations.size(), enrichedTlsCert, conversations.size());

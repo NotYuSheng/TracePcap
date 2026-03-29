@@ -45,6 +45,7 @@ export interface Conversation {
   protocol: Protocol;
   appName?: string;
   tsharkProtocol?: string;
+  ndpiProtocol?: string;
   category?: string;
   hostname?: string;
   ja3Client?: string;

@@ -53,6 +53,9 @@ public class ConversationEntity {
   @Column(name = "tshark_protocol", length = APP_NAME_MAX_LENGTH)
   private String tsharkProtocol;
 
+  @Column(name = "ndpi_protocol", length = APP_NAME_MAX_LENGTH)
+  private String ndpiProtocol;
+
   @Column(name = "flow_risks", columnDefinition = "text[]")
   private String[] flowRisks;
 

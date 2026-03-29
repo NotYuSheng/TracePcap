@@ -70,41 +70,47 @@ public class TsharkEnrichmentService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Enriches each conversation with Wireshark's protocol label.
-   * Also fills {@code appName} when nDPI left it null or returned a generic transport name.
+   * Enriches each conversation with Wireshark's protocol label and resolves the winning
+   * {@code appName}.
+   *
+   * <p>Priority: tshark (deterministic dissectors) > nDPI (heuristic, stored in
+   * {@code ndpiProtocol}). If tshark cannot identify a flow, nDPI's result is promoted to
+   * {@code appName} as a fallback. Both raw detections are always preserved so the UI can
+   * show a mismatch indicator when the engines disagree.
    */
   public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
     if (conversations.isEmpty()) return;
 
-    // canonical flow key → { displayProtocol → packet count }
     Map<String, Map<String, Integer>> flowFreq   = new HashMap<>();
-    // ip-pair key → same structure (portless protocol fallback)
     Map<String, Map<String, Integer>> ipPairFreq = new HashMap<>();
 
     runTshark(pcapFile, flowFreq, ipPairFreq);
-    if (flowFreq.isEmpty() && ipPairFreq.isEmpty()) return;
 
-    int filled = 0, mismatches = 0;
+    int tsharkWon = 0, ndpiFallback = 0, mismatches = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
       Map<String, Integer> freq = lookupFreq(conv, flowFreq, ipPairFreq);
-      if (freq == null) continue;
+      String detected = (freq != null) ? selectBestProtocol(freq) : null;
 
-      String detected = selectBestProtocol(freq);
-      if (detected == null) continue;
+      if (detected != null) {
+        conv.setTsharkProtocol(detected);
+        conv.setAppName(detected);          // tshark always wins
+        tsharkWon++;
 
-      conv.setTsharkProtocol(detected);
-
-      // Fill appName when nDPI gave nothing useful
-      String ndpiApp = conv.getAppName();
-      if (ndpiApp == null || NDPI_GENERIC.contains(ndpiApp)) {
-        conv.setAppName(detected);
-        filled++;
-      } else if (!normalise(detected).equals(normalise(ndpiApp))) {
-        mismatches++;
+        String ndpi = conv.getNdpiProtocol();
+        if (ndpi != null && !normalise(detected).equals(normalise(ndpi))) {
+          mismatches++;
+        }
+      } else {
+        // tshark found nothing — fall back to nDPI
+        String ndpi = conv.getNdpiProtocol();
+        if (ndpi != null && !NDPI_GENERIC.contains(ndpi)) {
+          conv.setAppName(ndpi);
+          ndpiFallback++;
+        }
       }
     }
-    log.info("tshark enrichment: {} appName filled, {} mismatches vs nDPI across {} conversations",
-        filled, mismatches, conversations.size());
+    log.info("tshark enrichment: tshark won={}, nDPI fallback={}, mismatches={} (out of {} conversations)",
+        tsharkWon, ndpiFallback, mismatches, conversations.size());
   }
 
   // ---------------------------------------------------------------------------

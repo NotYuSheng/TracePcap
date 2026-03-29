@@ -14,6 +14,7 @@ interface ConversationApiResponse {
   protocol: string;
   appName?: string | null;
   tsharkProtocol?: string | null;
+  ndpiProtocol?: string | null;
   category?: string | null;
   hostname?: string | null;
   ja3Client?: string | null;
@@ -72,6 +73,7 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     protocol: getProtocol(apiData.protocol),
     appName: apiData.appName ?? undefined,
     tsharkProtocol: apiData.tsharkProtocol ?? undefined,
+    ndpiProtocol: apiData.ndpiProtocol ?? undefined,
     category: apiData.category ?? undefined,
     hostname: apiData.hostname ?? undefined,
     ja3Client: apiData.ja3Client ?? undefined,

@@ -21,6 +21,7 @@ public class ConversationResponse {
   private String protocol;
   private String appName;
   private String tsharkProtocol;
+  private String ndpiProtocol;
   private String category;
   private String hostname;
   private String ja3Client;
