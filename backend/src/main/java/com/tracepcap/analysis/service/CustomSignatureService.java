@@ -17,9 +17,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Loads custom detection rules from {@code signatures.yml} and applies them to each conversation
- * after nDPI enrichment. Matched rule names are appended to the conversation's {@code flowRisks}
- * list, making them visible in the Risk Type filter and security alerts alongside nDPI's built-in
- * flags.
+ * after nDPI enrichment. Matched rule names are appended to the conversation's {@code customSignatures}
+ * list, making them visible in the UI alongside nDPI's built-in risk flags.
  *
  * <p>The file is reloaded on every analysis run so admins can update rules without restarting the
  * application.
@@ -115,13 +114,13 @@ public class CustomSignatureService {
   private boolean matches(PcapParserService.ConversationInfo conv, Map<String, Object> match) {
     // ip — exact match against srcIp OR dstIp
     if (match.containsKey("ip")) {
-      String ip = (String) match.get("ip");
+      String ip = String.valueOf(match.get("ip"));
       if (!ip.equals(conv.getSrcIp()) && !ip.equals(conv.getDstIp())) return false;
     }
 
     // cidr — CIDR range match against srcIp OR dstIp
     if (match.containsKey("cidr")) {
-      String cidr = (String) match.get("cidr");
+      String cidr = String.valueOf(match.get("cidr"));
       if (!inCidr(conv.getSrcIp(), cidr) && !inCidr(conv.getDstIp(), cidr)) return false;
     }
 
@@ -139,7 +138,7 @@ public class CustomSignatureService {
 
     // ja3 — exact match against ja3Client OR ja3Server
     if (match.containsKey("ja3")) {
-      String ja3 = (String) match.get("ja3");
+      String ja3 = String.valueOf(match.get("ja3"));
       boolean clientMatch = ja3.equals(conv.getJa3Client());
       boolean serverMatch = ja3.equals(conv.getJa3Server());
       if (!clientMatch && !serverMatch) return false;
@@ -147,19 +146,19 @@ public class CustomSignatureService {
 
     // hostname — exact or wildcard match against SNI hostname
     if (match.containsKey("hostname")) {
-      String pattern = (String) match.get("hostname");
+      String pattern = String.valueOf(match.get("hostname"));
       if (!hostnameMatches(conv.getHostname(), pattern)) return false;
     }
 
     // app — case-insensitive match against nDPI appName
     if (match.containsKey("app")) {
-      String app = (String) match.get("app");
+      String app = String.valueOf(match.get("app"));
       if (conv.getAppName() == null || !app.equalsIgnoreCase(conv.getAppName())) return false;
     }
 
     // protocol — case-insensitive match against transport/network protocol (e.g. TCP, UDP, ICMP)
     if (match.containsKey("protocol")) {
-      String protocol = (String) match.get("protocol");
+      String protocol = String.valueOf(match.get("protocol"));
       if (conv.getProtocol() == null || !protocol.equalsIgnoreCase(conv.getProtocol())) return false;
     }
 
@@ -209,11 +208,16 @@ public class CustomSignatureService {
     if (!pattern.startsWith("*.")) {
       return pattern.equalsIgnoreCase(hostname);
     }
-    // Wildcard: strip the "*." and check that hostname ends with the remainder,
-    // preceded by a "." or equal to it (covers the apex domain itself)
+    // Wildcard: strip the "*." and match exactly one subdomain label.
+    // e.g. "*.example.com" matches "foo.example.com" and "example.com"
+    // but NOT "foo.bar.example.com" (two labels before the suffix).
     String suffix = pattern.substring(2).toLowerCase();
     String h = hostname.toLowerCase();
-    return h.equals(suffix) || h.endsWith("." + suffix);
+    if (h.equals(suffix)) return true; // apex match: "example.com"
+    if (!h.endsWith("." + suffix)) return false;
+    // Ensure the prefix before ".suffix" contains no further dots (one label only)
+    String prefix = h.substring(0, h.length() - suffix.length() - 1);
+    return !prefix.contains(".");
   }
 
   private int toInt(Object value) {

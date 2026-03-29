@@ -16,7 +16,7 @@
 #   app      - case-insensitive match against nDPI application name  (e.g. TOR)
 #   protocol - case-insensitive match against transport protocol     (e.g. TCP, UDP, ICMP)
 #
-# Severity levels (for documentation only — use colors in the UI):
+# Severity levels (determines badge color-coding in the UI):
 #   low | medium | high | critical
 #
 # The `name` field becomes the tag shown in the UI (use underscores, no spaces).

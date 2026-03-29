@@ -16,7 +16,7 @@
 #   app      — case-insensitive match against nDPI application name  (e.g. TOR)
 #
 # The `name` field becomes the risk tag shown in the UI (use underscores, no spaces).
-# The `description` and `severity` fields are for documentation only.
+# The `description` field is for documentation. The `severity` field determines badge color-coding in the UI.
 #
 # ----------------------------------------------------------------------------
 
