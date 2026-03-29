@@ -29,7 +29,7 @@ public class FilterService {
   private final StorageService storageService;
   private final ObjectMapper objectMapper;
 
-  private static final int MAX_PACKETS = 100;
+  private static final int MAX_PACKETS = 10000;
   private static final int MAX_GENERATION_RETRIES = 3;
 
   /**
@@ -233,7 +233,7 @@ public class FilterService {
                 validation.getErrorMessage(), filterExpression));
       }
 
-      List<PacketDto> allPackets = filterPackets(tempFile, filterExpression, 10000);
+      List<PacketDto> allPackets = filterPackets(tempFile, filterExpression, MAX_PACKETS);
       int totalMatches = allPackets.size();
 
       int totalPages = (int) Math.ceil((double) totalMatches / pageSize);
@@ -354,7 +354,6 @@ public class FilterService {
       }
 
       String protocolRaw = f[8].isEmpty() ? "OTHER" : f[8].toUpperCase();
-      String info = f.length > 9 && !f[9].isEmpty() ? f[9] : protocolRaw;
 
       // TCP flags (indices 10–15)
       List<String> flags = new ArrayList<>();
