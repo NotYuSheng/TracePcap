@@ -20,13 +20,19 @@ const ndpiPopover = (
     <Popover.Body>
       <p className="mb-2">
         Application labels are identified by{' '}
-        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a>{' '}
-        deep packet inspection, which recognises services such as YouTube, WhatsApp, and Zoom
-        by traffic signatures and metadata.
+        <a
+          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          nDPI
+        </a>{' '}
+        deep packet inspection, which recognises services such as YouTube, WhatsApp, and Zoom by
+        traffic signatures and metadata.
       </p>
       <p className="mb-2">
-        Encrypted flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints,
-        not payload content.
+        Encrypted flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints, not
+        payload content.
       </p>
       <p className="mb-0">
         Treat labels as strong indicators, not definitive classifications. Cross-reference the
@@ -42,7 +48,9 @@ const l7Popover = (
     <Popover.Body>
       <p className="mb-2">
         Layer 7 protocols are identified by{' '}
-        <a href="https://www.wireshark.org/" target="_blank" rel="noopener noreferrer">Wireshark</a>{' '}
+        <a href="https://www.wireshark.org/" target="_blank" rel="noopener noreferrer">
+          Wireshark
+        </a>{' '}
         (tshark) deterministic dissectors — e.g. TLS, HTTP, DNS, QUIC. These reflect the
         application-layer protocol in use, independent of the service generating the traffic.
       </p>
@@ -59,7 +67,13 @@ const riskPopover = (
     <Popover.Body>
       <p className="mb-2">
         Risk flags are raised by{' '}
-        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a>{' '}
+        <a
+          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          nDPI
+        </a>{' '}
         based on built-in heuristics — for example, clear-text credentials, unsafe protocols,
         known-malicious TLS fingerprints, or unexpected port usage.
       </p>
@@ -75,21 +89,20 @@ const customRulesPopover = (
     <Popover.Header>About custom security alerts</Popover.Header>
     <Popover.Body>
       <p className="mb-2">
-        These rules are defined in <code>signatures.yml</code> and matched against each
-        conversation after nDPI analysis. Matches are based on IP, CIDR, port, JA3 fingerprint,
-        SNI hostname, application name, or transport protocol.
+        These rules are defined in <code>signatures.yml</code> and matched against each conversation
+        after nDPI analysis. Matches are based on IP, CIDR, port, JA3 fingerprint, SNI hostname,
+        application name, or transport protocol.
       </p>
       <p className="mb-0">
         Badge colours reflect severity: <strong style={{ color: '#dc3545' }}>critical</strong>,{' '}
         <strong style={{ color: '#fd7e14' }}>high</strong>,{' '}
         <strong style={{ color: '#e67e22' }}>medium</strong>,{' '}
-        <strong style={{ color: '#6f42c1' }}>low</strong>.
-        Click any badge to filter conversations by that rule.
+        <strong style={{ color: '#6f42c1' }}>low</strong>. Click any badge to filter conversations
+        by that rule.
       </p>
     </Popover.Body>
   </Popover>
 );
-
 
 export const AnalysisOverview = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
@@ -98,11 +111,16 @@ export const AnalysisOverview = () => {
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
 
   useEffect(() => {
-    conversationService.getSignatureRules().then(rules => {
-      const map: Record<string, string> = {};
-      rules.forEach(r => { map[r.name] = r.severity; });
-      setSignatureSeverities(map);
-    }).catch(console.error);
+    conversationService
+      .getSignatureRules()
+      .then(rules => {
+        const map: Record<string, string> = {};
+        rules.forEach(r => {
+          map[r.name] = r.severity;
+        });
+        setSignatureSeverities(map);
+      })
+      .catch(console.error);
 
     conversationService.getRiskTypes(fileId).then(setRiskTypes).catch(console.error);
   }, [fileId]);
@@ -119,7 +137,9 @@ export const AnalysisOverview = () => {
             <i className="bi bi-app-indicator me-2"></i>
             Applications Detected
             {data.detectedApplicationsTruncated && (
-              <span className="text-muted fs-6 fw-normal ms-2">(showing top {detectedApps.length})</span>
+              <span className="text-muted fs-6 fw-normal ms-2">
+                (showing top {detectedApps.length})
+              </span>
             )}
             <OverlayTrigger trigger="click" placement="right" overlay={ndpiPopover} rootClose>
               <button
@@ -145,7 +165,11 @@ export const AnalysisOverview = () => {
                     cursor: 'pointer',
                   }}
                   title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
-                  onClick={() => navigate(`/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`
+                    )
+                  }
                 >
                   {app.name}
                 </button>
@@ -180,7 +204,11 @@ export const AnalysisOverview = () => {
                   className="badge rounded-pill px-3 py-2 fs-6 border-0"
                   style={{ backgroundColor: bg, color: getTextColor(bg), cursor: 'pointer' }}
                   title="Click to filter conversations by this protocol"
-                  onClick={() => navigate(`/analysis/${fileId}/conversations?l7Protocols=${encodeURIComponent(proto)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/analysis/${fileId}/conversations?l7Protocols=${encodeURIComponent(proto)}`
+                    )
+                  }
                 >
                   {proto}
                 </button>
@@ -217,7 +245,11 @@ export const AnalysisOverview = () => {
                   cursor: 'pointer',
                 }}
                 title="Click to filter conversations by this risk flag"
-                onClick={() => navigate(`/analysis/${fileId}/conversations?riskTypes=${encodeURIComponent(risk)}`)}
+                onClick={() =>
+                  navigate(
+                    `/analysis/${fileId}/conversations?riskTypes=${encodeURIComponent(risk)}`
+                  )
+                }
               >
                 {risk}
               </button>
@@ -231,7 +263,12 @@ export const AnalysisOverview = () => {
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-shield-lock me-2" style={{ color: '#6f42c1' }}></i>
             Custom Security Alerts
-            <OverlayTrigger trigger="click" placement="right" overlay={customRulesPopover} rootClose>
+            <OverlayTrigger
+              trigger="click"
+              placement="right"
+              overlay={customRulesPopover}
+              rootClose
+            >
               <button
                 type="button"
                 className="btn btn-link p-0 text-muted"
@@ -251,7 +288,11 @@ export const AnalysisOverview = () => {
                   className="badge rounded-pill px-3 py-2 fs-6 border-0"
                   style={{ backgroundColor: bg, color: text, cursor: 'pointer' }}
                   title="Click to filter conversations by this rule"
-                  onClick={() => navigate(`/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}`
+                    )
+                  }
                 >
                   {rule.replace(/_/g, ' ')}
                 </button>

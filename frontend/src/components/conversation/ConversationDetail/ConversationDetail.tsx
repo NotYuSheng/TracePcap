@@ -25,7 +25,10 @@ function hasReadableAscii(hex: string): boolean {
   return printable / total > PRINTABLE_ASCII_THRESHOLD;
 }
 
-export const ConversationDetail = ({ conversation, signatureSeverities = {} }: ConversationDetailProps) => {
+export const ConversationDetail = ({
+  conversation,
+  signatureSeverities = {},
+}: ConversationDetailProps) => {
   const [source, destination] = conversation.endpoints;
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
 
@@ -37,8 +40,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
     return ids;
   }, [conversation.packets]);
 
-  const togglePacket = (id: string) =>
-    setExpandedPacketId(prev => (prev === id ? null : id));
+  const togglePacket = (id: string) => setExpandedPacketId(prev => (prev === id ? null : id));
 
   const getDirectionIndicator = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
@@ -75,17 +77,33 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                 </dd>
                 <dt className="col-sm-4">L4 Protocol:</dt>
                 <dd className="col-sm-8">
-                  {(() => { const bg = getProtocolColor(conversation.protocol.name); return (
-                    <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.protocol.name}</span>
-                  ); })()}
+                  {(() => {
+                    const bg = getProtocolColor(conversation.protocol.name);
+                    return (
+                      <span
+                        className="badge"
+                        style={{ backgroundColor: bg, color: getTextColor(bg) }}
+                      >
+                        {conversation.protocol.name}
+                      </span>
+                    );
+                  })()}
                 </dd>
                 {conversation.tsharkProtocol && (
                   <>
                     <dt className="col-sm-4">L7 Protocol:</dt>
                     <dd className="col-sm-8">
-                      {(() => { const bg = getProtocolColor(conversation.tsharkProtocol!); return (
-                        <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.tsharkProtocol}</span>
-                      ); })()}
+                      {(() => {
+                        const bg = getProtocolColor(conversation.tsharkProtocol!);
+                        return (
+                          <span
+                            className="badge"
+                            style={{ backgroundColor: bg, color: getTextColor(bg) }}
+                          >
+                            {conversation.tsharkProtocol}
+                          </span>
+                        );
+                      })()}
                     </dd>
                   </>
                 )}
@@ -95,7 +113,14 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <dd className="col-sm-8">
                       {(() => {
                         const bg = getAppColor(conversation.appName!);
-                        return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
+                        return (
+                          <span
+                            className="badge"
+                            style={{ backgroundColor: bg, color: getTextColor(bg) }}
+                          >
+                            {conversation.appName}
+                          </span>
+                        );
                       })()}
                     </dd>
                   </>
@@ -106,7 +131,15 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <dd className="col-sm-8">
                       <div className="d-flex flex-wrap gap-1">
                         {conversation.flowRisks.map(risk => (
-                          <span key={risk} className="badge" style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, whiteSpace: 'nowrap' }}>
+                          <span
+                            key={risk}
+                            className="badge"
+                            style={{
+                              backgroundColor: RISK_BADGE.bg,
+                              color: RISK_BADGE.text,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {risk}
                           </span>
                         ))}
@@ -122,9 +155,13 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                         {conversation.customSignatures.map(rule => {
                           const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                           return (
-                          <span key={rule} className="badge" style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}>
-                            {rule.replace(/_/g, ' ')}
-                          </span>
+                            <span
+                              key={rule}
+                              className="badge"
+                              style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}
+                            >
+                              {rule.replace(/_/g, ' ')}
+                            </span>
                           );
                         })}
                       </div>
@@ -175,7 +212,13 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                   <>
                     <dt className="col-sm-4">Cert Valid To:</dt>
                     <dd className="col-sm-8">
-                      <small className={conversation.tlsNotAfter < Date.now() ? 'text-danger fw-semibold' : undefined}>
+                      <small
+                        className={
+                          conversation.tlsNotAfter < Date.now()
+                            ? 'text-danger fw-semibold'
+                            : undefined
+                        }
+                      >
                         {formatTimestamp(conversation.tlsNotAfter)}
                         {conversation.tlsNotAfter < Date.now() && (
                           <span className="ms-1 badge bg-danger">Expired</span>
@@ -209,15 +252,18 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
         </div>
         <div className="card-body p-0">
           <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            <table className="table table-sm table-striped mb-0" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <table
+              className="table table-sm table-striped mb-0"
+              style={{ tableLayout: 'fixed', width: '100%' }}
+            >
               <colgroup>
-                <col style={{ width: '4%' }} />   {/* # */}
-                <col style={{ width: '3%' }} />   {/* direction */}
-                <col style={{ width: '16%' }} />  {/* timestamp */}
-                <col style={{ width: '18%' }} />  {/* source */}
-                <col style={{ width: '18%' }} />  {/* destination */}
-                <col style={{ width: '7%' }} />   {/* length */}
-                <col />                           {/* info — takes remaining space */}
+                <col style={{ width: '4%' }} /> {/* # */}
+                <col style={{ width: '3%' }} /> {/* direction */}
+                <col style={{ width: '16%' }} /> {/* timestamp */}
+                <col style={{ width: '18%' }} /> {/* source */}
+                <col style={{ width: '18%' }} /> {/* destination */}
+                <col style={{ width: '7%' }} /> {/* length */}
+                <col /> {/* info — takes remaining space */}
               </colgroup>
               <thead className="sticky-top bg-light">
                 <tr>
@@ -244,27 +290,64 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                         <td className={getDirectionClass(packet)}>
                           <strong>{getDirectionIndicator(packet)}</strong>
                         </td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           <small>{formatTimestamp(packet.timestamp)}</small>
                         </td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={formatIpPort(packet.source.ip, packet.source.port)}>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={formatIpPort(packet.source.ip, packet.source.port)}
+                        >
                           <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
                         </td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={formatIpPort(packet.destination.ip, packet.destination.port)}>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={formatIpPort(packet.destination.ip, packet.destination.port)}
+                        >
                           <small>
                             {formatIpPort(packet.destination.ip, packet.destination.port)}
                           </small>
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
-                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <small className="text-muted">{packet.info ?? packet.protocol.name}</small>
+                        <td
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <small className="text-muted">
+                            {packet.info ?? packet.protocol.name}
+                          </small>
                           {asciiPacketIds.has(packet.id) && (
-                            <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>ASCII</span>
+                            <span
+                              className="badge bg-warning text-dark ms-1"
+                              style={{ fontSize: '0.65rem' }}
+                            >
+                              ASCII
+                            </span>
                           )}
                           {packet.detectedFileType && (
-                            <span className="badge bg-info text-dark ms-1" style={{ fontSize: '0.65rem' }} title={`Magic bytes match: ${packet.detectedFileType}`}>{packet.detectedFileType}</span>
+                            <span
+                              className="badge bg-info text-dark ms-1"
+                              style={{ fontSize: '0.65rem' }}
+                              title={`Magic bytes match: ${packet.detectedFileType}`}
+                            >
+                              {packet.detectedFileType}
+                            </span>
                           )}
                         </td>
                       </tr>

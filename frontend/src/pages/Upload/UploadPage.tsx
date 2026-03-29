@@ -10,13 +10,19 @@ export const UploadPage = () => {
   const { uploadFile, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
 
-  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(',');
+  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(
+    ','
+  );
 
   useEffect(() => {
     fetch('/api/system/limits')
       .then(r => r.json())
-      .then(data => { if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes); })
-      .catch((err) => { console.error('Failed to fetch upload limits, using default.', err); });
+      .then(data => {
+        if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes);
+      })
+      .catch(err => {
+        console.error('Failed to fetch upload limits, using default.', err);
+      });
   }, []);
 
   return (
