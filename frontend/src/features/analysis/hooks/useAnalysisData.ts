@@ -38,7 +38,9 @@ export const useAnalysisData = (fileId: string) => {
           const limits = await limitsRes.json();
           if (limits.analysisTimeoutMs) analysisTimeoutMs = limits.analysisTimeoutMs;
         }
-      } catch { /* keep default */ }
+      } catch {
+        /* keep default */
+      }
 
       // Poll analysis endpoint using HTTP status codes
       const pollStatus = async () => {
