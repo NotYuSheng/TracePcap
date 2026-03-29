@@ -24,32 +24,38 @@ function formatNumber(num: number): string {
 
 function getRoleBadgeClass(role: string): string {
   switch (role) {
-    case 'client': return 'bg-primary';
-    case 'server': return 'bg-success';
-    case 'both':   return 'bg-secondary';
-    default:       return 'bg-light text-dark';
+    case 'client':
+      return 'bg-primary';
+    case 'server':
+      return 'bg-success';
+    case 'both':
+      return 'bg-secondary';
+    default:
+      return 'bg-light text-dark';
   }
 }
 
 const NODE_TYPE_DISPLAY: Record<NodeType, { label: string; icon: string; badgeClass: string }> = {
-  'dns-server':      { label: 'DNS Server',      icon: 'bi-globe2',          badgeClass: 'bg-warning text-dark' },
-  'web-server':      { label: 'Web Server',       icon: 'bi-server',          badgeClass: 'bg-success' },
-  'ssh-server':      { label: 'SSH Server',       icon: 'bi-terminal',        badgeClass: 'bg-info text-dark' },
-  'ftp-server':      { label: 'FTP Server',       icon: 'bi-folder-symlink',  badgeClass: 'bg-secondary' },
-  'mail-server':     { label: 'Mail Server',      icon: 'bi-envelope',        badgeClass: 'bg-danger' },
-  'dhcp-server':     { label: 'DHCP Server',      icon: 'bi-diagram-3',       badgeClass: 'bg-secondary' },
-  'ntp-server':      { label: 'NTP Server',       icon: 'bi-clock',           badgeClass: 'bg-dark' },
-  'database-server': { label: 'Database Server',  icon: 'bi-database',        badgeClass: 'bg-danger' },
-  'router':          { label: 'Router / Gateway', icon: 'bi-router',          badgeClass: 'bg-warning text-dark' },
-  'client':          { label: 'Client',           icon: 'bi-laptop',          badgeClass: 'bg-primary' },
-  'unknown':         { label: 'Unknown',          icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
+  'dns-server': { label: 'DNS Server', icon: 'bi-globe2', badgeClass: 'bg-warning text-dark' },
+  'web-server': { label: 'Web Server', icon: 'bi-server', badgeClass: 'bg-success' },
+  'ssh-server': { label: 'SSH Server', icon: 'bi-terminal', badgeClass: 'bg-info text-dark' },
+  'ftp-server': { label: 'FTP Server', icon: 'bi-folder-symlink', badgeClass: 'bg-secondary' },
+  'mail-server': { label: 'Mail Server', icon: 'bi-envelope', badgeClass: 'bg-danger' },
+  'dhcp-server': { label: 'DHCP Server', icon: 'bi-diagram-3', badgeClass: 'bg-secondary' },
+  'ntp-server': { label: 'NTP Server', icon: 'bi-clock', badgeClass: 'bg-dark' },
+  'database-server': { label: 'Database Server', icon: 'bi-database', badgeClass: 'bg-danger' },
+  router: { label: 'Router / Gateway', icon: 'bi-router', badgeClass: 'bg-warning text-dark' },
+  client: { label: 'Client', icon: 'bi-laptop', badgeClass: 'bg-primary' },
+  unknown: { label: 'Unknown', icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
 };
 
 export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) {
   const navigate = useNavigate();
   // ESC closes the modal
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
@@ -57,7 +63,9 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
   // Lock background scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, []);
 
   const connectedEdges = edges.filter(e => e.source === node.id || e.target === node.id);
@@ -68,7 +76,7 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
     const peer = edge.source === node.id ? edge.target : edge.source;
     const existing = peerMap.get(peer) ?? { packets: 0, bytes: 0, apps: new Set() };
     existing.packets += edge.data.packetCount;
-    existing.bytes   += edge.data.totalBytes;
+    existing.bytes += edge.data.totalBytes;
     const label = edge.data.appName ?? edge.data.protocol;
     existing.apps.add(label);
     peerMap.set(peer, existing);
@@ -83,14 +91,15 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
     <div
       className="modal fade show d-block"
       style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="node-details-title"
     >
       <div className="modal-dialog modal-lg modal-dialog-scrollable">
         <div className="modal-content">
-
           <div className="modal-header">
             <h5 id="node-details-title" className="modal-title font-monospace">
               <i className={`bi ${typeInfo.icon} me-2`}></i>
@@ -101,7 +110,12 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                 </small>
               )}
             </h5>
-            <button type="button" className="btn-close ms-3" onClick={onClose} title="Close (Esc)" />
+            <button
+              type="button"
+              className="btn-close ms-3"
+              onClick={onClose}
+              title="Close (Esc)"
+            />
           </div>
 
           <div className="modal-body">
@@ -112,15 +126,19 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                   <dt className="col-5 text-muted">IP</dt>
                   <dd className="col-7 font-monospace mb-1">{node.data.ip}</dd>
 
-                  {node.data.mac && <>
-                    <dt className="col-5 text-muted">MAC</dt>
-                    <dd className="col-7 font-monospace mb-1">{node.data.mac}</dd>
-                  </>}
+                  {node.data.mac && (
+                    <>
+                      <dt className="col-5 text-muted">MAC</dt>
+                      <dd className="col-7 font-monospace mb-1">{node.data.mac}</dd>
+                    </>
+                  )}
 
-                  {node.data.hostname && <>
-                    <dt className="col-5 text-muted">Hostname</dt>
-                    <dd className="col-7 mb-1">{node.data.hostname}</dd>
-                  </>}
+                  {node.data.hostname && (
+                    <>
+                      <dt className="col-5 text-muted">Hostname</dt>
+                      <dd className="col-7 mb-1">{node.data.hostname}</dd>
+                    </>
+                  )}
 
                   <dt className="col-5 text-muted">Role</dt>
                   <dd className="col-7 mb-1">
@@ -177,7 +195,9 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
               <h6 className="border-bottom pb-1 mb-2">Protocols</h6>
               <div className="d-flex flex-wrap gap-1">
                 {node.data.protocols.map(p => (
-                  <span key={p} className="badge bg-secondary">{p}</span>
+                  <span key={p} className="badge bg-secondary">
+                    {p}
+                  </span>
                 ))}
               </div>
             </div>
@@ -216,7 +236,9 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                         </td>
                         <td>
                           {Array.from(info.apps).map(app => (
-                            <span key={app} className="badge bg-light text-dark me-1 border">{app}</span>
+                            <span key={app} className="badge bg-light text-dark me-1 border">
+                              {app}
+                            </span>
                           ))}
                         </td>
                         <td className="text-end small">{formatNumber(info.packets)}</td>
@@ -228,7 +250,6 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

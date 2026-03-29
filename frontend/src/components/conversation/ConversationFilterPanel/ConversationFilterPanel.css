@@ -35,7 +35,10 @@
   cursor: pointer;
   background-color: #f0f2f5;
   color: #495057;
-  transition: background-color 0.12s, color 0.12s, box-shadow 0.12s;
+  transition:
+    background-color 0.12s,
+    color 0.12s,
+    box-shadow 0.12s;
   border: 1px solid transparent !important;
 }
 
@@ -48,7 +51,7 @@
   background-color: #0d6efd;
   color: #fff;
   border-color: #0d6efd !important;
-  box-shadow: 0 1px 4px rgba(13,110,253,0.3);
+  box-shadow: 0 1px 4px rgb(13 110 253 / 30%);
 }
 
 .filter-pill-scroll {
@@ -58,7 +61,7 @@
 
 .filter-panel-body {
   border: 1px solid #dee2e6;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 4%);
 }
 
 .filter-section-row {
