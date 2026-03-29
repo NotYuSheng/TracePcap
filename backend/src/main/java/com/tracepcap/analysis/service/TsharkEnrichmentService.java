@@ -3,7 +3,9 @@ package com.tracepcap.analysis.service;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,6 +92,24 @@ public class TsharkEnrichmentService {
     }
     log.info("tshark enrichment: set tsharkProtocol on {}/{} conversations",
         enriched, conversations.size());
+
+    // Second pass: extract HTTP User-Agent headers
+    Map<String, Set<String>> userAgentMap = new HashMap<>();
+    runTsharkUserAgents(pcapFile, userAgentMap);
+
+    int uaEnriched = 0;
+    for (PcapParserService.ConversationInfo conv : conversations) {
+      String key = canonicalKey(conv.getSrcIp(), conv.getSrcPort(),
+                                conv.getDstIp(), conv.getDstPort(),
+                                conv.getProtocol());
+      Set<String> agents = userAgentMap.get(key);
+      if (agents != null && !agents.isEmpty()) {
+        conv.setHttpUserAgents(new ArrayList<>(agents));
+        uaEnriched++;
+      }
+    }
+    log.info("tshark enrichment: set httpUserAgents on {}/{} conversations",
+        uaEnriched, conversations.size());
   }
 
   // ---------------------------------------------------------------------------
@@ -145,6 +165,85 @@ public class TsharkEnrichmentService {
         log.warn("tshark protocol enrichment failed: {}", e.getMessage());
       }
     }
+  }
+
+  /**
+   * Runs tshark to collect HTTP User-Agent header values per conversation flow.
+   *
+   * <p>Field order (0-indexed):
+   * 0=ip.src, 1=ip.dst, 2=ipv6.src, 3=ipv6.dst,
+   * 4=tcp.srcport, 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport,
+   * 8=ip.proto, 9=ipv6.nxt, 10=http.user_agent
+   */
+  private void runTsharkUserAgents(File pcapFile, Map<String, Set<String>> userAgentMap) {
+    ProcessBuilder pb = new ProcessBuilder(
+        TSHARK_BINARY, "-r", pcapFile.getAbsolutePath(),
+        "-Y", "http.user_agent",
+        "-T", "fields",
+        "-E", "separator=\t",
+        "-e", "ip.src",      "-e", "ip.dst",
+        "-e", "ipv6.src",    "-e", "ipv6.dst",
+        "-e", "tcp.srcport", "-e", "tcp.dstport",
+        "-e", "udp.srcport", "-e", "udp.dstport",
+        "-e", "ip.proto",    "-e", "ipv6.nxt",
+        "-e", "http.user_agent"
+    );
+    pb.redirectErrorStream(false);
+
+    try {
+      Process process = pb.start();
+
+      Thread errDrainer = new Thread(() -> {
+        try (BufferedReader err =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+          String line;
+          while ((line = err.readLine()) != null) log.debug("tshark ua stderr: {}", line);
+        } catch (Exception e) {
+          log.debug("Error draining tshark ua stderr", e);
+        }
+      });
+      errDrainer.setDaemon(true);
+      errDrainer.start();
+
+      try (BufferedReader reader =
+          new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          parseUserAgentLine(line, userAgentMap);
+        }
+      }
+      process.waitFor();
+      log.debug("tshark user-agent scan complete: {} distinct flow keys", userAgentMap.size());
+
+    } catch (Exception e) {
+      if (isNotFound(e)) {
+        log.warn("tshark not found — skipping HTTP User-Agent extraction.");
+      } else {
+        log.warn("tshark HTTP User-Agent extraction failed: {}", e.getMessage());
+      }
+    }
+  }
+
+  private void parseUserAgentLine(String line, Map<String, Set<String>> userAgentMap) {
+    String[] f = line.split("\t", -1);
+    if (f.length < 11) return;
+
+    String srcIp = !f[0].isEmpty() ? f[0] : (!f[2].isEmpty() ? f[2] : null);
+    String dstIp = !f[1].isEmpty() ? f[1] : (!f[3].isEmpty() ? f[3] : null);
+    if (srcIp == null || dstIp == null) return;
+
+    Integer srcPort = parsePort(!f[4].isEmpty() ? f[4] : f[6]);
+    Integer dstPort = parsePort(!f[5].isEmpty() ? f[5] : f[7]);
+
+    String protoNum = !f[8].isEmpty() ? f[8] : f[9];
+    String proto = IP_PROTO.getOrDefault(protoNum,
+        protoNum.isEmpty() ? "UNKNOWN" : protoNum.toUpperCase());
+
+    String userAgent = f[10].trim();
+    if (userAgent.isEmpty()) return;
+
+    String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
+    userAgentMap.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(userAgent);
   }
 
   /**

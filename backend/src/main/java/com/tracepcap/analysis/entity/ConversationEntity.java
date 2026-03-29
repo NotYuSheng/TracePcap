@@ -59,6 +59,9 @@ public class ConversationEntity {
   @Column(name = "custom_signatures", columnDefinition = "text[]")
   private String[] customSignatures;
 
+  @Column(name = "http_user_agents", columnDefinition = "text[]")
+  private String[] httpUserAgents;
+
   @Column(name = "category", length = CATEGORY_MAX_LENGTH)
   private String category;
 

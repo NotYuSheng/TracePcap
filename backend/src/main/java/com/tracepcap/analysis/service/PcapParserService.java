@@ -665,6 +665,7 @@ public class PcapParserService {
     private String tsharkProtocol;
     private List<String> flowRisks = new ArrayList<>();
     private List<String> customSignatures = new ArrayList<>();
+    private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;
     private String ja3Client;

@@ -55,6 +55,7 @@ export interface Conversation {
   tlsNotAfter?: number;
   flowRisks: string[];
   customSignatures: string[];
+  httpUserAgents: string[];
   startTime: number;
   endTime: number;
   packetCount: number;

@@ -131,6 +131,18 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     </dd>
                   </>
                 )}
+                {conversation.httpUserAgents && conversation.httpUserAgents.length > 0 && (
+                  <>
+                    <dt className="col-sm-4">User-Agents:</dt>
+                    <dd className="col-sm-8">
+                      <ul className="mb-0 ps-3">
+                        {conversation.httpUserAgents.map((ua, i) => (
+                          <li key={i}><small className="text-break">{ua}</small></li>
+                        ))}
+                      </ul>
+                    </dd>
+                  </>
+                )}
                 {conversation.ja3Client && (
                   <>
                     <dt className="col-sm-4">JA3 Client:</dt>

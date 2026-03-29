@@ -24,6 +24,7 @@ interface ConversationApiResponse {
   tlsNotAfter?: string | number[] | null;
   flowRisks?: string[] | null;
   customSignatures?: string[] | null;
+  httpUserAgents?: string[] | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[];
@@ -82,6 +83,7 @@ function transformConversation(apiData: ConversationApiResponse, packets: Packet
     tlsNotAfter: apiData.tlsNotAfter != null ? parseDateTime(apiData.tlsNotAfter) : undefined,
     flowRisks: apiData.flowRisks ?? [],
     customSignatures: apiData.customSignatures ?? [],
+    httpUserAgents: apiData.httpUserAgents ?? [],
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,

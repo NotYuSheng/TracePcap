@@ -176,6 +176,9 @@ public class AnalysisService {
                 .customSignatures(convInfo.getCustomSignatures().isEmpty()
                     ? null
                     : convInfo.getCustomSignatures().toArray(new String[0]))
+                .httpUserAgents(convInfo.getHttpUserAgents().isEmpty()
+                    ? null
+                    : convInfo.getHttpUserAgents().toArray(new String[0]))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -572,6 +575,7 @@ public class AnalysisService {
         .tlsNotAfter(conv.getTlsNotAfter())
         .flowRisks(conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
         .customSignatures(conv.getCustomSignatures() != null ? Arrays.asList(conv.getCustomSignatures()) : List.of())
+        .httpUserAgents(conv.getHttpUserAgents() != null ? Arrays.asList(conv.getHttpUserAgents()) : List.of())
         .packetCount(conv.getPacketCount())
         .totalBytes(conv.getTotalBytes())
         .startTime(conv.getStartTime())
@@ -607,6 +611,8 @@ public class AnalysisService {
                   ? Arrays.asList(conv.getFlowRisks()) : List.of())
               .customSignatures(conv.getCustomSignatures() != null
                   ? Arrays.asList(conv.getCustomSignatures()) : List.of())
+              .httpUserAgents(conv.getHttpUserAgents() != null
+                  ? Arrays.asList(conv.getHttpUserAgents()) : List.of())
               .packetCount(conv.getPacketCount())
               .totalBytes(conv.getTotalBytes())
               .startTime(conv.getStartTime())
@@ -681,6 +687,8 @@ public class AnalysisService {
             ? Arrays.asList(conversation.getFlowRisks()) : List.of())
         .customSignatures(conversation.getCustomSignatures() != null
             ? Arrays.asList(conversation.getCustomSignatures()) : List.of())
+        .httpUserAgents(conversation.getHttpUserAgents() != null
+            ? Arrays.asList(conversation.getHttpUserAgents()) : List.of())
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())
