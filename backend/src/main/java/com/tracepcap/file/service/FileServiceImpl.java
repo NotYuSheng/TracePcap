@@ -166,7 +166,6 @@ public class FileServiceImpl implements FileService {
       throw new InvalidFileException(
           "Invalid file type. Only .pcap, .pcapng, and .cap files are supported");
     }
-
   }
 
   /** Check if file has valid extension */
