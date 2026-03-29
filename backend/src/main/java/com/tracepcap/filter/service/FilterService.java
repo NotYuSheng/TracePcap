@@ -1,6 +1,7 @@
 package com.tracepcap.filter.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.tracepcap.common.TsharkHexUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.file.entity.FileEntity;
@@ -367,7 +368,7 @@ public class FilterService {
       if (f.length > 16 && !f[16].isEmpty()) payloadHex = f[16];
       else if (f.length > 17 && !f[17].isEmpty()) payloadHex = f[17];
 
-      String payloadAscii = hexToAscii(payloadHex, 200);
+      String payloadAscii = TsharkHexUtil.toAscii(payloadHex, 200);
 
       // Derive layer from protocol
       String proto = protocolRaw;
@@ -397,25 +398,6 @@ public class FilterService {
       log.warn("Error parsing packet line: {}", e.getMessage());
       return null;
     }
-  }
-
-  /**
-   * Convert tshark colon-separated hex payload to a printable ASCII string (non-printable → '.'),
-   * limited to {@code maxBytes} bytes.
-   */
-  private String hexToAscii(String tsharkHex, int maxBytes) {
-    if (tsharkHex == null || tsharkHex.isEmpty()) return "";
-    String plain = tsharkHex.replace(":", "");
-    int len = plain.length();
-    if (len % 2 != 0) len--; // drop incomplete trailing nibble
-    int byteCount = Math.min(len / 2, maxBytes);
-    StringBuilder sb = new StringBuilder(byteCount);
-    for (int i = 0; i < byteCount * 2; i += 2) {
-      int b = (Character.digit(plain.charAt(i), 16) << 4)
-          | Character.digit(plain.charAt(i + 1), 16);
-      sb.append((b >= 0x20 && b <= 0x7e) ? (char) b : '.');
-    }
-    return sb.toString();
   }
 
   /** Parse suggestions from JSON response */
