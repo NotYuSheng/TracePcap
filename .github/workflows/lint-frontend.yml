@@ -59,7 +59,7 @@ jobs:
           fi
 
           # Create a unique branch name for the lint fixes
-          LINT_BRANCH="chore/auto-lint-fixes-$(date +%s)"
+          LINT_BRANCH="chore/auto-lint-fixes-frontend-$(date +%s)"
 
           git checkout -b $LINT_BRANCH
           git add .
