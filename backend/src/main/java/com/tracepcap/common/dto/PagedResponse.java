@@ -19,8 +19,8 @@ public class PagedResponse<T> {
   private int totalPages;
 
   /**
-   * Create a paged response when DB has already done filtering/pagination.
-   * The content list is used as-is; total comes from the DB count.
+   * Create a paged response when DB has already done filtering/pagination. The content list is used
+   * as-is; total comes from the DB count.
    */
   public static <T> PagedResponse<T> of(List<T> content, long total, int page, int pageSize) {
     int totalPages = pageSize > 0 ? (int) Math.ceil((double) total / pageSize) : 0;

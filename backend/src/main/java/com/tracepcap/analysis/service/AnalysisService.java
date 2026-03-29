@@ -17,13 +17,13 @@ import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.file.service.StorageService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.io.File;
 import java.time.Duration;
 import java.util.*;
 import java.util.Arrays;
 import java.util.stream.Collectors;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,8 +51,7 @@ public class AnalysisService {
   // Keeps the Hibernate first-level cache from accumulating unbounded saved entities.
   private static final int JPA_FLUSH_INTERVAL = 50;
 
-  @PersistenceContext
-  private EntityManager entityManager;
+  @PersistenceContext private EntityManager entityManager;
 
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
@@ -170,12 +169,14 @@ public class AnalysisService {
                 .tlsSubject(convInfo.getTlsSubject())
                 .tlsNotBefore(convInfo.getTlsNotBefore())
                 .tlsNotAfter(convInfo.getTlsNotAfter())
-                .flowRisks(convInfo.getFlowRisks().isEmpty()
-                    ? null
-                    : convInfo.getFlowRisks().toArray(new String[0]))
-                .customSignatures(convInfo.getCustomSignatures().isEmpty()
-                    ? null
-                    : convInfo.getCustomSignatures().toArray(new String[0]))
+                .flowRisks(
+                    convInfo.getFlowRisks().isEmpty()
+                        ? null
+                        : convInfo.getFlowRisks().toArray(new String[0]))
+                .customSignatures(
+                    convInfo.getCustomSignatures().isEmpty()
+                        ? null
+                        : convInfo.getCustomSignatures().toArray(new String[0]))
                 .packetCount(convInfo.getPacketCount())
                 .totalBytes(convInfo.getTotalBytes())
                 .startTime(convInfo.getStartTime())
@@ -188,23 +189,26 @@ public class AnalysisService {
           // Build and save one batch at a time — avoids materialising the full PacketEntity list
           for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
             int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
-            List<PacketEntity> batch = packetInfos.subList(i, end).stream()
-                .map(pktInfo -> PacketEntity.builder()
-                    .file(file)
-                    .conversation(savedConversation)
-                    .packetNumber(pktInfo.getPacketNumber())
-                    .timestamp(pktInfo.getTimestamp())
-                    .srcIp(pktInfo.getSrcIp())
-                    .srcPort(pktInfo.getSrcPort())
-                    .dstIp(pktInfo.getDstIp())
-                    .dstPort(pktInfo.getDstPort())
-                    .protocol(pktInfo.getProtocol())
-                    .packetSize(pktInfo.getPacketSize())
-                    .info(pktInfo.getInfo())
-                    .payload(pktInfo.getPayload())
-                    .detectedFileType(pktInfo.getDetectedFileType())
-                    .build())
-                .collect(Collectors.toList());
+            List<PacketEntity> batch =
+                packetInfos.subList(i, end).stream()
+                    .map(
+                        pktInfo ->
+                            PacketEntity.builder()
+                                .file(file)
+                                .conversation(savedConversation)
+                                .packetNumber(pktInfo.getPacketNumber())
+                                .timestamp(pktInfo.getTimestamp())
+                                .srcIp(pktInfo.getSrcIp())
+                                .srcPort(pktInfo.getSrcPort())
+                                .dstIp(pktInfo.getDstIp())
+                                .dstPort(pktInfo.getDstPort())
+                                .protocol(pktInfo.getProtocol())
+                                .packetSize(pktInfo.getPacketSize())
+                                .info(pktInfo.getInfo())
+                                .payload(pktInfo.getPayload())
+                                .detectedFileType(pktInfo.getDetectedFileType())
+                                .build())
+                    .collect(Collectors.toList());
             packetRepository.saveAll(batch);
           }
           // Free the parsed packet list — memory is released as each conversation is saved
@@ -304,7 +308,8 @@ public class AnalysisService {
         .filter(conv -> conv.getAppName() != null && !conv.getAppName().isBlank())
         .forEach(
             conv -> {
-              long[] stats = appStatsMap.computeIfAbsent(conv.getAppName(), k -> new long[] {0L, 0L});
+              long[] stats =
+                  appStatsMap.computeIfAbsent(conv.getAppName(), k -> new long[] {0L, 0L});
               stats[0] += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
               stats[1] += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
             });
@@ -322,26 +327,28 @@ public class AnalysisService {
     List<AnalysisSummaryResponse.DetectedApplication> detectedApplications =
         appsTruncated ? allApps.subList(0, overviewAppsMax) : allApps;
 
-    List<String> detectedL7Protocols = conversations.stream()
-        .map(ConversationEntity::getTsharkProtocol)
-        .filter(p -> p != null && !p.isBlank())
-        .distinct()
-        .sorted()
-        .collect(Collectors.toList());
+    List<String> detectedL7Protocols =
+        conversations.stream()
+            .map(ConversationEntity::getTsharkProtocol)
+            .filter(p -> p != null && !p.isBlank())
+            .distinct()
+            .sorted()
+            .collect(Collectors.toList());
 
     // Aggregate category distribution
     class CategoryAggregate {
       long packetCount = 0L;
-      long totalBytes  = 0L;
+      long totalBytes = 0L;
     }
     Map<String, CategoryAggregate> catStatsMap = new java.util.TreeMap<>();
     conversations.stream()
         .filter(conv -> conv.getCategory() != null && !conv.getCategory().isBlank())
         .forEach(
             conv -> {
-              CategoryAggregate agg = catStatsMap.computeIfAbsent(conv.getCategory(), k -> new CategoryAggregate());
+              CategoryAggregate agg =
+                  catStatsMap.computeIfAbsent(conv.getCategory(), k -> new CategoryAggregate());
               agg.packetCount += conv.getPacketCount() != null ? conv.getPacketCount() : 0L;
-              agg.totalBytes  += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
+              agg.totalBytes += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;
             });
     long totalCatPackets = catStatsMap.values().stream().mapToLong(a -> a.packetCount).sum();
     List<AnalysisSummaryResponse.CategoryStat> categoryDistribution =
@@ -352,23 +359,33 @@ public class AnalysisService {
                         .category(e.getKey())
                         .count(e.getValue().packetCount)
                         .bytes(e.getValue().totalBytes)
-                        .percentage(totalCatPackets > 0
-                            ? (e.getValue().packetCount * 100.0 / totalCatPackets) : 0.0)
+                        .percentage(
+                            totalCatPackets > 0
+                                ? (e.getValue().packetCount * 100.0 / totalCatPackets)
+                                : 0.0)
                         .build())
-            .sorted(java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount).reversed())
+            .sorted(
+                java.util.Comparator.comparingLong(AnalysisSummaryResponse.CategoryStat::getCount)
+                    .reversed())
             .collect(Collectors.toList());
 
-    long securityAlertCount = conversations.stream()
-        .filter(conv -> (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
-            || (conv.getCustomSignatures() != null && conv.getCustomSignatures().length > 0))
-        .count();
+    long securityAlertCount =
+        conversations.stream()
+            .filter(
+                conv ->
+                    (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
+                        || (conv.getCustomSignatures() != null
+                            && conv.getCustomSignatures().length > 0))
+            .count();
 
-    List<String> triggeredCustomRules = conversations.stream()
-        .filter(conv -> conv.getCustomSignatures() != null && conv.getCustomSignatures().length > 0)
-        .flatMap(conv -> Arrays.stream(conv.getCustomSignatures()))
-        .distinct()
-        .sorted()
-        .collect(Collectors.toList());
+    List<String> triggeredCustomRules =
+        conversations.stream()
+            .filter(
+                conv -> conv.getCustomSignatures() != null && conv.getCustomSignatures().length > 0)
+            .flatMap(conv -> Arrays.stream(conv.getCustomSignatures()))
+            .distinct()
+            .sorted()
+            .collect(Collectors.toList());
 
     List<AnalysisSummaryResponse.ConversationSummary> topConversations =
         conversations.stream()
@@ -399,10 +416,14 @@ public class AnalysisService {
                                 : null)
                         .packetCount(conv.getPacketCount())
                         .totalBytes(conv.getTotalBytes())
-                        .flowRisks(conv.getFlowRisks() != null
-                            ? Arrays.asList(conv.getFlowRisks()) : List.of())
-                        .customSignatures(conv.getCustomSignatures() != null
-                            ? Arrays.asList(conv.getCustomSignatures()) : List.of())
+                        .flowRisks(
+                            conv.getFlowRisks() != null
+                                ? Arrays.asList(conv.getFlowRisks())
+                                : List.of())
+                        .customSignatures(
+                            conv.getCustomSignatures() != null
+                                ? Arrays.asList(conv.getCustomSignatures())
+                                : List.of())
                         .build())
             .collect(Collectors.toList());
 
@@ -499,9 +520,8 @@ public class AnalysisService {
 
     Page<ConversationEntity> dbPage = conversationRepository.findAll(spec, pageable);
 
-    List<ConversationResponse> content = dbPage.getContent().stream()
-        .map(this::toConversationResponse)
-        .collect(Collectors.toList());
+    List<ConversationResponse> content =
+        dbPage.getContent().stream().map(this::toConversationResponse).collect(Collectors.toList());
 
     return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
   }
@@ -512,7 +532,9 @@ public class AnalysisService {
     return conversationRepository.findDistinctFileTypesByFileId(fileId);
   }
 
-  /** Returns distinct nDPI risk type strings present in at-risk conversations for the given file. */
+  /**
+   * Returns distinct nDPI risk type strings present in at-risk conversations for the given file.
+   */
   @Transactional(readOnly = true)
   public List<String> getDistinctRiskTypes(UUID fileId) {
     return conversationRepository.findDistinctRiskTypesByFileId(fileId);
@@ -540,14 +562,15 @@ public class AnalysisService {
       return Sort.unsorted();
     }
     // Map frontend field names to entity field names
-    String field = switch (params.getSortBy()) {
-      case "packets"   -> "packetCount";
-      case "bytes"     -> "totalBytes";
-      case "duration"  -> "startTime"; // duration is computed; proxy with startTime
-      default          -> params.getSortBy(); // srcIp, dstIp, startTime pass through
-    };
-    Sort.Direction dir = "desc".equalsIgnoreCase(params.getSortDir())
-        ? Sort.Direction.DESC : Sort.Direction.ASC;
+    String field =
+        switch (params.getSortBy()) {
+          case "packets" -> "packetCount";
+          case "bytes" -> "totalBytes";
+          case "duration" -> "startTime"; // duration is computed; proxy with startTime
+          default -> params.getSortBy(); // srcIp, dstIp, startTime pass through
+        };
+    Sort.Direction dir =
+        "desc".equalsIgnoreCase(params.getSortDir()) ? Sort.Direction.DESC : Sort.Direction.ASC;
     return Sort.by(dir, field);
   }
 
@@ -571,7 +594,10 @@ public class AnalysisService {
         .tlsNotBefore(conv.getTlsNotBefore())
         .tlsNotAfter(conv.getTlsNotAfter())
         .flowRisks(conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
-        .customSignatures(conv.getCustomSignatures() != null ? Arrays.asList(conv.getCustomSignatures()) : List.of())
+        .customSignatures(
+            conv.getCustomSignatures() != null
+                ? Arrays.asList(conv.getCustomSignatures())
+                : List.of())
         .packetCount(conv.getPacketCount())
         .totalBytes(conv.getTotalBytes())
         .startTime(conv.getStartTime())
@@ -585,35 +611,38 @@ public class AnalysisService {
     List<ConversationEntity> conversations = conversationRepository.findByFileIdWithRisks(fileId);
 
     return conversations.stream()
-        .map(conv -> {
-          Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
-          return ConversationResponse.builder()
-              .conversationId(conv.getId())
-              .srcIp(conv.getSrcIp())
-              .srcPort(conv.getSrcPort())
-              .dstIp(conv.getDstIp())
-              .dstPort(conv.getDstPort())
-              .protocol(conv.getProtocol())
-              .appName(conv.getAppName())
-              .category(conv.getCategory())
-              .hostname(conv.getHostname())
-              .ja3Client(conv.getJa3Client())
-              .ja3Server(conv.getJa3Server())
-              .tlsIssuer(conv.getTlsIssuer())
-              .tlsSubject(conv.getTlsSubject())
-              .tlsNotBefore(conv.getTlsNotBefore())
-              .tlsNotAfter(conv.getTlsNotAfter())
-              .flowRisks(conv.getFlowRisks() != null
-                  ? Arrays.asList(conv.getFlowRisks()) : List.of())
-              .customSignatures(conv.getCustomSignatures() != null
-                  ? Arrays.asList(conv.getCustomSignatures()) : List.of())
-              .packetCount(conv.getPacketCount())
-              .totalBytes(conv.getTotalBytes())
-              .startTime(conv.getStartTime())
-              .endTime(conv.getEndTime())
-              .durationMs(duration.toMillis())
-              .build();
-        })
+        .map(
+            conv -> {
+              Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+              return ConversationResponse.builder()
+                  .conversationId(conv.getId())
+                  .srcIp(conv.getSrcIp())
+                  .srcPort(conv.getSrcPort())
+                  .dstIp(conv.getDstIp())
+                  .dstPort(conv.getDstPort())
+                  .protocol(conv.getProtocol())
+                  .appName(conv.getAppName())
+                  .category(conv.getCategory())
+                  .hostname(conv.getHostname())
+                  .ja3Client(conv.getJa3Client())
+                  .ja3Server(conv.getJa3Server())
+                  .tlsIssuer(conv.getTlsIssuer())
+                  .tlsSubject(conv.getTlsSubject())
+                  .tlsNotBefore(conv.getTlsNotBefore())
+                  .tlsNotAfter(conv.getTlsNotAfter())
+                  .flowRisks(
+                      conv.getFlowRisks() != null ? Arrays.asList(conv.getFlowRisks()) : List.of())
+                  .customSignatures(
+                      conv.getCustomSignatures() != null
+                          ? Arrays.asList(conv.getCustomSignatures())
+                          : List.of())
+                  .packetCount(conv.getPacketCount())
+                  .totalBytes(conv.getTotalBytes())
+                  .startTime(conv.getStartTime())
+                  .endTime(conv.getEndTime())
+                  .durationMs(duration.toMillis())
+                  .build();
+            })
         .collect(Collectors.toList());
   }
 
@@ -649,8 +678,7 @@ public class AnalysisService {
         conversationRepository
             .findById(conversationId)
             .orElseThrow(
-                () ->
-                    new ResourceNotFoundException("Conversation not found: " + conversationId));
+                () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
     List<PacketEntity> packets =
         packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
@@ -677,10 +705,14 @@ public class AnalysisService {
         .tlsSubject(conversation.getTlsSubject())
         .tlsNotBefore(conversation.getTlsNotBefore())
         .tlsNotAfter(conversation.getTlsNotAfter())
-        .flowRisks(conversation.getFlowRisks() != null
-            ? Arrays.asList(conversation.getFlowRisks()) : List.of())
-        .customSignatures(conversation.getCustomSignatures() != null
-            ? Arrays.asList(conversation.getCustomSignatures()) : List.of())
+        .flowRisks(
+            conversation.getFlowRisks() != null
+                ? Arrays.asList(conversation.getFlowRisks())
+                : List.of())
+        .customSignatures(
+            conversation.getCustomSignatures() != null
+                ? Arrays.asList(conversation.getCustomSignatures())
+                : List.of())
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())
         .startTime(conversation.getStartTime())

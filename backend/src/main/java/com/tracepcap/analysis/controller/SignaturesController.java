@@ -59,7 +59,7 @@ public class SignaturesController {
       for (Object item : (List<?>) raw) {
         if (!(item instanceof Map)) continue;
         Map<String, Object> rule = (Map<String, Object>) item;
-        String name     = rule.get("name")     != null ? rule.get("name").toString()     : null;
+        String name = rule.get("name") != null ? rule.get("name").toString() : null;
         String severity = rule.get("severity") != null ? rule.get("severity").toString() : "low";
         if (name != null && !name.isBlank()) result.add(Map.of("name", name, "severity", severity));
       }
@@ -91,7 +91,8 @@ public class SignaturesController {
       return ResponseEntity.ok(Map.of("status", "saved"));
     } catch (IOException e) {
       log.error("Failed to write signatures file: {}", e.getMessage());
-      return ResponseEntity.internalServerError().body(Map.of("error", "Failed to save: " + e.getMessage()));
+      return ResponseEntity.internalServerError()
+          .body(Map.of("error", "Failed to save: " + e.getMessage()));
     }
   }
 }
