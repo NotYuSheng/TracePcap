@@ -24,7 +24,6 @@ export const ConversationList = ({
   sortBy,
   sortDir,
   onSort,
-  onRiskFilterClick,
   visibleColumns,
   signatureSeverities = {},
 }: ConversationListProps) => {
@@ -258,9 +257,7 @@ export const ConversationList = ({
                             <span
                               key={risk}
                               className="badge"
-                              style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, cursor: 'pointer' }}
-                              title="Click to filter by security risks"
-                              onClick={e => { e.stopPropagation(); onRiskFilterClick?.(); }}
+                              style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, whiteSpace: 'nowrap' }}
                             >
                               {risk}
                             </span>
@@ -276,7 +273,7 @@ export const ConversationList = ({
                           {conversation.customSignatures.map(rule => {
                             const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                             return (
-                              <span key={rule} className="badge" style={{ backgroundColor: bg, color: text }}>
+                              <span key={rule} className="badge" style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}>
                                 {rule.replace(/_/g, ' ')}
                               </span>
                             );

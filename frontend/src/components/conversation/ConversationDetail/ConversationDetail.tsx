@@ -67,7 +67,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
         <div className="card-body">
           <div className="row">
             <div className="col-md-6">
-              <dl className="row mb-0 align-items-start">
+              <dl className="row mb-0">
                 <dt className="col-sm-4">Source:</dt>
                 <dd className="col-sm-8">{formatIpPort(source.ip, source.port)}</dd>
                 <dt className="col-sm-4">Destination:</dt>
@@ -127,7 +127,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <dd className="col-sm-8">
                       <div className="d-flex flex-wrap gap-1">
                         {conversation.flowRisks.map(risk => (
-                          <span key={risk} className="badge" style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text }}>
+                          <span key={risk} className="badge" style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, whiteSpace: 'nowrap' }}>
                             {risk}
                           </span>
                         ))}
@@ -143,7 +143,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                         {conversation.customSignatures.map(rule => {
                           const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                           return (
-                          <span key={rule} className="badge" style={{ backgroundColor: bg, color: text }}>
+                          <span key={rule} className="badge" style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}>
                             {rule.replace(/_/g, ' ')}
                           </span>
                           );
