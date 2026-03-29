@@ -3,7 +3,7 @@ import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
-import { getAppColor, getCategoryColor, getTextColor, getSeverityColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationFilterPanel.css';
 
@@ -330,7 +330,7 @@ export function ConversationFilterPanel({
                           key={rt}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: '#ffc107', color: '#212529' } : undefined}
+                          style={isActive ? { backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text } : undefined}
                           onClick={() => toggle('riskTypes', rt, filters.riskTypes)}
                         >
                           {rt.replace(/_/g, ' ')}
@@ -369,7 +369,7 @@ export function ConversationFilterPanel({
                   </div>
                   <div className="d-flex flex-wrap gap-2 align-items-center" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
                     <span>Severity:</span>
-                    {([['critical','#dc3545','#fff'],['high','#fd7e14','#fff'],['medium','#ffc107','#212529'],['low','#6f42c1','#fff']] as const).map(([label, bg, text]) => {
+                    {([['critical','#dc3545','#fff'],['high','#fd7e14','#fff'],['medium','#e67e22','#fff'],['low','#6f42c1','#fff']] as const).map(([label, bg, text]) => {
                       const rulesOfSeverity = customSignatureOptions.filter(r => (signatureSeverities[r] ?? 'low').toLowerCase() === label);
                       if (rulesOfSeverity.length === 0) return null;
                       const allSelected = rulesOfSeverity.every(r => filters.customSignatures.includes(r));

@@ -3,7 +3,7 @@ import type { Conversation } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
-import { getAppColor, getCategoryColor, getTextColor, getSeverityColor } from '@/utils/appColors';
+import { getAppColor, getCategoryColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
 
@@ -229,16 +229,16 @@ export const ConversationList = ({
                         const hasMismatch = !!conversation.tsharkProtocol && !!conversation.ndpiProtocol &&
                           normProto(conversation.tsharkProtocol) !== normProto(conversation.ndpiProtocol);
                         return (
-                          <span className="d-flex align-items-center gap-1 flex-wrap">
+                          <>
                             <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>
                             {hasMismatch && (
                               <i
-                                className="bi bi-exclamation-triangle-fill"
+                                className="bi bi-exclamation-triangle-fill ms-1"
                                 style={{ color: '#fd7e14', fontSize: '0.8rem' }}
                                 title={`Wireshark: "${conversation.tsharkProtocol}" vs nDPI: "${conversation.ndpiProtocol}" — click row to investigate`}
                               />
                             )}
-                          </span>
+                          </>
                         );
                       })() : <span className="text-muted">—</span>}
                     </td>
@@ -258,7 +258,7 @@ export const ConversationList = ({
                             <span
                               key={risk}
                               className="badge"
-                              style={{ backgroundColor: '#ffc107', color: '#212529', cursor: 'pointer' }}
+                              style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text, cursor: 'pointer' }}
                               title="Click to filter by security risks"
                               onClick={e => { e.stopPropagation(); onRiskFilterClick?.(); }}
                             >

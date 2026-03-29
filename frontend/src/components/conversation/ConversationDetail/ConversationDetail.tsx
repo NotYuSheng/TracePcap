@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Conversation, Packet } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
-import { getAppColor, getTextColor, getSeverityColor } from '@/utils/appColors';
+import { getAppColor, getTextColor, getSeverityColor, RISK_BADGE } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { HexViewer } from '../HexViewer/HexViewer';
 
@@ -67,7 +67,7 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
         <div className="card-body">
           <div className="row">
             <div className="col-md-6">
-              <dl className="row mb-0">
+              <dl className="row mb-0 align-items-start">
                 <dt className="col-sm-4">Source:</dt>
                 <dd className="col-sm-8">{formatIpPort(source.ip, source.port)}</dd>
                 <dt className="col-sm-4">Destination:</dt>
@@ -87,39 +87,37 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                   <>
                     <dt className="col-sm-4">Application:</dt>
                     <dd className="col-sm-8">
-                      <div className="d-flex flex-wrap align-items-center gap-2">
-                        {conversation.appName && (() => {
-                          const bg = getAppColor(conversation.appName!);
-                          return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
-                        })()}
-                      </div>
-                      <div className="d-flex flex-column gap-1 mt-1">
-                        {conversation.tsharkProtocol && (() => {
-                          const hasMismatch = !!conversation.ndpiProtocol &&
-                            normaliseProto(conversation.tsharkProtocol!) !== normaliseProto(conversation.ndpiProtocol!);
-                          return (
-                            <span className="text-muted small d-flex align-items-center gap-1">
-                              <i className="bi bi-eye" title="Wireshark dissector detection (deterministic)"></i>
-                              Wireshark: <strong>{conversation.tsharkProtocol}</strong>
-                              {hasMismatch && (
-                                <span
-                                  className="badge"
-                                  style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.7rem' }}
-                                  title={`Wireshark identified "${conversation.tsharkProtocol}" but nDPI identified "${conversation.ndpiProtocol}" — may indicate tunnelling or misclassification`}
-                                >
-                                  <i className="bi bi-exclamation-triangle-fill me-1"></i>mismatch
-                                </span>
-                              )}
+                      {conversation.appName && (() => {
+                        const bg = getAppColor(conversation.appName!);
+                        return <span className="badge" style={{ backgroundColor: bg, color: getTextColor(bg) }}>{conversation.appName}</span>;
+                      })()}
+                      {(conversation.tsharkProtocol || conversation.ndpiProtocol) && (
+                        <div className="d-flex flex-column gap-1 mt-1">
+                          {conversation.tsharkProtocol && (() => {
+                            const hasMismatch = !!conversation.ndpiProtocol &&
+                              normaliseProto(conversation.tsharkProtocol!) !== normaliseProto(conversation.ndpiProtocol!);
+                            return (
+                              <span className="text-muted small">
+                                Wireshark: <strong>{conversation.tsharkProtocol}</strong>
+                                {hasMismatch && (
+                                  <span
+                                    className="badge ms-1"
+                                    style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.7rem' }}
+                                    title={`Wireshark: "${conversation.tsharkProtocol}" vs nDPI: "${conversation.ndpiProtocol}" — may indicate tunnelling or misclassification`}
+                                  >
+                                    mismatch
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })()}
+                          {conversation.ndpiProtocol && (
+                            <span className="text-muted small">
+                              nDPI: <strong>{conversation.ndpiProtocol}</strong>
                             </span>
-                          );
-                        })()}
-                        {conversation.ndpiProtocol && (
-                          <span className="text-muted small d-flex align-items-center gap-1">
-                            <i className="bi bi-cpu" title="nDPI heuristic detection"></i>
-                            nDPI: <strong>{conversation.ndpiProtocol}</strong>
-                          </span>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </dd>
                   </>
                 )}
@@ -129,8 +127,8 @@ export const ConversationDetail = ({ conversation, signatureSeverities = {} }: C
                     <dd className="col-sm-8">
                       <div className="d-flex flex-wrap gap-1">
                         {conversation.flowRisks.map(risk => (
-                          <span key={risk} className="badge" style={{ backgroundColor: '#ffc107', color: '#212529' }}>
-                            <i className="bi bi-shield-exclamation me-1"></i>{risk}
+                          <span key={risk} className="badge" style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text }}>
+                            {risk}
                           </span>
                         ))}
                       </div>
