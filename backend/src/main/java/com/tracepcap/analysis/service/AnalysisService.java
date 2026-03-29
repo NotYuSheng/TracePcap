@@ -549,7 +549,8 @@ public class AnalysisService {
   }
 
   private ConversationResponse toConversationResponse(ConversationEntity conv) {
-    Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+    Duration duration = (conv.getStartTime() != null && conv.getEndTime() != null)
+        ? Duration.between(conv.getStartTime(), conv.getEndTime()) : Duration.ZERO;
     return ConversationResponse.builder()
         .conversationId(conv.getId())
         .srcIp(conv.getSrcIp())
@@ -584,7 +585,8 @@ public class AnalysisService {
 
     return conversations.stream()
         .map(conv -> {
-          Duration duration = Duration.between(conv.getStartTime(), conv.getEndTime());
+          Duration duration = (conv.getStartTime() != null && conv.getEndTime() != null)
+              ? Duration.between(conv.getStartTime(), conv.getEndTime()) : Duration.ZERO;
           return ConversationResponse.builder()
               .conversationId(conv.getId())
               .srcIp(conv.getSrcIp())
@@ -652,7 +654,8 @@ public class AnalysisService {
     List<PacketEntity> packets =
         packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
 
-    Duration duration = Duration.between(conversation.getStartTime(), conversation.getEndTime());
+    Duration duration = (conversation.getStartTime() != null && conversation.getEndTime() != null)
+        ? Duration.between(conversation.getStartTime(), conversation.getEndTime()) : Duration.ZERO;
 
     List<PacketResponse> packetResponses =
         packets.stream().map(this::toPacketResponse).collect(Collectors.toList());
