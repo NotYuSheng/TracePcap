@@ -216,8 +216,9 @@ public class PcapParserService {
   private byte[] hexToBytes(String hex) {
     if (hex == null || hex.isEmpty()) return null;
     int len = hex.length();
+    if (len % 2 != 0) len--; // drop incomplete trailing nibble
     byte[] data = new byte[len / 2];
-    for (int i = 0; i < len - 1; i += 2) {
+    for (int i = 0; i < len; i += 2) {
       data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
           | Character.digit(hex.charAt(i + 1), 16));
     }

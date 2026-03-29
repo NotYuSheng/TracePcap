@@ -406,7 +406,9 @@ public class FilterService {
   private String hexToAscii(String tsharkHex, int maxBytes) {
     if (tsharkHex == null || tsharkHex.isEmpty()) return "";
     String plain = tsharkHex.replace(":", "");
-    int byteCount = Math.min(plain.length() / 2, maxBytes);
+    int len = plain.length();
+    if (len % 2 != 0) len--; // drop incomplete trailing nibble
+    int byteCount = Math.min(len / 2, maxBytes);
     StringBuilder sb = new StringBuilder(byteCount);
     for (int i = 0; i < byteCount * 2; i += 2) {
       int b = (Character.digit(plain.charAt(i), 16) << 4)
