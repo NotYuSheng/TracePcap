@@ -7,24 +7,31 @@ import { getAppColor, getCategoryColor, getTextColor, getSeverityColor } from '@
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationFilterPanel.css';
 
-interface ProtocolStat  { protocol: string; count: number }
-interface AppStat        { name: string }
-interface CategoryStat   { category: string }
+interface ProtocolStat {
+  protocol: string;
+  count: number;
+}
+interface AppStat {
+  name: string;
+}
+interface CategoryStat {
+  category: string;
+}
 
 interface ConversationFilterPanelProps {
-  filters:           ConversationFilters;
-  onFiltersChange:   (update: Partial<ConversationFilters>) => void;
-  onClearAll:        () => void;
-  protocols:         ProtocolStat[];
-  apps:              AppStat[];
-  categories:        CategoryStat[];
-  fileTypes:               string[];
-  riskTypes:               string[];
-  customSignatureOptions:  string[];
-  signatureSeverities?:    Record<string, string>;
+  filters: ConversationFilters;
+  onFiltersChange: (update: Partial<ConversationFilters>) => void;
+  onClearAll: () => void;
+  protocols: ProtocolStat[];
+  apps: AppStat[];
+  categories: CategoryStat[];
+  fileTypes: string[];
+  riskTypes: string[];
+  customSignatureOptions: string[];
+  signatureSeverities?: Record<string, string>;
   activeFilterCount: number;
-  visibleColumns:    Set<ColumnKey>;
-  onToggleColumn:    (key: ColumnKey) => void;
+  visibleColumns: Set<ColumnKey>;
+  onToggleColumn: (key: ColumnKey) => void;
 }
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: React.ReactNode }) {
@@ -36,7 +43,12 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button type="button" className="btn btn-link p-0 text-muted ms-1" style={{ lineHeight: 1 }} aria-label={`About ${title}`}>
+      <button
+        type="button"
+        className="btn btn-link p-0 text-muted ms-1"
+        style={{ lineHeight: 1 }}
+        aria-label={`About ${title}`}
+      >
         <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
       </button>
     </OverlayTrigger>
@@ -56,11 +68,20 @@ function PillSectionHeader({
 }) {
   return (
     <div className="filter-section-row">
-      <span className="filter-section-label d-inline-flex align-items-center">{label}{info}</span>
+      <span className="filter-section-label d-inline-flex align-items-center">
+        {label}
+        {info}
+      </span>
       <div className="filter-section-actions">
-        <button type="button" className="filter-section-action" onClick={onSelectAll}>Select All</button>
-        <span className="filter-section-action" aria-hidden>·</span>
-        <button type="button" className="filter-section-action" onClick={onDeselectAll}>Clear</button>
+        <button type="button" className="filter-section-action" onClick={onSelectAll}>
+          Select All
+        </button>
+        <span className="filter-section-action" aria-hidden>
+          ·
+        </span>
+        <button type="button" className="filter-section-action" onClick={onDeselectAll}>
+          Clear
+        </button>
       </div>
     </div>
   );
@@ -87,8 +108,12 @@ export function ConversationFilterPanel({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setIpInput(filters.ip); }, [filters.ip]);
-  useEffect(() => { setPortInput(filters.port); }, [filters.port]);
+  useEffect(() => {
+    setIpInput(filters.ip);
+  }, [filters.ip]);
+  useEffect(() => {
+    setPortInput(filters.port);
+  }, [filters.port]);
 
   const handleIpChange = (value: string) => {
     setIpInput(value);
@@ -108,9 +133,7 @@ export function ConversationFilterPanel({
     value: string,
     current: string[]
   ) => {
-    const next = current.includes(value)
-      ? current.filter(v => v !== value)
-      : [...current, value];
+    const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
     onFiltersChange({ [key]: next } as Partial<ConversationFilters>);
   };
 
@@ -137,15 +160,20 @@ export function ConversationFilterPanel({
         <div className="card mt-2 filter-panel-body">
           <div className="card-body p-3">
             <div className="row g-3">
-
               {/* IP / Hostname */}
               <div className="col-md-4">
                 <label className="filter-section-label d-inline-flex align-items-center mb-2">
                   IP / Hostname
-                  <InfoPopover id="info-ip" title="IP / Hostname filter" body="Matches conversations where the source IP, destination IP, or hostname contains this text (case-insensitive)." />
+                  <InfoPopover
+                    id="info-ip"
+                    title="IP / Hostname filter"
+                    body="Matches conversations where the source IP, destination IP, or hostname contains this text (case-insensitive)."
+                  />
                 </label>
                 <div className="input-group input-group-sm">
-                  <span className="input-group-text"><i className="bi bi-search"></i></span>
+                  <span className="input-group-text">
+                    <i className="bi bi-search"></i>
+                  </span>
                   <input
                     type="text"
                     className="form-control"
@@ -154,7 +182,13 @@ export function ConversationFilterPanel({
                     onChange={e => handleIpChange(e.target.value)}
                   />
                   {ipInput && (
-                    <button type="button" className="btn btn-outline-secondary" onClick={() => handleIpChange('')}>×</button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => handleIpChange('')}
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
               </div>
@@ -163,7 +197,11 @@ export function ConversationFilterPanel({
               <div className="col-md-2">
                 <label className="filter-section-label d-inline-flex align-items-center mb-2">
                   Port
-                  <InfoPopover id="info-port" title="Port filter" body="Filters to conversations where either the source or destination port exactly matches the entered number." />
+                  <InfoPopover
+                    id="info-port"
+                    title="Port filter"
+                    body="Filters to conversations where either the source or destination port exactly matches the entered number."
+                  />
                 </label>
                 <div className="input-group input-group-sm">
                   <input
@@ -175,7 +213,13 @@ export function ConversationFilterPanel({
                     onChange={e => handlePortChange(e.target.value)}
                   />
                   {portInput && (
-                    <button type="button" className="btn btn-outline-secondary" onClick={() => handlePortChange('')}>×</button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => handlePortChange('')}
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
               </div>
@@ -190,9 +234,16 @@ export function ConversationFilterPanel({
                     checked={filters.hasRisks}
                     onChange={e => onFiltersChange({ hasRisks: e.target.checked })}
                   />
-                  <label className="form-check-label small d-inline-flex align-items-center" htmlFor="hasRisksCheck">
+                  <label
+                    className="form-check-label small d-inline-flex align-items-center"
+                    htmlFor="hasRisksCheck"
+                  >
                     Security risks only
-                    <InfoPopover id="info-risks" title="Security risks" body="Shows only conversations flagged with at least one nDPI risk indicator, such as unsafe protocols, clear-text credentials, or suspicious traffic patterns." />
+                    <InfoPopover
+                      id="info-risks"
+                      title="Security risks"
+                      body="Shows only conversations flagged with at least one nDPI risk indicator, such as unsafe protocols, clear-text credentials, or suspicious traffic patterns."
+                    />
                   </label>
                 </div>
               </div>
@@ -202,8 +253,16 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Protocol"
-                    info={<InfoPopover id="info-protocol" title="Protocol" body="Filter by transport or network protocol (e.g. TCP, UDP, ICMP). Select multiple to show any of them." />}
-                    onSelectAll={() => onFiltersChange({ protocols: protocols.map(p => p.protocol) })}
+                    info={
+                      <InfoPopover
+                        id="info-protocol"
+                        title="Protocol"
+                        body="Filter by transport or network protocol (e.g. TCP, UDP, ICMP). Select multiple to show any of them."
+                      />
+                    }
+                    onSelectAll={() =>
+                      onFiltersChange({ protocols: protocols.map(p => p.protocol) })
+                    }
                     onDeselectAll={() => onFiltersChange({ protocols: [] })}
                   />
                   <div className="d-flex flex-wrap gap-1">
@@ -215,7 +274,9 @@ export function ConversationFilterPanel({
                           key={protocol}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                          style={
+                            isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined
+                          }
                           onClick={() => toggle('protocols', protocol, filters.protocols)}
                         >
                           {protocol}
@@ -231,7 +292,19 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Application"
-                    info={<InfoPopover id="info-app" title="Application" body={<>Application layer protocol detected by nDPI deep packet inspection. <strong>Detection accuracy may vary</strong> — treat results as indicative, not definitive.</>} />}
+                    info={
+                      <InfoPopover
+                        id="info-app"
+                        title="Application"
+                        body={
+                          <>
+                            Application layer protocol detected by nDPI deep packet inspection.{' '}
+                            <strong>Detection accuracy may vary</strong> — treat results as
+                            indicative, not definitive.
+                          </>
+                        }
+                      />
+                    }
                     onSelectAll={() => onFiltersChange({ apps: apps.map(a => a.name) })}
                     onDeselectAll={() => onFiltersChange({ apps: [] })}
                   />
@@ -244,7 +317,9 @@ export function ConversationFilterPanel({
                           key={name}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                          style={
+                            isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined
+                          }
                           onClick={() => toggle('apps', name, filters.apps)}
                         >
                           {name}
@@ -260,8 +335,16 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Category"
-                    info={<InfoPopover id="info-category" title="Category" body="Broad traffic category assigned by nDPI (e.g. Web, Media, VPN). Select multiple to show any of them." />}
-                    onSelectAll={() => onFiltersChange({ categories: categories.map(c => c.category) })}
+                    info={
+                      <InfoPopover
+                        id="info-category"
+                        title="Category"
+                        body="Broad traffic category assigned by nDPI (e.g. Web, Media, VPN). Select multiple to show any of them."
+                      />
+                    }
+                    onSelectAll={() =>
+                      onFiltersChange({ categories: categories.map(c => c.category) })
+                    }
                     onDeselectAll={() => onFiltersChange({ categories: [] })}
                   />
                   <div className="d-flex flex-wrap gap-1">
@@ -273,7 +356,9 @@ export function ConversationFilterPanel({
                           key={category}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                          style={
+                            isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined
+                          }
                           onClick={() => toggle('categories', category, filters.categories)}
                         >
                           {category}
@@ -289,7 +374,13 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <PillSectionHeader
                     label="File Types"
-                    info={<InfoPopover id="info-filetypes" title="File Types" body="Shows only conversations containing at least one packet where a file signature (magic bytes) was detected in the payload — e.g. PDF, ZIP, PNG." />}
+                    info={
+                      <InfoPopover
+                        id="info-filetypes"
+                        title="File Types"
+                        body="Shows only conversations containing at least one packet where a file signature (magic bytes) was detected in the payload — e.g. PDF, ZIP, PNG."
+                      />
+                    }
                     onSelectAll={() => onFiltersChange({ fileTypes })}
                     onDeselectAll={() => onFiltersChange({ fileTypes: [] })}
                   />
@@ -302,7 +393,9 @@ export function ConversationFilterPanel({
                           key={ft}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                          style={
+                            isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined
+                          }
                           onClick={() => toggle('fileTypes', ft, filters.fileTypes)}
                         >
                           {ft}
@@ -318,7 +411,13 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Risk Type"
-                    info={<InfoPopover id="info-risktype" title="Risk Type" body="Filter by nDPI risk flags assigned to a conversation. Examples: clear-text credentials, unsafe protocols, known malicious signatures." />}
+                    info={
+                      <InfoPopover
+                        id="info-risktype"
+                        title="Risk Type"
+                        body="Filter by nDPI risk flags assigned to a conversation. Examples: clear-text credentials, unsafe protocols, known malicious signatures."
+                      />
+                    }
                     onSelectAll={() => onFiltersChange({ riskTypes })}
                     onDeselectAll={() => onFiltersChange({ riskTypes: [] })}
                   />
@@ -330,7 +429,9 @@ export function ConversationFilterPanel({
                           key={rt}
                           type="button"
                           className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
-                          style={isActive ? { backgroundColor: '#ffc107', color: '#212529' } : undefined}
+                          style={
+                            isActive ? { backgroundColor: '#ffc107', color: '#212529' } : undefined
+                          }
                           onClick={() => toggle('riskTypes', rt, filters.riskTypes)}
                         >
                           {rt.replace(/_/g, ' ')}
@@ -346,8 +447,16 @@ export function ConversationFilterPanel({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Custom Rules"
-                    info={<InfoPopover id="info-customrules" title="Custom Rules" body="Filter by your own custom detection rules defined in signatures.yml. Only rules that matched at least one conversation in this file are shown." />}
-                    onSelectAll={() => onFiltersChange({ customSignatures: customSignatureOptions })}
+                    info={
+                      <InfoPopover
+                        id="info-customrules"
+                        title="Custom Rules"
+                        body="Filter by your own custom detection rules defined in signatures.yml. Only rules that matched at least one conversation in this file are shown."
+                      />
+                    }
+                    onSelectAll={() =>
+                      onFiltersChange({ customSignatures: customSignatureOptions })
+                    }
                     onDeselectAll={() => onFiltersChange({ customSignatures: [] })}
                   />
                   <div className="d-flex flex-wrap gap-1 mb-2">
@@ -367,17 +476,37 @@ export function ConversationFilterPanel({
                       );
                     })}
                   </div>
-                  <div className="d-flex flex-wrap gap-2 align-items-center" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                  <div
+                    className="d-flex flex-wrap gap-2 align-items-center"
+                    style={{ fontSize: '0.75rem', color: '#6c757d' }}
+                  >
                     <span>Severity:</span>
-                    {([['critical','#dc3545','#fff'],['high','#fd7e14','#fff'],['medium','#ffc107','#212529'],['low','#6f42c1','#fff']] as const).map(([label, bg, text]) => {
-                      const rulesOfSeverity = customSignatureOptions.filter(r => (signatureSeverities[r] ?? 'low').toLowerCase() === label);
+                    {(
+                      [
+                        ['critical', '#dc3545', '#fff'],
+                        ['high', '#fd7e14', '#fff'],
+                        ['medium', '#ffc107', '#212529'],
+                        ['low', '#6f42c1', '#fff'],
+                      ] as const
+                    ).map(([label, bg, text]) => {
+                      const rulesOfSeverity = customSignatureOptions.filter(
+                        r => (signatureSeverities[r] ?? 'low').toLowerCase() === label
+                      );
                       if (rulesOfSeverity.length === 0) return null;
-                      const allSelected = rulesOfSeverity.every(r => filters.customSignatures.includes(r));
+                      const allSelected = rulesOfSeverity.every(r =>
+                        filters.customSignatures.includes(r)
+                      );
                       const handleClick = () => {
                         if (allSelected) {
-                          onFiltersChange({ customSignatures: filters.customSignatures.filter(r => !rulesOfSeverity.includes(r)) });
+                          onFiltersChange({
+                            customSignatures: filters.customSignatures.filter(
+                              r => !rulesOfSeverity.includes(r)
+                            ),
+                          });
                         } else {
-                          const next = [...new Set([...filters.customSignatures, ...rulesOfSeverity])];
+                          const next = [
+                            ...new Set([...filters.customSignatures, ...rulesOfSeverity]),
+                          ];
                           onFiltersChange({ customSignatures: next });
                         }
                       };
@@ -386,9 +515,19 @@ export function ConversationFilterPanel({
                           key={label}
                           type="button"
                           className="badge border-0"
-                          style={{ backgroundColor: allSelected ? bg : undefined, color: allSelected ? text : undefined, fontWeight: 400, cursor: 'pointer', opacity: allSelected ? 1 : 0.6 }}
+                          style={{
+                            backgroundColor: allSelected ? bg : undefined,
+                            color: allSelected ? text : undefined,
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            opacity: allSelected ? 1 : 0.6,
+                          }}
                           onClick={handleClick}
-                          title={allSelected ? `Deselect all ${label} rules` : `Select all ${label} rules`}
+                          title={
+                            allSelected
+                              ? `Deselect all ${label} rules`
+                              : `Select all ${label} rules`
+                          }
                         >
                           {label}
                         </button>
@@ -413,17 +552,22 @@ export function ConversationFilterPanel({
                         checked={visibleColumns.has(key)}
                         onChange={() => onToggleColumn(key)}
                       />
-                      <label className="form-check-label small" htmlFor={`col-${key}`}>{label}</label>
+                      <label className="form-check-label small" htmlFor={`col-${key}`}>
+                        {label}
+                      </label>
                     </div>
                   ))}
                 </div>
               </div>
-
             </div>
 
             {activeFilterCount > 0 && (
               <div className="mt-3 pt-2 border-top">
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClearAll}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={onClearAll}
+                >
                   <i className="bi bi-x-circle me-1"></i>Clear filters
                 </button>
               </div>

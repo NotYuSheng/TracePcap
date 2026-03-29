@@ -47,9 +47,19 @@ export function useNetworkData(
       // Fetch conversations from API
       // For network visualization, fetch all conversations (use large page size)
       const response = await conversationService.getConversations(fileId, {
-        ip: '', port: '', protocols: [], apps: [], categories: [],
-        hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [], sortBy: '', sortDir: 'asc',
-        page: 1, pageSize: 10000,
+        ip: '',
+        port: '',
+        protocols: [],
+        apps: [],
+        categories: [],
+        hasRisks: false,
+        fileTypes: [],
+        riskTypes: [],
+        customSignatures: [],
+        sortBy: '',
+        sortDir: 'asc',
+        page: 1,
+        pageSize: 10000,
       });
       const conversations = response.data;
 

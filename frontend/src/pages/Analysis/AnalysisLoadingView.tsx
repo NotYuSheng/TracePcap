@@ -60,9 +60,7 @@ export const AnalysisLoadingView = ({ fileId }: Props) => {
     : null;
 
   // Progress: clamp to 95% so the bar never reaches 100% while still loading
-  const progressPct = estimatedSeconds
-    ? Math.min(95, (elapsed / estimatedSeconds) * 100)
-    : null;
+  const progressPct = estimatedSeconds ? Math.min(95, (elapsed / estimatedSeconds) * 100) : null;
 
   return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>

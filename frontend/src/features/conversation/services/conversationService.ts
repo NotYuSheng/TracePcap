@@ -49,19 +49,17 @@ interface ConversationDetailApiResponse extends ConversationApiResponse {
   packets: PacketApiResponse[];
 }
 
-
 function getProtocol(protocolName: string): Protocol {
   const name = protocolName.toUpperCase();
   const layer =
-    name === 'TCP' || name === 'UDP'
-      ? 'transport'
-      : name === 'ICMP'
-        ? 'network'
-        : 'application';
+    name === 'TCP' || name === 'UDP' ? 'transport' : name === 'ICMP' ? 'network' : 'application';
   return { layer: layer as Protocol['layer'], name };
 }
 
-function transformConversation(apiData: ConversationApiResponse, packets: Packet[] = []): Conversation {
+function transformConversation(
+  apiData: ConversationApiResponse,
+  packets: Packet[] = []
+): Conversation {
   const srcEndpoint: NetworkEndpoint = { ip: apiData.srcIp, port: apiData.srcPort ?? 0 };
   const dstEndpoint: NetworkEndpoint = { ip: apiData.dstIp, port: apiData.dstPort ?? 0 };
 
@@ -113,20 +111,21 @@ export const conversationService = {
     filters: ConversationFilters
   ): Promise<PaginatedResponse<Conversation>> => {
     const params: Record<string, string> = {
-      page:     String(filters.page),
+      page: String(filters.page),
       pageSize: String(filters.pageSize),
     };
-    if (filters.ip)                   params.ip         = filters.ip;
-    if (filters.port)                 params.port       = filters.port;
-    if (filters.protocols.length > 0) params.protocols  = filters.protocols.join(',');
-    if (filters.apps.length > 0)      params.apps       = filters.apps.join(',');
-    if (filters.categories.length > 0)params.categories = filters.categories.join(',');
-    if (filters.hasRisks)             params.hasRisks   = 'true';
-    if (filters.fileTypes.length > 0) params.fileTypes  = filters.fileTypes.join(',');
-    if (filters.riskTypes.length > 0)        params.riskTypes        = filters.riskTypes.join(',');
-    if (filters.customSignatures.length > 0) params.customSignatures = filters.customSignatures.join(',');
-    if (filters.sortBy)                      params.sortBy           = filters.sortBy;
-    if (filters.sortBy)                      params.sortDir          = filters.sortDir;
+    if (filters.ip) params.ip = filters.ip;
+    if (filters.port) params.port = filters.port;
+    if (filters.protocols.length > 0) params.protocols = filters.protocols.join(',');
+    if (filters.apps.length > 0) params.apps = filters.apps.join(',');
+    if (filters.categories.length > 0) params.categories = filters.categories.join(',');
+    if (filters.hasRisks) params.hasRisks = 'true';
+    if (filters.fileTypes.length > 0) params.fileTypes = filters.fileTypes.join(',');
+    if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
+    if (filters.customSignatures.length > 0)
+      params.customSignatures = filters.customSignatures.join(',');
+    if (filters.sortBy) params.sortBy = filters.sortBy;
+    if (filters.sortBy) params.sortDir = filters.sortDir;
 
     const response = await apiClient.get<{
       data: ConversationApiResponse[];
@@ -150,17 +149,18 @@ export const conversationService = {
    */
   getExportUrl: (fileId: string, filters: ConversationFilters): string => {
     const params = new URLSearchParams();
-    if (filters.ip)                   params.set('ip',         filters.ip);
-    if (filters.port)                 params.set('port',       filters.port);
-    if (filters.protocols.length > 0) params.set('protocols',  filters.protocols.join(','));
-    if (filters.apps.length > 0)      params.set('apps',       filters.apps.join(','));
-    if (filters.categories.length > 0)params.set('categories', filters.categories.join(','));
-    if (filters.hasRisks)             params.set('hasRisks',   'true');
-    if (filters.fileTypes.length > 0) params.set('fileTypes',  filters.fileTypes.join(','));
-    if (filters.riskTypes.length > 0)        params.set('riskTypes',        filters.riskTypes.join(','));
-    if (filters.customSignatures.length > 0) params.set('customSignatures', filters.customSignatures.join(','));
-    if (filters.sortBy)                      params.set('sortBy',           filters.sortBy);
-    if (filters.sortBy)                      params.set('sortDir',          filters.sortDir);
+    if (filters.ip) params.set('ip', filters.ip);
+    if (filters.port) params.set('port', filters.port);
+    if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
+    if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));
+    if (filters.categories.length > 0) params.set('categories', filters.categories.join(','));
+    if (filters.hasRisks) params.set('hasRisks', 'true');
+    if (filters.fileTypes.length > 0) params.set('fileTypes', filters.fileTypes.join(','));
+    if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
+    if (filters.customSignatures.length > 0)
+      params.set('customSignatures', filters.customSignatures.join(','));
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
     return `/api/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
   },
@@ -169,9 +169,7 @@ export const conversationService = {
    * Returns distinct custom signature rule names triggered for the given file.
    */
   getCustomSignatures: async (fileId: string): Promise<string[]> => {
-    const response = await apiClient.get<string[]>(
-      `/conversations/${fileId}/custom-signatures`
-    );
+    const response = await apiClient.get<string[]>(`/conversations/${fileId}/custom-signatures`);
     return response.data;
   },
 
@@ -187,9 +185,7 @@ export const conversationService = {
    * Returns distinct nDPI risk type strings present in at-risk conversations for the given file.
    */
   getRiskTypes: async (fileId: string): Promise<string[]> => {
-    const response = await apiClient.get<string[]>(
-      API_ENDPOINTS.RISK_TYPES(fileId)
-    );
+    const response = await apiClient.get<string[]>(API_ENDPOINTS.RISK_TYPES(fileId));
     return response.data;
   },
 
@@ -197,9 +193,7 @@ export const conversationService = {
    * Returns distinct detected file types present in packets for the given file.
    */
   getFileTypes: async (fileId: string): Promise<string[]> => {
-    const response = await apiClient.get<string[]>(
-      `/conversations/${fileId}/file-types`
-    );
+    const response = await apiClient.get<string[]>(`/conversations/${fileId}/file-types`);
     return response.data;
   },
 

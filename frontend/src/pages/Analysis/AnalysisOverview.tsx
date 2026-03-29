@@ -19,14 +19,20 @@ const ndpiPopover = (
     <Popover.Body>
       <p className="mb-2">
         Application labels are detected by{' '}
-        <a href="https://www.ntop.org/products/deep-packet-inspection/ndpi/" target="_blank" rel="noopener noreferrer">nDPI</a>{' '}
+        <a
+          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          nDPI
+        </a>{' '}
         using deep packet inspection (DPI) heuristics.
       </p>
       <p className="mb-2">
         DPI is <strong>probabilistic</strong> — binary payloads can occasionally match the wrong
-        protocol's signatures (e.g. a file transfer triggering peer-to-peer heuristics).
-        Encrypted flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints,
-        not payload content.
+        protocol's signatures (e.g. a file transfer triggering peer-to-peer heuristics). Encrypted
+        flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints, not payload
+        content.
       </p>
       <p className="mb-0">
         Treat labels as strong indicators, not definitive classifications. Cross-reference the
@@ -36,18 +42,22 @@ const ndpiPopover = (
   </Popover>
 );
 
-
 export const AnalysisOverview = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
   const navigate = useNavigate();
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    conversationService.getSignatureRules().then(rules => {
-      const map: Record<string, string> = {};
-      rules.forEach(r => { map[r.name] = r.severity; });
-      setSignatureSeverities(map);
-    }).catch(console.error);
+    conversationService
+      .getSignatureRules()
+      .then(rules => {
+        const map: Record<string, string> = {};
+        rules.forEach(r => {
+          map[r.name] = r.severity;
+        });
+        setSignatureSeverities(map);
+      })
+      .catch(console.error);
   }, []);
 
   const detectedApps = data.detectedApplications ?? [];
@@ -62,7 +72,9 @@ export const AnalysisOverview = () => {
             <i className="bi bi-app-indicator me-2"></i>
             Applications Detected
             {data.detectedApplicationsTruncated && (
-              <span className="text-muted fs-6 fw-normal ms-2">(showing top {detectedApps.length})</span>
+              <span className="text-muted fs-6 fw-normal ms-2">
+                (showing top {detectedApps.length})
+              </span>
             )}
             <OverlayTrigger trigger="click" placement="right" overlay={ndpiPopover} rootClose>
               <button
@@ -88,7 +100,11 @@ export const AnalysisOverview = () => {
                     cursor: 'pointer',
                   }}
                   title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
-                  onClick={() => navigate(`/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`
+                    )
+                  }
                 >
                   {app.name}
                 </button>
@@ -98,7 +114,8 @@ export const AnalysisOverview = () => {
         </div>
       )}
 
-      {((data.securityAlertCount ?? 0) > 0 || (data.triggeredCustomRules && data.triggeredCustomRules.length > 0)) && (
+      {((data.securityAlertCount ?? 0) > 0 ||
+        (data.triggeredCustomRules && data.triggeredCustomRules.length > 0)) && (
         <div className="mt-4">
           <h5 className="mb-3">
             <i className="bi bi-shield-exclamation me-2 text-warning"></i>
@@ -112,7 +129,8 @@ export const AnalysisOverview = () => {
             >
               <span>
                 <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                <strong>{data.securityAlertCount}</strong> conversation{data.securityAlertCount !== 1 ? 's' : ''} flagged with security risks
+                <strong>{data.securityAlertCount}</strong> conversation
+                {data.securityAlertCount !== 1 ? 's' : ''} flagged with security risks
               </span>
               <span className="text-muted small">View in Conversations &rarr;</span>
             </div>
@@ -132,7 +150,11 @@ export const AnalysisOverview = () => {
                         className="badge"
                         style={{ backgroundColor: bg, color: text, cursor: 'pointer' }}
                         title="Click to filter conversations by this rule"
-                        onClick={() => navigate(`/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}`)}
+                        onClick={() =>
+                          navigate(
+                            `/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}`
+                          )
+                        }
                       >
                         {rule.replace(/_/g, ' ')}
                       </span>

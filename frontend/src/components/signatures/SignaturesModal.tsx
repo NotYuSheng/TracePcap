@@ -19,7 +19,8 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
     setLoading(true);
     setError(null);
     setSaved(false);
-    apiClient.get<{ content: string }>('/signatures')
+    apiClient
+      .get<{ content: string }>('/signatures')
       .then(r => setContent(r.data.content))
       .catch(() => setError('Failed to load signatures file.'))
       .finally(() => setLoading(false));
@@ -30,7 +31,9 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
     setError(null);
     setSaved(false);
     try {
-      const res = await apiClient.put<{ status?: string; error?: string }>('/signatures', { content });
+      const res = await apiClient.put<{ status?: string; error?: string }>('/signatures', {
+        content,
+      });
       if (res.data.error) {
         setError(res.data.error);
       } else {
@@ -53,8 +56,8 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
       </Modal.Header>
       <Modal.Body>
         <p className="text-muted small mb-3">
-          Edit <code>signatures.yml</code> to define custom detection rules. Matched rules appear
-          as risk flags alongside nDPI's built-in detections. Changes take effect on the next file
+          Edit <code>signatures.yml</code> to define custom detection rules. Matched rules appear as
+          risk flags alongside nDPI's built-in detections. Changes take effect on the next file
           analysis — no restart required.
         </p>
 
@@ -68,28 +71,42 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
             className="form-control font-monospace"
             rows={20}
             value={content}
-            onChange={e => { setContent(e.target.value); setSaved(false); }}
+            onChange={e => {
+              setContent(e.target.value);
+              setSaved(false);
+            }}
             spellCheck={false}
             style={{ fontSize: '0.82rem', resize: 'vertical' }}
           />
         )}
 
-        {error && (
-          <div className="alert alert-danger mt-2 py-2 small mb-0">{error}</div>
-        )}
+        {error && <div className="alert alert-danger mt-2 py-2 small mb-0">{error}</div>}
         {saved && (
           <div className="alert alert-success mt-2 py-2 small mb-0">
-            <i className="bi bi-check-circle me-1"></i>Saved — rules will apply on the next analysis.
+            <i className="bi bi-check-circle me-1"></i>Saved — rules will apply on the next
+            analysis.
           </div>
         )}
       </Modal.Body>
       <Modal.Footer>
-        <button type="button" className="btn btn-outline-secondary" onClick={onHide}>Close</button>
-        <button type="button" className="btn btn-primary" onClick={handleSave} disabled={loading || saving}>
+        <button type="button" className="btn btn-outline-secondary" onClick={onHide}>
+          Close
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={loading || saving}
+        >
           {saving ? (
-            <><span className="spinner-border spinner-border-sm me-1" role="status" />Saving…</>
+            <>
+              <span className="spinner-border spinner-border-sm me-1" role="status" />
+              Saving…
+            </>
           ) : (
-            <><i className="bi bi-floppy me-1"></i>Save</>
+            <>
+              <i className="bi bi-floppy me-1"></i>Save
+            </>
           )}
         </button>
       </Modal.Footer>
