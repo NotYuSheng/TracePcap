@@ -9,7 +9,7 @@ function useBackendReady() {
 
   useEffect(() => {
     let cancelled = false;
-    let timerId: number;
+    let timerId: number | undefined;
 
     async function check() {
       try {

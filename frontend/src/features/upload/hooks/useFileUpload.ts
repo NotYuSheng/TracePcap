@@ -59,7 +59,7 @@ export const useFileUpload = () => {
 
   const clearUploads = useCallback(() => setUploads([]), []);
 
-  // Legacy single-file compat (FileUploadZone still uses this in some places)
+  // True if any file is currently being uploaded
   const isUploading = uploads.some(u => u.isUploading);
 
   return { uploadFiles, uploads, clearUploads, isUploading };
