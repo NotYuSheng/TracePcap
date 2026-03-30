@@ -47,7 +47,9 @@ public class StoryController {
   }
 
   @GetMapping("/file/{fileId}")
-  @Operation(summary = "Get story by file", description = "Get the latest story for a file, if one exists")
+  @Operation(
+      summary = "Get story by file",
+      description = "Get the latest story for a file, if one exists")
   public ResponseEntity<StoryResponse> getStoryByFileId(@PathVariable UUID fileId) {
     log.info("Fetching latest story for file: {}", fileId);
 
