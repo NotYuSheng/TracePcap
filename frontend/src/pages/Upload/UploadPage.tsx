@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Row, Col } from '@govtechsg/sgds-react';
 import { FileUploadZone } from '@components/upload/FileUploadZone';
 import { FileList } from '@components/upload/FileList';
@@ -8,8 +9,9 @@ import { useFileUpload } from '@features/upload/hooks/useFileUpload';
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
 
 export const UploadPage = () => {
-  const { uploadFiles, fileStates, isUploading } = useFileUpload();
+  const { uploadFiles, uploads, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
+  const navigate = useNavigate();
 
   const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(
     ','
@@ -48,20 +50,19 @@ export const UploadPage = () => {
             </Col>
           </Row>
 
-          {fileStates.length > 0 && (
-            <Row className="justify-content-center mt-3">
-              <Col md={8} lg={6}>
-                {fileStates.map((fs, i) => (
-                  <UploadProgress
-                    key={i}
-                    fileName={fs.file.name}
-                    progress={fs.progress}
-                    isUploading={fs.status === 'uploading'}
-                    error={fs.error}
-                  />
-                ))}
-              </Col>
-            </Row>
+          {uploads.length > 0 && (
+            <div className="upload-progress-scroll mt-3">
+              {uploads.map(u => (
+                <UploadProgress
+                  key={u.id}
+                  fileName={u.fileName}
+                  progress={u.progress}
+                  isUploading={u.isUploading}
+                  error={u.error}
+                  onAnalyze={u.fileId ? () => navigate(`/analysis/${u.fileId}`) : undefined}
+                />
+              ))}
+            </div>
           )}
 
           <FileList />

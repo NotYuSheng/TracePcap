@@ -53,36 +53,20 @@ export const FileUploadZone = ({
           <input {...getInputProps()} />
 
           {isDragActive && !isDragReject ? (
-            <p className="mb-2">
-              <strong>Drop your files here</strong>
-            </p>
+            <p className="mb-0 fw-semibold text-primary">Drop your files here</p>
           ) : isDragReject ? (
-            <p className="mb-2 text-danger">
-              <strong>Invalid file type</strong>
-            </p>
+            <p className="mb-0 fw-semibold text-danger">Invalid file type</p>
           ) : (
             <>
-              <p className="mb-2">
-                <strong>Click to browse</strong> or drag & drop
+              <p className="mb-1">
+                <strong>Click to browse</strong> or drag &amp; drop
               </p>
               <small className="text-muted">
-                Supports {acceptedFileTypes.join(', ')} (max {Math.round(maxSize / 1024 / 1024)}MB
-                each)
+                {acceptedFileTypes.join(', ')} &middot; up to {Math.round(maxSize / 1024 / 1024)} MB each &middot; multiple files
               </small>
             </>
           )}
         </div>
-
-        {disabled && (
-          <div className="text-center">
-            <span
-              className="spinner-border spinner-border-sm me-2"
-              role="status"
-              aria-hidden="true"
-            ></span>
-            <span>Uploading...</span>
-          </div>
-        )}
 
         {fileRejections.length > 0 && (
           <div className="mt-3">
@@ -91,7 +75,11 @@ export const FileUploadZone = ({
                 <strong>{file.name}</strong>
                 <ul className="mb-0 mt-2">
                   {errors.map(e => (
-                    <li key={e.code}>{e.message}</li>
+                    <li key={e.code}>
+                      {e.code === 'file-invalid-type'
+                        ? `Unsupported file type. Only ${acceptedFileTypes.join(', ')} files are accepted.`
+                        : e.message}
+                    </li>
                   ))}
                 </ul>
               </div>

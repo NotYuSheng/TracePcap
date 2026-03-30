@@ -1,36 +1,41 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '@/store';
 import { uploadService } from '../services/uploadService';
-import type { FileUploadState } from '../types/upload.types';
 
-const CONCURRENCY_LIMIT = 3;
+export interface UploadEntry {
+  id: string;       // local key
+  fileId?: string;  // backend ID, set on success
+  fileName: string;
+  progress: number;
+  isUploading: boolean;
+  error?: string;
+}
 
 export const useFileUpload = () => {
-  const [fileStates, setFileStates] = useState<FileUploadState[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploads, setUploads] = useState<UploadEntry[]>([]);
   const addRecentFile = useStore(state => state.addRecentFile);
 
-  const updateFileState = (index: number, update: Partial<FileUploadState>) => {
-    setFileStates(prev => prev.map((s, i) => (i === index ? { ...s, ...update } : s)));
-  };
+  const update = (id: string, patch: Partial<UploadEntry>) =>
+    setUploads(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)));
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
-      const initial: FileUploadState[] = files.map(file => ({
-        file,
+      const entries: UploadEntry[] = files.map((f, i) => ({
+        id: `${Date.now()}-${i}`,
+        fileName: f.name,
         progress: 0,
-        status: 'pending',
+        isUploading: true,
       }));
-      setFileStates(initial);
-      setIsUploading(true);
 
-      let queueIndex = 0;
+      setUploads(prev => [...prev, ...entries]);
 
-      const uploadOne = async (file: File, index: number) => {
-        updateFileState(index, { status: 'uploading' });
+      // Upload sequentially so the backend isn't flooded
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const entryId = entries[i].id;
         try {
           const result = await uploadService.uploadPcap(file, progress => {
-            updateFileState(index, { progress });
+            update(entryId, { progress });
           });
 
           addRecentFile({
@@ -40,37 +45,22 @@ export const useFileUpload = () => {
             uploadedAt: Date.now(),
           });
 
-          updateFileState(index, { status: 'done', progress: 100, fileId: result.fileId });
+          update(entryId, { isUploading: false, progress: 100, fileId: result.fileId });
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Upload failed';
-          updateFileState(index, { status: 'error', error: message });
+          update(entryId, {
+            isUploading: false,
+            error: err instanceof Error ? err.message : 'Upload failed',
+          });
         }
-      };
-
-      const runNext = async (): Promise<void> => {
-        if (queueIndex >= files.length) return;
-        const index = queueIndex++;
-        await uploadOne(files[index], index);
-        await runNext();
-      };
-
-      const workers = Array.from({ length: Math.min(CONCURRENCY_LIMIT, files.length) }, runNext);
-      await Promise.all(workers);
-
-      setIsUploading(false);
+      }
     },
     [addRecentFile]
   );
 
-  const resetUpload = useCallback(() => {
-    setFileStates([]);
-    setIsUploading(false);
-  }, []);
+  const clearUploads = useCallback(() => setUploads([]), []);
 
-  return {
-    uploadFiles,
-    fileStates,
-    isUploading,
-    resetUpload,
-  };
+  // Legacy single-file compat (FileUploadZone still uses this in some places)
+  const isUploading = uploads.some(u => u.isUploading);
+
+  return { uploadFiles, uploads, clearUploads, isUploading };
 };
