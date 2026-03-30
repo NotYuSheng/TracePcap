@@ -154,7 +154,9 @@ export const ConversationList = ({
   const hasCustomRules = conversations.some(
     c => c.customSignatures && c.customSignatures.length > 0
   );
-  const hasFileTypes = conversations.some(c => c.detectedFileTypes && c.detectedFileTypes.length > 0);
+  const hasFileTypes = conversations.some(
+    c => c.detectedFileTypes && c.detectedFileTypes.length > 0
+  );
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -209,7 +211,9 @@ export const ConversationList = ({
               {col('category') && hasCategories && <th>Category</th>}
               {col('risks') && hasRisks && <th>Risks</th>}
               {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
-              {col('fileTypes') && hasFileTypes && <th style={{ whiteSpace: 'nowrap' }}>File Type</th>}
+              {col('fileTypes') && hasFileTypes && (
+                <th style={{ whiteSpace: 'nowrap' }}>File Type</th>
+              )}
               {col('packets') && <SortableHeader field="packets" label="Packets" />}
               {col('bytes') && <SortableHeader field="bytes" label="Bytes" />}
               {col('duration') && <SortableHeader field="duration" label="Duration" />}
@@ -365,7 +369,8 @@ export const ConversationList = ({
                   )}
                   {col('fileTypes') && hasFileTypes && (
                     <td>
-                      {conversation.detectedFileTypes && conversation.detectedFileTypes.length > 0 ? (
+                      {conversation.detectedFileTypes &&
+                      conversation.detectedFileTypes.length > 0 ? (
                         <div className="d-inline-flex flex-wrap gap-1">
                           {conversation.detectedFileTypes.map(ft => (
                             <span
