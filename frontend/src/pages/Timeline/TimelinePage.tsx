@@ -14,6 +14,7 @@ interface AnalysisOutletContext {
 export const TimelinePage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
+  const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +23,10 @@ export const TimelinePage = () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await timelineService.getTimelineData(fileId);
+        const data =
+          granularity === 'auto'
+            ? await timelineService.getTimelineData(fileId, 1, 100)
+            : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load timeline data');
@@ -34,7 +38,7 @@ export const TimelinePage = () => {
     if (fileId) {
       fetchTimeline();
     }
-  }, [fileId]);
+  }, [fileId, granularity]);
 
   if (loading) {
     return <LoadingSpinner size="large" message="Loading timeline..." />;
@@ -103,7 +107,11 @@ export const TimelinePage = () => {
         <div className="col-12">
           <div className="card">
             <div className="card-body">
-              <TrafficTimeline data={timelineData} />
+              <TrafficTimeline
+                data={timelineData}
+                granularity={granularity}
+                onGranularityChange={setGranularity}
+              />
             </div>
           </div>
         </div>

@@ -22,48 +22,58 @@ public class LlmClient {
   private Integer effectiveMaxTokens;
   private Integer modelContextLength;
 
-  /** Query the LLM server for model capabilities on startup */
+  /**
+   * Query the LLM server for model capabilities on startup. Runs in a background thread so it
+   * does not delay application startup when the LLM server is unavailable.
+   */
   @PostConstruct
   public void initializeModelCapabilities() {
-    try {
-      log.info("Querying LLM server for model capabilities...");
-      ModelInfo modelInfo = queryModelCapabilities();
+    // Set a safe default immediately so the app is usable before the background check finishes
+    effectiveMaxTokens = llmConfig.getApi().getMaxTokens();
 
-      if (modelInfo != null && modelInfo.getContextLength() != null) {
-        modelContextLength = modelInfo.getContextLength();
+    Thread.ofVirtual()
+        .name("llm-capability-check")
+        .start(
+            () -> {
+              try {
+                log.info("Querying LLM server for model capabilities...");
+                ModelInfo modelInfo = queryModelCapabilities();
 
-        // Set effective max tokens to 80% of context length to leave room for prompt
-        // or use configured value if it's smaller
-        int recommendedMaxTokens = (int) (modelContextLength * 0.8);
-        effectiveMaxTokens = Math.min(llmConfig.getApi().getMaxTokens(), recommendedMaxTokens);
+                if (modelInfo != null && modelInfo.getContextLength() != null) {
+                  modelContextLength = modelInfo.getContextLength();
 
-        log.info(
-            "Model '{}' capabilities detected: context_length={}, configured_max_tokens={}, effective_max_tokens={}",
-            llmConfig.getApi().getModel(),
-            modelContextLength,
-            llmConfig.getApi().getMaxTokens(),
-            effectiveMaxTokens);
+                  // Set effective max tokens to 80% of context length to leave room for prompt
+                  // or use configured value if it's smaller
+                  int recommendedMaxTokens = (int) (modelContextLength * 0.8);
+                  effectiveMaxTokens =
+                      Math.min(llmConfig.getApi().getMaxTokens(), recommendedMaxTokens);
 
-        if (llmConfig.getApi().getMaxTokens() > recommendedMaxTokens) {
-          log.warn(
-              "Configured max_tokens ({}) exceeds recommended limit ({}). Using {} tokens.",
-              llmConfig.getApi().getMaxTokens(),
-              recommendedMaxTokens,
-              effectiveMaxTokens);
-        }
-      } else {
-        log.warn(
-            "Could not determine model capabilities, using configured max_tokens: {}",
-            llmConfig.getApi().getMaxTokens());
-        effectiveMaxTokens = llmConfig.getApi().getMaxTokens();
-      }
-    } catch (Exception e) {
-      log.warn(
-          "Failed to query model capabilities: {}. Using configured max_tokens: {}",
-          e.getMessage(),
-          llmConfig.getApi().getMaxTokens());
-      effectiveMaxTokens = llmConfig.getApi().getMaxTokens();
-    }
+                  log.info(
+                      "Model '{}' capabilities detected: context_length={}, configured_max_tokens={}, effective_max_tokens={}",
+                      llmConfig.getApi().getModel(),
+                      modelContextLength,
+                      llmConfig.getApi().getMaxTokens(),
+                      effectiveMaxTokens);
+
+                  if (llmConfig.getApi().getMaxTokens() > recommendedMaxTokens) {
+                    log.warn(
+                        "Configured max_tokens ({}) exceeds recommended limit ({}). Using {} tokens.",
+                        llmConfig.getApi().getMaxTokens(),
+                        recommendedMaxTokens,
+                        effectiveMaxTokens);
+                  }
+                } else {
+                  log.warn(
+                      "Could not determine model capabilities, using configured max_tokens: {}",
+                      llmConfig.getApi().getMaxTokens());
+                }
+              } catch (Exception e) {
+                log.warn(
+                    "Failed to query model capabilities: {}. Using configured max_tokens: {}",
+                    e.getMessage(),
+                    llmConfig.getApi().getMaxTokens());
+              }
+            });
   }
 
   /** Query the LLM server for model information */

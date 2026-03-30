@@ -20,6 +20,7 @@ export const StoryPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
   const [story, setStory] = useState<Story | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
+  const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [generating, setGenerating] = useState(false);
   const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
@@ -72,11 +73,13 @@ export const StoryPage = () => {
   }, [fileId]);
 
   useEffect(() => {
-    // Load timeline data
     const fetchTimeline = async () => {
       try {
         setLoadingTimeline(true);
-        const data = await timelineService.getTimelineData(fileId);
+        const data =
+          granularity === 'auto'
+            ? await timelineService.getTimelineData(fileId, 1, 100)
+            : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {
         console.error('Failed to load timeline:', err);
@@ -88,7 +91,7 @@ export const StoryPage = () => {
     if (fileId) {
       fetchTimeline();
     }
-  }, [fileId]);
+  }, [fileId, granularity]);
 
   // Calculate traffic statistics
   const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0);
@@ -233,7 +236,11 @@ export const StoryPage = () => {
           <div className="col-12">
             <div className="card">
               <div className="card-body">
-                <TrafficTimeline data={timelineData} />
+                <TrafficTimeline
+                  data={timelineData}
+                  granularity={granularity}
+                  onGranularityChange={setGranularity}
+                />
               </div>
             </div>
           </div>

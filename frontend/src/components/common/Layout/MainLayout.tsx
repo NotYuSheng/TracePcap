@@ -1,11 +1,57 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { Container, Row, Col } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
 
+function useBackendReady() {
+  const [ready, setReady] = useState<boolean | null>(null);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+
+    async function check() {
+      try {
+        const res = await fetch('/api/system/limits');
+        if (res.ok) {
+          if (!cancelledRef.current) setReady(true);
+          return;
+        }
+      } catch {
+        // network error — backend not up yet
+      }
+      if (!cancelledRef.current) {
+        setReady(false);
+        setTimeout(check, 3000);
+      }
+    }
+
+    check();
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
+  return ready;
+}
+
 export const MainLayout = () => {
   const [showSignatures, setShowSignatures] = useState(false);
+  const backendReady = useBackendReady();
+
+  const mainContent =
+    backendReady === true ? (
+      <Outlet />
+    ) : (
+      <div className="d-flex flex-column align-items-center justify-content-center gap-3 py-5 text-muted">
+        <div className="spinner-border text-primary" role="status" aria-hidden="true" />
+        <div className="text-center">
+          <p className="mb-1 fw-semibold">Backend is starting up…</p>
+          <small>This may take up to a minute on first launch.</small>
+        </div>
+      </div>
+    );
 
   return (
     <div className="main-layout">
@@ -32,9 +78,7 @@ export const MainLayout = () => {
         </Container>
       </header>
       <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
-      <main className="main-content">
-        <Outlet />
-      </main>
+      <main className="main-content">{mainContent}</main>
       <footer className="main-footer mt-auto py-4 bg-light">
         <Container>
           <Row>
