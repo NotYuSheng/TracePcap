@@ -24,7 +24,7 @@ export const storyService = {
    */
   getStoryByFileId: async (fileId: string): Promise<Story | null> => {
     const response = await apiClient.get<Story>(API_ENDPOINTS.GET_STORY_BY_FILE(fileId), {
-      validateStatus: (status) => status === 200 || status === 204,
+      validateStatus: status => status === 200 || status === 204,
     });
     return response.status === 204 ? null : response.data;
   },
