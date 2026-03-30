@@ -3,6 +3,10 @@ import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
 import { storyService } from '@/features/story/services/storyService';
 import { timelineService } from '@/features/timeline/services/timelineService';
+import {
+  AUTO_GRANULARITY_INTERVAL,
+  AUTO_GRANULARITY_MAX_DATAPOINTS,
+} from '@/features/timeline/constants';
 import { NarrativeView } from '@components/story/NarrativeView';
 import { AnomalyHighlight } from '@components/story/AnomalyHighlight';
 import { StoryTimeline } from '@components/story/StoryTimeline';
@@ -78,7 +82,11 @@ export const StoryPage = () => {
         setLoadingTimeline(true);
         const data =
           granularity === 'auto'
-            ? await timelineService.getTimelineData(fileId, 1, 100)
+            ? await timelineService.getTimelineData(
+                fileId,
+                AUTO_GRANULARITY_INTERVAL,
+                AUTO_GRANULARITY_MAX_DATAPOINTS
+              )
             : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {

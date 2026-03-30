@@ -19,8 +19,8 @@ public class LlmClient {
 
   private final LlmConfig llmConfig;
   private final RestTemplate llmRestTemplate;
-  private Integer effectiveMaxTokens;
-  private Integer modelContextLength;
+  private volatile Integer effectiveMaxTokens;
+  private volatile Integer modelContextLength;
 
   /**
    * Query the LLM server for model capabilities on startup. Runs in a background thread so it

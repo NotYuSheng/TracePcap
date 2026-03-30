@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -56,12 +56,12 @@ interface CustomTooltipProps {
 }
 
 function CustomTooltip({ active, payload, label, viewMode }: CustomTooltipProps) {
-  if (!active || !payload || payload.length === 0) return null;
+  if (!active || !payload || payload.length === 0 || typeof label !== 'number') return null;
   const entry = payload[0];
   return (
     <div className="card shadow-sm" style={{ minWidth: '250px' }}>
       <div className="card-body p-2">
-        <p className="mb-2 fw-semibold">{formatTimestamp(label as number)}</p>
+        <p className="mb-2 fw-semibold">{formatTimestamp(label)}</p>
         <div className="small">
           {viewMode === 'packets' ? (
             <>
@@ -101,10 +101,10 @@ interface TrafficTimelineProps {
 export const TrafficTimeline = ({ data, granularity, onGranularityChange }: TrafficTimelineProps) => {
   const [viewMode, setViewMode] = useState<'packets' | 'bytes'>('packets');
 
-  const autoLabel = (() => {
+  const autoLabel = useMemo(() => {
     const secs = effectiveInterval(data);
     return secs !== null ? `Auto (${formatInterval(secs)})` : 'Auto';
-  })();
+  }, [data]);
 
   const chartData = data.map(point => ({
     timestamp: point.timestamp,

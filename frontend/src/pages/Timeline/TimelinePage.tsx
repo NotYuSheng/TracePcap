@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, TimelineDataPoint } from '@/types';
 import { timelineService } from '@/features/timeline/services/timelineService';
+import {
+  AUTO_GRANULARITY_INTERVAL,
+  AUTO_GRANULARITY_MAX_DATAPOINTS,
+} from '@/features/timeline/constants';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -25,7 +29,11 @@ export const TimelinePage = () => {
         setError(null);
         const data =
           granularity === 'auto'
-            ? await timelineService.getTimelineData(fileId, 1, 100)
+            ? await timelineService.getTimelineData(
+                fileId,
+                AUTO_GRANULARITY_INTERVAL,
+                AUTO_GRANULARITY_MAX_DATAPOINTS
+              )
             : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {

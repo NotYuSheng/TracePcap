@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { Container, Row, Col } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
@@ -6,30 +6,31 @@ import { SignaturesModal } from '@components/signatures/SignaturesModal';
 
 function useBackendReady() {
   const [ready, setReady] = useState<boolean | null>(null);
-  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    cancelledRef.current = false;
+    let cancelled = false;
+    let timerId: number;
 
     async function check() {
       try {
         const res = await fetch('/api/system/limits');
         if (res.ok) {
-          if (!cancelledRef.current) setReady(true);
+          if (!cancelled) setReady(true);
           return;
         }
       } catch {
         // network error — backend not up yet
       }
-      if (!cancelledRef.current) {
+      if (!cancelled) {
         setReady(false);
-        setTimeout(check, 3000);
+        timerId = window.setTimeout(check, 3000);
       }
     }
 
     check();
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
+      clearTimeout(timerId);
     };
   }, []);
 
