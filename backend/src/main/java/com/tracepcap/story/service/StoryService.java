@@ -122,12 +122,32 @@ public class StoryService {
             .orElseThrow(() -> new ResourceNotFoundException("Story not found: " + storyId));
 
     try {
-      StoryResponse response = objectMapper.readValue(story.getContent(), StoryResponse.class);
-      return response;
+      return objectMapper.readValue(story.getContent(), StoryResponse.class);
     } catch (Exception e) {
       log.error("Failed to parse story content", e);
       throw new RuntimeException("Failed to parse story content: " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Get the latest completed story for a file, if one exists
+   *
+   * @param fileId the file ID
+   * @return story response, or empty if none
+   */
+  public Optional<StoryResponse> getStoryByFileId(UUID fileId) {
+    return storyRepository
+        .findFirstByFileIdOrderByGeneratedAtDesc(fileId)
+        .filter(story -> story.getStatus() == StoryEntity.StoryStatus.COMPLETED)
+        .map(
+            story -> {
+              try {
+                return objectMapper.readValue(story.getContent(), StoryResponse.class);
+              } catch (Exception e) {
+                log.error("Failed to parse story content for file: {}", fileId, e);
+                return null;
+              }
+            });
   }
 
   /** Generate story content using LLM */

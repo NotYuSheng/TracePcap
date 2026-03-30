@@ -20,6 +20,7 @@ export const StoryPage = () => {
   const [story, setStory] = useState<Story | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +51,24 @@ export const StoryPage = () => {
   };
 
   useEffect(() => {
+    const fetchExistingStory = async () => {
+      try {
+        setLoadingStory(true);
+        const existing = await storyService.getStoryByFileId(fileId);
+        if (existing) setStory(existing);
+      } catch (err) {
+        console.error('Failed to load existing story:', err);
+      } finally {
+        setLoadingStory(false);
+      }
+    };
+
+    if (fileId) {
+      fetchExistingStory();
+    }
+  }, [fileId]);
+
+  useEffect(() => {
     // Load timeline data
     const fetchTimeline = async () => {
       try {
@@ -74,6 +93,14 @@ export const StoryPage = () => {
   const avgPackets = timelineData.length > 0 ? Math.round(totalPackets / timelineData.length) : 0;
   const packetCounts = timelineData.map(p => p.packetCount || 0).filter(n => !isNaN(n));
   const maxPackets = packetCounts.length > 0 ? Math.max(...packetCounts) : 0;
+
+  if (loadingStory) {
+    return (
+      <div className="text-center py-5">
+        <LoadingSpinner size="large" message="Loading story..." />
+      </div>
+    );
+  }
 
   if (generating && !story) {
     return (
@@ -101,15 +128,51 @@ export const StoryPage = () => {
 
   if (!story) {
     return (
-      <div className="text-center py-5">
-        <h4>No Story Generated Yet</h4>
-        <p className="text-muted mb-4">
-          Generate an AI-powered narrative analysis of this network capture
-        </p>
-        <button className="btn btn-primary" onClick={handleGenerateStory}>
-          <i className="bi bi-magic me-2"></i>
-          Generate Story
-        </button>
+      <div className="py-4">
+        <div className="card mb-4">
+          <div className="card-header">
+            <h6 className="mb-0">
+              <i className="bi bi-info-circle me-2"></i>
+              How Stories Are Generated &amp; Limitations
+            </h6>
+          </div>
+          <div className="card-body">
+            <p className="text-muted small mb-2">
+              The following data is sent to the configured LLM to generate the narrative:
+            </p>
+            <ul className="small text-muted mb-3">
+              <li>File metadata, traffic summary, protocol breakdown, and category distribution</li>
+              <li>
+                The top <strong>N</strong> conversations by volume, including nDPI app names,
+                categories, TLS certificate details, and risk flags (configurable via{' '}
+                <code>STORY_MAX_CONVERSATIONS</code>, default 20)
+              </li>
+              <li>
+                Security alerts listing up to <strong>N</strong> at-risk conversations — the LLM
+                is told the total count even when the list is truncated
+              </li>
+            </ul>
+            <p className="text-muted small mb-2">
+              <strong>Not sent to the LLM:</strong>
+            </p>
+            <ul className="small text-muted mb-0">
+              <li>Packet payloads and HTTP bodies</li>
+              <li>DNS query names and TLS SNI</li>
+              <li>Conversations beyond the configured cap</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <h4>No Story Generated Yet</h4>
+          <p className="text-muted mb-4">
+            Generate an AI-powered narrative analysis of this network capture
+          </p>
+          <button className="btn btn-primary" onClick={handleGenerateStory}>
+            <i className="bi bi-magic me-2"></i>
+            Generate Story
+          </button>
+        </div>
       </div>
     );
   }
@@ -119,37 +182,57 @@ export const StoryPage = () => {
       {/* Header */}
       <div className="row mb-4">
         <div className="col-12">
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <h4>Network Traffic Story</h4>
-              <ul className="text-muted mb-0 small ps-3">
+          <div className="position-relative">
+            <h4>Network Traffic Story</h4>
+            <button
+              className="btn btn-outline-primary btn-sm position-absolute top-0 end-0"
+              onClick={handleGenerateStory}
+              disabled={generating}
+              title={generating ? 'Generating...' : 'Regenerate'}
+            >
+              <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''}`}></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* How stories are generated */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-header">
+              <h6 className="mb-0">
+                <i className="bi bi-info-circle me-2"></i>
+                How Stories Are Generated &amp; Limitations
+              </h6>
+            </div>
+            <div className="card-body">
+              <p className="text-muted small mb-2">
+                The following data is sent to the configured LLM to generate the narrative:
+              </p>
+              <ul className="small text-muted mb-3">
                 <li>
-                  File metadata, traffic summary, protocol breakdown, and category distribution are
-                  always included
+                  File metadata, traffic summary, protocol breakdown, and category distribution
                 </li>
                 <li>
-                  The top <strong>N</strong> conversations by volume are included, with nDPI app
-                  names, categories, TLS certificate details, and risk flags (configurable via{' '}
+                  The top <strong>N</strong> conversations by volume, including nDPI app names,
+                  categories, TLS certificate details, and risk flags (configurable via{' '}
                   <code>STORY_MAX_CONVERSATIONS</code>, default 20)
                 </li>
                 <li>
-                  Security alerts list up to <strong>N</strong> at-risk conversations — the LLM is
-                  told the total count even when the list is truncated
-                </li>
-                <li>
-                  <strong>Not sent to the LLM:</strong> packet payloads, HTTP bodies, DNS query
-                  names, TLS SNI, and conversations beyond the configured cap
+                  Security alerts listing up to <strong>N</strong> at-risk conversations — the LLM
+                  is told the total count even when the list is truncated
                 </li>
               </ul>
+              <p className="text-muted small mb-2">
+                <strong>Not sent to the LLM:</strong>
+              </p>
+              <ul className="small text-muted mb-0">
+                <li>Packet payloads and HTTP bodies</li>
+                <li>DNS query names and TLS SNI</li>
+                <li>Conversations beyond the configured cap</li>
+              </ul>
             </div>
-            <button
-              className="btn btn-outline-primary btn-sm"
-              onClick={handleGenerateStory}
-              disabled={generating}
-            >
-              <i className="bi bi-arrow-clockwise me-2"></i>
-              {generating ? 'Generating...' : 'Regenerate'}
-            </button>
           </div>
         </div>
       </div>
