@@ -506,13 +506,7 @@ public class AnalysisService {
 
     Page<ConversationEntity> dbPage = conversationRepository.findAll(spec, pageable);
 
-    List<UUID> convIds = dbPage.getContent().stream().map(ConversationEntity::getId).toList();
-    Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
-
-    List<ConversationResponse> content =
-        dbPage.getContent().stream()
-            .map(c -> toConversationResponse(c, fileTypeMap))
-            .collect(Collectors.toList());
+    List<ConversationResponse> content = mapConversationsWithFileTypes(dbPage.getContent());
 
     return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
   }
@@ -545,10 +539,15 @@ public class AnalysisService {
     Specification<ConversationEntity> spec = ConversationRepository.buildSpec(fileId, params);
     List<ConversationEntity> entities = conversationRepository.findAll(spec, sort);
 
-    List<UUID> convIds = entities.stream().map(ConversationEntity::getId).toList();
-    Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
+    return mapConversationsWithFileTypes(entities);
+  }
 
-    return entities.stream()
+  private List<ConversationResponse> mapConversationsWithFileTypes(
+      List<ConversationEntity> conversations) {
+    if (conversations.isEmpty()) return List.of();
+    List<UUID> convIds = conversations.stream().map(ConversationEntity::getId).toList();
+    Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
+    return conversations.stream()
         .map(c -> toConversationResponse(c, fileTypeMap))
         .collect(Collectors.toList());
   }

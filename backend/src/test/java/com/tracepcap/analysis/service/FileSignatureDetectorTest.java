@@ -16,7 +16,7 @@ class FileSignatureDetectorTest {
   };
 
   private static byte[] httpResponse(String headers, byte[] body) {
-    byte[] headerBytes = headers.getBytes(StandardCharsets.ISO_8859_1);
+    byte[] headerBytes = headers.getBytes(StandardCharsets.US_ASCII);
     byte[] result = new byte[headerBytes.length + body.length];
     System.arraycopy(headerBytes, 0, result, 0, headerBytes.length);
     System.arraycopy(body, 0, result, headerBytes.length, body.length);
