@@ -34,10 +34,14 @@ export const timelineService = {
   /**
    * Get timeline data for a PCAP file
    */
-  getTimelineData: async (fileId: string, maxDataPoints?: number): Promise<TimelineDataPoint[]> => {
+  getTimelineData: async (
+    fileId: string,
+    interval?: number,
+    maxDataPoints?: number
+  ): Promise<TimelineDataPoint[]> => {
     const response = await apiClient.get<TimelineApiResponse[]>(
       API_ENDPOINTS.TIMELINE_DATA(fileId),
-      { params: { maxDataPoints } }
+      { params: { interval, maxDataPoints } }
     );
     return response.data.map(transformTimelineData);
   },

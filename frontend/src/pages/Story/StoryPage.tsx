@@ -3,6 +3,10 @@ import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
 import { storyService } from '@/features/story/services/storyService';
 import { timelineService } from '@/features/timeline/services/timelineService';
+import {
+  AUTO_GRANULARITY_INTERVAL,
+  AUTO_GRANULARITY_MAX_DATAPOINTS,
+} from '@/features/timeline/constants';
 import { NarrativeView } from '@components/story/NarrativeView';
 import { AnomalyHighlight } from '@components/story/AnomalyHighlight';
 import { StoryTimeline } from '@components/story/StoryTimeline';
@@ -20,6 +24,7 @@ export const StoryPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
   const [story, setStory] = useState<Story | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
+  const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [generating, setGenerating] = useState(false);
   const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
@@ -72,11 +77,17 @@ export const StoryPage = () => {
   }, [fileId]);
 
   useEffect(() => {
-    // Load timeline data
     const fetchTimeline = async () => {
       try {
         setLoadingTimeline(true);
-        const data = await timelineService.getTimelineData(fileId);
+        const data =
+          granularity === 'auto'
+            ? await timelineService.getTimelineData(
+                fileId,
+                AUTO_GRANULARITY_INTERVAL,
+                AUTO_GRANULARITY_MAX_DATAPOINTS
+              )
+            : await timelineService.getTimelineData(fileId, granularity);
         setTimelineData(data);
       } catch (err) {
         console.error('Failed to load timeline:', err);
@@ -88,7 +99,7 @@ export const StoryPage = () => {
     if (fileId) {
       fetchTimeline();
     }
-  }, [fileId]);
+  }, [fileId, granularity]);
 
   // Calculate traffic statistics
   const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0);
@@ -233,7 +244,11 @@ export const StoryPage = () => {
           <div className="col-12">
             <div className="card">
               <div className="card-body">
-                <TrafficTimeline data={timelineData} />
+                <TrafficTimeline
+                  data={timelineData}
+                  granularity={granularity}
+                  onGranularityChange={setGranularity}
+                />
               </div>
             </div>
           </div>

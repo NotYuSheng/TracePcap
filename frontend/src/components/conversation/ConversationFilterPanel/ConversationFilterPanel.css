@@ -42,6 +42,11 @@
   border: 1px solid transparent !important;
 }
 
+/* Override Bootstrap .badge's white text for the inactive (deselected) state */
+.filter-pill:not(.active) {
+  color: #333;
+}
+
 .filter-pill:hover {
   background-color: #e2e6ea;
   border-color: #c8cdd2 !important;
