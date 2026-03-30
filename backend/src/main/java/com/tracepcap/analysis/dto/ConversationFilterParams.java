@@ -49,6 +49,13 @@ public class ConversationFilterParams {
   private final List<String> customSignatures;
 
   /**
+   * Restrict to conversations that contain at least one packet whose payload includes this byte
+   * pattern. Accepts ASCII strings (e.g. {@code GET /admin}) or hex sequences (e.g. {@code
+   * 0x474554} or {@code 47 45 54}). Null or blank = no filter.
+   */
+  private final String payloadContains;
+
+  /**
    * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp}, {@code packets},
    * {@code bytes}, {@code duration}, {@code startTime}. Null or blank = default DB ordering.
    */

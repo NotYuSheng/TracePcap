@@ -69,17 +69,24 @@ export const Pagination: React.FC<PaginationProps> = ({
         )}
       </div>
 
-      <SgdsPagination
-        dataLength={totalItems}
-        currentPage={currentPage}
-        itemsPerPage={pageSize}
-        setCurrentPage={setCurrentPage}
-        size="sm"
-        limit={5}
-        ellipsisOn
-        ellipsisJump={2}
-        directionVariant="icon-text"
-      />
+      <div
+        onClickCapture={e => {
+          const anchor = (e.target as HTMLElement).closest('a');
+          if (anchor) e.preventDefault();
+        }}
+      >
+        <SgdsPagination
+          dataLength={totalItems}
+          currentPage={currentPage}
+          itemsPerPage={pageSize}
+          setCurrentPage={setCurrentPage}
+          size="sm"
+          limit={5}
+          ellipsisOn
+          ellipsisJump={2}
+          directionVariant="icon-text"
+        />
+      </div>
     </div>
   );
 };

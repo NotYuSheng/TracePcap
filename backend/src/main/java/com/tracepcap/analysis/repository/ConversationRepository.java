@@ -195,7 +195,56 @@ public interface ConversationRepository
         predicates.add(cb.exists(sub));
       }
 
+      // Payload contains — EXISTS subquery: match hex-encoded payload of any packet
+      if (params.getPayloadContains() != null && !params.getPayloadContains().isBlank()) {
+        String hexNeedle = toHexNeedle(params.getPayloadContains());
+        if (hexNeedle != null && !hexNeedle.isEmpty()) {
+          Subquery<UUID> sub = query.subquery(UUID.class);
+          var packet = sub.from(PacketEntity.class);
+          sub.select(packet.get("conversation").get("id"))
+              .where(
+                  cb.and(
+                      cb.equal(packet.get("conversation").get("id"), root.get("id")),
+                      cb.isNotNull(packet.get("payload")),
+                      cb.like(packet.get("payload"), "%" + hexNeedle + "%")));
+          predicates.add(cb.exists(sub));
+        }
+      }
+
       return cb.and(predicates.toArray(new Predicate[0]));
     };
+  }
+
+  /**
+   * Converts a user-supplied payload pattern to a lowercase hex substring for LIKE matching.
+   *
+   * <ul>
+   *   <li>Inputs starting with {@code 0x}, or containing only hex chars plus spaces/colons, are
+   *       treated as hex (separators stripped).
+   *   <li>All other inputs are treated as ASCII and each character is converted to its two-digit hex
+   *       equivalent.
+   * </ul>
+   */
+  static String toHexNeedle(String input) {
+    if (input == null) return null;
+    String trimmed = input.trim();
+    if (trimmed.isEmpty()) return null;
+
+    // Explicit hex prefix
+    if (trimmed.toLowerCase().startsWith("0x")) {
+      return trimmed.substring(2).replaceAll("[\\s:\\-]", "").toLowerCase();
+    }
+
+    // Looks like space- or colon-separated hex bytes (e.g. "47 45 54" or "47:45:54")
+    if (trimmed.matches("[0-9a-fA-F]{2}([\\s:][0-9a-fA-F]{2})*")) {
+      return trimmed.replaceAll("[\\s:]", "").toLowerCase();
+    }
+
+    // ASCII: convert each character to two-digit hex
+    StringBuilder sb = new StringBuilder(trimmed.length() * 2);
+    for (char c : trimmed.toCharArray()) {
+      sb.append(String.format("%02x", (int) c));
+    }
+    return sb.toString();
   }
 }

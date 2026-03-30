@@ -122,6 +122,7 @@ export const conversationService = {
     };
     if (filters.ip) params.ip = filters.ip;
     if (filters.port) params.port = filters.port;
+    if (filters.payloadContains) params.payloadContains = filters.payloadContains;
     if (filters.protocols.length > 0) params.protocols = filters.protocols.join(',');
     if (filters.l7Protocols.length > 0) params.l7Protocols = filters.l7Protocols.join(',');
     if (filters.apps.length > 0) params.apps = filters.apps.join(',');
@@ -158,6 +159,7 @@ export const conversationService = {
     const params = new URLSearchParams();
     if (filters.ip) params.set('ip', filters.ip);
     if (filters.port) params.set('port', filters.port);
+    if (filters.payloadContains) params.set('payloadContains', filters.payloadContains);
     if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
     if (filters.l7Protocols.length > 0) params.set('l7Protocols', filters.l7Protocols.join(','));
     if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));

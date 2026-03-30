@@ -48,6 +48,12 @@ export const ConversationDetail = ({
 
   const togglePacket = (id: string) => setExpandedPacketId(prev => (prev === id ? null : id));
 
+  const thStyle: React.CSSProperties = {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  };
+
   const getDirectionIndicator = (packet: Packet) => {
     if (packet.source.ip === source.ip) {
       return '→'; // Outgoing from source
@@ -288,14 +294,14 @@ export const ConversationDetail = ({
               </colgroup>
               <thead className="sticky-top bg-light">
                 <tr>
-                  <th>#</th>
+                  <th style={thStyle}>#</th>
                   <th></th>
-                  <th>Timestamp</th>
-                  <th>Source</th>
-                  <th>Destination</th>
-                  <th>Length</th>
-                  <th>File Type</th>
-                  <th>Info</th>
+                  <th style={thStyle}>Timestamp</th>
+                  <th style={thStyle}>Source</th>
+                  <th style={thStyle}>Destination</th>
+                  <th style={thStyle}>Len</th>
+                  <th style={thStyle}>File Type</th>
+                  <th style={thStyle}>Info</th>
                 </tr>
               </thead>
               <tbody>
@@ -357,13 +363,7 @@ export const ConversationDetail = ({
                             <span className="text-muted">—</span>
                           )}
                         </td>
-                        <td
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
+                        <td>
                           <small className="text-muted">
                             {packet.info ?? packet.protocol.name}
                           </small>

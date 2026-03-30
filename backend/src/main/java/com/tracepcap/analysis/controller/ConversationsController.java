@@ -69,6 +69,12 @@ public class ConversationsController {
           @RequestParam(required = false)
           String customSignatures,
       @Parameter(
+              description =
+                  "Filter conversations whose payload contains this pattern (ASCII or hex, e.g."
+                      + " 'GET /admin', '0x474554', '47 45 54')")
+          @RequestParam(required = false)
+          String payloadContains,
+      @Parameter(
               description = "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime")
           @RequestParam(required = false)
           String sortBy,
@@ -93,6 +99,7 @@ public class ConversationsController {
             fileTypes,
             riskTypes,
             customSignatures,
+            payloadContains,
             sortBy,
             sortDir,
             search);
@@ -153,6 +160,7 @@ public class ConversationsController {
       @RequestParam(required = false) String fileTypes,
       @RequestParam(required = false) String riskTypes,
       @RequestParam(required = false) String customSignatures,
+      @RequestParam(required = false) String payloadContains,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
       @RequestParam(required = false) String search,
@@ -171,6 +179,7 @@ public class ConversationsController {
             fileTypes,
             riskTypes,
             customSignatures,
+            payloadContains,
             sortBy,
             sortDir,
             search);
@@ -228,6 +237,7 @@ public class ConversationsController {
       String fileTypes,
       String riskTypes,
       String customSignatures,
+      String payloadContains,
       String sortBy,
       String sortDir,
       String search) {
@@ -243,6 +253,7 @@ public class ConversationsController {
         .fileTypes(splitComma(fileTypes))
         .riskTypes(splitComma(riskTypes))
         .customSignatures(splitComma(customSignatures))
+        .payloadContains(payloadContains)
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

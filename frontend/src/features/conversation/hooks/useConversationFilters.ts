@@ -23,6 +23,7 @@ export function useConversationFilters() {
     (): ConversationFilters => ({
       ip: searchParams.get('ip') ?? '',
       port: searchParams.get('port') ?? '',
+      payloadContains: searchParams.get('payloadContains') ?? '',
       protocols: splitComma(searchParams.get('protocols')),
       l7Protocols: splitComma(searchParams.get('l7Protocols')),
       apps: splitComma(searchParams.get('apps')),
@@ -44,6 +45,7 @@ export function useConversationFilters() {
       [
         filters.ip,
         filters.port,
+        filters.payloadContains,
         filters.protocols.length > 0,
         filters.l7Protocols.length > 0,
         filters.apps.length > 0,
@@ -66,6 +68,7 @@ export function useConversationFilters() {
         const cur: ConversationFilters = {
           ip: prev.get('ip') ?? '',
           port: prev.get('port') ?? '',
+          payloadContains: prev.get('payloadContains') ?? '',
           protocols: splitComma(prev.get('protocols')),
           l7Protocols: splitComma(prev.get('l7Protocols')),
           apps: splitComma(prev.get('apps')),
@@ -90,6 +93,7 @@ export function useConversationFilters() {
 
         set('ip', merged.ip || undefined);
         set('port', merged.port || undefined);
+        set('payloadContains', merged.payloadContains || undefined);
         set('protocols', joinComma(merged.protocols));
         set('l7Protocols', joinComma(merged.l7Protocols));
         set('apps', joinComma(merged.apps));
@@ -104,12 +108,12 @@ export function useConversationFilters() {
         set('pageSize', merged.pageSize !== 25 ? String(merged.pageSize) : undefined);
 
         return next;
-      });
+      }, { replace: true });
     },
     [setSearchParams]
   );
 
-  const clearAll = useCallback(() => setSearchParams({}), [setSearchParams]);
+  const clearAll = useCallback(() => setSearchParams({}, { replace: true }), [setSearchParams]);
 
   return { filters, activeFilterCount, setFilters, clearAll };
 }

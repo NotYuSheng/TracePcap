@@ -99,15 +99,24 @@ export const NetworkDiagramPage = () => {
       );
     }
 
-    // Get set of node IDs that have at least one visible edge
-    const visibleNodeIds = new Set<string>();
-    filtered.forEach(edge => {
-      visibleNodeIds.add(edge.source);
-      visibleNodeIds.add(edge.target);
-    });
+    const hasActiveFilters =
+      activeLegendProtocols.length > 0 || activeLegendNodeTypes.length > 0;
+
+    // When filters are active, hide nodes with no visible edge.
+    // When no filters are active, show all nodes (including hosts with no
+    // connections in the rendered edge set) so the count matches Unique Hosts.
+    let visibleNodes = nodes;
+    if (hasActiveFilters) {
+      const visibleNodeIds = new Set<string>();
+      filtered.forEach(edge => {
+        visibleNodeIds.add(edge.source);
+        visibleNodeIds.add(edge.target);
+      });
+      visibleNodes = nodes.filter(node => visibleNodeIds.has(node.id));
+    }
 
     return {
-      filteredNodes: nodes.filter(node => visibleNodeIds.has(node.id)),
+      filteredNodes: visibleNodes,
       filteredEdges: filtered,
     };
   }, [nodes, edges, activeLegendProtocols, activeLegendNodeTypes]);

@@ -36,6 +36,13 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  *   <li>{@code protocol} — case-insensitive match against transport/network protocol (e.g. TCP,
  *       UDP, ICMP)
  * </ul>
+ *
+ * <p>Top-level rule keys (alongside {@code match}):
+ *
+ * <ul>
+ *   <li>{@code payload_contains} — list of {@code {ascii: "..."}} or {@code {hex: "..."}} entries;
+ *       OR-matched by default, AND-matched when {@code match_all: true} is set on the rule.
+ * </ul>
  */
 @Slf4j
 @Service
@@ -60,13 +67,27 @@ public class CustomSignatureService {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> match = (Map<String, Object>) rule.get("match");
-        if (match == null || match.isEmpty()) continue;
 
-        if (matches(conv, match)) {
-          if (!conv.getCustomSignatures().contains(name)) {
-            conv.getCustomSignatures().add(name);
-            matchCount++;
-          }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> payloadContains =
+            (List<Map<String, Object>>) rule.get("payload_contains");
+
+        // A rule must specify at least one criterion
+        boolean hasMatch = match != null && !match.isEmpty();
+        boolean hasPayload = payloadContains != null && !payloadContains.isEmpty();
+        if (!hasMatch && !hasPayload) continue;
+
+        // All specified criteria must pass (AND between match block and payload_contains)
+        if (hasMatch && !matches(conv, match)) continue;
+
+        if (hasPayload) {
+          boolean matchAll = Boolean.TRUE.equals(rule.get("match_all"));
+          if (!payloadContainsMatch(conv.getPackets(), payloadContains, matchAll)) continue;
+        }
+
+        if (!conv.getCustomSignatures().contains(name)) {
+          conv.getCustomSignatures().add(name);
+          matchCount++;
         }
       }
     }
@@ -228,5 +249,61 @@ public class CustomSignatureService {
   private int toInt(Object value) {
     if (value instanceof Number) return ((Number) value).intValue();
     return Integer.parseInt(value.toString());
+  }
+
+  /**
+   * Returns true if at least one (OR) or all (AND when {@code matchAll=true}) of the given payload
+   * patterns are found in the raw payload bytes of any packet in the conversation.
+   *
+   * <p>Each pattern entry is a map with one key: {@code ascii} (plain text) or {@code hex} (hex
+   * string, with optional {@code 0x} prefix and space/colon separators). Patterns are matched
+   * against the packet's lowercase hex payload string.
+   */
+  private boolean payloadContainsMatch(
+      List<PcapParserService.PacketInfo> packets,
+      List<Map<String, Object>> patterns,
+      boolean matchAll) {
+    for (Map<String, Object> pattern : patterns) {
+      String hexNeedle = null;
+      if (pattern.containsKey("ascii")) {
+        hexNeedle = asciiToHex(String.valueOf(pattern.get("ascii")));
+      } else if (pattern.containsKey("hex")) {
+        hexNeedle = normalizeHex(String.valueOf(pattern.get("hex")));
+      }
+      if (hexNeedle == null || hexNeedle.isEmpty()) {
+        if (matchAll) return false; // empty/invalid pattern counts as unmatched in AND mode
+        continue;
+      }
+
+      final String needle = hexNeedle;
+      boolean found =
+          packets.stream()
+              .anyMatch(p -> p.getPayload() != null && p.getPayload().contains(needle));
+
+      if (matchAll && !found) return false;
+      if (!matchAll && found) return true;
+    }
+    // matchAll: all patterns passed. OR: none matched.
+    return matchAll;
+  }
+
+  /** Converts an ASCII string to its lowercase hex representation (e.g. "GET" → "474554"). */
+  private String asciiToHex(String ascii) {
+    if (ascii == null) return "";
+    StringBuilder sb = new StringBuilder(ascii.length() * 2);
+    for (char c : ascii.toCharArray()) {
+      sb.append(String.format("%02x", (int) c));
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Strips hex formatting ({@code 0x} prefix, spaces, colons, hyphens) and lowercases the result.
+   */
+  private String normalizeHex(String hex) {
+    if (hex == null) return "";
+    String s = hex.toLowerCase();
+    if (s.startsWith("0x")) s = s.substring(2);
+    return s.replaceAll("[\\s:\\-]", "");
   }
 }
