@@ -1,0 +1,1 @@
+export { StoryInfoCard } from './StoryInfoCard';

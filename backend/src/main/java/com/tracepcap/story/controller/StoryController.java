@@ -4,6 +4,7 @@ import com.tracepcap.story.dto.StoryResponse;
 import com.tracepcap.story.service.StoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,5 +44,15 @@ public class StoryController {
     StoryResponse story = storyService.getStory(UUID.fromString(storyId));
 
     return ResponseEntity.ok(story);
+  }
+
+  @GetMapping("/file/{fileId}")
+  @Operation(summary = "Get story by file", description = "Get the latest story for a file, if one exists")
+  public ResponseEntity<StoryResponse> getStoryByFileId(@PathVariable UUID fileId) {
+    log.info("Fetching latest story for file: {}", fileId);
+
+    Optional<StoryResponse> story = storyService.getStoryByFileId(fileId);
+
+    return story.map(ResponseEntity::ok).orElse(ResponseEntity.noContent().build());
   }
 }
