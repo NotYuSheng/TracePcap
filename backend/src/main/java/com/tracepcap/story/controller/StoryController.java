@@ -48,10 +48,10 @@ public class StoryController {
 
   @GetMapping("/file/{fileId}")
   @Operation(summary = "Get story by file", description = "Get the latest story for a file, if one exists")
-  public ResponseEntity<StoryResponse> getStoryByFileId(@PathVariable String fileId) {
+  public ResponseEntity<StoryResponse> getStoryByFileId(@PathVariable UUID fileId) {
     log.info("Fetching latest story for file: {}", fileId);
 
-    Optional<StoryResponse> story = storyService.getStoryByFileId(UUID.fromString(fileId));
+    Optional<StoryResponse> story = storyService.getStoryByFileId(fileId);
 
     return story.map(ResponseEntity::ok).orElse(ResponseEntity.noContent().build());
   }

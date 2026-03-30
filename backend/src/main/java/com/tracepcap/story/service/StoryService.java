@@ -145,7 +145,7 @@ public class StoryService {
                 return objectMapper.readValue(story.getContent(), StoryResponse.class);
               } catch (Exception e) {
                 log.error("Failed to parse story content for file: {}", fileId, e);
-                return null;
+                throw new RuntimeException("Failed to parse story content for file: " + fileId, e);
               }
             });
   }
