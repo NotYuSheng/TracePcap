@@ -1,67 +1,66 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/store';
 import { uploadService } from '../services/uploadService';
-import type { UploadError, UploadResponse } from '../types/upload.types';
+
+export interface UploadEntry {
+  id: string;       // local key
+  fileId?: string;  // backend ID, set on success
+  fileName: string;
+  progress: number;
+  isUploading: boolean;
+  error?: string;
+}
 
 export const useFileUpload = () => {
-  const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<UploadError | null>(null);
+  const [uploads, setUploads] = useState<UploadEntry[]>([]);
   const addRecentFile = useStore(state => state.addRecentFile);
-  const navigate = useNavigate();
 
-  const uploadFile = useCallback(
-    async (file: File): Promise<UploadResponse | null> => {
-      setIsUploading(true);
-      setError(null);
-      setProgress(0);
+  const update = (id: string, patch: Partial<UploadEntry>) =>
+    setUploads(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)));
 
-      try {
-        const result = await uploadService.uploadPcap(file, setProgress);
+  const uploadFiles = useCallback(
+    async (files: File[]) => {
+      const entries: UploadEntry[] = files.map((f, i) => ({
+        id: `${Date.now()}-${i}`,
+        fileName: f.name,
+        progress: 0,
+        isUploading: true,
+      }));
 
-        // Add to recent files
-        addRecentFile({
-          id: result.fileId,
-          name: file.name,
-          size: file.size,
-          uploadedAt: Date.now(),
-        });
+      setUploads(prev => [...prev, ...entries]);
 
-        // Navigate to analysis page on success
-        if (result.status === 'completed' || result.status === 'processing') {
-          setTimeout(() => {
-            navigate(`/analysis/${result.fileId}`);
-          }, 500);
+      // Upload sequentially so the backend isn't flooded
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const entryId = entries[i].id;
+        try {
+          const result = await uploadService.uploadPcap(file, progress => {
+            update(entryId, { progress });
+          });
+
+          addRecentFile({
+            id: result.fileId,
+            name: file.name,
+            size: file.size,
+            uploadedAt: Date.now(),
+          });
+
+          update(entryId, { isUploading: false, progress: 100, fileId: result.fileId });
+        } catch (err) {
+          update(entryId, {
+            isUploading: false,
+            error: err instanceof Error ? err.message : 'Upload failed',
+          });
         }
-
-        return result;
-      } catch (err) {
-        const uploadError: UploadError = {
-          code: 'UPLOAD_ERROR',
-          message: err instanceof Error ? err.message : 'Upload failed',
-          details: err,
-        };
-        setError(uploadError);
-        return null;
-      } finally {
-        setIsUploading(false);
       }
     },
-    [addRecentFile, navigate]
+    [addRecentFile]
   );
 
-  const resetUpload = useCallback(() => {
-    setProgress(0);
-    setError(null);
-    setIsUploading(false);
-  }, []);
+  const clearUploads = useCallback(() => setUploads([]), []);
 
-  return {
-    uploadFile,
-    isUploading,
-    progress,
-    error,
-    resetUpload,
-  };
+  // True if any file is currently being uploaded
+  const isUploading = uploads.some(u => u.isUploading);
+
+  return { uploadFiles, uploads, clearUploads, isUploading };
 };

@@ -5,7 +5,7 @@ import { CloudUpload } from 'lucide-react';
 import './FileUploadZone.css';
 
 interface FileUploadZoneProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (files: File[]) => void;
   disabled?: boolean;
   maxSize?: number;
   acceptedFileTypes?: string[];
@@ -20,7 +20,7 @@ export const FileUploadZone = ({
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        onFileSelect(acceptedFiles[0]);
+        onFileSelect(acceptedFiles);
       }
     },
     [onFileSelect]
@@ -32,7 +32,7 @@ export const FileUploadZone = ({
       'application/vnd.tcpdump.pcap': acceptedFileTypes,
     },
     maxSize,
-    multiple: false,
+    multiple: true,
     disabled,
   });
 
@@ -42,7 +42,7 @@ export const FileUploadZone = ({
         <div className="upload-icon my-3">
           <CloudUpload size={64} strokeWidth={1.5} className="text-primary" />
         </div>
-        <h4 className="mb-3">Upload PCAP File</h4>
+        <h4 className="mb-3">Upload PCAP Files</h4>
 
         <div
           {...getRootProps()}
@@ -53,35 +53,20 @@ export const FileUploadZone = ({
           <input {...getInputProps()} />
 
           {isDragActive && !isDragReject ? (
-            <p className="mb-2">
-              <strong>Drop your file here</strong>
-            </p>
+            <p className="mb-0 fw-semibold text-primary">Drop your files here</p>
           ) : isDragReject ? (
-            <p className="mb-2 text-danger">
-              <strong>Invalid file type</strong>
-            </p>
+            <p className="mb-0 fw-semibold text-danger">Invalid file type</p>
           ) : (
             <>
-              <p className="mb-2">
-                <strong>Click to browse</strong> or drag & drop
+              <p className="mb-1">
+                <strong>Click to browse</strong> or drag &amp; drop
               </p>
               <small className="text-muted">
-                Supports {acceptedFileTypes.join(', ')} (max {Math.round(maxSize / 1024 / 1024)}MB)
+                {acceptedFileTypes.join(', ')} &middot; up to {Math.round(maxSize / 1024 / 1024)} MB each &middot; multiple files
               </small>
             </>
           )}
         </div>
-
-        {disabled && (
-          <div className="text-center">
-            <span
-              className="spinner-border spinner-border-sm me-2"
-              role="status"
-              aria-hidden="true"
-            ></span>
-            <span>Uploading...</span>
-          </div>
-        )}
 
         {fileRejections.length > 0 && (
           <div className="mt-3">
@@ -90,7 +75,11 @@ export const FileUploadZone = ({
                 <strong>{file.name}</strong>
                 <ul className="mb-0 mt-2">
                   {errors.map(e => (
-                    <li key={e.code}>{e.message}</li>
+                    <li key={e.code}>
+                      {e.code === 'file-invalid-type'
+                        ? `Unsupported file type. Only ${acceptedFileTypes.join(', ')} files are accepted.`
+                        : e.message}
+                    </li>
                   ))}
                 </ul>
               </div>

@@ -1,14 +1,14 @@
-/* Upload Card Styles - matching MeetMemo */
 .upload-card {
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-  cursor: pointer;
+  border: 1px solid var(--sgds-gray-200, #e4e7ec);
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  background: #fff;
 }
 
 .upload-card:hover {
-  border-color: var(--tracepcap-primary);
-  box-shadow: 0 4px 12px rgb(0 118 209 / 12%);
+  border-color: var(--tracepcap-primary, #0076d1);
+  box-shadow: 0 2px 8px rgb(0 118 209 / 15%);
 }
 
 .upload-icon {
@@ -22,20 +22,32 @@
   }
 
   50% {
-    transform: translateY(-10px);
+    transform: translateY(-8px);
   }
 }
 
 /* Upload Dropzone */
 .upload-dropzone {
-  border: 2px dashed #dee2e6;
-  border-radius: 0.5rem;
-  padding: 2rem 1rem;
-  background-color: #f8f9fa;
-  transition: all 0.3s ease;
+  border: 2px dashed var(--sgds-gray-300, #d0d5dd);
+  border-radius: 8px;
+  padding: 1.75rem 1.5rem;
+  background: var(--sgds-gray-100, #f7f7f9);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  cursor: pointer;
 }
 
-.upload-dropzone:hover {
-  border-color: var(--tracepcap-primary);
-  background-color: #dbeafe;
+.upload-dropzone:hover,
+.upload-dropzone.drag-active {
+  border-color: var(--tracepcap-primary, #0076d1);
+  background: #eff6ff;
+}
+
+.upload-dropzone.drag-reject {
+  border-color: var(--sgds-danger, #d7260f);
+  background: #fff8f7;
+}
+
+.upload-dropzone.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

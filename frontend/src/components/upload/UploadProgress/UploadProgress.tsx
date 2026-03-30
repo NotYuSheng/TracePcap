@@ -5,7 +5,7 @@ interface UploadProgressProps {
   progress: number;
   isUploading: boolean;
   error?: string;
-  onCancel?: () => void;
+  onAnalyze?: () => void;
 }
 
 export const UploadProgress = ({
@@ -13,59 +13,63 @@ export const UploadProgress = ({
   progress,
   isUploading,
   error,
-  onCancel,
+  onAnalyze,
 }: UploadProgressProps) => {
-  const getStatusText = () => {
-    if (error) return 'Upload failed';
-    if (progress === 100 && isUploading) return 'Processing...';
-    if (progress === 100) return 'Upload complete';
-    return 'Uploading...';
-  };
+  const isProcessing = progress === 100 && isUploading;
+  const isDone = progress === 100 && !isUploading && !error;
 
-  const getStatusClass = () => {
-    if (error) return 'error';
-    if (progress === 100) return 'success';
-    return 'uploading';
-  };
+  const statusText = error
+    ? 'Upload failed'
+    : isProcessing
+      ? 'Processing…'
+      : isDone
+        ? 'Complete'
+        : `Uploading ${progress}%`;
+
+  const stateClass = error ? 'error' : isDone ? 'success' : '';
 
   return (
-    <div className={`upload-progress ${getStatusClass()}`}>
-      <div className="upload-progress-header">
-        <div className="file-info">
-          <i className="bi bi-file-earmark-binary"></i>
-          <span className="file-name">{fileName}</span>
-        </div>
-        <div className="upload-actions">
-          {isUploading && progress < 100 && onCancel && (
-            <button type="button" className="btn btn-sm btn-outline-danger" onClick={onCancel}>
-              Cancel
-            </button>
-          )}
-          {!isUploading && progress === 100 && !error && (
-            <i className="bi bi-check-circle-fill text-success"></i>
-          )}
-          {error && <i className="bi bi-x-circle-fill text-danger"></i>}
-        </div>
+    <div className={`upload-status-card ${stateClass}`}>
+      {/* Icon */}
+      <div className="usc-icon">
+        <i className={`bi ${error ? 'bi-file-earmark-x' : isDone ? 'bi-file-earmark-check' : 'bi-file-earmark-arrow-up'}`}></i>
       </div>
 
-      <div className="upload-progress-bar">
-        <div className="progress">
+      {/* File name + progress bar */}
+      <div className="usc-body">
+        <div className="usc-filename" title={fileName}>{fileName}</div>
+        <div className="progress usc-bar">
           <div
-            className={`progress-bar ${error ? 'bg-danger' : 'bg-primary'}`}
+            className={`progress-bar ${
+              error
+                ? 'bg-danger'
+                : isProcessing
+                  ? 'progress-bar-striped progress-bar-animated bg-warning'
+                  : 'bg-primary'
+            }`}
             role="progressbar"
-            style={{ width: `${progress}%` }}
-            aria-valuenow={progress}
+            style={{ width: `${isProcessing ? 100 : progress}%` }}
+            aria-valuenow={isProcessing ? 100 : progress}
             aria-valuemin={0}
             aria-valuemax={100}
-          >
-            {progress}%
-          </div>
+          />
         </div>
+        <div className="usc-status">{statusText}</div>
+        {error && <div className="usc-error">{error}</div>}
       </div>
 
-      <div className="upload-status">
-        <span className="status-text">{getStatusText()}</span>
-        {error && <span className="error-text">{error}</span>}
+      {/* Action */}
+      <div className="usc-action">
+        {isDone && onAnalyze && (
+          <button className="btn btn-sm btn-primary" onClick={onAnalyze}>
+            <i className="bi bi-graph-up me-1"></i>
+            Analyze
+          </button>
+        )}
+        {isDone && !onAnalyze && (
+          <i className="bi bi-check-circle-fill text-success usc-icon-lg"></i>
+        )}
+        {error && <i className="bi bi-x-circle-fill text-danger usc-icon-lg"></i>}
       </div>
     </div>
   );

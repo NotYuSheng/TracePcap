@@ -1,72 +1,91 @@
-.upload-progress {
-  border: 1px solid #dee2e6;
+.upload-status-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--sgds-gray-200, #e4e7ec);
   border-radius: 8px;
-  padding: 1.5rem;
-  margin-top: 1.5rem;
-  background-color: white;
-  box-shadow: 0 2px 4px rgb(0 0 0 / 5%);
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  transition: border-color 0.2s ease;
 }
 
-.upload-progress.error {
-  border-color: var(--tracepcap-danger);
-  background-color: #fff5f5;
+.upload-status-card.error {
+  border-color: var(--sgds-danger, #d7260f);
+  background: #fff8f7;
 }
 
-.upload-progress.success {
-  border-color: var(--tracepcap-success);
-  background-color: #f0fff4;
+.upload-status-card.success {
+  border-color: var(--sgds-success, #0a8217);
+  background: #f6fef7;
 }
 
-.upload-progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.file-info i {
+/* Left icon */
+.usc-icon {
   font-size: 1.5rem;
-  color: var(--tracepcap-primary);
+  color: var(--tracepcap-primary, #0076d1);
+  flex-shrink: 0;
+  line-height: 1;
+  width: 2rem;
+  text-align: center;
 }
 
-.file-name {
+.upload-status-card.error .usc-icon {
+  color: var(--sgds-danger, #d7260f);
+}
+
+.upload-status-card.success .usc-icon {
+  color: var(--sgds-success, #0a8217);
+}
+
+/* Middle: file name + bar */
+.usc-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.usc-filename {
   font-weight: 600;
-  color: #212529;
+  font-size: 0.875rem;
+  color: var(--sgds-body-color, #1d2939);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.375rem;
 }
 
-.upload-actions {
+.usc-bar {
+  height: 6px;
+  border-radius: var(--sgds-border-radius-pill, 50rem);
+  margin-bottom: 0.3rem;
+}
+
+.usc-status {
+  font-size: 0.8rem;
+  color: var(--sgds-gray-500, #667085);
+}
+
+.upload-status-card.error .usc-status {
+  color: var(--sgds-danger, #d7260f);
+}
+
+.upload-status-card.success .usc-status {
+  color: var(--sgds-success, #0a8217);
+}
+
+.usc-error {
+  font-size: 0.775rem;
+  color: var(--sgds-danger, #d7260f);
+  margin-top: 0.15rem;
+}
+
+/* Right: action */
+.usc-action {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
 }
 
-.upload-actions i {
-  font-size: 1.5rem;
-}
-
-.upload-progress-bar {
-  margin-bottom: 0.75rem;
-}
-
-.upload-status {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.status-text {
-  font-size: 0.9rem;
-  color: #6c757d;
-  font-weight: 500;
-}
-
-.error-text {
-  font-size: 0.85rem;
-  color: var(--tracepcap-danger);
+.usc-icon-lg {
+  font-size: 1.4rem;
 }

@@ -70,6 +70,35 @@ body {
   border-top: 1px solid #dee2e6;
 }
 
+/* Upload progress scroll row */
+.upload-progress-scroll {
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.125rem 0.625rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sgds-gray-300, #d0d5dd) transparent;
+}
+
+.upload-progress-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.upload-progress-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.upload-progress-scroll::-webkit-scrollbar-thumb {
+  background: var(--sgds-gray-300, #d0d5dd);
+  border-radius: var(--sgds-border-radius-pill, 50rem);
+}
+
+.upload-progress-scroll .upload-status-card {
+  flex: 0 0 320px;
+}
+
 /* Page Styles */
 .home-page,
 .upload-page,
