@@ -1,6 +1,7 @@
 package com.tracepcap.analysis.service;
 
 import java.io.ByteArrayInputStream;
+import java.util.Arrays;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
@@ -71,6 +72,27 @@ public final class FileSignatureDetector {
           Map.entry("application/java-archive", "JAR"));
 
   /**
+   * If {@code bytes} begins with an HTTP response status line ({@code HTTP/}), returns the bytes
+   * after the header block ({@code \r\n\r\n}). Returns the original array unchanged for all other
+   * payloads, or {@code null} if the payload contains only headers with no body.
+   */
+  static byte[] skipHttpResponseHeaders(byte[] bytes) {
+    if (bytes.length < 5
+        || bytes[0] != 'H' || bytes[1] != 'T' || bytes[2] != 'T'
+        || bytes[3] != 'P' || bytes[4] != '/') {
+      return bytes;
+    }
+    for (int i = 0; i < bytes.length - 3; i++) {
+      if (bytes[i] == '\r' && bytes[i + 1] == '\n'
+          && bytes[i + 2] == '\r' && bytes[i + 3] == '\n') {
+        int bodyStart = i + 4;
+        return bodyStart < bytes.length ? Arrays.copyOfRange(bytes, bodyStart, bytes.length) : null;
+      }
+    }
+    return null; // headers present but no body within the captured window
+  }
+
+  /**
    * Returns a short human-readable label (e.g. {@code "PDF"}, {@code "EXE/DLL"}) for the file type
    * detected from {@code appLayerBytes}, or {@code null} if the type is unknown or unrecognised.
    *
@@ -79,7 +101,9 @@ public final class FileSignatureDetector {
   public static String detect(byte[] appLayerBytes) {
     if (appLayerBytes == null || appLayerBytes.length == 0) return null;
     try {
-      String mime = TIKA.detect(new ByteArrayInputStream(appLayerBytes));
+      byte[] bytesToDetect = skipHttpResponseHeaders(appLayerBytes);
+      if (bytesToDetect == null || bytesToDetect.length == 0) return null;
+      String mime = TIKA.detect(new ByteArrayInputStream(bytesToDetect));
       if (mime == null
           || mime.equals("application/octet-stream")
           || mime.equals("text/plain")

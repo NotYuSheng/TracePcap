@@ -32,6 +32,7 @@ public class ConversationResponse {
   private List<String> flowRisks;
   private List<String> customSignatures;
   private List<String> httpUserAgents;
+  private List<String> detectedFileTypes;
   private Long packetCount;
   private Long totalBytes;
   private LocalDateTime startTime;
