@@ -5,8 +5,8 @@ on:
   # push:
   #   branches:
   #     - main
-    paths:
-      - 'backend/**'
+  #   paths:
+  #     - 'backend/**'
 
 permissions:
   contents: write
