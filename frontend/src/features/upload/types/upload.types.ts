@@ -28,6 +28,15 @@ export interface FileValidationResult {
   error?: string;
 }
 
+// Per-file upload state for multiple file uploads
+export interface FileUploadState {
+  file: File;
+  progress: number;
+  status: 'pending' | 'uploading' | 'done' | 'error';
+  fileId?: string;
+  error?: string;
+}
+
 // Upload State Types
 export interface UploadState {
   isUploading: boolean;
