@@ -7,8 +7,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
 /** Entity representing a generated story/narrative for a PCAP file */
 @Entity
 @Table(name = "stories")
@@ -35,8 +33,7 @@ public class StoryEntity {
   @Column(name = "tokens_used")
   private Integer tokensUsed;
 
-  @CreationTimestamp
-  @Column(name = "created_at", nullable = false, updatable = false)
+  @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
   private LocalDateTime createdAt;
 
   @Column(name = "status", nullable = false, length = 50)

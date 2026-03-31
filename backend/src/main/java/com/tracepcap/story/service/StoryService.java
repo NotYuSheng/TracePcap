@@ -43,7 +43,7 @@ public class StoryService {
    * @return generated story response
    */
   @Transactional
-  public StoryResponse generateStory(UUID fileId) {
+  public StoryResponse generateStory(UUID fileId, String additionalContext) {
     log.info("Generating story for file: {}", fileId);
 
     // Delete any existing stories for this file so we always generate fresh
@@ -68,7 +68,7 @@ public class StoryService {
 
     try {
       // Generate story content using LLM
-      String storyContent = generateStoryContent(file, analysis);
+      String storyContent = generateStoryContent(file, analysis, additionalContext);
 
       // Parse LLM response
       StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
@@ -150,10 +150,83 @@ public class StoryService {
             });
   }
 
+  /**
+   * Answer a question about an existing story using the LLM
+   *
+   * @param storyId the story ID
+   * @param question the user's question
+   * @return the LLM's answer
+   */
+  public StoryAnswerResponse askQuestion(UUID storyId, String question, List<com.tracepcap.story.dto.StoryQuestionRequest.HistoryEntry> history) {
+    StoryEntity story =
+        storyRepository
+            .findById(storyId)
+            .orElseThrow(() -> new ResourceNotFoundException("Story not found: " + storyId));
+
+    if (story.getStatus() != StoryEntity.StoryStatus.COMPLETED) {
+      throw new IllegalStateException("Story is not in a completed state");
+    }
+
+    String systemPrompt =
+        """
+        You are a cybersecurity analyst expert. You have already generated a network traffic
+        analysis story for a PCAP file. The story is provided to you as structured JSON below.
+
+        Answer the user's question concisely and accurately, drawing only from the story data
+        provided. If the answer cannot be determined from the available data, say so clearly.
+        Do NOT invent details that are not present in the story.
+
+        You must respond ONLY with valid JSON in this exact format:
+        {
+          "answer": "your plain-text answer here",
+          "followUpQuestions": [
+            "A specific follow-up question based on your answer",
+            "Another relevant follow-up question",
+            "A third follow-up question"
+          ]
+        }
+
+        The followUpQuestions must be 3 short, specific questions an analyst would naturally
+        ask next given your answer and the story data. Tailor them to the actual findings.
+        """;
+
+    StringBuilder userPrompt = new StringBuilder();
+    userPrompt.append("## Story Data\n").append(story.getContent()).append("\n\n");
+
+    if (history != null && !history.isEmpty()) {
+      userPrompt.append("## Conversation History\n");
+      for (var entry : history) {
+        String role = "assistant".equals(entry.getRole()) ? "Analyst" : "User";
+        userPrompt.append(role).append(": ").append(entry.getText()).append("\n\n");
+      }
+    }
+
+    userPrompt.append("## Current Question\n").append(question);
+
+    log.info("Answering question for story: {}", storyId);
+    String raw = llmClient.generateCompletion(systemPrompt, userPrompt.toString());
+    return parseAnswerResponse(raw);
+  }
+
+  /** Parse the LLM Q&A response into answer + follow-up questions */
+  private StoryAnswerResponse parseAnswerResponse(String content) {
+    try {
+      String json = extractJson(content);
+      Map<String, Object> data = objectMapper.readValue(json, new TypeReference<>() {});
+      String answer = (String) data.getOrDefault("answer", content);
+      List<String> followUps = parseSuggestedQuestions(data.get("followUpQuestions"));
+      return new StoryAnswerResponse(answer, followUps);
+    } catch (Exception e) {
+      log.warn("Failed to parse Q&A JSON response, returning raw text: {}", e.getMessage());
+      return new StoryAnswerResponse(content, new ArrayList<>());
+    }
+  }
+
   /** Generate story content using LLM */
-  private String generateStoryContent(FileEntity file, AnalysisResultEntity analysis) {
+  private String generateStoryContent(
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext) {
     String systemPrompt = buildSystemPrompt();
-    String userPrompt = buildUserPrompt(file, analysis);
+    String userPrompt = buildUserPrompt(file, analysis, additionalContext);
     return llmClient.generateCompletion(systemPrompt, userPrompt);
   }
 
@@ -198,12 +271,19 @@ public class StoryService {
                     "conversations": []
                   }
                 }
+              ],
+              "suggestedQuestions": [
+                "Which host generated the most traffic, and what was it doing?",
+                "Are there any signs of data exfiltration in this capture?",
+                "What is the significance of the TLS certificate anomalies found?"
               ]
             }
 
             Narrative types: "summary", "detail", "anomaly", "conclusion"
             Highlight types: "anomaly", "insight", "warning", "info"
             Timeline event types: "normal", "suspicious", "critical"
+            suggestedQuestions: exactly 3 short, specific follow-up questions a analyst might
+            want to ask about THIS capture — tailored to the actual findings, not generic.
 
             Focus on:
             - Clear, technical but accessible language
@@ -265,7 +345,7 @@ public class StoryService {
     return " [TLS: " + String.join(", ", parts) + "]";
   }
 
-  private String buildUserPrompt(FileEntity file, AnalysisResultEntity analysis) {
+  private String buildUserPrompt(FileEntity file, AnalysisResultEntity analysis, String additionalContext) {
 
     int maxConversations =
         llmConfig.getStory() != null ? llmConfig.getStory().getMaxConversations() : 20;
@@ -422,6 +502,11 @@ public class StoryService {
     prompt.append("- Application-layer content (HTTP bodies, DNS query names, etc.)\n");
     prompt.append("- Any conversations beyond those listed above\n\n");
 
+    if (additionalContext != null && !additionalContext.isBlank()) {
+      prompt.append("## Additional Context from Analyst\n");
+      prompt.append(additionalContext.strip()).append("\n\n");
+    }
+
     prompt.append("Generate a detailed story analyzing this network traffic. ");
     prompt.append("Include narrative sections, highlights of interesting findings, ");
     prompt.append("and a timeline of key events. Respond ONLY with valid JSON.");
@@ -463,11 +548,15 @@ public class StoryService {
       // Parse timeline (optional)
       List<StoryTimelineEvent> timeline = parseTimeline(data.get("timeline"));
 
+      // Parse suggested questions (optional)
+      List<String> suggestedQuestions = parseSuggestedQuestions(data.get("suggestedQuestions"));
+
       log.info(
-          "Successfully parsed story: {} narrative sections, {} highlights, {} timeline events",
+          "Successfully parsed story: {} narrative sections, {} highlights, {} timeline events, {} suggested questions",
           narrative.size(),
           highlights.size(),
-          timeline.size());
+          timeline.size(),
+          suggestedQuestions.size());
 
       return StoryResponse.builder()
           .id(storyId.toString())
@@ -476,6 +565,7 @@ public class StoryService {
           .narrative(narrative)
           .highlights(highlights)
           .timeline(timeline)
+          .suggestedQuestions(suggestedQuestions)
           .build();
 
     } catch (Exception e) {
@@ -539,6 +629,23 @@ public class StoryService {
           .collect(Collectors.toList());
     } catch (Exception e) {
       log.error("Error parsing narrative sections", e);
+      return new ArrayList<>();
+    }
+  }
+
+  /** Parse suggested questions from JSON */
+  @SuppressWarnings("unchecked")
+  private List<String> parseSuggestedQuestions(Object data) {
+    if (data == null) return new ArrayList<>();
+    try {
+      return ((List<Object>) data).stream()
+          .filter(q -> q instanceof String)
+          .map(q -> (String) q)
+          .filter(q -> !q.isBlank())
+          .limit(3)
+          .collect(Collectors.toList());
+    } catch (Exception e) {
+      log.warn("Failed to parse suggestedQuestions: {}", e.getMessage());
       return new ArrayList<>();
     }
   }

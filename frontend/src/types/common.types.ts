@@ -210,6 +210,7 @@ export interface Story {
   narrative: NarrativeSection[];
   highlights: Highlight[];
   timeline: StoryTimelineEvent[];
+  suggestedQuestions?: string[];
 }
 
 export interface NarrativeSection {

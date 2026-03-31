@@ -11,6 +11,7 @@ import { NarrativeView } from '@components/story/NarrativeView';
 import { AnomalyHighlight } from '@components/story/AnomalyHighlight';
 import { StoryTimeline } from '@components/story/StoryTimeline';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
+import { StoryChat } from '@components/story/StoryChat';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -25,6 +26,7 @@ export const StoryPage = () => {
   const [story, setStory] = useState<Story | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
+  const [additionalContext, setAdditionalContext] = useState('');
   const [generating, setGenerating] = useState(false);
   const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
@@ -35,7 +37,7 @@ export const StoryPage = () => {
     try {
       setGenerating(true);
       setError(null);
-      const generatedStory = await storyService.generateStory(fileId);
+      const generatedStory = await storyService.generateStory(fileId, additionalContext);
       setStory(generatedStory);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -55,7 +57,7 @@ export const StoryPage = () => {
     } finally {
       setGenerating(false);
     }
-  }, [fileId]);
+  }, [fileId, additionalContext]);
 
   useEffect(() => {
     const fetchExistingStory = async () => {
@@ -153,7 +155,10 @@ export const StoryPage = () => {
     return (
       <div className="py-4">
         <div className="mb-4">
-          <StoryInfoCard />
+          <StoryInfoCard
+            additionalContext={additionalContext}
+            onAdditionalContextChange={setAdditionalContext}
+          />
         </div>
 
         <div className="text-center">
@@ -175,15 +180,16 @@ export const StoryPage = () => {
       {/* Header */}
       <div className="row mb-4">
         <div className="col-12">
-          <div className="position-relative">
-            <h4>Network Traffic Story</h4>
+          <div className="d-flex align-items-center justify-content-between">
+            <h4 className="mb-0">Network Traffic Story</h4>
             <button
-              className="btn btn-outline-primary btn-sm position-absolute top-0 end-0"
+              className="btn btn-outline-primary btn-sm"
               onClick={handleGenerateStory}
               disabled={generating}
               title={generating ? 'Generating...' : 'Regenerate'}
             >
-              <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''}`}></i>
+              <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`}></i>
+              {generating ? 'Generating...' : 'Regenerate'}
             </button>
           </div>
         </div>
@@ -192,7 +198,17 @@ export const StoryPage = () => {
       {/* How stories are generated */}
       <div className="row mb-4">
         <div className="col-12">
-          <StoryInfoCard />
+          <StoryInfoCard
+            additionalContext={additionalContext}
+            onAdditionalContextChange={setAdditionalContext}
+          />
+        </div>
+      </div>
+
+      {/* Story Q&A */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} />
         </div>
       </div>
 
