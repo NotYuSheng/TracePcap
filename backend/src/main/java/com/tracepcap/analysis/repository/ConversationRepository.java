@@ -235,9 +235,9 @@ public interface ConversationRepository
       return trimmed.substring(2).replaceAll("[\\s:\\-]", "").toLowerCase();
     }
 
-    // Looks like space- or colon-separated hex bytes (e.g. "47 45 54" or "47:45:54")
-    if (trimmed.matches("[0-9a-fA-F]{2}([\\s:][0-9a-fA-F]{2})*")) {
-      return trimmed.replaceAll("[\\s:]", "").toLowerCase();
+    // Looks like space-, colon-, or hyphen-separated hex bytes (e.g. "47 45 54" or "47:45:54")
+    if (trimmed.matches("[0-9a-fA-F]{2}([\\s:-][0-9a-fA-F]{2})*")) {
+      return trimmed.replaceAll("[\\s:-]", "").toLowerCase();
     }
 
     // ASCII: convert each character to two-digit hex
