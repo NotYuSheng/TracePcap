@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from '@govtechsg/sgds-react';
 import { CloudUpload } from 'lucide-react';
+import { formatBytes } from '@/utils/formatters';
 import './FileUploadZone.css';
 
 interface FileUploadZoneProps {
@@ -78,7 +79,9 @@ export const FileUploadZone = ({
                     <li key={e.code}>
                       {e.code === 'file-invalid-type'
                         ? `Unsupported file type. Only ${acceptedFileTypes.join(', ')} files are accepted.`
-                        : e.message}
+                        : e.code === 'file-too-large'
+                          ? `File is larger than ${formatBytes(maxSize)}.`
+                          : e.message}
                     </li>
                   ))}
                 </ul>

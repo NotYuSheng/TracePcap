@@ -38,23 +38,74 @@ export const NetworkGraph = memo(function NetworkGraph({
 }: NetworkGraphProps) {
   const graphRef = useRef<GraphCanvasRef>(null);
 
+  // Hierarchical layout uses D3 stratify() which requires exactly ONE root
+  // (a node with no incoming edges). Network graphs almost always have multiple
+  // roots, which throws "multiple roots" and silently blanks the canvas.
+  //
+  // Fix: for hierarchical mode —
+  //   1. Drop isolated nodes (no edges) — they have no valid position in a tree.
+  //   2. Inject a hidden virtual root connected to every actual root (node with
+  //      no incoming edges) so stratify() always sees a single root.
+  const connectedNodeIds = new Set(edges.flatMap(e => [e.source, e.target]));
+  const VIRTUAL_ROOT = '__vr__';
+
+  let displayNodes = nodes;
+  let displayEdges = edges;
+
+  if (layoutType === 'hierarchicalTd') {
+    // Keep only nodes that have at least one edge
+    const edgeNodes = nodes.filter(n => connectedNodeIds.has(n.id));
+    const incomingIds = new Set(edges.map(e => e.target));
+    const rootIds = edgeNodes.filter(n => !incomingIds.has(n.id)).map(n => n.id);
+
+    if (rootIds.length > 1) {
+      // Inject virtual root node and edges — styled invisible
+      displayNodes = [
+        {
+          id: VIRTUAL_ROOT,
+          label: '',
+          data: { role: 'client', isAnomaly: false, totalBytes: 0 },
+        } as any,
+        ...edgeNodes,
+      ];
+      displayEdges = [
+        ...rootIds.map(id => ({
+          id: `${VIRTUAL_ROOT}_${id}`,
+          source: VIRTUAL_ROOT,
+          target: id,
+          label: '',
+          data: {
+            protocol: 'TCP',
+            packetCount: 1,
+            totalBytes: 0,
+            conversationId: '',
+            bidirectional: false,
+          },
+        })),
+        ...edges,
+      ];
+    } else {
+      displayNodes = edgeNodes;
+    }
+  }
+
   // Transform nodes for reagraph
-  const reagraphNodes = nodes.map(node => ({
+  const reagraphNodes = displayNodes.map(node => ({
     id: node.id,
-    label: node.label,
-    fill: getNodeColor(node.data),
-    size: Math.max(5, Math.log(node.data.totalBytes + 1) * 2),
+    label: node.id === VIRTUAL_ROOT ? '' : node.label,
+    fill: node.id === VIRTUAL_ROOT ? 'transparent' : getNodeColor(node.data),
+    size: node.id === VIRTUAL_ROOT ? 0.01 : Math.max(5, Math.log((node.data as any).totalBytes + 1) * 2),
     data: node.data,
   }));
 
   // Transform edges for reagraph
-  const reagraphEdges = edges.map(edge => ({
+  const reagraphEdges = displayEdges.map(edge => ({
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    label: edge.label,
-    stroke: getProtocolColor(edge.data.protocol),
-    size: Math.max(1, Math.log(edge.data.packetCount) * 0.5),
+    label: edge.source === VIRTUAL_ROOT ? '' : edge.label,
+    stroke: edge.source === VIRTUAL_ROOT ? 'transparent' : getProtocolColor(edge.data.protocol),
+    size: edge.source === VIRTUAL_ROOT ? 0.01 : Math.max(1, Math.log(edge.data.packetCount) * 0.5),
     data: edge.data,
   }));
 

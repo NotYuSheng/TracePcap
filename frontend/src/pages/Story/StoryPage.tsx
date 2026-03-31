@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
 import { storyService } from '@/features/story/services/storyService';
@@ -29,8 +29,9 @@ export const StoryPage = () => {
   const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const autoTriggeredRef = useRef(false);
 
-  const handleGenerateStory = async () => {
+  const handleGenerateStory = useCallback(async () => {
     try {
       setGenerating(true);
       setError(null);
@@ -54,7 +55,7 @@ export const StoryPage = () => {
     } finally {
       setGenerating(false);
     }
-  };
+  }, [fileId]);
 
   useEffect(() => {
     const fetchExistingStory = async () => {
@@ -75,6 +76,14 @@ export const StoryPage = () => {
       setLoadingStory(false);
     }
   }, [fileId]);
+
+  // Auto-generate story if none exists yet
+  useEffect(() => {
+    if (!loadingStory && !story && !generating && !error && !autoTriggeredRef.current) {
+      autoTriggeredRef.current = true;
+      handleGenerateStory();
+    }
+  }, [loadingStory, story, generating, error, handleGenerateStory]);
 
   useEffect(() => {
     const fetchTimeline = async () => {

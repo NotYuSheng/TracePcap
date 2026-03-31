@@ -17,6 +17,14 @@
 #   app      - case-insensitive nDPI application name                (e.g. "Telegram", "TOR", "DNS")
 #   protocol - case-insensitive transport protocol                   (e.g. "TCP", "UDP", "ICMP")
 #
+# Top-level rule keys (alongside or instead of match):
+#   payload_contains - list of byte patterns to search in packet payloads
+#                      each entry is one of:
+#                        ascii: "string"   - plain ASCII text  (e.g. "GET /admin")
+#                        hex:   "deadbeef" - hex bytes, with optional 0x prefix or space separators
+#                      multiple entries are OR-matched by default
+#                      set match_all: true on the rule to AND all entries instead
+#
 # Severity colors in the UI:
 #   critical -> red   | high -> orange   | medium -> amber   | low -> purple
 # ----------------------------------------------------------------------------
@@ -123,3 +131,49 @@ signatures:
     match:
       ip: "52.114.252.8"
       dstPort: 443
+
+  # --- payload_contains: ASCII string match ---
+  # Flag any conversation whose payload contains an HTTP GET to /admin.
+  - name: http_get_admin
+    description: HTTP GET request targeting /admin path detected in payload
+    severity: high
+    payload_contains:
+      - ascii: "GET /admin"
+
+  # --- payload_contains: hex byte match ---
+  # Detect the PDF magic bytes (%PDF-) anywhere in the payload.
+  - name: pdf_in_payload
+    description: PDF magic bytes (%PDF-) detected in packet payload
+    severity: low
+    payload_contains:
+      - hex: "255044462d"   # %PDF-
+
+  # --- payload_contains: multiple patterns (OR-matched by default) ---
+  # Flag conversations that carry cleartext credentials (basic auth or plain POST password field).
+  - name: cleartext_credentials
+    description: Possible cleartext credentials detected in payload (Basic auth header or POST password)
+    severity: critical
+    payload_contains:
+      - ascii: "Authorization: Basic"
+      - ascii: "password="
+
+  # --- payload_contains + match_all: all patterns must appear (AND) ---
+  # Flag HTTP POST requests that also contain a JSON body with "token" — possible API key exposure.
+  - name: http_post_with_token
+    description: HTTP POST request with token field detected in payload
+    severity: high
+    match_all: true
+    payload_contains:
+      - ascii: "POST /"
+      - ascii: "token"
+
+  # --- payload_contains combined with match fields ---
+  # Detect DNS TXT record responses (potential DNS tunnelling) by combining protocol + payload.
+  - name: dns_txt_response
+    description: DNS response containing TXT record type — possible DNS tunnelling or exfiltration
+    severity: high
+    match:
+      app: "DNS"
+      protocol: UDP
+    payload_contains:
+      - hex: "0010"   # QTYPE 16 = TXT record

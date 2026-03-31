@@ -49,6 +49,7 @@ export function useNetworkData(
       const response = await conversationService.getConversations(fileId, {
         ip: '',
         port: '',
+        payloadContains: '',
         protocols: [],
         l7Protocols: [],
         apps: [],

@@ -114,8 +114,10 @@ export function ConversationFilterPanel({
   const [isOpen, setIsOpen] = useState(activeFilterCount > 0);
   const [ipInput, setIpInput] = useState(filters.ip);
   const [portInput, setPortInput] = useState(filters.port);
+  const [payloadInput, setPayloadInput] = useState(filters.payloadContains);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const payloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setIpInput(filters.ip);
@@ -123,6 +125,9 @@ export function ConversationFilterPanel({
   useEffect(() => {
     setPortInput(filters.port);
   }, [filters.port]);
+  useEffect(() => {
+    setPayloadInput(filters.payloadContains);
+  }, [filters.payloadContains]);
 
   const handleIpChange = (value: string) => {
     setIpInput(value);
@@ -135,6 +140,15 @@ export function ConversationFilterPanel({
     setPortInput(value);
     if (portDebounceRef.current) clearTimeout(portDebounceRef.current);
     portDebounceRef.current = setTimeout(() => onFiltersChange({ port: value }), 300);
+  };
+
+  const handlePayloadChange = (value: string) => {
+    setPayloadInput(value);
+    if (payloadDebounceRef.current) clearTimeout(payloadDebounceRef.current);
+    payloadDebounceRef.current = setTimeout(
+      () => onFiltersChange({ payloadContains: value }),
+      300
+    );
   };
 
   const toggle = <K extends keyof ConversationFilters>(
@@ -226,6 +240,46 @@ export function ConversationFilterPanel({
                       type="button"
                       className="btn btn-outline-secondary"
                       onClick={() => handlePortChange('')}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Payload contains */}
+              <div className="col-md-4">
+                <label className="filter-section-label d-inline-flex align-items-center mb-2">
+                  Payload contains
+                  <InfoPopover
+                    id="info-payload"
+                    title="Payload contains"
+                    body={
+                      <>
+                        Matches conversations where any packet payload contains this byte pattern.
+                        Accepts <strong>ASCII strings</strong> (e.g. <code>GET /admin</code>),{' '}
+                        <strong>hex with 0x prefix</strong> (e.g. <code>0x474554</code>), or{' '}
+                        <strong>space-separated hex bytes</strong> (e.g. <code>47 45 54</code>).
+                      </>
+                    }
+                  />
+                </label>
+                <div className="input-group input-group-sm">
+                  <span className="input-group-text">
+                    <i className="bi bi-search"></i>
+                  </span>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. GET /admin or 0x474554"
+                    value={payloadInput}
+                    onChange={e => handlePayloadChange(e.target.value)}
+                  />
+                  {payloadInput && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={() => handlePayloadChange('')}
                     >
                       ×
                     </button>

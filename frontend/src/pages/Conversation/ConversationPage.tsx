@@ -318,23 +318,26 @@ export const ConversationPage = () => {
               <h6 className="mb-0">Conversations</h6>
               <small className="text-muted">Click a row to view details</small>
             </div>
-            <div className="card-body p-0">
-              {loading ? (
+            <div className="card-body p-0" style={{ position: 'relative' }}>
+              {loading && conversations.length === 0 && (
                 <LoadingSpinner size="medium" message="Loading conversations..." />
-              ) : (
-                <ConversationList
-                  conversations={conversations}
-                  onSelectConversation={c => {
-                    const idx = conversations.findIndex(x => x.id === c.id);
-                    openConversation(c, idx);
-                  }}
-                  sortBy={filters.sortBy}
-                  sortDir={filters.sortDir}
-                  onSort={handleSort}
-                  onRiskFilterClick={() => setFilters({ hasRisks: true })}
-                  visibleColumns={visibleColumns}
-                  signatureSeverities={signatureSeverities}
-                />
+              )}
+              {conversations.length > 0 && (
+                <div style={{ opacity: loading ? 0.4 : 1, pointerEvents: loading ? 'none' : 'auto', transition: 'opacity 0.15s' }}>
+                  <ConversationList
+                    conversations={conversations}
+                    onSelectConversation={c => {
+                      const idx = conversations.findIndex(x => x.id === c.id);
+                      openConversation(c, idx);
+                    }}
+                    sortBy={filters.sortBy}
+                    sortDir={filters.sortDir}
+                    onSort={handleSort}
+                    onRiskFilterClick={() => setFilters({ hasRisks: true })}
+                    visibleColumns={visibleColumns}
+                    signatureSeverities={signatureSeverities}
+                  />
+                </div>
               )}
             </div>
             {totalPages > 1 && (

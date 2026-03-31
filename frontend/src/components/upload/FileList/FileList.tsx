@@ -12,8 +12,10 @@ import './FileList.css';
 export const FileList = () => {
   const recentFiles = useStore(state => state.recentFiles);
   const removeRecentFile = useStore(state => state.removeRecentFile);
+  const clearRecentFiles = useStore(state => state.clearRecentFiles);
   const navigate = useNavigate();
   const [pendingDeleteFile, setPendingDeleteFile] = useState<RecentFile | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   // Validate files on mount - remove files that no longer exist on backend
   useEffect(() => {
@@ -81,11 +83,21 @@ export const FileList = () => {
   return (
     <>
       <Card className="file-list-card mt-4">
-        <Card.Header>
+        <Card.Header className="d-flex justify-content-between align-items-center">
           <h5 className="mb-0">
             <i className="bi bi-clock-history me-2"></i>
             Recent Uploads
           </h5>
+          {recentFiles.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-outline-danger btn-sm"
+              onClick={() => setConfirmDeleteAll(true)}
+            >
+              <i className="bi bi-trash me-1"></i>
+              Delete all
+            </button>
+          )}
         </Card.Header>
         <Card.Body className="p-0">
           {recentFiles.length === 0 ? (
@@ -93,7 +105,7 @@ export const FileList = () => {
               <p className="mb-0">No recent uploads. Upload a PCAP file to get started!</p>
             </div>
           ) : (
-            <div className="list-group list-group-flush">
+            <div className="list-group list-group-flush" style={{ maxHeight: '13.5rem', overflowY: 'auto' }}>
               {recentFiles.map(file => (
                 <div
                   key={file.id}
@@ -166,6 +178,34 @@ export const FileList = () => {
           </button>
           <button type="button" className="btn btn-outline-danger" onClick={handleConfirmDelete}>
             Delete
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Delete all confirmation modal */}
+      <Modal show={confirmDeleteAll} onHide={() => setConfirmDeleteAll(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Delete All</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Are you sure you want to remove all <strong>{recentFiles.length}</strong> recent uploads?
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => setConfirmDeleteAll(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => { clearRecentFiles(); setConfirmDeleteAll(false); }}
+          >
+            Delete all
           </button>
         </Modal.Footer>
       </Modal>

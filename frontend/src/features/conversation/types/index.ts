@@ -5,6 +5,7 @@ export type SortDir = 'asc' | 'desc';
 export interface ConversationFilters {
   ip: string;
   port: string;
+  payloadContains: string;
   protocols: string[];
   l7Protocols: string[];
   apps: string[];

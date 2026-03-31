@@ -277,6 +277,17 @@ export function buildNetworkGraph(
   // peerSets[ip] = set of all distinct peer IPs
   const peerSets: Record<string, Set<string>> = {};
 
+  // Seed all known hosts from the analysis summary so the node count matches
+  // the "Unique Hosts" figure on the overview, even for hosts that fall outside
+  // the conversation rendering limit below.
+  if (analysisSummary?.uniqueHosts) {
+    for (const host of analysisSummary.uniqueHosts) {
+      if (host.ip && !nodeMap[host.ip]) {
+        nodeMap[host.ip] = createNode(host.ip, host.hostname);
+      }
+    }
+  }
+
   // Limit conversations to top N by packet count for performance
   const limitedConversations =
     conversations.length > maxConversations

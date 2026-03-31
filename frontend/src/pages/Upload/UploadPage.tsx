@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col } from '@govtechsg/sgds-react';
+import { Row, Col, Modal } from '@govtechsg/sgds-react';
 import { FileUploadZone } from '@components/upload/FileUploadZone';
 import { FileList } from '@components/upload/FileList';
 import { UploadProgress } from '@components/upload/UploadProgress';
@@ -9,7 +9,7 @@ import { useFileUpload } from '@features/upload/hooks/useFileUpload';
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
 
 export const UploadPage = () => {
-  const { uploadFiles, uploads, isUploading } = useFileUpload();
+  const { uploadFiles, uploads, clearUploads, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
   const navigate = useNavigate();
 
@@ -27,6 +27,15 @@ export const UploadPage = () => {
         console.error('Failed to fetch upload limits, using default.', err);
       });
   }, []);
+
+  // Auto-navigate for single-file uploads only
+  useEffect(() => {
+    if (uploads.length !== 1 || isUploading) return;
+    const upload = uploads[0];
+    if (upload.fileId && !upload.error) {
+      navigate(`/analysis/${upload.fileId}`);
+    }
+  }, [uploads, isUploading, navigate]);
 
   return (
     <div className="upload-page">
@@ -50,20 +59,43 @@ export const UploadPage = () => {
             </Col>
           </Row>
 
-          {uploads.length > 0 && (
-            <div className="upload-progress-scroll mt-3">
-              {uploads.map(u => (
-                <UploadProgress
-                  key={u.id}
-                  fileName={u.fileName}
-                  progress={u.progress}
-                  isUploading={u.isUploading}
-                  error={u.error}
-                  onAnalyze={u.fileId ? () => navigate(`/analysis/${u.fileId}`) : undefined}
-                />
-              ))}
-            </div>
-          )}
+          <Modal
+            show={uploads.length > 0}
+            onHide={() => { if (!isUploading) clearUploads(); }}
+            centered
+            backdrop={isUploading ? 'static' : true}
+            keyboard={!isUploading}
+          >
+            <Modal.Header closeButton={!isUploading}>
+              <Modal.Title>
+                {isUploading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                    Uploading…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-circle-fill text-success me-2" />
+                    Upload complete
+                  </>
+                )}
+              </Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <div className="d-flex flex-column gap-2">
+                {uploads.map(u => (
+                  <UploadProgress
+                    key={u.id}
+                    fileName={u.fileName}
+                    progress={u.progress}
+                    isUploading={u.isUploading}
+                    error={u.error}
+                    onAnalyze={u.fileId ? () => navigate(`/analysis/${u.fileId}`) : undefined}
+                  />
+                ))}
+              </div>
+            </Modal.Body>
+          </Modal>
 
           <FileList />
         </Col>
