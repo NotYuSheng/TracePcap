@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   GENERATE_STORY: (fileId: string) => `/story/generate/${fileId}`,
   GET_STORY: (storyId: string) => `/story/${storyId}`,
   GET_STORY_BY_FILE: (fileId: string) => `/story/file/${fileId}`,
+  ASK_STORY: (storyId: string) => `/story/${storyId}/ask`,
 
   // Filter Generator (Not yet implemented in backend)
   GENERATE_FILTER: (fileId: string) => `/filter/generate/${fileId}`,

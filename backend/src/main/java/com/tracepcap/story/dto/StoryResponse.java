@@ -18,4 +18,5 @@ public class StoryResponse {
   private List<NarrativeSection> narrative;
   private List<Highlight> highlights;
   private List<StoryTimelineEvent> timeline;
+  private List<String> suggestedQuestions;
 }

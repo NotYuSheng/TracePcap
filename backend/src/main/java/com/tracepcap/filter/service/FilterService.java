@@ -44,7 +44,7 @@ public class FilterService {
     try {
       ProcessBuilder pb =
           new ProcessBuilder(
-              "tshark", "-r", pcapFile.getAbsolutePath(), "-Y", displayFilter.trim(), "-c", "1");
+              "tshark", "-r", pcapFile.getAbsolutePath(), "-2", "-R", displayFilter.trim(), "-c", "1");
       pb.redirectErrorStream(true);
       Process process = pb.start();
 
@@ -293,7 +293,8 @@ public class FilterService {
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
-            "-Y",
+            "-2",
+            "-R",
             displayFilter,
             "-T",
             "fields",
@@ -326,7 +327,7 @@ public class FilterService {
             "-e",
             "tcp.flags.fin",
             "-e",
-            "tcp.flags.rst",
+            "tcp.flags.reset",
             "-e",
             "tcp.flags.push",
             "-e",
@@ -392,7 +393,7 @@ public class FilterService {
 
       // TCP flags (indices 10–15)
       List<String> flags = new ArrayList<>();
-      String[] flagNames = {"SYN", "ACK", "FIN", "RST", "PSH", "URG"};
+      String[] flagNames = {"SYN", "ACK", "FIN", "RST", "PSH", "URG"}; // display names only
       for (int i = 0; i < flagNames.length; i++) {
         if (f.length > 10 + i && "1".equals(f[10 + i])) flags.add(flagNames[i]);
       }
