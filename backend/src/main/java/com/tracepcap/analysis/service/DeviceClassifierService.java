@@ -317,8 +317,9 @@ public class DeviceClassifierService {
         continue;
       }
 
-      String deviceType = scoreAndClassify(ip, profile, ttl, ouiHint);
-      int confidence = computeConfidence(profile, ttl, ouiHint, mac);
+      Map<String, Integer> scores = new HashMap<>();
+      String deviceType = scoreAndClassify(ip, profile, ttl, ouiHint, scores);
+      int confidence = computeConfidence(scores);
 
       results.add(
           HostClassificationEntity.builder()
@@ -382,7 +383,7 @@ public class DeviceClassifierService {
   }
 
   private String ouiKey(String mac) {
-    if (mac == null || mac.length() < 8) return null;
+    if (mac == null || mac.length() < 6) return null;
     // Normalise to lower-case colon form "aa:bb:cc"
     String norm = mac.toLowerCase().replace("-", ":").replace(".", ":");
     // Accept "aa:bb:cc:dd:ee:ff" or "aabbccddeeff" etc.
@@ -397,11 +398,13 @@ public class DeviceClassifierService {
 
   /**
    * Core classifier: weighs signals and returns the most likely device type.
+   * Populates {@code scoresOut} with the final per-type scores so the caller
+   * can compute a margin-based confidence.
    */
   private String scoreAndClassify(
-      String ip, HostProfile p, Integer ttl, String ouiHint) {
+      String ip, HostProfile p, Integer ttl, String ouiHint, Map<String, Integer> scoresOut) {
 
-    Map<String, Integer> scores = new HashMap<>();
+    Map<String, Integer> scores = scoresOut;
     scores.put(ROUTER, 0);
     scores.put(MOBILE, 0);
     scores.put(LAPTOP_DESKTOP, 0);
@@ -490,16 +493,22 @@ public class DeviceClassifierService {
   }
 
   /**
-   * Confidence = number of distinct signals that agreed, scaled to 0–100.
+   * Confidence based on the score margin between the winning type and the
+   * second-best type. A large margin means the classification is unambiguous;
+   * a small margin means the signals are conflicted.
+   *
+   * <p>Scale: margin ≥ 60 → 100 %, scaled linearly down to 0 % at margin = 0.
    */
-  private int computeConfidence(HostProfile p, Integer ttl, String ouiHint, String mac) {
-    int signals = 0;
-    if (ouiHint != null) signals++;
-    if (ttl != null) signals++;
-    if (!p.apps.isEmpty()) signals++;
-    if (p.conversationCount >= 3) signals++; // enough traffic data
-    // Max 4 signals → scale to 100
-    return Math.min(100, signals * 25);
+  private int computeConfidence(Map<String, Integer> scores) {
+    List<Integer> sorted = scores.values().stream()
+        .sorted(Comparator.reverseOrder())
+        .toList();
+    if (sorted.isEmpty() || sorted.get(0) == 0) return 0;
+    int best   = sorted.get(0);
+    int second = sorted.size() > 1 ? sorted.get(1) : 0;
+    int margin = best - second;
+    // Clamp margin to [0, 60] and scale to [0, 100]
+    return Math.min(100, (int) Math.round(margin * 100.0 / 60.0));
   }
 
   /**

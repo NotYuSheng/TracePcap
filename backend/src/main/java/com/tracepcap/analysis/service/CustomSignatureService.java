@@ -119,17 +119,23 @@ public class CustomSignatureService {
     List<Map<String, Object>> rules = loadRules();
     if (rules.isEmpty()) return Map.of();
 
-    Map<String, String> overrides = new HashMap<>();
+    // Build rule-name → device_type map in one pass over rules
+    Map<String, String> ruleDeviceType = new HashMap<>();
     for (Map<String, Object> rule : rules) {
       String deviceType = (String) rule.get("device_type");
-      if (deviceType == null || deviceType.isBlank()) continue;
-
       String name = (String) rule.get("name");
-      if (name == null || name.isBlank()) continue;
+      if (deviceType != null && !deviceType.isBlank() && name != null && !name.isBlank()) {
+        ruleDeviceType.put(name, deviceType);
+      }
+    }
+    if (ruleDeviceType.isEmpty()) return Map.of();
 
-      // Any conversation that matched this rule contributes its src + dst IPs
-      for (PcapParserService.ConversationInfo conv : conversations) {
-        if (conv.getCustomSignatures().contains(name)) {
+    // One pass over conversations — look up each matched signature in the map
+    Map<String, String> overrides = new HashMap<>();
+    for (PcapParserService.ConversationInfo conv : conversations) {
+      for (String sig : conv.getCustomSignatures()) {
+        String deviceType = ruleDeviceType.get(sig);
+        if (deviceType != null) {
           if (conv.getSrcIp() != null) overrides.putIfAbsent(conv.getSrcIp(), deviceType);
           if (conv.getDstIp() != null) overrides.putIfAbsent(conv.getDstIp(), deviceType);
         }

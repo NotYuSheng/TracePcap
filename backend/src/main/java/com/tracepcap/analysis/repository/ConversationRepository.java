@@ -198,28 +198,19 @@ public interface ConversationRepository
 
       // Device type filter — srcIp or dstIp is classified with one of the given device types
       if (params.getDeviceTypes() != null && !params.getDeviceTypes().isEmpty()) {
-        Subquery<String> srcSub = query.subquery(String.class);
-        var srcHost = srcSub.from(HostClassificationEntity.class);
-        srcSub
-            .select(srcHost.get("ip"))
+        Subquery<String> deviceTypeSub = query.subquery(String.class);
+        var host = deviceTypeSub.from(HostClassificationEntity.class);
+        deviceTypeSub
+            .select(host.get("ip"))
             .where(
                 cb.and(
-                    cb.equal(srcHost.get("file").get("id"), fileId),
-                    srcHost.get("deviceType").in(params.getDeviceTypes())));
-
-        Subquery<String> dstSub = query.subquery(String.class);
-        var dstHost = dstSub.from(HostClassificationEntity.class);
-        dstSub
-            .select(dstHost.get("ip"))
-            .where(
-                cb.and(
-                    cb.equal(dstHost.get("file").get("id"), fileId),
-                    dstHost.get("deviceType").in(params.getDeviceTypes())));
+                    cb.equal(host.get("file").get("id"), fileId),
+                    host.get("deviceType").in(params.getDeviceTypes())));
 
         predicates.add(
             cb.or(
-                root.get("srcIp").in(srcSub),
-                root.get("dstIp").in(dstSub)));
+                root.get("srcIp").in(deviceTypeSub),
+                root.get("dstIp").in(deviceTypeSub)));
       }
 
       // Payload contains — EXISTS subquery: match hex-encoded payload of any packet

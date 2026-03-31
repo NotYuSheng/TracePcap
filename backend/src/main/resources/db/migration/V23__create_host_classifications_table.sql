@@ -9,5 +9,3 @@ CREATE TABLE host_classifications (
     confidence  INTEGER NOT NULL,
     UNIQUE (file_id, ip)
 );
-
-CREATE INDEX idx_host_class_file_id ON host_classifications(file_id);
