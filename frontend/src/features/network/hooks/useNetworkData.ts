@@ -58,6 +58,7 @@ export function useNetworkData(
         fileTypes: [],
         riskTypes: [],
         customSignatures: [],
+        deviceTypes: [],
         sortBy: '',
         sortDir: 'asc',
         page: 1,
@@ -65,11 +66,20 @@ export function useNetworkData(
       });
       const conversations = response.data;
 
+      // Fetch host classifications in parallel with conversation fetch (best-effort)
+      let hostClassifications;
+      try {
+        hostClassifications = await conversationService.getHostClassifications(fileId);
+      } catch {
+        // If the endpoint isn't available (e.g. older analysis), silently skip
+      }
+
       // Transform to graph data with conversation limit
       const graphData = networkService.buildNetworkGraph(
         conversations,
         analysisSummary,
-        maxConversations
+        maxConversations,
+        hostClassifications
       );
 
       setNodes(graphData.nodes);

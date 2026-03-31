@@ -2,6 +2,7 @@ import { useRef, memo } from 'react';
 import { GraphCanvas, type GraphCanvasRef } from 'reagraph';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
+import { deviceTypeColor } from '@/utils/deviceType';
 import './NetworkGraph.css';
 
 interface NetworkGraphProps {
@@ -11,22 +12,44 @@ interface NetworkGraphProps {
   layoutType?: 'forceDirected2d' | 'hierarchicalTd';
 }
 
+// Node types that carry specific semantic meaning — device type should not override these.
+const SPECIFIC_NODE_TYPES = new Set([
+  'dns-server', 'web-server', 'ssh-server', 'ftp-server',
+  'mail-server', 'dhcp-server', 'ntp-server', 'database-server', 'router',
+]);
+
 /**
- * Get node color based on detected node type (falls back to role-based color)
+ * Get node color:
+ *   anomaly > specific port-based nodeType > device type > generic nodeType > role fallback.
+ *
+ * Specific server roles (DNS, HTTP, SSH, …) keep their dedicated colours.
+ * Device type colours apply only to generic nodes (client / unknown).
  */
-function getNodeColor(nodeData: { role: string; isAnomaly: boolean; nodeType?: string }): string {
+function getNodeColor(nodeData: {
+  role: string;
+  isAnomaly: boolean;
+  nodeType?: string;
+  deviceType?: string;
+}): string {
   if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
+
+  // Specific server roles win — they carry meaningful port-based identity.
+  if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
+    return NODE_TYPE_COLORS[nodeData.nodeType];
+
+  // For generic nodes, device type adds useful information.
+  if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
+    return deviceTypeColor(nodeData.deviceType);
+
+  // Generic node type colour (client = blue, unknown = gray).
   if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType])
     return NODE_TYPE_COLORS[nodeData.nodeType];
 
-  // Fallback to role-based colour for unclassified nodes
+  // Final role-based fallback.
   switch (nodeData.role) {
-    case 'server':
-      return '#2ecc71'; // Green
-    case 'both':
-      return '#9b59b6'; // Purple
-    default:
-      return '#95a5a6'; // Gray
+    case 'server': return '#2ecc71';
+    case 'both':   return '#9b59b6';
+    default:       return '#95a5a6';
   }
 }
 

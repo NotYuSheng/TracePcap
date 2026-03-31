@@ -8,9 +8,11 @@ import com.tracepcap.analysis.dto.PacketResponse;
 import com.tracepcap.analysis.dto.ProtocolStatsResponse;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.common.exception.ResourceNotFoundException;
@@ -56,12 +58,14 @@ public class AnalysisService {
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
+  private final HostClassificationRepository hostClassificationRepository;
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
   private final NdpiService ndpiService;
   private final TsharkEnrichmentService tsharkEnrichmentService;
   private final CustomSignatureService customSignatureService;
+  private final DeviceClassifierService deviceClassifierService;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -104,6 +108,18 @@ public class AnalysisService {
 
       // Apply custom user-defined signature rules (appends matched rule names to customSignatures)
       customSignatureService.applySignatures(parseResult.getConversations());
+
+      // Classify each unique host into a device category and save to DB
+      Map<String, String> deviceOverrides =
+          customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
+      List<HostClassificationEntity> hostClassifications =
+          deviceClassifierService.classify(
+              file,
+              parseResult.getConversations(),
+              parseResult.getHostTtls(),
+              parseResult.getHostMacs(),
+              deviceOverrides);
+      hostClassificationRepository.saveAll(hostClassifications);
 
       // Update analysis results
       analysis.setPacketCount(parseResult.getPacketCount());

@@ -11,6 +11,9 @@ export const API_ENDPOINTS = {
   FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
   KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,
 
+  // Host Classifications
+  HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
+
   // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,

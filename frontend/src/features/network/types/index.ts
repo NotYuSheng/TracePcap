@@ -1,4 +1,5 @@
 // Network Graph Types
+import type { DeviceType } from '@/types';
 
 export type NodeType =
   | 'dns-server'
@@ -40,6 +41,12 @@ export interface NodeData {
   isAnomaly: boolean;
   nodeType: NodeType;
   nodeTypeEvidence: NodeTypeEvidence;
+  /** Device type from backend classification (e.g. ROUTER, MOBILE, SERVER). */
+  deviceType?: DeviceType;
+  /** Confidence score 0–100 from the classifier. */
+  deviceConfidence?: number;
+  /** Manufacturer from OUI lookup. */
+  manufacturer?: string;
 }
 
 export interface GraphEdge {

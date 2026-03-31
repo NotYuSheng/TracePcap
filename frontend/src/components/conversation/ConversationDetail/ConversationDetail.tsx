@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Conversation, Packet } from '@/types';
+import type { Conversation, Packet, HostClassification } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import {
   getAppColor,
@@ -9,11 +9,15 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
+import { deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HexViewer } from '../HexViewer/HexViewer';
+import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
+import type { DeviceClassificationInfo } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
 
 interface ConversationDetailProps {
   conversation: Conversation;
   signatureSeverities?: Record<string, string>;
+  hostClassMap?: Map<string, HostClassification>;
 }
 
 const PRINTABLE_ASCII_THRESHOLD = 0.3;
@@ -34,9 +38,24 @@ function hasReadableAscii(hex: string): boolean {
 export const ConversationDetail = ({
   conversation,
   signatureSeverities = {},
+  hostClassMap,
 }: ConversationDetailProps) => {
   const [source, destination] = conversation.endpoints;
+  const srcClass = hostClassMap?.get(source.ip);
+  const dstClass = hostClassMap?.get(destination.ip);
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
+  const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
+
+  const openDevicePopup = (cls: HostClassification, ip: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDevicePopup({
+      ip,
+      deviceType: cls.deviceType,
+      confidence: cls.confidence,
+      manufacturer: cls.manufacturer,
+      ttl: cls.ttl,
+    });
+  };
 
   const asciiPacketIds = useMemo(() => {
     const ids = new Set<string>();
@@ -79,10 +98,32 @@ export const ConversationDetail = ({
             <div className="col-md-6">
               <dl className="row mb-0">
                 <dt className="col-sm-4">Source:</dt>
-                <dd className="col-sm-8">{formatIpPort(source.ip, source.port)}</dd>
+                <dd className="col-sm-8">
+                  {formatIpPort(source.ip, source.port)}
+                  {srcClass && (
+                    <span
+                      className="ms-2 badge"
+                      style={{ backgroundColor: deviceTypeColor(srcClass.deviceType), color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
+                      title="Click for details"
+                      onClick={e => openDevicePopup(srcClass, source.ip, e)}
+                    >
+                      {deviceTypeIcon(srcClass.deviceType)} {deviceTypeLabel(srcClass.deviceType)}
+                    </span>
+                  )}
+                </dd>
                 <dt className="col-sm-4">Destination:</dt>
                 <dd className="col-sm-8">
                   {formatIpPort(destination.ip, destination.port)}
+                  {dstClass && (
+                    <span
+                      className="ms-2 badge"
+                      style={{ backgroundColor: deviceTypeColor(dstClass.deviceType), color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
+                      title="Click for details"
+                      onClick={e => openDevicePopup(dstClass, destination.ip, e)}
+                    >
+                      {deviceTypeIcon(dstClass.deviceType)} {deviceTypeLabel(dstClass.deviceType)}
+                    </span>
+                  )}
                   {conversation.hostname && (
                     <small className="text-info d-block">{conversation.hostname}</small>
                   )}
@@ -405,6 +446,10 @@ export const ConversationDetail = ({
           </div>
         </div>
       </div>
+
+      {devicePopup && (
+        <DeviceClassificationPopup info={devicePopup} onClose={() => setDevicePopup(null)} />
+      )}
     </div>
   );
 };

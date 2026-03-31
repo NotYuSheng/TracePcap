@@ -24,12 +24,15 @@ public class PcapParserService {
     result.setProtocolCounts(new HashMap<>());
     result.setProtocolBytes(new HashMap<>());
     result.setConversations(new ArrayList<>());
+    // First-seen TTL and MAC per source IP (used for device classification)
+    Map<String, Integer> hostTtls = new HashMap<>();
+    Map<String, String> hostMacs = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info |
-    //         tcp.payload | udp.payload
+    //         tcp.payload | udp.payload | ip.ttl | eth.src
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -66,7 +69,11 @@ public class PcapParserService {
             "-e",
             "tcp.payload",
             "-e",
-            "udp.payload");
+            "udp.payload",
+            "-e",
+            "ip.ttl",
+            "-e",
+            "eth.src");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     long packetNumber = 0;
@@ -101,6 +108,13 @@ public class PcapParserService {
           String protocol = protocolRaw.length() > 20 ? protocolRaw.substring(0, 20) : protocolRaw;
           String info = (f.length > 11 && !f[11].isEmpty()) ? f[11] : protocol;
 
+          // Extract TTL (field 14) and source MAC (field 15) — best-effort, may be absent
+          Integer ttl = null;
+          if (f.length > 14 && !f[14].isEmpty()) {
+            try { ttl = Integer.parseInt(firstValue(f[14])); } catch (NumberFormatException ignored) {}
+          }
+          String srcMac = (f.length > 15 && !f[15].isEmpty()) ? firstValue(f[15]).toLowerCase() : null;
+
           LocalDateTime timestamp =
               LocalDateTime.ofInstant(
                   Instant.ofEpochMilli((long) (epochSec * 1000)), ZoneId.systemDefault());
@@ -114,6 +128,12 @@ public class PcapParserService {
 
           result.setTotalBytes(result.getTotalBytes() + packetSize);
           incrementProtocolCount(result, protocol, packetSize);
+
+          // Record first-seen TTL and MAC for source IP
+          if (srcIp != null) {
+            if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
+            if (srcMac != null) hostMacs.putIfAbsent(srcIp, srcMac);
+          }
 
           // Track conversations for IP traffic
           if (srcIp != null && dstIp != null) {
@@ -194,6 +214,8 @@ public class PcapParserService {
 
     result.setPacketCount(packetNumber);
     result.setConversations(new ArrayList<>(conversationMap.values()));
+    result.setHostTtls(hostTtls);
+    result.setHostMacs(hostMacs);
 
     log.info(
         "PCAP analysis completed: {} packets, {} bytes, {} conversations",
@@ -280,6 +302,10 @@ public class PcapParserService {
     private Map<String, Long> protocolCounts;
     private Map<String, Long> protocolBytes;
     private List<ConversationInfo> conversations;
+    /** First-seen TTL value per source IP address. */
+    private Map<String, Integer> hostTtls = new HashMap<>();
+    /** First-seen Ethernet source MAC address per source IP address. */
+    private Map<String, String> hostMacs = new HashMap<>();
   }
 
   @lombok.Data

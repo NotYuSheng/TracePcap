@@ -1,7 +1,14 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
-import type { Conversation, NetworkEndpoint, Protocol, PaginatedResponse, Packet } from '@/types';
+import type {
+  Conversation,
+  NetworkEndpoint,
+  Protocol,
+  PaginatedResponse,
+  Packet,
+  HostClassification,
+} from '@/types';
 import type { ConversationFilters } from '../types';
 
 // Backend response types
@@ -132,6 +139,8 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
     if (filters.customSignatures.length > 0)
       params.customSignatures = filters.customSignatures.join(',');
+    if (filters.deviceTypes && filters.deviceTypes.length > 0)
+      params.deviceTypes = filters.deviceTypes.join(',');
     if (filters.sortBy) params.sortBy = filters.sortBy;
     if (filters.sortBy) params.sortDir = filters.sortDir;
 
@@ -169,6 +178,8 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
     if (filters.customSignatures.length > 0)
       params.set('customSignatures', filters.customSignatures.join(','));
+    if (filters.deviceTypes && filters.deviceTypes.length > 0)
+      params.set('deviceTypes', filters.deviceTypes.join(','));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
@@ -204,6 +215,16 @@ export const conversationService = {
    */
   getFileTypes: async (fileId: string): Promise<string[]> => {
     const response = await apiClient.get<string[]>(`/conversations/${fileId}/file-types`);
+    return response.data;
+  },
+
+  /**
+   * Returns device-type classifications for all unique hosts in the given file.
+   */
+  getHostClassifications: async (fileId: string): Promise<HostClassification[]> => {
+    const response = await apiClient.get<HostClassification[]>(
+      API_ENDPOINTS.HOST_CLASSIFICATIONS(fileId)
+    );
     return response.data;
   },
 

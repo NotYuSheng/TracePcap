@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import type { AnalysisData, Conversation } from '@/types';
+import type { AnalysisData, Conversation, HostClassification } from '@/types';
 import type { SortField } from '@/features/conversation/types';
 import { loadVisibleColumns, COLUMN_STORAGE_KEY } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
@@ -36,6 +36,7 @@ export const ConversationPage = () => {
   const [riskTypeOptions, setRiskTypeOptions] = useState<string[]>([]);
   const [customSignatureOptions, setCustomSignatureOptions] = useState<string[]>([]);
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
+  const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
 
   const toggleColumn = useCallback((key: ColumnKey) => {
@@ -66,6 +67,10 @@ export const ConversationPage = () => {
         });
         setSignatureSeverities(map);
       })
+      .catch(console.error);
+    conversationService
+      .getHostClassifications(fileId)
+      .then(list => setHostClassMap(new Map(list.map(c => [c.ip, c]))))
       .catch(console.error);
   }, [fileId]);
 
@@ -336,6 +341,7 @@ export const ConversationPage = () => {
                     onRiskFilterClick={() => setFilters({ hasRisks: true })}
                     visibleColumns={visibleColumns}
                     signatureSeverities={signatureSeverities}
+                    hostClassMap={hostClassMap}
                   />
                 </div>
               )}
@@ -415,6 +421,7 @@ export const ConversationPage = () => {
                   <ConversationDetail
                     conversation={selectedConversation}
                     signatureSeverities={signatureSeverities}
+                    hostClassMap={hostClassMap}
                   />
                 )}
               </div>
