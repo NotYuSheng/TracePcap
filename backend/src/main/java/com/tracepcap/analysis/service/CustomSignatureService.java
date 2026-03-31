@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -97,6 +98,44 @@ public class CustomSignatureService {
           matchCount,
           conversations.size());
     }
+  }
+
+  /**
+   * Returns a map of IP address → custom device type for any IPs that were involved in
+   * conversations matched by a rule containing a {@code device_type} field. Call this after
+   * {@link #applySignatures} so the conversations already carry their matched rule names.
+   *
+   * <p>Example YAML:
+   *
+   * <pre>
+   * - name: my_cctv
+   *   device_type: "CCTV Camera"
+   *   match:
+   *     ip: "192.168.1.50"
+   * </pre>
+   */
+  public Map<String, String> getDeviceTypeOverrides(
+      List<PcapParserService.ConversationInfo> conversations) {
+    List<Map<String, Object>> rules = loadRules();
+    if (rules.isEmpty()) return Map.of();
+
+    Map<String, String> overrides = new HashMap<>();
+    for (Map<String, Object> rule : rules) {
+      String deviceType = (String) rule.get("device_type");
+      if (deviceType == null || deviceType.isBlank()) continue;
+
+      String name = (String) rule.get("name");
+      if (name == null || name.isBlank()) continue;
+
+      // Any conversation that matched this rule contributes its src + dst IPs
+      for (PcapParserService.ConversationInfo conv : conversations) {
+        if (conv.getCustomSignatures().contains(name)) {
+          if (conv.getSrcIp() != null) overrides.putIfAbsent(conv.getSrcIp(), deviceType);
+          if (conv.getDstIp() != null) overrides.putIfAbsent(conv.getDstIp(), deviceType);
+        }
+      }
+    }
+    return overrides;
   }
 
   // -------------------------------------------------------------------------

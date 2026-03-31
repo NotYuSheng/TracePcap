@@ -82,7 +82,13 @@ public class ConversationsController {
           @RequestParam(required = false)
           String sortDir,
       @Parameter(description = "Legacy alias for ip param") @RequestParam(required = false)
-          String search) {
+          String search,
+      @Parameter(
+              description =
+                  "Comma-separated list of device types to include (ROUTER, MOBILE,"
+                      + " LAPTOP_DESKTOP, SERVER, IOT, UNKNOWN, or custom)")
+          @RequestParam(required = false)
+          String deviceTypes) {
 
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 25;
@@ -102,7 +108,8 @@ public class ConversationsController {
             payloadContains,
             sortBy,
             sortDir,
-            search);
+            search,
+            deviceTypes);
 
     log.info(
         "GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, l7Protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
@@ -164,6 +171,7 @@ public class ConversationsController {
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
       @RequestParam(required = false) String search,
+      @RequestParam(required = false) String deviceTypes,
       HttpServletResponse response)
       throws IOException {
 
@@ -182,7 +190,8 @@ public class ConversationsController {
             payloadContains,
             sortBy,
             sortDir,
-            search);
+            search,
+            deviceTypes);
     List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -240,7 +249,8 @@ public class ConversationsController {
       String payloadContains,
       String sortBy,
       String sortDir,
-      String search) {
+      String search,
+      String deviceTypes) {
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
         .ip(resolvedIp)
@@ -254,6 +264,7 @@ public class ConversationsController {
         .riskTypes(splitComma(riskTypes))
         .customSignatures(splitComma(customSignatures))
         .payloadContains(payloadContains)
+        .deviceTypes(splitComma(deviceTypes))
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

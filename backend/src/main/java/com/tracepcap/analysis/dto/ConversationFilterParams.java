@@ -56,6 +56,12 @@ public class ConversationFilterParams {
   private final String payloadContains;
 
   /**
+   * Restrict to conversations where srcIp OR dstIp has a host classification whose deviceType is
+   * in this list (OR match). Empty = no filter.
+   */
+  private final List<String> deviceTypes;
+
+  /**
    * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp}, {@code packets},
    * {@code bytes}, {@code duration}, {@code startTime}. Null or blank = default DB ordering.
    */

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Conversation } from '@/types';
+import type { Conversation, HostClassification } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
@@ -23,6 +23,7 @@ interface ConversationListProps {
   onRiskFilterClick?: () => void;
   visibleColumns: Set<ColumnKey>;
   signatureSeverities?: Record<string, string>;
+  hostClassMap?: Map<string, HostClassification>;
 }
 
 export const ConversationList = ({

@@ -1,4 +1,4 @@
-import type { Conversation, AnalysisSummary } from '@/types';
+import type { Conversation, AnalysisSummary, HostClassification } from '@/types';
 import type {
   GraphNode,
   GraphEdge,
@@ -262,11 +262,13 @@ function markAnomalies(nodeMap: NodeMap, analysisSummary?: AnalysisSummary) {
  * @param conversations - Array of conversations to visualize
  * @param analysisSummary - Optional analysis summary for anomaly detection
  * @param maxConversations - Maximum number of conversations to render (default: 500)
+ * @param hostClassifications - Optional per-IP device classifications from the backend
  */
 export function buildNetworkGraph(
   conversations: Conversation[],
   analysisSummary?: AnalysisSummary,
-  maxConversations: number = 500
+  maxConversations: number = 500,
+  hostClassifications?: HostClassification[]
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const edges: GraphEdge[] = [];
@@ -341,6 +343,20 @@ export function buildNetworkGraph(
   Object.keys(nodeMap).forEach(ip => {
     classifyNodeType(nodeMap[ip], serverPorts[ip] || {}, peerSets[ip]?.size || 0);
   });
+
+  // Apply backend device classifications (deviceType, confidence, manufacturer)
+  if (hostClassifications) {
+    const classMap = new Map(hostClassifications.map(c => [c.ip, c]));
+    Object.keys(nodeMap).forEach(ip => {
+      const c = classMap.get(ip);
+      if (c) {
+        nodeMap[ip].data.deviceType = c.deviceType;
+        nodeMap[ip].data.deviceConfidence = c.confidence;
+        nodeMap[ip].data.manufacturer = c.manufacturer;
+        if (c.mac && !nodeMap[ip].data.mac) nodeMap[ip].data.mac = c.mac;
+      }
+    });
+  }
 
   // Mark anomalies if analysis data is available
   if (analysisSummary) {

@@ -27,6 +27,12 @@
 #
 # Severity colors in the UI:
 #   critical -> red   | high -> orange   | medium -> amber   | low -> purple
+#
+# Optional device classification override:
+#   device_type - pin a matched IP's device type in the Network Diagram and Conversation filters
+#                 Standard values: ROUTER | MOBILE | LAPTOP_DESKTOP | SERVER | IOT | UNKNOWN
+#                 Custom strings are also accepted (e.g. "CCTV Camera", "PLC")
+#                 When set, ALL IPs (src + dst) involved in a matching conversation inherit this type.
 # ----------------------------------------------------------------------------
 
 signatures:
@@ -177,3 +183,13 @@ signatures:
       protocol: UDP
     payload_contains:
       - hex: "0010"   # QTYPE 16 = TXT record
+
+  # --- device_type: pin an IP to a specific device category ---
+  # Any IP communicating with 192.168.1.50 will be labelled "CCTV Camera".
+  # Replace the IP and device_type with your own values.
+  # - name: cctv_camera
+  #   description: Known CCTV camera on the local network
+  #   severity: low
+  #   device_type: "CCTV Camera"
+  #   match:
+  #     ip: "192.168.1.50"

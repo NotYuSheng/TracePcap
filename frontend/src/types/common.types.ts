@@ -262,6 +262,25 @@ export interface Session {
   purpose?: string;
 }
 
+// Device Classification Types
+export type DeviceType =
+  | 'ROUTER'
+  | 'MOBILE'
+  | 'LAPTOP_DESKTOP'
+  | 'SERVER'
+  | 'IOT'
+  | 'UNKNOWN'
+  | string; // custom override values from YAML
+
+export interface HostClassification {
+  ip: string;
+  mac?: string;
+  manufacturer?: string;
+  ttl?: number;
+  deviceType: DeviceType;
+  confidence: number;
+}
+
 // Filter Generator Types
 export interface FilterGenerationRequest {
   fileId: string;

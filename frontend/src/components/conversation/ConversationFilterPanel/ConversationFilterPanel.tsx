@@ -12,6 +12,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
+import { DEVICE_TYPES, deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import './ConversationFilterPanel.css';
 
 interface ProtocolStat {
@@ -639,6 +640,43 @@ export function ConversationFilterPanel({
                   </div>
                 </div>
               )}
+
+              {/* Device type filter */}
+              <div className="col-12">
+                <PillSectionHeader
+                  label={
+                    <>
+                      <i className="bi bi-cpu me-1"></i>Device Type
+                    </>
+                  }
+                  onSelectAll={() => onFiltersChange({ deviceTypes: [...DEVICE_TYPES] })}
+                  onDeselectAll={() => onFiltersChange({ deviceTypes: [] })}
+                />
+                <div className="d-flex flex-wrap gap-1 mt-1">
+                  {DEVICE_TYPES.map(dt => {
+                    const selected = (filters.deviceTypes ?? []).includes(dt);
+                    const bg = deviceTypeColor(dt);
+                    return (
+                      <button
+                        key={dt}
+                        type="button"
+                        className="badge border-0"
+                        style={{
+                          backgroundColor: selected ? bg : undefined,
+                          color: selected ? '#fff' : undefined,
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          opacity: selected ? 1 : 0.55,
+                          border: `1px solid ${bg}`,
+                        }}
+                        onClick={() => toggle('deviceTypes', dt, filters.deviceTypes ?? [])}
+                      >
+                        {deviceTypeIcon(dt)} {deviceTypeLabel(dt)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Column visibility */}
               <div className="col-12 pt-1 border-top mt-3">

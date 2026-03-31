@@ -2,6 +2,7 @@ package com.tracepcap.analysis.repository;
 
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
@@ -193,6 +194,32 @@ public interface ConversationRepository
                     cb.equal(packet.get("conversation").get("id"), root.get("id")),
                     packet.get("detectedFileType").in(params.getFileTypes())));
         predicates.add(cb.exists(sub));
+      }
+
+      // Device type filter — srcIp or dstIp is classified with one of the given device types
+      if (params.getDeviceTypes() != null && !params.getDeviceTypes().isEmpty()) {
+        Subquery<String> srcSub = query.subquery(String.class);
+        var srcHost = srcSub.from(HostClassificationEntity.class);
+        srcSub
+            .select(srcHost.get("ip"))
+            .where(
+                cb.and(
+                    cb.equal(srcHost.get("file").get("id"), fileId),
+                    srcHost.get("deviceType").in(params.getDeviceTypes())));
+
+        Subquery<String> dstSub = query.subquery(String.class);
+        var dstHost = dstSub.from(HostClassificationEntity.class);
+        dstSub
+            .select(dstHost.get("ip"))
+            .where(
+                cb.and(
+                    cb.equal(dstHost.get("file").get("id"), fileId),
+                    dstHost.get("deviceType").in(params.getDeviceTypes())));
+
+        predicates.add(
+            cb.or(
+                root.get("srcIp").in(srcSub),
+                root.get("dstIp").in(dstSub)));
       }
 
       // Payload contains — EXISTS subquery: match hex-encoded payload of any packet

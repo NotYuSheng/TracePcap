@@ -21,6 +21,7 @@ export const NetworkDiagramPage = () => {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
   const [activeLegendNodeTypes, setActiveLegendNodeTypes] = useState<string[]>([]);
+  const [activeLegendDeviceTypes, setActiveLegendDeviceTypes] = useState<string[]>([]);
 
   const toggleLegendProtocol = (key: string) =>
     setActiveLegendProtocols(prev =>
@@ -31,6 +32,12 @@ export const NetworkDiagramPage = () => {
     setActiveLegendNodeTypes(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
+
+  const toggleLegendDeviceType = (key: string) =>
+    setActiveLegendDeviceTypes(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+
   const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
     'forceDirected2d'
   );
@@ -41,6 +48,14 @@ export const NetworkDiagramPage = () => {
     nodes.forEach(n => {
       if (n.data.isAnomaly) types.add('anomaly');
       types.add(n.data.nodeType);
+    });
+    return types;
+  }, [nodes]);
+
+  const presentDeviceTypes = useMemo(() => {
+    const types = new Set<string>();
+    nodes.forEach(n => {
+      if (n.data.deviceType) types.add(n.data.deviceType);
     });
     return types;
   }, [nodes]);
@@ -99,8 +114,22 @@ export const NetworkDiagramPage = () => {
       );
     }
 
+    // Apply device type filter — keep edges that touch at least one node matching ANY selected device type
+    if (activeLegendDeviceTypes.length > 0) {
+      const matchingIds = new Set(
+        nodes
+          .filter(n => activeLegendDeviceTypes.includes(n.data.deviceType ?? ''))
+          .map(n => n.id)
+      );
+      filtered = filtered.filter(
+        edge => matchingIds.has(edge.source) || matchingIds.has(edge.target)
+      );
+    }
+
     const hasActiveFilters =
-      activeLegendProtocols.length > 0 || activeLegendNodeTypes.length > 0;
+      activeLegendProtocols.length > 0 ||
+      activeLegendNodeTypes.length > 0 ||
+      activeLegendDeviceTypes.length > 0;
 
     // When filters are active, hide nodes with no visible edge.
     // When no filters are active, show all nodes (including hosts with no
@@ -119,7 +148,7 @@ export const NetworkDiagramPage = () => {
       filteredNodes: visibleNodes,
       filteredEdges: filtered,
     };
-  }, [nodes, edges, activeLegendProtocols, activeLegendNodeTypes]);
+  }, [nodes, edges, activeLegendProtocols, activeLegendNodeTypes, activeLegendDeviceTypes]);
 
   const handleNodeClick = (node: GraphNode) => {
     setSelectedNode(node);
@@ -166,6 +195,7 @@ export const NetworkDiagramPage = () => {
           <div className="card mb-3">
             <div className="card-body p-0" style={{ height: '600px' }}>
               <NetworkGraph
+                key={`${layoutType}|${activeLegendProtocols.join(',')}|${activeLegendNodeTypes.join(',')}|${activeLegendDeviceTypes.join(',')}`}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 onNodeClick={handleNodeClick}
@@ -188,6 +218,10 @@ export const NetworkDiagramPage = () => {
             onLegendNodeTypeClear={() => setActiveLegendNodeTypes([])}
             presentNodeTypes={presentNodeTypes}
             presentEdgeLegendKeys={presentEdgeLegendKeys}
+            activeLegendDeviceTypes={activeLegendDeviceTypes}
+            onLegendDeviceTypeClick={toggleLegendDeviceType}
+            onLegendDeviceTypeClear={() => setActiveLegendDeviceTypes([])}
+            presentDeviceTypes={presentDeviceTypes}
           />
         </div>
       </div>

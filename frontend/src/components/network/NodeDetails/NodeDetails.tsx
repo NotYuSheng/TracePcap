@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge, NodeType } from '@/features/network/types';
+import { deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
 import './NodeDetails.css';
 
 interface NodeDetailsProps {
@@ -51,6 +53,8 @@ const NODE_TYPE_DISPLAY: Record<NodeType, { label: string; icon: string; badgeCl
 
 export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) {
   const navigate = useNavigate();
+  const [devicePopupOpen, setDevicePopupOpen] = useState(false);
+
   // ESC closes the modal
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -164,6 +168,31 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                       </div>
                     )}
                   </dd>
+
+                  {node.data.deviceType && (
+                    <>
+                      <dt className="col-5 text-muted">Device</dt>
+                      <dd className="col-7 mb-1">
+                        <span
+                          className="badge"
+                          role="button"
+                          title="Click for details"
+                          style={{
+                            backgroundColor: deviceTypeColor(node.data.deviceType),
+                            color: '#fff',
+                            cursor: 'pointer',
+                          }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setDevicePopupOpen(true);
+                          }}
+                        >
+                          {deviceTypeIcon(node.data.deviceType)}{' '}
+                          {deviceTypeLabel(node.data.deviceType)}
+                        </span>
+                      </dd>
+                    </>
+                  )}
                 </dl>
               </div>
 
@@ -252,6 +281,18 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
           </div>
         </div>
       </div>
+
+      {devicePopupOpen && node.data.deviceType && (
+        <DeviceClassificationPopup
+          info={{
+            ip: node.data.ip,
+            deviceType: node.data.deviceType,
+            confidence: node.data.deviceConfidence ?? 0,
+            manufacturer: node.data.manufacturer,
+          }}
+          onClose={() => setDevicePopupOpen(false)}
+        />
+      )}
     </div>
   );
 }
