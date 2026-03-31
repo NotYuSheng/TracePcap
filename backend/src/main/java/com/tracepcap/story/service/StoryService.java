@@ -157,7 +157,7 @@ public class StoryService {
    * @param question the user's question
    * @return the LLM's answer
    */
-  public StoryAnswerResponse askQuestion(UUID storyId, String question, List<com.tracepcap.story.dto.StoryQuestionRequest.HistoryEntry> history) {
+  public StoryAnswerResponse askQuestion(UUID storyId, String question, List<StoryQuestionRequest.HistoryEntry> history) {
     StoryEntity story =
         storyRepository
             .findById(storyId)

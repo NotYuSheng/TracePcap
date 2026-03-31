@@ -32,12 +32,12 @@ public class StoryController {
       summary = "Generate story",
       description = "Generate an AI-powered narrative story for a PCAP file")
   public ResponseEntity<StoryResponse> generateStory(
-      @PathVariable String fileId,
+      @PathVariable UUID fileId,
       @RequestBody(required = false) GenerateStoryRequest request) {
     log.info("Received story generation request for file: {}", fileId);
 
     String additionalContext = request != null ? request.getAdditionalContext() : null;
-    StoryResponse story = storyService.generateStory(UUID.fromString(fileId), additionalContext);
+    StoryResponse story = storyService.generateStory(fileId, additionalContext);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(story);
   }
@@ -55,10 +55,10 @@ public class StoryController {
   @PostMapping("/{storyId}/ask")
   @Operation(summary = "Ask a question", description = "Ask the LLM a question about an existing story")
   public ResponseEntity<StoryAnswerResponse> askQuestion(
-      @PathVariable String storyId, @RequestBody StoryQuestionRequest request) {
+      @PathVariable UUID storyId, @RequestBody StoryQuestionRequest request) {
     log.info("Received question for story: {}", storyId);
 
-    StoryAnswerResponse answer = storyService.askQuestion(UUID.fromString(storyId), request.getQuestion(), request.getHistory());
+    StoryAnswerResponse answer = storyService.askQuestion(storyId, request.getQuestion(), request.getHistory());
 
     return ResponseEntity.ok(answer);
   }
