@@ -4,13 +4,16 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -21,12 +24,17 @@ import org.springframework.web.client.RestClient;
  *
  * <p>Geo enrichment is best-effort: if the API is unreachable (offline deployment) the service
  * logs a warning and returns whatever is already in the cache.
+ *
+ * <p>Note: ip-api.com requires a Pro plan for HTTPS; the free tier only supports HTTP. IP
+ * addresses sent to the API are therefore unencrypted in transit. In air-gapped or high-security
+ * environments set {@code GEO_ENRICHMENT_ENABLED=false} to disable all external lookups.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class GeoIpService {
 
+  // ip-api.com free tier only supports HTTP — see class-level javadoc.
   private static final String API_URL = "http://ip-api.com/batch?fields=status,countryCode,country,as,org,query";
   private static final int BATCH_SIZE = 100;
 
@@ -37,6 +45,27 @@ public class GeoIpService {
   private int timeoutSeconds;
 
   private final IpGeoInfoRepository geoInfoRepository;
+
+  /** Shared RestClient — initialised once in {@link #init()} and reused for all requests. */
+  private RestClient restClient;
+
+  /**
+   * Tracks whether a warning has already been logged for the current analysis run so we don't
+   * flood the log if the API is unreachable across multiple batches.
+   */
+  private final AtomicBoolean warnedThisRun = new AtomicBoolean(false);
+
+  @PostConstruct
+  void init() {
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout((int) Duration.ofSeconds(timeoutSeconds).toMillis());
+    factory.setReadTimeout((int) Duration.ofSeconds(timeoutSeconds).toMillis());
+    restClient = RestClient.builder()
+        .baseUrl(API_URL)
+        .defaultHeader("Content-Type", "application/json")
+        .requestFactory(factory)
+        .build();
+  }
 
   public record GeoResult(String country, String countryCode, String asn, String org) {}
 
@@ -49,6 +78,9 @@ public class GeoIpService {
 
     List<String> external = ips.stream().filter(ip -> !isPrivate(ip)).collect(Collectors.toList());
     if (external.isEmpty()) return Map.of();
+
+    // Reset per-run warning flag so each new analysis run gets at most one warning
+    warnedThisRun.set(false);
 
     // Load cached entries
     Map<String, GeoResult> result = new HashMap<>();
@@ -114,16 +146,6 @@ public class GeoIpService {
 
   private Map<String, GeoResult> fetchFromApi(List<String> ips) {
     Map<String, GeoResult> result = new HashMap<>();
-    RestClient client = RestClient.builder()
-        .baseUrl(API_URL)
-        .defaultHeader("Content-Type", "application/json")
-        .requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {
-          {
-            setConnectTimeout((int) Duration.ofSeconds(timeoutSeconds).toMillis());
-            setReadTimeout((int) Duration.ofSeconds(timeoutSeconds).toMillis());
-          }
-        })
-        .build();
 
     // Process in batches of BATCH_SIZE
     for (int i = 0; i < ips.size(); i += BATCH_SIZE) {
@@ -132,7 +154,7 @@ public class GeoIpService {
           .map(ip -> Map.of("query", ip))
           .collect(Collectors.toList());
       try {
-        IpApiResponse[] responses = client.post()
+        IpApiResponse[] responses = restClient.post()
             .body(requestBody)
             .retrieve()
             .body(IpApiResponse[].class);
@@ -153,7 +175,10 @@ public class GeoIpService {
           }
         }
       } catch (Exception e) {
-        log.warn("GeoIP lookup failed for batch starting at index {}: {}", i, e.getMessage());
+        // Log only once per analysis run to avoid flooding the log when the API is unreachable
+        if (warnedThisRun.compareAndSet(false, true)) {
+          log.warn("GeoIP lookup failed (further failures this run will be suppressed): {}", e.getMessage());
+        }
         // Return partial results — don't fail the caller
       }
     }

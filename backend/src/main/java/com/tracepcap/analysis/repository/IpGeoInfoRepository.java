@@ -22,9 +22,9 @@ public interface IpGeoInfoRepository extends JpaRepository<IpGeoInfoEntity, Stri
           "SELECT DISTINCT g.country_code, g.country"
               + " FROM ip_geo_cache g"
               + " WHERE g.ip IN ("
-              + "   SELECT DISTINCT c.src_ip FROM conversations c WHERE c.file_id = :fileId"
-              + "   UNION"
-              + "   SELECT DISTINCT c.dst_ip FROM conversations c WHERE c.file_id = :fileId"
+              + "   SELECT src_ip FROM conversations WHERE file_id = :fileId"
+              + "   UNION ALL"
+              + "   SELECT dst_ip FROM conversations WHERE file_id = :fileId"
               + " )"
               + " AND g.country_code IS NOT NULL"
               + " ORDER BY g.country",
