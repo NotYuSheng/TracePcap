@@ -17,6 +17,9 @@ public class SystemController {
   @Value("${ANALYSIS_TIMEOUT_SECONDS:300}")
   private int analysisTimeoutSeconds;
 
+  @Value("${llm.api.timeout-seconds:300}")
+  private int llmTimeoutSeconds;
+
   /**
    * Returns runtime limits derived from APP_MEMORY_MB so the frontend never needs build-time baked
    * values. Consumed by the upload page and the analysis polling hook.
@@ -30,6 +33,8 @@ public class SystemController {
             "maxUploadMb",
             maxUploadSizeBytes / 1024 / 1024,
             "analysisTimeoutMs",
-            (long) analysisTimeoutSeconds * 1000));
+            (long) analysisTimeoutSeconds * 1000,
+            "llmTimeoutMs",
+            (long) llmTimeoutSeconds * 1000));
   }
 }
