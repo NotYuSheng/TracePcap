@@ -9,7 +9,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
-import { deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
 import type { DeviceClassificationInfo } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
@@ -28,8 +28,26 @@ function countryFlag(code: string): string {
     .join('');
 }
 
-function GeoInfoRows({ geo, label }: { geo?: ConversationGeoInfo; label: string }) {
-  if (!geo?.countryCode) return null;
+function isPrivateIp(ip: string): boolean {
+  return (
+    /^10\./.test(ip) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+    /^192\.168\./.test(ip) ||
+    /^127\./.test(ip) ||
+    /^169\.254\./.test(ip)
+  );
+}
+
+function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: string; ip: string }) {
+  if (!geo?.countryCode) {
+    if (!isPrivateIp(ip)) return null;
+    return (
+      <>
+        <dt className="col-sm-4">{label} Country:</dt>
+        <dd className="col-sm-8"><span className="text-muted">Internal</span></dd>
+      </>
+    );
+  }
   return (
     <>
       <dt className="col-sm-4">{label} Country:</dt>
@@ -129,7 +147,7 @@ export const ConversationDetail = ({
                       title="Click for details"
                       onClick={e => openDevicePopup(srcClass, source.ip, e)}
                     >
-                      {deviceTypeIcon(srcClass.deviceType)} {deviceTypeLabel(srcClass.deviceType)}
+                      {deviceTypeLabel(srcClass.deviceType)}
                     </span>
                   )}
                 </dd>
@@ -143,15 +161,15 @@ export const ConversationDetail = ({
                       title="Click for details"
                       onClick={e => openDevicePopup(dstClass, destination.ip, e)}
                     >
-                      {deviceTypeIcon(dstClass.deviceType)} {deviceTypeLabel(dstClass.deviceType)}
+                      {deviceTypeLabel(dstClass.deviceType)}
                     </span>
                   )}
                   {conversation.hostname && (
                     <small className="text-info d-block">{conversation.hostname}</small>
                   )}
                 </dd>
-                <GeoInfoRows geo={conversation.srcGeo} label="Src" />
-                <GeoInfoRows geo={conversation.dstGeo} label="Dst" />
+                <GeoInfoRows geo={conversation.srcGeo} label="Src" ip={source.ip} />
+                <GeoInfoRows geo={conversation.dstGeo} label="Dst" ip={destination.ip} />
                 <dt className="col-sm-4">L4 Protocol:</dt>
                 <dd className="col-sm-8">
                   {(() => {
