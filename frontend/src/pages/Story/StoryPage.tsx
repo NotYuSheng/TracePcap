@@ -31,18 +31,51 @@ export const StoryPage = () => {
   const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
   const autoTriggeredRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch('/api/system/limits')
+      .then(r => r.json())
+      .then((data: { llmTimeoutMs?: number }) => {
+        if (data.llmTimeoutMs) setLlmTimeoutMs(data.llmTimeoutMs);
+      })
+      .catch(() => {/* keep default */});
+  }, []);
+
+  useEffect(() => {
+    if (generating) {
+      setElapsedSeconds(0);
+      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [generating]);
 
   const handleGenerateStory = useCallback(async () => {
     try {
       setGenerating(true);
       setError(null);
-      const generatedStory = await storyService.generateStory(fileId, additionalContext);
+      const generatedStory = await storyService.generateStory(fileId, additionalContext, llmTimeoutMs);
       setStory(generatedStory);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (
+      const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
+      if (isTimeout) {
+        const minutes = Math.round(llmTimeoutMs / 60000);
+        setError(
+          `Story generation timed out after ${minutes} minute${minutes !== 1 ? 's' : ''}. The LLM is taking too long to respond. Try again or reduce the capture size.`
+        );
+      } else if (
         status === 500 ||
         msg.includes('500') ||
         msg.toLowerCase().includes('llm') ||
@@ -57,7 +90,7 @@ export const StoryPage = () => {
     } finally {
       setGenerating(false);
     }
-  }, [fileId, additionalContext]);
+  }, [fileId, additionalContext, llmTimeoutMs]);
 
   useEffect(() => {
     const fetchExistingStory = async () => {
@@ -128,6 +161,12 @@ export const StoryPage = () => {
   }
 
   if (generating && !story) {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    const elapsed = minutes > 0
+      ? `${minutes}m ${seconds.toString().padStart(2, '0')}s`
+      : `${seconds}s`;
+    const timeoutMinutes = Math.round(llmTimeoutMs / 60000);
     return (
       <div className="text-center py-5">
         <LoadingSpinner
@@ -136,6 +175,9 @@ export const StoryPage = () => {
         />
         <p className="text-muted mt-3">
           AI is analyzing the network traffic and creating a comprehensive narrative...
+        </p>
+        <p className="text-muted small mt-1">
+          Elapsed: <strong>{elapsed}</strong> &nbsp;|&nbsp; Timeout: {timeoutMinutes} min
         </p>
       </div>
     );

@@ -6,9 +6,11 @@ export const storyService = {
   /**
    * Generate a story/narrative for a PCAP file
    */
-  generateStory: async (fileId: string, additionalContext?: string): Promise<Story> => {
+  generateStory: async (fileId: string, additionalContext?: string, timeoutMs?: number): Promise<Story> => {
     const body = additionalContext?.trim() ? { additionalContext: additionalContext.trim() } : undefined;
-    const response = await apiClient.post<Story>(API_ENDPOINTS.GENERATE_STORY(fileId), body);
+    const response = await apiClient.post<Story>(API_ENDPOINTS.GENERATE_STORY(fileId), body, {
+      ...(timeoutMs !== undefined && { timeout: timeoutMs }),
+    });
     return response.data;
   },
 
