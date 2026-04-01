@@ -12,7 +12,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
-import { DEVICE_TYPES, deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { DEVICE_TYPES, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import './ConversationFilterPanel.css';
 
 interface ProtocolStat {
@@ -655,11 +655,7 @@ export function ConversationFilterPanel({
               {countryOptions.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
-                    label={
-                      <>
-                        <i className="bi bi-globe me-1"></i>Country
-                      </>
-                    }
+                    label="Country"
                     info={
                       <InfoPopover
                         id="info-country"
@@ -673,22 +669,14 @@ export function ConversationFilterPanel({
                     onDeselectAll={() => onFiltersChange({ countries: [] })}
                   />
                   <div className="d-flex flex-wrap gap-1 mt-1">
-                    {countryOptions.map(option => {
-                      const [code, name] = option.split('|');
+                    {countryOptions.map(o => o.split('|')).filter(([code]) => code).map(([code, name]) => {
                       const selected = (filters.countries ?? []).includes(code);
                       return (
                         <button
                           key={code}
                           type="button"
-                          className="badge border-0"
-                          style={{
-                            fontWeight: 400,
-                            cursor: 'pointer',
-                            opacity: selected ? 1 : 0.55,
-                            backgroundColor: selected ? '#0d6efd' : undefined,
-                            color: selected ? '#fff' : undefined,
-                            border: '1px solid #0d6efd',
-                          }}
+                          className={`badge rounded-pill border-0 filter-pill ${selected ? 'active' : ''}`}
+                          style={selected ? { backgroundColor: '#0d6efd', color: '#fff' } : undefined}
                           title={name}
                           onClick={() => toggle('countries', code, filters.countries ?? [])}
                         >
@@ -703,10 +691,13 @@ export function ConversationFilterPanel({
               {/* Device type filter */}
               <div className="col-12">
                 <PillSectionHeader
-                  label={
-                    <>
-                      <i className="bi bi-cpu me-1"></i>Device Type
-                    </>
+                  label="Device Type"
+                  info={
+                    <InfoPopover
+                      id="info-devicetype"
+                      title="Device Type"
+                      body="Filter by the classified device type of hosts in each conversation. Device types are inferred from traffic patterns and port usage. Click on a device type badge in the conversation details to see the confidence score and evidence."
+                    />
                   }
                   onSelectAll={() => onFiltersChange({ deviceTypes: [...DEVICE_TYPES] })}
                   onDeselectAll={() => onFiltersChange({ deviceTypes: [] })}
@@ -719,18 +710,11 @@ export function ConversationFilterPanel({
                       <button
                         key={dt}
                         type="button"
-                        className="badge border-0"
-                        style={{
-                          backgroundColor: selected ? bg : undefined,
-                          color: selected ? '#fff' : undefined,
-                          fontWeight: 400,
-                          cursor: 'pointer',
-                          opacity: selected ? 1 : 0.55,
-                          border: `1px solid ${bg}`,
-                        }}
+                        className={`badge rounded-pill border-0 filter-pill ${selected ? 'active' : ''}`}
+                        style={selected ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
                         onClick={() => toggle('deviceTypes', dt, filters.deviceTypes ?? [])}
                       >
-                        {deviceTypeIcon(dt)} {deviceTypeLabel(dt)}
+                        {deviceTypeLabel(dt)}
                       </button>
                     );
                   })}
