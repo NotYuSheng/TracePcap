@@ -139,7 +139,7 @@ llm:
     model: ${LLM_MODEL:gpt-4}
     temperature: ${LLM_TEMPERATURE:0.7}
     max-tokens: ${LLM_MAX_TOKENS:2000}
-    timeout-seconds: ${LLM_TIMEOUT:60}
+    timeout-seconds: ${LLM_TIMEOUT:300}
   story:
     max-conversations: ${STORY_MAX_CONVERSATIONS:20}
   retry:
@@ -164,3 +164,6 @@ tracepcap:
     apps-max: ${OVERVIEW_APPS_MAX:100}            # Max apps shown when apps-limited=true
   signatures:
     path: ${SIGNATURES_PATH:/app/config/signatures.yml}  # Path to the custom signatures YAML file
+  geo:
+    enabled: ${GEO_ENRICHMENT_ENABLED:true}
+    timeout-seconds: ${GEO_TIMEOUT_SECONDS:10}

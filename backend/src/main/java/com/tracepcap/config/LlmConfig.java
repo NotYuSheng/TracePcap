@@ -42,7 +42,7 @@ public class LlmConfig {
   @Bean
   public RestTemplate llmRestTemplate() {
     int timeoutMs =
-        (api != null && api.getTimeoutSeconds() != null) ? api.getTimeoutSeconds() * 1000 : 60_000;
+        (api != null && api.getTimeoutSeconds() != null) ? api.getTimeoutSeconds() * 1000 : 300_000;
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(timeoutMs);
     factory.setReadTimeout(timeoutMs);
