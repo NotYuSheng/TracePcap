@@ -38,6 +38,13 @@ export interface CategoryStat {
   bytes: number;
 }
 
+export interface ConversationGeoInfo {
+  country: string;
+  countryCode: string;
+  asn?: string;
+  org?: string;
+}
+
 // Conversation Types
 export interface Conversation {
   id: string;
@@ -63,6 +70,8 @@ export interface Conversation {
   totalBytes: number;
   packets: Packet[];
   direction: 'bidirectional' | 'unidirectional';
+  srcGeo?: ConversationGeoInfo;
+  dstGeo?: ConversationGeoInfo;
 }
 
 // Analysis Types

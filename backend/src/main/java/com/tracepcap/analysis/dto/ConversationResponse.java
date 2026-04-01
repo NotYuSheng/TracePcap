@@ -13,6 +13,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ConversationResponse {
+
+  /** Geolocation info for a single IP endpoint. Null for private/unresolved IPs. */
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class GeoInfo {
+    private String country;
+    private String countryCode;
+    private String asn;
+    private String org;
+  }
+
   private UUID conversationId;
   private String srcIp;
   private Integer srcPort;
@@ -38,4 +51,6 @@ public class ConversationResponse {
   private LocalDateTime startTime;
   private LocalDateTime endTime;
   private Long durationMs;
+  private GeoInfo srcGeo;
+  private GeoInfo dstGeo;
 }

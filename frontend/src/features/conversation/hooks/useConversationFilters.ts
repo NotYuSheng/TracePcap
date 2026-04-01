@@ -33,6 +33,7 @@ export function useConversationFilters() {
       riskTypes: splitComma(searchParams.get('riskTypes')),
       customSignatures: splitComma(searchParams.get('customSignatures')),
       deviceTypes: splitComma(searchParams.get('deviceTypes')),
+      countries: splitComma(searchParams.get('countries')),
       sortBy: (searchParams.get('sortBy') ?? '') as SortField,
       sortDir: (searchParams.get('sortDir') ?? 'asc') as SortDir,
       page: Math.max(1, parseInt(searchParams.get('page') ?? '1')),
@@ -56,6 +57,7 @@ export function useConversationFilters() {
         filters.riskTypes.length > 0,
         filters.customSignatures.length > 0,
         filters.deviceTypes.length > 0,
+        filters.countries.length > 0,
       ].filter(Boolean).length,
     [filters]
   );
@@ -80,6 +82,7 @@ export function useConversationFilters() {
           riskTypes: splitComma(prev.get('riskTypes')),
           customSignatures: splitComma(prev.get('customSignatures')),
           deviceTypes: splitComma(prev.get('deviceTypes')),
+          countries: splitComma(prev.get('countries')),
           sortBy: (prev.get('sortBy') ?? '') as SortField,
           sortDir: (prev.get('sortDir') ?? 'asc') as SortDir,
           page: Math.max(1, parseInt(prev.get('page') ?? '1')),
@@ -106,6 +109,7 @@ export function useConversationFilters() {
         set('riskTypes', joinComma(merged.riskTypes));
         set('customSignatures', joinComma(merged.customSignatures));
         set('deviceTypes', joinComma(merged.deviceTypes ?? []));
+        set('countries', joinComma(merged.countries ?? []));
         set('sortBy', merged.sortBy || undefined);
         set('sortDir', merged.sortBy ? merged.sortDir : undefined);
         set('page', newPage > 1 ? String(newPage) : undefined);

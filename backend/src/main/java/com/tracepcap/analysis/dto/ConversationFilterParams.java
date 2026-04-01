@@ -62,6 +62,12 @@ public class ConversationFilterParams {
   private final List<String> deviceTypes;
 
   /**
+   * Restrict to conversations where srcIp OR dstIp resolves to one of the given ISO 3166-1 alpha-2
+   * country codes (OR match). Empty = no filter.
+   */
+  private final List<String> countries;
+
+  /**
    * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp}, {@code packets},
    * {@code bytes}, {@code duration}, {@code startTime}. Null or blank = default DB ordering.
    */

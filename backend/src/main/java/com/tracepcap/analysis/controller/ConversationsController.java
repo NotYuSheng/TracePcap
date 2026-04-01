@@ -88,7 +88,10 @@ public class ConversationsController {
                   "Comma-separated list of device types to include (ROUTER, MOBILE,"
                       + " LAPTOP_DESKTOP, SERVER, IOT, UNKNOWN, or custom)")
           @RequestParam(required = false)
-          String deviceTypes) {
+          String deviceTypes,
+      @Parameter(description = "Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG)")
+          @RequestParam(required = false)
+          String countries) {
 
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) pageSize = 25;
@@ -109,7 +112,8 @@ public class ConversationsController {
             sortBy,
             sortDir,
             search,
-            deviceTypes);
+            deviceTypes,
+            countries);
 
     log.info(
         "GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, l7Protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
@@ -152,6 +156,13 @@ public class ConversationsController {
     return ResponseEntity.ok(analysisService.getDistinctCustomSignatures(fileId));
   }
 
+  /** Returns the distinct country codes seen in external IPs for this file, as "CC|Country" strings. */
+  @GetMapping("/{fileId}/countries")
+  @Operation(summary = "List distinct country codes seen in external IPs for a file")
+  public ResponseEntity<List<String>> getCountries(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(analysisService.getDistinctCountries(fileId));
+  }
+
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
   @GetMapping("/{fileId}/export")
   @Operation(summary = "Export filtered conversations as CSV")
@@ -172,6 +183,7 @@ public class ConversationsController {
       @RequestParam(required = false) String sortDir,
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String deviceTypes,
+      @RequestParam(required = false) String countries,
       HttpServletResponse response)
       throws IOException {
 
@@ -191,7 +203,8 @@ public class ConversationsController {
             sortBy,
             sortDir,
             search,
-            deviceTypes);
+            deviceTypes,
+            countries);
     List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -250,7 +263,8 @@ public class ConversationsController {
       String sortBy,
       String sortDir,
       String search,
-      String deviceTypes) {
+      String deviceTypes,
+      String countries) {
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
         .ip(resolvedIp)
@@ -265,6 +279,7 @@ public class ConversationsController {
         .customSignatures(splitComma(customSignatures))
         .payloadContains(payloadContains)
         .deviceTypes(splitComma(deviceTypes))
+        .countries(splitComma(countries))
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

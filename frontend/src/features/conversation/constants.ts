@@ -8,6 +8,8 @@ export type ColumnKey =
   | 'risks'
   | 'customRules'
   | 'fileTypes'
+  | 'srcCountry'
+  | 'dstCountry'
   | 'packets'
   | 'bytes'
   | 'duration'
@@ -23,13 +25,15 @@ export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boole
   { key: 'risks', label: 'Risks', defaultVisible: true },
   { key: 'customRules', label: 'Custom Rules', defaultVisible: true },
   { key: 'fileTypes', label: 'File Type', defaultVisible: true },
+  { key: 'srcCountry', label: 'Src Country', defaultVisible: false },
+  { key: 'dstCountry', label: 'Dst Country', defaultVisible: false },
   { key: 'packets', label: 'Packets', defaultVisible: false },
   { key: 'bytes', label: 'Bytes', defaultVisible: false },
   { key: 'duration', label: 'Duration', defaultVisible: false },
   { key: 'startTime', label: 'Start Time', defaultVisible: true },
 ];
 
-export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v4';
+export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v5';
 
 export function loadVisibleColumns(): Set<ColumnKey> {
   try {

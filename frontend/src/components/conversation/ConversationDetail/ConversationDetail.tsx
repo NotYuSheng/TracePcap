@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Conversation, Packet, HostClassification } from '@/types';
+import type { Conversation, ConversationGeoInfo, Packet, HostClassification } from '@/types';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import {
   getAppColor,
@@ -18,6 +18,28 @@ interface ConversationDetailProps {
   conversation: Conversation;
   signatureSeverities?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
+}
+
+function countryFlag(code: string): string {
+  return code
+    .toUpperCase()
+    .split('')
+    .map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
+function GeoInfoRows({ geo, label }: { geo?: ConversationGeoInfo; label: string }) {
+  if (!geo?.countryCode) return null;
+  return (
+    <>
+      <dt className="col-sm-4">{label} Country:</dt>
+      <dd className="col-sm-8">
+        {countryFlag(geo.countryCode)} {geo.country} ({geo.countryCode})
+        {geo.asn && <small className="text-muted ms-2">{geo.asn}</small>}
+        {geo.org && <small className="text-muted d-block">{geo.org}</small>}
+      </dd>
+    </>
+  );
 }
 
 const PRINTABLE_ASCII_THRESHOLD = 0.3;
@@ -128,6 +150,8 @@ export const ConversationDetail = ({
                     <small className="text-info d-block">{conversation.hostname}</small>
                   )}
                 </dd>
+                <GeoInfoRows geo={conversation.srcGeo} label="Src" />
+                <GeoInfoRows geo={conversation.dstGeo} label="Dst" />
                 <dt className="col-sm-4">L4 Protocol:</dt>
                 <dd className="col-sm-8">
                   {(() => {

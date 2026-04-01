@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import type {
   Conversation,
+  ConversationGeoInfo,
   NetworkEndpoint,
   Protocol,
   PaginatedResponse,
@@ -33,6 +34,8 @@ interface ConversationApiResponse {
   customSignatures?: string[] | null;
   httpUserAgents?: string[] | null;
   detectedFileTypes?: string[] | null;
+  srcGeo?: ConversationGeoInfo | null;
+  dstGeo?: ConversationGeoInfo | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[];
@@ -91,6 +94,8 @@ function transformConversation(
     customSignatures: apiData.customSignatures ?? [],
     httpUserAgents: apiData.httpUserAgents ?? [],
     detectedFileTypes: apiData.detectedFileTypes ?? [],
+    srcGeo: apiData.srcGeo ?? undefined,
+    dstGeo: apiData.dstGeo ?? undefined,
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
@@ -141,6 +146,8 @@ export const conversationService = {
       params.customSignatures = filters.customSignatures.join(',');
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.deviceTypes = filters.deviceTypes.join(',');
+    if (filters.countries && filters.countries.length > 0)
+      params.countries = filters.countries.join(',');
     if (filters.sortBy) params.sortBy = filters.sortBy;
     if (filters.sortBy) params.sortDir = filters.sortDir;
 
@@ -180,6 +187,8 @@ export const conversationService = {
       params.set('customSignatures', filters.customSignatures.join(','));
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.set('deviceTypes', filters.deviceTypes.join(','));
+    if (filters.countries && filters.countries.length > 0)
+      params.set('countries', filters.countries.join(','));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
@@ -199,6 +208,14 @@ export const conversationService = {
    */
   getSignatureRules: async (): Promise<{ name: string; severity: string }[]> => {
     const response = await apiClient.get<{ name: string; severity: string }[]>('/signatures/rules');
+    return response.data;
+  },
+
+  /**
+   * Returns distinct country codes seen in external IPs for this file, as "CC|Country" strings.
+   */
+  getCountries: async (fileId: string): Promise<string[]> => {
+    const response = await apiClient.get<string[]>(`/conversations/${fileId}/countries`);
     return response.data;
   },
 

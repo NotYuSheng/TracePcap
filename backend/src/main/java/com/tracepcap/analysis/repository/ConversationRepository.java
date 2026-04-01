@@ -3,6 +3,7 @@ package com.tracepcap.analysis.repository;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
@@ -211,6 +212,17 @@ public interface ConversationRepository
             cb.or(
                 root.get("srcIp").in(deviceTypeSub),
                 root.get("dstIp").in(deviceTypeSub)));
+      }
+
+      // Country filter — srcIp or dstIp resolves to one of the given country codes
+      if (params.getCountries() != null && !params.getCountries().isEmpty()) {
+        Subquery<String> countrySub = query.subquery(String.class);
+        var geo = countrySub.from(IpGeoInfoEntity.class);
+        countrySub
+            .select(geo.get("ip"))
+            .where(geo.get("countryCode").in(params.getCountries()));
+        predicates.add(
+            cb.or(root.get("srcIp").in(countrySub), root.get("dstIp").in(countrySub)));
       }
 
       // Payload contains — EXISTS subquery: match hex-encoded payload of any packet

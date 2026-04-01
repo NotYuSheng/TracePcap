@@ -38,6 +38,7 @@ interface ConversationFilterPanelProps {
   riskTypes: string[];
   customSignatureOptions: string[];
   signatureSeverities?: Record<string, string>;
+  countryOptions: string[];
   activeFilterCount: number;
   visibleColumns: Set<ColumnKey>;
   onToggleColumn: (key: ColumnKey) => void;
@@ -96,6 +97,14 @@ function PillSectionHeader({
   );
 }
 
+function countryFlag(code: string): string {
+  return code
+    .toUpperCase()
+    .split('')
+    .map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
 export function ConversationFilterPanel({
   filters,
   onFiltersChange,
@@ -108,6 +117,7 @@ export function ConversationFilterPanel({
   riskTypes,
   customSignatureOptions,
   signatureSeverities = {},
+  countryOptions,
   activeFilterCount,
   visibleColumns,
   onToggleColumn,
@@ -634,6 +644,55 @@ export function ConversationFilterPanel({
                           }
                         >
                           {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Country filter */}
+              {countryOptions.length > 0 && (
+                <div className="col-12">
+                  <PillSectionHeader
+                    label={
+                      <>
+                        <i className="bi bi-globe me-1"></i>Country
+                      </>
+                    }
+                    info={
+                      <InfoPopover
+                        id="info-country"
+                        title="Country filter"
+                        body="Filter by the country of external IP addresses (source or destination). Based on ip-api.com geolocation data."
+                      />
+                    }
+                    onSelectAll={() =>
+                      onFiltersChange({ countries: countryOptions.map(o => o.split('|')[0]) })
+                    }
+                    onDeselectAll={() => onFiltersChange({ countries: [] })}
+                  />
+                  <div className="d-flex flex-wrap gap-1 mt-1">
+                    {countryOptions.map(option => {
+                      const [code, name] = option.split('|');
+                      const selected = (filters.countries ?? []).includes(code);
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          className="badge border-0"
+                          style={{
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            opacity: selected ? 1 : 0.55,
+                            backgroundColor: selected ? '#0d6efd' : undefined,
+                            color: selected ? '#fff' : undefined,
+                            border: '1px solid #0d6efd',
+                          }}
+                          title={name}
+                          onClick={() => toggle('countries', code, filters.countries ?? [])}
+                        >
+                          {countryFlag(code)} {code}
                         </button>
                       );
                     })}
