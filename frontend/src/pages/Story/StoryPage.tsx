@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
+import { apiClient } from '@/services/api/client';
 import { storyService } from '@/features/story/services/storyService';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import {
@@ -33,16 +34,17 @@ export const StoryPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
+  const [loadingLimits, setLoadingLimits] = useState(true);
   const autoTriggeredRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetch('/api/system/limits')
-      .then(r => r.json())
-      .then((data: { llmTimeoutMs?: number }) => {
-        if (data.llmTimeoutMs) setLlmTimeoutMs(data.llmTimeoutMs);
+    apiClient.get<{ llmTimeoutMs?: number }>('/system/limits')
+      .then(res => {
+        if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs);
       })
-      .catch(() => {/* keep default */});
+      .catch(() => {/* keep default */})
+      .finally(() => setLoadingLimits(false));
   }, []);
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export const StoryPage = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
+      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
       if (isTimeout) {
         const minutes = Math.round(llmTimeoutMs / 60000);
         setError(
@@ -112,13 +114,13 @@ export const StoryPage = () => {
     }
   }, [fileId]);
 
-  // Auto-generate story if none exists yet
+  // Auto-generate story if none exists yet — wait for limits to load so the correct timeout is used
   useEffect(() => {
-    if (!loadingStory && !story && !generating && !error && !autoTriggeredRef.current) {
+    if (!loadingStory && !loadingLimits && !story && !generating && !error && !autoTriggeredRef.current) {
       autoTriggeredRef.current = true;
       handleGenerateStory();
     }
-  }, [loadingStory, story, generating, error, handleGenerateStory]);
+  }, [loadingStory, loadingLimits, story, generating, error, handleGenerateStory]);
 
   useEffect(() => {
     const fetchTimeline = async () => {

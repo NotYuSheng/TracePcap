@@ -17,7 +17,7 @@ public class SystemController {
   @Value("${ANALYSIS_TIMEOUT_SECONDS:300}")
   private int analysisTimeoutSeconds;
 
-  @Value("${LLM_TIMEOUT:300}")
+  @Value("${llm.api.timeout-seconds:300}")
   private int llmTimeoutSeconds;
 
   /**
