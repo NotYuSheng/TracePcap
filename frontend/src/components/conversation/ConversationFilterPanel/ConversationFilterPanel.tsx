@@ -669,8 +669,7 @@ export function ConversationFilterPanel({
                     onDeselectAll={() => onFiltersChange({ countries: [] })}
                   />
                   <div className="d-flex flex-wrap gap-1 mt-1">
-                    {countryOptions.filter(option => option.split('|')[0]).map(option => {
-                      const [code, name] = option.split('|');
+                    {countryOptions.map(o => o.split('|')).filter(([code]) => code).map(([code, name]) => {
                       const selected = (filters.countries ?? []).includes(code);
                       return (
                         <button
@@ -697,7 +696,7 @@ export function ConversationFilterPanel({
                     <InfoPopover
                       id="info-devicetype"
                       title="Device Type"
-                      body="Filter by the classified device type of hosts in each conversation. Device types are inferred from traffic patterns and port usage. Hover over a device type badge in the conversation details to see the confidence score and evidence."
+                      body="Filter by the classified device type of hosts in each conversation. Device types are inferred from traffic patterns and port usage. Click on a device type badge in the conversation details to see the confidence score and evidence."
                     />
                   }
                   onSelectAll={() => onFiltersChange({ deviceTypes: [...DEVICE_TYPES] })}
@@ -712,7 +711,7 @@ export function ConversationFilterPanel({
                         key={dt}
                         type="button"
                         className={`badge rounded-pill border-0 filter-pill ${selected ? 'active' : ''}`}
-                        style={selected ? { backgroundColor: bg, color: '#fff' } : undefined}
+                        style={selected ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
                         onClick={() => toggle('deviceTypes', dt, filters.deviceTypes ?? [])}
                       >
                         {deviceTypeLabel(dt)}

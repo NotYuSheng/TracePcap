@@ -29,13 +29,7 @@ function countryFlag(code: string): string {
 }
 
 function isPrivateIp(ip: string): boolean {
-  return (
-    /^10\./.test(ip) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
-    /^192\.168\./.test(ip) ||
-    /^127\./.test(ip) ||
-    /^169\.254\./.test(ip)
-  );
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
 }
 
 function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: string; ip: string }) {
