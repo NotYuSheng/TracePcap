@@ -13,6 +13,7 @@ import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.common.exception.ResourceNotFoundException;
@@ -59,6 +60,7 @@ public class AnalysisService {
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
   private final HostClassificationRepository hostClassificationRepository;
+  private final IpGeoInfoRepository ipGeoInfoRepository;
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
@@ -66,6 +68,7 @@ public class AnalysisService {
   private final TsharkEnrichmentService tsharkEnrichmentService;
   private final CustomSignatureService customSignatureService;
   private final DeviceClassifierService deviceClassifierService;
+  private final GeoIpService geoIpService;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -120,6 +123,17 @@ public class AnalysisService {
               parseResult.getHostMacs(),
               deviceOverrides);
       hostClassificationRepository.saveAll(hostClassifications);
+
+      // Pre-warm the geo-IP cache for all unique IPs in this capture (best-effort)
+      try {
+        Set<String> allIps =
+            parseResult.getConversations().stream()
+                .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+                .collect(Collectors.toSet());
+        geoIpService.lookupExternal(allIps);
+      } catch (Exception e) {
+        log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
+      }
 
       // Update analysis results
       analysis.setPacketCount(parseResult.getPacketCount());
@@ -546,6 +560,17 @@ public class AnalysisService {
     return conversationRepository.findDistinctCustomSignaturesByFileId(fileId);
   }
 
+  /**
+   * Returns distinct country codes seen in this file's conversations, as "CC|Country name" strings
+   * (e.g. "US|United States"). Only countries with a non-null country code are returned.
+   */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctCountries(UUID fileId) {
+    return ipGeoInfoRepository.findDistinctCountriesByFileId(fileId).stream()
+        .map(row -> row[0] + "|" + row[1])
+        .collect(Collectors.toList());
+  }
+
   /** Also used by the CSV export — returns ALL matching rows without pagination. */
   @Transactional(readOnly = true)
   public List<ConversationResponse> getConversationsForExport(
@@ -563,8 +588,9 @@ public class AnalysisService {
     if (conversations.isEmpty()) return List.of();
     List<UUID> convIds = conversations.stream().map(ConversationEntity::getId).toList();
     Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
+    Map<String, GeoIpService.GeoResult> geoMap = buildGeoMap(conversations);
     return conversations.stream()
-        .map(c -> toConversationResponse(c, fileTypeMap))
+        .map(c -> toConversationResponse(c, fileTypeMap, geoMap))
         .collect(Collectors.toList());
   }
 
@@ -585,6 +611,19 @@ public class AnalysisService {
     return Sort.by(dir, field);
   }
 
+  private Map<String, GeoIpService.GeoResult> buildGeoMap(List<ConversationEntity> conversations) {
+    Set<String> ips =
+        conversations.stream()
+            .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+            .collect(Collectors.toSet());
+    try {
+      return geoIpService.lookupExternal(ips);
+    } catch (Exception e) {
+      log.warn("Geo lookup failed during response mapping: {}", e.getMessage());
+      return Map.of();
+    }
+  }
+
   private Map<UUID, List<String>> buildFileTypeMap(List<UUID> ids) {
     if (ids.isEmpty()) return Map.of();
     return packetRepository.findFileTypesByConversationIds(ids).stream()
@@ -597,7 +636,9 @@ public class AnalysisService {
   }
 
   private ConversationResponse toConversationResponse(
-      ConversationEntity conv, Map<UUID, List<String>> fileTypeMap) {
+      ConversationEntity conv,
+      Map<UUID, List<String>> fileTypeMap,
+      Map<String, GeoIpService.GeoResult> geoMap) {
     Duration duration =
         (conv.getStartTime() != null && conv.getEndTime() != null)
             ? Duration.between(conv.getStartTime(), conv.getEndTime())
@@ -628,11 +669,28 @@ public class AnalysisService {
         .startTime(conv.getStartTime())
         .endTime(conv.getEndTime())
         .durationMs(duration.toMillis())
+        .srcGeo(toGeoInfo(geoMap.get(conv.getSrcIp())))
+        .dstGeo(toGeoInfo(geoMap.get(conv.getDstIp())))
         .build();
   }
 
+  private ConversationResponse toConversationResponse(
+      ConversationEntity conv, Map<UUID, List<String>> fileTypeMap) {
+    return toConversationResponse(conv, fileTypeMap, Map.of());
+  }
+
   private ConversationResponse toConversationResponse(ConversationEntity conv) {
-    return toConversationResponse(conv, Map.of());
+    return toConversationResponse(conv, Map.of(), Map.of());
+  }
+
+  private static ConversationResponse.GeoInfo toGeoInfo(GeoIpService.GeoResult result) {
+    if (result == null || result.countryCode() == null) return null;
+    return ConversationResponse.GeoInfo.builder()
+        .country(result.country())
+        .countryCode(result.countryCode())
+        .asn(result.asn())
+        .org(result.org())
+        .build();
   }
 
   @Transactional(readOnly = true)
@@ -720,6 +778,10 @@ public class AnalysisService {
     List<PacketResponse> packetResponses =
         packets.stream().map(this::toPacketResponse).collect(Collectors.toList());
 
+    Map<String, GeoIpService.GeoResult> geoMap =
+        geoIpService.lookupExternal(
+            new HashSet<>(List.of(conversation.getSrcIp(), conversation.getDstIp())));
+
     return ConversationDetailResponse.builder()
         .conversationId(conversation.getId())
         .srcIp(conversation.getSrcIp())
@@ -745,6 +807,8 @@ public class AnalysisService {
         .startTime(conversation.getStartTime())
         .endTime(conversation.getEndTime())
         .durationMs(duration.toMillis())
+        .srcGeo(toGeoInfo(geoMap.get(conversation.getSrcIp())))
+        .dstGeo(toGeoInfo(geoMap.get(conversation.getDstIp())))
         .packets(packetResponses)
         .build();
   }

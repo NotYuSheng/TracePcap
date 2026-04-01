@@ -37,5 +37,7 @@ public class ConversationDetailResponse {
   private LocalDateTime startTime;
   private LocalDateTime endTime;
   private Long durationMs;
+  private ConversationResponse.GeoInfo srcGeo;
+  private ConversationResponse.GeoInfo dstGeo;
   private List<PacketResponse> packets;
 }

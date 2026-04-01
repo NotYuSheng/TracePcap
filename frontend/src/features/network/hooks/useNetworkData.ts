@@ -59,6 +59,7 @@ export function useNetworkData(
         riskTypes: [],
         customSignatures: [],
         deviceTypes: [],
+        countries: [],
         sortBy: '',
         sortDir: 'asc',
         page: 1,

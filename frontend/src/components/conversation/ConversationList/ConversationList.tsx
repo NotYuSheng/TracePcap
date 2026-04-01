@@ -1,8 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Conversation, HostClassification } from '@/types';
+import type { Conversation, ConversationGeoInfo, HostClassification } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
+
+/** Converts an ISO 3166-1 alpha-2 country code to a flag emoji. */
+function countryFlag(code: string): string {
+  return code
+    .toUpperCase()
+    .split('')
+    .map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
+function GeoCell({ geo }: { geo?: ConversationGeoInfo }) {
+  if (!geo?.countryCode) return <span className="text-muted">—</span>;
+  return (
+    <span title={`${geo.country}${geo.org ? ` · ${geo.org}` : ''}${geo.asn ? ` (${geo.asn})` : ''}`}>
+      {countryFlag(geo.countryCode)} {geo.countryCode}
+    </span>
+  );
+}
 import {
   getAppColor,
   getCategoryColor,
@@ -211,6 +229,8 @@ export const ConversationList = ({
               {col('risks') && hasRisks && <th>Risks</th>}
               {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
               {col('fileTypes') && hasFileTypes && <th style={{ whiteSpace: 'nowrap' }}>File Type</th>}
+              {col('srcCountry') && <th style={{ whiteSpace: 'nowrap' }}>Src Country</th>}
+              {col('dstCountry') && <th style={{ whiteSpace: 'nowrap' }}>Dst Country</th>}
               {col('packets') && <SortableHeader field="packets" label="Packets" />}
               {col('bytes') && <SortableHeader field="bytes" label="Bytes" />}
               {col('duration') && <SortableHeader field="duration" label="Duration" />}
@@ -383,6 +403,8 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
+                  {col('srcCountry') && <td><GeoCell geo={conversation.srcGeo} /></td>}
+                  {col('dstCountry') && <td><GeoCell geo={conversation.dstGeo} /></td>}
                   {col('packets') && <td>{conversation.packetCount.toLocaleString()}</td>}
                   {col('bytes') && <td>{formatBytes(conversation.totalBytes)}</td>}
                   {col('duration') && <td>{formatDuration(duration)}</td>}

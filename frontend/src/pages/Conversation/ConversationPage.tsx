@@ -35,6 +35,7 @@ export const ConversationPage = () => {
   const [fileTypeOptions, setFileTypeOptions] = useState<string[]>([]);
   const [riskTypeOptions, setRiskTypeOptions] = useState<string[]>([]);
   const [customSignatureOptions, setCustomSignatureOptions] = useState<string[]>([]);
+  const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
@@ -72,6 +73,7 @@ export const ConversationPage = () => {
       .getHostClassifications(fileId)
       .then(list => setHostClassMap(new Map(list.map(c => [c.ip, c]))))
       .catch(console.error);
+    conversationService.getCountries(fileId).then(setCountryOptions).catch(console.error);
   }, [fileId]);
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
@@ -309,6 +311,7 @@ export const ConversationPage = () => {
             riskTypes={riskTypeOptions}
             customSignatureOptions={customSignatureOptions}
             signatureSeverities={signatureSeverities}
+            countryOptions={countryOptions}
             activeFilterCount={activeFilterCount}
             visibleColumns={visibleColumns}
             onToggleColumn={toggleColumn}

@@ -6,6 +6,7 @@ import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.config.LlmConfig;
 import com.tracepcap.file.entity.FileEntity;
@@ -35,6 +36,7 @@ public class StoryService {
   private final LlmClient llmClient;
   private final LlmConfig llmConfig;
   private final ObjectMapper objectMapper;
+  private final GeoIpService geoIpService;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -331,6 +333,26 @@ public class StoryService {
    * issuer=CN=Let's Encrypt, expires=2025/06/01 EXPIRED]" Returns an empty string if no TLS cert
    * data is available.
    */
+  /**
+   * Builds a geo label for a conversation, e.g. " [SG/AS9506 Singtel -> US/AS15169 Google LLC]".
+   * Only external IPs (those present in geoMap) are annotated; private IPs are shown as "private".
+   * Returns an empty string if neither endpoint has geo data.
+   */
+  private String buildGeoLabel(
+      String srcIp, String dstIp, Map<String, GeoIpService.GeoResult> geoMap) {
+    GeoIpService.GeoResult srcGeo = geoMap.get(srcIp);
+    GeoIpService.GeoResult dstGeo = geoMap.get(dstIp);
+    if (srcGeo == null && dstGeo == null) return "";
+
+    String srcPart = srcGeo != null && srcGeo.countryCode() != null
+        ? srcGeo.countryCode() + (srcGeo.org() != null ? "/" + srcGeo.org() : "")
+        : "private";
+    String dstPart = dstGeo != null && dstGeo.countryCode() != null
+        ? dstGeo.countryCode() + (dstGeo.org() != null ? "/" + dstGeo.org() : "")
+        : "private";
+    return " [" + srcPart + " -> " + dstPart + "]";
+  }
+
   private String buildTlsCertLabel(ConversationEntity conv) {
     List<String> parts = new ArrayList<>();
     if (conv.getTlsSubject() != null) parts.add("subject=" + conv.getTlsSubject());
@@ -360,6 +382,17 @@ public class StoryService {
         conversationRepository.findTopByFileIdOrderByTotalBytesDesc(
             fileId, PageRequest.of(0, maxConversations));
     long totalConversations = conversationRepository.countByFileId(fileId);
+
+    // Build geo map for all IPs appearing in the prompt (best-effort, empty on failure)
+    Map<String, GeoIpService.GeoResult> geoMap;
+    try {
+      Set<String> promptIps = new HashSet<>();
+      topConversations.forEach(c -> { promptIps.add(c.getSrcIp()); promptIps.add(c.getDstIp()); });
+      geoMap = geoIpService.lookupExternal(promptIps);
+    } catch (Exception e) {
+      log.warn("Geo lookup failed during story generation: {}", e.getMessage());
+      geoMap = Map.of();
+    }
 
     List<Object[]> categoryRows = conversationRepository.findCategoryDistributionByFileId(fileId);
 
@@ -440,14 +473,16 @@ public class StoryService {
                 ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]"
                 : "";
         String tlsCertLabel = buildTlsCertLabel(conv);
+        String geoLabel = buildGeoLabel(conv.getSrcIp(), conv.getDstIp(), geoMap);
         prompt.append(
             String.format(
-                "%d. %s:%s <-> %s:%s (%s%s%s%s%s, %d packets, %d bytes)\n",
+                "%d. %s:%s <-> %s:%s%s (%s%s%s%s%s, %d packets, %d bytes)\n",
                 i + 1,
                 conv.getSrcIp(),
                 conv.getSrcPort() != null ? conv.getSrcPort() : "*",
                 conv.getDstIp(),
                 conv.getDstPort() != null ? conv.getDstPort() : "*",
+                geoLabel,
                 conv.getProtocol(),
                 appLabel,
                 catLabel,
@@ -476,13 +511,15 @@ public class StoryService {
             (conv.getAppName() != null && !conv.getAppName().isBlank())
                 ? " [" + conv.getAppName() + "]"
                 : "";
+        String geoLabel = buildGeoLabel(conv.getSrcIp(), conv.getDstIp(), geoMap);
         prompt.append(
             String.format(
-                "- %s:%s <-> %s:%s (%s%s): %s\n",
+                "- %s:%s <-> %s:%s%s (%s%s): %s\n",
                 conv.getSrcIp(),
                 conv.getSrcPort() != null ? conv.getSrcPort() : "*",
                 conv.getDstIp(),
                 conv.getDstPort() != null ? conv.getDstPort() : "*",
+                geoLabel,
                 conv.getProtocol(),
                 appLabel,
                 String.join(", ", conv.getFlowRisks())));
