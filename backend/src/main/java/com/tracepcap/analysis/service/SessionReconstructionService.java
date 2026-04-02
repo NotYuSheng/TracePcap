@@ -29,6 +29,9 @@ public class SessionReconstructionService {
   /** Maximum body bytes to include in an HTTP message. */
   private static final int MAX_BODY_DISPLAY_BYTES = 65_536; // 64 KB
 
+  /** Refuse reconstruction for PCAP files larger than this to protect disk/I/O. */
+  private static final long MAX_PCAP_FILE_BYTES = 500L * 1024 * 1024; // 500 MB
+
   private final ConversationRepository conversationRepository;
   private final StorageService storageService;
 
@@ -44,9 +47,23 @@ public class SessionReconstructionService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
+    // Refuse to download files that would be excessively large
+    Long pcapSize = conv.getFile().getFileSize();
+    if (pcapSize != null && pcapSize > MAX_PCAP_FILE_BYTES) {
+      return error(
+          String.format(
+              "Capture file is too large for session reconstruction (%.0f MB). "
+                  + "The limit is %d MB.",
+              pcapSize / 1_048_576.0, MAX_PCAP_FILE_BYTES / 1_048_576));
+    }
+
     File tempFile = null;
     try {
       tempFile = File.createTempFile("session-", ".pcap");
+      log.debug(
+          "Downloading {} bytes from {} for session reconstruction",
+          pcapSize,
+          conv.getFile().getMinioPath());
       storageService.downloadFileToLocal(conv.getFile().getMinioPath(), tempFile);
       return doReconstruct(conv, tempFile);
     } catch (ResourceNotFoundException e) {
@@ -220,8 +237,11 @@ public class SessionReconstructionService {
     Process process = pb.start();
 
     List<RawChunk> chunks = new ArrayList<>();
-    // Determine which tshark Node maps to CLIENT/SERVER once we parse the header
     String node0Direction = null; // "CLIENT" or "SERVER"
+
+    // Accumulate consecutive same-direction bytes in a stream to avoid O(N²) array copies
+    ByteArrayOutputStream accumulator = new ByteArrayOutputStream();
+    String currentDirection = null;
 
     long totalBytes = 0;
     boolean truncated = false;
@@ -233,7 +253,6 @@ public class SessionReconstructionService {
         if (line.startsWith("===")) continue;
         if (line.startsWith("Filter:")) continue;
         if (line.startsWith("Node0:")) {
-          // Node0:<ip>:<port> — compare IP with conversation srcIp to assign direction
           String node0Ip = extractIp(line.substring("Node0:".length()));
           node0Direction = node0Ip.equals(conv.getSrcIp()) ? "CLIENT" : "SERVER";
           continue;
@@ -241,50 +260,57 @@ public class SessionReconstructionService {
         if (line.startsWith("Node1:")) continue;
         if (line.isBlank()) continue;
 
-        if (truncated) continue; // still drain the process output
+        if (truncated) continue; // drain stdout without processing
 
         boolean isNode1 = line.startsWith("\t");
         String hexLine = isNode1 ? line.stripLeading() : line;
         if (hexLine.isBlank()) continue;
 
-        String direction;
-        if (node0Direction == null) {
-          // fallback: no header seen yet, treat non-indented as CLIENT
-          direction = isNode1 ? "SERVER" : "CLIENT";
-        } else {
-          String nodeDir = isNode1 ? opposite(node0Direction) : node0Direction;
-          direction = nodeDir;
-        }
+        String direction =
+            (node0Direction == null)
+                ? (isNode1 ? "SERVER" : "CLIENT")
+                : (isNode1 ? opposite(node0Direction) : node0Direction);
 
         byte[] data = hexToBytes(hexLine);
         if (data == null || data.length == 0) continue;
 
-        totalBytes += data.length;
-        if (totalBytes > MAX_SESSION_BYTES) {
+        // Handle truncation: include bytes up to the limit then stop accumulating
+        if (totalBytes + data.length > MAX_SESSION_BYTES) {
           truncated = true;
-          // Include partial chunk up to limit
-          long remaining = MAX_SESSION_BYTES - (totalBytes - data.length);
+          int remaining = (int) (MAX_SESSION_BYTES - totalBytes);
           if (remaining > 0) {
-            data = Arrays.copyOf(data, (int) remaining);
-            chunks.add(new RawChunk(direction, data));
+            if (!direction.equals(currentDirection)) {
+              flushAccumulator(chunks, accumulator, currentDirection);
+              currentDirection = direction;
+            }
+            accumulator.write(data, 0, remaining);
+            totalBytes += remaining;
           }
           continue;
         }
 
-        // Merge consecutive same-direction chunks for cleaner display
-        if (!chunks.isEmpty() && chunks.get(chunks.size() - 1).direction.equals(direction)) {
-          RawChunk last = chunks.get(chunks.size() - 1);
-          byte[] merged = new byte[last.data.length + data.length];
-          System.arraycopy(last.data, 0, merged, 0, last.data.length);
-          System.arraycopy(data, 0, merged, last.data.length, data.length);
-          chunks.set(chunks.size() - 1, new RawChunk(direction, merged));
-        } else {
-          chunks.add(new RawChunk(direction, data));
+        totalBytes += data.length;
+
+        if (!direction.equals(currentDirection)) {
+          flushAccumulator(chunks, accumulator, currentDirection);
+          currentDirection = direction;
         }
+        accumulator.write(data);
       }
     }
+    // Flush any remaining accumulated bytes
+    flushAccumulator(chunks, accumulator, currentDirection);
+
     process.waitFor();
     return chunks;
+  }
+
+  private void flushAccumulator(
+      List<RawChunk> chunks, ByteArrayOutputStream accumulator, String direction) {
+    if (direction != null && accumulator.size() > 0) {
+      chunks.add(new RawChunk(direction, accumulator.toByteArray()));
+      accumulator.reset();
+    }
   }
 
   private String extractIp(String nodeStr) {
@@ -415,49 +441,137 @@ public class SessionReconstructionService {
   }
 
   /**
-   * Splits a raw HTTP byte stream into individual HTTP messages.
-   * For requests: splits at GET/POST/HEAD/etc. lines.
-   * For responses: splits at HTTP/1.x or HTTP/2 status lines.
+   * Splits a raw HTTP byte stream into individual messages by parsing sequentially.
+   *
+   * <p>Rather than scanning the whole buffer for start-line patterns (which causes false positives
+   * when those strings appear inside a message body), this method:
+   * <ol>
+   *   <li>Anchors to the first message at position 0 (or skips leading garbage).
+   *   <li>Parses headers to determine body length via {@code Content-Length} or chunked encoding.
+   *   <li>Jumps to the exact byte after the body end to find the next message.
+   * </ol>
    */
   private List<byte[]> splitHttpMessages(byte[] stream, boolean isRequest) {
     List<byte[]> messages = new ArrayList<>();
     if (stream.length == 0) return messages;
 
-    String text = new String(stream, StandardCharsets.ISO_8859_1);
-    String[] patterns =
+    String[] patternStrings =
         isRequest
-            ? new String[] {"GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ", "CONNECT "}
+            ? new String[] {
+              "GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ", "CONNECT "
+            }
             : new String[] {"HTTP/1.0 ", "HTTP/1.1 ", "HTTP/2 "};
 
-    // Find all message start positions
-    List<Integer> starts = new ArrayList<>();
-    for (int i = 0; i < text.length(); ) {
-      boolean found = false;
-      for (String pat : patterns) {
-        if (text.startsWith(pat, i)) {
-          starts.add(i);
-          // Skip to next line to avoid re-matching within body
-          int nl = text.indexOf('\n', i);
-          i = nl < 0 ? text.length() : nl + 1;
-          found = true;
+    int pos = 0;
+    while (pos < stream.length) {
+      // Find the next message start at or after pos
+      int msgStart = -1;
+      for (String pat : patternStrings) {
+        byte[] pb = pat.getBytes(StandardCharsets.US_ASCII);
+        // Only check at the current position to avoid scanning into bodies
+        if (matchesAt(stream, pos, pb)) {
+          msgStart = pos;
           break;
         }
       }
-      if (!found) i++;
+
+      if (msgStart < 0) {
+        // Current position doesn't look like a message start.
+        // Scan forward one line at a time (handles leading junk or pipelining gaps).
+        int nl = indexOf(stream, pos, new byte[] {'\n'});
+        if (nl < 0) break;
+        pos = nl + 1;
+        continue;
+      }
+
+      // Find end of headers (\r\n\r\n or \n\n)
+      byte[] crlfcrlf = "\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
+      byte[] lflf = "\n\n".getBytes(StandardCharsets.US_ASCII);
+      int headerEnd = indexOf(stream, msgStart, crlfcrlf);
+      int bodyStart;
+      if (headerEnd >= 0) {
+        bodyStart = headerEnd + 4;
+      } else {
+        headerEnd = indexOf(stream, msgStart, lflf);
+        bodyStart = (headerEnd >= 0) ? headerEnd + 2 : stream.length;
+      }
+
+      if (headerEnd < 0) {
+        // Incomplete headers — grab the rest and stop
+        messages.add(Arrays.copyOfRange(stream, msgStart, stream.length));
+        break;
+      }
+
+      // Parse headers for body length
+      String headerSection =
+          new String(
+              Arrays.copyOfRange(stream, msgStart, headerEnd), StandardCharsets.ISO_8859_1);
+      String[] lines = headerSection.split("\r?\n", -1);
+
+      int contentLength = -1;
+      boolean chunked = false;
+      for (int i = 1; i < lines.length; i++) {
+        String lower = lines[i].toLowerCase(java.util.Locale.ROOT);
+        if (lower.startsWith("content-length:")) {
+          try {
+            contentLength =
+                Integer.parseInt(lines[i].substring(lines[i].indexOf(':') + 1).trim());
+          } catch (NumberFormatException ignored) {
+          }
+        } else if (lower.startsWith("transfer-encoding:") && lower.contains("chunked")) {
+          chunked = true;
+        }
+      }
+
+      int msgEnd;
+      if (contentLength >= 0) {
+        msgEnd = Math.min(bodyStart + contentLength, stream.length);
+      } else if (chunked) {
+        msgEnd = findChunkedBodyEnd(stream, bodyStart);
+      } else {
+        // No body length — assume this message runs to the end of the stream
+        msgEnd = stream.length;
+      }
+
+      messages.add(Arrays.copyOfRange(stream, msgStart, msgEnd));
+      pos = msgEnd;
     }
 
-    if (starts.isEmpty()) {
-      // No splits found — treat whole buffer as one message
+    if (messages.isEmpty() && stream.length > 0) {
       messages.add(stream);
-      return messages;
-    }
-
-    for (int i = 0; i < starts.size(); i++) {
-      int start = starts.get(i);
-      int end = i + 1 < starts.size() ? starts.get(i + 1) : stream.length;
-      messages.add(Arrays.copyOfRange(stream, start, end));
     }
     return messages;
+  }
+
+  /** Returns true when {@code stream[at..at+pattern.length]} equals {@code pattern}. */
+  private boolean matchesAt(byte[] stream, int at, byte[] pattern) {
+    if (at + pattern.length > stream.length) return false;
+    for (int i = 0; i < pattern.length; i++) {
+      if (stream[at + i] != pattern[i]) return false;
+    }
+    return true;
+  }
+
+  /** Returns the byte position immediately after the terminal zero-chunk of a chunked body. */
+  private int findChunkedBodyEnd(byte[] stream, int start) {
+    int pos = start;
+    byte[] crlf = "\r\n".getBytes(StandardCharsets.US_ASCII);
+    while (pos < stream.length) {
+      int lineEnd = indexOf(stream, pos, crlf);
+      if (lineEnd < 0) return stream.length;
+      String sizeLine =
+          new String(Arrays.copyOfRange(stream, pos, lineEnd), StandardCharsets.US_ASCII).trim();
+      int semi = sizeLine.indexOf(';');
+      if (semi >= 0) sizeLine = sizeLine.substring(0, semi).trim();
+      try {
+        int chunkSize = Integer.parseInt(sizeLine, 16);
+        pos = lineEnd + 2 + chunkSize + 2; // chunk-size CRLF data CRLF
+        if (chunkSize == 0) return Math.min(pos, stream.length);
+      } catch (NumberFormatException e) {
+        return stream.length;
+      }
+    }
+    return stream.length;
   }
 
   private SessionResponse.HttpMessage parseHttpMessage(byte[] raw) {
@@ -620,8 +734,8 @@ public class SessionReconstructionService {
     if (hex == null || hex.isBlank()) return new byte[0];
     int len = hex.length();
     if (len % 2 != 0) {
-      hex = hex + "0";
-      len++;
+      // Odd-length hex is malformed — do not silently corrupt the last byte
+      return null;
     }
     byte[] out = new byte[len / 2];
     for (int i = 0; i < len; i += 2) {
