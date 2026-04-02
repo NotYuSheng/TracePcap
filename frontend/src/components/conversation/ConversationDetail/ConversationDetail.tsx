@@ -11,6 +11,7 @@ import {
 import { getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HexViewer } from '../HexViewer/HexViewer';
+import { SessionTab } from '../SessionTab/SessionTab';
 import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
 import type { DeviceClassificationInfo } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
 
@@ -77,6 +78,7 @@ export const ConversationDetail = ({
   const [source, destination] = conversation.endpoints;
   const srcClass = hostClassMap?.get(source.ip);
   const dstClass = hostClassMap?.get(destination.ip);
+  const [activeTab, setActiveTab] = useState<'packets' | 'session'>('packets');
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
   const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
 
@@ -349,138 +351,172 @@ export const ConversationDetail = ({
       </div>
 
       <div className="card">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <h6 className="mb-0">Packet Stream ({conversation.packets?.length || 0} packets)</h6>
-          <small className="text-muted">Click a row to view hex payload</small>
+        <div className="card-header">
+          <ul className="nav nav-tabs card-header-tabs">
+            <li className="nav-item">
+              <button
+                className={`nav-link${activeTab === 'packets' ? ' active' : ''}`}
+                onClick={() => setActiveTab('packets')}
+              >
+                Packets
+                <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }}>
+                  {conversation.packets?.length || 0}
+                </span>
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link${activeTab === 'session' ? ' active' : ''}`}
+                onClick={() => setActiveTab('session')}
+              >
+                Session
+              </button>
+            </li>
+          </ul>
         </div>
-        <div className="card-body p-0">
-          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            <table
-              className="table table-sm table-striped mb-0"
-              style={{ tableLayout: 'fixed', width: '100%' }}
-            >
-              <colgroup>
-                <col style={{ width: '4%' }} /> {/* # */}
-                <col style={{ width: '3%' }} /> {/* direction */}
-                <col style={{ width: '14%' }} /> {/* timestamp */}
-                <col style={{ width: '16%' }} /> {/* source */}
-                <col style={{ width: '16%' }} /> {/* destination */}
-                <col style={{ width: '6%' }} /> {/* length */}
-                <col style={{ width: '8%' }} /> {/* file type */}
-                <col /> {/* info — takes remaining space */}
-              </colgroup>
-              <thead className="sticky-top bg-light">
-                <tr>
-                  <th style={thStyle}>#</th>
-                  <th></th>
-                  <th style={thStyle}>Timestamp</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Destination</th>
-                  <th style={thStyle}>Len</th>
-                  <th style={thStyle}>File Type</th>
-                  <th style={thStyle}>Info</th>
-                </tr>
-              </thead>
-              <tbody>
-                {conversation.packets && conversation.packets.length > 0 ? (
-                  conversation.packets.map((packet, index) => (
-                    <>
-                      <tr
-                        key={packet.id}
-                        onClick={() => togglePacket(packet.id)}
-                        style={{ cursor: packet.payload ? 'pointer' : 'default' }}
-                        className={expandedPacketId === packet.id ? 'table-active' : undefined}
-                      >
-                        <td className="text-muted">{index + 1}</td>
-                        <td className={getDirectionClass(packet)}>
-                          <strong>{getDirectionIndicator(packet)}</strong>
-                        </td>
-                        <td
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
+
+        {activeTab === 'packets' && (
+          <div className="card-body p-0">
+            <div className="px-3 py-2 border-bottom d-flex justify-content-end">
+              <small className="text-muted">Click a row to view hex payload</small>
+            </div>
+            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              <table
+                className="table table-sm table-striped mb-0"
+                style={{ tableLayout: 'fixed', width: '100%' }}
+              >
+                <colgroup>
+                  <col style={{ width: '4%' }} /> {/* # */}
+                  <col style={{ width: '3%' }} /> {/* direction */}
+                  <col style={{ width: '14%' }} /> {/* timestamp */}
+                  <col style={{ width: '16%' }} /> {/* source */}
+                  <col style={{ width: '16%' }} /> {/* destination */}
+                  <col style={{ width: '6%' }} /> {/* length */}
+                  <col style={{ width: '8%' }} /> {/* file type */}
+                  <col /> {/* info — takes remaining space */}
+                </colgroup>
+                <thead className="sticky-top bg-light">
+                  <tr>
+                    <th style={thStyle}>#</th>
+                    <th></th>
+                    <th style={thStyle}>Timestamp</th>
+                    <th style={thStyle}>Source</th>
+                    <th style={thStyle}>Destination</th>
+                    <th style={thStyle}>Len</th>
+                    <th style={thStyle}>File Type</th>
+                    <th style={thStyle}>Info</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {conversation.packets && conversation.packets.length > 0 ? (
+                    conversation.packets.map((packet, index) => (
+                      <>
+                        <tr
+                          key={packet.id}
+                          onClick={() => togglePacket(packet.id)}
+                          style={{ cursor: packet.payload ? 'pointer' : 'default' }}
+                          className={expandedPacketId === packet.id ? 'table-active' : undefined}
                         >
-                          <small>{formatTimestamp(packet.timestamp)}</small>
-                        </td>
-                        <td
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                          title={formatIpPort(packet.source.ip, packet.source.port)}
-                        >
-                          <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
-                        </td>
-                        <td
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                          title={formatIpPort(packet.destination.ip, packet.destination.port)}
-                        >
-                          <small>
-                            {formatIpPort(packet.destination.ip, packet.destination.port)}
-                          </small>
-                        </td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
-                        <td>
-                          {packet.detectedFileType ? (
-                            <span
-                              className="badge bg-info text-dark"
-                              style={{ fontSize: '0.65rem' }}
-                              title={`Magic bytes match: ${packet.detectedFileType}`}
-                            >
-                              {packet.detectedFileType}
-                            </span>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        <td>
-                          <small className="text-muted">
-                            {packet.info ?? packet.protocol.name}
-                          </small>
-                          {asciiPacketIds.has(packet.id) && (
-                            <span
-                              className="badge bg-warning text-dark ms-1"
-                              style={{ fontSize: '0.65rem' }}
-                            >
-                              ASCII
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                      {expandedPacketId === packet.id && (
-                        <tr key={`${packet.id}-hex`}>
-                          <td colSpan={8} className="p-2">
-                            {packet.payload ? (
-                              <HexViewer
-                                hex={packet.payload}
-                                truncated={packet.payload.length >= 2048}
-                              />
+                          <td className="text-muted">{index + 1}</td>
+                          <td className={getDirectionClass(packet)}>
+                            <strong>{getDirectionIndicator(packet)}</strong>
+                          </td>
+                          <td
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <small>{formatTimestamp(packet.timestamp)}</small>
+                          </td>
+                          <td
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={formatIpPort(packet.source.ip, packet.source.port)}
+                          >
+                            <small>{formatIpPort(packet.source.ip, packet.source.port)}</small>
+                          </td>
+                          <td
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={formatIpPort(packet.destination.ip, packet.destination.port)}
+                          >
+                            <small>
+                              {formatIpPort(packet.destination.ip, packet.destination.port)}
+                            </small>
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
+                          <td>
+                            {packet.detectedFileType ? (
+                              <span
+                                className="badge bg-info text-dark"
+                                style={{ fontSize: '0.65rem' }}
+                                title={`Magic bytes match: ${packet.detectedFileType}`}
+                              >
+                                {packet.detectedFileType}
+                              </span>
                             ) : (
-                              <p className="text-muted small mb-0">No payload data available.</p>
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                          <td>
+                            <small className="text-muted">
+                              {packet.info ?? packet.protocol.name}
+                            </small>
+                            {asciiPacketIds.has(packet.id) && (
+                              <span
+                                className="badge bg-warning text-dark ms-1"
+                                style={{ fontSize: '0.65rem' }}
+                              >
+                                ASCII
+                              </span>
                             )}
                           </td>
                         </tr>
-                      )}
-                    </>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="text-center text-muted py-3">
-                      No packet details available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                        {expandedPacketId === packet.id && (
+                          <tr key={`${packet.id}-hex`}>
+                            <td colSpan={8} className="p-2">
+                              {packet.payload ? (
+                                <HexViewer
+                                  hex={packet.payload}
+                                  truncated={packet.payload.length >= 2048}
+                                />
+                              ) : (
+                                <p className="text-muted small mb-0">No payload data available.</p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="text-center text-muted py-3">
+                        No packet details available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'session' && (
+          <div className="card-body">
+            <SessionTab
+              conversationId={conversation.id}
+              protocol={conversation.protocol.name}
+            />
+          </div>
+        )}
       </div>
 
       {devicePopup && (
