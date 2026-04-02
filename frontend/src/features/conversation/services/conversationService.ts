@@ -120,6 +120,39 @@ function transformPacket(apiData: PacketApiResponse, protocol: Protocol): Packet
   };
 }
 
+// Session reconstruction types
+export interface SessionChunk {
+  direction: 'CLIENT' | 'SERVER';
+  text: string;
+  binary: boolean;
+  byteLength: number;
+}
+
+export interface HttpMessage {
+  firstLine: string;
+  headers: Record<string, string>;
+  body: string | null;
+  bodyBinary: boolean;
+  bodyDecompressed: boolean;
+  bodyTruncated: boolean;
+  bodyLength: number;
+}
+
+export interface HttpExchange {
+  request: HttpMessage | null;
+  response: HttpMessage | null;
+}
+
+export interface SessionData {
+  detectedProtocol: string | null;
+  chunks: SessionChunk[];
+  httpExchanges: HttpExchange[] | null;
+  truncated: boolean;
+  totalClientBytes: number;
+  totalServerBytes: number;
+  errorMessage: string | null;
+}
+
 export const conversationService = {
   /**
    * Get conversations for a PCAP file with structured filtering, sorting, and pagination.
@@ -241,6 +274,16 @@ export const conversationService = {
   getHostClassifications: async (fileId: string): Promise<HostClassification[]> => {
     const response = await apiClient.get<HostClassification[]>(
       API_ENDPOINTS.HOST_CLASSIFICATIONS(fileId)
+    );
+    return response.data;
+  },
+
+  /**
+   * Reconstruct the full TCP/UDP session for a conversation and decode the application payload.
+   */
+  reconstructSession: async (conversationId: string): Promise<SessionData> => {
+    const response = await apiClient.get<SessionData>(
+      `/conversations/${conversationId}/session`
     );
     return response.data;
   },

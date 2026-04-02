@@ -3,7 +3,9 @@ package com.tracepcap.analysis.controller;
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
+import com.tracepcap.analysis.dto.SessionResponse;
 import com.tracepcap.analysis.service.AnalysisService;
+import com.tracepcap.analysis.service.SessionReconstructionService;
 import com.tracepcap.common.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class ConversationsController {
 
   private final AnalysisService analysisService;
+  private final SessionReconstructionService sessionReconstructionService;
 
   private static final DateTimeFormatter CSV_DT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -236,6 +239,14 @@ public class ConversationsController {
           escapeCsv(customSigsValue));
     }
     writer.flush();
+  }
+
+  /** Reconstruct the full TCP/UDP session for a conversation and decode the application payload. */
+  @GetMapping("/{conversationId}/session")
+  @Operation(summary = "Reconstruct TCP/UDP session with application-layer payload decoding")
+  public ResponseEntity<SessionResponse> getSession(@PathVariable UUID conversationId) {
+    log.info("GET /api/conversations/{}/session", conversationId);
+    return ResponseEntity.ok(sessionReconstructionService.reconstruct(conversationId));
   }
 
   /** Get detailed conversation info including all packets */
