@@ -70,6 +70,7 @@ public class AnalysisService {
   private final DeviceClassifierService deviceClassifierService;
   private final GeoIpService geoIpService;
   private final FileExtractionService fileExtractionService;
+  private final AnalysisRecordService analysisRecordService;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -80,40 +81,47 @@ public class AnalysisService {
             .findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
-    // Check if already analyzed
+    // Check if already analyzed or currently in progress
     if (analysisResultRepository.existsByFileId(fileId)) {
-      log.info("File {} already analyzed, skipping", fileId);
+      log.info("File {} already analyzed or in progress, skipping", fileId);
       return;
     }
 
+    // Create the IN_PROGRESS record immediately in a separate committed transaction so the
+    // frontend can see that analysis has started rather than waiting for the entire job to finish.
+    AnalysisResultEntity analysis = analysisRecordService.createInProgress(file);
+
     try {
-      // Create initial analysis record
-      AnalysisResultEntity analysis =
-          AnalysisResultEntity.builder()
-              .file(file)
-              .status(AnalysisResultEntity.AnalysisStatus.IN_PROGRESS)
-              .build();
-      analysis = analysisResultRepository.save(analysis);
+      long analysisStart = System.currentTimeMillis();
 
-      // Download file from MinIO to temp location
+      // Stage 1: Download
+      long t = System.currentTimeMillis();
       File tempFile = File.createTempFile("pcap-", ".pcap");
+      try {
       storageService.downloadFileToLocal(file.getMinioPath(), tempFile);
+      log.info("[{}] [1/7] Download: {}ms", fileId, System.currentTimeMillis() - t);
 
-      // Parse PCAP file
+      // Stage 2: PCAP parse
+      t = System.currentTimeMillis();
       PcapParserService.PcapAnalysisResult parseResult =
           pcapParserService.analyzePcapFile(tempFile);
+      log.info("[{}] [2/7] PCAP parse: {}ms  ({} packets, {} conversations)",
+          fileId, System.currentTimeMillis() - t,
+          parseResult.getPacketCount(), parseResult.getConversations().size());
 
-      // Enrich conversations with app names and security risks via nDPI (single subprocess run)
-      ndpiService.enrich(tempFile, parseResult.getConversations());
+      // Stage 3: nDPI + tshark enrichment
+      t = System.currentTimeMillis();
+      if (file.isEnableNdpi()) {
+        ndpiService.enrich(tempFile, parseResult.getConversations());
+        tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
+        log.info("[{}] [3/7] nDPI + tshark enrichment: {}ms", fileId, System.currentTimeMillis() - t);
+      } else {
+        log.info("[{}] [3/7] nDPI + tshark enrichment: skipped", fileId);
+      }
 
-      // Enrich with Wireshark dissector-based protocol detection; stores the L7 protocol
-      // label in tsharkProtocol for complementary display in the UI alongside nDPI results.
-      tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
-
-      // Apply custom user-defined signature rules (appends matched rule names to customSignatures)
+      // Stage 4: Signatures, device classification, geo-IP
+      t = System.currentTimeMillis();
       customSignatureService.applySignatures(parseResult.getConversations());
-
-      // Classify each unique host into a device category and save to DB
       Map<String, String> deviceOverrides =
           customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
       List<HostClassificationEntity> hostClassifications =
@@ -124,8 +132,6 @@ public class AnalysisService {
               parseResult.getHostMacs(),
               deviceOverrides);
       hostClassificationRepository.saveAll(hostClassifications);
-
-      // Pre-warm the geo-IP cache for all unique IPs in this capture (best-effort)
       try {
         Set<String> allIps =
             parseResult.getConversations().stream()
@@ -135,19 +141,18 @@ public class AnalysisService {
       } catch (Exception e) {
         log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
       }
+      log.info("[{}] [4/7] Signatures + classification + geo-IP: {}ms", fileId, System.currentTimeMillis() - t);
 
-      // Update analysis results
+      // Stage 5: Persist analysis result
+      t = System.currentTimeMillis();
       analysis.setPacketCount(parseResult.getPacketCount());
       analysis.setTotalBytes(parseResult.getTotalBytes());
       analysis.setStartTime(parseResult.getStartTime());
       analysis.setEndTime(parseResult.getEndTime());
-
       if (parseResult.getStartTime() != null && parseResult.getEndTime() != null) {
         Duration duration = Duration.between(parseResult.getStartTime(), parseResult.getEndTime());
         analysis.setDurationMs(duration.toMillis());
       }
-
-      // Convert protocol counts to JSON format
       Map<String, Object> protocolStats = new HashMap<>();
       parseResult
           .getProtocolCounts()
@@ -161,17 +166,13 @@ public class AnalysisService {
               });
       analysis.setProtocolStats(protocolStats);
       analysis.setStatus(AnalysisResultEntity.AnalysisStatus.COMPLETED);
-
       analysisResultRepository.save(analysis);
+      log.info("[{}] [5/7] Analysis result saved: {}ms", fileId, System.currentTimeMillis() - t);
 
-      // Save conversations and their packets.
-      // Packets are built and saved in PACKET_BATCH_SIZE chunks per conversation so we
-      // never hold more than one batch of PacketEntity objects in memory at a time.
-      // After each conversation's packets are persisted the source PacketInfo list is
-      // cleared so the parser's heap footprint shrinks progressively during this phase.
-      // Every JPA_FLUSH_INTERVAL conversations we flush+clear the JPA session to prevent
-      // Hibernate's first-level cache from accumulating all saved entities.
+      // Stage 6: DB inserts (conversations + packets)
+      t = System.currentTimeMillis();
       int convIndex = 0;
+      long packetsInserted = 0;
       List<UUID> savedConversationIds = new ArrayList<>();
       for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
         ConversationEntity conversation =
@@ -205,7 +206,6 @@ public class AnalysisService {
 
         List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
         if (!packetInfos.isEmpty()) {
-          // Build and save one batch at a time — avoids materialising the full PacketEntity list
           for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
             int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
             List<PacketEntity> batch =
@@ -229,24 +229,33 @@ public class AnalysisService {
                                 .build())
                     .collect(Collectors.toList());
             packetRepository.saveAll(batch);
+            packetsInserted += batch.size();
           }
-          // Free the parsed packet list — memory is released as each conversation is saved
           packetInfos.clear();
         }
 
-        // Periodically flush and clear the JPA session so Hibernate's first-level cache
-        // doesn't accumulate every saved entity for the lifetime of the transaction
         if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
           entityManager.flush();
           entityManager.clear();
+          log.info("[{}] [6/7] DB insert progress: {}/{} conversations, {} packets",
+              fileId, convIndex, parseResult.getConversations().size(), packetsInserted);
         }
       }
+      log.info("[{}] [6/7] DB inserts done: {}ms  ({} conversations, {} packets)",
+          fileId, System.currentTimeMillis() - t,
+          parseResult.getConversations().size(), packetsInserted);
 
-      // Extract files embedded in the packet streams (best-effort; failures do not abort analysis)
-      try {
-        fileExtractionService.extractFiles(file, tempFile, savedConversationIds);
-      } catch (Exception e) {
-        log.warn("File extraction failed for {}: {}", fileId, e.getMessage());
+      // Stage 7: File extraction
+      t = System.currentTimeMillis();
+      if (file.isEnableFileExtraction()) {
+        try {
+          fileExtractionService.extractFiles(file, tempFile, savedConversationIds);
+          log.info("[{}] [7/7] File extraction: {}ms", fileId, System.currentTimeMillis() - t);
+        } catch (Exception e) {
+          log.warn("[{}] [7/7] File extraction failed ({}ms): {}", fileId, System.currentTimeMillis() - t, e.getMessage());
+        }
+      } else {
+        log.info("[{}] [7/7] File extraction: skipped", fileId);
       }
 
       // Update file status
@@ -259,23 +268,22 @@ public class AnalysisService {
       file.setDuration(analysis.getDurationMs());
       fileRepository.save(file);
 
-      // Cleanup temp file
-      tempFile.delete();
+      log.info("[{}] Analysis complete: total {}ms", fileId, System.currentTimeMillis() - analysisStart);
 
-      log.info("Analysis completed for file: {}", fileId);
+      } finally {
+        tempFile.delete();
+      }
 
     } catch (Exception e) {
       log.error("Error analyzing file {}: {}", fileId, e.getMessage(), e);
 
-      // Mark analysis as failed
-      analysisResultRepository
-          .findByFileId(fileId)
-          .ifPresent(
-              analysis -> {
-                analysis.setStatus(AnalysisResultEntity.AnalysisStatus.FAILED);
-                analysis.setErrorMessage(e.getMessage());
-                analysisResultRepository.save(analysis);
-              });
+      // Mark analysis as FAILED in a separate committed transaction so the status persists even
+      // though the outer transaction is being rolled back.
+      try {
+        analysisRecordService.markFailed(analysis.getId(), e.getMessage());
+      } catch (Exception markEx) {
+        log.error("Failed to mark analysis {} as FAILED: {}", analysis.getId(), markEx.getMessage());
+      }
 
       throw new RuntimeException("Failed to analyze file", e);
     }

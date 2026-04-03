@@ -1,0 +1,3 @@
+ALTER TABLE files
+    ADD COLUMN enable_ndpi          BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN enable_file_extraction BOOLEAN NOT NULL DEFAULT TRUE;

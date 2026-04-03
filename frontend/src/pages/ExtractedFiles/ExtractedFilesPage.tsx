@@ -50,8 +50,10 @@ const ExtractionInfoCard = () => {
             </li>
             <li>
               <strong>Raw stream</strong> — for non-HTTP conversations, the TCP/UDP stream is
-              reconstructed and scanned with Apache Tika's magic-byte database. Any byte range
-              that matches a known file signature is extracted.
+              reconstructed and scanned in a single pass using an Aho-Corasick automaton built
+              from known file magic bytes. Candidate positions are then confirmed with Apache
+              Tika's MIME detection. Any byte range matching a known file signature is extracted
+              and stored with its detected MIME type.
             </li>
           </ul>
           <p className="mb-0">

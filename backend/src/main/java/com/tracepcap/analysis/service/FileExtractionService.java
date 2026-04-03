@@ -46,16 +46,88 @@ public class FileExtractionService {
   /** Maximum number of non-HTTP conversations to scan for embedded files. */
   private static final int MAX_RAW_STREAM_CONVERSATIONS = 50;
 
+  /** Maximum embedded files extracted per raw stream. Prevents runaway extraction on streams
+   *  that contain many magic-byte sequences (e.g. synthetic test data or binary protocols). */
+  private static final int MAX_MATCHES_PER_STREAM = 20;
+
   private static final Tika TIKA = new Tika();
 
   /** Tika MIME type repository — used to resolve file extensions from detected MIME strings. */
   private static final MimeTypes TIKA_MIME_REPO = MimeTypes.getDefaultMimeTypes();
 
+  // -------------------------------------------------------------------------
+  // Aho-Corasick automaton — built once at class load from MAGIC_PATTERNS
+  // -------------------------------------------------------------------------
+
   /**
-   * Step size for the magic-byte sliding window scan. All known Tika magic sequences are ≥ 4 bytes,
-   * so a 4-byte step catches every signature while reducing Tika calls by ~4× vs byte-by-byte.
+   * Known file-format magic byte sequences. Aho-Corasick finds their positions in a stream in
+   * one O(n) pass; Tika then confirms each candidate. This replaces the old O(n/4) sliding-window
+   * approach and reduces per-stream Tika calls from millions to O(actual matches).
    */
-  private static final int SCAN_STEP = 4;
+  private static final List<byte[]> MAGIC_PATTERNS = buildMagicPatterns();
+
+  /**
+   * Complete Aho-Corasick GOTO table: {@code AC_GOTO[state][byte] = nextState}.
+   * "Complete" means failure-link logic is baked in — no −1 entries — so the search
+   * loop is a single array lookup per byte with no branching.
+   */
+  private static final int[][] AC_GOTO;
+
+  /**
+   * Output function: {@code AC_OUTPUT[state]} is the index into {@link #MAGIC_PATTERNS}
+   * for a terminal state, or −1 for non-terminal states.
+   */
+  private static final int[] AC_OUTPUT;
+
+  static {
+    int totalLen = MAGIC_PATTERNS.stream().mapToInt(p -> p.length).sum();
+    int maxStates = totalLen + 1;
+
+    int[][] gotoFn = new int[maxStates][256];
+    int[]   output = new int[maxStates];
+    int[]   fail   = new int[maxStates];
+    Arrays.fill(output, -1);
+    for (int[] row : gotoFn) Arrays.fill(row, -1);
+
+    // Phase 1 — insert all patterns into the trie
+    int stateCount = 1; // 0 = root
+    for (int pi = 0; pi < MAGIC_PATTERNS.size(); pi++) {
+      byte[] pat = MAGIC_PATTERNS.get(pi);
+      int cur = 0;
+      for (byte b : pat) {
+        int c = b & 0xFF;
+        if (gotoFn[cur][c] == -1) gotoFn[cur][c] = stateCount++;
+        cur = gotoFn[cur][c];
+      }
+      output[cur] = pi;
+    }
+
+    // Phase 2 — complete root (missing transitions → root) and BFS failure links
+    for (int c = 0; c < 256; c++) {
+      if (gotoFn[0][c] == -1) gotoFn[0][c] = 0;
+    }
+    Queue<Integer> q = new ArrayDeque<>();
+    for (int c = 0; c < 256; c++) {
+      int s = gotoFn[0][c];
+      if (s != 0) { fail[s] = 0; q.add(s); }
+    }
+    while (!q.isEmpty()) {
+      int r = q.poll();
+      for (int c = 0; c < 256; c++) {
+        int s = gotoFn[r][c];
+        if (s == -1) {
+          gotoFn[r][c] = gotoFn[fail[r]][c]; // complete: borrow from failure ancestor
+        } else {
+          fail[s] = gotoFn[fail[r]][c];
+          if (output[s] == -1) output[s] = output[fail[s]]; // propagate suffix output
+          q.add(s);
+        }
+      }
+    }
+
+    AC_GOTO   = Arrays.copyOf(gotoFn, stateCount);
+    AC_OUTPUT = Arrays.copyOf(output, stateCount);
+  }
 
   // -------------------------------------------------------------------------
   // Magic byte scanning result
@@ -70,6 +142,9 @@ public class FileExtractionService {
    * @param ext      file extension (without leading dot)
    */
   private record MagicMatch(int start, int end, String mimeType, String ext) {}
+
+  /** Associates a tshark stream index with its transport protocol ("tcp" or "udp"). */
+  private record StreamInfo(String transport, int index) {}
 
   @PersistenceContext
   private EntityManager entityManager;
@@ -360,45 +435,55 @@ public class FileExtractionService {
     if (convIdsWithFiles.isEmpty()) return;
 
     List<ConversationEntity> candidates =
-        allConvs.stream().filter(c -> convIdsWithFiles.contains(c.getId())).toList();
+        allConvs.stream()
+            .filter(c -> convIdsWithFiles.contains(c.getId()))
+            .filter(c -> {
+              String tp = c.getTsharkProtocol();
+              return tp == null || !tp.toUpperCase().contains("HTTP");
+            })
+            .limit(MAX_RAW_STREAM_CONVERSATIONS)
+            .toList();
 
-    int processed = 0;
+    if (candidates.isEmpty()) return;
+
+    // Single tshark pass to resolve stream indices for all candidate conversations at once.
+    Map<String, StreamInfo> streamIndexMap = buildStreamIndexMap(tempPcapFile);
+
+    Map<ConversationEntity, StreamInfo> convStreamMap = new LinkedHashMap<>();
     for (ConversationEntity conv : candidates) {
-      if (processed >= MAX_RAW_STREAM_CONVERSATIONS) break;
+      StreamInfo info = streamIndexMap.get(streamKey(conv.getSrcIp(), conv.getSrcPort(),
+                                                      conv.getDstIp(), conv.getDstPort()));
+      if (info == null) {
+        info = streamIndexMap.get(streamKey(conv.getDstIp(), conv.getDstPort(),
+                                            conv.getSrcIp(), conv.getSrcPort()));
+      }
+      if (info != null) convStreamMap.put(conv, info);
+    }
 
-      // HTTP is handled by tshark --export-objects
-      String tproto = conv.getTsharkProtocol();
-      if (tproto != null && tproto.toUpperCase().contains("HTTP")) continue;
+    if (convStreamMap.isEmpty()) return;
 
+    Set<Integer> tcpIds = new HashSet<>(), udpIds = new HashSet<>();
+    for (StreamInfo info : convStreamMap.values()) {
+      ("tcp".equals(info.transport()) ? tcpIds : udpIds).add(info.index());
+    }
+
+    // Single tshark pass to read all required streams at once.
+    Map<String, byte[]> streamData = readAllStreams(tempPcapFile, tcpIds, udpIds);
+
+    for (Map.Entry<ConversationEntity, StreamInfo> entry : convStreamMap.entrySet()) {
+      ConversationEntity conv = entry.getKey();
+      StreamInfo info = entry.getValue();
+      byte[] streamBytes = streamData.get(info.transport() + ":" + info.index());
+      if (streamBytes == null || streamBytes.length == 0) continue;
       try {
-        extractFromConversation(file, tempPcapFile, conv);
-        processed++;
+        processMagicMatches(file, conv, streamBytes);
       } catch (Exception e) {
         log.debug("Stream extraction skipped for conversation {}: {}", conv.getId(), e.getMessage());
       }
     }
   }
 
-  private void extractFromConversation(
-      FileEntity file, File tempPcapFile, ConversationEntity conv) throws Exception {
-
-    String transport = null;
-    Integer streamIdx = null;
-    for (String t : new String[]{"tcp", "udp"}) {
-      streamIdx = findStreamIndex(tempPcapFile, conv, t);
-      if (streamIdx != null) {
-        transport = t;
-        break;
-      }
-    }
-    if (transport == null) {
-      log.debug("Stream not found for conversation {}", conv.getId());
-      return;
-    }
-
-    byte[] streamBytes = readFollowRaw(tempPcapFile, transport, streamIdx);
-    if (streamBytes == null || streamBytes.length == 0) return;
-
+  private void processMagicMatches(FileEntity file, ConversationEntity conv, byte[] streamBytes) {
     List<MagicMatch> segments = findMagicMatches(streamBytes);
     for (MagicMatch seg : segments) {
       int start = seg.start();
@@ -412,37 +497,29 @@ public class FileExtractionService {
       String mime = detectMime(fileData);
       String ext = seg.ext();
       String name = "stream-" + conv.getId().toString().substring(0, 8) + "-" + start + "." + ext;
-
       storeExtractedFile(file, conv.getId(), fileData, name, mime, sha256, "magic_bytes");
     }
   }
 
   // -------------------------------------------------------------------------
-  // Stream index lookup
+  // Batched stream index lookup — single tshark pass for all conversations
   // -------------------------------------------------------------------------
 
-  private Integer findStreamIndex(File pcapFile, ConversationEntity conv, String transport)
-      throws Exception {
-    for (int flip = 0; flip < 2; flip++) {
-      String src = flip == 0 ? conv.getSrcIp() : conv.getDstIp();
-      String dst = flip == 0 ? conv.getDstIp() : conv.getSrcIp();
-      Integer sp = flip == 0 ? conv.getSrcPort() : conv.getDstPort();
-      Integer dp = flip == 0 ? conv.getDstPort() : conv.getSrcPort();
-
-      String ipProto = (src != null && src.contains(":")) ? "ipv6" : "ip";
-      StringBuilder filter = new StringBuilder();
-      filter.append(ipProto).append(".src==").append(src);
-      if (sp != null) filter.append(" && ").append(transport).append(".srcport==").append(sp);
-      filter.append(" && ").append(ipProto).append(".dst==").append(dst);
-      if (dp != null) filter.append(" && ").append(transport).append(".dstport==").append(dp);
-
+  /**
+   * Reads the pcap once and builds a map from conversation-endpoint key to
+   * (transport, streamIndex). Replaces the old per-conversation findStreamIndex calls.
+   */
+  private Map<String, StreamInfo> buildStreamIndexMap(File pcapFile) {
+    Map<String, StreamInfo> map = new HashMap<>();
+    try {
       ProcessBuilder pb =
           new ProcessBuilder(
-              "tshark",
-              "-r", pcapFile.getAbsolutePath(),
-              "-Y", filter.toString(),
-              "-T", "fields",
-              "-e", transport + ".stream");
+              "tshark", "-r", pcapFile.getAbsolutePath(),
+              "-T", "fields", "-E", "separator=|",
+              "-e", "ip.src",      "-e", "ip.dst",
+              "-e", "ipv6.src",    "-e", "ipv6.dst",
+              "-e", "tcp.srcport", "-e", "tcp.dstport", "-e", "tcp.stream",
+              "-e", "udp.srcport", "-e", "udp.dstport", "-e", "udp.stream");
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
 
@@ -450,54 +527,121 @@ public class FileExtractionService {
           new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
         String line;
         while ((line = br.readLine()) != null) {
-          line = line.trim();
-          if (!line.isEmpty()) {
+          String[] f = line.split("\\|", -1);
+          if (f.length < 10) continue;
+
+          String srcIp = firstNonEmpty(f[0], f[2]);
+          String dstIp = firstNonEmpty(f[1], f[3]);
+          if (srcIp == null || dstIp == null) continue;
+
+          // TCP
+          if (!f[6].isEmpty()) {
             try {
-              int idx = Integer.parseInt(line);
-              proc.destroy();
-              return idx;
-            } catch (NumberFormatException ignored) {
-            }
+              int idx = Integer.parseInt(f[6].split(",")[0].trim());
+              putBoth(map, srcIp, parsePort(f[4]), dstIp, parsePort(f[5]),
+                      new StreamInfo("tcp", idx));
+            } catch (NumberFormatException ignored) {}
+          }
+
+          // UDP
+          if (!f[9].isEmpty()) {
+            try {
+              int idx = Integer.parseInt(f[9].split(",")[0].trim());
+              putBoth(map, srcIp, parsePort(f[7]), dstIp, parsePort(f[8]),
+                      new StreamInfo("udp", idx));
+            } catch (NumberFormatException ignored) {}
           }
         }
       }
-      proc.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+      if (!proc.waitFor(120, java.util.concurrent.TimeUnit.SECONDS)) {
+        proc.destroyForcibly();
+      }
+    } catch (Exception e) {
+      log.warn("buildStreamIndexMap failed: {}", e.getMessage());
     }
-    return null;
+    return map;
+  }
+
+  private static void putBoth(Map<String, StreamInfo> map,
+      String srcIp, Integer srcPort, String dstIp, Integer dstPort, StreamInfo info) {
+    map.putIfAbsent(streamKey(srcIp, srcPort, dstIp, dstPort), info);
+    map.putIfAbsent(streamKey(dstIp, dstPort, srcIp, srcPort), info);
+  }
+
+  private static String streamKey(String ip1, Integer p1, String ip2, Integer p2) {
+    return ip1 + ":" + p1 + "\u2192" + ip2 + ":" + p2;
   }
 
   // -------------------------------------------------------------------------
-  // tshark follow raw → byte[]
+  // Batched stream reading — single tshark pass for all streams
   // -------------------------------------------------------------------------
 
-  private byte[] readFollowRaw(File pcapFile, String transport, int streamIdx) throws Exception {
-    ProcessBuilder pb =
-        new ProcessBuilder(
-            "tshark",
-            "-r", pcapFile.getAbsolutePath(),
-            "-q",
-            "-z", "follow," + transport + ",raw," + streamIdx);
-    pb.redirectError(ProcessBuilder.Redirect.DISCARD);
-    Process proc = pb.start();
+  /**
+   * Reads all requested TCP and UDP streams in one tshark invocation using multiple
+   * {@code -z follow,<proto>,raw,<N>} arguments. Returns a map from "tcp:N" / "udp:N" to the
+   * reassembled raw bytes for that stream.
+   */
+  private Map<String, byte[]> readAllStreams(
+      File pcapFile, Set<Integer> tcpIds, Set<Integer> udpIds) {
+    Map<String, byte[]> result = new HashMap<>();
+    if (tcpIds.isEmpty() && udpIds.isEmpty()) return result;
 
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    try (BufferedReader br =
-        new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
-      String line;
-      while ((line = br.readLine()) != null) {
-        if (line.startsWith("===") || line.startsWith("Filter:") || line.startsWith("Node"))
-          continue;
-        String hexLine = line.stripLeading();
-        if (hexLine.isEmpty()) continue;
-        byte[] chunk = hexToBytes(hexLine);
-        if (chunk != null) {
-          bos.write(chunk);
-          if (bos.size() >= MAX_EXTRACTED_FILE_BYTES) break;
+    List<String> cmd = new ArrayList<>();
+    cmd.add("tshark");
+    cmd.add("-r"); cmd.add(pcapFile.getAbsolutePath());
+    cmd.add("-q");
+    for (int idx : tcpIds) { cmd.add("-z"); cmd.add("follow,tcp,raw," + idx); }
+    for (int idx : udpIds) { cmd.add("-z"); cmd.add("follow,udp,raw," + idx); }
+
+    try {
+      ProcessBuilder pb = new ProcessBuilder(cmd);
+      pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+      Process proc = pb.start();
+
+      String currentKey = null;
+      ByteArrayOutputStream currentBuf = null;
+
+      try (BufferedReader br =
+          new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+        String line;
+        while ((line = br.readLine()) != null) {
+          if (line.startsWith("=====")) {
+            // Block delimiter — flush current stream if any
+            if (currentKey != null && currentBuf != null) {
+              result.put(currentKey, currentBuf.toByteArray());
+            }
+            currentKey = null;
+            currentBuf = null;
+          } else if (line.startsWith("Filter: tcp.stream eq ")) {
+            currentKey = "tcp:" + line.substring("Filter: tcp.stream eq ".length()).trim();
+            currentBuf = new ByteArrayOutputStream();
+          } else if (line.startsWith("Filter: udp.stream eq ")) {
+            currentKey = "udp:" + line.substring("Filter: udp.stream eq ".length()).trim();
+            currentBuf = new ByteArrayOutputStream();
+          } else if (currentBuf != null
+              && !line.startsWith("Follow:") && !line.startsWith("Node ")) {
+            String hexLine = line.stripLeading();
+            if (!hexLine.isEmpty()) {
+              byte[] chunk = hexToBytes(hexLine);
+              if (chunk != null
+                  && currentBuf.size() + chunk.length <= MAX_EXTRACTED_FILE_BYTES) {
+                currentBuf.write(chunk);
+              }
+            }
+          }
+        }
+        // Flush final stream (no trailing === in some tshark versions)
+        if (currentKey != null && currentBuf != null) {
+          result.put(currentKey, currentBuf.toByteArray());
         }
       }
+      if (!proc.waitFor(300, java.util.concurrent.TimeUnit.SECONDS)) {
+        proc.destroyForcibly();
+      }
+    } catch (Exception e) {
+      log.warn("readAllStreams failed: {}", e.getMessage());
     }
-    proc.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
-    return bos.toByteArray();
+    return result;
   }
 
   private static byte[] hexToBytes(String hex) {
@@ -514,34 +658,34 @@ public class FileExtractionService {
   }
 
   // -------------------------------------------------------------------------
-  // Magic byte scanning (Tika-driven sliding window)
+  // Magic byte scanning (Aho-Corasick + Tika confirmation)
   // -------------------------------------------------------------------------
 
   /**
-   * Scans {@code data} for embedded files using Tika's {@code detect(byte[])} on a sliding window.
+   * Scans {@code data} for embedded files using Aho-Corasick to locate magic-byte candidates
+   * in one O(n) pass, then confirms each with a single Tika call.
    *
-   * <p>A 32-byte window is advanced in {@value #SCAN_STEP}-byte steps. All known Tika magic
-   * sequences are at least 4 bytes long, so a 4-byte step catches every signature while reducing
-   * the number of Tika calls by ~4× compared to a byte-by-byte scan. If Tika returns anything
-   * other than {@code application/octet-stream} or {@code text/plain}, the position is recorded
-   * as the start of an embedded file and the window jumps forward by 256 bytes to skip the
-   * current signature region before resuming the coarse scan.
+   * <p>This replaces the old sliding-window approach (O(n/4) Tika calls) and reduces per-stream
+   * Tika invocations from millions to O(actual magic-byte matches) — roughly 100–500× fewer
+   * calls on large streams with few or no embedded files.
    */
   private List<MagicMatch> findMagicMatches(byte[] data) {
     List<MagicMatch> results = new ArrayList<>();
-    // Reuse a fixed-size window buffer to avoid per-position allocation.
-    byte[] window = new byte[32];
-    for (int i = 0; i < data.length; i += SCAN_STEP) {
-      int windowLen = Math.min(32, data.length - i);
-      System.arraycopy(data, i, window, 0, windowLen);
-      if (windowLen < 32) Arrays.fill(window, windowLen, 32, (byte) 0);
+    int state = 0;
+    int i = 0;
+    while (i < data.length) {
+      state = AC_GOTO[state][data[i] & 0xFF];
+      i++;
+      int pi = AC_OUTPUT[state];
+      if (pi < 0) continue;
 
-      String mime;
-      try {
-        mime = TIKA.detect(window);
-      } catch (Exception ignored) {
-        continue;
-      }
+      int patLen = MAGIC_PATTERNS.get(pi).length;
+      int start  = i - patLen;
+      if (start < 0) continue;
+
+      // Tika confirmation — only called at actual magic-byte positions
+      int windowEnd = Math.min(start + 32, data.length);
+      String mime = detectMime(Arrays.copyOfRange(data, start, windowEnd));
       if ("application/octet-stream".equals(mime) || "text/plain".equals(mime)) continue;
 
       String ext;
@@ -554,10 +698,100 @@ public class FileExtractionService {
       }
       if (ext.isEmpty()) ext = "bin";
 
-      results.add(new MagicMatch(i, data.length, mime, ext));
-      i += 256 - SCAN_STEP; // jump past the current signature region before resuming coarse scan
+      results.add(new MagicMatch(start, data.length, mime, ext));
+      if (results.size() >= MAX_MATCHES_PER_STREAM) break;
+      // Jump past this match's signature region to avoid re-detecting the same file body,
+      // then reset the automaton so it starts fresh from the new position.
+      i = start + 256;
+      state = 0;
     }
     return results;
+  }
+
+  /**
+   * Magic byte sequences searched by the Aho-Corasick automaton.
+   * Covers archives, documents, images, audio/video, executables, crypto, and common text formats.
+   */
+  private static List<byte[]> buildMagicPatterns() {
+    List<byte[]> p = new ArrayList<>();
+    // Archives
+    add(p, 0x50,0x4B,0x03,0x04);                                  // ZIP / OOXML / JAR / APK
+    add(p, 0x50,0x4B,0x05,0x06);                                  // ZIP (empty)
+    add(p, 0x50,0x4B,0x07,0x08);                                  // ZIP (spanned)
+    add(p, 0x1F,0x8B);                                             // GZIP
+    add(p, 0x42,0x5A,0x68);                                        // BZIP2
+    add(p, 0x37,0x7A,0xBC,0xAF,0x27,0x1C);                        // 7-Zip
+    add(p, 0x52,0x61,0x72,0x21,0x1A,0x07);                        // RAR v4
+    add(p, 0xFD,0x37,0x7A,0x58,0x5A,0x00);                        // XZ
+    add(p, 0x28,0xB5,0x2F,0xFD);                                   // Zstandard
+    add(p, 0x60,0xEA);                                             // ARJ
+    add(p, 0x30,0x37,0x30,0x37,0x30,0x31);                        // CPIO new ASCII (070701)
+    add(p, 0x30,0x37,0x30,0x37,0x30,0x32);                        // CPIO new CRC  (070702)
+    add(p, 0xC7,0x71);                                             // CPIO binary
+    add(p, 0x71,0xC7);                                             // CPIO binary (BE)
+    // Documents
+    add(p, 0x25,0x50,0x44,0x46);                                   // PDF
+    add(p, 0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1);             // OLE2 (DOC / XLS / PPT)
+    add(p, 0x7B,0x5C,0x72,0x74,0x66);                             // RTF
+    add(p, 0x25,0x21);                                             // PostScript
+    // Images
+    add(p, 0xFF,0xD8,0xFF);                                        // JPEG
+    add(p, 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A);             // PNG
+    add(p, 0x47,0x49,0x46,0x38,0x37,0x61);                        // GIF87a
+    add(p, 0x47,0x49,0x46,0x38,0x39,0x61);                        // GIF89a
+    add(p, 0x42,0x4D);                                             // BMP
+    add(p, 0x49,0x49,0x2A,0x00);                                   // TIFF LE
+    add(p, 0x4D,0x4D,0x00,0x2A);                                   // TIFF BE
+    add(p, 0x52,0x49,0x46,0x46);                                   // RIFF (WAV / AVI / WebP)
+    add(p, 0x00,0x00,0x01,0x00);                                   // ICO
+    add(p, 0x0A,0x05);                                             // PCX v5
+    add(p, 0x0A,0x03);                                             // PCX v3
+    add(p, 0x0A,0x02);                                             // PCX v2
+    add(p, 0x38,0x42,0x50,0x53);                                   // Photoshop PSD
+    add(p, 0xFF,0x0A);                                             // JPEG XL codestream
+    add(p, 0x00,0x00,0x00,0x0C,0x4A,0x58,0x4C,0x20);             // JPEG XL ISO box
+    // Audio / Video
+    add(p, 0xFF,0xFB);                                             // MP3 (MPEG-1 L3)
+    add(p, 0xFF,0xFA);                                             // MP3 (MPEG-1 L3 protected)
+    add(p, 0xFF,0xF3);                                             // MP3 (MPEG-2 L3)
+    add(p, 0xFF,0xF2);                                             // MP3 (MPEG-2.5 L3)
+    add(p, 0x49,0x44,0x33);                                        // MP3 ID3 tag
+    add(p, 0x0B,0x77);                                             // AC3 / Dolby Digital
+    add(p, 0x66,0x4C,0x61,0x43);                                   // FLAC
+    add(p, 0x4F,0x67,0x67,0x53);                                   // OGG
+    add(p, 0x1A,0x45,0xDF,0xA3);                                   // MKV / WebM
+    add(p, 0x4D,0x54,0x68,0x64);                                   // MIDI
+    // Executables
+    add(p, 0x7F,0x45,0x4C,0x46);                                   // ELF
+    add(p, 0x4D,0x5A);                                             // PE (EXE / DLL)
+    add(p, 0xCA,0xFE,0xBA,0xBE);                                   // Java class / Mach-O fat
+    add(p, 0xCE,0xFA,0xED,0xFE);                                   // Mach-O 32-bit LE
+    add(p, 0xCF,0xFA,0xED,0xFE);                                   // Mach-O 64-bit LE
+    add(p, 0xFE,0xED,0xFA,0xCE);                                   // Mach-O 32-bit BE
+    add(p, 0xFE,0xED,0xFA,0xCF);                                   // Mach-O 64-bit BE
+    // Crypto / certificates
+    add(p, 0x2D,0x2D,0x2D,0x2D,0x2D);                             // PEM (-----)
+    add(p, 0x30,0x82);                                             // DER / ASN.1 / PKCS
+    // Database
+    add(p, 0x53,0x51,0x4C,0x69,0x74,0x65,0x20,0x66,
+           0x6F,0x72,0x6D,0x61,0x74,0x20,0x33,0x00);              // SQLite 3
+    // Flash
+    add(p, 0x46,0x57,0x53);                                        // SWF (FWS)
+    add(p, 0x43,0x57,0x53);                                        // SWF compressed (CWS)
+    add(p, 0x5A,0x57,0x53);                                        // SWF LZMA (ZWS)
+    // Text / markup
+    add(p, 0x3C,0x3F,0x78,0x6D,0x6C);                             // <?xml
+    add(p, 0x3C,0x68,0x74,0x6D,0x6C);                             // <html
+    add(p, 0x3C,0x48,0x54,0x4D,0x4C);                             // <HTML
+    add(p, 0x3C,0x21,0x44,0x4F,0x43,0x54);                        // <!DOCTYPE
+    return Collections.unmodifiableList(p);
+  }
+
+  /** Packs vararg ints into a {@code byte[]} and appends it to {@code list}. */
+  private static void add(List<byte[]> list, int... bytes) {
+    byte[] arr = new byte[bytes.length];
+    for (int i = 0; i < bytes.length; i++) arr[i] = (byte) bytes[i];
+    list.add(arr);
   }
 
   // -------------------------------------------------------------------------
