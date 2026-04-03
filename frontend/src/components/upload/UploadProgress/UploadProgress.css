@@ -79,6 +79,12 @@
   margin-top: 0.15rem;
 }
 
+.usc-duplicate-warning {
+  font-size: 0.775rem;
+  color: #92640a;
+  margin-top: 0.15rem;
+}
+
 /* Right: action */
 .usc-action {
   flex-shrink: 0;

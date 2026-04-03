@@ -3,6 +3,7 @@ package com.tracepcap.file.repository;
 import com.tracepcap.file.entity.FileEntity;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,4 +22,7 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
 
   /** Find files uploaded before the specified timestamp (for cleanup) */
   List<FileEntity> findByUploadedAtBefore(LocalDateTime timestamp);
+
+  /** Find the most recently uploaded file with the given SHA-256 hash */
+  Optional<FileEntity> findFirstByFileHashOrderByUploadedAtDesc(String fileHash);
 }

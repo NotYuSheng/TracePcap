@@ -1,5 +1,6 @@
 package com.tracepcap.file.service;
 
+import com.tracepcap.common.exception.DuplicateFileException;
 import com.tracepcap.common.exception.InvalidFileException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.dto.FileMetadataDto;
@@ -9,9 +10,12 @@ import com.tracepcap.file.event.FileUploadedEvent;
 import com.tracepcap.file.mapper.FileMapper;
 import com.tracepcap.file.repository.FileRepository;
 import java.io.InputStream;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +48,15 @@ public class FileServiceImpl implements FileService {
     // Validate file
     validateFile(file);
 
+    // Compute SHA-256 hash to detect duplicates
+    String fileHash = computeSha256(file);
+
+    // Reject if a file with the same hash already exists
+    Optional<FileEntity> existing = fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+    if (existing.isPresent()) {
+      throw new DuplicateFileException(existing.get().getId());
+    }
+
     // Generate unique ID and file name
     UUID fileId = UUID.randomUUID();
     String fileName = fileId.toString() + getFileExtension(file.getOriginalFilename());
@@ -63,6 +76,7 @@ public class FileServiceImpl implements FileService {
               .minioPath(minioPath)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
+              .fileHash(fileHash)
               .build();
 
       fileEntity = fileRepository.save(fileEntity);
@@ -178,5 +192,17 @@ public class FileServiceImpl implements FileService {
   private String getFileExtension(String filename) {
     int lastDotIndex = filename.lastIndexOf('.');
     return lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
+  }
+
+  /** Compute SHA-256 hex digest of the uploaded file bytes */
+  private String computeSha256(MultipartFile file) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hash = digest.digest(file.getBytes());
+      return HexFormat.of().formatHex(hash);
+    } catch (Exception e) {
+      log.warn("Failed to compute SHA-256 for file {}: {}", file.getOriginalFilename(), e.getMessage());
+      return null;
+    }
   }
 }
