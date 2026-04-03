@@ -36,7 +36,7 @@ export const ScrollableTable = ({ children, maxHeight = '62vh' }: ScrollableTabl
     const table = scroll.querySelector('table');
     if (table) ro.observe(table);
     return () => ro.disconnect();
-  });
+  }, []);
 
   const handleScroll = useCallback(() => {
     if (!syncingRef.current && topBarRef.current && scrollRef.current) {

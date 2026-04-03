@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -77,7 +78,7 @@ public class ExtractedFilesController {
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
-            "attachment; filename=\"" + filename.replace("\"", "_") + "\"")
+            ContentDisposition.builder("attachment").filename(filename).build().toString())
         .contentType(MediaType.parseMediaType(mimeType))
         .body(body);
   }

@@ -294,15 +294,15 @@ public class AnalysisService {
     // Convert time to Unix timestamps (milliseconds)
     Long startTimeMs =
         analysis.getStartTime() != null
-            ? analysis.getStartTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            ? analysis.getStartTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
             : null;
     Long endTimeMs =
         analysis.getEndTime() != null
-            ? analysis.getEndTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            ? analysis.getEndTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
             : null;
     Long uploadTimeMs =
         file.getUploadedAt() != null
-            ? file.getUploadedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            ? file.getUploadedAt().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
             : null;
 
     // Build protocol distribution
@@ -431,13 +431,13 @@ public class AnalysisService {
                         .startTime(
                             conv.getStartTime() != null
                                 ? conv.getStartTime()
-                                    .atZone(java.time.ZoneId.systemDefault()).toInstant()
+                                    .toInstant(java.time.ZoneOffset.UTC)
                                     .toEpochMilli()
                                 : null)
                         .endTime(
                             conv.getEndTime() != null
                                 ? conv.getEndTime()
-                                    .atZone(java.time.ZoneId.systemDefault()).toInstant()
+                                    .toInstant(java.time.ZoneOffset.UTC)
                                     .toEpochMilli()
                                 : null)
                         .packetCount(conv.getPacketCount())
