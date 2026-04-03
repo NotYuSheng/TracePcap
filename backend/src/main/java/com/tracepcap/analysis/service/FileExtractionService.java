@@ -553,7 +553,9 @@ public class FileExtractionService {
           }
         }
       }
-      proc.waitFor(120, java.util.concurrent.TimeUnit.SECONDS);
+      if (!proc.waitFor(120, java.util.concurrent.TimeUnit.SECONDS)) {
+        proc.destroyForcibly();
+      }
     } catch (Exception e) {
       log.warn("buildStreamIndexMap failed: {}", e.getMessage());
     }
@@ -633,7 +635,9 @@ public class FileExtractionService {
           result.put(currentKey, currentBuf.toByteArray());
         }
       }
-      proc.waitFor(300, java.util.concurrent.TimeUnit.SECONDS);
+      if (!proc.waitFor(300, java.util.concurrent.TimeUnit.SECONDS)) {
+        proc.destroyForcibly();
+      }
     } catch (Exception e) {
       log.warn("readAllStreams failed: {}", e.getMessage());
     }

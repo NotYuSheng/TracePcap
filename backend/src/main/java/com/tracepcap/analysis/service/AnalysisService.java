@@ -97,6 +97,7 @@ public class AnalysisService {
       // Stage 1: Download
       long t = System.currentTimeMillis();
       File tempFile = File.createTempFile("pcap-", ".pcap");
+      try {
       storageService.downloadFileToLocal(file.getMinioPath(), tempFile);
       log.info("[{}] [1/7] Download: {}ms", fileId, System.currentTimeMillis() - t);
 
@@ -267,9 +268,11 @@ public class AnalysisService {
       file.setDuration(analysis.getDurationMs());
       fileRepository.save(file);
 
-      tempFile.delete();
-
       log.info("[{}] Analysis complete: total {}ms", fileId, System.currentTimeMillis() - analysisStart);
+
+      } finally {
+        tempFile.delete();
+      }
 
     } catch (Exception e) {
       log.error("Error analyzing file {}: {}", fileId, e.getMessage(), e);
