@@ -96,6 +96,25 @@ export const ConversationPage = () => {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-open conversation modal when navigated here with ?highlight=<conversationId>
+  // (e.g. from the "View conversation" link on the Extracted Files page)
+  useEffect(() => {
+    const highlightId = searchParams.get('highlight');
+    if (!highlightId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('highlight');
+    setSearchParams(next, { replace: true });
+    setDetailLoading(true);
+    conversationService
+      .getConversationDetail(highlightId)
+      .then(conv => {
+        setSelectedConversation(conv);
+        setSelectedIndex(-1);
+      })
+      .catch(err => console.error('Failed to load highlighted conversation:', err))
+      .finally(() => setDetailLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch conversations whenever filters change
   useEffect(() => {
     if (!fileId) return;
@@ -425,6 +444,7 @@ export const ConversationPage = () => {
                     conversation={selectedConversation}
                     signatureSeverities={signatureSeverities}
                     hostClassMap={hostClassMap}
+                    fileId={fileId}
                   />
                 )}
               </div>

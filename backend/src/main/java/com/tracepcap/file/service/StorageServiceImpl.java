@@ -4,6 +4,7 @@ import com.tracepcap.common.exception.StorageException;
 import com.tracepcap.config.MinioConfig;
 import io.minio.*;
 import io.minio.http.Method;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -113,6 +114,25 @@ public class StorageServiceImpl implements StorageService {
     } catch (Exception e) {
       log.error("Failed to download file to local: {}", fileName, e);
       throw new StorageException("Failed to download file to local storage", e);
+    }
+  }
+
+  @Override
+  public String uploadBytes(byte[] data, String path, String contentType) {
+    try {
+      ensureBucketExists();
+      minioClient.putObject(
+          PutObjectArgs.builder()
+              .bucket(minioConfig.getBucket())
+              .object(path)
+              .stream(new ByteArrayInputStream(data), data.length, -1)
+              .contentType(contentType != null ? contentType : "application/octet-stream")
+              .build());
+      log.info("Uploaded {} bytes to MinIO path: {}", data.length, path);
+      return path;
+    } catch (Exception e) {
+      log.error("Failed to upload bytes to path: {}", path, e);
+      throw new StorageException("Failed to upload bytes to storage", e);
     }
   }
 

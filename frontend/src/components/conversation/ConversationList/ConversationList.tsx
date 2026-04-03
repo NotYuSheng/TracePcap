@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState } from 'react';
+import { ScrollableTable } from '@components/common/ScrollableTable';
 import type { Conversation, ConversationGeoInfo, HostClassification } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
@@ -54,117 +55,8 @@ export const ConversationList = ({
   signatureSeverities = {},
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [scrolledEnd, setScrolledEnd] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const topBarRef = useRef<HTMLDivElement>(null);
-  const topInnerRef = useRef<HTMLDivElement>(null);
-  const syncingRef = useRef(false);
 
   const col = (key: ColumnKey) => visibleColumns.has(key);
-
-  const updateTopBarWidth = useCallback(() => {
-    const table = scrollRef.current?.querySelector('table');
-    if (topInnerRef.current && table) {
-      topInnerRef.current.style.width = `${table.scrollWidth}px`;
-    }
-  }, []);
-
-  const handleScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setScrolledEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
-    if (!syncingRef.current && topBarRef.current) {
-      syncingRef.current = true;
-      topBarRef.current.scrollLeft = el.scrollLeft;
-      syncingRef.current = false;
-    }
-    updateTopBarWidth();
-  }, [updateTopBarWidth]);
-
-  const handleTopScroll = useCallback(() => {
-    if (!syncingRef.current && scrollRef.current && topBarRef.current) {
-      syncingRef.current = true;
-      scrollRef.current.scrollLeft = topBarRef.current.scrollLeft;
-      syncingRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    updateTopBarWidth();
-  }, [conversations, visibleColumns, updateTopBarWidth]);
-
-  // Pan state in refs — no re-renders, always current in the rAF loop
-  const panActive = useRef(false);
-  const panOrigin = useRef({ x: 0, y: 0 });
-  const panMouse = useRef({ x: 0, y: 0 });
-  const panRaf = useRef(0);
-  const panDot = useRef<HTMLDivElement | null>(null);
-  const panTick = useRef<() => void>(() => {});
-
-  const stopPan = useCallback(() => {
-    panActive.current = false;
-    if (scrollRef.current) scrollRef.current.style.cursor = '';
-    cancelAnimationFrame(panRaf.current);
-    panDot.current?.remove();
-    panDot.current = null;
-  }, []);
-
-  // Define the tick loop once and store in ref; window listeners use same ref
-  useEffect(() => {
-    const DEAD = 8,
-      SPD = 0.1;
-    panTick.current = () => {
-      if (!panActive.current) return;
-      const dx = panMouse.current.x - panOrigin.current.x;
-      const dy = panMouse.current.y - panOrigin.current.y;
-      if (scrollRef.current && Math.abs(dx) > DEAD) scrollRef.current.scrollLeft += dx * SPD;
-      if (scrollRef.current && Math.abs(dy) > DEAD) scrollRef.current.scrollTop += dy * SPD;
-      panRaf.current = requestAnimationFrame(panTick.current);
-    };
-
-    const onMove = (e: MouseEvent) => {
-      panMouse.current = { x: e.clientX, y: e.clientY };
-    };
-    const onClick = (e: MouseEvent) => {
-      if (panActive.current && e.button !== 1) stopPan();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') stopPan();
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mousedown', onClick);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      stopPan();
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mousedown', onClick);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [stopPan]);
-
-  const handleMiddleDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.button !== 1) return;
-      e.preventDefault();
-      if (panActive.current) {
-        stopPan();
-        return;
-      }
-      panActive.current = true;
-      panOrigin.current = { x: e.clientX, y: e.clientY };
-      panMouse.current = { x: e.clientX, y: e.clientY };
-      if (scrollRef.current) scrollRef.current.style.cursor = 'all-scroll';
-      const dot = document.createElement('div');
-      dot.className = 'conv-pan-dot';
-      dot.style.left = `${e.clientX}px`;
-      dot.style.top = `${e.clientY}px`;
-      document.body.appendChild(dot);
-      panDot.current = dot;
-      panRaf.current = requestAnimationFrame(panTick.current);
-    },
-    [stopPan]
-  );
 
   const hasAppNames = conversations.some(c => c.appName);
   const hasL7Protocols = conversations.some(c => c.tsharkProtocol);
@@ -204,17 +96,7 @@ export const ConversationList = ({
 
   return (
     <div className="conversation-list">
-      {/* Top phantom scrollbar */}
-      <div ref={topBarRef} className="conv-top-scrollbar" onScroll={handleTopScroll}>
-        <div ref={topInnerRef} className="conv-top-scrollbar-inner" />
-      </div>
-
-      <div
-        ref={scrollRef}
-        className={`conv-table-scroll${scrolledEnd ? ' scrolled-end' : ''}`}
-        onScroll={handleScroll}
-        onMouseDown={handleMiddleDown}
-      >
+      <ScrollableTable>
         <table className="table table-hover">
           <thead>
             <tr>
@@ -418,7 +300,7 @@ export const ConversationList = ({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollableTable>
 
       {conversations.length === 0 && (
         <div className="text-center py-5">

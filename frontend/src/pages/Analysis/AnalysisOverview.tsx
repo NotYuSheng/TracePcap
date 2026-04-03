@@ -13,6 +13,7 @@ import {
 } from '@/utils/appColors';
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
+import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -114,6 +115,7 @@ export const AnalysisOverview = () => {
   const navigate = useNavigate();
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
+  const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     conversationService
@@ -128,13 +130,17 @@ export const AnalysisOverview = () => {
       .catch(console.error);
 
     conversationService.getRiskTypes(fileId).then(setRiskTypes).catch(console.error);
+
+    getExtractedFiles(fileId)
+      .then(files => setExtractedFilesCount(files.length))
+      .catch(() => setExtractedFilesCount(undefined));
   }, [fileId]);
 
   const detectedApps = data.detectedApplications ?? [];
 
   return (
     <div className="analysis-overview">
-      <AnalysisSummary summary={data} />
+      <AnalysisSummary summary={data} extractedFilesCount={extractedFilesCount} />
 
       {detectedApps.length > 0 && (
         <div className="mt-4">

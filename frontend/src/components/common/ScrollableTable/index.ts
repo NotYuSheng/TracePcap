@@ -1,0 +1,1 @@
+export { ScrollableTable } from './ScrollableTable';

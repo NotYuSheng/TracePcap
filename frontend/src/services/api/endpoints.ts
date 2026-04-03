@@ -34,4 +34,9 @@ export const API_ENDPOINTS = {
   // Filter Generator (Not yet implemented in backend)
   GENERATE_FILTER: (fileId: string) => `/filter/generate/${fileId}`,
   EXECUTE_FILTER: (fileId: string) => `/filter/execute/${fileId}`,
+
+  // Extracted Files
+  EXTRACTED_FILES: (fileId: string) => `/files/${fileId}/extractions`,
+  EXTRACTED_FILE_DOWNLOAD: (fileId: string, extractionId: string) =>
+    `/files/${fileId}/extractions/${extractionId}/download`,
 } as const;

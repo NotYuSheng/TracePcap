@@ -1,0 +1,1 @@
+export { ExtractedFilesPage } from './ExtractedFilesPage';

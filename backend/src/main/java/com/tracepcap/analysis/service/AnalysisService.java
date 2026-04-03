@@ -69,6 +69,7 @@ public class AnalysisService {
   private final CustomSignatureService customSignatureService;
   private final DeviceClassifierService deviceClassifierService;
   private final GeoIpService geoIpService;
+  private final FileExtractionService fileExtractionService;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -171,6 +172,7 @@ public class AnalysisService {
       // Every JPA_FLUSH_INTERVAL conversations we flush+clear the JPA session to prevent
       // Hibernate's first-level cache from accumulating all saved entities.
       int convIndex = 0;
+      List<UUID> savedConversationIds = new ArrayList<>();
       for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
         ConversationEntity conversation =
             ConversationEntity.builder()
@@ -199,6 +201,7 @@ public class AnalysisService {
                 .endTime(convInfo.getEndTime())
                 .build();
         ConversationEntity savedConversation = conversationRepository.save(conversation);
+        savedConversationIds.add(savedConversation.getId());
 
         List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
         if (!packetInfos.isEmpty()) {
@@ -237,6 +240,13 @@ public class AnalysisService {
           entityManager.flush();
           entityManager.clear();
         }
+      }
+
+      // Extract files embedded in the packet streams (best-effort; failures do not abort analysis)
+      try {
+        fileExtractionService.extractFiles(file, tempFile, savedConversationIds);
+      } catch (Exception e) {
+        log.warn("File extraction failed for {}: {}", fileId, e.getMessage());
       }
 
       // Update file status
@@ -284,15 +294,15 @@ public class AnalysisService {
     // Convert time to Unix timestamps (milliseconds)
     Long startTimeMs =
         analysis.getStartTime() != null
-            ? analysis.getStartTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+            ? analysis.getStartTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
             : null;
     Long endTimeMs =
         analysis.getEndTime() != null
-            ? analysis.getEndTime().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+            ? analysis.getEndTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
             : null;
     Long uploadTimeMs =
         file.getUploadedAt() != null
-            ? file.getUploadedAt().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+            ? file.getUploadedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
             : null;
 
     // Build protocol distribution
@@ -421,13 +431,13 @@ public class AnalysisService {
                         .startTime(
                             conv.getStartTime() != null
                                 ? conv.getStartTime()
-                                    .toInstant(java.time.ZoneOffset.UTC)
+                                    .atZone(java.time.ZoneId.systemDefault()).toInstant()
                                     .toEpochMilli()
                                 : null)
                         .endTime(
                             conv.getEndTime() != null
                                 ? conv.getEndTime()
-                                    .toInstant(java.time.ZoneOffset.UTC)
+                                    .atZone(java.time.ZoneId.systemDefault()).toInstant()
                                     .toEpochMilli()
                                 : null)
                         .packetCount(conv.getPacketCount())
