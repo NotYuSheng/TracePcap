@@ -11,8 +11,8 @@ interface Props {
   fileId: string;
 }
 
-// Rough estimate: ~3 seconds per MB (Aho-Corasick scan removed the file extraction bottleneck)
-const SECONDS_PER_MB = 3;
+// Rough estimate: ~0.5 seconds per MB (measured ~0.4 s/MB on 125 MB captures post AC optimisation)
+const SECONDS_PER_MB = 0.5;
 const MIN_ESTIMATE_S = 10;
 
 function formatBytes(bytes: number): string {
