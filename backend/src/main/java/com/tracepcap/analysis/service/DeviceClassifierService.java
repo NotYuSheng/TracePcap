@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -48,10 +49,11 @@ public class DeviceClassifierService {
   // OUI vendor lookup — loaded at startup from /usr/share/wireshark/manuf
   // -------------------------------------------------------------------------
 
-  private static final String MANUF_FILE = "/usr/share/wireshark/manuf";
+  @Value("${app.wireshark.manuf-path:/usr/share/wireshark/manuf}")
+  private String manufFile;
 
   /** OUI (lower-case "aa:bb:cc") → short vendor name from the manuf file */
-  private final Map<String, String> ouiVendor = new HashMap<>();
+  private Map<String, String> ouiVendor = Collections.emptyMap();
 
   /**
    * Vendor name substring (lower-case) → device-type hint.
@@ -86,11 +88,12 @@ public class DeviceClassifierService {
 
   @PostConstruct
   void loadManufFile() {
-    Path path = Path.of(MANUF_FILE);
+    Path path = Path.of(manufFile);
     if (!Files.exists(path)) {
-      log.warn("Wireshark manuf file not found at {}; OUI vendor lookup disabled", MANUF_FILE);
+      log.warn("Wireshark manuf file not found at {}; OUI vendor lookup disabled", manufFile);
       return;
     }
+    Map<String, String> mutable = new HashMap<>();
     int loaded = 0;
     try (BufferedReader br = Files.newBufferedReader(path)) {
       String line;
@@ -100,13 +103,14 @@ public class DeviceClassifierService {
         if (parts.length < 2) continue;
         String oui = parts[0].trim();
         if (oui.contains("/")) continue; // skip /28 and /36 MA-M / MA-S entries
-        ouiVendor.put(oui.toLowerCase(), parts[1].trim());
+        mutable.put(oui.toLowerCase(), parts[1].trim());
         loaded++;
       }
     } catch (Exception e) {
       log.warn("Failed to load Wireshark manuf file: {}", e.getMessage());
     }
-    log.info("Loaded {} OUI entries from {}", loaded, MANUF_FILE);
+    ouiVendor = Collections.unmodifiableMap(mutable);
+    log.info("Loaded {} OUI entries from {}", loaded, manufFile);
   }
 
   // -------------------------------------------------------------------------

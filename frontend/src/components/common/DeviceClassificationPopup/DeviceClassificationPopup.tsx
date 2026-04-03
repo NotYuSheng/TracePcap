@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { portToServiceLabel } from '@/utils/portUtils';
 
 export interface DeviceClassificationInfo {
   ip: string;
@@ -9,19 +10,6 @@ export interface DeviceClassificationInfo {
   ttl?: number;
   role?: 'client' | 'server';
   conversationPort?: number;
-}
-
-function portToTypeLabel(port: number): string | null {
-  if (port === 80 || port === 8080) return 'Web Server';
-  if (port === 443 || port === 8443) return 'Web Server (HTTPS)';
-  if (port === 53) return 'DNS Server';
-  if (port === 22) return 'SSH Server';
-  if (port === 21) return 'FTP Server';
-  if (port === 25 || port === 587 || port === 465) return 'Mail Server';
-  if (port === 67 || port === 68) return 'DHCP Server';
-  if (port === 123) return 'NTP Server';
-  if (port === 3306 || port === 5432 || port === 1433 || port === 27017) return 'Database Server';
-  return null;
 }
 
 function confidenceLevel(pct: number): string {
@@ -108,7 +96,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
             typeLabel = 'Client';
             typeNote = 'Initiated this conversation';
           } else if (info.role === 'server' && info.conversationPort != null) {
-            typeLabel = portToTypeLabel(info.conversationPort) ?? 'Server';
+            typeLabel = portToServiceLabel(info.conversationPort) ?? 'Server';
             typeNote = `Based on destination port ${info.conversationPort} in this conversation`;
           }
           if (!typeLabel) return null;
