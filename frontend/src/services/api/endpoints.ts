@@ -3,6 +3,7 @@ export const API_ENDPOINTS = {
   UPLOAD_PCAP: '/files',
   FILES_LIST: '/files',
   FILE_METADATA: (fileId: string) => `/files/${fileId}`,
+  FILE_DELETE: (fileId: string) => `/files/${fileId}`,
   FILE_DOWNLOAD: (fileId: string) => `/files/${fileId}/download`,
 
   // Analysis (Not yet implemented in backend)

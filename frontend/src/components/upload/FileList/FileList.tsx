@@ -12,7 +12,6 @@ import './FileList.css';
 export const FileList = () => {
   const recentFiles = useStore(state => state.recentFiles);
   const removeRecentFile = useStore(state => state.removeRecentFile);
-  const clearRecentFiles = useStore(state => state.clearRecentFiles);
   const navigate = useNavigate();
   const [pendingDeleteFile, setPendingDeleteFile] = useState<RecentFile | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
@@ -73,8 +72,13 @@ export const FileList = () => {
     setPendingDeleteFile(file);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (pendingDeleteFile) {
+      try {
+        await apiClient.delete(API_ENDPOINTS.FILE_DELETE(pendingDeleteFile.id));
+      } catch (err) {
+        console.error('Failed to delete file from backend:', err);
+      }
       removeRecentFile(pendingDeleteFile.id);
       setPendingDeleteFile(null);
     }
@@ -203,7 +207,18 @@ export const FileList = () => {
           <button
             type="button"
             className="btn btn-danger"
-            onClick={() => { clearRecentFiles(); setConfirmDeleteAll(false); }}
+            onClick={async () => {
+              const files = useStore.getState().recentFiles;
+              const results = await Promise.allSettled(
+                files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.id)))
+              );
+              results.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                  removeRecentFile(files[index].id);
+                }
+              });
+              setConfirmDeleteAll(false);
+            }}
           >
             Delete all
           </button>

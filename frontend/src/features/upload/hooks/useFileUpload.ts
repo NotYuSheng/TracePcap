@@ -9,6 +9,8 @@ export interface UploadEntry {
   progress: number;
   isUploading: boolean;
   error?: string;
+  isDuplicate?: boolean;
+  duplicateOfFileId?: string;
 }
 
 export const useFileUpload = () => {
@@ -46,11 +48,19 @@ export const useFileUpload = () => {
           });
 
           update(entryId, { isUploading: false, progress: 100, fileId: result.fileId });
-        } catch (err) {
-          update(entryId, {
-            isUploading: false,
-            error: err instanceof Error ? err.message : 'Upload failed',
-          });
+        } catch (err: any) {
+          const data = err?.response?.data;
+          if (err?.response?.status === 409 && data?.existingFileId) {
+            update(entryId, {
+              isUploading: false,
+              progress: 100,
+              isDuplicate: true,
+              duplicateOfFileId: data.existingFileId,
+            });
+          } else {
+            const message = data?.message || (err instanceof Error ? err.message : 'Upload failed');
+            update(entryId, { isUploading: false, error: message });
+          }
         }
       }
     },

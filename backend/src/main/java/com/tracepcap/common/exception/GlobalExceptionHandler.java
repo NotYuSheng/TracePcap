@@ -32,6 +32,24 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
   }
 
+  @ExceptionHandler(DuplicateFileException.class)
+  public ResponseEntity<ErrorResponse> handleDuplicateFileException(
+      DuplicateFileException ex, HttpServletRequest request) {
+    log.warn("Duplicate file upload rejected: existing file ID {}", ex.getExistingFileId());
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.CONFLICT.value())
+            .error("Conflict")
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .existingFileId(ex.getExistingFileId().toString())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+  }
+
   @ExceptionHandler(InvalidFileException.class)
   public ResponseEntity<ErrorResponse> handleInvalidFileException(
       InvalidFileException ex, HttpServletRequest request) {

@@ -28,11 +28,11 @@ export const UploadPage = () => {
       });
   }, []);
 
-  // Auto-navigate for single-file uploads only
+  // Auto-navigate for single-file uploads only (skip if duplicate so user can see the warning)
   useEffect(() => {
     if (uploads.length !== 1 || isUploading) return;
     const upload = uploads[0];
-    if (upload.fileId && !upload.error) {
+    if (upload.fileId && !upload.error && !upload.isDuplicate) {
       navigate(`/analysis/${upload.fileId}`);
     }
   }, [uploads, isUploading, navigate]);
@@ -90,7 +90,9 @@ export const UploadPage = () => {
                     progress={u.progress}
                     isUploading={u.isUploading}
                     error={u.error}
+                    isDuplicate={u.isDuplicate}
                     onAnalyze={u.fileId ? () => navigate(`/analysis/${u.fileId}`) : undefined}
+                    onOpenExisting={u.duplicateOfFileId ? () => navigate(`/analysis/${u.duplicateOfFileId}`) : undefined}
                   />
                 ))}
               </div>

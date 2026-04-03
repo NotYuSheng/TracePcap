@@ -30,6 +30,9 @@ public class FileEntity {
   @Column(name = "minio_path", nullable = false, length = 512)
   private String minioPath;
 
+  @Column(name = "file_hash", length = 64)
+  private String fileHash;
+
   @Column(name = "uploaded_at", nullable = false)
   private LocalDateTime uploadedAt;
 
