@@ -194,15 +194,21 @@ public class FileServiceImpl implements FileService {
     return lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
   }
 
-  /** Compute SHA-256 hex digest of the uploaded file bytes */
+  /** Compute SHA-256 hex digest of the uploaded file using a streaming approach */
   private String computeSha256(MultipartFile file) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      byte[] hash = digest.digest(file.getBytes());
-      return HexFormat.of().formatHex(hash);
+      try (InputStream is = file.getInputStream()) {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = is.read(buffer)) != -1) {
+          digest.update(buffer, 0, bytesRead);
+        }
+      }
+      return HexFormat.of().formatHex(digest.digest());
     } catch (Exception e) {
-      log.warn("Failed to compute SHA-256 for file {}: {}", file.getOriginalFilename(), e.getMessage());
-      return null;
+      log.error("Failed to compute SHA-256 for file {}: {}", file.getOriginalFilename(), e.getMessage());
+      throw new InvalidFileException("Could not process file: failed to compute hash", e);
     }
   }
 }

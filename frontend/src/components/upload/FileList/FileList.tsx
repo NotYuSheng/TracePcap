@@ -12,7 +12,6 @@ import './FileList.css';
 export const FileList = () => {
   const recentFiles = useStore(state => state.recentFiles);
   const removeRecentFile = useStore(state => state.removeRecentFile);
-  const clearRecentFiles = useStore(state => state.clearRecentFiles);
   const navigate = useNavigate();
   const [pendingDeleteFile, setPendingDeleteFile] = useState<RecentFile | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
@@ -210,10 +209,14 @@ export const FileList = () => {
             className="btn btn-danger"
             onClick={async () => {
               const files = useStore.getState().recentFiles;
-              await Promise.allSettled(
+              const results = await Promise.allSettled(
                 files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.id)))
               );
-              clearRecentFiles();
+              results.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                  removeRecentFile(files[index].id);
+                }
+              });
               setConfirmDeleteAll(false);
             }}
           >
