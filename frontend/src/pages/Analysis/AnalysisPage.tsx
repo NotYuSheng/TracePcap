@@ -62,10 +62,10 @@ export const AnalysisPage = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <ul className="nav nav-tabs">
+      <ul className="nav nav-tabs" style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', display: 'flex' }}>
         <li className="nav-item">
           <button
-            className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
+            style={{ whiteSpace: 'nowrap' }} className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => handleTabChange('overview')}
           >
             <i className="bi bi-speedometer2 me-2"></i>
@@ -74,7 +74,7 @@ export const AnalysisPage = () => {
         </li>
         <li className="nav-item">
           <button
-            className={`nav-link ${activeTab === 'conversations' ? 'active' : ''}`}
+            style={{ whiteSpace: 'nowrap' }} className={`nav-link ${activeTab === 'conversations' ? 'active' : ''}`}
             onClick={() => handleTabChange('conversations')}
           >
             <i className="bi bi-arrow-left-right me-2"></i>
@@ -83,7 +83,7 @@ export const AnalysisPage = () => {
         </li>
         <li className="nav-item">
           <button
-            className={`nav-link ${activeTab === 'story' ? 'active' : ''}`}
+            style={{ whiteSpace: 'nowrap' }} className={`nav-link ${activeTab === 'story' ? 'active' : ''}`}
             onClick={() => handleTabChange('story')}
           >
             <i className="bi bi-journal-text me-2"></i>
@@ -92,7 +92,7 @@ export const AnalysisPage = () => {
         </li>
         <li className="nav-item">
           <button
-            className={`nav-link ${activeTab === 'filter-generator' ? 'active' : ''}`}
+            style={{ whiteSpace: 'nowrap' }} className={`nav-link ${activeTab === 'filter-generator' ? 'active' : ''}`}
             onClick={() => handleTabChange('filter-generator')}
           >
             <i className="bi bi-funnel me-2"></i>
@@ -101,20 +101,20 @@ export const AnalysisPage = () => {
         </li>
         <li className="nav-item">
           <button
-            className={`nav-link ${activeTab === 'network-diagram' ? 'active' : ''}`}
-            onClick={() => handleTabChange('network-diagram')}
-          >
-            <i className="bi bi-diagram-3 me-2"></i>
-            Network Diagram
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'extracted-files' ? 'active' : ''}`}
+            style={{ whiteSpace: 'nowrap' }} className={`nav-link ${activeTab === 'extracted-files' ? 'active' : ''}`}
             onClick={() => handleTabChange('extracted-files')}
           >
             <i className="bi bi-file-earmark-arrow-down me-2"></i>
             Extracted Files
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            style={{ whiteSpace: 'nowrap' }} className={`nav-link ${activeTab === 'network-diagram' ? 'active' : ''}`}
+            onClick={() => handleTabChange('network-diagram')}
+          >
+            <i className="bi bi-diagram-3 me-2"></i>
+            Network Diagram
           </button>
         </li>
       </ul>

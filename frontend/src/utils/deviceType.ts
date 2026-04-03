@@ -1,28 +1,6 @@
 import type { DeviceType } from '@/types';
 
 /**
- * Returns a Unicode emoji icon representing the device type.
- * Used in ConversationList, ConversationDetail, and NetworkDiagram.
- */
-export function deviceTypeIcon(deviceType: DeviceType): string {
-  switch (deviceType) {
-    case 'ROUTER':
-      return '🔀';
-    case 'MOBILE':
-      return '📱';
-    case 'LAPTOP_DESKTOP':
-      return '💻';
-    case 'SERVER':
-      return '🖥️';
-    case 'IOT':
-      return '🔌';
-    case 'UNKNOWN':
-    default:
-      return '❓';
-  }
-}
-
-/**
  * Returns a human-readable label for the device type.
  */
 export function deviceTypeLabel(deviceType: DeviceType): string {

@@ -353,6 +353,7 @@ export function buildNetworkGraph(
         nodeMap[ip].data.deviceType = c.deviceType;
         nodeMap[ip].data.deviceConfidence = c.confidence;
         nodeMap[ip].data.manufacturer = c.manufacturer;
+        nodeMap[ip].data.ttl = c.ttl;
         if (c.mac && !nodeMap[ip].data.mac) nodeMap[ip].data.mac = c.mac;
       }
     });

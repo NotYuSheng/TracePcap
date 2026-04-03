@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge, NodeType } from '@/features/network/types';
-import { deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
-import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
+import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import './NodeDetails.css';
 
 interface NodeDetailsProps {
@@ -53,7 +53,7 @@ const NODE_TYPE_DISPLAY: Record<NodeType, { label: string; icon: string; badgeCl
 
 export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) {
   const navigate = useNavigate();
-  const [devicePopupOpen, setDevicePopupOpen] = useState(false);
+  const [classificationPopupOpen, setClassificationPopupOpen] = useState(false);
 
   // ESC closes the modal
   useEffect(() => {
@@ -73,6 +73,8 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
   }, []);
 
   const connectedEdges = edges.filter(e => e.source === node.id || e.target === node.id);
+  const initiatedCount = connectedEdges.filter(e => e.source === node.id).length;
+  const receivedCount = connectedEdges.filter(e => e.target === node.id).length;
 
   // Build per-peer summary: peerIp → { packets, bytes, apps }
   const peerMap = new Map<string, { packets: number; bytes: number; apps: Set<string> }>();
@@ -89,8 +91,6 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
   const peers = Array.from(peerMap.entries()).sort((a, b) => b[1].bytes - a[1].bytes);
 
   const typeInfo = NODE_TYPE_DISPLAY[node.data.nodeType] ?? NODE_TYPE_DISPLAY['unknown'];
-  const ev = node.data.nodeTypeEvidence;
-
   return (
     <div
       className="modal fade show d-block"
@@ -106,7 +106,6 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
         <div className="modal-content">
           <div className="modal-header">
             <h5 id="node-details-title" className="modal-title font-monospace">
-              <i className={`bi ${typeInfo.icon} me-2`}></i>
               {node.data.ip}
               {node.data.hostname && (
                 <small className="text-muted ms-2 fw-normal node-details-hostname">
@@ -144,55 +143,42 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                     </>
                   )}
 
-                  <dt className="col-5 text-muted">Role</dt>
+                  <dt className="col-5 text-muted">Classification</dt>
                   <dd className="col-7 mb-1">
-                    <span className={`badge ${getRoleBadgeClass(node.data.role)}`}>
-                      {node.data.role.toUpperCase()}
-                    </span>
-                  </dd>
-
-                  <dt className="col-5 text-muted">Type</dt>
-                  <dd className="col-7 mb-1">
-                    <span className={`badge ${typeInfo.badgeClass}`}>
-                      <i className={`bi ${typeInfo.icon} me-1`}></i>
-                      {typeInfo.label}
-                    </span>
-                    {ev.dominantPort && (
-                      <div className="text-muted mt-1 node-details-evidence">
-                        {ev.connectionCount} conn. on port {ev.dominantPort}
-                      </div>
-                    )}
-                    {!ev.dominantPort && node.data.nodeType === 'router' && (
-                      <div className="text-muted mt-1 node-details-evidence">
-                        {ev.distinctPeers} distinct peers
-                      </div>
-                    )}
-                  </dd>
-
-                  {node.data.deviceType && (
-                    <>
-                      <dt className="col-5 text-muted">Device</dt>
-                      <dd className="col-7 mb-1">
+                    {(() => {
+                      // Pick the single most informative badge label + style
+                      const isGeneric = node.data.nodeType === 'client' || node.data.nodeType === 'unknown';
+                      let badgeContent: React.ReactNode;
+                      if (!isGeneric) {
+                        // Specific type is the clearest signal
+                        badgeContent = <span className={`badge ${typeInfo.badgeClass}`}>{typeInfo.label}</span>;
+                      } else if (node.data.deviceType) {
+                        // Device type is more informative than "client/unknown"
+                        badgeContent = (
+                          <span className="badge" style={{ backgroundColor: deviceTypeColor(node.data.deviceType), color: '#fff' }}>
+                            {deviceTypeLabel(node.data.deviceType)}
+                          </span>
+                        );
+                      } else {
+                        // Fall back to role
+                        badgeContent = (
+                          <span className={`badge ${getRoleBadgeClass(node.data.role)}`}>
+                            {node.data.role.charAt(0).toUpperCase() + node.data.role.slice(1)}
+                          </span>
+                        );
+                      }
+                      return (
                         <span
-                          className="badge"
                           role="button"
-                          title="Click for details"
-                          style={{
-                            backgroundColor: deviceTypeColor(node.data.deviceType),
-                            color: '#fff',
-                            cursor: 'pointer',
-                          }}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setDevicePopupOpen(true);
-                          }}
+                          title="Click for classification details"
+                          style={{ cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); setClassificationPopupOpen(true); }}
                         >
-                          {deviceTypeIcon(node.data.deviceType)}{' '}
-                          {deviceTypeLabel(node.data.deviceType)}
+                          {badgeContent}
                         </span>
-                      </dd>
-                    </>
-                  )}
+                      );
+                    })()}
+                  </dd>
                 </dl>
               </div>
 
@@ -282,15 +268,23 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
         </div>
       </div>
 
-      {devicePopupOpen && node.data.deviceType && (
-        <DeviceClassificationPopup
+      {classificationPopupOpen && (
+        <NodeClassificationPopup
           info={{
             ip: node.data.ip,
+            nodeType: node.data.nodeType,
+            typeLabel: typeInfo.label,
+            typeBadgeClass: typeInfo.badgeClass,
+            typeEvidence: node.data.nodeTypeEvidence,
+            role: node.data.role,
+            initiated: initiatedCount,
+            received: receivedCount,
             deviceType: node.data.deviceType,
-            confidence: node.data.deviceConfidence ?? 0,
+            deviceConfidence: node.data.deviceConfidence,
             manufacturer: node.data.manufacturer,
+            ttl: node.data.ttl,
           }}
-          onClose={() => setDevicePopupOpen(false)}
+          onClose={() => setClassificationPopupOpen(false)}
         />
       )}
     </div>

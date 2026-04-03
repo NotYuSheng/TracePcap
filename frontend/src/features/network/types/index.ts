@@ -47,6 +47,8 @@ export interface NodeData {
   deviceConfidence?: number;
   /** Manufacturer from OUI lookup. */
   manufacturer?: string;
+  /** TTL observed for this host. */
+  ttl?: number;
 }
 
 export interface GraphEdge {

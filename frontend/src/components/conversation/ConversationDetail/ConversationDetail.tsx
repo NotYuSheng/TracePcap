@@ -88,7 +88,7 @@ export const ConversationDetail = ({
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
   const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
 
-  const openDevicePopup = (cls: HostClassification, ip: string, e: React.MouseEvent) => {
+  const openDevicePopup = (cls: HostClassification, ip: string, role: 'client' | 'server', e: React.MouseEvent) => {
     e.stopPropagation();
     setDevicePopup({
       ip,
@@ -96,6 +96,8 @@ export const ConversationDetail = ({
       confidence: cls.confidence,
       manufacturer: cls.manufacturer,
       ttl: cls.ttl,
+      role,
+      conversationPort: destination.port ?? undefined,
     });
   };
 
@@ -167,7 +169,7 @@ export const ConversationDetail = ({
                       className="ms-2 badge"
                       style={{ backgroundColor: deviceTypeColor(srcClass.deviceType), color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
                       title="Click for details"
-                      onClick={e => openDevicePopup(srcClass, source.ip, e)}
+                      onClick={e => openDevicePopup(srcClass, source.ip, 'client', e)}
                     >
                       {deviceTypeLabel(srcClass.deviceType)}
                     </span>
@@ -181,7 +183,7 @@ export const ConversationDetail = ({
                       className="ms-2 badge"
                       style={{ backgroundColor: deviceTypeColor(dstClass.deviceType), color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
                       title="Click for details"
-                      onClick={e => openDevicePopup(dstClass, destination.ip, e)}
+                      onClick={e => openDevicePopup(dstClass, destination.ip, 'server', e)}
                     >
                       {deviceTypeLabel(dstClass.deviceType)}
                     </span>

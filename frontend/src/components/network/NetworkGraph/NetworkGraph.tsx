@@ -53,6 +53,57 @@ function getNodeColor(nodeData: {
   }
 }
 
+/**
+ * Build a BFS spanning tree from `nodes` using `edges`.
+ * Returns the subset of edges that form the tree (back-edges are dropped so
+ * d3 stratify() receives a DAG with no cycles).  O(V+E) via adjacency list.
+ */
+function bfsSpanningTree(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+): GraphEdge[] {
+  // Build adjacency list: source → outgoing edges
+  const adj = new Map<string, GraphEdge[]>();
+  for (const edge of edges) {
+    if (!adj.has(edge.source)) adj.set(edge.source, []);
+    adj.get(edge.source)!.push(edge);
+  }
+
+  const incomingIds = new Set(edges.map(e => e.target));
+  const rootIds = nodes.filter(n => !incomingIds.has(n.id)).map(n => n.id);
+
+  const visited = new Set<string>();
+  const treeEdges: GraphEdge[] = [];
+  const queue: string[] = rootIds.length > 0 ? [...rootIds] : (nodes[0] ? [nodes[0].id] : []);
+  queue.forEach(id => visited.add(id));
+
+  const bfs = (startQueue: string[]) => {
+    const q = [...startQueue];
+    while (q.length > 0) {
+      const current = q.shift()!;
+      for (const edge of adj.get(current) ?? []) {
+        if (!visited.has(edge.target)) {
+          visited.add(edge.target);
+          treeEdges.push(edge);
+          q.push(edge.target);
+        }
+      }
+    }
+  };
+
+  bfs(queue);
+
+  // Handle disconnected sub-graphs
+  for (const node of nodes) {
+    if (!visited.has(node.id)) {
+      visited.add(node.id);
+      bfs([node.id]);
+    }
+  }
+
+  return treeEdges;
+}
+
 export const NetworkGraph = memo(function NetworkGraph({
   nodes,
   edges,
@@ -78,11 +129,18 @@ export const NetworkGraph = memo(function NetworkGraph({
   if (layoutType === 'hierarchicalTd') {
     // Keep only nodes that have at least one edge
     const edgeNodes = nodes.filter(n => connectedNodeIds.has(n.id));
-    const incomingIds = new Set(edges.map(e => e.target));
-    const rootIds = edgeNodes.filter(n => !incomingIds.has(n.id)).map(n => n.id);
 
-    if (rootIds.length > 1) {
-      // Inject virtual root node and edges — styled invisible
+    // Build a spanning tree via BFS to eliminate cycles.
+    // d3 stratify() requires a DAG — bidirectional edges create cycles that crash it.
+    // Pre-index adjacency list for O(V+E) BFS instead of O(V*E).
+    const treeEdges = bfsSpanningTree(edgeNodes, edges);
+
+    // Determine roots in the spanning tree
+    const treeTargets = new Set(treeEdges.map(e => e.target));
+    const treeRootIds = edgeNodes.filter(n => !treeTargets.has(n.id)).map(n => n.id);
+
+    if (treeRootIds.length > 1) {
+      // Inject virtual root so stratify() sees exactly one root
       displayNodes = [
         {
           id: VIRTUAL_ROOT,
@@ -92,7 +150,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         ...edgeNodes,
       ];
       displayEdges = [
-        ...rootIds.map(id => ({
+        ...treeRootIds.map(id => ({
           id: `${VIRTUAL_ROOT}_${id}`,
           source: VIRTUAL_ROOT,
           target: id,
@@ -105,10 +163,11 @@ export const NetworkGraph = memo(function NetworkGraph({
             bidirectional: false,
           },
         })),
-        ...edges,
+        ...treeEdges,
       ];
     } else {
       displayNodes = edgeNodes;
+      displayEdges = treeEdges;
     }
   }
 
