@@ -1,9 +1,9 @@
 spring:
   jpa:
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   devtools:
     restart:
@@ -14,9 +14,9 @@ spring:
 logging:
   level:
     root: INFO
-    com.tracepcap: DEBUG
-    org.springframework: DEBUG
-    org.hibernate: DEBUG
+    com.tracepcap: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
   file:
     name: logs/tracepcap-dev.log
 

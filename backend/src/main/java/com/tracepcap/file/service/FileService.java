@@ -18,7 +18,7 @@ public interface FileService {
    * @param file the multipart file
    * @return upload response with file metadata
    */
-  FileUploadResponse uploadFile(MultipartFile file);
+  FileUploadResponse uploadFile(MultipartFile file, boolean enableNdpi, boolean enableFileExtraction);
 
   /**
    * Get file metadata by ID

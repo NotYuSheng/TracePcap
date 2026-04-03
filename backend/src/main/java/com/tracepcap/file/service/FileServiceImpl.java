@@ -42,7 +42,7 @@ public class FileServiceImpl implements FileService {
 
   @Override
   @Transactional
-  public FileUploadResponse uploadFile(MultipartFile file) {
+  public FileUploadResponse uploadFile(MultipartFile file, boolean enableNdpi, boolean enableFileExtraction) {
     log.info("Starting file upload: {}", file.getOriginalFilename());
 
     // Validate file
@@ -77,6 +77,8 @@ public class FileServiceImpl implements FileService {
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
               .fileHash(fileHash)
+              .enableNdpi(enableNdpi)
+              .enableFileExtraction(enableFileExtraction)
               .build();
 
       fileEntity = fileRepository.save(fileEntity);

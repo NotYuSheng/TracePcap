@@ -5,12 +5,18 @@ import { FileUploadZone } from '@components/upload/FileUploadZone';
 import { FileList } from '@components/upload/FileList';
 import { UploadProgress } from '@components/upload/UploadProgress';
 import { useFileUpload } from '@features/upload/hooks/useFileUpload';
+import type { AnalysisOptions } from '@features/upload/services/uploadService';
 
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
 
 export const UploadPage = () => {
   const { uploadFiles, uploads, clearUploads, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [analysisOptions, setAnalysisOptions] = useState<AnalysisOptions>({
+    enableNdpi: true,
+    enableFileExtraction: true,
+  });
   const navigate = useNavigate();
 
   const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap').split(
@@ -37,6 +43,20 @@ export const UploadPage = () => {
     }
   }, [uploads, isUploading, navigate]);
 
+  const handleFileSelect = (files: File[]) => {
+    setPendingFiles(files);
+  };
+
+  const handleConfirmUpload = () => {
+    if (!pendingFiles) return;
+    uploadFiles(pendingFiles, analysisOptions);
+    setPendingFiles(null);
+  };
+
+  const handleCancelPending = () => {
+    setPendingFiles(null);
+  };
+
   return (
     <div className="upload-page">
       <Row className="justify-content-center">
@@ -51,7 +71,7 @@ export const UploadPage = () => {
           <Row className="justify-content-center">
             <Col md={8} lg={6}>
               <FileUploadZone
-                onFileSelect={uploadFiles}
+                onFileSelect={handleFileSelect}
                 disabled={isUploading}
                 maxSize={maxUploadBytes}
                 acceptedFileTypes={acceptedTypes}
@@ -59,6 +79,82 @@ export const UploadPage = () => {
             </Col>
           </Row>
 
+          {/* Pre-upload: analysis options confirmation */}
+          <Modal
+            show={pendingFiles !== null}
+            onHide={handleCancelPending}
+            centered
+          >
+            <Modal.Header closeButton>
+              <Modal.Title>
+                <i className="bi bi-sliders me-2" />
+                Analysis options
+              </Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
+                Select which optional stages to run. Disabling stages reduces analysis time for large captures.
+              </p>
+
+              <div className="d-flex flex-column gap-3">
+                <label className="d-flex align-items-start gap-3" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    className="form-check-input mt-1 flex-shrink-0"
+                    checked={analysisOptions.enableNdpi}
+                    onChange={e =>
+                      setAnalysisOptions(o => ({ ...o, enableNdpi: e.target.checked }))
+                    }
+                  />
+                  <div>
+                    <div className="fw-semibold">Protocol &amp; application classification</div>
+                    <div className="text-muted" style={{ fontSize: '0.82rem' }}>
+                      Identifies apps (Zoom, Chrome, etc.), traffic categories, and security risks.
+                      Adds ~1–2 min for large captures.
+                    </div>
+                  </div>
+                </label>
+
+                <label className="d-flex align-items-start gap-3" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    className="form-check-input mt-1 flex-shrink-0"
+                    checked={analysisOptions.enableFileExtraction}
+                    onChange={e =>
+                      setAnalysisOptions(o => ({ ...o, enableFileExtraction: e.target.checked }))
+                    }
+                  />
+                  <div>
+                    <div className="fw-semibold">Embedded file extraction</div>
+                    <div className="text-muted" style={{ fontSize: '0.82rem' }}>
+                      Extracts files transferred over HTTP and raw TCP/UDP streams.
+                      Adds ~1–2 min for large captures.
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {pendingFiles && pendingFiles.length > 0 && (
+                <div className="mt-3 pt-3 border-top text-muted" style={{ fontSize: '0.82rem' }}>
+                  <i className="bi bi-file-earmark-binary me-1" />
+                  {pendingFiles.length === 1
+                    ? pendingFiles[0].name
+                    : `${pendingFiles.length} files selected`}
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              <button className="btn btn-outline-secondary btn-sm" onClick={handleCancelPending}>
+                Cancel
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleConfirmUpload}>
+                <i className="bi bi-upload me-1" />
+                Start upload
+              </button>
+            </Modal.Footer>
+          </Modal>
+
+          {/* Post-upload: progress / completion */}
           <Modal
             show={uploads.length > 0}
             onHide={() => { if (!isUploading) clearUploads(); }}

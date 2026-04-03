@@ -33,10 +33,14 @@ public class FileController {
 
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(summary = "Upload PCAP file", description = "Upload a PCAP file for analysis")
-  public ResponseEntity<FileUploadResponse> uploadFile(@RequestParam("file") MultipartFile file) {
-    log.info("Received file upload request: {}", file.getOriginalFilename());
+  public ResponseEntity<FileUploadResponse> uploadFile(
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(value = "enableNdpi", defaultValue = "true") boolean enableNdpi,
+      @RequestParam(value = "enableFileExtraction", defaultValue = "true") boolean enableFileExtraction) {
+    log.info("Received file upload request: {} (ndpi={}, extraction={})",
+        file.getOriginalFilename(), enableNdpi, enableFileExtraction);
 
-    FileUploadResponse response = fileService.uploadFile(file);
+    FileUploadResponse response = fileService.uploadFile(file, enableNdpi, enableFileExtraction);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }

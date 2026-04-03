@@ -11,8 +11,8 @@ interface Props {
   fileId: string;
 }
 
-// Rough estimate: ~0.75 seconds per MB for parsing + DB insert pipeline
-const SECONDS_PER_MB = 0.75;
+// Rough estimate: ~3 seconds per MB (Aho-Corasick scan removed the file extraction bottleneck)
+const SECONDS_PER_MB = 3;
 const MIN_ESTIMATE_S = 10;
 
 function formatBytes(bytes: number): string {

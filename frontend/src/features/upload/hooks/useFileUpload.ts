@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '@/store';
-import { uploadService } from '../services/uploadService';
+import { uploadService, type AnalysisOptions } from '../services/uploadService';
 
 export interface UploadEntry {
   id: string;       // local key
@@ -21,7 +21,7 @@ export const useFileUpload = () => {
     setUploads(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)));
 
   const uploadFiles = useCallback(
-    async (files: File[]) => {
+    async (files: File[], options: AnalysisOptions = { enableNdpi: true, enableFileExtraction: true }) => {
       const entries: UploadEntry[] = files.map((f, i) => ({
         id: `${Date.now()}-${i}`,
         fileName: f.name,
@@ -38,7 +38,7 @@ export const useFileUpload = () => {
         try {
           const result = await uploadService.uploadPcap(file, progress => {
             update(entryId, { progress });
-          });
+          }, options);
 
           addRecentFile({
             id: result.fileId,

@@ -98,15 +98,13 @@ export const useAnalysisData = (fileId: string) => {
       // Set up polling every 2 seconds
       pollInterval = setInterval(pollStatus, 2000);
 
-      // Timeout after backend-configured analysis timeout
+      // After the backend-configured timeout, log a warning but keep polling — large files
+      // can take well over 15 minutes and the analysis is still running on the server.
       setTimeout(() => {
-        if (pollInterval) {
-          clearInterval(pollInterval);
-          if (!cancelled && loading) {
-            setError(new Error('Analysis timeout - file is taking too long to process'));
-            setLoading(false);
-          }
-        }
+        console.warn(
+          `[useAnalysisData] Analysis for ${fileId} has exceeded ${analysisTimeoutMs / 1000}s — ` +
+          'still polling; large files may take longer than expected.'
+        );
       }, analysisTimeoutMs);
     };
 

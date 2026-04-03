@@ -33,6 +33,14 @@ public class FileEntity {
   @Column(name = "file_hash", length = 64)
   private String fileHash;
 
+  @Builder.Default
+  @Column(name = "enable_ndpi", nullable = false)
+  private boolean enableNdpi = true;
+
+  @Builder.Default
+  @Column(name = "enable_file_extraction", nullable = false)
+  private boolean enableFileExtraction = true;
+
   @Column(name = "uploaded_at", nullable = false)
   private LocalDateTime uploadedAt;
 
