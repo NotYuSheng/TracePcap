@@ -12,6 +12,14 @@ RUN npm ci
 # Copy frontend source code
 COPY frontend ./
 
+# Build-time env vars (passed from docker-compose build args / root .env)
+ARG VITE_API_BASE_URL=/api
+ARG VITE_SUPPORTED_FILE_TYPES=.pcap,.pcapng,.cap
+ARG VITE_ANALYSIS_OPTIONS=false
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_SUPPORTED_FILE_TYPES=${VITE_SUPPORTED_FILE_TYPES}
+ENV VITE_ANALYSIS_OPTIONS=${VITE_ANALYSIS_OPTIONS}
+
 # Build the application
 RUN npm run build
 

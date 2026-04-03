@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { useStore } from '@/store';
 import { uploadService, type AnalysisOptions } from '../services/uploadService';
 
 export interface UploadEntry {
@@ -15,7 +14,6 @@ export interface UploadEntry {
 
 export const useFileUpload = () => {
   const [uploads, setUploads] = useState<UploadEntry[]>([]);
-  const addRecentFile = useStore(state => state.addRecentFile);
 
   const update = (id: string, patch: Partial<UploadEntry>) =>
     setUploads(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)));
@@ -40,13 +38,6 @@ export const useFileUpload = () => {
             update(entryId, { progress });
           }, options);
 
-          addRecentFile({
-            id: result.fileId,
-            name: file.name,
-            size: file.size,
-            uploadedAt: Date.now(),
-          });
-
           update(entryId, { isUploading: false, progress: 100, fileId: result.fileId });
         } catch (err: any) {
           const data = err?.response?.data;
@@ -64,7 +55,7 @@ export const useFileUpload = () => {
         }
       }
     },
-    [addRecentFile]
+    []
   );
 
   const clearUploads = useCallback(() => setUploads([]), []);
@@ -74,3 +65,4 @@ export const useFileUpload = () => {
 
   return { uploadFiles, uploads, clearUploads, isUploading };
 };
+

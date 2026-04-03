@@ -43,8 +43,14 @@ export const UploadPage = () => {
     }
   }, [uploads, isUploading, navigate]);
 
+  const analysisOptionsEnabled = import.meta.env.VITE_ANALYSIS_OPTIONS !== 'false';
+
   const handleFileSelect = (files: File[]) => {
-    setPendingFiles(files);
+    if (!analysisOptionsEnabled) {
+      uploadFiles(files, { enableNdpi: true, enableFileExtraction: true });
+    } else {
+      setPendingFiles(files);
+    }
   };
 
   const handleConfirmUpload = () => {
