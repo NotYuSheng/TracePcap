@@ -3,43 +3,41 @@ import { useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Card, Modal } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
-import { useStore } from '@/store';
-import type { RecentFile } from '@/store/slices/uploadSlice';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { parseDateTime } from '@/utils/dateUtils';
 import './FileList.css';
 
+interface FileMetadata {
+  fileId: string;
+  fileName: string;
+  fileSize: number;
+  uploadedAt: string | number[];
+  status: string;
+}
+
 export const FileList = () => {
-  const recentFiles = useStore(state => state.recentFiles);
-  const removeRecentFile = useStore(state => state.removeRecentFile);
   const navigate = useNavigate();
-  const [pendingDeleteFile, setPendingDeleteFile] = useState<RecentFile | null>(null);
+  const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pendingDeleteFile, setPendingDeleteFile] = useState<FileMetadata | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
-  // Validate files on mount - remove files that no longer exist on backend
-  useEffect(() => {
-    const validateFiles = async () => {
-      const { recentFiles, removeRecentFile } = useStore.getState();
-      for (const file of recentFiles) {
-        try {
-          await apiClient.get(API_ENDPOINTS.FILE_METADATA(file.id));
-        } catch (error: unknown) {
-          if (isAxiosError(error)) {
-            const status = error.response?.status;
-            if (status === 404) {
-              removeRecentFile(file.id);
-            } else if (status !== undefined) {
-              console.warn(`Unexpected status ${status} for file ${file.name}`);
-            }
-          }
-          // Network error or backend down — keep file in list
-        }
-      }
-    };
-
-    if (useStore.getState().recentFiles.length > 0) {
-      validateFiles();
+  const fetchFiles = async () => {
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.FILES_LIST, {
+        params: { sort: 'uploadedAt,desc', size: 50 },
+      });
+      setFiles(res.data.content ?? []);
+    } catch (err) {
+      console.error('Failed to fetch files:', err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchFiles();
   }, []);
 
   const formatFileSize = (bytes: number): string => {
@@ -63,25 +61,19 @@ export const FileList = () => {
     return date.toLocaleDateString();
   };
 
-  const handleFileClick = (file: RecentFile) => {
-    navigate(`/analysis/${file.id}`);
-  };
-
-  const handleDeleteClick = (file: RecentFile, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPendingDeleteFile(file);
-  };
-
   const handleConfirmDelete = async () => {
-    if (pendingDeleteFile) {
-      try {
-        await apiClient.delete(API_ENDPOINTS.FILE_DELETE(pendingDeleteFile.id));
-      } catch (err) {
-        console.error('Failed to delete file from backend:', err);
+    if (!pendingDeleteFile) return;
+    try {
+      await apiClient.delete(API_ENDPOINTS.FILE_DELETE(pendingDeleteFile.fileId));
+      setFiles(prev => prev.filter(f => f.fileId !== pendingDeleteFile.fileId));
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        setFiles(prev => prev.filter(f => f.fileId !== pendingDeleteFile.fileId));
+      } else {
+        console.error('Failed to delete file:', err);
       }
-      removeRecentFile(pendingDeleteFile.id);
-      setPendingDeleteFile(null);
     }
+    setPendingDeleteFile(null);
   };
 
   return (
@@ -89,10 +81,10 @@ export const FileList = () => {
       <Card className="file-list-card mt-4">
         <Card.Header className="d-flex justify-content-between align-items-center">
           <h5 className="mb-0">
-            <i className="bi bi-clock-history me-2"></i>
-            Recent Uploads
+            <i className="bi bi-folder2-open me-2"></i>
+            All Uploads
           </h5>
-          {recentFiles.length > 0 && (
+          {files.length > 0 && (
             <button
               type="button"
               className="btn btn-outline-danger btn-sm"
@@ -104,18 +96,23 @@ export const FileList = () => {
           )}
         </Card.Header>
         <Card.Body className="p-0">
-          {recentFiles.length === 0 ? (
+          {loading ? (
             <div className="text-center text-muted py-4">
-              <p className="mb-0">No recent uploads. Upload a PCAP file to get started!</p>
+              <div className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+              Loading files…
+            </div>
+          ) : files.length === 0 ? (
+            <div className="text-center text-muted py-4">
+              <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
             </div>
           ) : (
             <div className="list-group list-group-flush" style={{ maxHeight: '13.5rem', overflowY: 'auto' }}>
-              {recentFiles.map(file => (
+              {files.map(file => (
                 <div
-                  key={file.id}
+                  key={file.fileId}
                   className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
                   style={{ cursor: 'pointer' }}
-                  onClick={() => handleFileClick(file)}
+                  onClick={() => navigate(`/analysis/${file.fileId}`)}
                 >
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2">
@@ -124,9 +121,14 @@ export const FileList = () => {
                         style={{ fontSize: '1.2rem' }}
                       ></i>
                       <div>
-                        <div className="fw-medium">{file.name}</div>
+                        <div className="fw-medium">{file.fileName}</div>
                         <small className="text-muted">
-                          {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
+                          {formatFileSize(file.fileSize)} • {formatDate(parseDateTime(file.uploadedAt))}
+                          {file.status !== 'completed' && (
+                            <span className="ms-2 badge bg-secondary" style={{ fontSize: '0.7rem' }}>
+                              {file.status.toLowerCase()}
+                            </span>
+                          )}
                         </small>
                       </div>
                     </div>
@@ -136,7 +138,7 @@ export const FileList = () => {
                       className="btn btn-outline-primary btn-sm"
                       onClick={e => {
                         e.stopPropagation();
-                        handleFileClick(file);
+                        navigate(`/analysis/${file.fileId}`);
                       }}
                     >
                       <i className="bi bi-graph-up me-1"></i>
@@ -144,7 +146,10 @@ export const FileList = () => {
                     </button>
                     <button
                       className="btn btn-link btn-sm p-0 text-danger"
-                      onClick={e => handleDeleteClick(file, e)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        setPendingDeleteFile(file);
+                      }}
                       title="Delete this file"
                     >
                       <i className="bi bi-trash"></i>
@@ -168,8 +173,7 @@ export const FileList = () => {
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Are you sure you want to remove <strong>{pendingDeleteFile?.name}</strong> from your
-            recent uploads?
+            Are you sure you want to delete <strong>{pendingDeleteFile?.fileName}</strong>?
           </p>
         </Modal.Body>
         <Modal.Footer>
@@ -193,7 +197,7 @@ export const FileList = () => {
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Are you sure you want to remove all <strong>{recentFiles.length}</strong> recent uploads?
+            Are you sure you want to delete all <strong>{files.length}</strong> uploaded files?
           </p>
         </Modal.Body>
         <Modal.Footer>
@@ -208,15 +212,15 @@ export const FileList = () => {
             type="button"
             className="btn btn-danger"
             onClick={async () => {
-              const files = useStore.getState().recentFiles;
               const results = await Promise.allSettled(
-                files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.id)))
+                files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.fileId)))
               );
-              results.forEach((result, index) => {
-                if (result.status === 'fulfilled') {
-                  removeRecentFile(files[index].id);
-                }
-              });
+              const deletedIds = new Set(
+                results
+                  .map((r, i) => (r.status === 'fulfilled' ? files[i].fileId : null))
+                  .filter(Boolean)
+              );
+              setFiles(prev => prev.filter(f => !deletedIds.has(f.fileId)));
               setConfirmDeleteAll(false);
             }}
           >
