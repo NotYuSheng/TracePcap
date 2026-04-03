@@ -54,4 +54,14 @@ public interface StorageService {
    * @param targetFile the local file to write to
    */
   void downloadFileToLocal(String fileName, java.io.File targetFile);
+
+  /**
+   * Upload raw bytes to storage
+   *
+   * @param data the bytes to upload
+   * @param path the destination path in storage
+   * @param contentType MIME type of the content
+   * @return the storage path
+   */
+  String uploadBytes(byte[] data, String path, String contentType);
 }

@@ -3,9 +3,10 @@ import './AnalysisSummary.css';
 
 interface AnalysisSummaryProps {
   summary: AnalysisSummaryType;
+  extractedFilesCount?: number;
 }
 
-export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
+export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummaryProps) => {
   const formatFileSize = (bytes: number | undefined | null): string => {
     if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -88,11 +89,13 @@ export const AnalysisSummary = ({ summary }: AnalysisSummaryProps) => {
 
         <div className="summary-card">
           <div className="card-icon">
-            <i className="bi bi-diagram-3"></i>
+            <i className="bi bi-file-earmark-arrow-down"></i>
           </div>
           <div className="card-content">
-            <div className="card-label">Protocols</div>
-            <div className="card-value">{summary.protocolDistribution?.length || 0}</div>
+            <div className="card-label">Files Detected</div>
+            <div className="card-value">
+              {extractedFilesCount != null ? extractedFilesCount : '—'}
+            </div>
           </div>
         </div>
 

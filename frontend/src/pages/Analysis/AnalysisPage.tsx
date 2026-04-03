@@ -22,6 +22,8 @@ export const AnalysisPage = () => {
       setActiveTab('filter-generator');
     } else if (path.includes('/network-diagram')) {
       setActiveTab('network-diagram');
+    } else if (path.includes('/extracted-files')) {
+      setActiveTab('extracted-files');
     } else {
       setActiveTab('overview');
     }
@@ -104,6 +106,15 @@ export const AnalysisPage = () => {
           >
             <i className="bi bi-diagram-3 me-2"></i>
             Network Diagram
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'extracted-files' ? 'active' : ''}`}
+            onClick={() => handleTabChange('extracted-files')}
+          >
+            <i className="bi bi-file-earmark-arrow-down me-2"></i>
+            Extracted Files
           </button>
         </li>
       </ul>

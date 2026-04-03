@@ -7,6 +7,7 @@ import { ConversationPage } from '@pages/Conversation';
 import { StoryPage } from '@pages/Story';
 import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
+import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { NotFoundPage } from '@pages/NotFound';
 
 export const router = createBrowserRouter([
@@ -41,6 +42,10 @@ export const router = createBrowserRouter([
           {
             path: 'network-diagram',
             element: <NetworkDiagramPage />,
+          },
+          {
+            path: 'extracted-files',
+            element: <ExtractedFilesPage />,
           },
         ],
       },

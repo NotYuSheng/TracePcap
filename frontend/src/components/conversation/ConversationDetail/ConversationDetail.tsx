@@ -1,5 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Conversation, ConversationGeoInfo, Packet, HostClassification } from '@/types';
+import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import {
   getAppColor,
@@ -19,6 +21,7 @@ interface ConversationDetailProps {
   conversation: Conversation;
   signatureSeverities?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
+  fileId?: string;
 }
 
 function countryFlag(code: string): string {
@@ -74,11 +77,14 @@ export const ConversationDetail = ({
   conversation,
   signatureSeverities = {},
   hostClassMap,
+  fileId,
 }: ConversationDetailProps) => {
+  const navigate = useNavigate();
   const [source, destination] = conversation.endpoints;
   const srcClass = hostClassMap?.get(source.ip);
   const dstClass = hostClassMap?.get(destination.ip);
   const [activeTab, setActiveTab] = useState<'packets' | 'session'>('packets');
+  const [extractedCount, setExtractedCount] = useState<number | null>(null);
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
   const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
 
@@ -92,6 +98,14 @@ export const ConversationDetail = ({
       ttl: cls.ttl,
     });
   };
+
+  useEffect(() => {
+    if (!fileId) return;
+    setExtractedCount(null);
+    getExtractionsByConversation(fileId, conversation.id)
+      .then(files => setExtractedCount(files.length))
+      .catch(() => setExtractedCount(null));
+  }, [fileId, conversation.id]);
 
   const asciiPacketIds = useMemo(() => {
     const ids = new Set<string>();
@@ -126,8 +140,20 @@ export const ConversationDetail = ({
   return (
     <div className="conversation-detail">
       <div className="card mb-4">
-        <div className="card-header">
+        <div className="card-header d-flex align-items-center justify-content-between">
           <h5 className="mb-0">Conversation Details</h5>
+          {extractedCount != null && extractedCount > 0 && fileId && (
+            <button
+              className="btn btn-sm btn-outline-warning"
+              onClick={() =>
+                navigate(`/analysis/${fileId}/extracted-files`)
+              }
+              title="Files extracted from this conversation's stream"
+            >
+              <i className="bi bi-file-earmark-arrow-down me-1"></i>
+              {extractedCount} extracted file{extractedCount !== 1 ? 's' : ''}
+            </button>
+          )}
         </div>
         <div className="card-body">
           <div className="row">
