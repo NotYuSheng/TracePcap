@@ -81,8 +81,46 @@ export const NetworkGraph = memo(function NetworkGraph({
     const incomingIds = new Set(edges.map(e => e.target));
     const rootIds = edgeNodes.filter(n => !incomingIds.has(n.id)).map(n => n.id);
 
-    if (rootIds.length > 1) {
-      // Inject virtual root node and edges — styled invisible
+    // Build a spanning tree via BFS to eliminate cycles.
+    // d3 stratify() requires a DAG — bidirectional edges create cycles that crash it.
+    const visited = new Set<string>();
+    const treeEdges: typeof edges = [];
+    const queue: string[] = rootIds.length > 0 ? [...rootIds] : (edgeNodes[0] ? [edgeNodes[0].id] : []);
+    queue.forEach(id => visited.add(id));
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const edge of edges) {
+        if (edge.source === current && !visited.has(edge.target)) {
+          visited.add(edge.target);
+          treeEdges.push(edge);
+          queue.push(edge.target);
+        }
+      }
+    }
+    // Include any nodes not reached by BFS (disconnected sub-graphs)
+    for (const node of edgeNodes) {
+      if (!visited.has(node.id)) {
+        visited.add(node.id);
+        queue.push(node.id);
+        while (queue.length > 0) {
+          const current = queue.shift()!;
+          for (const edge of edges) {
+            if (edge.source === current && !visited.has(edge.target)) {
+              visited.add(edge.target);
+              treeEdges.push(edge);
+              queue.push(edge.target);
+            }
+          }
+        }
+      }
+    }
+
+    // Determine roots in the spanning tree
+    const treeTargets = new Set(treeEdges.map(e => e.target));
+    const treeRootIds = edgeNodes.filter(n => !treeTargets.has(n.id)).map(n => n.id);
+
+    if (treeRootIds.length > 1) {
+      // Inject virtual root so stratify() sees exactly one root
       displayNodes = [
         {
           id: VIRTUAL_ROOT,
@@ -92,7 +130,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         ...edgeNodes,
       ];
       displayEdges = [
-        ...rootIds.map(id => ({
+        ...treeRootIds.map(id => ({
           id: `${VIRTUAL_ROOT}_${id}`,
           source: VIRTUAL_ROOT,
           target: id,
@@ -105,10 +143,11 @@ export const NetworkGraph = memo(function NetworkGraph({
             bidirectional: false,
           },
         })),
-        ...edges,
+        ...treeEdges,
       ];
     } else {
       displayNodes = edgeNodes;
+      displayEdges = treeEdges;
     }
   }
 

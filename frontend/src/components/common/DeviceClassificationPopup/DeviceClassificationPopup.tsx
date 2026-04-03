@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { deviceTypeIcon, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 
 export interface DeviceClassificationInfo {
   ip: string;
@@ -7,6 +7,21 @@ export interface DeviceClassificationInfo {
   confidence: number;
   manufacturer?: string;
   ttl?: number;
+  role?: 'client' | 'server';
+  conversationPort?: number;
+}
+
+function portToTypeLabel(port: number): string | null {
+  if (port === 80 || port === 8080) return 'Web Server';
+  if (port === 443 || port === 8443) return 'Web Server (HTTPS)';
+  if (port === 53) return 'DNS Server';
+  if (port === 22) return 'SSH Server';
+  if (port === 21) return 'FTP Server';
+  if (port === 25 || port === 587 || port === 465) return 'Mail Server';
+  if (port === 67 || port === 68) return 'DHCP Server';
+  if (port === 123) return 'NTP Server';
+  if (port === 3306 || port === 5432 || port === 1433 || port === 27017) return 'Database Server';
+  return null;
 }
 
 function confidenceLevel(pct: number): string {
@@ -18,24 +33,16 @@ function confidenceLevel(pct: number): string {
 
 function buildSignals(info: DeviceClassificationInfo): string[] {
   const signals: string[] = [];
-  if (info.manufacturer) {
-    signals.push(`MAC OUI matched: ${info.manufacturer}`);
-  }
+  if (info.manufacturer) signals.push(`MAC OUI matched: ${info.manufacturer}`);
   if (info.ttl != null) {
     const os =
-      info.ttl <= 64
-        ? 'Linux / Android / iOS'
-        : info.ttl <= 128
-          ? 'Windows'
-          : 'Network device (Cisco / BSD)';
-    signals.push(`TTL ${info.ttl} fingerprint → ${os}`);
+      info.ttl <= 64 ? 'Linux / Android / iOS' :
+      info.ttl <= 128 ? 'Windows' :
+      'Network device (Cisco / BSD)';
+    signals.push(`TTL ${info.ttl} → ${os}`);
   }
-  if (info.confidence >= 60) {
-    signals.push('Application traffic profile analysed');
-  }
-  if (info.confidence >= 25) {
-    signals.push('Network traffic patterns analysed (ports, peer count)');
-  }
+  if (info.confidence >= 60) signals.push('Application traffic profile analysed');
+  if (info.confidence >= 25) signals.push('Network traffic patterns analysed');
   return signals;
 }
 
@@ -69,77 +76,89 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
         left: '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 9999,
-        minWidth: '280px',
-        maxWidth: '360px',
+        minWidth: '300px',
+        maxWidth: '380px',
         boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
         borderRadius: '8px',
         backgroundColor: '#fff',
         border: '1px solid #dee2e6',
       }}
     >
+      {/* Header */}
       <div
         style={{ backgroundColor: badgeBg, borderRadius: '8px 8px 0 0', padding: '10px 14px' }}
         className="d-flex align-items-center justify-content-between"
       >
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>
-          {deviceTypeIcon(info.deviceType)} {deviceTypeLabel(info.deviceType)}
-        </span>
+        <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>Classification</span>
         <button
           onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#fff',
-            fontSize: '1.1rem',
-            lineHeight: 1,
-            cursor: 'pointer',
-            padding: '0 0 0 8px',
-          }}
+          style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.1rem', lineHeight: 1, cursor: 'pointer', padding: '0 0 0 8px' }}
           aria-label="Close"
-        >
-          ×
-        </button>
+        >×</button>
       </div>
+
       <div style={{ padding: '12px 14px' }}>
-        <p className="mb-1 small text-muted">{info.ip}</p>
-        {info.manufacturer && (
-          <p className="mb-2 small">
-            <strong>Vendor:</strong> {info.manufacturer}
-          </p>
-        )}
-        <div className="mb-2 d-flex align-items-center gap-2">
-          <span className="small fw-semibold">Confidence:</span>
-          <div
-            className="flex-grow-1"
-            style={{
-              background: '#e9ecef',
-              borderRadius: '4px',
-              height: '6px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${info.confidence}%`,
-                height: '100%',
-                backgroundColor: badgeBg,
-                borderRadius: '4px',
-              }}
-            />
+        <p className="mb-2 small text-muted">{info.ip}</p>
+
+        {/* Type row */}
+        {(() => {
+          let typeLabel: string | null = null;
+          let typeNote: string | null = null;
+          if (info.role === 'client') {
+            typeLabel = 'Client';
+            typeNote = 'Initiated this conversation';
+          } else if (info.role === 'server' && info.conversationPort != null) {
+            typeLabel = portToTypeLabel(info.conversationPort) ?? 'Server';
+            typeNote = `Based on destination port ${info.conversationPort} in this conversation`;
+          }
+          if (!typeLabel) return null;
+          return (
+            <div className="d-flex align-items-start gap-2 mb-2">
+              <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Type</span>
+              <div>
+                <span className="badge bg-secondary">{typeLabel}</span>
+                {typeNote && <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>{typeNote}</div>}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Device row */}
+        <div className="d-flex align-items-start gap-2 mb-2">
+          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Device</span>
+          <div style={{ flex: 1 }}>
+            <span className="badge" style={{ backgroundColor: badgeBg, color: '#fff' }}>
+              {deviceTypeLabel(info.deviceType)}
+            </span>
+            {signals.length > 0 && (
+              <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                {signals.map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
+            )}
+            <div className="d-flex align-items-center gap-2 mt-1">
+              <div style={{ flex: 1, background: '#e9ecef', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${info.confidence}%`, height: '100%', backgroundColor: badgeBg, borderRadius: '4px' }} />
+              </div>
+              <span style={{ fontSize: '0.72rem', color: '#6c757d', whiteSpace: 'nowrap' }}>
+                {info.confidence}% — {level}
+              </span>
+            </div>
           </div>
-          <span className="small text-muted text-nowrap">
-            {info.confidence}% — {level}
-          </span>
         </div>
-        {signals.length > 0 && (
-          <>
-            <p className="mb-1 small fw-semibold">Signals used:</p>
-            <ul className="mb-0 ps-3" style={{ fontSize: '0.8rem' }}>
-              {signals.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </>
+
+        {/* Role row */}
+        {info.role && (
+          <div className="d-flex align-items-start gap-2 mb-0">
+            <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Role</span>
+            <div>
+              <span className={`badge ${info.role === 'client' ? 'bg-primary' : 'bg-success'}`}>
+                {info.role.charAt(0).toUpperCase() + info.role.slice(1)}
+              </span>
+              <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                {info.role === 'client' ? 'Initiated this conversation' : 'Received this conversation'}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

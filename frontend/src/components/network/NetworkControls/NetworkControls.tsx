@@ -11,14 +11,11 @@ interface NetworkControlsProps {
   activeLegendProtocols: string[];
   onLegendProtocolClick: (key: string) => void;
   onLegendProtocolClear: () => void;
-  activeLegendNodeTypes: string[];
-  onLegendNodeTypeClick: (key: string) => void;
-  onLegendNodeTypeClear: () => void;
+  activeNodeFilters: string[];
+  onNodeFilterClick: (key: string) => void;
+  onNodeFilterClear: () => void;
   presentNodeTypes: Set<string>;
   presentEdgeLegendKeys: Set<string>;
-  activeLegendDeviceTypes: string[];
-  onLegendDeviceTypeClick: (key: string) => void;
-  onLegendDeviceTypeClear: () => void;
   presentDeviceTypes: Set<string>;
 }
 
@@ -70,14 +67,11 @@ export function NetworkControls({
   activeLegendProtocols,
   onLegendProtocolClick,
   onLegendProtocolClear,
-  activeLegendNodeTypes,
-  onLegendNodeTypeClick,
-  onLegendNodeTypeClear,
+  activeNodeFilters,
+  onNodeFilterClick,
+  onNodeFilterClear,
   presentNodeTypes,
   presentEdgeLegendKeys,
-  activeLegendDeviceTypes,
-  onLegendDeviceTypeClick,
-  onLegendDeviceTypeClear,
   presentDeviceTypes,
 }: NetworkControlsProps) {
   const [showColorInfo, setShowColorInfo] = useState(false);
@@ -159,11 +153,11 @@ export function NetworkControls({
         <div className="card-body p-2">
           <div className="legend-section mb-2">
             <div className="legend-title d-flex justify-content-between align-items-center">
-              <span>Node Types</span>
-              {activeLegendNodeTypes.length > 0 && (
+              <span>Nodes</span>
+              {activeNodeFilters.length > 0 && (
                 <button
                   className="btn btn-link btn-sm p-0 text-muted legend-small-text"
-                  onClick={onLegendNodeTypeClear}
+                  onClick={onNodeFilterClear}
                 >
                   Clear ×
                 </button>
@@ -173,48 +167,43 @@ export function NetworkControls({
               Click to filter (multi-select)
             </small>
             {NODE_LEGEND.filter(({ key }) => presentNodeTypes.has(key)).map(
-              ({ label, key, color }) => (
-                <button
-                  key={key}
-                  className={`legend-item-btn ${activeLegendNodeTypes.includes(key) ? 'active' : ''} ${activeLegendNodeTypes.length > 0 && !activeLegendNodeTypes.includes(key) ? 'dimmed' : ''}`}
-                  onClick={() => onLegendNodeTypeClick(key)}
-                  title={`${activeLegendNodeTypes.includes(key) ? 'Deselect' : 'Select'} ${label}`}
-                >
-                  <span className="legend-color" style={{ background: color }}></span>
-                  {label}
-                </button>
-              )
+              ({ label, key, color }) => {
+                const fkey = `nt:${key}`;
+                return (
+                  <button
+                    key={fkey}
+                    className={`legend-item-btn ${activeNodeFilters.includes(fkey) ? 'active' : ''} ${activeNodeFilters.length > 0 && !activeNodeFilters.includes(fkey) ? 'dimmed' : ''}`}
+                    onClick={() => onNodeFilterClick(fkey)}
+                    title={`${activeNodeFilters.includes(fkey) ? 'Deselect' : 'Select'} ${label}`}
+                  >
+                    <span className="legend-color" style={{ background: color }}></span>
+                    {label}
+                  </button>
+                );
+              }
+            )}
+            {presentDeviceTypes.size > 0 && (
+              <>
+                <div className="legend-small-text text-muted mt-2 mb-1" style={{ borderTop: '1px solid #dee2e6', paddingTop: '6px' }}>
+                  By device
+                </div>
+                {DEVICE_TYPES.filter(dt => presentDeviceTypes.has(dt)).map(dt => {
+                  const fkey = `dt:${dt}`;
+                  return (
+                    <button
+                      key={fkey}
+                      className={`legend-item-btn ${activeNodeFilters.includes(fkey) ? 'active' : ''} ${activeNodeFilters.length > 0 && !activeNodeFilters.includes(fkey) ? 'dimmed' : ''}`}
+                      onClick={() => onNodeFilterClick(fkey)}
+                      title={`${activeNodeFilters.includes(fkey) ? 'Deselect' : 'Select'} ${deviceTypeLabel(dt)}`}
+                    >
+                      <span className="legend-color" style={{ background: deviceTypeColor(dt) }}></span>
+                      {deviceTypeLabel(dt)}
+                    </button>
+                  );
+                })}
+              </>
             )}
           </div>
-          {presentDeviceTypes.size > 0 && (
-            <div className="legend-section mb-2">
-              <div className="legend-title d-flex justify-content-between align-items-center">
-                <span>Device Types</span>
-                {activeLegendDeviceTypes.length > 0 && (
-                  <button
-                    className="btn btn-link btn-sm p-0 text-muted legend-small-text"
-                    onClick={onLegendDeviceTypeClear}
-                  >
-                    Clear ×
-                  </button>
-                )}
-              </div>
-              <small className="text-muted d-block mb-1 legend-small-text">
-                Click to filter (multi-select)
-              </small>
-              {DEVICE_TYPES.filter(dt => presentDeviceTypes.has(dt)).map(dt => (
-                <button
-                  key={dt}
-                  className={`legend-item-btn ${activeLegendDeviceTypes.includes(dt) ? 'active' : ''} ${activeLegendDeviceTypes.length > 0 && !activeLegendDeviceTypes.includes(dt) ? 'dimmed' : ''}`}
-                  onClick={() => onLegendDeviceTypeClick(dt)}
-                  title={`${activeLegendDeviceTypes.includes(dt) ? 'Deselect' : 'Select'} ${deviceTypeLabel(dt)}`}
-                >
-                  <span className="legend-color" style={{ background: deviceTypeColor(dt) }}></span>
-                  {deviceTypeLabel(dt)}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="legend-section">
             <div className="legend-title d-flex justify-content-between align-items-center">
