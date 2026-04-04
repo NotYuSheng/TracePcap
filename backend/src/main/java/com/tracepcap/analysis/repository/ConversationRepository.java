@@ -130,9 +130,20 @@ public interface ConversationRepository
         predicates.add(root.get("protocol").in(params.getProtocols()));
       }
 
-      // L7 Protocol multi-value
+      // L7 Protocol multi-value — plain SARGable IN predicate.
+      // Filter values arrive already normalised (uppercase, "THE " stripped) from the badge labels.
+      // For backward-compatibility with data stored before normalisation was introduced, we expand
+      // each value to its common pre-normalisation variants on the Java side so no DB-side function
+      // is applied to the column and any index on tshark_protocol remains usable.
       if (params.getL7Protocols() != null && !params.getL7Protocols().isEmpty()) {
-        predicates.add(root.get("tsharkProtocol").in(params.getL7Protocols()));
+        List<String> variants = params.getL7Protocols().stream()
+            .flatMap(p -> {
+              String titleCase = p.charAt(0) + p.substring(1).toLowerCase();
+              return java.util.stream.Stream.of(p, titleCase, p.toLowerCase(), "The " + titleCase);
+            })
+            .distinct()
+            .collect(java.util.stream.Collectors.toList());
+        predicates.add(root.get("tsharkProtocol").in(variants));
       }
 
       // Application multi-value

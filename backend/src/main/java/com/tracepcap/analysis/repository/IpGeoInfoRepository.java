@@ -19,7 +19,7 @@ public interface IpGeoInfoRepository extends JpaRepository<IpGeoInfoEntity, Stri
    */
   @Query(
       value =
-          "SELECT DISTINCT g.country_code, g.country"
+          "SELECT g.country_code, MIN(g.country) AS country"
               + " FROM ip_geo_cache g"
               + " WHERE g.ip IN ("
               + "   SELECT src_ip FROM conversations WHERE file_id = :fileId"
@@ -27,7 +27,8 @@ public interface IpGeoInfoRepository extends JpaRepository<IpGeoInfoEntity, Stri
               + "   SELECT dst_ip FROM conversations WHERE file_id = :fileId"
               + " )"
               + " AND g.country_code IS NOT NULL"
-              + " ORDER BY g.country",
+              + " GROUP BY g.country_code"
+              + " ORDER BY MIN(g.country)",
       nativeQuery = true)
   List<Object[]> findDistinctCountriesByFileId(@Param("fileId") java.util.UUID fileId);
 }

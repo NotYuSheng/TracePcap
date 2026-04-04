@@ -15,7 +15,7 @@ export const getL7ProtocolColor = getCategoryColor;
 const SEVERITY_COLORS: Record<string, { bg: string; text: string }> = {
   critical: { bg: '#dc3545', text: '#fff' },
   high: { bg: '#fd7e14', text: '#fff' },
-  medium: { bg: '#e67e22', text: '#fff' },
+  medium: { bg: '#f0c040', text: '#212529' },
   low: { bg: '#6f42c1', text: '#fff' },
 };
 

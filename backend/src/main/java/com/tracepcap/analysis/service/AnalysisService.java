@@ -365,6 +365,7 @@ public class AnalysisService {
         conversations.stream()
             .map(ConversationEntity::getTsharkProtocol)
             .filter(p -> p != null && !p.isBlank())
+            .map(TsharkEnrichmentService::normalizeL7Protocol)
             .distinct()
             .sorted()
             .collect(Collectors.toList());
