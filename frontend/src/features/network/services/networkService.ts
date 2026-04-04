@@ -144,7 +144,8 @@ function updateNodeStats(
  */
 function createEdge(conversation: Conversation, srcIp: string, dstIp: string): GraphEdge {
   const protocol = conversation.protocol.name.toUpperCase();
-  const labelName = conversation.appName ?? protocol;
+  const rawName = conversation.appName ?? protocol;
+  const labelName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   return {
     id: conversation.id,

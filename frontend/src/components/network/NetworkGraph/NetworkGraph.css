@@ -19,17 +19,117 @@
   background: #f8f9fa;
 }
 
-.reset-camera-btn {
+/* Loading overlay while ELK computes positions */
+.network-graph-layouting {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
-  z-index: 10;
-  border: 1px solid #dee2e6;
-  background: #fff;
-  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(255 255 255 / 70%);
+  font-size: 0.85rem;
+  color: #6c757d;
+  pointer-events: none;
 }
 
-.reset-camera-btn:hover {
+/* Custom node — Packet Tracer style: icon above label */
+.network-flow-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 68px;
+  border-radius: 8px;
+  padding: 6px 8px 4px;
+  background: #fff;
+  border: 2px solid #95a5a6;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 15%);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+  gap: 3px;
+}
+
+.network-flow-node:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
+}
+
+.network-flow-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.network-flow-label {
+  color: #333;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 82px;
+  text-align: center;
+}
+
+/* Hide React Flow handles — present for edge routing but not visible */
+.network-flow-handle {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+/* Edge label */
+.network-flow-edge-label {
+  position: absolute;
+  font-size: 10px;
+  background: rgb(255 255 255 / 90%);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: all;
+  border: 1px solid #dee2e6;
+}
+
+
+/* Fullscreen: card fills viewport, graph body fills the card */
+.card:fullscreen {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  background: #fff;
+}
+
+.card:fullscreen .network-diagram-graph-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.card:fullscreen .network-diagram-graph-body .network-graph-container {
+  height: 100%;
+}
+
+/* Override React Flow defaults to match app style */
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__controls {
+  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid #dee2e6;
+  background: #fff;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__controls-button:hover {
   background: #f8f9fa;
-  border-color: #adb5bd;
 }
