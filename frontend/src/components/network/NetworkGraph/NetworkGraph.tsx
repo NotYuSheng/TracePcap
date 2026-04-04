@@ -9,7 +9,6 @@ import {
   EdgeLabelRenderer,
   applyNodeChanges,
   applyEdgeChanges,
-  MarkerType,
   type Node,
   type Edge,
   type NodeChange,
@@ -52,8 +51,8 @@ interface FlowEdgeData extends Record<string, unknown> {
 // Constants
 // ---------------------------------------------------------------------------
 
-const NODE_WIDTH = 90;
-const NODE_HEIGHT = 68;
+const NODE_WIDTH = 56;
+const NODE_HEIGHT = 56;
 
 const elk = new ELK();
 
@@ -165,7 +164,7 @@ function assignEdgeOffsets(edges: GraphEdge[]): Map<string, number> {
     if (group.length === 1) {
       offsetMap.set(group[0].id, 0);
     } else {
-      const step = 12; // px between parallel lines
+      const step = 20; // px between parallel lines
       const mid = (group.length - 1) / 2;
       group.forEach((e, i) => {
         offsetMap.set(e.id, (i - mid) * step);
@@ -240,13 +239,7 @@ async function computeLayout(
       data: { label: e.label, offset: offsetMap.get(e.id) ?? 0 },
       style: {
         stroke: color,
-        strokeWidth: Math.max(1, Math.log(e.data.packetCount) * 0.5),
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color,
-        width: 14,
-        height: 14,
+        strokeWidth: 1.5,
       },
     };
   });
@@ -262,12 +255,12 @@ function NetworkNode({ data }: NodeProps) {
   const { label, color, icon } = data as FlowNodeData;
   return (
     <div className="network-flow-node" style={{ borderColor: color }}>
-      <Handle type="target" position={Position.Top} className="network-flow-handle" />
+      <Handle type="target" position={Position.Top} className="network-flow-handle" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+      <Handle type="source" position={Position.Top} className="network-flow-handle" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
       <div className="network-flow-icon" style={{ color }}>
         <i className={`bi ${icon}`} />
       </div>
       <span className="network-flow-label">{label}</span>
-      <Handle type="source" position={Position.Bottom} className="network-flow-handle" />
     </div>
   );
 }
@@ -276,13 +269,11 @@ function NetworkNode({ data }: NodeProps) {
 // Custom edge — straight line with perpendicular offset per parallel edge
 // ---------------------------------------------------------------------------
 
-function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style, markerEnd }: EdgeProps) {
+function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: EdgeProps) {
   const { label, offset } = (data ?? { label: '', offset: 0 }) as FlowEdgeData;
 
   // Use a canonical direction for the perpendicular so that A→B and B→A
-  // both receive the same perpendicular unit vector. Without this, reversing
-  // source/target also reverses the perpendicular, causing both edges to
-  // land on the same side and overlap.
+  // both receive the same perpendicular unit vector.
   const canonicalX = sourceX < targetX || (sourceX === targetX && sourceY <= targetY);
   const cdx = canonicalX ? targetX - sourceX : sourceX - targetX;
   const cdy = canonicalX ? targetY - sourceY : sourceY - targetY;
@@ -294,19 +285,31 @@ function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style, mark
   const sy = sourceY + py;
   const tx = targetX + px;
   const ty = targetY + py;
-  const midX = (sx + tx) / 2;
-  const midY = (sy + ty) / 2;
+
+  const labelX = sx + (tx - sx) * 0.30;
+  const labelY = sy + (ty - sy) * 0.30;
+
+  // Arrow at midpoint, pointing toward target
+  const arrowX = (sx + tx) / 2;
+  const arrowY = (sy + ty) / 2;
+  const angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI);
+  const arrowColor = (style?.stroke as string) ?? '#999';
 
   const edgePath = `M ${sx},${sy} L ${tx},${ty}`;
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      <BaseEdge id={id} path={edgePath} style={style} />
+      <polygon
+        points="-6,-3.5 6,0 -6,3.5"
+        transform={`translate(${arrowX},${arrowY}) rotate(${angle})`}
+        fill={arrowColor}
+      />
       {label && (
         <EdgeLabelRenderer>
           <div
             className="network-flow-edge-label nodrag nopan"
-            style={{ transform: `translate(-50%,-50%) translate(${midX}px,${midY}px)` }}
+            style={{ transform: `translate(-50%,-50%) translate(${labelX}px,${labelY}px)` }}
           >
             {label}
           </div>

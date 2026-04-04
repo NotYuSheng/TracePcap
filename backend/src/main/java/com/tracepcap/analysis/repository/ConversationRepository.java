@@ -130,9 +130,28 @@ public interface ConversationRepository
         predicates.add(root.get("protocol").in(params.getProtocols()));
       }
 
-      // L7 Protocol multi-value
+      // L7 Protocol multi-value — match case-insensitively by comparing UPPER(tsharkProtocol)
+      // after stripping a leading "THE " prefix, to handle variants like "Netherlands" vs
+      // "The Netherlands" that both normalise to the same badge label.
       if (params.getL7Protocols() != null && !params.getL7Protocols().isEmpty()) {
-        predicates.add(root.get("tsharkProtocol").in(params.getL7Protocols()));
+        // Normalise incoming values the same way the badge labels are built
+        List<String> normalized = params.getL7Protocols().stream()
+            .map(String::toUpperCase)
+            .map(p -> p.startsWith("THE ") ? p.substring(4) : p)
+            .distinct()
+            .collect(java.util.stream.Collectors.toList());
+        // Build UPPER(tsharkProtocol) expression
+        jakarta.persistence.criteria.Expression<String> upper =
+            cb.upper(root.get("tsharkProtocol"));
+        // Use CASE … WHEN to strip a leading "THE " from the stored value before comparing.
+        // Equivalent SQL: UPPER(CASE WHEN tsharkProtocol ILIKE 'THE %'
+        //                           THEN SUBSTRING(tsharkProtocol, 5) ELSE tsharkProtocol END)
+        jakarta.persistence.criteria.Expression<String> normalizedDb =
+            cb.<String>selectCase()
+                .when(cb.like(upper, "THE %"),
+                      cb.substring(upper, 5))
+                .otherwise(upper);
+        predicates.add(normalizedDb.in(normalized));
       }
 
       // Application multi-value

@@ -599,7 +599,7 @@ export function ConversationFilterPanel({
                       [
                         ['critical', '#dc3545', '#fff'],
                         ['high', '#fd7e14', '#fff'],
-                        ['medium', '#e67e22', '#fff'],
+                        ['medium', '#f0c040', '#212529'],
                         ['low', '#6f42c1', '#fff'],
                       ] as const
                     ).map(([label, bg, text]) => {
@@ -628,14 +628,8 @@ export function ConversationFilterPanel({
                         <button
                           key={label}
                           type="button"
-                          className="badge border-0"
-                          style={{
-                            backgroundColor: allSelected ? bg : undefined,
-                            color: allSelected ? text : undefined,
-                            fontWeight: 400,
-                            cursor: 'pointer',
-                            opacity: allSelected ? 1 : 0.6,
-                          }}
+                          className={`badge border-0 filter-pill ${allSelected ? 'active' : ''}`}
+                          style={allSelected ? { backgroundColor: bg, color: text } : undefined}
                           onClick={handleClick}
                           title={
                             allSelected
