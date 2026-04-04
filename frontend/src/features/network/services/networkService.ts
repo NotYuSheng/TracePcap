@@ -158,6 +158,7 @@ function createEdge(conversation: Conversation, srcIp: string, dstIp: string): G
   const rawName = conversation.appName ?? protocol;
   const labelName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
+  const flowRisks = conversation.flowRisks ?? [];
   return {
     id: conversation.id,
     source: srcIp,
@@ -170,6 +171,16 @@ function createEdge(conversation: Conversation, srcIp: string, dstIp: string): G
       totalBytes: conversation.totalBytes,
       conversationId: conversation.id,
       bidirectional: conversation.direction === 'bidirectional',
+      srcPort: conversation.endpoints[0].port,
+      dstPort: conversation.endpoints[1].port,
+      l7Protocol: conversation.tsharkProtocol,
+      category: conversation.category,
+      flowRisks,
+      customSignatures: conversation.customSignatures ?? [],
+      detectedFileTypes: conversation.detectedFileTypes ?? [],
+      srcCountry: conversation.srcGeo?.countryCode,
+      dstCountry: conversation.dstGeo?.countryCode,
+      hasRisks: flowRisks.length > 0,
     },
   };
 }

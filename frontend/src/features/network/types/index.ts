@@ -69,6 +69,17 @@ export interface EdgeData {
   totalBytes: number;
   conversationId: string;
   bidirectional: boolean;
+  // Extra conversation fields for filtering
+  srcPort?: number;
+  dstPort?: number;
+  l7Protocol?: string;
+  category?: string;
+  flowRisks?: string[];
+  customSignatures?: string[];
+  detectedFileTypes?: string[];
+  srcCountry?: string;
+  dstCountry?: string;
+  hasRisks?: boolean;
 }
 
 export interface NetworkGraphData {

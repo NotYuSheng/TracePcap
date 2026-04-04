@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  Panel,
   Handle,
   Position,
   BaseEdge,
@@ -34,6 +35,7 @@ interface NetworkGraphProps {
   edges: GraphEdge[];
   onNodeClick?: (node: GraphNode) => void;
   layoutType?: 'forceDirected2d' | 'hierarchicalTd';
+  onLayoutChange?: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
 }
 
 interface FlowNodeData extends Record<string, unknown> {
@@ -335,6 +337,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   edges,
   onNodeClick,
   layoutType = 'forceDirected2d',
+  onLayoutChange,
 }: NetworkGraphProps) {
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
@@ -422,6 +425,26 @@ export const NetworkGraph = memo(function NetworkGraph({
       >
         <Background gap={20} color="#f0f0f0" />
         <Controls showInteractive={false} />
+        {onLayoutChange && (
+          <Panel position="bottom-right">
+            <div className="react-flow__controls network-layout-controls">
+              <button
+                className={`react-flow__controls-button${layoutType === 'forceDirected2d' ? ' active' : ''}`}
+                onClick={() => onLayoutChange('forceDirected2d')}
+                title="Force Directed layout"
+              >
+                <i className="bi bi-diagram-2" />
+              </button>
+              <button
+                className={`react-flow__controls-button${layoutType === 'hierarchicalTd' ? ' active' : ''}`}
+                onClick={() => onLayoutChange('hierarchicalTd')}
+                title="Hierarchical layout"
+              >
+                <i className="bi bi-diagram-3" />
+              </button>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );
