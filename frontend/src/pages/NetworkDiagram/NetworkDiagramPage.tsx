@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
@@ -35,6 +35,23 @@ export const NetworkDiagramPage = () => {
   const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
     'forceDirected2d'
   );
+
+  const graphCardRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      graphCardRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   // Which node type keys actually exist in the data
   const presentNodeTypes = useMemo(() => {
@@ -179,10 +196,19 @@ export const NetworkDiagramPage = () => {
 
       <div className="row">
         <div className="col-lg-8">
-          <div className="card mb-3">
-            <div className="card-body p-0" style={{ height: '600px' }}>
+          <div className="card mb-3" ref={graphCardRef}>
+            <div className="card-header d-flex justify-content-end py-1 px-2">
+              <button
+                className="btn btn-sm btn-light"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
+              </button>
+            </div>
+            <div className="card-body p-0 network-diagram-graph-body">
               <NetworkGraph
-                key={`${layoutType}|${activeLegendProtocols.join(',')}|${activeNodeFilters.join(',')}`}
+                key={layoutType}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 onNodeClick={handleNodeClick}

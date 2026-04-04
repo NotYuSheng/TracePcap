@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      // elkjs default entry uses web workers which don't work in Vite's browser build.
+      // Redirect to the self-contained bundled version that runs synchronously.
+      'elkjs': path.resolve(__dirname, 'node_modules/elkjs/lib/elk.bundled.js'),
       '@': path.resolve(__dirname, './src'),
       '@components': path.resolve(__dirname, './src/components'),
       '@pages': path.resolve(__dirname, './src/pages'),
@@ -36,7 +39,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'viz-vendor': ['recharts', 'd3', 'reagraph'],
+          'viz-vendor': ['recharts', 'd3', '@xyflow/react', 'elkjs'],
           'sgds-vendor': ['@govtechsg/sgds-react', '@govtechsg/sgds'],
         },
       },

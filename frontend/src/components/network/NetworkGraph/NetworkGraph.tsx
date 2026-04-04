@@ -1,9 +1,34 @@
-import { useRef, memo } from 'react';
-import { GraphCanvas, type GraphCanvasRef } from 'reagraph';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  Handle,
+  Position,
+  BaseEdge,
+  EdgeLabelRenderer,
+  applyNodeChanges,
+  applyEdgeChanges,
+  MarkerType,
+  type Node,
+  type Edge,
+  type NodeChange,
+  type EdgeChange,
+  type NodeTypes,
+  type EdgeTypes,
+  type NodeProps,
+  type EdgeProps,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import ELK from 'elkjs';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
 import { deviceTypeColor } from '@/utils/deviceType';
 import './NetworkGraph.css';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface NetworkGraphProps {
   nodes: GraphNode[];
@@ -12,19 +37,35 @@ interface NetworkGraphProps {
   layoutType?: 'forceDirected2d' | 'hierarchicalTd';
 }
 
-// Node types that carry specific semantic meaning — device type should not override these.
+interface FlowNodeData extends Record<string, unknown> {
+  label: string;
+  color: string;
+  icon: string;
+}
+
+interface FlowEdgeData extends Record<string, unknown> {
+  label: string;
+  offset: number; // perpendicular pixel offset for parallel edges
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const NODE_WIDTH = 90;
+const NODE_HEIGHT = 68;
+
+const elk = new ELK();
+
+// ---------------------------------------------------------------------------
+// Node helpers
+// ---------------------------------------------------------------------------
+
 const SPECIFIC_NODE_TYPES = new Set([
   'dns-server', 'web-server', 'ssh-server', 'ftp-server',
   'mail-server', 'dhcp-server', 'ntp-server', 'database-server', 'router',
 ]);
 
-/**
- * Get node color:
- *   anomaly > specific port-based nodeType > device type > generic nodeType > role fallback.
- *
- * Specific server roles (DNS, HTTP, SSH, …) keep their dedicated colours.
- * Device type colours apply only to generic nodes (client / unknown).
- */
 function getNodeColor(nodeData: {
   role: string;
   isAnomaly: boolean;
@@ -32,20 +73,12 @@ function getNodeColor(nodeData: {
   deviceType?: string;
 }): string {
   if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
-
-  // Specific server roles win — they carry meaningful port-based identity.
   if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
     return NODE_TYPE_COLORS[nodeData.nodeType];
-
-  // For generic nodes, device type adds useful information.
   if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
     return deviceTypeColor(nodeData.deviceType);
-
-  // Generic node type colour (client = blue, unknown = gray).
   if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType])
     return NODE_TYPE_COLORS[nodeData.nodeType];
-
-  // Final role-based fallback.
   switch (nodeData.role) {
     case 'server': return '#2ecc71';
     case 'both':   return '#9b59b6';
@@ -53,56 +86,246 @@ function getNodeColor(nodeData: {
   }
 }
 
-/**
- * Build a BFS spanning tree from `nodes` using `edges`.
- * Returns the subset of edges that form the tree (back-edges are dropped so
- * d3 stratify() receives a DAG with no cycles).  O(V+E) via adjacency list.
- */
-function bfsSpanningTree(
+const NODE_ICONS: Record<string, string> = {
+  'router':          'bi-router',
+  'web-server':      'bi-globe',
+  'dns-server':      'bi-search',
+  'ssh-server':      'bi-terminal',
+  'ftp-server':      'bi-hdd-network',
+  'mail-server':     'bi-envelope',
+  'dhcp-server':     'bi-broadcast',
+  'ntp-server':      'bi-clock',
+  'database-server': 'bi-database',
+  'client':          'bi-laptop',
+  'anomaly':         'bi-exclamation-triangle-fill',
+};
+
+function getNodeIcon(nodeData: { nodeType?: string; isAnomaly: boolean }): string {
+  if (nodeData.isAnomaly) return NODE_ICONS['anomaly'];
+  return NODE_ICONS[nodeData.nodeType ?? ''] ?? 'bi-pc-display';
+}
+
+// ---------------------------------------------------------------------------
+// Deduplicate same-protocol edges between the same node pair
+// Handles backend inconsistencies where the same app protocol arrives with
+// different casing (e.g. "telegram" vs "Telegram") across conversations.
+// ---------------------------------------------------------------------------
+
+function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
+  const groups = new Map<string, GraphEdge[]>();
+  for (const e of edges) {
+    const appOrProto = (e.data.appName ?? e.data.protocol).toLowerCase();
+    const key = `${e.source}\0${e.target}\0${appOrProto}`;
+    const g = groups.get(key) ?? [];
+    g.push(e);
+    groups.set(key, g);
+  }
+
+  const result: GraphEdge[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    const dominant = group.reduce((best, e) =>
+      e.data.packetCount > best.data.packetCount ? e : best,
+    );
+    const totalPackets = group.reduce((s, e) => s + e.data.packetCount, 0);
+    const totalBytes = group.reduce((s, e) => s + e.data.totalBytes, 0);
+    const raw = dominant.data.appName ?? dominant.data.protocol;
+    const displayName = raw.charAt(0).toUpperCase() + raw.slice(1);
+    result.push({
+      ...dominant,
+      id: group.map(e => e.id).join('|'),
+      label: `${displayName} (${totalPackets})`,
+      data: { ...dominant.data, packetCount: totalPackets, totalBytes },
+    });
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Parallel edge handling — perpendicular pixel offset
+// All edges between the same node pair are fanned out as parallel straight
+// lines. Each keeps its own protocol colour, label, and direction arrow.
+// ---------------------------------------------------------------------------
+
+function assignEdgeOffsets(edges: GraphEdge[]): Map<string, number> {
+  // Group by unordered pair so A→B and B→A are fanned together
+  const groups = new Map<string, GraphEdge[]>();
+  for (const e of edges) {
+    const key = [e.source, e.target].sort().join('\0');
+    const g = groups.get(key) ?? [];
+    g.push(e);
+    groups.set(key, g);
+  }
+
+  const offsetMap = new Map<string, number>();
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      offsetMap.set(group[0].id, 0);
+    } else {
+      const step = 12; // px between parallel lines
+      const mid = (group.length - 1) / 2;
+      group.forEach((e, i) => {
+        offsetMap.set(e.id, (i - mid) * step);
+      });
+    }
+  }
+  return offsetMap;
+}
+
+// ---------------------------------------------------------------------------
+// ELK layout
+// ---------------------------------------------------------------------------
+
+const ELK_OPTIONS: Record<string, Record<string, string>> = {
+  hierarchicalTd: {
+    'elk.algorithm': 'layered',
+    'elk.direction': 'DOWN',
+    'elk.separateConnectedComponents': 'true',
+    'elk.spacing.componentComponent': '80',
+    'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+    'elk.spacing.nodeNode': '40',
+    'elk.edgeRouting': 'SPLINES',
+  },
+  forceDirected2d: {
+    'elk.algorithm': 'org.eclipse.elk.force',
+    'elk.separateConnectedComponents': 'true',
+    'elk.spacing.nodeNode': '80',
+    'elk.force.iterations': '500',
+    'elk.force.repulsion': '5.0',
+  },
+};
+
+async function computeLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
-): GraphEdge[] {
-  // Build adjacency list: source → outgoing edges
-  const adj = new Map<string, GraphEdge[]>();
-  for (const edge of edges) {
-    if (!adj.has(edge.source)) adj.set(edge.source, []);
-    adj.get(edge.source)!.push(edge);
-  }
+  layoutType: 'forceDirected2d' | 'hierarchicalTd',
+): Promise<{ nodes: Node[]; edges: Edge[] }> {
+  const dedupedEdges = deduplicateEdges(edges);
+  const offsetMap = assignEdgeOffsets(dedupedEdges);
 
-  const incomingIds = new Set(edges.map(e => e.target));
-  const rootIds = nodes.filter(n => !incomingIds.has(n.id)).map(n => n.id);
+  const graph = await elk.layout({
+    id: 'root',
+    layoutOptions: ELK_OPTIONS[layoutType],
+    children: nodes.map(n => ({ id: n.id, width: NODE_WIDTH, height: NODE_HEIGHT })),
+    edges: dedupedEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+  });
 
-  const visited = new Set<string>();
-  const treeEdges: GraphEdge[] = [];
-  const queue: string[] = rootIds.length > 0 ? [...rootIds] : (nodes[0] ? [nodes[0].id] : []);
-  queue.forEach(id => visited.add(id));
+  const posMap = new Map(
+    (graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]),
+  );
 
-  const bfs = (startQueue: string[]) => {
-    const q = [...startQueue];
-    while (q.length > 0) {
-      const current = q.shift()!;
-      for (const edge of adj.get(current) ?? []) {
-        if (!visited.has(edge.target)) {
-          visited.add(edge.target);
-          treeEdges.push(edge);
-          q.push(edge.target);
-        }
-      }
-    }
-  };
+  const rfNodes: Node[] = nodes.map(n => ({
+    id: n.id,
+    type: 'networkNode',
+    position: posMap.get(n.id) ?? { x: 0, y: 0 },
+    data: {
+      label: n.label,
+      color: getNodeColor(n.data),
+      icon: getNodeIcon(n.data),
+    },
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
+  }));
 
-  bfs(queue);
+  const rfEdges: Edge[] = dedupedEdges.map(e => {
+    const color = getProtocolColor(e.data.protocol);
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      type: 'networkEdge',
+      data: { label: e.label, offset: offsetMap.get(e.id) ?? 0 },
+      style: {
+        stroke: color,
+        strokeWidth: Math.max(1, Math.log(e.data.packetCount) * 0.5),
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color,
+        width: 14,
+        height: 14,
+      },
+    };
+  });
 
-  // Handle disconnected sub-graphs
-  for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      visited.add(node.id);
-      bfs([node.id]);
-    }
-  }
-
-  return treeEdges;
+  return { nodes: rfNodes, edges: rfEdges };
 }
+
+// ---------------------------------------------------------------------------
+// Custom node — Packet Tracer style: icon above, label below
+// ---------------------------------------------------------------------------
+
+function NetworkNode({ data }: NodeProps) {
+  const { label, color, icon } = data as FlowNodeData;
+  return (
+    <div className="network-flow-node" style={{ borderColor: color }}>
+      <Handle type="target" position={Position.Top} className="network-flow-handle" />
+      <div className="network-flow-icon" style={{ color }}>
+        <i className={`bi ${icon}`} />
+      </div>
+      <span className="network-flow-label">{label}</span>
+      <Handle type="source" position={Position.Bottom} className="network-flow-handle" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom edge — straight line with perpendicular offset per parallel edge
+// ---------------------------------------------------------------------------
+
+function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style, markerEnd }: EdgeProps) {
+  const { label, offset } = (data ?? { label: '', offset: 0 }) as FlowEdgeData;
+
+  // Use a canonical direction for the perpendicular so that A→B and B→A
+  // both receive the same perpendicular unit vector. Without this, reversing
+  // source/target also reverses the perpendicular, causing both edges to
+  // land on the same side and overlap.
+  const canonicalX = sourceX < targetX || (sourceX === targetX && sourceY <= targetY);
+  const cdx = canonicalX ? targetX - sourceX : sourceX - targetX;
+  const cdy = canonicalX ? targetY - sourceY : sourceY - targetY;
+  const len = Math.sqrt(cdx * cdx + cdy * cdy) || 1;
+  const px = (-cdy / len) * offset;
+  const py = (cdx / len) * offset;
+
+  const sx = sourceX + px;
+  const sy = sourceY + py;
+  const tx = targetX + px;
+  const ty = targetY + py;
+  const midX = (sx + tx) / 2;
+  const midY = (sy + ty) / 2;
+
+  const edgePath = `M ${sx},${sy} L ${tx},${ty}`;
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            className="network-flow-edge-label nodrag nopan"
+            style={{ transform: `translate(-50%,-50%) translate(${midX}px,${midY}px)` }}
+          >
+            {label}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stable type maps
+// ---------------------------------------------------------------------------
+
+const nodeTypes: NodeTypes = { networkNode: NetworkNode };
+const edgeTypes: EdgeTypes = { networkEdge: NetworkEdge };
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export const NetworkGraph = memo(function NetworkGraph({
   nodes,
@@ -110,107 +333,61 @@ export const NetworkGraph = memo(function NetworkGraph({
   onNodeClick,
   layoutType = 'forceDirected2d',
 }: NetworkGraphProps) {
-  const graphRef = useRef<GraphCanvasRef>(null);
+  const [rfNodes, setRfNodes] = useState<Node[]>([]);
+  const [rfEdges, setRfEdges] = useState<Edge[]>([]);
 
-  // Hierarchical layout uses D3 stratify() which requires exactly ONE root
-  // (a node with no incoming edges). Network graphs almost always have multiple
-  // roots, which throws "multiple roots" and silently blanks the canvas.
-  //
-  // Fix: for hierarchical mode —
-  //   1. Drop isolated nodes (no edges) — they have no valid position in a tree.
-  //   2. Inject a hidden virtual root connected to every actual root (node with
-  //      no incoming edges) so stratify() always sees a single root.
-  const connectedNodeIds = new Set(edges.flatMap(e => [e.source, e.target]));
-  const VIRTUAL_ROOT = '__vr__';
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => setRfNodes(nds => applyNodeChanges(changes, nds)),
+    [],
+  );
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setRfEdges(eds => applyEdgeChanges(changes, eds)),
+    [],
+  );
+  const [layouting, setLayouting] = useState(false);
 
-  let displayNodes = nodes;
-  let displayEdges = edges;
+  const visibleNodes = useMemo(() => {
+    if (layoutType !== 'hierarchicalTd') return nodes;
+    const connected = new Set(edges.flatMap(e => [e.source, e.target]));
+    return nodes.filter(n => connected.has(n.id));
+  }, [nodes, edges, layoutType]);
 
-  if (layoutType === 'hierarchicalTd') {
-    // Keep only nodes that have at least one edge
-    const edgeNodes = nodes.filter(n => connectedNodeIds.has(n.id));
+  useEffect(() => {
+    let active = true;
 
-    // Build a spanning tree via BFS to eliminate cycles.
-    // d3 stratify() requires a DAG — bidirectional edges create cycles that crash it.
-    // Pre-index adjacency list for O(V+E) BFS instead of O(V*E).
-    const treeEdges = bfsSpanningTree(edgeNodes, edges);
-
-    // Determine roots in the spanning tree
-    const treeTargets = new Set(treeEdges.map(e => e.target));
-    const treeRootIds = edgeNodes.filter(n => !treeTargets.has(n.id)).map(n => n.id);
-
-    if (treeRootIds.length > 1) {
-      // Inject virtual root so stratify() sees exactly one root
-      displayNodes = [
-        {
-          id: VIRTUAL_ROOT,
-          label: '',
-          data: { role: 'client', isAnomaly: false, totalBytes: 0 },
-        } as any,
-        ...edgeNodes,
-      ];
-      displayEdges = [
-        ...treeRootIds.map(id => ({
-          id: `${VIRTUAL_ROOT}_${id}`,
-          source: VIRTUAL_ROOT,
-          target: id,
-          label: '',
-          data: {
-            protocol: 'TCP',
-            packetCount: 1,
-            totalBytes: 0,
-            conversationId: '',
-            bidirectional: false,
-          },
-        })),
-        ...treeEdges,
-      ];
-    } else {
-      displayNodes = edgeNodes;
-      displayEdges = treeEdges;
+    if (visibleNodes.length === 0) {
+      setRfNodes([]);
+      setRfEdges([]);
+      return;
     }
-  }
 
-  // Transform nodes for reagraph
-  const reagraphNodes = displayNodes.map(node => ({
-    id: node.id,
-    label: node.id === VIRTUAL_ROOT ? '' : node.label,
-    fill: node.id === VIRTUAL_ROOT ? 'transparent' : getNodeColor(node.data),
-    size: node.id === VIRTUAL_ROOT ? 0.01 : Math.max(5, Math.log((node.data as any).totalBytes + 1) * 2),
-    data: node.data,
-  }));
+    setLayouting(true);
+    computeLayout(visibleNodes, edges, layoutType)
+      .then(({ nodes: n, edges: e }) => {
+        if (!active) return;
+        setRfNodes(n);
+        setRfEdges(e);
+        setLayouting(false);
+      })
+      .catch(err => {
+        if (!active) return;
+        console.error('ELK layout error:', err);
+        setLayouting(false);
+      });
 
-  // Transform edges for reagraph
-  const reagraphEdges = displayEdges.map(edge => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    label: edge.source === VIRTUAL_ROOT ? '' : edge.label,
-    stroke: edge.source === VIRTUAL_ROOT ? 'transparent' : getProtocolColor(edge.data.protocol),
-    size: edge.source === VIRTUAL_ROOT ? 0.01 : Math.max(1, Math.log(edge.data.packetCount) * 0.5),
-    data: edge.data,
-  }));
+    return () => { active = false; };
+  }, [visibleNodes, edges, layoutType]);
 
-  const handleNodeClick = (node: any) => {
-    if (onNodeClick) {
-      // Find the original node with full data
-      const originalNode = nodes.find(n => n.id === node.id);
-      if (originalNode) {
-        onNodeClick(originalNode);
-      }
-    }
-  };
-
-  const resetCamera = () => {
-    if (graphRef.current) {
-      graphRef.current.centerGraph();
-    }
-  };
+  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (!onNodeClick) return;
+    const original = nodes.find(n => n.id === node.id);
+    if (original) onNodeClick(original);
+  }, [nodes, onNodeClick]);
 
   if (nodes.length === 0) {
     return (
       <div className="network-graph-empty">
-        <i className="bi bi-diagram-3" style={{ fontSize: '4rem', opacity: 0.3 }}></i>
+        <i className="bi bi-diagram-3" style={{ fontSize: '4rem', opacity: 0.3 }} />
         <h5 className="mt-3 text-muted">No Network Data Available</h5>
         <p className="text-muted">Upload a pcap file to visualize network topology</p>
       </div>
@@ -219,24 +396,30 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   return (
     <div className="network-graph-container">
-      <GraphCanvas
-        key={layoutType}
-        ref={graphRef}
-        nodes={reagraphNodes}
-        edges={reagraphEdges}
-        layoutType={layoutType}
+      {layouting && (
+        <div className="network-graph-layouting">
+          <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
+          Computing layout…
+        </div>
+      )}
+      <ReactFlow
+        nodes={rfNodes}
+        edges={rfEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodeClick={handleNodeClick}
-        labelType="all"
-        edgeLabelPosition="natural"
-        draggable
-      />
-      <button
-        className="btn btn-sm btn-light reset-camera-btn"
-        onClick={resetCamera}
-        title="Reset camera view"
+        fitView
+        fitViewOptions={{ padding: 0.15 }}
+        nodesConnectable={false}
+        nodesDraggable
+        elementsSelectable
+        minZoom={0.1}
       >
-        <i className="bi bi-arrows-fullscreen"></i>
-      </button>
+        <Background gap={20} color="#f0f0f0" />
+        <Controls showInteractive={false} />
+      </ReactFlow>
     </div>
   );
 });
