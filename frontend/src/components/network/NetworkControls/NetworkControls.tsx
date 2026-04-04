@@ -93,6 +93,13 @@ export function NetworkControls({
   useEffect(() => { setIpInput(ipFilter); }, [ipFilter]);
   useEffect(() => { setPortInput(portFilter); }, [portFilter]);
 
+  useEffect(() => {
+    return () => {
+      if (ipDebounceRef.current) clearTimeout(ipDebounceRef.current);
+      if (portDebounceRef.current) clearTimeout(portDebounceRef.current);
+    };
+  }, []);
+
   const handleIpChange = (value: string) => {
     setIpInput(value);
     if (ipDebounceRef.current) clearTimeout(ipDebounceRef.current);

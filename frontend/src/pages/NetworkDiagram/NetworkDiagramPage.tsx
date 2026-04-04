@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
@@ -12,6 +12,19 @@ import { ErrorMessage } from '@components/common/ErrorMessage';
 interface AnalysisOutletContext {
   data: AnalysisData;
   fileId: string;
+}
+
+/** Returns true if an edge's protocol/app matches a legend key (e.g. HTTPS, ICMP, STP). */
+function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean {
+  if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+  if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
+  if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
+  return proto === key || app.includes(key);
+}
+
+function toggleSet(setter: Dispatch<SetStateAction<string[]>>) {
+  return (val: string) =>
+    setter(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
 }
 
 function formatBytes(bytes: number): string {
@@ -42,9 +55,6 @@ export const NetworkDiagramPage = () => {
   const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
   const [hasRisksOnly, setHasRisksOnly] = useState(false);
-
-  const toggleSet = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (val: string) =>
-    setter(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
 
   const toggleLegendProtocol = toggleSet(setActiveLegendProtocols);
   const toggleNodeFilter = toggleSet(setActiveNodeFilters);
@@ -114,18 +124,9 @@ export const NetworkDiagramPage = () => {
     edges.forEach(edge => {
       const proto = edge.data.protocol.toUpperCase();
       const app = (edge.data.appName ?? '').toUpperCase();
-      if (proto === 'HTTP' || app === 'HTTP') keys.add('HTTP');
-      if (proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS'))
-        keys.add('HTTPS');
-      if (proto === 'DNS' || app === 'DNS') keys.add('DNS');
-      if (proto === 'TCP') keys.add('TCP');
-      if (proto === 'UDP') keys.add('UDP');
-      if (proto === 'ICMP' || proto === 'ICMPV6') keys.add('ICMP');
-      if (proto === 'ARP') keys.add('ARP');
-      if (proto === 'STP' || proto === 'RSTP') keys.add('STP');
-      if (proto === 'LLDP') keys.add('LLDP');
-      if (proto === 'CDP') keys.add('CDP');
-      if (proto === 'EAPOL') keys.add('EAPOL');
+      ['HTTP', 'HTTPS', 'DNS', 'TCP', 'UDP', 'ICMP', 'ARP', 'STP', 'LLDP', 'CDP', 'EAPOL'].forEach(key => {
+        if (edgeMatchesLegendKey(proto, app, key)) keys.add(key);
+      });
     });
     return keys;
   }, [edges]);
@@ -191,13 +192,7 @@ export const NetworkDiagramPage = () => {
       filtered = filtered.filter(edge => {
         const proto = edge.data.protocol.toUpperCase();
         const app = (edge.data.appName ?? '').toUpperCase();
-        return activeLegendProtocols.some(key => {
-          if (key === 'HTTPS')
-            return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
-          if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
-          if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
-          return proto === key || app.includes(key);
-        });
+        return activeLegendProtocols.some(key => edgeMatchesLegendKey(proto, app, key));
       });
     }
 
