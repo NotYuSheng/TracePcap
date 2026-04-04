@@ -40,4 +40,7 @@ export const API_ENDPOINTS = {
   EXTRACTED_FILES: (fileId: string) => `/files/${fileId}/extractions`,
   EXTRACTED_FILE_DOWNLOAD: (fileId: string, extractionId: string) =>
     `/files/${fileId}/extractions/${extractionId}/download`,
+
+  // Report
+  REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
 } as const;

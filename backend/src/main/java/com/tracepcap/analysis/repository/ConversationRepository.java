@@ -74,6 +74,52 @@ public interface ConversationRepository
           + " GROUP BY c.category ORDER BY SUM(c.packetCount) DESC")
   List<Object[]> findCategoryDistributionByFileId(@Param("fileId") UUID fileId);
 
+  /** Aggregated application stats (appName, packetCount, bytes) for a file. */
+  @Query(
+      "SELECT c.appName, SUM(c.packetCount), SUM(c.totalBytes) FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId AND c.appName IS NOT NULL AND c.appName <> ''"
+          + " GROUP BY c.appName ORDER BY SUM(c.totalBytes) DESC")
+  List<Object[]> findApplicationStatsByFileId(@Param("fileId") UUID fileId);
+
+  /** Aggregated L7 protocol stats (tsharkProtocol, packetCount, bytes) for a file. */
+  @Query(
+      "SELECT c.tsharkProtocol, SUM(c.packetCount), SUM(c.totalBytes) FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId"
+          + " AND c.tsharkProtocol IS NOT NULL AND c.tsharkProtocol <> ''"
+          + " GROUP BY c.tsharkProtocol ORDER BY SUM(c.totalBytes) DESC")
+  List<Object[]> findL7ProtocolStatsByFileId(@Param("fileId") UUID fileId);
+
+  /**
+   * Lightweight edge data for topology diagrams.
+   * Returns (srcIp, dstIp, protocol, sumBytes, sumPackets), ordered by sumBytes DESC.
+   */
+  @Query(
+      "SELECT c.srcIp, c.dstIp, c.protocol, SUM(c.totalBytes), SUM(c.packetCount)"
+          + " FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " GROUP BY c.srcIp, c.dstIp, c.protocol ORDER BY SUM(c.totalBytes) DESC")
+  List<Object[]> findEdgeDataForDiagramByFileId(
+      @Param("fileId") UUID fileId, Pageable pageable);
+
+  /** Conversations that have TLS metadata (JA3 hashes or certificate info). */
+  @Query(
+      "SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND (c.ja3Client IS NOT NULL OR c.tlsIssuer IS NOT NULL"
+          + " OR c.tlsSubject IS NOT NULL)"
+          + " ORDER BY c.totalBytes DESC")
+  List<ConversationEntity> findConversationsWithTlsByFileId(
+      @Param("fileId") UUID fileId, Pageable pageable);
+
+  /** Distinct HTTP user-agent strings seen in a file (unnested from array column). */
+  @Query(
+      value =
+          "SELECT DISTINCT unnest(http_user_agents) AS ua"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " AND http_user_agents IS NOT NULL"
+              + " AND array_length(http_user_agents, 1) > 0"
+              + " ORDER BY ua",
+      nativeQuery = true)
+  List<String> findDistinctHttpUserAgentsByFileId(@Param("fileId") UUID fileId);
+
   /** Returns the distinct risk type strings present across all at-risk conversations for a file. */
   @Query(
       value =
