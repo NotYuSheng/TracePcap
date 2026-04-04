@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -346,27 +346,37 @@ export const NetworkGraph = memo(function NetworkGraph({
   );
   const [layouting, setLayouting] = useState(false);
 
-  const visibleNodes = layoutType === 'hierarchicalTd'
-    ? (() => {
-        const connected = new Set(edges.flatMap(e => [e.source, e.target]));
-        return nodes.filter(n => connected.has(n.id));
-      })()
-    : nodes;
+  const visibleNodes = useMemo(() => {
+    if (layoutType !== 'hierarchicalTd') return nodes;
+    const connected = new Set(edges.flatMap(e => [e.source, e.target]));
+    return nodes.filter(n => connected.has(n.id));
+  }, [nodes, edges, layoutType]);
 
   useEffect(() => {
-    if (visibleNodes.length === 0) return;
+    let active = true;
+
+    if (visibleNodes.length === 0) {
+      setRfNodes([]);
+      setRfEdges([]);
+      return;
+    }
+
     setLayouting(true);
     computeLayout(visibleNodes, edges, layoutType)
       .then(({ nodes: n, edges: e }) => {
+        if (!active) return;
         setRfNodes(n);
         setRfEdges(e);
         setLayouting(false);
       })
       .catch(err => {
+        if (!active) return;
         console.error('ELK layout error:', err);
         setLayouting(false);
       });
-  }, [nodes, edges, layoutType]);
+
+    return () => { active = false; };
+  }, [visibleNodes, edges, layoutType]);
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (!onNodeClick) return;

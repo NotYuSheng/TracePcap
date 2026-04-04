@@ -208,7 +208,7 @@ export const NetworkDiagramPage = () => {
             </div>
             <div className="card-body p-0 network-diagram-graph-body">
               <NetworkGraph
-                key={`${layoutType}|${activeLegendProtocols.join(',')}|${activeNodeFilters.join(',')}`}
+                key={layoutType}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 onNodeClick={handleNodeClick}
