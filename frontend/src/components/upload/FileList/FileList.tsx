@@ -124,7 +124,7 @@ export const FileList = () => {
                         <div className="fw-medium">{file.fileName}</div>
                         <small className="text-muted">
                           {formatFileSize(file.fileSize)} • {formatDate(parseDateTime(file.uploadedAt))}
-                          {file.status !== 'completed' && (
+                          {file.status.toLowerCase() !== 'completed' && (
                             <span className="ms-2 badge bg-secondary" style={{ fontSize: '0.7rem' }}>
                               {file.status.toLowerCase()}
                             </span>
