@@ -101,6 +101,10 @@ services:
     build:
       context: .
       dockerfile: ./nginx/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_SUPPORTED_FILE_TYPES: ${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}
+        VITE_ANALYSIS_OPTIONS: ${VITE_ANALYSIS_OPTIONS:-false}
     container_name: tracepcap-nginx
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this
