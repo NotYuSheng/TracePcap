@@ -115,7 +115,7 @@ export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummar
           </div>
           <div className="card-content">
             <div className="card-label">Conversations</div>
-            <div className="card-value">{summary.topConversations?.length || 0}</div>
+            <div className="card-value">{summary.totalConversations ?? summary.topConversations?.length ?? 0}</div>
           </div>
         </div>
 

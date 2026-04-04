@@ -97,7 +97,8 @@ public class ConversationsController {
           String countries) {
 
     if (page < 1) page = 1;
-    if (pageSize < 1 || pageSize > 100) pageSize = 25;
+    if (pageSize < 1) pageSize = 25;
+    if (pageSize > 10000) pageSize = 10000;
 
     ConversationFilterParams params =
         buildFilterParams(

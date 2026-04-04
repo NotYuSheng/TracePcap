@@ -26,6 +26,7 @@ public class AnalysisSummaryResponse {
 
   // Protocol and conversation data
   private List<ProtocolStat> protocolDistribution;
+  private Long totalConversations;
   private List<ConversationSummary> topConversations;
   private Long securityAlertCount;
   private List<String> triggeredCustomRules;

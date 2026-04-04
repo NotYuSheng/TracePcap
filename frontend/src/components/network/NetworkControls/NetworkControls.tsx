@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import type { NetworkStats } from '@/features/network/types';
-import { PROTOCOL_COLORS, NODE_TYPE_COLORS } from '@/features/network/constants';
+import {
+  PROTOCOL_COLORS,
+  PROTOCOL_LABELS,
+  NODE_TYPE_COLORS,
+  NODE_TYPE_LABELS,
+  DEFAULT_EDGE_COLOR,
+} from '@/features/network/constants';
 import { DEVICE_TYPES, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import './NetworkControls.css';
 
@@ -19,28 +25,21 @@ interface NetworkControlsProps {
   presentDeviceTypes: Set<string>;
 }
 
-const EDGE_LEGEND = [
-  { label: 'HTTP', key: 'HTTP', color: PROTOCOL_COLORS['HTTP'] },
-  { label: 'HTTPS/TLS', key: 'HTTPS', color: PROTOCOL_COLORS['HTTPS'] },
-  { label: 'DNS', key: 'DNS', color: PROTOCOL_COLORS['DNS'] },
-  { label: 'TCP', key: 'TCP', color: PROTOCOL_COLORS['TCP'] },
-  { label: 'UDP', key: 'UDP', color: PROTOCOL_COLORS['UDP'] },
-];
+function edgeLegendLabel(key: string): string {
+  return PROTOCOL_LABELS[key] ?? key;
+}
 
-const NODE_LEGEND = [
-  { label: 'DNS Server', key: 'dns-server', color: NODE_TYPE_COLORS['dns-server'] },
-  { label: 'Web Server', key: 'web-server', color: NODE_TYPE_COLORS['web-server'] },
-  { label: 'SSH Server', key: 'ssh-server', color: NODE_TYPE_COLORS['ssh-server'] },
-  { label: 'FTP Server', key: 'ftp-server', color: NODE_TYPE_COLORS['ftp-server'] },
-  { label: 'Mail Server', key: 'mail-server', color: NODE_TYPE_COLORS['mail-server'] },
-  { label: 'DHCP Server', key: 'dhcp-server', color: NODE_TYPE_COLORS['dhcp-server'] },
-  { label: 'NTP Server', key: 'ntp-server', color: NODE_TYPE_COLORS['ntp-server'] },
-  { label: 'Database Server', key: 'database-server', color: NODE_TYPE_COLORS['database-server'] },
-  { label: 'Router / Gateway', key: 'router', color: NODE_TYPE_COLORS['router'] },
-  { label: 'Client', key: 'client', color: NODE_TYPE_COLORS['client'] },
-  { label: 'Anomaly', key: 'anomaly', color: NODE_TYPE_COLORS['anomaly'] },
-  { label: 'Unknown', key: 'unknown', color: NODE_TYPE_COLORS['unknown'] },
-];
+function edgeLegendColor(key: string): string {
+  return PROTOCOL_COLORS[key] ?? DEFAULT_EDGE_COLOR;
+}
+
+function nodeLegendLabel(key: string): string {
+  return NODE_TYPE_LABELS[key] ?? key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function nodeLegendColor(key: string): string {
+  return NODE_TYPE_COLORS[key] ?? '#95a5a6';
+}
 
 /**
  * Format bytes to human-readable string
@@ -166,9 +165,10 @@ export function NetworkControls({
             <small className="text-muted d-block mb-1 legend-small-text">
               Click to filter (multi-select)
             </small>
-            {NODE_LEGEND.filter(({ key }) => presentNodeTypes.has(key)).map(
-              ({ label, key, color }) => {
+            {Array.from(presentNodeTypes).map(key => {
                 const fkey = `nt:${key}`;
+                const label = nodeLegendLabel(key);
+                const color = nodeLegendColor(key);
                 return (
                   <button
                     key={fkey}
@@ -180,8 +180,7 @@ export function NetworkControls({
                     {label}
                   </button>
                 );
-              }
-            )}
+              })}
             {presentDeviceTypes.size > 0 && (
               <>
                 <div className="legend-small-text text-muted mt-2 mb-1" style={{ borderTop: '1px solid #dee2e6', paddingTop: '6px' }}>
@@ -220,19 +219,21 @@ export function NetworkControls({
             <small className="text-muted d-block mb-1 legend-small-text">
               Click to filter (multi-select)
             </small>
-            {EDGE_LEGEND.filter(({ key }) => presentEdgeLegendKeys.has(key)).map(
-              ({ label, key, color }) => (
-                <button
-                  key={key}
-                  className={`legend-item-btn ${activeLegendProtocols.includes(key) ? 'active' : ''} ${activeLegendProtocols.length > 0 && !activeLegendProtocols.includes(key) ? 'dimmed' : ''}`}
-                  onClick={() => onLegendProtocolClick(key)}
-                  title={`${activeLegendProtocols.includes(key) ? 'Deselect' : 'Select'} ${label}`}
-                >
-                  <span className="legend-color" style={{ background: color }}></span>
-                  {label}
-                </button>
-              )
-            )}
+            {Array.from(presentEdgeLegendKeys).map(key => {
+                const label = edgeLegendLabel(key);
+                const color = edgeLegendColor(key);
+                return (
+                  <button
+                    key={key}
+                    className={`legend-item-btn ${activeLegendProtocols.includes(key) ? 'active' : ''} ${activeLegendProtocols.length > 0 && !activeLegendProtocols.includes(key) ? 'dimmed' : ''}`}
+                    onClick={() => onLegendProtocolClick(key)}
+                    title={`${activeLegendProtocols.includes(key) ? 'Deselect' : 'Select'} ${label}`}
+                  >
+                    <span className="legend-color" style={{ background: color }}></span>
+                    {label}
+                  </button>
+                );
+              })}
           </div>
         </div>
       </div>

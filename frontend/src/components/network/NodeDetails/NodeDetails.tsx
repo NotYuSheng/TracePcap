@@ -48,6 +48,7 @@ const NODE_TYPE_DISPLAY: Record<NodeType, { label: string; icon: string; badgeCl
   'database-server': { label: 'Database Server', icon: 'bi-database', badgeClass: 'bg-danger' },
   router: { label: 'Router / Gateway', icon: 'bi-router', badgeClass: 'bg-warning text-dark' },
   client: { label: 'Client', icon: 'bi-laptop', badgeClass: 'bg-primary' },
+  'l2-device': { label: 'L2 Device', icon: 'bi-ethernet', badgeClass: 'bg-teal text-white' },
   unknown: { label: 'Unknown', icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
 };
 

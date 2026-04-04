@@ -43,6 +43,7 @@ export const analysisService = {
       fileSize: summary.fileSize || 0,
       uploadTime: summary.uploadTime || Date.now(),
       totalPackets: summary.totalPackets || 0,
+      totalConversations: summary.totalConversations || 0,
       timeRange: [startTime, endTime],
       protocolDistribution,
       topConversations,

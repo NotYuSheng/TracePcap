@@ -62,11 +62,17 @@ interface ConversationDetailApiResponse extends ConversationApiResponse {
   packets: PacketApiResponse[];
 }
 
+const L2_PROTOCOLS = new Set(['ARP', 'STP', 'RSTP', 'LLDP', 'CDP', 'LOOP', 'EAPOL', 'LACP', 'PVST']);
+const L3_PROTOCOLS = new Set(['ICMP', 'ICMPV6', 'IGMP', 'OSPF', 'GRE', 'VRRP']);
+
 function getProtocol(protocolName: string): Protocol {
   const name = protocolName.toUpperCase();
-  const layer =
-    name === 'TCP' || name === 'UDP' ? 'transport' : name === 'ICMP' ? 'network' : 'application';
-  return { layer: layer as Protocol['layer'], name };
+  const layer: Protocol['layer'] =
+    name === 'TCP' || name === 'UDP' ? 'transport'
+    : L3_PROTOCOLS.has(name) ? 'network'
+    : L2_PROTOCOLS.has(name) ? 'link'
+    : 'application';
+  return { layer, name };
 }
 
 function transformConversation(

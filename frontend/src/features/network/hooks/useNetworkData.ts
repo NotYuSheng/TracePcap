@@ -10,18 +10,21 @@ interface UseNetworkDataReturn extends NetworkGraphData {
   refetch: () => void;
 }
 
+export const CONVERSATION_LIMIT_ENABLED =
+  import.meta.env.VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT !== 'false';
+const MAX_CONVERSATIONS = 500;
+
 /**
  * Custom hook for fetching and transforming network data into graph format
  * Follows the same pattern as useAnalysisData
  * @param fileId - The file ID to fetch conversations for
  * @param analysisSummary - Optional analysis summary for anomaly detection
- * @param maxConversations - Maximum conversations to render (default: 500 for performance)
  */
 export function useNetworkData(
   fileId: string,
-  analysisSummary?: AnalysisSummary,
-  maxConversations: number = 500
+  analysisSummary?: AnalysisSummary
 ): UseNetworkDataReturn {
+  const maxConversations = CONVERSATION_LIMIT_ENABLED ? MAX_CONVERSATIONS : Infinity;
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [stats, setStats] = useState<NetworkStats>({
@@ -102,7 +105,7 @@ export function useNetworkData(
 
   useEffect(() => {
     fetchData();
-  }, [fileId, maxConversations]);
+  }, [fileId]);
 
   return {
     nodes,

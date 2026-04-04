@@ -12,6 +12,7 @@ export type NodeType =
   | 'database-server'
   | 'router'
   | 'client'
+  | 'l2-device'
   | 'unknown';
 
 export interface NodeTypeEvidence {
@@ -29,6 +30,8 @@ export interface GraphNode {
 export interface NodeData {
   ip: string;
   mac?: string;
+  /** True when this node is identified by a MAC address (pure L2 device with no IP). */
+  isL2?: boolean;
   hostname?: string;
   packetsSent: number;
   packetsReceived: number;
