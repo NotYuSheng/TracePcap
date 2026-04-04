@@ -235,6 +235,40 @@ export const conversationService = {
   },
 
   /**
+   * Build a URL to export a single conversation as a PCAP file.
+   */
+  getConversationPcapExportUrl: (conversationId: string): string => {
+    return `/api/conversations/detail/${conversationId}/export-pcap`;
+  },
+
+  /**
+   * Build a URL for the PCAP export endpoint with the current filters.
+   */
+  getPcapExportUrl: (fileId: string, filters: ConversationFilters): string => {
+    const params = new URLSearchParams();
+    if (filters.ip) params.set('ip', filters.ip);
+    if (filters.port) params.set('port', filters.port);
+    if (filters.payloadContains) params.set('payloadContains', filters.payloadContains);
+    if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
+    if (filters.l7Protocols.length > 0) params.set('l7Protocols', filters.l7Protocols.join(','));
+    if (filters.apps.length > 0) params.set('apps', filters.apps.join(','));
+    if (filters.categories.length > 0) params.set('categories', filters.categories.join(','));
+    if (filters.hasRisks) params.set('hasRisks', 'true');
+    if (filters.fileTypes.length > 0) params.set('fileTypes', filters.fileTypes.join(','));
+    if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
+    if (filters.customSignatures.length > 0)
+      params.set('customSignatures', filters.customSignatures.join(','));
+    if (filters.deviceTypes && filters.deviceTypes.length > 0)
+      params.set('deviceTypes', filters.deviceTypes.join(','));
+    if (filters.countries && filters.countries.length > 0)
+      params.set('countries', filters.countries.join(','));
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters.sortBy) params.set('sortDir', filters.sortDir);
+    const qs = params.toString();
+    return `/api/conversations/${fileId}/export-pcap${qs ? '?' + qs : ''}`;
+  },
+
+  /**
    * Returns distinct custom signature rule names triggered for the given file.
    */
   getCustomSignatures: async (fileId: string): Promise<string[]> => {

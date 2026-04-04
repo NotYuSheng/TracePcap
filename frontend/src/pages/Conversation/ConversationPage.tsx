@@ -429,6 +429,14 @@ export const ConversationPage = () => {
                 >
                   <i className="bi bi-download me-1"></i>CSV
                 </button>
+                <a
+                  href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
+                  download
+                  className="btn btn-sm btn-outline-secondary ms-2"
+                  title="Export this conversation as PCAP"
+                >
+                  <i className="bi bi-download me-1"></i>PCAP
+                </a>
                 <button
                   type="button"
                   className="btn-close ms-2"
