@@ -315,12 +315,20 @@ public class TsharkEnrichmentService {
             .max(Map.Entry.comparingByValue())
             .map(Map.Entry::getKey)
             .orElse(null);
-    if (appLevel != null) return appLevel;
-    // All generic — still store the most common transport name
-    return freq.entrySet().stream()
-        .max(Map.Entry.comparingByValue())
-        .map(Map.Entry::getKey)
-        .orElse(null);
+    String result = appLevel != null ? appLevel
+        : freq.entrySet().stream()
+            .max(Map.Entry.comparingByValue())
+            .map(Map.Entry::getKey)
+            .orElse(null);
+    // Normalise at storage time so the DB always holds clean values and
+    // downstream queries can use a plain equality/IN predicate.
+    return result != null ? normalizeL7Protocol(result) : null;
+  }
+
+  /** Uppercase and strip a leading "The " article (e.g. "The Netherlands" → "NETHERLANDS"). */
+  static String normalizeL7Protocol(String proto) {
+    String upper = proto.toUpperCase();
+    return upper.startsWith("THE ") ? upper.substring(4) : upper;
   }
 
   /**

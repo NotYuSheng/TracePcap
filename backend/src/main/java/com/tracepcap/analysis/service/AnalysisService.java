@@ -365,8 +365,7 @@ public class AnalysisService {
         conversations.stream()
             .map(ConversationEntity::getTsharkProtocol)
             .filter(p -> p != null && !p.isBlank())
-            .map(String::toUpperCase)
-            .map(p -> p.startsWith("THE ") ? p.substring(4) : p)
+            .map(TsharkEnrichmentService::normalizeL7Protocol)
             .distinct()
             .sorted()
             .collect(Collectors.toList());
