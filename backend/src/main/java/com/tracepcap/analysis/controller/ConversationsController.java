@@ -272,8 +272,9 @@ public class ConversationsController {
             ip, port, protocols, l7Protocols, apps, categories, hasRisks, fileTypes, riskTypes,
             customSignatures, payloadContains, sortBy, sortDir, search, deviceTypes, countries);
 
+    String filename = analysisService.getBulkPcapFilename(fileId);
     response.setContentType("application/vnd.tcpdump.pcap");
-    response.setHeader("Content-Disposition", "attachment; filename=\"conversations.pcap\"");
+    response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
 
     try (OutputStream out = response.getOutputStream()) {
       analysisService.exportConversationsAsPcap(fileId, params, out);

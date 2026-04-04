@@ -431,13 +431,7 @@ export const ConversationPage = () => {
                 </button>
                 <a
                   href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
-                  download={(() => {
-                    const base = (data.fileName ?? 'capture').replace(/\.[^.]+$/, '');
-                    const now = new Date();
-                    const pad = (n: number) => String(n).padStart(2, '0');
-                    const ts = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-                    return `tracepcap_${base}_${ts}.pcap`;
-                  })()}
+                  download
                   className="btn btn-sm btn-outline-secondary ms-2"
                   title="Export this conversation as PCAP"
                 >

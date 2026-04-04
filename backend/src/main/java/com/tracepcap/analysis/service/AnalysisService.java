@@ -596,7 +596,7 @@ public class AnalysisService {
 
   /**
    * Returns a descriptive filename for a conversation PCAP export, e.g.
-   * {@code conv_192.168.1.1_12345-10.0.0.1_80_TCP.pcap}.
+   * {@code tracepcap_capture_04-01-2026_14-30-00.pcap}.
    */
   @Transactional(readOnly = true)
   public String getConversationPcapFilename(UUID conversationId) {
@@ -606,6 +606,22 @@ public class AnalysisService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
     return buildConversationPcapFilename(conv);
+  }
+
+  /**
+   * Returns a descriptive filename for a bulk (filtered) PCAP export.
+   */
+  @Transactional(readOnly = true)
+  public String getBulkPcapFilename(UUID fileId) {
+    FileEntity file =
+        fileRepository
+            .findById(fileId)
+            .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    String base = file.getFileName() != null
+        ? file.getFileName().replaceAll("\\.[^.]+$", "")
+        : "capture";
+    String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
+    return "tracepcap_" + base + "_" + ts + ".pcap";
   }
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
@@ -643,7 +659,8 @@ public class AnalysisService {
             .collect(Collectors.toList());
 
     if (frameNumbers.isEmpty()) {
-      log.warn("No packets found in DB for conversationId={}; PCAP export will be empty", conversationId);
+      throw new IOException(
+          "No packets found for conversation " + conversationId + "; cannot export PCAP");
     }
 
     File tempInput = null;
@@ -654,27 +671,23 @@ public class AnalysisService {
 
       storageService.downloadFileToLocal(conv.getFile().getMinioPath(), tempInput);
 
-      List<String> cmd = new ArrayList<>(
-          Arrays.asList("tshark", "-r", tempInput.getAbsolutePath(),
-              "-w", tempOutput.getAbsolutePath()));
-
-      if (!frameNumbers.isEmpty()) {
-        // Build filter using exact frame numbers — guaranteed to match the right packets
-        String filter = frameNumbers.stream()
-            .map(n -> "frame.number==" + n)
-            .collect(Collectors.joining(" || "));
-        cmd.add("-Y");
-        cmd.add(filter);
-      }
+      // Use compact set syntax to avoid exceeding OS arg-length limits on large conversations
+      String filter = "frame.number in {"
+          + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
+          + "}";
 
       log.info("Exporting PCAP for conversationId={}, {} frames", conversationId, frameNumbers.size());
-      ProcessBuilder pb = new ProcessBuilder(cmd);
+      ProcessBuilder pb = new ProcessBuilder(
+          "tshark", "-r", tempInput.getAbsolutePath(),
+          "-Y", filter,
+          "-w", tempOutput.getAbsolutePath());
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
       try {
         int exitCode = proc.waitFor();
         if (exitCode != 0) {
-          log.warn("tshark exited with code {} during PCAP export for conversationId={}", exitCode, conversationId);
+          log.error("tshark exited with code {} during PCAP export for conversationId={}", exitCode, conversationId);
+          throw new IOException("tshark failed to filter PCAP (exit code " + exitCode + ")");
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -772,11 +785,18 @@ public class AnalysisService {
       if (sb.length() > 0) sb.append(" || ");
       String srcIp = conv.getSrcIp();
       String dstIp = conv.getDstIp();
-      boolean ipv6 = (srcIp != null && srcIp.contains(":")) || (dstIp != null && dstIp.contains(":"));
-      String addrField = ipv6 ? "ipv6.addr" : "ip.addr";
+      // Determine address field per-IP to handle mixed or missing addresses correctly
+      String srcAddrField = (srcIp != null && srcIp.contains(":")) ? "ipv6.src" : "ip.src";
+      String dstAddrField = (dstIp != null && dstIp.contains(":")) ? "ipv6.dst" : "ip.dst";
       sb.append('(');
-      sb.append(addrField).append("==").append(srcIp != null ? srcIp : "0.0.0.0");
-      sb.append(" && ").append(addrField).append("==").append(dstIp != null ? dstIp : "0.0.0.0");
+      sb.append('(').append(srcAddrField).append("==").append(srcIp != null ? srcIp : "0.0.0.0")
+        .append(" && ").append(dstAddrField).append("==").append(dstIp != null ? dstIp : "0.0.0.0")
+        .append(')');
+      // Also match the reverse direction
+      sb.append(" || ");
+      sb.append('(').append(srcAddrField.replace(".src", ".dst")).append("==").append(srcIp != null ? srcIp : "0.0.0.0")
+        .append(" && ").append(dstAddrField.replace(".dst", ".src")).append("==").append(dstIp != null ? dstIp : "0.0.0.0")
+        .append(')');
       if (conv.getSrcPort() != null && conv.getDstPort() != null) {
         String proto = conv.getProtocol();
         String portField = "UDP".equalsIgnoreCase(proto) ? "udp.port" : "tcp.port";
