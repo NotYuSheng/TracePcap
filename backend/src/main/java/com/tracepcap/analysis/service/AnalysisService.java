@@ -23,6 +23,9 @@ import com.tracepcap.file.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.*;
 import java.util.Arrays;
@@ -591,6 +594,102 @@ public class AnalysisService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Returns a descriptive filename for a conversation PCAP export, e.g.
+   * {@code conv_192.168.1.1_12345-10.0.0.1_80_TCP.pcap}.
+   */
+  @Transactional(readOnly = true)
+  public String getConversationPcapFilename(UUID conversationId) {
+    ConversationEntity conv =
+        conversationRepository
+            .findById(conversationId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+    return buildConversationPcapFilename(conv);
+  }
+
+  private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
+      java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy_HH-mm-ss")
+          .withZone(java.time.ZoneId.of("Asia/Singapore"));
+
+  private static String buildConversationPcapFilename(ConversationEntity conv) {
+    String base = conv.getFile() != null && conv.getFile().getFileName() != null
+        ? conv.getFile().getFileName().replaceAll("\\.[^.]+$", "")
+        : "capture";
+    String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
+    return "tracepcap_" + base + "_" + ts + ".pcap";
+  }
+
+  /**
+   * Exports a single conversation as a PCAP file. Uses the exact frame numbers stored in the
+   * database to filter packets, which is reliable regardless of capture format or tunnelling.
+   * Streams the result into the given OutputStream.
+   */
+  @Transactional(readOnly = true)
+  public void exportConversationAsPcap(UUID conversationId, java.io.OutputStream out)
+      throws IOException {
+
+    ConversationEntity conv =
+        conversationRepository
+            .findById(conversationId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+
+    List<Long> frameNumbers =
+        packetRepository
+            .findByConversationIdOrderByPacketNumberAsc(conversationId)
+            .stream()
+            .map(PacketEntity::getPacketNumber)
+            .collect(Collectors.toList());
+
+    if (frameNumbers.isEmpty()) {
+      log.warn("No packets found in DB for conversationId={}; PCAP export will be empty", conversationId);
+    }
+
+    File tempInput = null;
+    File tempOutput = null;
+    try {
+      tempInput = File.createTempFile("pcap-in-", ".pcap");
+      tempOutput = File.createTempFile("pcap-out-", ".pcap");
+
+      storageService.downloadFileToLocal(conv.getFile().getMinioPath(), tempInput);
+
+      List<String> cmd = new ArrayList<>(
+          Arrays.asList("tshark", "-r", tempInput.getAbsolutePath(),
+              "-w", tempOutput.getAbsolutePath()));
+
+      if (!frameNumbers.isEmpty()) {
+        // Build filter using exact frame numbers — guaranteed to match the right packets
+        String filter = frameNumbers.stream()
+            .map(n -> "frame.number==" + n)
+            .collect(Collectors.joining(" || "));
+        cmd.add("-Y");
+        cmd.add(filter);
+      }
+
+      log.info("Exporting PCAP for conversationId={}, {} frames", conversationId, frameNumbers.size());
+      ProcessBuilder pb = new ProcessBuilder(cmd);
+      pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+      Process proc = pb.start();
+      try {
+        int exitCode = proc.waitFor();
+        if (exitCode != 0) {
+          log.warn("tshark exited with code {} during PCAP export for conversationId={}", exitCode, conversationId);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("PCAP export interrupted", e);
+      }
+
+      try (InputStream is = new FileInputStream(tempOutput)) {
+        is.transferTo(out);
+      }
+    } finally {
+      if (tempInput != null && !tempInput.delete()) tempInput.deleteOnExit();
+      if (tempOutput != null && !tempOutput.delete()) tempOutput.deleteOnExit();
+    }
+  }
+
   /** Also used by the CSV export — returns ALL matching rows without pagination. */
   @Transactional(readOnly = true)
   public List<ConversationResponse> getConversationsForExport(
@@ -601,6 +700,92 @@ public class AnalysisService {
     List<ConversationEntity> entities = conversationRepository.findAll(spec, sort);
 
     return mapConversationsWithFileTypes(entities);
+  }
+
+  /**
+   * Exports filtered conversations as a PCAP file. Downloads the original PCAP from storage,
+   * applies a tshark display filter derived from the matched conversations, and streams the result
+   * into the given OutputStream.
+   *
+   * @param fileId the file whose conversations should be exported
+   * @param params filter parameters (same as the listing endpoint)
+   * @param out    the output stream to write the filtered PCAP bytes to
+   */
+  @Transactional(readOnly = true)
+  public void exportConversationsAsPcap(
+      UUID fileId, ConversationFilterParams params, java.io.OutputStream out)
+      throws IOException {
+
+    FileEntity file =
+        fileRepository
+            .findById(fileId)
+            .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+
+    List<ConversationResponse> conversations = getConversationsForExport(fileId, params);
+
+    File tempInput = null;
+    File tempOutput = null;
+    try {
+      tempInput = File.createTempFile("pcap-in-", ".pcap");
+      tempOutput = File.createTempFile("pcap-out-", ".pcap");
+
+      storageService.downloadFileToLocal(file.getMinioPath(), tempInput);
+
+      List<String> cmd = new ArrayList<>(
+          Arrays.asList("tshark", "-r", tempInput.getAbsolutePath(),
+              "-w", tempOutput.getAbsolutePath()));
+      if (!conversations.isEmpty()) {
+        cmd.add("-Y");
+        cmd.add(buildPcapDisplayFilter(conversations));
+      }
+
+      log.info("Exporting PCAP for fileId={} with {} conversations", fileId, conversations.size());
+      ProcessBuilder pb = new ProcessBuilder(cmd);
+      pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+      Process proc = pb.start();
+      try {
+        int exitCode = proc.waitFor();
+        if (exitCode != 0) {
+          log.warn("tshark exited with code {} during PCAP export for fileId={}", exitCode, fileId);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("PCAP export interrupted", e);
+      }
+
+      try (InputStream is = new FileInputStream(tempOutput)) {
+        is.transferTo(out);
+      }
+    } finally {
+      if (tempInput != null && !tempInput.delete()) tempInput.deleteOnExit();
+      if (tempOutput != null && !tempOutput.delete()) tempOutput.deleteOnExit();
+    }
+  }
+
+  /**
+   * Builds a tshark display filter expression that matches exactly the given set of conversations.
+   * Each conversation contributes one OR-clause matching its 5-tuple.
+   */
+  private static String buildPcapDisplayFilter(List<ConversationResponse> conversations) {
+    StringBuilder sb = new StringBuilder();
+    for (ConversationResponse conv : conversations) {
+      if (sb.length() > 0) sb.append(" || ");
+      String srcIp = conv.getSrcIp();
+      String dstIp = conv.getDstIp();
+      boolean ipv6 = (srcIp != null && srcIp.contains(":")) || (dstIp != null && dstIp.contains(":"));
+      String addrField = ipv6 ? "ipv6.addr" : "ip.addr";
+      sb.append('(');
+      sb.append(addrField).append("==").append(srcIp != null ? srcIp : "0.0.0.0");
+      sb.append(" && ").append(addrField).append("==").append(dstIp != null ? dstIp : "0.0.0.0");
+      if (conv.getSrcPort() != null && conv.getDstPort() != null) {
+        String proto = conv.getProtocol();
+        String portField = "UDP".equalsIgnoreCase(proto) ? "udp.port" : "tcp.port";
+        sb.append(" && ").append(portField).append("==").append(conv.getSrcPort());
+        sb.append(" && ").append(portField).append("==").append(conv.getDstPort());
+      }
+      sb.append(')');
+    }
+    return sb.toString();
   }
 
   private List<ConversationResponse> mapConversationsWithFileTypes(

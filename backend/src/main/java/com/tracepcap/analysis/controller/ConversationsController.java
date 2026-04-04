@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -242,6 +243,43 @@ public class ConversationsController {
     writer.flush();
   }
 
+  /** Export all matching conversations as PCAP (no pagination, same filters as listing) */
+  @GetMapping("/{fileId}/export-pcap")
+  @Operation(summary = "Export filtered conversations as PCAP")
+  public void exportConversationsAsPcap(
+      @PathVariable UUID fileId,
+      @RequestParam(required = false) String ip,
+      @RequestParam(required = false) Integer port,
+      @RequestParam(required = false) String protocols,
+      @RequestParam(required = false) String l7Protocols,
+      @RequestParam(required = false) String apps,
+      @RequestParam(required = false) String categories,
+      @RequestParam(required = false) Boolean hasRisks,
+      @RequestParam(required = false) String fileTypes,
+      @RequestParam(required = false) String riskTypes,
+      @RequestParam(required = false) String customSignatures,
+      @RequestParam(required = false) String payloadContains,
+      @RequestParam(required = false) String sortBy,
+      @RequestParam(required = false) String sortDir,
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) String deviceTypes,
+      @RequestParam(required = false) String countries,
+      HttpServletResponse response)
+      throws IOException {
+
+    ConversationFilterParams params =
+        buildFilterParams(
+            ip, port, protocols, l7Protocols, apps, categories, hasRisks, fileTypes, riskTypes,
+            customSignatures, payloadContains, sortBy, sortDir, search, deviceTypes, countries);
+
+    response.setContentType("application/vnd.tcpdump.pcap");
+    response.setHeader("Content-Disposition", "attachment; filename=\"conversations.pcap\"");
+
+    try (OutputStream out = response.getOutputStream()) {
+      analysisService.exportConversationsAsPcap(fileId, params, out);
+    }
+  }
+
   /** Reconstruct the full TCP/UDP session for a conversation and decode the application payload. */
   @GetMapping("/{conversationId}/session")
   @Operation(summary = "Reconstruct TCP/UDP session with application-layer payload decoding")
@@ -257,6 +295,20 @@ public class ConversationsController {
       @PathVariable UUID conversationId) {
     log.info("GET /api/conversations/detail/{}", conversationId);
     return ResponseEntity.ok(analysisService.getConversationDetail(conversationId));
+  }
+
+  /** Export a single conversation as a PCAP file filtered from the original capture. */
+  @GetMapping("/detail/{conversationId}/export-pcap")
+  @Operation(summary = "Export a single conversation as PCAP")
+  public void exportConversationAsPcap(
+      @PathVariable UUID conversationId, HttpServletResponse response) throws IOException {
+    log.info("GET /api/conversations/detail/{}/export-pcap", conversationId);
+    String filename = analysisService.getConversationPcapFilename(conversationId);
+    response.setContentType("application/vnd.tcpdump.pcap");
+    response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    try (OutputStream out = response.getOutputStream()) {
+      analysisService.exportConversationAsPcap(conversationId, out);
+    }
   }
 
   /** Shared helper — builds a {@link ConversationFilterParams} from raw request parameters. */
