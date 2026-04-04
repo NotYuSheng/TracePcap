@@ -493,6 +493,7 @@ public class AnalysisService {
         .timeRange(
             startTimeMs != null && endTimeMs != null ? List.of(startTimeMs, endTimeMs) : List.of())
         .protocolDistribution(protocolDistribution)
+        .totalConversations((long) conversations.size())
         .topConversations(topConversations)
         .securityAlertCount(securityAlertCount)
         .triggeredCustomRules(triggeredCustomRules)

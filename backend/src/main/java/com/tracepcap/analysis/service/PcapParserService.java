@@ -32,7 +32,8 @@ public class PcapParserService {
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info |
-    //         tcp.payload | udp.payload | ip.ttl | eth.src
+    //         tcp.payload | udp.payload | ip.ttl | eth.src |
+    //         arp.src.proto_ipv4 | arp.dst.proto_ipv4 | eth.dst
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -73,7 +74,13 @@ public class PcapParserService {
             "-e",
             "ip.ttl",
             "-e",
-            "eth.src");
+            "eth.src",
+            "-e",
+            "arp.src.proto_ipv4",
+            "-e",
+            "arp.dst.proto_ipv4",
+            "-e",
+            "eth.dst");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     long packetNumber = 0;
@@ -114,6 +121,15 @@ public class PcapParserService {
             try { ttl = Integer.parseInt(firstValue(f[14])); } catch (NumberFormatException ignored) {}
           }
           String srcMac = (f.length > 15 && !f[15].isEmpty()) ? firstValue(f[15]).toLowerCase() : null;
+
+          // Layer-2 address fallback for non-IP protocols (ARP, STP, LLDP, CDP, etc.).
+          // For ARP: use the embedded protocol (IP) addresses from the ARP payload.
+          // For other pure L2 frames: use Ethernet MAC addresses as node identifiers.
+          String arpSrcIp = (f.length > 16 && !f[16].isEmpty()) ? firstValue(f[16]) : null;
+          String arpDstIp = (f.length > 17 && !f[17].isEmpty()) ? firstValue(f[17]) : null;
+          String dstMac   = (f.length > 18 && !f[18].isEmpty()) ? firstValue(f[18]).toLowerCase() : null;
+          if (srcIp == null) srcIp = (arpSrcIp != null) ? arpSrcIp : srcMac;
+          if (dstIp == null) dstIp = (arpDstIp != null) ? arpDstIp : dstMac;
 
           LocalDateTime timestamp =
               LocalDateTime.ofInstant(

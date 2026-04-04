@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
-import { useNetworkData } from '@/features/network/hooks/useNetworkData';
+import { useNetworkData, CONVERSATION_LIMIT_ENABLED } from '@/features/network/hooks/useNetworkData';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
@@ -83,6 +83,12 @@ export const NetworkDiagramPage = () => {
       if (proto === 'DNS' || app === 'DNS') keys.add('DNS');
       if (proto === 'TCP') keys.add('TCP');
       if (proto === 'UDP') keys.add('UDP');
+      if (proto === 'ICMP' || proto === 'ICMPV6') keys.add('ICMP');
+      if (proto === 'ARP') keys.add('ARP');
+      if (proto === 'STP' || proto === 'RSTP') keys.add('STP');
+      if (proto === 'LLDP') keys.add('LLDP');
+      if (proto === 'CDP') keys.add('CDP');
+      if (proto === 'EAPOL') keys.add('EAPOL');
     });
     return keys;
   }, [edges]);
@@ -104,6 +110,8 @@ export const NetworkDiagramPage = () => {
               app.includes('SSL') ||
               app.includes('HTTPS')
             );
+          if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
+          if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
           return proto === key || app.includes(key);
         });
       });
@@ -183,13 +191,22 @@ export const NetworkDiagramPage = () => {
               {filteredNodes.length} nodes, {filteredEdges.length} connections
             </div>
           </div>
-          {stats.isLimited && (
-            <div className="alert alert-warning mt-2 mb-0">
-              <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>Performance Limit:</strong> Showing top {stats.displayedConversations} of{' '}
-              {stats.totalConversations} conversations by packet count. This prevents browser lag
-              with large captures.
-            </div>
+          {CONVERSATION_LIMIT_ENABLED && (
+            stats.isLimited ? (
+              <div className="alert alert-warning mt-2 mb-0">
+                <i className="bi bi-exclamation-triangle me-2"></i>
+                <strong>Performance limit active:</strong> Showing top {stats.displayedConversations?.toLocaleString()} of{' '}
+                {stats.totalConversations?.toLocaleString()} conversations by packet count.{' '}
+                Set <code>VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false</code> to render all.
+              </div>
+            ) : (
+              <div className="alert alert-info mt-2 mb-0">
+                <i className="bi bi-info-circle me-2"></i>
+                <strong>Performance limit enabled</strong> — all{' '}
+                {stats.totalConversations?.toLocaleString()}{' '}
+                conversations are within the 500-connection limit and fully rendered.
+              </div>
+            )
           )}
         </div>
       </div>

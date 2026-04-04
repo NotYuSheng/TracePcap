@@ -53,6 +53,13 @@ const PORT_SERVICE_MAP: Record<string, NodeType> = {
 /** Minimum distinct peers before a non-server node is classified as a router/gateway */
 const ROUTER_PEER_THRESHOLD = 10;
 
+/** MAC address regex — identifies nodes that have no IP and are addressed by MAC only */
+const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
+
+function isMacAddress(id: string): boolean {
+  return MAC_REGEX.test(id);
+}
+
 /**
  * Classify a node type from its inbound port frequency map and distinct peer count.
  * serverPorts: { "53/UDP": 42, "80/TCP": 1 } — counts of connections received on each port.
@@ -62,6 +69,8 @@ function classifyNodeType(
   serverPorts: Record<string, number>,
   distinctPeers: number
 ): void {
+  // L2-only nodes (identified by MAC address) keep their pre-assigned type
+  if (node.data.isL2) return;
   // Find the port/protocol with the most inbound connections
   let dominantPort: string | null = null;
   let maxCount = 0;
@@ -90,13 +99,15 @@ function classifyNodeType(
  * Create a new graph node from a network endpoint
  */
 function createNode(ip: string, hostname?: string, mac?: string): GraphNode {
+  const isL2 = isMacAddress(ip);
   return {
     id: ip,
     label: hostname || ip,
     data: {
       ip,
-      mac,
+      mac: isL2 ? ip : mac, // for MAC-identified nodes, the "ip" field IS the MAC
       hostname,
+      isL2,
       packetsSent: 0,
       packetsReceived: 0,
       bytesSent: 0,
@@ -106,7 +117,7 @@ function createNode(ip: string, hostname?: string, mac?: string): GraphNode {
       protocols: [],
       connections: 0,
       isAnomaly: false,
-      nodeType: 'unknown',
+      nodeType: isL2 ? 'l2-device' : 'unknown',
       nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
     },
   };
@@ -193,6 +204,7 @@ function calculateNetworkStats(nodeMap: NodeMap, edges: GraphEdge[]): NetworkSta
  * Determine final node role based on observed behavior
  */
 function finalizeNodeRole(node: GraphNode, srcPort: number, dstPort: number) {
+  if (node.data.isL2) return;
   const srcRole = determineRole(srcPort);
   const dstRole = determineRole(dstPort);
 
@@ -365,8 +377,13 @@ export function buildNetworkGraph(
     markAnomalies(nodeMap, analysisSummary);
   }
 
-  // Calculate statistics
+  // Calculate statistics, then override packet/byte totals with the authoritative
+  // figures from the analysis summary when available. The per-conversation sum
+  // misses non-flow traffic (ARP, ICMP, malformed frames, etc.).
   const stats = calculateNetworkStats(nodeMap, edges);
+  if (analysisSummary?.totalPackets != null) {
+    stats.totalPackets = analysisSummary.totalPackets;
+  }
 
   return {
     nodes: Array.from(Object.values(nodeMap)),

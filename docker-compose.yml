@@ -105,6 +105,7 @@ services:
         VITE_API_BASE_URL: /api
         VITE_SUPPORTED_FILE_TYPES: ${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}
         VITE_ANALYSIS_OPTIONS: ${VITE_ANALYSIS_OPTIONS:-false}
+        VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT: ${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}
     container_name: tracepcap-nginx
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this

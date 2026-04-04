@@ -81,6 +81,7 @@ export interface AnalysisSummary {
   fileSize: number;
   uploadTime: number;
   totalPackets: number;
+  totalConversations: number;
   timeRange: [number, number];
   protocolDistribution: ProtocolStats[];
   topConversations: Conversation[];

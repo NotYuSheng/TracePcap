@@ -137,8 +137,9 @@ public interface ConversationRepository
       // is applied to the column and any index on tshark_protocol remains usable.
       if (params.getL7Protocols() != null && !params.getL7Protocols().isEmpty()) {
         List<String> variants = params.getL7Protocols().stream()
+            .filter(p -> p != null && !p.isEmpty())
             .flatMap(p -> {
-              String titleCase = p.charAt(0) + p.substring(1).toLowerCase();
+              String titleCase = Character.toUpperCase(p.charAt(0)) + p.substring(1).toLowerCase();
               return java.util.stream.Stream.of(p, titleCase, p.toLowerCase(), "The " + titleCase);
             })
             .distinct()
