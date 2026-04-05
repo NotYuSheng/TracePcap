@@ -225,10 +225,11 @@ export const ConversationPage = () => {
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const base = (data.fileName ?? 'conversations').replace(/\.[^.]+$/, '');
     const src = conversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_');
     const dst = conversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_');
-    const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-    a.download = `conversation_${src}_${dst}_${ts}.csv`;
+    const ts = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+    a.download = `tracepcap_${base}_${src}-${dst}_${ts}.csv`;
     a.href = url;
     a.click();
     URL.revokeObjectURL(url);
@@ -284,11 +285,11 @@ export const ConversationPage = () => {
 
   // CSV export URL
   const exportUrl = conversationService.getExportUrl(fileId, filters);
-  const exportFilename = (() => {
-    const base = (data.fileName ?? 'conversations').replace(/\.[^.]+$/, '');
-    const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-    return `${base}_${ts}.csv`;
-  })();
+  const pcapExportUrl = conversationService.getPcapExportUrl(fileId, filters);
+  const exportBase = (data.fileName ?? 'conversations').replace(/\.[^.]+$/, '');
+  const exportTs = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+  const exportFilename = `tracepcap_${exportBase}_${exportTs}.csv`;
+  const pcapExportFilename = `tracepcap_${exportBase}_${exportTs}.pcap`;
 
   const modalTitle = selectedConversation
     ? `${formatIpPort(selectedConversation.endpoints[0].ip, selectedConversation.endpoints[0].port)} ↔ ${formatIpPort(selectedConversation.endpoints[1].ip, selectedConversation.endpoints[1].port)}`
@@ -307,15 +308,26 @@ export const ConversationPage = () => {
                 ({totalItems.toLocaleString()})
               </span>
             </h4>
-            <a
-              href={exportUrl}
-              download={exportFilename}
-              className="btn btn-sm btn-outline-secondary"
-              title="Export current filtered results as CSV"
-            >
-              <i className="bi bi-download me-1"></i>
-              Export CSV
-            </a>
+            <div className="d-flex gap-2">
+              <a
+                href={exportUrl}
+                download={exportFilename}
+                className="btn btn-sm btn-outline-secondary"
+                title="Export current filtered results as CSV"
+              >
+                <i className="bi bi-download me-1"></i>
+                Export CSV
+              </a>
+              <a
+                href={pcapExportUrl}
+                download={pcapExportFilename}
+                className="btn btn-sm btn-outline-secondary"
+                title="Export current filtered results as PCAP"
+              >
+                <i className="bi bi-download me-1"></i>
+                Export PCAP
+              </a>
+            </div>
           </div>
 
           <ConversationFilterPanel
@@ -431,7 +443,7 @@ export const ConversationPage = () => {
                 </button>
                 <a
                   href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
-                  download
+                  download={`tracepcap_${exportBase}_${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}_${exportTs}.pcap`}
                   className="btn btn-sm btn-outline-secondary ms-2"
                   title="Export this conversation as PCAP"
                 >
@@ -460,6 +472,7 @@ export const ConversationPage = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

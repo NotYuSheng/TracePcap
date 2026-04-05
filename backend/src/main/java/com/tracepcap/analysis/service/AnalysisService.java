@@ -625,7 +625,7 @@ public class AnalysisService {
   }
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
-      java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy_HH-mm-ss")
+      java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
           .withZone(java.time.ZoneId.of("Asia/Singapore"));
 
   private static String buildConversationPcapFilename(ConversationEntity conv) {
@@ -736,6 +736,14 @@ public class AnalysisService {
 
     List<ConversationResponse> conversations = getConversationsForExport(fileId, params);
 
+    List<UUID> conversationIds = conversations.stream()
+        .map(ConversationResponse::getConversationId)
+        .collect(Collectors.toList());
+
+    List<Long> frameNumbers = conversationIds.isEmpty()
+        ? List.of()
+        : packetRepository.findPacketNumbersByConversationIds(conversationIds);
+
     File tempInput = null;
     File tempOutput = null;
     try {
@@ -747,12 +755,16 @@ public class AnalysisService {
       List<String> cmd = new ArrayList<>(
           Arrays.asList("tshark", "-r", tempInput.getAbsolutePath(),
               "-w", tempOutput.getAbsolutePath()));
-      if (!conversations.isEmpty()) {
+      if (!frameNumbers.isEmpty()) {
+        String filter = "frame.number in {"
+            + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
+            + "}";
         cmd.add("-Y");
-        cmd.add(buildPcapDisplayFilter(conversations));
+        cmd.add(filter);
       }
 
-      log.info("Exporting PCAP for fileId={} with {} conversations", fileId, conversations.size());
+      log.info("Exporting PCAP for fileId={} with {} conversations ({} frames)",
+          fileId, conversations.size(), frameNumbers.size());
       ProcessBuilder pb = new ProcessBuilder(cmd);
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
@@ -779,34 +791,6 @@ public class AnalysisService {
    * Builds a tshark display filter expression that matches exactly the given set of conversations.
    * Each conversation contributes one OR-clause matching its 5-tuple.
    */
-  private static String buildPcapDisplayFilter(List<ConversationResponse> conversations) {
-    StringBuilder sb = new StringBuilder();
-    for (ConversationResponse conv : conversations) {
-      if (sb.length() > 0) sb.append(" || ");
-      String srcIp = conv.getSrcIp();
-      String dstIp = conv.getDstIp();
-      // Determine address field per-IP to handle mixed or missing addresses correctly
-      String srcAddrField = (srcIp != null && srcIp.contains(":")) ? "ipv6.src" : "ip.src";
-      String dstAddrField = (dstIp != null && dstIp.contains(":")) ? "ipv6.dst" : "ip.dst";
-      sb.append('(');
-      sb.append('(').append(srcAddrField).append("==").append(srcIp != null ? srcIp : "0.0.0.0")
-        .append(" && ").append(dstAddrField).append("==").append(dstIp != null ? dstIp : "0.0.0.0")
-        .append(')');
-      // Also match the reverse direction
-      sb.append(" || ");
-      sb.append('(').append(srcAddrField.replace(".src", ".dst")).append("==").append(srcIp != null ? srcIp : "0.0.0.0")
-        .append(" && ").append(dstAddrField.replace(".dst", ".src")).append("==").append(dstIp != null ? dstIp : "0.0.0.0")
-        .append(')');
-      if (conv.getSrcPort() != null && conv.getDstPort() != null) {
-        String proto = conv.getProtocol();
-        String portField = "UDP".equalsIgnoreCase(proto) ? "udp.port" : "tcp.port";
-        sb.append(" && ").append(portField).append("==").append(conv.getSrcPort());
-        sb.append(" && ").append(portField).append("==").append(conv.getDstPort());
-      }
-      sb.append(')');
-    }
-    return sb.toString();
-  }
 
   private List<ConversationResponse> mapConversationsWithFileTypes(
       List<ConversationEntity> conversations) {
