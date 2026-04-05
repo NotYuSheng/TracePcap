@@ -103,7 +103,8 @@ public class DeviceClassifierService {
         if (parts.length < 2) continue;
         String oui = parts[0].trim();
         if (oui.contains("/")) continue; // skip /28 and /36 MA-M / MA-S entries
-        mutable.put(oui.toLowerCase(), parts[1].trim());
+        String name = parts.length >= 3 && !parts[2].isBlank() ? parts[2].trim() : parts[1].trim();
+        mutable.put(oui.toLowerCase(), name);
         loaded++;
       }
     } catch (Exception e) {
