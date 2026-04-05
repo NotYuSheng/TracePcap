@@ -121,69 +121,73 @@ public class ReportService {
       document.open();
 
       // ── Sections ──────────────────────────────────────────────────────────
+      // Section counter: increment only for sections that are actually emitted
+      // so numbering stays consecutive even when optional sections are skipped.
+      int sec = 1;
       addCover(document, file);
-      addFileInfo(document, file);
+      addFileInfo(document, file, sec++);
       addExecutiveSummary(
           document, file, analysis, hosts.size(), totalConversations,
-          riskCount, extractedFiles.size(), geoCountries.size());
+          riskCount, extractedFiles.size(), geoCountries.size(), sec++);
 
       if (analysis != null && analysis.getProtocolStats() != null) {
-        addProtocolDistribution(document, analysis.getProtocolStats());
+        addProtocolDistribution(document, analysis.getProtocolStats(), sec++);
       }
 
       if (!categoryStats.isEmpty()) {
-        addCategoryDistribution(document, categoryStats);
+        addCategoryDistribution(document, categoryStats, sec++);
       }
 
       if (!appStats.isEmpty()) {
-        addApplicationsDetected(document, appStats);
+        addApplicationsDetected(document, appStats, sec++);
       }
 
       if (!l7Stats.isEmpty()) {
-        addL7Protocols(document, l7Stats);
+        addL7Protocols(document, l7Stats, sec++);
       }
 
-      addHostInventory(document, hosts);
+      addHostInventory(document, hosts, sec++);
 
       if (!geoCountries.isEmpty()) {
-        addGeoSummary(document, geoCountries);
+        addGeoSummary(document, geoCountries, sec++);
       }
 
       if (!riskTypes.isEmpty() || !customSigs.isEmpty()) {
-        addRiskTypeSummary(document, riskTypes, customSigs);
+        addRiskTypeSummary(document, riskTypes, customSigs, sec++);
       }
 
       if (!riskyConversations.isEmpty()) {
-        addSecurityFindings(document, riskyConversations);
+        addSecurityFindings(document, riskyConversations, sec++);
       }
 
       if (!tlsConversations.isEmpty()) {
-        addTlsAnalysis(document, tlsConversations);
+        addTlsAnalysis(document, tlsConversations, sec++);
       }
 
       if (!httpUserAgents.isEmpty()) {
-        addHttpUserAgents(document, httpUserAgents);
+        addHttpUserAgents(document, httpUserAgents, sec++);
       }
 
       if (!topConversations.isEmpty()) {
-        addTopConversations(document, topConversations);
+        addTopConversations(document, topConversations, sec++);
       }
 
       if (!fileTypes.isEmpty()) {
-        addDetectedFileTypes(document, fileTypes);
+        addDetectedFileTypes(document, fileTypes, sec++);
       }
 
       if (!extractedFiles.isEmpty()) {
-        addExtractedFiles(document, extractedFiles);
+        addExtractedFiles(document, extractedFiles, sec++);
       }
 
-      addTopologyDiagram(document, request.getForceDirectedImage(), "Force-Directed Layout", 16);
-      addTopologyDiagram(document, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", 17);
+      addTopologyDiagram(document, request.getForceDirectedImage(), "Force-Directed Layout", sec++);
+      addTopologyDiagram(document, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++);
 
-      document.close();
     } catch (Exception e) {
       log.error("PDF generation failed for file {}", fileId, e);
       throw new RuntimeException("Report generation failed", e);
+    } finally {
+      document.close();
     }
   }
 
@@ -219,8 +223,8 @@ public class ReportService {
   // Section: File Information
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addFileInfo(Document doc, FileEntity file) throws Exception {
-    addSectionHeader(doc, "1. File Information");
+  private void addFileInfo(Document doc, FileEntity file, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". File Information");
 
     String[][] rows = {
       {"File Name", file.getFileName()},
@@ -246,9 +250,10 @@ public class ReportService {
       long totalConversations,
       long riskCount,
       int extractedCount,
-      int countryCount)
+      int countryCount,
+      int sec)
       throws Exception {
-    addSectionHeader(doc, "2. Executive Summary");
+    addSectionHeader(doc, sec + ". Executive Summary");
 
     String packets = analysis != null && analysis.getPacketCount() != null
         ? String.valueOf(analysis.getPacketCount()) : "—";
@@ -278,9 +283,9 @@ public class ReportService {
   // Section: Protocol Distribution
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addProtocolDistribution(Document doc, Map<String, Object> protocolStats)
+  private void addProtocolDistribution(Document doc, Map<String, Object> protocolStats, int sec)
       throws Exception {
-    addSectionHeader(doc, "3. Protocol Distribution");
+    addSectionHeader(doc, sec + ". Protocol Distribution");
 
     PdfPTable table = new PdfPTable(new float[] {3, 2, 2, 2});
     table.setWidthPercentage(100);
@@ -312,9 +317,9 @@ public class ReportService {
   // Section: Category Distribution
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addCategoryDistribution(Document doc, List<Object[]> categoryStats)
+  private void addCategoryDistribution(Document doc, List<Object[]> categoryStats, int sec)
       throws Exception {
-    addSectionHeader(doc, "4. Traffic Category Distribution");
+    addSectionHeader(doc, sec + ". Traffic Category Distribution");
 
     PdfPTable table = new PdfPTable(new float[] {4, 2});
     table.setWidthPercentage(100);
@@ -335,9 +340,9 @@ public class ReportService {
   // Section: Applications Detected
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addApplicationsDetected(Document doc, List<Object[]> appStats)
+  private void addApplicationsDetected(Document doc, List<Object[]> appStats, int sec)
       throws Exception {
-    addSectionHeader(doc, "5. Applications Detected (" + appStats.size() + ")");
+    addSectionHeader(doc, sec + ". Applications Detected (" + appStats.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {4, 2, 2});
     table.setWidthPercentage(100);
@@ -361,8 +366,8 @@ public class ReportService {
   // Section: L7 Protocols
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addL7Protocols(Document doc, List<Object[]> l7Stats) throws Exception {
-    addSectionHeader(doc, "6. Detected L7 Protocols (" + l7Stats.size() + ")");
+  private void addL7Protocols(Document doc, List<Object[]> l7Stats, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". Detected L7 Protocols (" + l7Stats.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {4, 2, 2});
     table.setWidthPercentage(100);
@@ -386,9 +391,9 @@ public class ReportService {
   // Section: Host Inventory (with supporting evidence)
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addHostInventory(Document doc, List<HostClassificationEntity> hosts)
+  private void addHostInventory(Document doc, List<HostClassificationEntity> hosts, int sec)
       throws Exception {
-    addSectionHeader(doc, "7. Host Inventory (" + hosts.size() + " hosts)");
+    addSectionHeader(doc, sec + ". Host Inventory (" + hosts.size() + " hosts)");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 3, 2, 2, 1, 4});
     table.setWidthPercentage(100);
@@ -486,8 +491,8 @@ public class ReportService {
   // Section: Geo Summary
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addGeoSummary(Document doc, List<Object[]> geoCountries) throws Exception {
-    addSectionHeader(doc, "8. Geographic Distribution (" + geoCountries.size() + " countries)");
+  private void addGeoSummary(Document doc, List<Object[]> geoCountries, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". Geographic Distribution (" + geoCountries.size() + " countries)");
 
     PdfPTable table = new PdfPTable(new float[] {2, 5});
     table.setWidthPercentage(60);
@@ -510,8 +515,8 @@ public class ReportService {
   // ══════════════════════════════════════════════════════════════════════════
 
   private void addRiskTypeSummary(
-      Document doc, List<String> riskTypes, List<String> customSigs) throws Exception {
-    addSectionHeader(doc, "9. Risk & Signature Summary");
+      Document doc, List<String> riskTypes, List<String> customSigs, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". Risk & Signature Summary");
 
     if (!riskTypes.isEmpty()) {
       addSubHeader(doc, "nDPI Flow Risk Types Detected");
@@ -546,9 +551,9 @@ public class ReportService {
   // Section: Security Findings
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addSecurityFindings(Document doc, List<ConversationEntity> risky) throws Exception {
+  private void addSecurityFindings(Document doc, List<ConversationEntity> risky, int sec) throws Exception {
     addSectionHeader(doc,
-        "10. Security Findings (" + risky.size() + " at-risk conversations)");
+        sec + ". Security Findings (" + risky.size() + " at-risk conversations)");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 2, 2, 5});
     table.setWidthPercentage(100);
@@ -576,9 +581,9 @@ public class ReportService {
   // Section: TLS Analysis
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addTlsAnalysis(Document doc, List<ConversationEntity> tlsConvs) throws Exception {
+  private void addTlsAnalysis(Document doc, List<ConversationEntity> tlsConvs, int sec) throws Exception {
     addSectionHeader(doc,
-        "11. TLS / HTTPS Analysis (" + tlsConvs.size() + " encrypted conversations)");
+        sec + ". TLS / HTTPS Analysis (" + tlsConvs.size() + " encrypted conversations)");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 3, 3, 3, 4, 3, 3});
     table.setWidthPercentage(100);
@@ -610,8 +615,8 @@ public class ReportService {
   // Section: HTTP User Agents
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addHttpUserAgents(Document doc, List<String> agents) throws Exception {
-    addSectionHeader(doc, "12. HTTP User Agents (" + agents.size() + " distinct)");
+  private void addHttpUserAgents(Document doc, List<String> agents, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". HTTP User Agents (" + agents.size() + " distinct)");
     doc.add(tagTable(agents));
   }
 
@@ -619,8 +624,8 @@ public class ReportService {
   // Section: Top Conversations
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addTopConversations(Document doc, List<ConversationEntity> convs) throws Exception {
-    addSectionHeader(doc, "13. Top Conversations by Traffic (top " + convs.size() + ")");
+  private void addTopConversations(Document doc, List<ConversationEntity> convs, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". Top Conversations by Traffic (top " + convs.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 3, 3, 2, 2, 2});
     table.setWidthPercentage(100);
@@ -653,8 +658,8 @@ public class ReportService {
   // Section: Detected File Types
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addDetectedFileTypes(Document doc, List<String> fileTypes) throws Exception {
-    addSectionHeader(doc, "14. Detected File Types in Packet Payloads (" + fileTypes.size() + ")");
+  private void addDetectedFileTypes(Document doc, List<String> fileTypes, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". Detected File Types in Packet Payloads (" + fileTypes.size() + ")");
     doc.add(tagTable(fileTypes));
   }
 
@@ -662,8 +667,8 @@ public class ReportService {
   // Section: Extracted Files
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addExtractedFiles(Document doc, List<ExtractedFileEntity> files) throws Exception {
-    addSectionHeader(doc, "15. Extracted Files (" + files.size() + ")");
+  private void addExtractedFiles(Document doc, List<ExtractedFileEntity> files, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". Extracted Files (" + files.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {4, 3, 2, 2, 7});
     table.setWidthPercentage(100);
@@ -717,7 +722,15 @@ public class ReportService {
     float usableW = landscape.getWidth()  - 80f;
     float usableH = landscape.getHeight() - 100f - 21f - 8f - 40f;
 
-    byte[] imageBytes = Base64.getDecoder().decode(base64Image);
+    byte[] imageBytes;
+    try {
+      String data = base64Image.contains(",") ? base64Image.split(",")[1] : base64Image;
+      imageBytes = Base64.getDecoder().decode(data);
+    } catch (IllegalArgumentException e) {
+      log.warn("Invalid base64 image data for layout: {}", layoutName);
+      doc.add(new Paragraph("Invalid diagram image data.", cellFont()));
+      return;
+    }
     Image img = Image.getInstance(imageBytes);
     img.scaleToFit(usableW, usableH);
     img.setAlignment(Image.ALIGN_CENTER);

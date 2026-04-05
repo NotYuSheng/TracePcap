@@ -286,15 +286,24 @@ public class TsharkEnrichmentService {
   }
 
   /**
+   * Generic link/transport labels that can appear at the top of a {@code frame.protocols} stack
+   * when Wireshark cannot dissect further. These are not application-layer identifiers and should
+   * be suppressed, the same way the previous TRANSPORT_LAYER set was used.
+   */
+  private static final Set<String> NON_APP_PROTOCOLS =
+      Set.of("DATA", "FRAME", "ETH", "ETHERNET", "SLL", "RAW");
+
+  /**
    * Returns the upperscased deepest protocol from a {@code frame.protocols} stack (e.g. {@code
    * "eth:ethertype:ip:tcp:http"} → {@code "HTTP"}), or {@code null} when the deepest entry equals
-   * the known L4 transport proto (meaning no application-layer protocol was identified).
+   * the known L4 transport proto or is a non-informative link/frame label.
    */
   static String extractAppLayerProto(String frameProtocols, String l4proto) {
     if (frameProtocols.isEmpty()) return null;
     String[] stack = frameProtocols.split(":");
     String top = stack[stack.length - 1].toUpperCase();
-    return top.equalsIgnoreCase(l4proto) ? null : top;
+    if (top.equalsIgnoreCase(l4proto) || NON_APP_PROTOCOLS.contains(top)) return null;
+    return top;
   }
 
   /** Uppercase and strip a leading "The " article (e.g. "The Netherlands" → "NETHERLANDS"). */

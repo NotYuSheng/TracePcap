@@ -76,6 +76,26 @@ class TsharkEnrichmentServiceTest {
     assertThat(TsharkEnrichmentService.extractAppLayerProto("", "TCP")).isNull();
   }
 
+  @Test
+  void extractAppLayerProto_dataAtTop_returnsNull() {
+    // "data" is a non-informative label Wireshark emits when it cannot dissect further
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:data", "TCP"))
+        .isNull();
+  }
+
+  @Test
+  void extractAppLayerProto_frameAtTop_returnsNull() {
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("frame:eth:ethertype:ip:frame", "TCP"))
+        .isNull();
+  }
+
+  @Test
+  void extractAppLayerProto_sllAtTop_returnsNull() {
+    // SLL (Linux cooked capture) at the top means no app-layer dissection
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("sll:ethertype:ip:tcp:sll", "TCP"))
+        .isNull();
+  }
+
   // --- normalizeL7Protocol ---
 
   @Test
