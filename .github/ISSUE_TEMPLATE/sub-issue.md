@@ -2,11 +2,11 @@
 name: Sub-Issue Template
 about: Use this for tracking sub-tasks under major issues
 title: "[Sub-Issue] "
-labels:
+labels: sub-issue
 assignees: ''
 ---
 
-### Sub-Issue: \[Brief Description of the Sub-Task]
+### Sub-Issue: [Brief Description of the Sub-Task]
 
 **Related to**: #X
 
@@ -14,7 +14,7 @@ assignees: ''
 
 ### What needs to be done
 
-\[Clearly describe the scope and purpose of this sub-issue. If applicable, mention relevant existing code, its limitations, and what the outcome of this sub-issue should achieve.]
+[Clearly describe the scope and purpose of this sub-issue. If applicable, mention relevant existing code, its limitations, and what the outcome of this sub-issue should achieve.]
 
 ---
 
@@ -33,4 +33,4 @@ assignees: ''
 
 ### Why this is needed
 
-\[Explain why the change improves maintainability, reusability, or correctness. Focus on long-term benefits like reducing duplication, simplifying onboarding, or decoupling service responsibilities.]
+[Explain why the change improves maintainability, reusability, or correctness. Focus on long-term benefits like reducing duplication, simplifying onboarding, or decoupling service responsibilities.]
