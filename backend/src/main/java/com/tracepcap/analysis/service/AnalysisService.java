@@ -752,16 +752,21 @@ public class AnalysisService {
 
       storageService.downloadFileToLocal(file.getMinioPath(), tempInput);
 
+      // Always apply a display filter so we never accidentally export the full PCAP.
+      // When no conversations match, frame.number == 0 produces a valid 0-packet output
+      // (real frame numbers start at 1).
+      // NOTE: for very large exports the filter string can approach OS ARG_MAX (~2 MB on Linux);
+      // this is unlikely in practice for filtered exports but may occur for unfiltered bulk exports
+      // of large capture files.
+      String filter = frameNumbers.isEmpty()
+          ? "frame.number == 0"
+          : "frame.number in {"
+              + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
+              + "}";
       List<String> cmd = new ArrayList<>(
           Arrays.asList("tshark", "-r", tempInput.getAbsolutePath(),
+              "-Y", filter,
               "-w", tempOutput.getAbsolutePath()));
-      if (!frameNumbers.isEmpty()) {
-        String filter = "frame.number in {"
-            + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
-            + "}";
-        cmd.add("-Y");
-        cmd.add(filter);
-      }
 
       log.info("Exporting PCAP for fileId={} with {} conversations ({} frames)",
           fileId, conversations.size(), frameNumbers.size());
