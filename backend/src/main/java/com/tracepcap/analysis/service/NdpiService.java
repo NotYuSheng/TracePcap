@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -102,10 +101,6 @@ public class NdpiService {
   /** nDPI prints TLS validity dates as {@code yyyy/MM/dd HH:mm:ss} (UTC). */
   private static final DateTimeFormatter NDPI_DATE_FMT =
       DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
-
-  /** Transport-only names that carry no application-layer signal. */
-  private static final Set<String> SKIP_PROTOCOLS =
-      Set.of("TCP", "UDP", "ICMP", "ICMPv6", "Unknown", "UNKNOWN");
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -254,7 +249,7 @@ public class NdpiService {
     String protoField = m.group(6).trim();
     int dot = protoField.lastIndexOf('.');
     String appName = dot >= 0 ? protoField.substring(dot + 1) : protoField;
-    if (SKIP_PROTOCOLS.contains(appName)) appName = null;
+    if (appName.equalsIgnoreCase(l4proto) || "unknown".equalsIgnoreCase(appName)) appName = null;
     if (appName != null && appName.length() > ConversationEntity.APP_NAME_MAX_LENGTH)
       appName = appName.substring(0, ConversationEntity.APP_NAME_MAX_LENGTH);
 
