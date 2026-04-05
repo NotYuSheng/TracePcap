@@ -30,24 +30,25 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 
 </div>
 
-> [!IMPORTANT]
-> This project is still in **early development**. While functional, it is currently **suboptimal for larger PCAP files** (>100MB). Performance optimizations and scalability improvements are planned for future releases. For best results, use with small to medium-sized capture files.
-
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **PCAP Upload & Management** | Upload and manage PCAP/CAP files (max 512MB) with MinIO object storage |
-| **Network Visualization** | Interactive 3D network topology diagrams showing communication patterns and relationships |
-| **Timeline Analysis** | Chronological view of network events with detailed packet information |
-| **AI Filter Generator** | LLM-powered Wireshark/tcpdump filter generation from natural language queries |
-| **Packet Analysis** | Deep packet inspection with protocol-level analysis using pcap4j |
-| **Conversation Tracking** | Identify and analyze network conversations between hosts with server-side filtering, sorting, and CSV export |
-| **Custom Signature Rules** | YAML-based detection rules matched against IP, CIDR, port, JA3, hostname, app, and protocol fields |
-| **Story Mode** | Narrative reconstruction of network activities and events |
-| **Export Options** | Export analysis results and filters for use in Wireshark or other tools |
-| **Real-time Processing** | Asynchronous analysis with progress tracking |
-| **Multi-protocol Support** | Supports TCP, UDP, ICMP, and various application-layer protocols |
+| **PCAP Upload & Management** | Upload and manage PCAP/PCAPNG/CAP files (max 512MB) with MinIO object storage; duplicate detection and configurable upload limits |
+| **Network Visualization** | Interactive network topology using React Flow + ELK layout with a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, layout controls, and clickable node detail panel |
+| **nDPI Security Detection** | Deep packet inspection via nDPI v5: application identification, traffic categories, risk/alert flags, JA3/JA3S TLS fingerprints, SNI extraction, and TLS certificate metadata per conversation |
+| **Conversation Tracking** | Paginated conversation list with advanced filtering (IP, port, protocol, app, risk, custom rules, device type, country, payload pattern), multi-column sorting, column picker, and bulk PCAP export |
+| **Session Reconstruction** | TCP/UDP application-layer payload decoding with a hex+ASCII viewer for inspecting raw packet payloads |
+| **File Extraction** | HTTP object extraction and raw TCP/UDP stream extraction via Aho-Corasick; automatic MIME type detection; bulk download |
+| **Geolocation & Device Classification** | Country/ASN enrichment for external IPs; automatic device-type prediction (Router, Server, IoT, Mobile, Laptop/Desktop) across all views |
+| **MAC Manufacturer Lookup** | Wireshark OUI database integration for vendor identification from MAC addresses |
+| **Timeline Analysis** | Chronological traffic visualization with configurable time granularity (auto or manual) and protocol breakdown |
+| **AI Filter Generator** | LLM-powered Wireshark/tcpdump filter generation from natural language queries with confidence scores and packet-level results |
+| **Story Mode** | AI-generated narrative reconstruction of network activities with an interactive LLM Q&A chat, custom context input, and story timeline |
+| **Custom Signature Rules** | YAML-based detection rules matched against IP, CIDR, port, JA3, hostname, app, and protocol fields; live-reloaded without restart |
+| **Export Options** | PDF report (with live topology capture), per-conversation PCAP, bulk PCAP export, and CSV export |
+| **Real-time Processing** | Asynchronous analysis with detailed progress tracking |
+| **Multi-protocol Support** | TCP, UDP, ICMP, and application-layer protocols including TLS, HTTP, DNS, QUIC, and L2 protocols (ARP, STP, LLDP, CDP) |
 
 ## Quick Start
 
@@ -103,17 +104,19 @@ Open **http://localhost:80** in your browser.
 
 ### Basic Workflow
 
-1. **Upload** - Navigate to the Upload page and drag-and-drop your PCAP file or click to browse
-2. **Analyze** - File is automatically processed and analyzed for network patterns
-3. **Visualize** - View interactive 3D network topology showing hosts and communication flows
-4. **Timeline** - Explore packet-level details in chronological order
-5. **Conversations** - Review network conversations between specific endpoints
-6. **Generate Filters** - Use AI to create Wireshark filters from natural language (e.g., "show all HTTP traffic from 192.168.1.1")
-7. **Export** - Apply generated filters in Wireshark or save analysis results
+1. **Upload** — Drag-and-drop a PCAP/PCAPNG file; optionally enable nDPI analysis and file extraction before uploading
+2. **Analyze** — File is processed asynchronously with a detailed progress view
+3. **Overview** — Review detected applications, protocols, risk alerts, and custom signature matches
+4. **Visualize** — Explore the interactive network topology with filters, layout controls, and node detail panels
+5. **Conversations** — Review flows with advanced filtering, session reconstruction, and payload inspection
+6. **Story Mode** — Read the AI-generated narrative and ask follow-up questions via LLM chat
+7. **Extracted Files** — Browse and download files recovered from HTTP responses and raw streams
+8. **Generate Filters** — Use AI to create Wireshark/tcpdump filters from natural language (e.g., "show all TLS traffic to external IPs")
+9. **Export** — Download a PDF report, per-conversation or bulk PCAP, or CSV
 
 ### Supported File Formats
 
-PCAP, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
+PCAP, PCAPNG, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
 
 ## Tech Stack
 
@@ -122,9 +125,9 @@ PCAP, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
 | **Backend** | Spring Boot 3.2.1, Java 21, Maven, Lombok, MapStruct |
 | **Architecture** | Layered architecture (Controller → Service → Repository → Database) |
 | **Frontend** | React 19, Vite, TypeScript, Lucide Icons, SGDS React |
-| **Visualization** | D3.js, reagraph (3D network graphs), Recharts |
+| **Visualization** | React Flow + ELK (network topology), Recharts, D3.js |
 | **Reverse Proxy** | Nginx |
-| **Packet Parsing** | pcap4j 1.8.2 |
+| **Packet Parsing** | tshark / Wireshark, nDPI v5 (deep packet inspection) |
 | **Database** | PostgreSQL 15 with Flyway migrations |
 | **Object Storage** | MinIO (S3-compatible) |
 | **Containerization** | Docker, Docker Compose |
