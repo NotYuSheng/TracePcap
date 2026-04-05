@@ -39,43 +39,6 @@ public class TsharkEnrichmentService {
 
   private static final String TSHARK_BINARY = "tshark";
 
-  /**
-   * Transport / link-layer protocol names that carry no application-layer signal. When a flow's
-   * packets only produce these labels we still record the most common one as tsharkProtocol, but we
-   * do not promote it to appName if nDPI already has a value.
-   */
-  private static final Set<String> TRANSPORT_LAYER =
-      Set.of(
-          "TCP",
-          "UDP",
-          "ICMP",
-          "ICMPV6",
-          "GRE",
-          "ESP",
-          "AH",
-          "SCTP",
-          "OSPF",
-          "PIM",
-          "VRRP",
-          "IGMP",
-          "IGMPV2",
-          "IGMPV3",
-          "ETHERNET",
-          "ETH",
-          "ARP",
-          "IPV4",
-          "IPV6",
-          "VLAN",
-          "LLC",
-          "STP",
-          "RSTP",
-          "CDP",
-          "LLDP",
-          "SLL",
-          "DATA",
-          "FRAME",
-          "RAW");
-
   /** ip.proto number → transport protocol name. */
   private static final Map<String, String> IP_PROTO =
       Map.ofEntries(
@@ -152,7 +115,7 @@ public class TsharkEnrichmentService {
    * for every packet in the file.
    *
    * <p>Field order (0-indexed): 0=ip.src, 1=ip.dst, 2=ipv6.src, 3=ipv6.dst, 4=tcp.srcport,
-   * 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport, 8=ip.proto, 9=ipv6.nxt, 10=_ws.col.Protocol,
+   * 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport, 8=ip.proto, 9=ipv6.nxt, 10=frame.protocols,
    * 11=http.user_agent
    */
   private void runTshark(
@@ -190,7 +153,7 @@ public class TsharkEnrichmentService {
             "-e",
             "ipv6.nxt",
             "-e",
-            "_ws.col.Protocol",
+            "frame.protocols",
             "-e",
             "http.user_agent");
     pb.redirectErrorStream(false);
@@ -237,7 +200,7 @@ public class TsharkEnrichmentService {
    *
    * <p>Field order matches the {@code -e} arguments above (0-indexed): 0=ip.src, 1=ip.dst,
    * 2=ipv6.src, 3=ipv6.dst, 4=tcp.srcport, 5=tcp.dstport, 6=udp.srcport, 7=udp.dstport, 8=ip.proto,
-   * 9=ipv6.nxt, 10=_ws.col.Protocol, 11=http.user_agent
+   * 9=ipv6.nxt, 10=frame.protocols, 11=http.user_agent
    */
   private void parseLine(
       String line,
@@ -261,17 +224,22 @@ public class TsharkEnrichmentService {
     String proto =
         IP_PROTO.getOrDefault(protoNum, protoNum.isEmpty() ? "UNKNOWN" : protoNum.toUpperCase());
 
-    String displayProto = f[10].trim();
-    if (!displayProto.isEmpty()) {
-      // Use a canonical (direction-independent) key so both A→B and B→A packets merge
-      String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
-      flowFreq.computeIfAbsent(key, k -> new HashMap<>()).merge(displayProto, 1, Integer::sum);
+    String frameProtocols = f[10].trim();
+    if (!frameProtocols.isEmpty()) {
+      // Take the deepest protocol in the stack — the highest OSI layer Wireshark recognised.
+      // Skip if it equals the transport-layer proto: those packets carry no app-layer signal.
+      String topProto = extractAppLayerProto(frameProtocols, proto);
+      if (topProto != null) {
+        // Use a canonical (direction-independent) key so both A→B and B→A packets merge
+        String key = canonicalKey(srcIp, srcPort, dstIp, dstPort, proto);
+        flowFreq.computeIfAbsent(key, k -> new HashMap<>()).merge(topProto, 1, Integer::sum);
 
-      // Portless fallback (ICMP, OSPF, GRE, etc.)
-      if (srcPort == null && dstPort == null) {
-        ipPairFreq
-            .computeIfAbsent(ipPairKey(srcIp, dstIp), k -> new HashMap<>())
-            .merge(displayProto, 1, Integer::sum);
+        // Portless fallback (ICMP, OSPF, GRE, etc.)
+        if (srcPort == null && dstPort == null) {
+          ipPairFreq
+              .computeIfAbsent(ipPairKey(srcIp, dstIp), k -> new HashMap<>())
+              .merge(topProto, 1, Integer::sum);
+        }
       }
     }
 
@@ -304,25 +272,38 @@ public class TsharkEnrichmentService {
   }
 
   /**
-   * Returns the most frequently seen application-layer protocol in the map. If all entries are
-   * transport/link-layer names, returns the most common one instead.
+   * Returns the most frequently seen application-layer protocol in the map. The map only contains
+   * app-layer labels — transport-layer entries are excluded in {@link #parseLine} by comparing
+   * against the known L4 proto.
    */
   private String selectBestProtocol(Map<String, Integer> freq) {
-    // Prefer anything that isn't a bare transport/link-layer name
-    String appLevel =
-        freq.entrySet().stream()
-            .filter(e -> !TRANSPORT_LAYER.contains(e.getKey().toUpperCase()))
-            .max(Map.Entry.comparingByValue())
-            .map(Map.Entry::getKey)
-            .orElse(null);
-    String result = appLevel != null ? appLevel
-        : freq.entrySet().stream()
-            .max(Map.Entry.comparingByValue())
-            .map(Map.Entry::getKey)
-            .orElse(null);
     // Normalise at storage time so the DB always holds clean values and
     // downstream queries can use a plain equality/IN predicate.
-    return result != null ? normalizeL7Protocol(result) : null;
+    return freq.entrySet().stream()
+        .max(Map.Entry.comparingByValue())
+        .map(e -> normalizeL7Protocol(e.getKey()))
+        .orElse(null);
+  }
+
+  /**
+   * Generic link/transport labels that can appear at the top of a {@code frame.protocols} stack
+   * when Wireshark cannot dissect further. These are not application-layer identifiers and should
+   * be suppressed, the same way the previous TRANSPORT_LAYER set was used.
+   */
+  private static final Set<String> NON_APP_PROTOCOLS =
+      Set.of("DATA", "FRAME", "ETH", "ETHERNET", "SLL", "RAW");
+
+  /**
+   * Returns the upperscased deepest protocol from a {@code frame.protocols} stack (e.g. {@code
+   * "eth:ethertype:ip:tcp:http"} → {@code "HTTP"}), or {@code null} when the deepest entry equals
+   * the known L4 transport proto or is a non-informative link/frame label.
+   */
+  static String extractAppLayerProto(String frameProtocols, String l4proto) {
+    if (frameProtocols.isEmpty()) return null;
+    String[] stack = frameProtocols.split(":");
+    String top = stack[stack.length - 1].toUpperCase();
+    if (top.equalsIgnoreCase(l4proto) || NON_APP_PROTOCOLS.contains(top)) return null;
+    return top;
   }
 
   /** Uppercase and strip a leading "The " article (e.g. "The Netherlands" → "NETHERLANDS"). */

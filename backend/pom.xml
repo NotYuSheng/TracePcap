@@ -134,6 +134,13 @@
             <artifactId>tika-core</artifactId>
             <version>2.9.2</version>
         </dependency>
+
+        <!-- PDF report generation -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.30</version>
+        </dependency>
     </dependencies>
 
     <build>
