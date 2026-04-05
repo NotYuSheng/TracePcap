@@ -101,10 +101,21 @@ public class DeviceClassifierService {
         if (line.startsWith("#") || line.isBlank()) continue;
         String[] parts = line.split("\t", 3);
         if (parts.length < 2) continue;
-        String oui = parts[0].trim();
-        if (oui.contains("/")) continue; // skip /28 and /36 MA-M / MA-S entries
-        String name = parts.length >= 3 && !parts[2].isBlank() ? parts[2].trim() : parts[1].trim();
-        mutable.put(oui.toLowerCase(), name);
+        String rawOui = parts[0].trim();
+        if (rawOui.contains("/")) continue; // skip /28 and /36 MA-M / MA-S entries
+        String oui = ouiKey(rawOui);
+        if (oui == null) continue;
+
+        String name = (parts.length >= 3 && !parts[2].isBlank() && !parts[2].trim().startsWith("#"))
+            ? parts[2] : parts[1];
+        int hashIdx = name.indexOf('#');
+        if (hashIdx != -1) name = name.substring(0, hashIdx);
+        name = name.trim();
+
+        if (name.isEmpty()) continue;
+        if (name.length() > 100) name = name.substring(0, 100);
+
+        mutable.put(oui, name);
         loaded++;
       }
     } catch (Exception e) {
