@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -36,6 +36,8 @@ interface NetworkGraphProps {
   onNodeClick?: (node: GraphNode) => void;
   layoutType?: 'forceDirected2d' | 'hierarchicalTd';
   onLayoutChange?: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
+  /** Called once after ELK layout completes and ReactFlow has painted. */
+  onLayoutComplete?: () => void;
 }
 
 interface FlowNodeData extends Record<string, unknown> {
@@ -338,6 +340,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onNodeClick,
   layoutType = 'forceDirected2d',
   onLayoutChange,
+  onLayoutComplete,
 }: NetworkGraphProps) {
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
@@ -383,6 +386,20 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     return () => { active = false; };
   }, [visibleNodes, edges, layoutType]);
+
+  // Signal the caller once the layout has been computed and painted.
+  // Works for both the normal case (rfNodes set after ELK) and the empty-data
+  // case (visibleNodes.length === 0, layouting never becomes true).
+  const onLayoutCompleteRef = useRef(onLayoutComplete);
+  useEffect(() => { onLayoutCompleteRef.current = onLayoutComplete; });
+
+  useEffect(() => {
+    const idle =
+      !layouting && (rfNodes.length > 0 || visibleNodes.length === 0);
+    if (!idle) return;
+    const id = requestAnimationFrame(() => onLayoutCompleteRef.current?.());
+    return () => cancelAnimationFrame(id);
+  }, [layouting, rfNodes.length, visibleNodes.length]);
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (!onNodeClick) return;

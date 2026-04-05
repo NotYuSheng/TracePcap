@@ -691,20 +691,47 @@ public class ReportService {
 
   private void addTopologyDiagram(
       Document doc, String base64Image, String layoutName, int sectionNum) throws Exception {
-    addSectionHeader(doc, sectionNum + ". Network Topology — " + layoutName);
+
+    // Each topology diagram gets its own full landscape page.
+    // Use an explicit Rectangle rather than rotate() so the size is applied
+    // unambiguously regardless of the previous page's orientation.
+    Rectangle landscape = new Rectangle(PageSize.A4.getHeight(), PageSize.A4.getWidth());
+    doc.setPageSize(landscape);
+    doc.newPage();
+
+    // Compact title — avoids the ~50pt overhead of the banner-style section
+    // header so the image fits on the same page without shrinking.
+    Font titleFont = new Font(Font.HELVETICA, 11, Font.BOLD, C_HEADER_BG);
+    Paragraph title = new Paragraph(sectionNum + ". Network Topology — " + layoutName, titleFont);
+    title.setSpacingBefore(4);
+    title.setSpacingAfter(6);
+    doc.add(title);
 
     if (base64Image == null || base64Image.isBlank()) {
       doc.add(new Paragraph("Diagram image not provided.", cellFont()));
       return;
     }
 
+    // Usable area: landscape height minus top+bottom margins (100), title (21),
+    // image spacingBefore (8), and disclaimer with its spacing (40).
+    float usableW = landscape.getWidth()  - 80f;
+    float usableH = landscape.getHeight() - 100f - 21f - 8f - 40f;
+
     byte[] imageBytes = Base64.getDecoder().decode(base64Image);
     Image img = Image.getInstance(imageBytes);
-    img.scaleToFit(510, 330);
+    img.scaleToFit(usableW, usableH);
     img.setAlignment(Image.ALIGN_CENTER);
     img.setSpacingBefore(8);
-    img.setSpacingAfter(10);
     doc.add(img);
+
+    Font disclaimerFont = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(120, 120, 120));
+    Paragraph disclaimer = new Paragraph(
+        "Note: This diagram is automatically generated and may not render all connections accurately for large or complex network captures. "
+        + "For a complete view, consider taking a manual screenshot from the Network Diagram page.",
+        disclaimerFont);
+    disclaimer.setAlignment(Element.ALIGN_CENTER);
+    disclaimer.setSpacingBefore(6);
+    doc.add(disclaimer);
   }
 
   // ══════════════════════════════════════════════════════════════════════════

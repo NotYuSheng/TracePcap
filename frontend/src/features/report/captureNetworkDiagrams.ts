@@ -1,376 +1,142 @@
 /**
- * Renders both ELK network diagram layouts (force-directed + hierarchical) to
- * base64-encoded PNG strings suitable for embedding in a PDF report.
+ * Captures both ELK network diagram layouts by rendering the real NetworkGraph
+ * React component into a visible-but-covered container and screenshotting it
+ * with html-to-image.
  *
- * Uses the exact same ELK options, colour logic, and data pipeline as
- * NetworkGraph.tsx — no html2canvas, no browser screenshot, no timing hacks.
+ * Why html-to-image (not html2canvas):
+ *   html2canvas does not reliably capture SVG elements, and ReactFlow renders
+ *   all edges as SVG.  html-to-image uses SVG foreignObject serialisation which
+ *   handles the ReactFlow SVG+HTML mix correctly.
+ *
+ * Why skipFonts:true:
+ *   html-to-image re-fetches every @font-face file to embed it inline.  The
+ *   Bootstrap Icons font is bundled by Vite with hashed asset URLs that fail
+ *   when re-fetched (CORS / wrong origin).  Skipping font embedding lets the
+ *   capture succeed; node-type icons inside the circles will be blank glyphs,
+ *   but all topology edges, labels and colours are preserved.
+ *
+ * Why visible container + overlay:
+ *   Both html-to-image and html2canvas respect CSS opacity.  Using opacity:0
+ *   produces a fully transparent PNG.  Instead the container sits at z-index
+ *   9999 (fully opaque, fully painted) while a solid white overlay at z-index
+ *   10000 hides it from the user.  html-to-image targets the container element
+ *   directly and ignores the overlay above it.
  */
 
-import ELK from 'elkjs';
-import type { Node, Edge } from '@xyflow/react';
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { toPng } from 'html-to-image';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { networkService } from '@/features/network/services/networkService';
-import { getProtocolColor } from '@/features/network/constants';
-import { NODE_TYPE_COLORS } from '@/features/network/constants';
-import { deviceTypeColor } from '@/utils/deviceType';
+import { NetworkGraph } from '@/components/network/NetworkGraph/NetworkGraph';
+import { CONVERSATION_LIMIT_ENABLED } from '@/features/network/hooks/useNetworkData';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import type { AnalysisSummary } from '@/types';
 
-// ── constants matching NetworkGraph.tsx ──────────────────────────────────────
+// Match the same conversation cap the Network Diagram page uses so the report
+// shows identical edges.  If the env flag disables the limit, capture all.
+const MAX_CONVERSATIONS = CONVERSATION_LIMIT_ENABLED ? 500 : Infinity;
+const CAPTURE_W = 1400;
+const CAPTURE_H = 860;
 
-const NODE_W = 56;
-const NODE_H = 56;
-const MAX_CONVERSATIONS = 500;
+let captureSeq = 0;
 
-const ELK_OPTIONS: Record<string, Record<string, string>> = {
-  hierarchicalTd: {
-    'elk.algorithm': 'layered',
-    'elk.direction': 'DOWN',
-    'elk.separateConnectedComponents': 'true',
-    'elk.spacing.componentComponent': '80',
-    'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-    'elk.spacing.nodeNode': '40',
-    'elk.edgeRouting': 'SPLINES',
-  },
-  forceDirected2d: {
-    'elk.algorithm': 'org.eclipse.elk.force',
-    'elk.separateConnectedComponents': 'true',
-    'elk.spacing.nodeNode': '80',
-    'elk.force.iterations': '500',
-    'elk.force.repulsion': '5.0',
-  },
-};
-
-const SPECIFIC_NODE_TYPES = new Set([
-  'dns-server', 'web-server', 'ssh-server', 'ftp-server',
-  'mail-server', 'dhcp-server', 'ntp-server', 'database-server', 'router',
-]);
-
-const elk = new ELK();
-
-// ── colour helpers (mirrors NetworkGraph.tsx) ────────────────────────────────
-
-function getNodeColor(nodeData: {
-  role: string;
-  isAnomaly: boolean;
-  nodeType?: string;
-  deviceType?: string;
-}): string {
-  if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
-  if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
-    return NODE_TYPE_COLORS[nodeData.nodeType];
-  if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
-    return deviceTypeColor(nodeData.deviceType);
-  if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType])
-    return NODE_TYPE_COLORS[nodeData.nodeType];
-  switch (nodeData.role) {
-    case 'server': return '#2ecc71';
-    case 'both':   return '#9b59b6';
-    default:       return '#95a5a6';
-  }
-}
-
-// ── dedup + offset (mirrors NetworkGraph.tsx) ─────────────────────────────────
-
-function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
-  const groups = new Map<string, GraphEdge[]>();
-  for (const e of edges) {
-    const appOrProto = (e.data.appName ?? e.data.protocol).toLowerCase();
-    const key = `${e.source}\0${e.target}\0${appOrProto}`;
-    const g = groups.get(key) ?? [];
-    g.push(e);
-    groups.set(key, g);
-  }
-  const result: GraphEdge[] = [];
-  for (const group of groups.values()) {
-    if (group.length === 1) { result.push(group[0]); continue; }
-    const dominant = group.reduce((best, e) =>
-      e.data.packetCount > best.data.packetCount ? e : best);
-    const totalPackets = group.reduce((s, e) => s + e.data.packetCount, 0);
-    const totalBytes   = group.reduce((s, e) => s + e.data.totalBytes,  0);
-    const raw = dominant.data.appName ?? dominant.data.protocol;
-    const displayName = raw.charAt(0).toUpperCase() + raw.slice(1);
-    result.push({
-      ...dominant,
-      id: group.map(e => e.id).join('|'),
-      label: `${displayName} (${totalPackets})`,
-      data: { ...dominant.data, packetCount: totalPackets, totalBytes },
-    });
-  }
-  return result;
-}
-
-function assignEdgeOffsets(edges: GraphEdge[]): Map<string, number> {
-  const groups = new Map<string, GraphEdge[]>();
-  for (const e of edges) {
-    const key = [e.source, e.target].sort().join('\0');
-    const g = groups.get(key) ?? [];
-    g.push(e);
-    groups.set(key, g);
-  }
-  const offsetMap = new Map<string, number>();
-  for (const group of groups.values()) {
-    if (group.length === 1) { offsetMap.set(group[0].id, 0); continue; }
-    const step = 20;
-    const mid  = (group.length - 1) / 2;
-    group.forEach((e, i) => offsetMap.set(e.id, (i - mid) * step));
-  }
-  return offsetMap;
-}
-
-// ── ELK layout (mirrors computeLayout in NetworkGraph.tsx) ───────────────────
-
-interface LayoutResult {
-  rfNodes: Node[];
-  rfEdges: Edge[];
-}
-
-async function computeLayout(
+async function captureLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
   layoutType: 'forceDirected2d' | 'hierarchicalTd',
-): Promise<LayoutResult> {
-  // For hierarchical, drop unconnected nodes (same as NetworkGraph.tsx)
-  let visibleNodes = nodes;
-  if (layoutType === 'hierarchicalTd') {
-    const connected = new Set(edges.flatMap(e => [e.source, e.target]));
-    visibleNodes = nodes.filter(n => connected.has(n.id));
-  }
-
-  const dedupedEdges = deduplicateEdges(edges);
-  const offsetMap    = assignEdgeOffsets(dedupedEdges);
-
-  const graph = await elk.layout({
-    id: 'root',
-    layoutOptions: ELK_OPTIONS[layoutType],
-    children: visibleNodes.map(n => ({ id: n.id, width: NODE_W, height: NODE_H })),
-    edges: dedupedEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
-  });
-
-  const posMap = new Map(
-    (graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]),
-  );
-
-  const rfNodes: Node[] = visibleNodes.map(n => ({
-    id: n.id,
-    type: 'networkNode',
-    position: posMap.get(n.id) ?? { x: 0, y: 0 },
-    data: {
-      label: n.label,
-      color: getNodeColor(n.data),
-    },
-    width: NODE_W,
-    height: NODE_H,
-  }));
-
-  const rfEdges: Edge[] = dedupedEdges.map(e => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    data: { label: e.label ?? '', offset: offsetMap.get(e.id) ?? 0 },
-    style: { stroke: getProtocolColor(e.data.protocol), strokeWidth: 1.5 },
-  }));
-
-  return { rfNodes, rfEdges };
-}
-
-// ── SVG renderer ──────────────────────────────────────────────────────────────
-
-const SVG_W = 1400;
-const SVG_H = 860;
-const TITLE_H = 36;
-const PADDING = 55;
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function layoutToSvg(
-  { rfNodes, rfEdges }: LayoutResult,
-  title: string,
-): string {
-  if (rfNodes.length === 0) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${SVG_W}" height="${SVG_H}">
-      <rect width="${SVG_W}" height="${SVG_H}" fill="#f8fafc"/>
-      <rect width="${SVG_W}" height="${TITLE_H}" fill="#1e40af"/>
-      <text x="14" y="24" font-size="15" font-weight="bold" fill="white"
-            font-family="Arial,Helvetica,sans-serif">${esc(title)}</text>
-      <text x="${SVG_W / 2}" y="${SVG_H / 2}" text-anchor="middle"
-            font-size="16" fill="#94a3b8" font-family="Arial,Helvetica,sans-serif">
-        No network data available
-      </text>
-    </svg>`;
-  }
-
-  // Bounding box
-  const xs = rfNodes.map(n => n.position.x);
-  const ys = rfNodes.map(n => n.position.y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  const maxX = Math.max(...xs) + NODE_W;
-  const maxY = Math.max(...ys) + NODE_H;
-  const contentW = maxX - minX || 1;
-  const contentH = maxY - minY || 1;
-
-  const availW = SVG_W - 2 * PADDING;
-  const availH = SVG_H - TITLE_H - 2 * PADDING;
-  const scale = Math.min(availW / contentW, availH / contentH);
-
-  const tx = (x: number) => PADDING + (x - minX) * scale;
-  const ty = (y: number) => TITLE_H + PADDING + (y - minY) * scale;
-  const cx = (x: number) => tx(x) + (NODE_W * scale) / 2;
-  const cy = (y: number) => ty(y) + (NODE_H * scale) / 2;
-
-  const nodePos = new Map(rfNodes.map(n => [n.id, n.position]));
-
-  const parts: string[] = [];
-
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${SVG_W}" height="${SVG_H}">`);
-  parts.push(`<rect width="${SVG_W}" height="${SVG_H}" fill="#f8fafc"/>`);
-
-  // Subtle dot grid
-  parts.push(`<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-    <circle cx="10" cy="10" r="0.8" fill="#cbd5e1"/>
-  </pattern>
-  <rect x="0" y="${TITLE_H}" width="${SVG_W}" height="${SVG_H - TITLE_H}" fill="url(#grid)"/>`);
-
-  // ── Edges ────────────────────────────────────────────────────────────────
-  for (const edge of rfEdges) {
-    const sp = nodePos.get(edge.source);
-    const tp = nodePos.get(edge.target);
-    if (!sp || !tp) continue;
-
-    const sx = cx(sp.x);
-    const sy = cy(sp.y);
-    const ex = cx(tp.x);
-    const ey = cy(tp.y);
-    const offset = (edge.data as { offset?: number }).offset ?? 0;
-    const color  = (edge.style?.stroke as string) ?? '#95a5a6';
-    const label  = (edge.data as { label?: string }).label ?? '';
-
-    // Perpendicular offset (same math as NetworkEdge component)
-    const canonicalDir = sx < ex || (sx === ex && sy <= ey);
-    const cdx = canonicalDir ? ex - sx : sx - ex;
-    const cdy = canonicalDir ? ey - sy : sy - ey;
-    const len = Math.sqrt(cdx * cdx + cdy * cdy) || 1;
-    const px = (-cdy / len) * offset;
-    const py = ( cdx / len) * offset;
-
-    const x1 = sx + px; const y1 = sy + py;
-    const x2 = ex + px; const y2 = ey + py;
-
-    // Line
-    parts.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}"
-      x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-      stroke="${esc(color)}" stroke-width="1.5" opacity="0.75"/>`);
-
-    // Arrowhead at midpoint
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-    parts.push(`<polygon points="-5,-3 5,0 -5,3"
-      transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${angle.toFixed(1)})"
-      fill="${esc(color)}" opacity="0.85"/>`);
-
-    // Label (only if non-trivial)
-    if (label && label.length < 40) {
-      const lx = x1 + (x2 - x1) * 0.3;
-      const ly = y1 + (y2 - y1) * 0.3 - 4;
-      const tw = Math.min(label.length * 5.5, 100);
-      parts.push(
-        `<rect x="${(lx - tw / 2).toFixed(1)}" y="${(ly - 9).toFixed(1)}"
-          width="${tw.toFixed(1)}" height="12" rx="2"
-          fill="white" fill-opacity="0.85"/>`,
-        `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
-          text-anchor="middle" font-size="7.5" fill="#444"
-          font-family="Arial,Helvetica,sans-serif">${esc(label)}</text>`,
-      );
-    }
-  }
-
-  // ── Nodes ────────────────────────────────────────────────────────────────
-  const nodeR = Math.max(18, Math.min(28, (NODE_W * scale) / 2 - 2));
-
-  for (const node of rfNodes) {
-    const color = (node.data as { color?: string }).color ?? '#95a5a6';
-    const label = (node.data as { label?: string }).label ?? node.id;
-    const ncx   = cx(node.position.x);
-    const ncy   = cy(node.position.y);
-
-    // Outer circle with device-type colour
-    parts.push(`<circle cx="${ncx.toFixed(1)}" cy="${ncy.toFixed(1)}"
-      r="${nodeR}"
-      fill="${esc(color)}" fill-opacity="0.15"
-      stroke="${esc(color)}" stroke-width="2.5"/>`);
-
-    // Label lines (split at '\n' if present, or truncate)
-    const labelLines = label.includes('\n')
-      ? label.split('\n')
-      : [label];
-    const firstLine = labelLines[0] ?? '';
-    const secondLine = labelLines[1] ?? '';
-
-    const fontSize = Math.max(6, Math.min(9, (nodeR * 0.55)));
-
-    // Primary label inside circle
-    parts.push(`<text x="${ncx.toFixed(1)}" y="${(ncy + fontSize * 0.35).toFixed(1)}"
-      text-anchor="middle" font-size="${fontSize.toFixed(1)}"
-      fill="${esc(color)}" font-weight="bold"
-      font-family="'Courier New',monospace">${esc(firstLine)}</text>`);
-
-    // Secondary line below circle
-    if (secondLine) {
-      parts.push(`<text x="${ncx.toFixed(1)}" y="${(ncy + nodeR + 12).toFixed(1)}"
-        text-anchor="middle" font-size="7.5" fill="#64748b"
-        font-family="Arial,Helvetica,sans-serif">${esc(secondLine)}</text>`);
-    } else {
-      // Show node.id (IP) if label doesn't already include it
-      const ip = node.id;
-      if (ip !== label) {
-        parts.push(`<text x="${ncx.toFixed(1)}" y="${(ncy + nodeR + 12).toFixed(1)}"
-          text-anchor="middle" font-size="7.5" fill="#64748b"
-          font-family="'Courier New',monospace">${esc(ip)}</text>`);
-      }
-    }
-  }
-
-  // ── Title bar ────────────────────────────────────────────────────────────
-  parts.push(`<rect width="${SVG_W}" height="${TITLE_H}" fill="#1e40af"/>`);
-  parts.push(`<text x="14" y="24" font-size="14" font-weight="bold" fill="white"
-    font-family="Arial,Helvetica,sans-serif">${esc(title)}</text>`);
-  parts.push(`<text x="${SVG_W - 14}" y="24" font-size="11" fill="#93c5fd"
-    text-anchor="end" font-family="Arial,Helvetica,sans-serif">
-    ${rfNodes.length} nodes · ${rfEdges.length} connections
-  </text>`);
-
-  parts.push('</svg>');
-  return parts.join('\n');
-}
-
-// ── SVG → base64 PNG via Canvas ───────────────────────────────────────────────
-
-function svgToBase64Png(svgStr: string): Promise<string> {
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const img  = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width  = SVG_W;
-      canvas.height = SVG_H;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(0, 0, SVG_W, SVG_H);
-      ctx.drawImage(img, 0, 0, SVG_W, SVG_H);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/png').split(',')[1]);
+    const id = `__nr-capture-${++captureSeq}`;
+
+    // Solid white overlay — hides the container from the user while it renders.
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;z-index:10000;background:#fff;pointer-events:none';
+
+    // Capture container — on-screen, fully opaque so the capture library gets
+    // real pixels.  Covered by the overlay above.
+    const container = document.createElement('div');
+    container.id = id;
+    container.style.cssText = [
+      'position:fixed',
+      'top:0',
+      'left:0',
+      `width:${CAPTURE_W}px`,
+      `height:${CAPTURE_H}px`,
+      'z-index:9999',
+      'overflow:hidden',
+      'background:#fff',
+    ].join(';');
+
+    // Override the component's 70vh height so it fills the capture area.
+    const styleEl = document.createElement('style');
+    styleEl.textContent =
+      `#${id} .network-graph-container { height:${CAPTURE_H}px !important; }`;
+
+    document.head.appendChild(styleEl);
+    document.body.appendChild(overlay);
+    document.body.appendChild(container);
+
+    const root = createRoot(container);
+    let done = false;
+
+    const cleanup = () => {
+      root.unmount();
+      container.remove();
+      overlay.remove();
+      styleEl.remove();
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG→PNG failed')); };
-    img.src = url;
+
+    const handleLayoutComplete = () => {
+      if (done) return;
+      done = true;
+
+      // Wait for ReactFlow to fully settle: fitView, edge routing and any
+      // internal async paint passes all need to complete before we snapshot.
+      // rAFs alone are not enough for force-directed layouts with many edges —
+      // a short setTimeout gives the browser time to finish all pending work.
+      setTimeout(() =>
+        requestAnimationFrame(async () => {
+          try {
+            const dataUrl = await toPng(container, {
+              width: CAPTURE_W,
+              height: CAPTURE_H,
+              pixelRatio: 6,
+              // Skip re-fetching web fonts (Bootstrap Icons) — those fetches
+              // fail when Vite-bundled with hashed asset URLs.  Edge lines,
+              // labels and colours are all captured; only icon glyphs are
+              // absent.
+              skipFonts: true,
+            });
+            cleanup();
+            resolve(dataUrl.split(',')[1]);
+          } catch (err) {
+            console.error('[captureNetworkDiagrams] toPng failed:', err);
+            cleanup();
+            reject(err);
+          }
+        })
+      , 500);
+    };
+
+    root.render(
+      createElement(NetworkGraph, {
+        nodes,
+        edges,
+        layoutType,
+        onLayoutComplete: handleLayoutComplete,
+      }),
+    );
+
+    // Safety valve — 30 s should be ample even for large captures.
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        cleanup();
+        reject(new Error(`Network diagram capture timed out (${layoutType})`));
+      }
+    }, 30_000);
   });
 }
 
@@ -385,7 +151,6 @@ export async function captureNetworkDiagrams(
   fileId: string,
   analysisSummary?: AnalysisSummary,
 ): Promise<DiagramImages> {
-  // 1. Fetch conversation + host data (same as useNetworkData)
   const response = await conversationService.getConversations(fileId, {
     ip: '', port: '', payloadContains: '',
     protocols: [], l7Protocols: [], apps: [], categories: [],
@@ -400,27 +165,14 @@ export async function captureNetworkDiagrams(
     hostClassifications = await conversationService.getHostClassifications(fileId);
   } catch { /* optional — best effort */ }
 
-  // 2. Build graph (same as useNetworkData)
-  const graphData = networkService.buildNetworkGraph(
+  const { nodes, edges } = networkService.buildNetworkGraph(
     response.data, analysisSummary, MAX_CONVERSATIONS, hostClassifications,
   );
 
-  const { nodes, edges } = graphData;
-
-  // 3. Run both ELK layouts
-  const [fdLayout, hierLayout] = await Promise.all([
-    computeLayout(nodes, edges, 'forceDirected2d'),
-    computeLayout(nodes, edges, 'hierarchicalTd'),
-  ]);
-
-  // 4. Render SVG → PNG
-  const fdSvg   = layoutToSvg(fdLayout,   'Force-Directed Layout');
-  const hierSvg = layoutToSvg(hierLayout, 'Hierarchical Layout (Top-Down)');
-
-  const [forceDirected, hierarchical] = await Promise.all([
-    svgToBase64Png(fdSvg),
-    svgToBase64Png(hierSvg),
-  ]);
+  // Sequential — both layouts share the module-level ELK singleton inside
+  // NetworkGraph.tsx; running them in parallel risks a layout race condition.
+  const forceDirected = await captureLayout(nodes, edges, 'forceDirected2d');
+  const hierarchical  = await captureLayout(nodes, edges, 'hierarchicalTd');
 
   return { forceDirected, hierarchical };
 }
