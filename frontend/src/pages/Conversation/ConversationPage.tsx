@@ -14,6 +14,14 @@ import { ErrorMessage } from '@components/common/ErrorMessage';
 import { Pagination } from '@components/common/Pagination';
 import { formatIpPort } from '@/utils/formatters';
 
+/** Produces a consistent export filename: tracepcap_<base>[_<ipSuffix>]_<timestamp>.<ext> */
+function makeExportFilename(base: string, ext: string, ipSuffix?: string): string {
+  const ts = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+  return ipSuffix
+    ? `tracepcap_${base}_${ipSuffix}_${ts}.${ext}`
+    : `tracepcap_${base}_${ts}.${ext}`;
+}
+
 interface AnalysisOutletContext {
   data: AnalysisData;
   fileId: string;
@@ -225,10 +233,10 @@ export const ConversationPage = () => {
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const base = (data.fileName ?? 'conversations').replace(/\.[^.]+$/, '');
     const src = conversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_');
     const dst = conversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_');
-    const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-    a.download = `conversation_${src}_${dst}_${ts}.csv`;
+    a.download = makeExportFilename(base, 'csv', `${src}-${dst}`);
     a.href = url;
     a.click();
     URL.revokeObjectURL(url);
@@ -284,11 +292,10 @@ export const ConversationPage = () => {
 
   // CSV export URL
   const exportUrl = conversationService.getExportUrl(fileId, filters);
-  const exportFilename = (() => {
-    const base = (data.fileName ?? 'conversations').replace(/\.[^.]+$/, '');
-    const ts = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-    return `${base}_${ts}.csv`;
-  })();
+  const pcapExportUrl = conversationService.getPcapExportUrl(fileId, filters);
+  const exportBase = (data.fileName ?? 'conversations').replace(/\.[^.]+$/, '');
+  const exportFilename = makeExportFilename(exportBase, 'csv');
+  const pcapExportFilename = makeExportFilename(exportBase, 'pcap');
 
   const modalTitle = selectedConversation
     ? `${formatIpPort(selectedConversation.endpoints[0].ip, selectedConversation.endpoints[0].port)} ↔ ${formatIpPort(selectedConversation.endpoints[1].ip, selectedConversation.endpoints[1].port)}`
@@ -307,15 +314,26 @@ export const ConversationPage = () => {
                 ({totalItems.toLocaleString()})
               </span>
             </h4>
-            <a
-              href={exportUrl}
-              download={exportFilename}
-              className="btn btn-sm btn-outline-secondary"
-              title="Export current filtered results as CSV"
-            >
-              <i className="bi bi-download me-1"></i>
-              Export CSV
-            </a>
+            <div className="d-flex gap-2">
+              <a
+                href={exportUrl}
+                download={exportFilename}
+                className="btn btn-sm btn-outline-secondary"
+                title="Export current filtered results as CSV"
+              >
+                <i className="bi bi-download me-1"></i>
+                Export CSV
+              </a>
+              <a
+                href={pcapExportUrl}
+                download={pcapExportFilename}
+                className="btn btn-sm btn-outline-secondary"
+                title="Export current filtered results as PCAP"
+              >
+                <i className="bi bi-download me-1"></i>
+                Export PCAP
+              </a>
+            </div>
           </div>
 
           <ConversationFilterPanel
@@ -431,7 +449,7 @@ export const ConversationPage = () => {
                 </button>
                 <a
                   href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
-                  download
+                  download={makeExportFilename(exportBase, 'pcap', `${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}`)}
                   className="btn btn-sm btn-outline-secondary ms-2"
                   title="Export this conversation as PCAP"
                 >
@@ -460,6 +478,7 @@ export const ConversationPage = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

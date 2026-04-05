@@ -16,4 +16,9 @@ public interface PacketRepository extends JpaRepository<PacketEntity, UUID> {
       "SELECT p.conversation.id, p.detectedFileType FROM PacketEntity p"
           + " WHERE p.conversation.id IN :ids AND p.detectedFileType IS NOT NULL")
   List<Object[]> findFileTypesByConversationIds(@Param("ids") List<UUID> ids);
+
+  @Query(
+      "SELECT p.packetNumber FROM PacketEntity p"
+          + " WHERE p.conversation.id IN :ids ORDER BY p.packetNumber ASC")
+  List<Long> findPacketNumbersByConversationIds(@Param("ids") List<UUID> ids);
 }

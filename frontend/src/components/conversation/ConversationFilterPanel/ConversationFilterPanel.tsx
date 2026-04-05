@@ -43,6 +43,8 @@ interface ConversationFilterPanelProps {
   activeFilterCount: number;
   visibleColumns: Set<ColumnKey>;
   onToggleColumn: (key: ColumnKey) => void;
+  hideColumnToggle?: boolean;
+  defaultOpen?: boolean;
 }
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: React.ReactNode }) {
@@ -91,8 +93,10 @@ export function ConversationFilterPanel({
   activeFilterCount,
   visibleColumns,
   onToggleColumn,
+  hideColumnToggle = false,
+  defaultOpen,
 }: ConversationFilterPanelProps) {
-  const [isOpen, setIsOpen] = useState(activeFilterCount > 0);
+  const [isOpen, setIsOpen] = useState(defaultOpen ?? activeFilterCount > 0);
   const [ipInput, setIpInput] = useState(filters.ip);
   const [portInput, setPortInput] = useState(filters.port);
   const [payloadInput, setPayloadInput] = useState(filters.payloadContains);
@@ -686,27 +690,29 @@ export function ConversationFilterPanel({
               </div>
 
               {/* Column visibility */}
-              <div className="col-12 pt-1 border-top mt-3">
-                <label className="filter-section-label d-block mb-2">
-                  <i className="bi bi-layout-three-columns me-1"></i>Columns
-                </label>
-                <div className="d-flex flex-wrap gap-2">
-                  {COLUMN_DEFS.map(({ key, label }) => (
-                    <div key={key} className="form-check form-check-inline mb-0">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id={`col-${key}`}
-                        checked={visibleColumns.has(key)}
-                        onChange={() => onToggleColumn(key)}
-                      />
-                      <label className="form-check-label small" htmlFor={`col-${key}`}>
-                        {label}
-                      </label>
-                    </div>
-                  ))}
+              {!hideColumnToggle && (
+                <div className="col-12 pt-1 border-top mt-3">
+                  <label className="filter-section-label d-block mb-2">
+                    <i className="bi bi-layout-three-columns me-1"></i>Columns
+                  </label>
+                  <div className="d-flex flex-wrap gap-2">
+                    {COLUMN_DEFS.map(({ key, label }) => (
+                      <div key={key} className="form-check form-check-inline mb-0">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id={`col-${key}`}
+                          checked={visibleColumns.has(key)}
+                          onChange={() => onToggleColumn(key)}
+                        />
+                        <label className="form-check-label small" htmlFor={`col-${key}`}>
+                          {label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {activeFilterCount > 0 && (
