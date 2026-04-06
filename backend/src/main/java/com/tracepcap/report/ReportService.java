@@ -23,6 +23,10 @@ import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
+import com.tracepcap.story.dto.Finding;
+import com.tracepcap.story.dto.InvestigationStep;
+import com.tracepcap.story.dto.StoryResponse;
+import com.tracepcap.story.service.StoryService;
 import java.awt.Color;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
@@ -30,6 +34,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,13 +65,14 @@ public class ReportService {
   private static final DateTimeFormatter DT_FMT =
       DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
 
-  // ── repositories ──────────────────────────────────────────────────────────
+  // ── repositories / services ───────────────────────────────────────────────
   private final FileRepository fileRepository;
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
   private final HostClassificationRepository hostClassificationRepository;
   private final ExtractedFileRepository extractedFileRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final StoryService storyService;
 
   // ══════════════════════════════════════════════════════════════════════════
   // Public entry point
@@ -109,6 +115,8 @@ public class ReportService {
     long totalConversations = conversationRepository.countByFileId(fileId);
     long riskCount = conversationRepository.countAtRiskByFileId(fileId);
 
+    StoryResponse story = storyService.getStoryByFileId(fileId).orElse(null);
+
     Document document = new Document(PageSize.A4, 40, 40, 60, 40);
     try {
       PdfWriter.getInstance(document, out);
@@ -130,6 +138,20 @@ public class ReportService {
           extractedFiles.size(),
           geoCountries.size(),
           sec++);
+
+      if (story != null) {
+        if (story.getNarrative() != null && !story.getNarrative().isEmpty()) {
+          addAiNarrative(document, story, sec++);
+        }
+        if (story.getFindings() != null && !story.getFindings().isEmpty()) {
+          addDeterministicFindings(document, story.getFindings(), sec++);
+        }
+        if (story.getInvestigationSteps() != null && !story.getInvestigationSteps().isEmpty()) {
+          addInvestigationSteps(document, story.getInvestigationSteps(), sec++);
+        }
+      } else {
+        addStoryNotGenerated(document, sec++);
+      }
 
       if (analysis != null && analysis.getProtocolStats() != null) {
         addProtocolDistribution(document, analysis.getProtocolStats(), sec++);
@@ -810,6 +832,199 @@ public class ReportService {
     disclaimer.setAlignment(Element.ALIGN_CENTER);
     disclaimer.setSpacingBefore(6);
     doc.add(disclaimer);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section: Story not generated
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private void addStoryNotGenerated(Document doc, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". AI-Generated Narrative");
+    Font f = new Font(Font.HELVETICA, 10, Font.ITALIC, C_TEXT);
+    Paragraph p = new Paragraph(
+        "No story has been generated for this capture. Visit the Story tab to generate one before exporting the report.", f);
+    p.setSpacingBefore(8);
+    p.setSpacingAfter(8);
+    doc.add(p);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section: AI Narrative
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private static final Color C_SEVERITY_CRITICAL = new Color(220, 38, 38);
+  private static final Color C_SEVERITY_HIGH     = new Color(234, 88, 12);
+  private static final Color C_SEVERITY_MEDIUM   = new Color(202, 138, 4);
+  private static final Color C_SEVERITY_LOW      = new Color(100, 116, 139);
+
+  private void addAiNarrative(Document doc, StoryResponse story, int sec) throws Exception {
+    addSectionHeader(doc, sec + ". AI-Generated Narrative");
+
+    Font bodyFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
+    Font titleFont = new Font(Font.HELVETICA, 10, Font.BOLD, C_TEXT);
+
+    for (var section : story.getNarrative()) {
+      if (section.getTitle() != null) {
+        Paragraph title = new Paragraph(section.getTitle(), titleFont);
+        title.setSpacingBefore(10);
+        title.setSpacingAfter(4);
+        doc.add(title);
+      }
+      if (section.getContent() != null) {
+        Paragraph content = new Paragraph(section.getContent(), bodyFont);
+        content.setSpacingAfter(8);
+        doc.add(content);
+      }
+    }
+
+    if (story.getTimeline() != null && !story.getTimeline().isEmpty()) {
+      addSubHeader(doc, "Key Events Timeline");
+      PdfPTable table = new PdfPTable(new float[] {2, 4, 2});
+      table.setWidthPercentage(100);
+      table.setSpacingBefore(6);
+      table.setSpacingAfter(12);
+      addTableHeader(table, "Title", "Description", "Type");
+      Font f = cellFont();
+      for (int i = 0; i < story.getTimeline().size(); i++) {
+        var event = story.getTimeline().get(i);
+        Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
+        addRow(table, bg, f,
+            nvl(event.getTitle()),
+            nvl(event.getDescription()),
+            event.getType() != null ? event.getType().name() : "—");
+      }
+      doc.add(table);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section: Deterministic Findings
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private void addDeterministicFindings(Document doc, List<Finding> findings, int sec)
+      throws Exception {
+    addSectionHeader(doc, sec + ". Deterministic Findings (" + findings.size() + ")");
+
+    Font bodyFont = new Font(Font.HELVETICA, 9, Font.NORMAL, C_TEXT);
+
+    String[] severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW"};
+    for (String sev : severities) {
+      List<Finding> group = findings.stream()
+          .filter(f -> f.getSeverity() != null && sev.equals(f.getSeverity().name()))
+          .collect(java.util.stream.Collectors.toList());
+      if (group.isEmpty()) continue;
+
+      Color sevColor = switch (sev) {
+        case "CRITICAL" -> C_SEVERITY_CRITICAL;
+        case "HIGH"     -> C_SEVERITY_HIGH;
+        case "MEDIUM"   -> C_SEVERITY_MEDIUM;
+        default         -> C_SEVERITY_LOW;
+      };
+
+      Font sevFont = new Font(Font.HELVETICA, 10, Font.BOLD, Color.WHITE);
+      PdfPTable banner = new PdfPTable(1);
+      banner.setWidthPercentage(100);
+      banner.setSpacingBefore(8);
+      banner.setSpacingAfter(2);
+      PdfPCell bannerCell = new PdfPCell(new Phrase(sev + " (" + group.size() + ")", sevFont));
+      bannerCell.setBackgroundColor(sevColor);
+      bannerCell.setPadding(5);
+      bannerCell.setBorder(Rectangle.NO_BORDER);
+      banner.addCell(bannerCell);
+      doc.add(banner);
+
+      PdfPTable table = new PdfPTable(new float[] {3, 3, 6, 4});
+      table.setWidthPercentage(100);
+      table.setSpacingBefore(2);
+      table.setSpacingAfter(8);
+      addTableHeader(table, "Type", "Title", "Summary", "Affected IPs");
+      Font f = cellFont();
+      for (int i = 0; i < group.size(); i++) {
+        Finding finding = group.get(i);
+        Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
+        String type = finding.getType() != null ? finding.getType().name().replace("_", " ") : "—";
+        String ips = finding.getAffectedIps() != null
+            ? String.join(", ", finding.getAffectedIps())
+            : "—";
+        addRow(table, bg, f,
+            type,
+            nvl(finding.getTitle()),
+            nvl(finding.getSummary()),
+            ips.isEmpty() ? "—" : ips);
+      }
+      doc.add(table);
+
+      // Metrics for each finding as a small note
+      for (Finding finding : group) {
+        if (finding.getMetrics() != null && !finding.getMetrics().isEmpty()) {
+          StringBuilder metrics = new StringBuilder("  Metrics — ");
+          finding.getMetrics().forEach((k, v) -> metrics.append(k).append(": ").append(v).append("  "));
+          Paragraph mp = new Paragraph(metrics.toString(), bodyFont);
+          mp.setSpacingAfter(4);
+          doc.add(mp);
+        }
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section: LLM Investigation Steps
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private void addInvestigationSteps(Document doc, List<InvestigationStep> steps, int sec)
+      throws Exception {
+    addSectionHeader(doc, sec + ". LLM Investigation (" + steps.size() + " queries)");
+
+    Font bodyFont = new Font(Font.HELVETICA, 9, Font.NORMAL, C_TEXT);
+    Font boldFont = new Font(Font.HELVETICA, 9, Font.BOLD, C_TEXT);
+
+    for (InvestigationStep step : steps) {
+      var query = step.getQuery();
+      addSubHeader(doc, query.getId() + ": " + nvl(query.getLabel()));
+
+      if (step.getHypothesis() != null) {
+        Paragraph hyp = new Paragraph();
+        hyp.add(new Phrase("Hypothesis [" + step.getHypothesis().getConfidence() + "]: ", boldFont));
+        hyp.add(new Phrase(step.getHypothesis().getHypothesis(), bodyFont));
+        hyp.setSpacingAfter(6);
+        doc.add(hyp);
+      }
+
+      long total = step.getConversationCount();
+      int shown = step.getConversations() != null ? step.getConversations().size() : 0;
+      Paragraph countLine = new Paragraph(
+          "Matching conversations: " + total + (shown < total ? " (showing top " + shown + ")" : ""),
+          bodyFont);
+      countLine.setSpacingAfter(4);
+      doc.add(countLine);
+
+      if (step.getConversations() != null && !step.getConversations().isEmpty()) {
+        PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 2, 2, 2, 4});
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(4);
+        table.setSpacingAfter(10);
+        addTableHeader(table, "Source", "Destination", "Port", "Protocol", "App", "Bytes", "Risks");
+        Font f = cellFont();
+        for (int i = 0; i < step.getConversations().size(); i++) {
+          var ev = step.getConversations().get(i);
+          Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
+          String risks = ev.getFlowRisks() != null ? String.join(", ", ev.getFlowRisks()) : "—";
+          addRow(table, bg, f,
+              nvl(ev.getSrcIp()),
+              nvl(ev.getDstIp()),
+              ev.getDstPort() != null ? String.valueOf(ev.getDstPort()) : "—",
+              nvl(ev.getProtocol()),
+              nvl(ev.getAppName()),
+              ev.getTotalBytes() != null ? formatBytes(ev.getTotalBytes()) : "—",
+              risks.isEmpty() ? "—" : risks);
+        }
+        doc.add(table);
+      } else {
+        Paragraph none = new Paragraph("No matching conversations found.", bodyFont);
+        none.setSpacingAfter(8);
+        doc.add(none);
+      }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

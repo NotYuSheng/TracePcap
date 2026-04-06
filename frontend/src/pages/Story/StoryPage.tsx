@@ -10,7 +10,6 @@ import {
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
 import { NarrativeView } from '@components/story/NarrativeView';
-import { AnomalyHighlight } from '@components/story/AnomalyHighlight';
 import { StoryTimeline } from '@components/story/StoryTimeline';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
@@ -284,19 +283,6 @@ export const StoryPage = () => {
         </div>
       </div>
 
-
-      {/* Key Highlights Section */}
-      {story.highlights && story.highlights.length > 0 && (
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="card">
-              <div className="card-body">
-                <AnomalyHighlight highlights={story.highlights} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Traffic Timeline Visualization */}
       {!loadingTimeline && timelineData.length > 0 && (
