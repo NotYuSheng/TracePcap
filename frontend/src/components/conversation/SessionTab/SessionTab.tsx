@@ -187,7 +187,6 @@ function HttpMessageBlock({
                 className="tp-stream-pane"
                 style={{
                   fontSize: '0.72rem',
-                  backgroundColor: '#f8f9fa',
                   borderRadius: '4px',
                   padding: '0.5rem',
                   maxHeight: '300px',

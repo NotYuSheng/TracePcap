@@ -362,9 +362,18 @@ export const NetworkGraph = memo(function NetworkGraph({
   onLayoutComplete,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
+  const [sysDark, setSysDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setSysDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [themeMode]);
   const darkMode =
-    themeMode === 'dark' ||
-    (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    themeMode === 'dark' || (themeMode === 'system' && sysDark);
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
 

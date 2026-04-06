@@ -283,13 +283,6 @@
   color: var(--tp-text);
 }
 
-/* Alert danger — fix dark-red-on-dark-red readability */
-[data-theme='dark'] .alert-danger {
-  background-color: #2d1515;
-  border-color: #5a2020;
-  color: #ffb3b3;
-}
-
 /* table cells — SGDS applies color/bg directly on td/th */
 [data-theme='dark'] .table > :not(caption) > * > * {
   background-color: var(--tp-surface);
@@ -399,29 +392,6 @@
   background-color: var(--tp-surface);
   color: var(--tp-text);
   border-color: var(--tp-border);
-}
-
-/* tp-* utility classes (theme-aware, used in place of bg-light in JSX) */
-[data-theme='dark'] .tp-stream-pane {
-  background-color: var(--tp-surface) !important;
-  border-color: var(--tp-border) !important;
-  color: var(--tp-text) !important;
-}
-
-[data-theme='dark'] .tp-stat-box {
-  background-color: var(--tp-surface) !important;
-  border-color: var(--tp-border) !important;
-  color: var(--tp-text) !important;
-}
-
-[data-theme='dark'] .tp-code-inline {
-  background-color: var(--tp-bg-subtle) !important;
-  color: var(--tp-text) !important;
-}
-
-[data-theme='dark'] .tp-payload-pre {
-  background-color: var(--tp-surface) !important;
-  color: var(--tp-text) !important;
 }
 
 [data-theme='dark'] .card-header.bg-white {
