@@ -10,22 +10,21 @@ const categoryInfoPopover = (
     <Popover.Body>
       <p className="mb-2">
         Categories are assigned by{' '}
-        <a
-          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
           nDPI
         </a>{' '}
         by first identifying the application (e.g. YouTube → <em>Media</em>, Google → <em>Web</em>),
         then mapping it to a category.
       </p>
-      <p className="mb-0">
+      <p className="mb-2">
         Because application detection uses deep packet inspection heuristics, it is
         <strong> probabilistic</strong> — binary payloads can occasionally match the wrong
         signature. A misidentified application will produce an incorrect category. Treat category
         labels as strong indicators, not definitive classifications.
       </p>
+      <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer" className="small">
+        View protocol reference →
+      </a>
     </Popover.Body>
   </Popover>
 );

@@ -26,11 +26,7 @@ const ndpiPopover = (
     <Popover.Body>
       <p className="mb-2">
         Application labels are identified by{' '}
-        <a
-          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
           nDPI
         </a>{' '}
         deep packet inspection, which recognises services such as YouTube, WhatsApp, and Zoom by
@@ -40,10 +36,13 @@ const ndpiPopover = (
         Encrypted flows (TLS/QUIC) are identified by metadata such as SNI and JA3 fingerprints, not
         payload content.
       </p>
-      <p className="mb-0">
+      <p className="mb-2">
         Treat labels as strong indicators, not definitive classifications. Cross-reference the
         destination IP/port and packet payload if a label looks unexpected.
       </p>
+      <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer" className="small">
+        View protocol reference →
+      </a>
     </Popover.Body>
   </Popover>
 );
@@ -73,19 +72,18 @@ const riskPopover = (
     <Popover.Body>
       <p className="mb-2">
         Risk flags are raised by{' '}
-        <a
-          href="https://www.ntop.org/products/deep-packet-inspection/ndpi/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer">
           nDPI
         </a>{' '}
         based on built-in heuristics — for example, clear-text credentials, unsafe protocols,
         known-malicious TLS fingerprints, or unexpected port usage.
       </p>
-      <p className="mb-0">
+      <p className="mb-2">
         Click any badge to filter the Conversations tab to flows carrying that risk flag.
       </p>
+      <a href="/ndpi-reference.html" target="_blank" rel="noopener noreferrer" className="small">
+        View protocol reference →
+      </a>
     </Popover.Body>
   </Popover>
 );
