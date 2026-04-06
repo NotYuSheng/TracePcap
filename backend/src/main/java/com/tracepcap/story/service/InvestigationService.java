@@ -103,7 +103,9 @@ public class InvestigationService {
 
       if (Boolean.TRUE.equals(q.getHasRisks())) {
         predicates.add(cb.isNotNull(root.get("flowRisks")));
-        predicates.add(cb.greaterThan(cb.length(root.get("flowRisks").as(String.class)), 2));
+        // array_length(flow_risks, 1) IS NOT NULL means the array is non-empty
+        predicates.add(cb.isNotNull(
+            cb.function("array_length", Integer.class, root.get("flowRisks"), cb.literal(1))));
       }
 
       if (Boolean.TRUE.equals(q.getHasTlsAnomaly())) {
@@ -111,8 +113,15 @@ public class InvestigationService {
       }
 
       if (q.getRiskType() != null) {
-        // Use a native-ish approach: check if the flowRisks array contains the riskType string
-        predicates.add(cb.like(root.get("flowRisks").as(String.class), "%" + q.getRiskType() + "%"));
+        // Match exact element in the PostgreSQL array text representation: {a,b,c}
+        // An element can appear as: {riskType,  {riskType}  ,riskType,  ,riskType}
+        String rt = q.getRiskType();
+        predicates.add(cb.or(
+            cb.like(root.get("flowRisks").as(String.class), "{" + rt + ",%"),
+            cb.like(root.get("flowRisks").as(String.class), "%," + rt + ",%"),
+            cb.like(root.get("flowRisks").as(String.class), "%," + rt + "}"),
+            cb.equal(root.get("flowRisks").as(String.class), "{" + rt + "}")
+        ));
       }
 
       if (q.getMinFlows() != null) {

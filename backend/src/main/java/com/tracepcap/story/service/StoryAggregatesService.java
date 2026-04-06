@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
 public class StoryAggregatesService {
 
   private static final Set<String> PRIVATE_PREFIXES =
-      Set.of("10.", "127.", "169.254.", "::1", "fc", "fd");
+      Set.of("10.", "127.", "169.254.", "::1", "fc", "fd", "fe80");
 
   private final ConversationRepository conversationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
@@ -39,9 +39,7 @@ public class StoryAggregatesService {
       UUID fileId, List<ConversationEntity> shownConversations, long totalConversations) {
     try {
       long totalPackets = conversationRepository.sumPacketsByFileId(fileId);
-      long totalBytes = conversationRepository.findTopByFileIdOrderByTotalBytesDesc(
-              fileId, org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE))
-          .stream().mapToLong(ConversationEntity::getTotalBytes).sum();
+      long totalBytes = conversationRepository.sumTotalBytesByFileId(fileId);
 
       return StoryAggregates.builder()
           .coverage(computeCoverage(shownConversations, totalConversations, totalPackets, totalBytes))
@@ -109,7 +107,7 @@ public class StoryAggregatesService {
     Map<String, IpGeoInfoEntity> geoByIp = ipGeoInfoRepository
         .findAllByIpIn(ipBytes.keySet())
         .stream()
-        .collect(Collectors.toMap(IpGeoInfoEntity::getIp, g -> g));
+        .collect(Collectors.toMap(IpGeoInfoEntity::getIp, g -> g, (a, b) -> a));
 
     // Group by (asn, org, country)
     record AsnKey(String asn, String org, String country) {}
@@ -144,10 +142,13 @@ public class StoryAggregatesService {
     }
     // 172.16.0.0/12
     if (ip.startsWith("172.")) {
-      try {
-        int second = Integer.parseInt(ip.split("\\.")[1]);
-        if (second >= 16 && second <= 31) return true;
-      } catch (NumberFormatException ignored) {}
+      String[] parts = ip.split("\\.");
+      if (parts.length >= 2) {
+        try {
+          int second = Integer.parseInt(parts[1]);
+          if (second >= 16 && second <= 31) return true;
+        } catch (NumberFormatException ignored) {}
+      }
     }
     // 192.168.x.x
     if (ip.startsWith("192.168.")) return true;

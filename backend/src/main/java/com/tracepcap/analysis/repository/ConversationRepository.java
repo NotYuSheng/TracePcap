@@ -159,6 +159,12 @@ public interface ConversationRepository
           + " WHERE c.file.id = :fileId")
   long sumPacketsByFileId(@Param("fileId") UUID fileId);
 
+  /** Total byte count across all conversations for a file. */
+  @Query(
+      "SELECT COALESCE(SUM(c.totalBytes), 0) FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId")
+  long sumTotalBytesByFileId(@Param("fileId") UUID fileId);
+
   /** All conversations for a file that have TLS certificate data (for anomaly aggregation). */
   @Query(
       "SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId"
