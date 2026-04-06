@@ -84,6 +84,23 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
   }
 
+  @ExceptionHandler(LlmException.class)
+  public ResponseEntity<ErrorResponse> handleLlmException(
+      LlmException ex, HttpServletRequest request) {
+    log.error("LLM service error: {}", ex.getMessage());
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_GATEWAY.value())
+            .error("Bad Gateway")
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
+  }
+
   @ExceptionHandler(MaxUploadSizeExceededException.class)
   public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(
       MaxUploadSizeExceededException ex, HttpServletRequest request) {

@@ -1,6 +1,7 @@
 package com.tracepcap.story.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.tracepcap.common.exception.LlmException;
 import com.tracepcap.config.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
@@ -166,16 +167,18 @@ public class LlmClient {
 
         var choice = response.getBody().getChoices().get(0);
         String content = choice.getMessage() != null ? choice.getMessage().getContent() : null;
-        if (content == null) throw new RuntimeException("Empty response from LLM API");
+        if (content == null) throw new LlmException("Empty response from LLM API");
         log.info("Successfully received LLM response, length: {}", content.length());
         return content;
       }
 
-      throw new RuntimeException("Empty response from LLM API");
+      throw new LlmException("Empty response from LLM API");
 
+    } catch (LlmException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Error calling LLM API", e);
-      throw new RuntimeException("Failed to generate LLM completion: " + e.getMessage(), e);
+      throw new LlmException("Failed to reach the LLM service: " + e.getMessage(), e);
     }
   }
 

@@ -1,5 +1,30 @@
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { StoryTimelineEvent } from '@/types';
 import { formatTimestamp } from '@/utils/formatters';
+
+function InfoPopover() {
+  const popover = (
+    <Popover id="info-event-timeline" style={{ maxWidth: '320px' }}>
+      <Popover.Header>Event Timeline — How it works</Popover.Header>
+      <Popover.Body className="small">
+        <p className="mb-2">Timeline events are extracted by the LLM from the evidence it was given — at-risk conversations and pre-computed aggregates. Events are sorted chronologically by the timestamp the LLM assigned to each.</p>
+        <p className="mb-2"><strong>Limitations:</strong></p>
+        <ul className="mb-0 ps-3">
+          <li>Timestamps are estimated by the LLM and may not exactly match packet-level timing.</li>
+          <li>Only activity visible in the evidence sample is represented — benign or low-volume flows may be absent.</li>
+          <li>Event classification (normal / suspicious / critical) reflects the LLM's judgment, not a deterministic rule.</li>
+        </ul>
+      </Popover.Body>
+    </Popover>
+  );
+  return (
+    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+      <button type="button" className="btn btn-link p-0 text-muted ms-2" style={{ lineHeight: 1 }} aria-label="About Event Timeline">
+        <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
+      </button>
+    </OverlayTrigger>
+  );
+}
 
 interface StoryTimelineProps {
   events: StoryTimelineEvent[];
@@ -28,7 +53,7 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
 
   return (
     <div className="story-timeline">
-      <h5 className="mb-4">Event Timeline</h5>
+      <h5 className="mb-4 d-flex align-items-center">Event Timeline<InfoPopover /></h5>
 
       <div className="timeline">
         {sortedEvents.map((event, index) => (

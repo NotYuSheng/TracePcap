@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
 import { apiClient } from '@/services/api/client';
@@ -9,10 +10,12 @@ import {
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
 import { NarrativeView } from '@components/story/NarrativeView';
-import { AnomalyHighlight } from '@components/story/AnomalyHighlight';
 import { StoryTimeline } from '@components/story/StoryTimeline';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
+import { AggregatesPanel } from '@components/story/AggregatesPanel';
+import { FindingsPanel } from '@components/story/FindingsPanel';
+import { InvestigationPanel } from '@components/story/InvestigationPanel';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -21,6 +24,27 @@ interface AnalysisOutletContext {
   data: AnalysisData;
   fileId: string;
 }
+
+function NarrativeInfoPopover() {
+  const popover = (
+    <Popover id="info-narrative" style={{ maxWidth: '340px' }}>
+      <Popover.Header>Narrative — How it works</Popover.Header>
+      <Popover.Body className="small">
+        <p className="mb-2">The narrative is written by the LLM using deterministic findings computed from the full dataset — it writes prose, not analysis. Every CRITICAL and HIGH finding is guaranteed to appear in at least one highlight and timeline event.</p>
+        <p className="mb-2"><strong>Not included:</strong> packet payloads, HTTP bodies, DNS query names, TLS SNI, or raw conversation lists (replaced by structured findings).</p>
+        <p className="mb-0"><strong>Limitations:</strong> Treat this as a starting point for investigation. The LLM cannot invent findings not listed in the Deterministic Findings panel above.</p>
+      </Popover.Body>
+    </Popover>
+  );
+  return (
+    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+      <button type="button" className="btn btn-link p-0 text-muted ms-2" style={{ lineHeight: 1 }} aria-label="About Narrative">
+        <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
+      </button>
+    </OverlayTrigger>
+  );
+}
+
 
 export const StoryPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
@@ -78,26 +102,19 @@ export const StoryPage = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      const isTimeout =
-        (err as { code?: string })?.code === 'ECONNABORTED' ||
-        msg.toLowerCase().includes('timeout') ||
-        msg.toLowerCase().includes('exceeded');
+      const serverMsg: string = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '';
+      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
       if (isTimeout) {
         const minutes = Math.round(llmTimeoutMs / 60000);
         setError(
           `Story generation timed out after ${minutes} minute${minutes !== 1 ? 's' : ''}. The LLM is taking too long to respond. Try again or reduce the capture size.`
         );
-      } else if (
-        status === 500 ||
-        msg.includes('500') ||
-        msg.toLowerCase().includes('llm') ||
-        msg.toLowerCase().includes('connection')
-      ) {
+      } else if (status === 502) {
         setError(
           'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
         );
       } else {
-        setError(msg || 'Failed to generate story');
+        setError(serverMsg || msg || 'Failed to generate story');
       }
     } finally {
       setGenerating(false);
@@ -164,12 +181,6 @@ export const StoryPage = () => {
     }
   }, [fileId, granularity]);
 
-  // Calculate traffic statistics
-  const totalPackets = timelineData.reduce((sum, point) => sum + (point.packetCount || 0), 0);
-  const totalBytes = timelineData.reduce((sum, point) => sum + (point.bytes || 0), 0);
-  const avgPackets = timelineData.length > 0 ? Math.round(totalPackets / timelineData.length) : 0;
-  const packetCounts = timelineData.map(p => p.packetCount || 0).filter(n => !isNaN(n));
-  const maxPackets = packetCounts.length > 0 ? Math.max(...packetCounts) : 0;
 
   if (loadingStory) {
     return (
@@ -272,56 +283,6 @@ export const StoryPage = () => {
         </div>
       </div>
 
-      {/* Traffic Statistics Cards */}
-      {!loadingTimeline && timelineData.length > 0 && (
-        <div className="row mb-4">
-          <div className="col-md-3">
-            <div className="card">
-              <div className="card-body text-center">
-                <h6 className="text-muted mb-1">Total Packets</h6>
-                <h3 className="mb-0">{totalPackets.toLocaleString()}</h3>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card">
-              <div className="card-body text-center">
-                <h6 className="text-muted mb-1">Total Data</h6>
-                <h3 className="mb-0">{(totalBytes / 1024 / 1024).toFixed(2)} MB</h3>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card">
-              <div className="card-body text-center">
-                <h6 className="text-muted mb-1">Avg Packets/Min</h6>
-                <h3 className="mb-0">{avgPackets.toLocaleString()}</h3>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card">
-              <div className="card-body text-center">
-                <h6 className="text-muted mb-1">Peak Packets/Min</h6>
-                <h3 className="mb-0">{maxPackets.toLocaleString()}</h3>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Key Highlights Section */}
-      {story.highlights && story.highlights.length > 0 && (
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="card">
-              <div className="card-body">
-                <AnomalyHighlight highlights={story.highlights} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Traffic Timeline Visualization */}
       {!loadingTimeline && timelineData.length > 0 && (
@@ -340,10 +301,38 @@ export const StoryPage = () => {
         </div>
       )}
 
+      {/* Aggregates Panel — pre-computed full-dataset analytics */}
+      {story.aggregates && (
+        <div className="row mb-4">
+          <div className="col-12">
+            <AggregatesPanel aggregates={story.aggregates} />
+          </div>
+        </div>
+      )}
+
+      {/* Findings Panel — deterministic detector output */}
+      {story.findings && story.findings.length > 0 && (
+        <div className="row mb-4">
+          <div className="col-12">
+            <FindingsPanel findings={story.findings} />
+          </div>
+        </div>
+      )}
+
+      {/* Investigation Panel — LLM-directed retrieval results */}
+      {story.investigationSteps && story.investigationSteps.length > 0 && (
+        <div className="row mb-4">
+          <div className="col-12">
+            <InvestigationPanel steps={story.investigationSteps} />
+          </div>
+        </div>
+      )}
+
       {/* Narrative and Event Timeline */}
       <div className="row">
         {/* Narrative Section */}
         <div className="col-lg-8">
+          <h5 className="mb-3 d-flex align-items-center">Narrative<NarrativeInfoPopover /></h5>
           <NarrativeView sections={story.narrative} />
         </div>
 

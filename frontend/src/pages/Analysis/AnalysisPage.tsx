@@ -15,6 +15,7 @@ export const AnalysisPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [reportStep, setReportStep] = useState<string | null>(null);
 
   useEffect(() => {
     const path = location.pathname;
@@ -35,10 +36,12 @@ export const AnalysisPage = () => {
     if (!fileId) return;
     setReportLoading(true);
     setReportError(null);
+    setReportStep('Rendering network diagrams…');
     try {
       // Render both ELK layouts and capture as PNG
       const diagrams = await captureNetworkDiagrams(fileId, data ?? undefined);
 
+      setReportStep('Building PDF…');
       // POST diagrams + fileId → receive PDF blob
       const response = await apiClient.post(
         API_ENDPOINTS.REPORT_DOWNLOAD(fileId),
@@ -57,6 +60,7 @@ export const AnalysisPage = () => {
       setReportError('Report generation failed. Please try again.');
     } finally {
       setReportLoading(false);
+      setReportStep(null);
     }
   };
 
@@ -72,6 +76,22 @@ export const AnalysisPage = () => {
 
   return (
     <div className="analysis-page">
+      {reportStep && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10001,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div className="card shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
+            <div className="spinner-border text-primary mb-3" role="status" />
+            <h6 className="mb-1">Generating Report</h6>
+            <p className="text-muted small mb-0">{reportStep}</p>
+            <p className="text-muted small mt-1">This may take up to 60 seconds.</p>
+          </div>
+        </div>
+      )}
       <div className="analysis-header mb-4 d-flex justify-content-between align-items-start">
         <div>
           <h2>Network Traffic Analysis</h2>

@@ -1,0 +1,1 @@
+export { InvestigationPanel } from './InvestigationPanel';

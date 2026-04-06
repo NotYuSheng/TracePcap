@@ -2,11 +2,11 @@ package com.tracepcap.story.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tracepcap.analysis.dto.TimelineDataDto;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.service.GeoIpService;
+import com.tracepcap.analysis.service.TimelineService;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.config.LlmConfig;
 import com.tracepcap.file.entity.FileEntity;
@@ -19,7 +19,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +35,10 @@ public class StoryService {
   private final LlmClient llmClient;
   private final LlmConfig llmConfig;
   private final ObjectMapper objectMapper;
-  private final GeoIpService geoIpService;
+  private final StoryAggregatesService storyAggregatesService;
+  private final FindingsService findingsService;
+  private final InvestigationService investigationService;
+  private final TimelineService timelineService;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -69,11 +71,51 @@ public class StoryService {
     LocalDateTime generatedAt = LocalDateTime.now();
 
     try {
-      // Generate story content using LLM
-      String storyContent = generateStoryContent(file, analysis, additionalContext);
+      long totalConversations = conversationRepository.countByFileId(fileId);
 
-      // Parse LLM response
+      // Run all deterministic detectors
+      List<Finding> findings = findingsService.detectAll(fileId, totalConversations, analysis.getTotalBytes());
+      log.info("Detected {} findings for file: {}", findings.size(), fileId);
+
+      // Pre-compute aggregates over the full dataset for the aggregates panel and prompt context
+      StoryAggregates aggregates =
+          storyAggregatesService.compute(fileId, List.of(), totalConversations);
+      log.info("Computed aggregates for file: {} ({} beacon candidates, {} ASN entries)",
+          fileId, aggregates.getBeaconCandidates().size(), aggregates.getTopExternalAsns().size());
+
+      // Fetch timeline bins for LLM context (max 50 bins)
+      List<TimelineDataDto> timelineBins = List.of();
+      try {
+        timelineBins = timelineService.getTimelineData(fileId, 1, 50);
+      } catch (Exception e) {
+        log.warn("Failed to fetch timeline bins for story: {}", e.getMessage());
+      }
+
+      // Phase 1: LLM generates hypotheses + queries
+      List<InvestigationStep> investigationSteps = List.of();
+      try {
+        String phase1Json = llmClient.generateCompletion(
+            buildHypothesisSystemPrompt(),
+            buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins)
+        );
+        var phase1 = parseHypothesesAndQueries(phase1Json);
+        investigationSteps = investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
+        log.info("Investigation complete: {} steps for file: {}", investigationSteps.size(), fileId);
+      } catch (Exception e) {
+        log.warn("Investigation phase failed, falling back to direct narrative: {}", e.getMessage());
+      }
+
+      // Phase 2: LLM writes narrative with investigation results
+      String storyContent = llmClient.generateCompletion(
+          buildSystemPrompt(),
+          buildNarrativeUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins, investigationSteps)
+      );
+
+      // Parse LLM response and attach aggregates + findings
       StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
+      storyResponse.setAggregates(aggregates);
+      storyResponse.setFindings(findings);
+      storyResponse.setInvestigationSteps(investigationSteps.isEmpty() ? null : investigationSteps);
 
       // Create and save story entity with content
       StoryEntity story =
@@ -225,198 +267,55 @@ public class StoryService {
     }
   }
 
-  /** Generate story content using LLM */
-  private String generateStoryContent(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext) {
-    String systemPrompt = buildSystemPrompt();
-    String userPrompt = buildUserPrompt(file, analysis, additionalContext);
-    return llmClient.generateCompletion(systemPrompt, userPrompt);
-  }
-
   /** Build system prompt for LLM */
   private String buildSystemPrompt() {
     return """
-            You are a cybersecurity analyst expert specializing in network traffic analysis.
-            Your task is to analyze PCAP file data and create a comprehensive, narrative story
-            that explains what happened in the network traffic in a clear and engaging way.
+            You are a cybersecurity analyst. Your ONLY job is to write a clear, technical narrative from the pre-computed deterministic findings provided. Do NOT re-interpret the raw data. Do NOT invent findings not listed. Do NOT contradict any metric given.
 
-            You must respond ONLY with valid JSON in the following format:
+            You must respond ONLY with valid JSON:
             {
               "narrative": [
-                {
-                  "title": "Summary",
-                  "content": "A comprehensive summary of the network traffic...",
-                  "type": "summary",
-                  "relatedData": {
-                    "packets": [],
-                    "conversations": [],
-                    "hosts": []
-                  }
-                }
+                { "title": "...", "content": "...", "type": "summary|detail|anomaly|conclusion",
+                  "relatedData": { "packets": [], "conversations": [], "hosts": [] } }
               ],
               "highlights": [
-                {
-                  "id": "h1",
-                  "type": "anomaly",
-                  "title": "Unusual Traffic Pattern",
-                  "description": "Description of the anomaly...",
-                  "timestamp": 1234567890
-                }
+                { "id": "h1", "type": "anomaly|warning|insight|info", "title": "...", "description": "...", "timestamp": null }
               ],
               "timeline": [
-                {
-                  "timestamp": 1234567890,
-                  "title": "Connection Established",
-                  "description": "Description of the event...",
-                  "type": "normal",
-                  "relatedData": {
-                    "packets": [],
-                    "conversations": []
-                  }
-                }
+                { "timestamp": null, "title": "...", "description": "...", "type": "normal|suspicious|critical",
+                  "relatedData": { "packets": [], "conversations": [] } }
               ],
-              "suggestedQuestions": [
-                "Which host generated the most traffic, and what was it doing?",
-                "Are there any signs of data exfiltration in this capture?",
-                "What is the significance of the TLS certificate anomalies found?"
-              ]
+              "suggestedQuestions": ["...", "...", "..."]
             }
 
-            Narrative types: "summary", "detail", "anomaly", "conclusion"
-            Highlight types: "anomaly", "insight", "warning", "info"
-            Timeline event types: "normal", "suspicious", "critical"
-            suggestedQuestions: exactly 3 short, specific follow-up questions a analyst might
-            want to ask about THIS capture — tailored to the actual findings, not generic.
-
-            Focus on:
-            - Clear, technical but accessible language
-            - Identifying patterns, anomalies, and security concerns
-            - Providing actionable insights
-            - Creating a chronological narrative of events
-
-            Security risk guidance:
-            - Conversations tagged with nDPI security risks (shown as [RISKS: ...]) should be
-              treated as the highest-priority findings in the story.
-            - Each risk flag in the Security Alerts section must appear in at least one highlight
-              (type "anomaly" for severe risks such as clear_text_credentials, suspicious_entropy,
-              suspicious_dns_traffic, binary_application_transfer, possible_exploit_detected;
-              type "warning" for certificate/policy issues such as self_signed_certificate,
-              obsolete_tls_version, weak_tls_cipher) and one timeline event
-              (type "critical" or "suspicious" accordingly).
-            - Do NOT invent risks that are not listed in the data.
+            Rules:
+            - Every CRITICAL or HIGH severity finding MUST appear in at least one highlight and one timeline event.
+            - anomaly highlight type for CRITICAL findings; warning for HIGH; insight for MEDIUM/LOW.
+            - Timeline event type: critical for CRITICAL findings; suspicious for HIGH; normal for MEDIUM/LOW.
+            - suggestedQuestions: exactly 3, specific to the actual findings, not generic.
+            - Narrative: "summary" section first covering overall picture, then "detail" sections per major finding cluster, "conclusion" last with recommendations.
+            - Write for a technical security analyst. Reference specific IPs, ports, counts, and ratios from the findings.
+            - The aggregates section provides full-dataset context — use it to frame the scale of findings.
             """;
   }
 
   /**
-   * Build user prompt with analysis data.
-   *
-   * <p>Data included in the prompt:
-   *
-   * <ul>
-   *   <li>File metadata (name, size, upload time)
-   *   <li>Traffic summary (packet count, bytes, duration, time range)
-   *   <li>Protocol breakdown (packet count, bytes, % per protocol)
-   *   <li>Top-N conversations by traffic volume, including app name and nDPI risk flags where
-   *       detected
-   *   <li>Security Alerts section listing all conversations with at least one risk flag
-   * </ul>
-   *
-   * <p>Known limitations — data NOT available to the LLM:
-   *
-   * <ul>
-   *   <li>Packet-level payloads or raw bytes (not captured during analysis)
-   *   <li>Conversations beyond the configured cap (STORY_MAX_CONVERSATIONS)
-   *   <li>Application-layer content (HTTP bodies, DNS query names, TLS SNI, etc.)
-   * </ul>
+   * Build the base prompt context with findings and aggregates. Callers append their own closing instruction.
    */
-  /**
-   * Build a TLS certificate label for a conversation, e.g.: " [TLS: subject=CN=*.example.com,
-   * issuer=CN=Let's Encrypt, expires=2025/06/01 EXPIRED]" Returns an empty string if no TLS cert
-   * data is available.
-   */
-  /**
-   * Builds a geo label for a conversation, e.g. " [SG/AS9506 Singtel -> US/AS15169 Google LLC]".
-   * Only external IPs (those present in geoMap) are annotated; private IPs are shown as "private".
-   * Returns an empty string if neither endpoint has geo data.
-   */
-  private String buildGeoLabel(
-      String srcIp, String dstIp, Map<String, GeoIpService.GeoResult> geoMap) {
-    GeoIpService.GeoResult srcGeo = geoMap.get(srcIp);
-    GeoIpService.GeoResult dstGeo = geoMap.get(dstIp);
-    if (srcGeo == null && dstGeo == null) return "";
-
-    String srcPart =
-        srcGeo != null && srcGeo.countryCode() != null
-            ? srcGeo.countryCode() + (srcGeo.org() != null ? "/" + srcGeo.org() : "")
-            : "private";
-    String dstPart =
-        dstGeo != null && dstGeo.countryCode() != null
-            ? dstGeo.countryCode() + (dstGeo.org() != null ? "/" + dstGeo.org() : "")
-            : "private";
-    return " [" + srcPart + " -> " + dstPart + "]";
-  }
-
-  private String buildTlsCertLabel(ConversationEntity conv) {
-    List<String> parts = new ArrayList<>();
-    if (conv.getTlsSubject() != null) parts.add("subject=" + conv.getTlsSubject());
-    if (conv.getTlsIssuer() != null) parts.add("issuer=" + conv.getTlsIssuer());
-    if (conv.getTlsNotAfter() != null) {
-      boolean expired = conv.getTlsNotAfter().isBefore(LocalDateTime.now());
-      String expiryPart = "expires=" + conv.getTlsNotAfter();
-      if (expired) expiryPart += " EXPIRED";
-      parts.add(expiryPart);
-    }
-    if (parts.isEmpty()) return "";
-    return " [TLS: " + String.join(", ", parts) + "]";
-  }
-
-  private String buildUserPrompt(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext) {
-
-    int maxConversations =
-        llmConfig.getStory() != null ? llmConfig.getStory().getMaxConversations() : 20;
-    // Security alerts are capped at the same limit to keep the prompt within context-window budget.
-    // The total count is still reported so the LLM knows the full scope.
-    int maxAlerts = maxConversations;
+  private String buildBasePromptContext(
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      StoryAggregates agg, List<Finding> findings) {
 
     UUID fileId = file.getId();
-
-    // Fetch only what we need — never load the full conversation table
-    List<ConversationEntity> topConversations =
-        conversationRepository.findTopByFileIdOrderByTotalBytesDesc(
-            fileId, PageRequest.of(0, maxConversations));
-    long totalConversations = conversationRepository.countByFileId(fileId);
-
-    // Build geo map for all IPs appearing in the prompt (best-effort, empty on failure)
-    Map<String, GeoIpService.GeoResult> geoMap;
-    try {
-      Set<String> promptIps = new HashSet<>();
-      topConversations.forEach(
-          c -> {
-            promptIps.add(c.getSrcIp());
-            promptIps.add(c.getDstIp());
-          });
-      geoMap = geoIpService.lookupExternal(promptIps);
-    } catch (Exception e) {
-      log.warn("Geo lookup failed during story generation: {}", e.getMessage());
-      geoMap = Map.of();
-    }
-
     List<Object[]> categoryRows = conversationRepository.findCategoryDistributionByFileId(fileId);
 
-    long totalAtRisk = conversationRepository.countAtRiskByFileId(fileId);
-    List<ConversationEntity> atRiskSample =
-        totalAtRisk > 0
-            ? conversationRepository.findAtRiskByFileIdLimited(fileId, maxAlerts)
-            : Collections.emptyList();
-
     StringBuilder prompt = new StringBuilder();
-    prompt.append("Analyze this network traffic capture and create a comprehensive story:\n\n");
+    prompt.append("Analyze this network traffic capture and write a narrative from the findings below:\n\n");
 
     prompt.append("## File Information\n");
     prompt.append(String.format("- Filename: %s\n", file.getFileName()));
     prompt.append(String.format("- File Size: %d bytes\n", file.getFileSize()));
-    prompt.append(String.format("- Upload Time: %s\n\n", file.getUploadedAt()));
+    prompt.append("\n");
 
     prompt.append("## Traffic Summary\n");
     prompt.append(String.format("- Total Packets: %d\n", analysis.getPacketCount()));
@@ -424,34 +323,26 @@ public class StoryService {
     prompt.append(String.format("- Duration: %d ms\n", analysis.getDurationMs()));
     prompt.append(String.format("- Start Time: %s\n", analysis.getStartTime()));
     prompt.append(String.format("- End Time: %s\n", analysis.getEndTime()));
+    long totalConversations = agg.getCoverage() != null ? agg.getCoverage().getTotalConversations() : 0;
     prompt.append(String.format("- Total Conversations: %d\n\n", totalConversations));
 
-    // Protocol breakdown
     if (analysis.getProtocolStats() != null && !analysis.getProtocolStats().isEmpty()) {
       prompt.append("## Protocol Breakdown\n");
-      analysis
-          .getProtocolStats()
-          .forEach(
-              (protocol, statsObj) -> {
-                if (statsObj instanceof Map) {
-                  @SuppressWarnings("unchecked")
-                  Map<String, Object> stats = (Map<String, Object>) statsObj;
-                  Object packets = stats.get("packetCount");
-                  Object bytes = stats.get("bytes");
-                  Object pct = stats.get("percentage");
-                  prompt.append(
-                      String.format(
-                          "- %s: %s packets, %s bytes (%.1f%%)\n",
-                          protocol,
-                          packets,
-                          bytes,
-                          pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
-                }
-              });
+      analysis.getProtocolStats().forEach((protocol, statsObj) -> {
+        if (statsObj instanceof Map) {
+          @SuppressWarnings("unchecked")
+          Map<String, Object> stats = (Map<String, Object>) statsObj;
+          Object packets = stats.get("packetCount");
+          Object bytes = stats.get("bytes");
+          Object pct = stats.get("percentage");
+          prompt.append(String.format("- %s: %s packets, %s bytes (%.1f%%)\n",
+              protocol, packets, bytes,
+              pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
+        }
+      });
       prompt.append("\n");
     }
 
-    // Category distribution — aggregated at DB level, no entity loading
     if (!categoryRows.isEmpty()) {
       prompt.append("## Traffic Category Breakdown\n");
       for (Object[] row : categoryRows) {
@@ -460,103 +351,262 @@ public class StoryService {
       prompt.append("\n");
     }
 
-    // Top-N conversations by volume
-    if (!topConversations.isEmpty()) {
-      prompt.append(
-          String.format(
-              "## Top %d Conversations (by traffic volume, %d total)\n",
-              topConversations.size(), totalConversations));
-      for (int i = 0; i < topConversations.size(); i++) {
-        ConversationEntity conv = topConversations.get(i);
-        String appLabel =
-            (conv.getAppName() != null && !conv.getAppName().isBlank())
-                ? " [" + conv.getAppName() + "]"
-                : "";
-        String catLabel =
-            (conv.getCategory() != null && !conv.getCategory().isBlank())
-                ? " [CAT: " + conv.getCategory() + "]"
-                : "";
-        String riskLabel =
-            (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
-                ? " [RISKS: " + String.join(", ", conv.getFlowRisks()) + "]"
-                : "";
-        String tlsCertLabel = buildTlsCertLabel(conv);
-        String geoLabel = buildGeoLabel(conv.getSrcIp(), conv.getDstIp(), geoMap);
-        prompt.append(
-            String.format(
-                "%d. %s:%s <-> %s:%s%s (%s%s%s%s%s, %d packets, %d bytes)\n",
-                i + 1,
-                conv.getSrcIp(),
-                conv.getSrcPort() != null ? conv.getSrcPort() : "*",
-                conv.getDstIp(),
-                conv.getDstPort() != null ? conv.getDstPort() : "*",
-                geoLabel,
-                conv.getProtocol(),
-                appLabel,
-                catLabel,
-                riskLabel,
-                tlsCertLabel,
-                conv.getPacketCount(),
-                conv.getTotalBytes()));
+    // ── Deterministic Findings ──────────────────────────────────────────────
+    prompt.append(String.format(
+        "## Deterministic Findings — %d findings, ordered by severity\n", findings.size()));
+    prompt.append("(These are computed from the full dataset. Treat them as ground truth.)\n");
+    for (Finding f : findings) {
+      prompt.append(String.format("\n### [%s] %s — %s\n", f.getSeverity(), f.getType(), f.getTitle()));
+      prompt.append(f.getSummary()).append("\n");
+      if (f.getMetrics() != null && !f.getMetrics().isEmpty()) {
+        prompt.append("Metrics: ");
+        prompt.append(f.getMetrics().entrySet().stream()
+            .map(e -> e.getKey() + ": " + e.getValue())
+            .collect(Collectors.joining(", ")));
+        prompt.append("\n");
       }
-      if (totalConversations > maxConversations) {
-        prompt.append(
-            String.format(
-                "... and %d more conversations not shown (increase STORY_MAX_CONVERSATIONS to include more).\n",
-                totalConversations - maxConversations));
+      if (f.getAffectedIps() != null && !f.getAffectedIps().isEmpty()) {
+        prompt.append("Affected IPs: ").append(String.join(", ", f.getAffectedIps())).append("\n");
+      } else {
+        prompt.append("Affected IPs: N/A\n");
       }
-      prompt.append("\n");
+    }
+    prompt.append("\n");
+
+    // ── Full-Dataset Traffic Aggregates ────────────────────────────────────
+    prompt.append("## Full-Dataset Traffic Aggregates\n");
+    prompt.append(String.format("- Unknown application traffic: %.1f%%\n", agg.getUnknownAppPct()));
+
+    if (agg.getTopExternalAsns() != null && !agg.getTopExternalAsns().isEmpty()) {
+      prompt.append("### Top External Destinations\n");
+      for (int i = 0; i < agg.getTopExternalAsns().size(); i++) {
+        StoryAggregates.AsnEntry e = agg.getTopExternalAsns().get(i);
+        String label = e.getOrg() != null ? e.getOrg() : "Unknown";
+        if (e.getAsn() != null) label = e.getAsn() + " " + label;
+        if (e.getCountry() != null) label += " (" + e.getCountry() + ")";
+        prompt.append(String.format("%d. %s — %d flows, %.1f%% of bytes\n",
+            i + 1, label, e.getFlowCount(), e.getPct()));
+      }
     }
 
-    // Security alerts — capped to avoid blowing the context window
-    if (totalAtRisk > 0) {
-      prompt.append(
-          String.format(
-              "## Security Alerts (%d total conversations with nDPI risk flags; showing top %d)\n",
-              totalAtRisk, atRiskSample.size()));
-      for (ConversationEntity conv : atRiskSample) {
-        String appLabel =
-            (conv.getAppName() != null && !conv.getAppName().isBlank())
-                ? " [" + conv.getAppName() + "]"
-                : "";
-        String geoLabel = buildGeoLabel(conv.getSrcIp(), conv.getDstIp(), geoMap);
-        prompt.append(
-            String.format(
-                "- %s:%s <-> %s:%s%s (%s%s): %s\n",
-                conv.getSrcIp(),
-                conv.getSrcPort() != null ? conv.getSrcPort() : "*",
-                conv.getDstIp(),
-                conv.getDstPort() != null ? conv.getDstPort() : "*",
-                geoLabel,
-                conv.getProtocol(),
-                appLabel,
-                String.join(", ", conv.getFlowRisks())));
+    if (agg.getProtocolRiskMatrix() != null && !agg.getProtocolRiskMatrix().isEmpty()) {
+      prompt.append("### Protocol Risk Matrix\n");
+      for (StoryAggregates.ProtocolRiskEntry e : agg.getProtocolRiskMatrix()) {
+        double riskPct = e.getTotal() > 0 ? e.getAtRisk() * 100.0 / e.getTotal() : 0;
+        prompt.append(String.format("- %s: %d total, %d at-risk (%.1f%%)\n",
+            e.getProtocol(), e.getTotal(), e.getAtRisk(), riskPct));
       }
-      if (totalAtRisk > maxAlerts) {
-        prompt.append(
-            String.format(
-                "... and %d more at-risk conversations not shown.\n", totalAtRisk - maxAlerts));
-      }
-      prompt.append("\n");
     }
+
+    StoryAggregates.TlsAnomalySummary tls = agg.getTlsAnomalySummary();
+    if (tls != null && tls.getTotal() > 0) {
+      prompt.append("### TLS Anomaly Summary\n");
+      prompt.append(String.format("- Self-signed: %d, Expired: %d, Unknown CA: %d (of %d total TLS flows)\n",
+          tls.getSelfSigned(), tls.getExpired(), tls.getUnknownCa(), tls.getTotal()));
+    }
+
+    if (agg.getBeaconCandidates() != null && !agg.getBeaconCandidates().isEmpty()) {
+      prompt.append("### Beacon Candidates\n");
+      for (StoryAggregates.BeaconCandidate b : agg.getBeaconCandidates()) {
+        String app = b.getAppName() != null ? " [" + b.getAppName() + "]" : "";
+        long intervalSec = b.getAvgIntervalMs() / 1000;
+        String interval = intervalSec < 60
+            ? intervalSec + "s"
+            : (intervalSec / 60) + "m " + (intervalSec % 60) + "s";
+        prompt.append(String.format("- %s -> %s:%s (%s%s) — %d flows, avg interval %s, jitter %.0f%%\n",
+            b.getSrcIp(),
+            b.getDstIp() != null ? b.getDstIp() : "?",
+            b.getDstPort() != null ? b.getDstPort() : "*",
+            b.getProtocol(), app, b.getFlowCount(), interval, b.getCv() * 100));
+      }
+    }
+    prompt.append("\n");
 
     prompt.append("## Analysis Limitations\n");
-    prompt.append(
-        "The following data was NOT available during this analysis — do not infer or hallucinate details about them:\n");
-    prompt.append("- Packet payloads or raw bytes (not captured)\n");
-    prompt.append("- Application-layer content (HTTP bodies, DNS query names, etc.)\n");
-    prompt.append("- Any conversations beyond those listed above\n\n");
+    prompt.append("- Packet payloads and HTTP bodies not available\n");
+    prompt.append("- DNS query names and TLS SNI not captured\n");
+    prompt.append("- Benign (non-risk) conversations not individually listed\n\n");
 
     if (additionalContext != null && !additionalContext.isBlank()) {
       prompt.append("## Additional Context from Analyst\n");
       prompt.append(additionalContext.strip()).append("\n\n");
     }
 
-    prompt.append("Generate a detailed story analyzing this network traffic. ");
-    prompt.append("Include narrative sections, highlights of interesting findings, ");
-    prompt.append("and a timeline of key events. Respond ONLY with valid JSON.");
+    return prompt.toString();
+  }
+
+  /** Build hypothesis system prompt for Phase 1 */
+  private String buildHypothesisSystemPrompt() {
+    return """
+        You are a cybersecurity analyst. Your ONLY job is to form hypotheses and specify targeted database queries to test them, based on the pre-computed findings and traffic timeline provided.
+
+        You must respond ONLY with valid JSON in this exact format:
+        {
+          "hypotheses": [
+            {
+              "id": "h1",
+              "queryRef": "q1",
+              "hypothesis": "Concise 1-sentence testable hypothesis referencing specific IPs or ports",
+              "confidence": "HIGH"
+            }
+          ],
+          "queries": [
+            {
+              "id": "q1",
+              "label": "Short description of what you are looking for",
+              "srcIp": null,
+              "dstIp": null,
+              "dstPort": null,
+              "protocol": null,
+              "appName": null,
+              "category": null,
+              "hasRisks": null,
+              "hasTlsAnomaly": null,
+              "riskType": null,
+              "minBytes": null,
+              "maxBytes": null,
+              "minFlows": null
+            }
+          ]
+        }
+
+        Rules:
+        - Generate 1 to 5 queries. No more.
+        - Each query MUST set at least 1 non-null filter field. Do NOT generate catch-all queries with all nulls.
+        - Each hypothesis must reference exactly one query via queryRef.
+        - Only use IPs, ports, and protocols you have seen in the findings or aggregates.
+        - Do NOT guess or invent values not present in the provided data.
+        - confidence must be one of: HIGH, MEDIUM, LOW.
+        - Use the traffic timeline to anchor hypotheses to specific time windows when possible.
+        - Available filter fields: srcIp, dstIp, dstPort, protocol, appName, category, hasRisks (boolean), hasTlsAnomaly (boolean), riskType (string), minBytes (number), maxBytes (number), minFlows (number).
+        - minBytes and maxBytes are PER-CONVERSATION byte counts, NOT aggregate totals. Do NOT set minBytes to an aggregate total from the findings (e.g. total bytes for an IP). Only use minBytes if you want conversations larger than a specific individual flow size.
+        - To find unknown/unidentified application traffic, set hasRisks=null and appName=null (leave appName as null — do not set it to "UNKNOWN_APP" or any string).
+        - To find traffic from a specific IP, use srcIp only — do not combine srcIp with minBytes.
+        - riskType values must match exactly what appears in the findings, e.g. "susp_entropy", "unidirectional_traffic".
+        """;
+  }
+
+  /** Build hypothesis user prompt for Phase 1 */
+  private String buildHypothesisUserPrompt(
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      StoryAggregates aggregates, List<Finding> findings, List<TimelineDataDto> timelineBins) {
+
+    StringBuilder prompt = new StringBuilder(
+        buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
+
+    appendTimelineBins(prompt, timelineBins);
+
+    prompt.append("Based on the findings, aggregates, and timeline above, generate hypotheses and specify database queries to investigate the most suspicious activity.\n");
+    prompt.append("Respond ONLY with valid JSON.");
 
     return prompt.toString();
+  }
+
+  /** Build the full narrative user prompt for Phase 2 */
+  private String buildNarrativeUserPrompt(
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      StoryAggregates aggregates, List<Finding> findings,
+      List<TimelineDataDto> timelineBins, List<InvestigationStep> investigationSteps) {
+
+    StringBuilder prompt = new StringBuilder(
+        buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
+
+    appendTimelineBins(prompt, timelineBins);
+
+    if (!investigationSteps.isEmpty()) {
+      prompt.append("## Investigation Results\n");
+      prompt.append("The following targeted queries were executed against the full dataset to gather evidence for each hypothesis.\n\n");
+      for (InvestigationStep step : investigationSteps) {
+        InvestigationQuery q = step.getQuery();
+        prompt.append(String.format("### Query %s: \"%s\"\n", q.getId(), q.getLabel()));
+        if (step.getHypothesis() != null) {
+          prompt.append(String.format("Hypothesis [%s]: %s\n",
+              step.getHypothesis().getConfidence(), step.getHypothesis().getHypothesis()));
+        }
+        prompt.append(String.format("Total matching conversations: %d (showing top %d)\n",
+            step.getConversationCount(), step.getConversations().size()));
+        if (!step.getConversations().isEmpty()) {
+          prompt.append("| src | dst | port | proto | app | bytes | start | risks |\n");
+          prompt.append("|-----|-----|------|-------|-----|-------|-------|-------|\n");
+          for (ConversationEvidence ev : step.getConversations()) {
+            String risks = ev.getFlowRisks() != null ? String.join(",", ev.getFlowRisks()) : "";
+            String app = ev.getAppName() != null ? ev.getAppName() : "-";
+            String start = ev.getStartTime() != null ? ev.getStartTime().substring(11, 19) : "-";
+            prompt.append(String.format("| %s | %s | %d | %s | %s | %d | %s | %s |\n",
+                ev.getSrcIp(), ev.getDstIp(), ev.getDstPort() != null ? ev.getDstPort() : 0,
+                ev.getProtocol(), app, ev.getTotalBytes() != null ? ev.getTotalBytes() : 0, start, risks));
+          }
+        } else {
+          prompt.append("No matching conversations found.\n");
+        }
+        prompt.append("\n");
+      }
+    }
+
+    prompt.append("Write the final narrative story using all evidence above. Confirm or refute each hypothesis using the investigation results. Respond ONLY with valid JSON.");
+
+    return prompt.toString();
+  }
+
+  /** Append timeline bins section to a prompt builder */
+  private void appendTimelineBins(StringBuilder prompt, List<TimelineDataDto> bins) {
+    if (bins == null || bins.isEmpty()) return;
+    prompt.append("## Traffic Timeline (up to 50 time windows)\n");
+    prompt.append("| time | packets | bytes | notes |\n");
+    prompt.append("|------|---------|-------|-------|\n");
+    for (TimelineDataDto bin : bins) {
+      String ts = bin.getTimestamp() != null ? bin.getTimestamp().toString().substring(0, 19) : "-";
+      long bytes = bin.getBytes() != null ? bin.getBytes() : 0;
+      String bytesHuman = bytes > 1_048_576 ? String.format("%.1fMB", bytes / 1_048_576.0)
+          : bytes > 1024 ? String.format("%.1fKB", bytes / 1024.0)
+          : bytes + "B";
+      prompt.append(String.format("| %s | %d | %s |\n",
+          ts, bin.getPacketCount() != null ? bin.getPacketCount() : 0, bytesHuman));
+    }
+    prompt.append("\n");
+  }
+
+  private record ParsedPhase1(List<InvestigationQuery> queries, List<Hypothesis> hypotheses) {}
+
+  /** Parse Phase 1 LLM response into hypotheses and queries */
+  private ParsedPhase1 parseHypothesesAndQueries(String content) {
+    try {
+      String json = extractJson(content);
+      Map<String, Object> data = objectMapper.readValue(json, new TypeReference<>() {});
+
+      List<InvestigationQuery> queries = new ArrayList<>();
+      List<Hypothesis> hypotheses = new ArrayList<>();
+
+      Object queriesRaw = data.get("queries");
+      if (queriesRaw instanceof List<?> qList) {
+        for (Object item : qList) {
+          try {
+            String itemJson = objectMapper.writeValueAsString(item);
+            queries.add(objectMapper.readValue(itemJson, InvestigationQuery.class));
+          } catch (Exception e) {
+            log.warn("Skipping malformed query: {}", e.getMessage());
+          }
+        }
+      }
+
+      Object hypothesesRaw = data.get("hypotheses");
+      if (hypothesesRaw instanceof List<?> hList) {
+        for (Object item : hList) {
+          try {
+            String itemJson = objectMapper.writeValueAsString(item);
+            hypotheses.add(objectMapper.readValue(itemJson, Hypothesis.class));
+          } catch (Exception e) {
+            log.warn("Skipping malformed hypothesis: {}", e.getMessage());
+          }
+        }
+      }
+
+      log.info("Parsed phase 1: {} queries, {} hypotheses", queries.size(), hypotheses.size());
+      return new ParsedPhase1(queries, hypotheses);
+    } catch (Exception e) {
+      log.error("Failed to parse phase 1 LLM response: {}", e.getMessage());
+      return new ParsedPhase1(List.of(), List.of());
+    }
   }
 
   /** Parse LLM response into StoryResponse */
