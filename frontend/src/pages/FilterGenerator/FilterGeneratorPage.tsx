@@ -351,7 +351,7 @@ export const FilterGeneratorPage = () => {
               </h5>
               <p className="mb-2">
                 The filter{' '}
-                <code className="text-dark bg-light px-2 py-1 rounded">{editableFilter}</code> is
+                <code className="tp-code-inline px-2 py-1 rounded">{editableFilter}</code> is
                 valid but didn't match any packets in this PCAP file.
               </p>
               <hr />
@@ -545,7 +545,7 @@ export const FilterGeneratorPage = () => {
                   <div className="col-12">
                     <strong>Payload:</strong>
                     <pre
-                      className="bg-light p-3 rounded mt-2 font-monospace small"
+                      className="tp-payload-pre p-3 rounded mt-2 font-monospace small"
                       style={{ maxHeight: '300px', overflow: 'auto' }}
                     >
                       {selectedPacket.payload || 'No payload data'}

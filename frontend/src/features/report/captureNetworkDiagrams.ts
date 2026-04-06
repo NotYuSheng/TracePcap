@@ -46,6 +46,12 @@ async function captureLayout(
   edges: GraphEdge[],
   layoutType: 'forceDirected2d' | 'hierarchicalTd'
 ): Promise<string> {
+  // Force light mode on the html element for the duration of the capture so
+  // the PDF diagram is always rendered on a white background regardless of
+  // the user's current theme setting.
+  const prevTheme = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', 'light');
+
   return new Promise((resolve, reject) => {
     const id = `__nr-capture-${++captureSeq}`;
 
@@ -85,6 +91,12 @@ async function captureLayout(
       container.remove();
       overlay.remove();
       styleEl.remove();
+      // Restore the user's original theme after capture completes.
+      if (prevTheme) {
+        document.documentElement.setAttribute('data-theme', prevTheme);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
     };
 
     const handleLayoutComplete = () => {

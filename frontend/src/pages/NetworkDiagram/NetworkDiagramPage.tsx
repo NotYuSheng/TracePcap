@@ -389,7 +389,7 @@ export const NetworkDiagramPage = () => {
               { label: 'Packets', value: stats.totalPackets.toLocaleString() },
               { label: 'Data', value: formatBytes(stats.totalBytes) },
             ].map(({ label, value }) => (
-              <div key={label} className="text-center px-3 py-1 bg-light rounded border">
+              <div key={label} className="text-center px-3 py-1 tp-stat-box rounded border">
                 <div style={{ fontSize: '0.7rem', color: '#6c757d', textTransform: 'uppercase' }}>
                   {label}
                 </div>

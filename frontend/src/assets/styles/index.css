@@ -22,6 +22,35 @@
   --network-neutral: #95a5a6;
 }
 
+/* Light mode tokens (default) */
+[data-theme='light'],
+:root {
+  --tp-bg: #f8fafc;
+  --tp-bg-subtle: #f8f9fa;
+  --tp-surface: #ffffff;
+  --tp-surface-hover: #f8f9fa;
+  --tp-border: #dee2e6;
+  --tp-text: #212529;
+  --tp-text-muted: #6c757d;
+  --tp-header-bg: #ffffff;
+  --tp-footer-bg: #f8f9fa;
+  --tp-scrollbar: #adb5bd;
+}
+
+/* Dark mode tokens — must come after :root to win the cascade */
+[data-theme='dark'] {
+  --tp-bg: #0f1117;
+  --tp-bg-subtle: #1a1d27;
+  --tp-surface: #1e2130;
+  --tp-surface-hover: #252840;
+  --tp-border: #2e3349;
+  --tp-text: #e2e8f0;
+  --tp-text-muted: #8892a4;
+  --tp-header-bg: #13151f;
+  --tp-footer-bg: #13151f;
+  --tp-scrollbar: #3a4060;
+}
+
 body {
   font-family:
     Inter,
@@ -31,7 +60,8 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background-color: var(--tp-bg);
+  color: var(--tp-text);
 }
 
 #root {
@@ -50,12 +80,12 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #f8fafc;
+  background-color: var(--tp-bg);
 }
 
 .main-header {
-  background-color: white;
-  border-bottom: 1px solid #dee2e6;
+  background-color: var(--tp-header-bg);
+  border-bottom: 1px solid var(--tp-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -67,7 +97,9 @@ body {
 }
 
 .main-footer {
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--tp-border);
+  background-color: var(--tp-footer-bg) !important;
+  color: var(--tp-text-muted);
 }
 
 /* Upload progress scroll row */
@@ -79,7 +111,7 @@ body {
   padding: 0.25rem 0.125rem 0.625rem;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: var(--sgds-gray-300, #d0d5dd) transparent;
+  scrollbar-color: var(--tp-scrollbar) transparent;
 }
 
 .upload-progress-scroll::-webkit-scrollbar {
@@ -97,6 +129,29 @@ body {
 
 .upload-progress-scroll .upload-status-card {
   flex: 0 0 320px;
+}
+
+/* Utility classes that adapt to dark mode via CSS variables */
+.tp-stat-box {
+  background-color: var(--tp-bg-subtle);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+
+.tp-stream-pane {
+  background-color: var(--tp-surface);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+.tp-code-inline {
+  background-color: var(--tp-bg-subtle);
+  color: var(--tp-text);
+}
+
+.tp-payload-pre {
+  background-color: var(--tp-bg-subtle);
+  color: var(--tp-text);
 }
 
 /* Page Styles */

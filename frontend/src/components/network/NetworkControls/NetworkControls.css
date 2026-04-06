@@ -16,7 +16,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6c757d;
+  color: var(--tp-text-muted, #6c757d);
 }
 
 .nc-filter-panel .filter-section-actions {
@@ -46,8 +46,8 @@
   font-size: 0.78rem;
   padding: 0.25rem 0.6rem;
   cursor: pointer;
-  background-color: #f0f2f5;
-  color: #495057;
+  background-color: var(--tp-bg-subtle, #f0f2f5);
+  color: var(--tp-text, #495057);
   transition:
     background-color 0.12s,
     color 0.12s,
@@ -56,12 +56,12 @@
 }
 
 .nc-filter-panel .filter-pill:not(.active) {
-  color: #333;
+  color: var(--tp-text, #333);
 }
 
 .nc-filter-panel .filter-pill:hover {
-  background-color: #e2e6ea;
-  border-color: #c8cdd2 !important;
+  background-color: var(--tp-surface-hover, #e2e6ea);
+  border-color: var(--tp-border, #c8cdd2) !important;
 }
 
 .nc-filter-panel .filter-pill.active {
@@ -75,8 +75,9 @@
 }
 
 .nc-filter-panel .filter-panel-body {
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--tp-border, #dee2e6);
   box-shadow: 0 1px 4px rgb(0 0 0 / 4%);
+  background-color: var(--tp-surface, #fff);
 }
 
 /* ── Legend pills (colored dot + label, used for node types & edge protocols) ── */
@@ -88,8 +89,8 @@
   font-size: 0.78rem;
   padding: 0.25rem 0.6rem;
   cursor: pointer;
-  background-color: #f0f2f5;
-  color: #333;
+  background-color: var(--tp-bg-subtle, #f0f2f5);
+  color: var(--tp-text, #333);
   border: 1px solid transparent !important;
   transition:
     background-color 0.12s,
@@ -98,8 +99,8 @@
 }
 
 .nc-legend-pill:hover {
-  background-color: #e2e6ea;
-  border-color: #c8cdd2 !important;
+  background-color: var(--tp-surface-hover, #e2e6ea);
+  border-color: var(--tp-border, #c8cdd2) !important;
 }
 
 .nc-legend-pill.active {

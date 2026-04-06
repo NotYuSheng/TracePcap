@@ -3,9 +3,10 @@
   align-items: center;
   gap: 0.875rem;
   padding: 0.875rem 1rem;
-  border: 1px solid var(--sgds-gray-200, #e4e7ec);
+  border: 1px solid var(--tp-border, #e4e7ec);
   border-radius: 8px;
-  background: #fff;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #1d2939);
   box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
   transition: border-color 0.2s ease;
 }
@@ -15,9 +16,17 @@
   background: #fff8f7;
 }
 
+[data-theme='dark'] .upload-status-card.error {
+  background: #2d0f0f;
+}
+
 .upload-status-card.success {
   border-color: var(--sgds-success, #0a8217);
   background: #f6fef7;
+}
+
+[data-theme='dark'] .upload-status-card.success {
+  background: #0d2e1a;
 }
 
 /* Left icon */
@@ -47,7 +56,7 @@
 .usc-filename {
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--sgds-body-color, #1d2939);
+  color: var(--tp-text, #1d2939);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
