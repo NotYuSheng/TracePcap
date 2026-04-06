@@ -22,3 +22,409 @@
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
+
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+/*
+ * SGDS uses --sgds-* variables (not --bs-*).
+ * Overriding them at [data-theme='dark'] cascades into every SGDS component
+ * automatically — no need for per-component rules.
+ */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* ── SGDS global tokens ── */
+  --sgds-body-bg: var(--tp-bg);
+  --sgds-body-color: var(--tp-text);
+  --sgds-border-color: var(--tp-border);
+  --sgds-border-color-translucent: rgba(255, 255, 255, 0.1);
+
+  /* ── Card ── */
+  --sgds-card-bg: var(--tp-surface);
+  --sgds-card-cap-bg: var(--tp-bg-subtle);
+  --sgds-card-border-color: var(--tp-border);
+  --sgds-card-color: var(--tp-text);
+
+  /* ── Table ── */
+  --sgds-table-bg: transparent;
+  --sgds-table-color: var(--tp-text);
+  --sgds-table-border-color: var(--tp-border);
+  --sgds-table-striped-bg: rgba(255, 255, 255, 0.04);
+  --sgds-table-striped-color: var(--tp-text);
+  --sgds-table-hover-bg: rgba(255, 255, 255, 0.06);
+  --sgds-table-hover-color: var(--tp-text);
+  --sgds-table-active-bg: rgba(255, 255, 255, 0.08);
+  --sgds-table-active-color: var(--tp-text);
+
+  /* ── List group ── */
+  --sgds-list-group-bg: var(--tp-surface);
+  --sgds-list-group-color: var(--tp-text);
+  --sgds-list-group-border-color: var(--tp-border);
+  --sgds-list-group-action-color: var(--tp-text);
+  --sgds-list-group-action-hover-color: var(--tp-text);
+  --sgds-list-group-action-hover-bg: var(--tp-surface-hover);
+  --sgds-list-group-action-active-color: var(--tp-text);
+  --sgds-list-group-action-active-bg: var(--tp-surface-hover);
+  --sgds-list-group-disabled-color: var(--tp-text-muted);
+  --sgds-list-group-disabled-bg: var(--tp-surface);
+
+  /* ── Modal ── */
+  --sgds-modal-bg: var(--tp-surface);
+  --sgds-modal-color: var(--tp-text);
+  --sgds-modal-border-color: var(--tp-border);
+  --sgds-modal-header-border-color: var(--tp-border);
+  --sgds-modal-footer-border-color: var(--tp-border);
+
+  /* ── Dropdown ── */
+  --sgds-dropdown-bg: var(--tp-surface);
+  --sgds-dropdown-color: var(--tp-text);
+  --sgds-dropdown-border-color: var(--tp-border);
+  --sgds-dropdown-link-color: var(--tp-text);
+  --sgds-dropdown-link-hover-color: var(--tp-text);
+  --sgds-dropdown-link-hover-bg: var(--tp-surface-hover);
+  --sgds-dropdown-link-active-color: #fff;
+  --sgds-dropdown-divider-bg: var(--tp-border);
+  --sgds-dropdown-header-color: var(--tp-text-muted);
+
+  /* ── Input / form ── */
+  --sgds-input-bg: var(--tp-surface);
+  --sgds-input-color: var(--tp-text);
+  --sgds-input-border-color: var(--tp-border);
+  --sgds-input-placeholder-color: var(--tp-text-muted);
+  --sgds-input-focus-bg: var(--tp-surface);
+  --sgds-input-focus-color: var(--tp-text);
+  --sgds-input-disabled-bg: var(--tp-bg-subtle);
+  --sgds-input-disabled-color: var(--tp-text-muted);
+
+  /* ── Navbar / header ── */
+  --sgds-navbar-color: var(--tp-text);
+  --sgds-navbar-bg: var(--tp-header-bg);
+
+  /* ── Pagination ── */
+  --sgds-pagination-bg: var(--tp-surface);
+  --sgds-pagination-color: var(--tp-text);
+  --sgds-pagination-border-color: var(--tp-border);
+  --sgds-pagination-hover-bg: var(--tp-surface-hover);
+  --sgds-pagination-hover-color: var(--tp-text);
+  --sgds-pagination-hover-border-color: var(--tp-border);
+  --sgds-pagination-disabled-bg: var(--tp-surface);
+  --sgds-pagination-disabled-color: var(--tp-text-muted);
+  --sgds-pagination-disabled-border-color: var(--tp-border);
+
+  /* ── Progress ── */
+  --sgds-progress-bg: var(--tp-bg-subtle);
+
+  /* ── Accordion ── */
+  --sgds-accordion-bg: var(--tp-surface);
+  --sgds-accordion-color: var(--tp-text);
+  --sgds-accordion-border-color: var(--tp-border);
+  --sgds-accordion-button-bg: var(--tp-surface);
+  --sgds-accordion-button-color: var(--tp-text);
+  --sgds-accordion-button-active-bg: var(--tp-bg-subtle);
+  --sgds-accordion-button-active-color: var(--tp-text);
+  --sgds-accordion-body-bg: var(--tp-surface);
+  --sgds-accordion-body-color: var(--tp-text);
+
+  /* ── Tooltip / Popover ── */
+  --sgds-tooltip-bg: var(--tp-bg-subtle);
+  --sgds-tooltip-color: var(--tp-text);
+  --sgds-popover-bg: var(--tp-surface);
+  --sgds-popover-border-color: var(--tp-border);
+  --sgds-popover-header-bg: var(--tp-bg-subtle);
+  --sgds-popover-body-color: var(--tp-text);
+}
+
+/* ── Direct property overrides (where variables alone aren't enough) ──
+ *
+ * SGDS defines --sgds-card-bg, --sgds-list-group-bg etc. locally on the
+ * component selector (e.g. .card { --sgds-card-bg: #fff }).  Local custom
+ * property declarations beat inherited ones, so setting them on [data-theme='dark']
+ * (the html element) has no effect.  We must re-declare them on the same
+ * element to win the specificity battle.
+ */
+
+[data-theme='dark'] body {
+  background-color: var(--tp-bg);
+  color: var(--tp-text);
+}
+
+/* Card — re-declare local SGDS variables on the element */
+[data-theme='dark'] .card {
+  --sgds-card-bg: var(--tp-surface);
+  --sgds-card-cap-bg: var(--tp-bg-subtle);
+  --sgds-card-border-color: var(--tp-border);
+  --sgds-card-color: var(--tp-text);
+  color: var(--tp-text);
+}
+
+/* List group */
+[data-theme='dark'] .list-group-item {
+  --sgds-list-group-bg: var(--tp-surface);
+  --sgds-list-group-color: var(--tp-text);
+  --sgds-list-group-border-color: var(--tp-border);
+  --sgds-list-group-action-color: var(--tp-text);
+  --sgds-list-group-action-hover-bg: var(--tp-surface-hover);
+  --sgds-list-group-action-hover-color: var(--tp-text);
+  --sgds-list-group-action-active-bg: var(--tp-surface-hover);
+  --sgds-list-group-action-active-color: var(--tp-text);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .list-group-item-action:hover,
+[data-theme='dark'] .list-group-item-action:focus {
+  background-color: var(--tp-surface-hover);
+  color: var(--tp-text);
+}
+
+/* Table */
+[data-theme='dark'] .table {
+  --sgds-table-color: var(--tp-text);
+  --sgds-table-bg: var(--tp-surface);
+  --sgds-table-border-color: var(--tp-border);
+  --sgds-table-striped-bg: rgba(255, 255, 255, 0.04);
+  --sgds-table-hover-bg: rgba(255, 255, 255, 0.06);
+}
+
+/* Dropdown */
+[data-theme='dark'] .dropdown-menu {
+  --sgds-dropdown-bg: var(--tp-surface);
+  --sgds-dropdown-color: var(--tp-text);
+  --sgds-dropdown-border-color: var(--tp-border);
+  --sgds-dropdown-link-color: var(--tp-text);
+  --sgds-dropdown-link-hover-bg: var(--tp-surface-hover);
+}
+
+/* Modal */
+[data-theme='dark'] .modal-content {
+  --sgds-modal-bg: var(--tp-surface);
+  --sgds-modal-border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+/* Nav tabs */
+[data-theme='dark'] .nav-tabs {
+  --sgds-nav-tabs-link-active-color: var(--tp-text);
+  --sgds-nav-tabs-link-active-bg: var(--tp-surface);
+  --sgds-nav-tabs-link-active-border-color: var(--tp-border) var(--tp-border) var(--tp-surface);
+  --sgds-nav-tabs-link-hover-border-color: var(--tp-border) var(--tp-border) transparent;
+  border-color: var(--tp-border);
+}
+
+[data-theme='dark'] .nav-tabs .nav-link {
+  color: var(--tp-text-muted);
+}
+
+[data-theme='dark'] .nav-tabs .nav-link:hover {
+  border-color: var(--tp-border) var(--tp-border) transparent;
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .nav-tabs .nav-link.active {
+  background-color: var(--tp-surface);
+  border-color: var(--tp-border) var(--tp-border) var(--tp-surface);
+  color: var(--tp-text);
+}
+
+/* Pagination */
+[data-theme='dark'] .page-item .page-link {
+  --sgds-pagination-bg: var(--tp-surface);
+  --sgds-pagination-color: var(--tp-text);
+  --sgds-pagination-border-color: var(--tp-border);
+  background-color: var(--tp-surface);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+
+[data-theme='dark'] .page-item.disabled .page-link {
+  background-color: var(--tp-bg-subtle);
+  color: var(--tp-text-muted);
+  border-color: var(--tp-border);
+}
+
+/* form-control and form-select set background/color directly, not via variable */
+[data-theme='dark'] .form-control,
+[data-theme='dark'] .form-select,
+[data-theme='dark'] .form-control:focus,
+[data-theme='dark'] .form-select:focus {
+  background-color: var(--tp-surface);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .form-control::placeholder {
+  color: var(--tp-text-muted);
+}
+
+/* input-group-text — hardcoded bg/color in SGDS, no variable */
+[data-theme='dark'] .input-group-text {
+  background-color: var(--tp-bg-subtle);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+/* Popover — re-declare local vars on the element */
+[data-theme='dark'] .popover {
+  --sgds-popover-bg: var(--tp-surface);
+  --sgds-popover-border-color: var(--tp-border);
+  --sgds-popover-header-bg: var(--tp-bg-subtle);
+  --sgds-popover-header-color: var(--tp-text);
+  --sgds-popover-body-color: var(--tp-text);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .popover-header {
+  background-color: var(--tp-bg-subtle);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+
+[data-theme='dark'] .popover-body {
+  background-color: var(--tp-surface);
+  color: var(--tp-text);
+}
+
+/* Alert danger — fix dark-red-on-dark-red readability */
+[data-theme='dark'] .alert-danger {
+  background-color: #2d1515;
+  border-color: #5a2020;
+  color: #ffb3b3;
+}
+
+/* table cells — SGDS applies color/bg directly on td/th */
+[data-theme='dark'] .table > :not(caption) > * > * {
+  background-color: var(--tp-surface);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+
+[data-theme='dark'] .table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: var(--tp-bg-subtle);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .table-hover > tbody > tr:hover > * {
+  background-color: var(--tp-surface-hover);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] thead th,
+[data-theme='dark'] .sticky-top {
+  background-color: var(--tp-bg-subtle) !important;
+  color: var(--tp-text) !important;
+  border-color: var(--tp-border) !important;
+}
+
+/* Bootstrap utility classes */
+[data-theme='dark'] .bg-light,
+[data-theme='dark'] .bg-white {
+  background-color: var(--tp-surface) !important;
+  color: var(--tp-text) !important;
+}
+
+[data-theme='dark'] .text-dark {
+  color: var(--tp-text) !important;
+}
+
+[data-theme='dark'] .text-muted {
+  color: var(--tp-text-muted) !important;
+}
+
+[data-theme='dark'] .border,
+[data-theme='dark'] .border-top,
+[data-theme='dark'] .border-bottom,
+[data-theme='dark'] .border-start,
+[data-theme='dark'] .border-end {
+  border-color: var(--tp-border) !important;
+}
+
+/* Buttons */
+[data-theme='dark'] .btn-outline-secondary {
+  color: var(--tp-text-muted);
+  border-color: var(--tp-border);
+}
+
+[data-theme='dark'] .btn-outline-secondary:hover {
+  background-color: var(--tp-surface-hover);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Alerts */
+[data-theme='dark'] .alert-danger {
+  background-color: #3d1a1a;
+  border-color: #6b2d2d;
+  color: #f8a5a5;
+}
+
+[data-theme='dark'] .alert-warning {
+  background-color: #3d2e0a;
+  border-color: #6b4f10;
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .alert-success {
+  background-color: #0d2e1a;
+  border-color: #1a5233;
+  color: #6ee7b7;
+}
+
+[data-theme='dark'] .alert-info {
+  background-color: #0d2233;
+  border-color: #1a4060;
+  color: #7dd3fc;
+}
+
+[data-theme='dark'] .alert-secondary {
+  background-color: var(--tp-bg-subtle);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+/* Misc */
+[data-theme='dark'] hr {
+  border-color: var(--tp-border);
+  opacity: 1;
+}
+
+[data-theme='dark'] code {
+  background-color: var(--tp-bg-subtle);
+  color: #e879f9;
+}
+
+[data-theme='dark'] pre {
+  background-color: var(--tp-surface);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+
+/* tp-* utility classes (theme-aware, used in place of bg-light in JSX) */
+[data-theme='dark'] .tp-stream-pane {
+  background-color: var(--tp-surface) !important;
+  border-color: var(--tp-border) !important;
+  color: var(--tp-text) !important;
+}
+
+[data-theme='dark'] .tp-stat-box {
+  background-color: var(--tp-surface) !important;
+  border-color: var(--tp-border) !important;
+  color: var(--tp-text) !important;
+}
+
+[data-theme='dark'] .tp-code-inline {
+  background-color: var(--tp-bg-subtle) !important;
+  color: var(--tp-text) !important;
+}
+
+[data-theme='dark'] .tp-payload-pre {
+  background-color: var(--tp-surface) !important;
+  color: var(--tp-text) !important;
+}
+
+[data-theme='dark'] .card-header.bg-white {
+  background-color: var(--tp-surface) !important;
+  color: var(--tp-text) !important;
+}

@@ -6,7 +6,7 @@
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
-  color: #212529;
+  color: var(--tp-text, #212529);
 }
 
 .summary-cards {
@@ -20,10 +20,11 @@
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background-color: white;
-  border: 1px solid #dee2e6;
+  background-color: var(--tp-surface, white);
+  border: 1px solid var(--tp-border, #dee2e6);
   border-radius: 8px;
   transition: all 0.2s ease;
+  color: var(--tp-text, #212529);
 }
 
 .summary-card:hover {
@@ -43,7 +44,7 @@
 
 .card-label {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: var(--tp-text-muted, #6c757d);
   margin-bottom: 0.25rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -52,6 +53,6 @@
 .card-value {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #212529;
+  color: var(--tp-text, #212529);
   word-break: break-word;
 }

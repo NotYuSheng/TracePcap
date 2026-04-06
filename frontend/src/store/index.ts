@@ -4,8 +4,12 @@ import { createUploadSlice } from './slices/uploadSlice';
 import type { UploadSlice } from './slices/uploadSlice';
 import { createAnalysisSlice } from './slices/analysisSlice';
 import type { AnalysisSlice } from './slices/analysisSlice';
+import { createThemeSlice } from './slices/themeSlice';
+import type { ThemeSlice, ThemeMode } from './slices/themeSlice';
 
-type StoreState = UploadSlice & AnalysisSlice;
+export type { ThemeMode };
+
+type StoreState = UploadSlice & AnalysisSlice & ThemeSlice;
 
 export const useStore = create<StoreState>()(
   devtools(
@@ -13,6 +17,7 @@ export const useStore = create<StoreState>()(
       (...a) => ({
         ...createUploadSlice(...a),
         ...createAnalysisSlice(...a),
+        ...createThemeSlice(...a),
       }),
       {
         name: 'tracepcap-storage',
@@ -20,6 +25,7 @@ export const useStore = create<StoreState>()(
           // Only persist certain parts of state
           recentFiles: state.recentFiles,
           analysisSummaries: state.analysisSummaries,
+          themeMode: state.themeMode,
         }),
       }
     ),

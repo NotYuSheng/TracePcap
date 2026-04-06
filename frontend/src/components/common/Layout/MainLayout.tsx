@@ -3,6 +3,8 @@ import { Link, Outlet } from 'react-router-dom';
 import { Container, Row, Col } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
+import { useStore } from '@/store';
+import type { ThemeMode } from '@/store';
 
 function useBackendReady() {
   const [ready, setReady] = useState<boolean | null>(null);
@@ -37,9 +39,44 @@ function useBackendReady() {
   return ready;
 }
 
+const THEME_ICONS: Record<ThemeMode, string> = {
+  light: 'bi-sun',
+  dark: 'bi-moon-stars',
+  system: 'bi-circle-half',
+};
+
+const THEME_LABELS: Record<ThemeMode, string> = {
+  light: 'Light mode — click for dark',
+  dark: 'Dark mode — click for system',
+  system: 'System mode — click for light',
+};
+
+function useResolvedDark(themeMode: ThemeMode): boolean {
+  const [sysDark, setSysDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setSysDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [themeMode]);
+  if (themeMode === 'light') return false;
+  if (themeMode === 'dark') return true;
+  return sysDark;
+}
+
 export const MainLayout = () => {
   const [showSignatures, setShowSignatures] = useState(false);
   const backendReady = useBackendReady();
+  const themeMode = useStore(s => s.themeMode);
+  const cycleTheme = useStore(s => s.cycleTheme);
+  const isDark = useResolvedDark(themeMode);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   const mainContent =
     backendReady === true ? (
@@ -68,19 +105,30 @@ export const MainLayout = () => {
                 </div>
               </div>
             </Link>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => setShowSignatures(true)}
-            >
-              <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
-            </button>
+            <div className="d-flex align-items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={cycleTheme}
+                aria-label={THEME_LABELS[themeMode]}
+                title={THEME_LABELS[themeMode]}
+              >
+                <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => setShowSignatures(true)}
+              >
+                <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
+              </button>
+            </div>
           </div>
         </Container>
       </header>
       <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
       <main className="main-content">{mainContent}</main>
-      <footer className="main-footer mt-auto py-4 bg-light">
+      <footer className="main-footer mt-auto py-4">
         <Container>
           <Row>
             <Col className="text-center text-muted">

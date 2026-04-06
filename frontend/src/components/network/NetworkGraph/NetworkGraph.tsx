@@ -24,6 +24,7 @@ import ELK from 'elkjs';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
 import { deviceTypeColor } from '@/utils/deviceType';
+import { useStore } from '@/store';
 import './NetworkGraph.css';
 
 // ---------------------------------------------------------------------------
@@ -360,6 +361,10 @@ export const NetworkGraph = memo(function NetworkGraph({
   onLayoutChange,
   onLayoutComplete,
 }: NetworkGraphProps) {
+  const themeMode = useStore(s => s.themeMode);
+  const darkMode =
+    themeMode === 'dark' ||
+    (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
 
@@ -464,7 +469,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         elementsSelectable
         minZoom={0.1}
       >
-        <Background gap={20} color="#f0f0f0" />
+        <Background gap={20} color={darkMode ? '#1e2130' : '#f0f0f0'} />
         <Controls showInteractive={false} />
         {onLayoutChange && (
           <Panel position="bottom-right">

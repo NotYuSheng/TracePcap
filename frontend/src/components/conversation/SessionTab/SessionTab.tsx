@@ -57,6 +57,7 @@ function InterleavedStream({ chunks }: { chunks: SessionChunk[] }) {
 
       {/* Single scrollable pane */}
       <div
+        className="tp-stream-pane"
         style={{
           maxHeight: '550px',
           overflowY: 'auto',
@@ -183,6 +184,7 @@ function HttpMessageBlock({
             </button>
             {showBody && (
               <pre
+                className="tp-stream-pane"
                 style={{
                   fontSize: '0.72rem',
                   backgroundColor: '#f8f9fa',
@@ -221,7 +223,7 @@ function HttpExchangeBlock({ exchange, index }: { exchange: HttpExchange; index:
       >
         {collapsed ? '▸' : '▾'} Exchange #{index + 1}
         {exchange.request && (
-          <code className="ms-2 text-dark" style={{ fontSize: '0.78rem' }}>
+          <code className="ms-2" style={{ fontSize: '0.78rem' }}>
             {exchange.request.firstLine.split(' ').slice(0, 2).join(' ')}
           </code>
         )}

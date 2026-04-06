@@ -1,11 +1,12 @@
 .upload-card {
-  border: 1px solid var(--sgds-gray-200, #e4e7ec);
+  border: 1px solid var(--tp-border, #e4e7ec);
   border-radius: 8px;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
   box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
-  background: #fff;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #212529);
 }
 
 .upload-card:hover {
@@ -30,10 +31,10 @@
 
 /* Upload Dropzone */
 .upload-dropzone {
-  border: 2px dashed var(--sgds-gray-300, #d0d5dd);
+  border: 2px dashed var(--tp-border, #d0d5dd);
   border-radius: 8px;
   padding: 1.75rem 1.5rem;
-  background: var(--sgds-gray-100, #f7f7f9);
+  background: var(--tp-bg-subtle, #f7f7f9);
   transition:
     border-color 0.2s ease,
     background 0.2s ease;
@@ -46,9 +47,18 @@
   background: #eff6ff;
 }
 
+[data-theme='dark'] .upload-dropzone:hover,
+[data-theme='dark'] .upload-dropzone.drag-active {
+  background: #0d2033;
+}
+
 .upload-dropzone.drag-reject {
   border-color: var(--sgds-danger, #d7260f);
   background: #fff8f7;
+}
+
+[data-theme='dark'] .upload-dropzone.drag-reject {
+  background: #2d0f0f;
 }
 
 .upload-dropzone.disabled {
