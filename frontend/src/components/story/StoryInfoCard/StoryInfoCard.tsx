@@ -30,15 +30,16 @@ export const StoryInfoCard = ({
             The following data is sent to the configured LLM to generate the narrative:
           </p>
           <ul className="small text-muted mb-3">
-            <li>File metadata, traffic summary, protocol breakdown, and category distribution</li>
+            <li>File metadata, traffic summary, protocol breakdown, category distribution</li>
             <li>
-              The top <strong>N</strong> conversations by volume, including nDPI app names,
-              categories, TLS certificate details, and risk flags (configurable via{' '}
-              <code>STORY_MAX_CONVERSATIONS</code>, default 20)
+              <strong>Deterministic findings (full dataset)</strong> — pre-computed by 8 detectors
+              covering: nDPI risk flags, beacon/C2 patterns, TLS anomalies, volume anomalies,
+              fan-out/scanning, long sessions, unknown application traffic, and port-protocol
+              mismatches
             </li>
             <li>
-              Security alerts listing up to <strong>N</strong> at-risk conversations — the LLM is
-              told the total count even when the list is truncated
+              <strong>Full-dataset aggregates</strong> — top external ASNs, protocol risk matrix,
+              TLS counts, beacon candidates
             </li>
           </ul>
           <p className="text-muted small mb-2">
@@ -47,7 +48,7 @@ export const StoryInfoCard = ({
           <ul className="small text-muted mb-3">
             <li>Packet payloads and HTTP bodies</li>
             <li>DNS query names and TLS SNI</li>
-            <li>Conversations beyond the configured cap</li>
+            <li>Raw conversation lists (replaced by structured findings)</li>
           </ul>
 
           {onAdditionalContextChange !== undefined && (

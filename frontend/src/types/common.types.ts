@@ -212,6 +212,128 @@ export interface KillChainPhase {
   timestamp: number;
 }
 
+// Story Aggregate Types
+export interface StoryAggregates {
+  coverage: StoryCoverage;
+  topExternalAsns: AsnEntry[];
+  protocolRiskMatrix: ProtocolRiskEntry[];
+  tlsAnomalySummary: TlsAnomalySummary;
+  unknownAppPct: number;
+  beaconCandidates: BeaconCandidate[];
+}
+
+export interface StoryCoverage {
+  totalConversations: number;
+  shownConversations: number;
+  totalPackets: number;
+  shownPackets: number;
+  bytesCoveragePct: number;
+}
+
+export interface AsnEntry {
+  asn: string | null;
+  org: string;
+  country: string | null;
+  bytes: number;
+  pct: number;
+  flowCount: number;
+}
+
+export interface ProtocolRiskEntry {
+  protocol: string;
+  total: number;
+  atRisk: number;
+}
+
+export interface TlsAnomalySummary {
+  selfSigned: number;
+  expired: number;
+  unknownCa: number;
+  total: number;
+}
+
+export interface BeaconCandidate {
+  srcIp: string;
+  dstIp: string | null;
+  dstPort: number | null;
+  protocol: string;
+  appName: string | null;
+  flowCount: number;
+  avgIntervalMs: number;
+  cv: number;
+}
+
+export type FindingType =
+  | 'NDPI_RISK'
+  | 'BEACON'
+  | 'TLS_ANOMALY'
+  | 'VOLUME'
+  | 'FAN_OUT'
+  | 'LONG_SESSION'
+  | 'UNKNOWN_APP'
+  | 'PORT_PROTOCOL_MISMATCH';
+
+export type FindingSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface Finding {
+  type: FindingType;
+  severity: FindingSeverity;
+  title: string;
+  summary: string;
+  metrics: Record<string, number | string | null>;
+  affectedIps: string[];
+}
+
+export interface InvestigationQuery {
+  id: string;
+  label: string;
+  srcIp?: string | null;
+  dstIp?: string | null;
+  dstPort?: number | null;
+  protocol?: string | null;
+  appName?: string | null;
+  category?: string | null;
+  hasRisks?: boolean | null;
+  hasTlsAnomaly?: boolean | null;
+  riskType?: string | null;
+  minBytes?: number | null;
+  maxBytes?: number | null;
+  minFlows?: number | null;
+}
+
+export interface Hypothesis {
+  id: string;
+  queryRef: string;
+  hypothesis: string;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export interface ConversationEvidence {
+  srcIp: string;
+  srcPort?: number;
+  dstIp: string;
+  dstPort?: number;
+  protocol: string;
+  appName?: string | null;
+  category?: string | null;
+  hostname?: string | null;
+  totalBytes?: number | null;
+  packetCount?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  flowRisks?: string[];
+  tlsIssuer?: string | null;
+  tlsSubject?: string | null;
+  ja3Client?: string | null;
+}
+
+export interface InvestigationStep {
+  query: InvestigationQuery;
+  hypothesis?: Hypothesis | null;
+  conversations: ConversationEvidence[];
+  conversationCount: number;
+}
+
 // Story Types
 export interface Story {
   id: string;
@@ -221,6 +343,9 @@ export interface Story {
   highlights: Highlight[];
   timeline: StoryTimelineEvent[];
   suggestedQuestions?: string[];
+  aggregates?: StoryAggregates;
+  findings?: Finding[];
+  investigationSteps?: InvestigationStep[];
 }
 
 export interface NarrativeSection {

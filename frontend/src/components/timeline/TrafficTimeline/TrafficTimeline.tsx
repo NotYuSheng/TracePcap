@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
 } from 'recharts';
 import type { TimelineDataPoint } from '@/types';
 import { formatTimestamp, formatBytes, formatNumber } from '@/utils/formatters';
@@ -23,6 +24,17 @@ const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
   { label: '1h', seconds: 3600 },
   { label: '1d', seconds: 86400 },
 ];
+
+// Distinct colours for protocols — cycles if more than 12
+const PROTOCOL_COLORS = [
+  '#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0',
+  '#6f42c1', '#fd7e14', '#20c997', '#d63384', '#6c757d',
+  '#0dcaf0', '#adb5bd',
+];
+
+function protocolColor(index: number): string {
+  return PROTOCOL_COLORS[index % PROTOCOL_COLORS.length];
+}
 
 /** Derive the effective bin interval (seconds) from the returned data. */
 function effectiveInterval(data: TimelineDataPoint[]): number | null {
@@ -44,51 +56,34 @@ function formatInterval(secs: number): string {
   return `${Math.floor(secs / 86400)}d`;
 }
 
-interface ChartDataPoint {
-  timestamp: number;
-  value: number;
-  protocols: Record<string, number>;
-}
-
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: Array<{ value?: number; payload?: ChartDataPoint }>;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
   label?: number;
   viewMode: 'packets' | 'bytes';
 }
 
 function CustomTooltip({ active, payload, label, viewMode }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0 || typeof label !== 'number') return null;
-  const entry = payload[0];
+  const total = payload.reduce((s, e) => s + (e.value ?? 0), 0);
   return (
-    <div className="card shadow-sm" style={{ minWidth: '250px' }}>
+    <div className="card shadow-sm" style={{ minWidth: '220px' }}>
       <div className="card-body p-2">
-        <p className="mb-2 fw-semibold">{formatTimestamp(label)}</p>
-        <div className="small">
-          {viewMode === 'packets' ? (
-            <>
-              <div className="mb-1">
-                <strong>Total Packets:</strong> {formatNumber(entry.value ?? 0)}
-              </div>
-              {entry.payload?.protocols && (
-                <div className="mt-2">
-                  <strong>By Protocol:</strong>
-                  <ul className="list-unstyled mb-0 mt-1">
-                    {Object.entries(entry.payload.protocols).map(([proto, count]) => (
-                      <li key={proto}>
-                        {proto}: {formatNumber(count)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="mb-1">
-              <strong>Total Bytes:</strong> {formatBytes(entry.value ?? 0)}
-            </div>
-          )}
+        <p className="mb-2 fw-semibold small">{formatTimestamp(label)}</p>
+        <div className="mb-1 small">
+          <strong>Total {viewMode === 'packets' ? 'Packets' : 'Bytes'}:</strong>{' '}
+          {viewMode === 'packets' ? formatNumber(total) : formatBytes(total)}
         </div>
+        {viewMode === 'packets' && payload.length > 1 && (
+          <ul className="list-unstyled mb-0 mt-1 small">
+            {[...payload].reverse().map(entry => (
+              <li key={entry.name} className="d-flex justify-content-between gap-3">
+                <span style={{ color: entry.color }}>{entry.name}</span>
+                <span>{formatNumber(entry.value ?? 0)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -112,11 +107,47 @@ export const TrafficTimeline = ({
     return secs !== null ? `Auto (${formatInterval(secs)})` : 'Auto';
   }, [data]);
 
-  const chartData = data.map(point => ({
-    timestamp: point.timestamp,
-    value: viewMode === 'packets' ? point.packetCount : point.bytes,
-    protocols: point.protocols,
-  }));
+  // Collect all protocols across all bins, ordered by total packets descending
+  const allProtocols = useMemo(() => {
+    const totals: Record<string, number> = {};
+    data.forEach(point => {
+      Object.entries(point.protocols ?? {}).forEach(([proto, count]) => {
+        totals[proto] = (totals[proto] ?? 0) + count;
+      });
+    });
+    return Object.entries(totals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([proto]) => proto);
+  }, [data]);
+
+  // Build chart data: each bin gets a key per protocol (packets mode) or total bytes
+  const chartData = useMemo(() =>
+    data.map(point => {
+      const entry: Record<string, number | string> = { timestamp: point.timestamp };
+      if (viewMode === 'packets') {
+        allProtocols.forEach(proto => {
+          entry[proto] = point.protocols?.[proto] ?? 0;
+        });
+      } else {
+        entry['bytes'] = point.bytes;
+      }
+      return entry;
+    }),
+  [data, viewMode, allProtocols]);
+
+  const xAxisTickFormatter = useMemo(() => {
+    const secs = effectiveInterval(data);
+    return (ts: number) => {
+      const date = new Date(ts);
+      if (secs !== null && secs >= 86400) {
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      }
+      if (secs !== null && secs >= 3600) {
+        return `${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    };
+  }, [data]);
 
   return (
     <div className="traffic-timeline">
@@ -165,51 +196,36 @@ export const TrafficTimeline = ({
       </div>
 
       <ResponsiveContainer width="100%" height={400}>
-        <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#0d6efd" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#0d6efd" stopOpacity={0.1} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={ts => {
-              const date = new Date(ts);
-              return date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
-            }}
-          />
+        <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} barCategoryGap="20%">
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="timestamp" tickFormatter={xAxisTickFormatter} />
           <YAxis
             tickFormatter={value =>
               viewMode === 'packets' ? formatNumber(value) : formatBytes(value)
             }
           />
           <Tooltip content={<CustomTooltip viewMode={viewMode} />} />
-          <Legend formatter={() => (viewMode === 'packets' ? 'Packet Count' : 'Bytes')} />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke="#0d6efd"
-            fillOpacity={1}
-            fill="url(#colorValue)"
-          />
-        </AreaChart>
+          {viewMode === 'packets' ? (
+            <>
+              <Legend />
+              {allProtocols.map((proto, i) => (
+                <Bar key={proto} dataKey={proto} stackId="a" fill={protocolColor(i)} isAnimationActive={false} />
+              ))}
+            </>
+          ) : (
+            <Bar dataKey="bytes" fill="#0d6efd" isAnimationActive={false}>
+              {chartData.map((_, i) => (
+                <Cell key={i} fill="#0d6efd" fillOpacity={0.8} />
+              ))}
+            </Bar>
+          )}
+        </BarChart>
       </ResponsiveContainer>
 
-      <div className="row mt-4">
-        <div className="col-md-12">
-          <div className="alert alert-info">
-            <small>
-              <strong>Tip:</strong> Hover over the chart to see detailed information about each time
-              period. Use the granularity selector to adjust the bin size, or leave it on Auto for
-              an optimal view of the capture duration.
-            </small>
-          </div>
-        </div>
+      <div className="mt-3">
+        <small className="text-muted">
+          <strong>Tip:</strong> Hover over a bar to see the protocol breakdown for that time window. Each colour represents a distinct protocol. Use granularity to zoom in or out.
+        </small>
       </div>
     </div>
   );

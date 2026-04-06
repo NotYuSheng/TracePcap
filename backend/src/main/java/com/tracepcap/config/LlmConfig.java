@@ -14,7 +14,6 @@ import org.springframework.web.client.RestTemplate;
 public class LlmConfig {
 
   private ApiConfig api;
-  private StoryConfig story;
   private RetryConfig retry;
 
   @Data
@@ -25,12 +24,6 @@ public class LlmConfig {
     private Double temperature;
     private Integer maxTokens;
     private Integer timeoutSeconds;
-  }
-
-  @Data
-  public static class StoryConfig {
-    /** Maximum number of conversations included in the story prompt (sorted by traffic volume). */
-    private Integer maxConversations = 20;
   }
 
   @Data

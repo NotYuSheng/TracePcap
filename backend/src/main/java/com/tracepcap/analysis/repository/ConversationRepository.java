@@ -47,16 +47,31 @@ public interface ConversationRepository
       @Param("fileId") UUID fileId, Pageable pageable);
 
   /**
-   * Returns at-risk conversations for a file, capped to a limit. Uses native query because JPQL
-   * cannot express array_length.
+   * Returns at-risk conversations for a file, capped to a limit, ordered by risk count then bytes.
+   * Uses native query because JPQL cannot express array_length.
    */
   @Query(
       value =
           "SELECT * FROM conversations WHERE file_id = :fileId"
               + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0"
+              + " ORDER BY array_length(flow_risks, 1) DESC, total_bytes DESC"
               + " LIMIT :lim",
       nativeQuery = true)
   List<ConversationEntity> findAtRiskByFileIdLimited(
+      @Param("fileId") UUID fileId, @Param("lim") int lim);
+
+  /**
+   * Returns the top-N at-risk conversations for a file, ordered by risk count descending then
+   * bytes descending. Used for guaranteed risk-slot selection in story prompt construction.
+   */
+  @Query(
+      value =
+          "SELECT * FROM conversations WHERE file_id = :fileId"
+              + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0"
+              + " ORDER BY array_length(flow_risks, 1) DESC, total_bytes DESC"
+              + " LIMIT :lim",
+      nativeQuery = true)
+  List<ConversationEntity> findTopAtRiskByFileId(
       @Param("fileId") UUID fileId, @Param("lim") int lim);
 
   /** Total count of at-risk conversations for a file (used for prompt summary line). */
@@ -119,6 +134,55 @@ public interface ConversationRepository
       nativeQuery = true)
   List<String> findDistinctHttpUserAgentsByFileId(@Param("fileId") UUID fileId);
 
+  /** Per-protocol total conversation count vs. at-risk count for a file. */
+  @Query(
+      value =
+          "SELECT protocol, COUNT(*) AS total,"
+              + " SUM(CASE WHEN flow_risks IS NOT NULL AND array_length(flow_risks,1) > 0"
+              + "     THEN 1 ELSE 0 END) AS at_risk"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " GROUP BY protocol ORDER BY total DESC",
+      nativeQuery = true)
+  List<Object[]> findProtocolRiskMatrixByFileId(@Param("fileId") UUID fileId);
+
+  /** Count of conversations with no detected application name for a file. */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM conversations"
+              + " WHERE file_id = :fileId AND (app_name IS NULL OR app_name = '')",
+      nativeQuery = true)
+  long countUnknownAppByFileId(@Param("fileId") UUID fileId);
+
+  /** Total packet count across all conversations for a file. */
+  @Query(
+      "SELECT COALESCE(SUM(c.packetCount), 0) FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId")
+  long sumPacketsByFileId(@Param("fileId") UUID fileId);
+
+  /** All conversations for a file that have TLS certificate data (for anomaly aggregation). */
+  @Query(
+      "SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND c.tlsIssuer IS NOT NULL")
+  List<ConversationEntity> findTlsConversationsByFileId(@Param("fileId") UUID fileId);
+
+  /**
+   * Returns flow tuples (srcIp, dstIp, dstPort, protocol, appName, startTime) for groups that
+   * have at least 3 conversations, ordered for efficient beacon detection grouping.
+   */
+  @Query(
+      value =
+          "SELECT src_ip, dst_ip, dst_port, protocol, app_name, start_time"
+              + " FROM conversations"
+              + " WHERE file_id = :fileId"
+              + "   AND (src_ip, COALESCE(dst_ip,''), COALESCE(CAST(dst_port AS text),''), protocol) IN ("
+              + "     SELECT src_ip, COALESCE(dst_ip,''), COALESCE(CAST(dst_port AS text),''), protocol"
+              + "     FROM conversations WHERE file_id = :fileId"
+              + "     GROUP BY src_ip, dst_ip, dst_port, protocol HAVING COUNT(*) >= 3"
+              + "   )"
+              + " ORDER BY src_ip, dst_ip, dst_port, protocol, start_time",
+      nativeQuery = true)
+  List<Object[]> findFlowsForBeaconDetection(@Param("fileId") UUID fileId);
+
   /** Returns the distinct risk type strings present across all at-risk conversations for a file. */
   @Query(
       value =
@@ -129,6 +193,43 @@ public interface ConversationRepository
       nativeQuery = true)
   List<String> findDistinctRiskTypesByFileId(@Param("fileId") UUID fileId);
 
+  /**
+   * For each distinct risk type in the file, returns aggregate stats:
+   * [risk_type, conversation_count, total_bytes, distinct_src_ips, distinct_dst_ips].
+   * Used to build risk-type cluster summaries for the story prompt.
+   */
+  @Query(
+      value =
+          "SELECT r.risk_type,"
+              + "  COUNT(*) AS conv_count,"
+              + "  SUM(c.total_bytes) AS total_bytes,"
+              + "  COUNT(DISTINCT c.src_ip) AS distinct_src_ips,"
+              + "  COUNT(DISTINCT c.dst_ip) AS distinct_dst_ips"
+              + " FROM conversations c,"
+              + "   unnest(c.flow_risks) AS r(risk_type)"
+              + " WHERE c.file_id = :fileId"
+              + "   AND c.flow_risks IS NOT NULL AND array_length(c.flow_risks, 1) > 0"
+              + " GROUP BY r.risk_type"
+              + " ORDER BY conv_count DESC",
+      nativeQuery = true)
+  List<Object[]> findRiskTypeStatsByFileId(@Param("fileId") UUID fileId);
+
+  /**
+   * Returns the single highest-bytes conversation that contains the given risk type.
+   * Used for diversity-aware example selection in story prompt construction.
+   */
+  @Query(
+      value =
+          "SELECT * FROM conversations"
+              + " WHERE file_id = :fileId"
+              + "   AND flow_risks IS NOT NULL"
+              + "   AND :riskType = ANY(flow_risks)"
+              + " ORDER BY total_bytes DESC"
+              + " LIMIT 1",
+      nativeQuery = true)
+  List<ConversationEntity> findTopConversationByRiskType(
+      @Param("fileId") UUID fileId, @Param("riskType") String riskType);
+
   /** Returns the distinct custom signature rule names triggered for a file. */
   @Query(
       value =
@@ -138,6 +239,47 @@ public interface ConversationRepository
               + " ORDER BY rule_name",
       nativeQuery = true)
   List<String> findDistinctCustomSignaturesByFileId(@Param("fileId") UUID fileId);
+
+  /**
+   * Returns fan-out candidates: source IPs connecting to more than 5 distinct destination IPs.
+   * Columns: [src_ip, distinct_dst_ips, total_flows]
+   */
+  @Query(
+      value =
+          "SELECT src_ip, COUNT(DISTINCT dst_ip) AS distinct_dst_ips, COUNT(*) AS total_flows"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " GROUP BY src_ip HAVING COUNT(DISTINCT dst_ip) > 5"
+              + " ORDER BY distinct_dst_ips DESC",
+      nativeQuery = true)
+  List<Object[]> findFanOutCandidatesByFileId(@Param("fileId") UUID fileId);
+
+  /**
+   * Returns top senders by total bytes for volume anomaly detection.
+   * Columns: [src_ip, total_bytes, flow_count]
+   */
+  @Query(
+      value =
+          "SELECT src_ip, SUM(total_bytes) AS total_bytes, COUNT(*) AS flow_count"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " GROUP BY src_ip ORDER BY total_bytes DESC LIMIT 20",
+      nativeQuery = true)
+  List<Object[]> findTopSendersByFileId(@Param("fileId") UUID fileId);
+
+  /**
+   * Returns long-duration sessions exceeding the given threshold in seconds.
+   * Columns: [src_ip, dst_ip, dst_port, protocol, app_name, duration_ms, total_bytes, packet_count]
+   */
+  @Query(
+      value =
+          "SELECT src_ip, dst_ip, dst_port, protocol, app_name,"
+              + " EXTRACT(EPOCH FROM (end_time - start_time)) * 1000 AS duration_ms,"
+              + " total_bytes, packet_count"
+              + " FROM conversations WHERE file_id = :fileId"
+              + "   AND EXTRACT(EPOCH FROM (end_time - start_time)) > :thresholdSeconds"
+              + " ORDER BY duration_ms DESC LIMIT 20",
+      nativeQuery = true)
+  List<Object[]> findLongSessionsByFileId(
+      @Param("fileId") UUID fileId, @Param("thresholdSeconds") long thresholdSeconds);
 
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
   static Specification<ConversationEntity> buildSpec(UUID fileId, ConversationFilterParams params) {
