@@ -29,10 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Extracts files embedded in packet streams from a PCAP file.
  *
  * <p>Two strategies are used:
+ *
  * <ol>
- *   <li>HTTP objects via {@code tshark --export-objects http}</li>
- *   <li>Raw TCP/UDP streams: conversations where packets had file-type detections are
- *       reconstructed and scanned for known magic-byte signatures.</li>
+ *   <li>HTTP objects via {@code tshark --export-objects http}
+ *   <li>Raw TCP/UDP streams: conversations where packets had file-type detections are reconstructed
+ *       and scanned for known magic-byte signatures.
  * </ol>
  */
 @Slf4j
@@ -46,8 +47,10 @@ public class FileExtractionService {
   /** Maximum number of non-HTTP conversations to scan for embedded files. */
   private static final int MAX_RAW_STREAM_CONVERSATIONS = 50;
 
-  /** Maximum embedded files extracted per raw stream. Prevents runaway extraction on streams
-   *  that contain many magic-byte sequences (e.g. synthetic test data or binary protocols). */
+  /**
+   * Maximum embedded files extracted per raw stream. Prevents runaway extraction on streams that
+   * contain many magic-byte sequences (e.g. synthetic test data or binary protocols).
+   */
   private static final int MAX_MATCHES_PER_STREAM = 20;
 
   private static final Tika TIKA = new Tika();
@@ -60,22 +63,22 @@ public class FileExtractionService {
   // -------------------------------------------------------------------------
 
   /**
-   * Known file-format magic byte sequences. Aho-Corasick finds their positions in a stream in
-   * one O(n) pass; Tika then confirms each candidate. This replaces the old O(n/4) sliding-window
+   * Known file-format magic byte sequences. Aho-Corasick finds their positions in a stream in one
+   * O(n) pass; Tika then confirms each candidate. This replaces the old O(n/4) sliding-window
    * approach and reduces per-stream Tika calls from millions to O(actual matches).
    */
   private static final List<byte[]> MAGIC_PATTERNS = buildMagicPatterns();
 
   /**
-   * Complete Aho-Corasick GOTO table: {@code AC_GOTO[state][byte] = nextState}.
-   * "Complete" means failure-link logic is baked in — no −1 entries — so the search
-   * loop is a single array lookup per byte with no branching.
+   * Complete Aho-Corasick GOTO table: {@code AC_GOTO[state][byte] = nextState}. "Complete" means
+   * failure-link logic is baked in — no −1 entries — so the search loop is a single array lookup
+   * per byte with no branching.
    */
   private static final int[][] AC_GOTO;
 
   /**
-   * Output function: {@code AC_OUTPUT[state]} is the index into {@link #MAGIC_PATTERNS}
-   * for a terminal state, or −1 for non-terminal states.
+   * Output function: {@code AC_OUTPUT[state]} is the index into {@link #MAGIC_PATTERNS} for a
+   * terminal state, or −1 for non-terminal states.
    */
   private static final int[] AC_OUTPUT;
 
@@ -84,8 +87,8 @@ public class FileExtractionService {
     int maxStates = totalLen + 1;
 
     int[][] gotoFn = new int[maxStates][256];
-    int[]   output = new int[maxStates];
-    int[]   fail   = new int[maxStates];
+    int[] output = new int[maxStates];
+    int[] fail = new int[maxStates];
     Arrays.fill(output, -1);
     for (int[] row : gotoFn) Arrays.fill(row, -1);
 
@@ -109,7 +112,10 @@ public class FileExtractionService {
     Queue<Integer> q = new ArrayDeque<>();
     for (int c = 0; c < 256; c++) {
       int s = gotoFn[0][c];
-      if (s != 0) { fail[s] = 0; q.add(s); }
+      if (s != 0) {
+        fail[s] = 0;
+        q.add(s);
+      }
     }
     while (!q.isEmpty()) {
       int r = q.poll();
@@ -125,7 +131,7 @@ public class FileExtractionService {
       }
     }
 
-    AC_GOTO   = Arrays.copyOf(gotoFn, stateCount);
+    AC_GOTO = Arrays.copyOf(gotoFn, stateCount);
     AC_OUTPUT = Arrays.copyOf(output, stateCount);
   }
 
@@ -136,18 +142,17 @@ public class FileExtractionService {
   /**
    * A confirmed magic-byte match within a byte stream.
    *
-   * @param start    byte offset where the file signature was detected
-   * @param end      byte offset of the end of the stream (file data ends here unless truncated)
+   * @param start byte offset where the file signature was detected
+   * @param end byte offset of the end of the stream (file data ends here unless truncated)
    * @param mimeType MIME type string detected by Tika
-   * @param ext      file extension (without leading dot)
+   * @param ext file extension (without leading dot)
    */
   private record MagicMatch(int start, int end, String mimeType, String ext) {}
 
   /** Associates a tshark stream index with its transport protocol ("tcp" or "udp"). */
   private record StreamInfo(String transport, int index) {}
 
-  @PersistenceContext
-  private EntityManager entityManager;
+  @PersistenceContext private EntityManager entityManager;
 
   private final ExtractedFileRepository extractedFileRepository;
   private final ConversationRepository conversationRepository;
@@ -161,18 +166,15 @@ public class FileExtractionService {
   /**
    * Extracts files from the given PCAP and saves metadata to the database.
    *
-   * <p>Must be called within the same transaction that saved the conversations so
-   * that flushed-but-uncommitted conversation rows are visible to repository queries.
+   * <p>Must be called within the same transaction that saved the conversations so that
+   * flushed-but-uncommitted conversation rows are visible to repository queries.
    *
-   * @param file               the persisted FileEntity
-   * @param tempPcapFile       the PCAP on local disk (will not be deleted here)
+   * @param file the persisted FileEntity
+   * @param tempPcapFile the PCAP on local disk (will not be deleted here)
    * @param savedConversationIds IDs of conversations already persisted to DB for this file
    */
   @Transactional
-  public void extractFiles(
-      FileEntity file,
-      File tempPcapFile,
-      List<UUID> savedConversationIds) {
+  public void extractFiles(FileEntity file, File tempPcapFile, List<UUID> savedConversationIds) {
 
     log.info("Starting file extraction for PCAP {}", file.getId());
 
@@ -208,8 +210,10 @@ public class FileExtractionService {
       ProcessBuilder pb =
           new ProcessBuilder(
               "tshark",
-              "-r", tempPcapFile.getAbsolutePath(),
-              "--export-objects", "http," + tmpDir.getAbsolutePath());
+              "-r",
+              tempPcapFile.getAbsolutePath(),
+              "--export-objects",
+              "http," + tmpDir.getAbsolutePath());
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
       proc.getInputStream().transferTo(OutputStream.nullOutputStream());
@@ -260,9 +264,9 @@ public class FileExtractionService {
    * Runs a secondary tshark pass to correlate exported HTTP filenames with conversation IDs.
    *
    * <p>tshark names exported HTTP objects after the last path segment of the response URI,
-   * appending {@code (N)} before the extension when the same basename appears multiple times
-   * (e.g. {@code dagbok.html}, {@code dagbok(1).html}, {@code dagbok(2).html}).
-   * We replicate this numbering by processing URIs in pcap order and tracking per-basename counts.
+   * appending {@code (N)} before the extension when the same basename appears multiple times (e.g.
+   * {@code dagbok.html}, {@code dagbok(1).html}, {@code dagbok(2).html}). We replicate this
+   * numbering by processing URIs in pcap order and tracking per-basename counts.
    *
    * @return map from tshark-exported filename → conversation UUID
    */
@@ -278,29 +282,38 @@ public class FileExtractionService {
       ProcessBuilder pb =
           new ProcessBuilder(
               "tshark",
-              "-r", pcapFile.getAbsolutePath(),
-              "-Y", "http.request",
-              "-T", "fields",
-              "-e", "http.request.uri",
-              "-e", "ip.src",
-              "-e", "ipv6.src",
-              "-e", "tcp.srcport",
-              "-e", "ip.dst",
-              "-e", "ipv6.dst",
-              "-e", "tcp.dstport");
+              "-r",
+              pcapFile.getAbsolutePath(),
+              "-Y",
+              "http.request",
+              "-T",
+              "fields",
+              "-e",
+              "http.request.uri",
+              "-e",
+              "ip.src",
+              "-e",
+              "ipv6.src",
+              "-e",
+              "tcp.srcport",
+              "-e",
+              "ip.dst",
+              "-e",
+              "ipv6.dst",
+              "-e",
+              "tcp.dstport");
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
 
-      try (BufferedReader br =
-          new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
         String line;
         while ((line = br.readLine()) != null) {
           String[] cols = line.split("\t", -1);
           if (cols.length < 7) continue;
-          String uri     = cols[0].trim();
-          String srcIp   = firstNonEmpty(cols[1], cols[2]);
+          String uri = cols[0].trim();
+          String srcIp = firstNonEmpty(cols[1], cols[2]);
           String srcPort = cols[3].trim();
-          String dstIp   = firstNonEmpty(cols[4], cols[5]);
+          String dstIp = firstNonEmpty(cols[4], cols[5]);
           String dstPort = cols[6].trim();
           if (uri.isEmpty()) continue;
 
@@ -327,9 +340,9 @@ public class FileExtractionService {
   }
 
   /**
-   * Derives the base filename from an HTTP URI the same way tshark does:
-   * last path segment, URL-decoded, with unsafe chars replaced by {@code _}.
-   * Returns {@code %2f} for root/empty paths (matching tshark's observed behaviour).
+   * Derives the base filename from an HTTP URI the same way tshark does: last path segment,
+   * URL-decoded, with unsafe chars replaced by {@code _}. Returns {@code %2f} for root/empty paths
+   * (matching tshark's observed behaviour).
    */
   private static String uriToBasename(String uri) {
     try {
@@ -339,8 +352,10 @@ public class FileExtractionService {
         int slashAfterHost = uri.indexOf('/', schemeEnd + 3);
         path = slashAfterHost >= 0 ? uri.substring(slashAfterHost) : "/";
       }
-      int q = path.indexOf('?'); if (q >= 0) path = path.substring(0, q);
-      int f = path.indexOf('#'); if (f >= 0) path = path.substring(0, f);
+      int q = path.indexOf('?');
+      if (q >= 0) path = path.substring(0, q);
+      int f = path.indexOf('#');
+      if (f >= 0) path = path.substring(0, f);
       int lastSlash = path.lastIndexOf('/');
       String segment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
       segment = URLDecoder.decode(segment, StandardCharsets.UTF_8);
@@ -352,24 +367,28 @@ public class FileExtractionService {
   }
 
   /**
-   * Strips a tshark duplicate-numbering suffix from a filename.
-   * e.g. {@code "xcms(1).asp"} → {@code "xcms.asp"}, {@code "dagbok(2).html"} → {@code "dagbok.html"}.
-   * Returns {@code null} if the filename has no such suffix.
+   * Strips a tshark duplicate-numbering suffix from a filename. e.g. {@code "xcms(1).asp"} → {@code
+   * "xcms.asp"}, {@code "dagbok(2).html"} → {@code "dagbok.html"}. Returns {@code null} if the
+   * filename has no such suffix.
    */
   private static String stripNumberSuffix(String filename) {
     int dot = filename.lastIndexOf('.');
     String base = dot > 0 ? filename.substring(0, dot) : filename;
-    String ext  = dot > 0 ? filename.substring(dot) : "";
+    String ext = dot > 0 ? filename.substring(dot) : "";
     int open = base.lastIndexOf('(');
     if (open <= 0 || !base.endsWith(")")) return null;
     String inner = base.substring(open + 1, base.length() - 1);
-    try { Integer.parseInt(inner); } catch (NumberFormatException e) { return null; }
+    try {
+      Integer.parseInt(inner);
+    } catch (NumberFormatException e) {
+      return null;
+    }
     return base.substring(0, open) + ext;
   }
 
   /**
-   * Replicates tshark's duplicate-filename suffix: inserts {@code (N)} before the extension.
-   * e.g. {@code addDuplicateSuffix("dagbok.html", 1)} → {@code "dagbok(1).html"}.
+   * Replicates tshark's duplicate-filename suffix: inserts {@code (N)} before the extension. e.g.
+   * {@code addDuplicateSuffix("dagbok.html", 1)} → {@code "dagbok(1).html"}.
    */
   private static String addDuplicateSuffix(String basename, int n) {
     int dot = basename.lastIndexOf('.');
@@ -388,21 +407,31 @@ public class FileExtractionService {
 
   private static Integer parsePort(String s) {
     if (s == null || s.isBlank()) return null;
-    try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return null; }
+    try {
+      return Integer.parseInt(s.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   /** Finds a conversation matching the given endpoint pair (bidirectional). */
   private static ConversationEntity findConvByEndpoints(
       List<ConversationEntity> convs,
-      String srcIp, Integer srcPort,
-      String dstIp, Integer dstPort) {
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort) {
     for (ConversationEntity c : convs) {
       boolean fwd =
-          eq(c.getSrcIp(), srcIp) && eq(c.getDstIp(), dstIp)
-              && eq(c.getSrcPort(), srcPort) && eq(c.getDstPort(), dstPort);
+          eq(c.getSrcIp(), srcIp)
+              && eq(c.getDstIp(), dstIp)
+              && eq(c.getSrcPort(), srcPort)
+              && eq(c.getDstPort(), dstPort);
       boolean rev =
-          eq(c.getSrcIp(), dstIp) && eq(c.getDstIp(), srcIp)
-              && eq(c.getSrcPort(), dstPort) && eq(c.getDstPort(), srcPort);
+          eq(c.getSrcIp(), dstIp)
+              && eq(c.getDstIp(), srcIp)
+              && eq(c.getSrcPort(), dstPort)
+              && eq(c.getDstPort(), srcPort);
       if (fwd || rev) return c;
     }
     return null;
@@ -419,9 +448,7 @@ public class FileExtractionService {
   // -------------------------------------------------------------------------
 
   private void extractFromRawStreams(
-      FileEntity file,
-      File tempPcapFile,
-      List<ConversationEntity> allConvs) {
+      FileEntity file, File tempPcapFile, List<ConversationEntity> allConvs) {
 
     if (allConvs.isEmpty()) return;
 
@@ -437,10 +464,11 @@ public class FileExtractionService {
     List<ConversationEntity> candidates =
         allConvs.stream()
             .filter(c -> convIdsWithFiles.contains(c.getId()))
-            .filter(c -> {
-              String tp = c.getTsharkProtocol();
-              return tp == null || !tp.toUpperCase().contains("HTTP");
-            })
+            .filter(
+                c -> {
+                  String tp = c.getTsharkProtocol();
+                  return tp == null || !tp.toUpperCase().contains("HTTP");
+                })
             .limit(MAX_RAW_STREAM_CONVERSATIONS)
             .toList();
 
@@ -451,11 +479,15 @@ public class FileExtractionService {
 
     Map<ConversationEntity, StreamInfo> convStreamMap = new LinkedHashMap<>();
     for (ConversationEntity conv : candidates) {
-      StreamInfo info = streamIndexMap.get(streamKey(conv.getSrcIp(), conv.getSrcPort(),
-                                                      conv.getDstIp(), conv.getDstPort()));
+      StreamInfo info =
+          streamIndexMap.get(
+              streamKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort()));
       if (info == null) {
-        info = streamIndexMap.get(streamKey(conv.getDstIp(), conv.getDstPort(),
-                                            conv.getSrcIp(), conv.getSrcPort()));
+        info =
+            streamIndexMap.get(
+                streamKey(
+                    conv.getDstIp(), conv.getDstPort(),
+                    conv.getSrcIp(), conv.getSrcPort()));
       }
       if (info != null) convStreamMap.put(conv, info);
     }
@@ -478,7 +510,8 @@ public class FileExtractionService {
       try {
         processMagicMatches(file, conv, streamBytes);
       } catch (Exception e) {
-        log.debug("Stream extraction skipped for conversation {}: {}", conv.getId(), e.getMessage());
+        log.debug(
+            "Stream extraction skipped for conversation {}: {}", conv.getId(), e.getMessage());
       }
     }
   }
@@ -506,25 +539,45 @@ public class FileExtractionService {
   // -------------------------------------------------------------------------
 
   /**
-   * Reads the pcap once and builds a map from conversation-endpoint key to
-   * (transport, streamIndex). Replaces the old per-conversation findStreamIndex calls.
+   * Reads the pcap once and builds a map from conversation-endpoint key to (transport,
+   * streamIndex). Replaces the old per-conversation findStreamIndex calls.
    */
   private Map<String, StreamInfo> buildStreamIndexMap(File pcapFile) {
     Map<String, StreamInfo> map = new HashMap<>();
     try {
       ProcessBuilder pb =
           new ProcessBuilder(
-              "tshark", "-r", pcapFile.getAbsolutePath(),
-              "-T", "fields", "-E", "separator=|",
-              "-e", "ip.src",      "-e", "ip.dst",
-              "-e", "ipv6.src",    "-e", "ipv6.dst",
-              "-e", "tcp.srcport", "-e", "tcp.dstport", "-e", "tcp.stream",
-              "-e", "udp.srcport", "-e", "udp.dstport", "-e", "udp.stream");
+              "tshark",
+              "-r",
+              pcapFile.getAbsolutePath(),
+              "-T",
+              "fields",
+              "-E",
+              "separator=|",
+              "-e",
+              "ip.src",
+              "-e",
+              "ip.dst",
+              "-e",
+              "ipv6.src",
+              "-e",
+              "ipv6.dst",
+              "-e",
+              "tcp.srcport",
+              "-e",
+              "tcp.dstport",
+              "-e",
+              "tcp.stream",
+              "-e",
+              "udp.srcport",
+              "-e",
+              "udp.dstport",
+              "-e",
+              "udp.stream");
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
 
-      try (BufferedReader br =
-          new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
         String line;
         while ((line = br.readLine()) != null) {
           String[] f = line.split("\\|", -1);
@@ -538,18 +591,20 @@ public class FileExtractionService {
           if (!f[6].isEmpty()) {
             try {
               int idx = Integer.parseInt(f[6].split(",")[0].trim());
-              putBoth(map, srcIp, parsePort(f[4]), dstIp, parsePort(f[5]),
-                      new StreamInfo("tcp", idx));
-            } catch (NumberFormatException ignored) {}
+              putBoth(
+                  map, srcIp, parsePort(f[4]), dstIp, parsePort(f[5]), new StreamInfo("tcp", idx));
+            } catch (NumberFormatException ignored) {
+            }
           }
 
           // UDP
           if (!f[9].isEmpty()) {
             try {
               int idx = Integer.parseInt(f[9].split(",")[0].trim());
-              putBoth(map, srcIp, parsePort(f[7]), dstIp, parsePort(f[8]),
-                      new StreamInfo("udp", idx));
-            } catch (NumberFormatException ignored) {}
+              putBoth(
+                  map, srcIp, parsePort(f[7]), dstIp, parsePort(f[8]), new StreamInfo("udp", idx));
+            } catch (NumberFormatException ignored) {
+            }
           }
         }
       }
@@ -562,8 +617,13 @@ public class FileExtractionService {
     return map;
   }
 
-  private static void putBoth(Map<String, StreamInfo> map,
-      String srcIp, Integer srcPort, String dstIp, Integer dstPort, StreamInfo info) {
+  private static void putBoth(
+      Map<String, StreamInfo> map,
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort,
+      StreamInfo info) {
     map.putIfAbsent(streamKey(srcIp, srcPort, dstIp, dstPort), info);
     map.putIfAbsent(streamKey(dstIp, dstPort, srcIp, srcPort), info);
   }
@@ -577,9 +637,9 @@ public class FileExtractionService {
   // -------------------------------------------------------------------------
 
   /**
-   * Reads all requested TCP and UDP streams in one tshark invocation using multiple
-   * {@code -z follow,<proto>,raw,<N>} arguments. Returns a map from "tcp:N" / "udp:N" to the
-   * reassembled raw bytes for that stream.
+   * Reads all requested TCP and UDP streams in one tshark invocation using multiple {@code -z
+   * follow,<proto>,raw,<N>} arguments. Returns a map from "tcp:N" / "udp:N" to the reassembled raw
+   * bytes for that stream.
    */
   private Map<String, byte[]> readAllStreams(
       File pcapFile, Set<Integer> tcpIds, Set<Integer> udpIds) {
@@ -588,10 +648,17 @@ public class FileExtractionService {
 
     List<String> cmd = new ArrayList<>();
     cmd.add("tshark");
-    cmd.add("-r"); cmd.add(pcapFile.getAbsolutePath());
+    cmd.add("-r");
+    cmd.add(pcapFile.getAbsolutePath());
     cmd.add("-q");
-    for (int idx : tcpIds) { cmd.add("-z"); cmd.add("follow,tcp,raw," + idx); }
-    for (int idx : udpIds) { cmd.add("-z"); cmd.add("follow,udp,raw," + idx); }
+    for (int idx : tcpIds) {
+      cmd.add("-z");
+      cmd.add("follow,tcp,raw," + idx);
+    }
+    for (int idx : udpIds) {
+      cmd.add("-z");
+      cmd.add("follow,udp,raw," + idx);
+    }
 
     try {
       ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -601,8 +668,7 @@ public class FileExtractionService {
       String currentKey = null;
       ByteArrayOutputStream currentBuf = null;
 
-      try (BufferedReader br =
-          new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
         String line;
         while ((line = br.readLine()) != null) {
           if (line.startsWith("=====")) {
@@ -619,12 +685,12 @@ public class FileExtractionService {
             currentKey = "udp:" + line.substring("Filter: udp.stream eq ".length()).trim();
             currentBuf = new ByteArrayOutputStream();
           } else if (currentBuf != null
-              && !line.startsWith("Follow:") && !line.startsWith("Node ")) {
+              && !line.startsWith("Follow:")
+              && !line.startsWith("Node ")) {
             String hexLine = line.stripLeading();
             if (!hexLine.isEmpty()) {
               byte[] chunk = hexToBytes(hexLine);
-              if (chunk != null
-                  && currentBuf.size() + chunk.length <= MAX_EXTRACTED_FILE_BYTES) {
+              if (chunk != null && currentBuf.size() + chunk.length <= MAX_EXTRACTED_FILE_BYTES) {
                 currentBuf.write(chunk);
               }
             }
@@ -662,12 +728,12 @@ public class FileExtractionService {
   // -------------------------------------------------------------------------
 
   /**
-   * Scans {@code data} for embedded files using Aho-Corasick to locate magic-byte candidates
-   * in one O(n) pass, then confirms each with a single Tika call.
+   * Scans {@code data} for embedded files using Aho-Corasick to locate magic-byte candidates in one
+   * O(n) pass, then confirms each with a single Tika call.
    *
    * <p>This replaces the old sliding-window approach (O(n/4) Tika calls) and reduces per-stream
-   * Tika invocations from millions to O(actual magic-byte matches) — roughly 100–500× fewer
-   * calls on large streams with few or no embedded files.
+   * Tika invocations from millions to O(actual magic-byte matches) — roughly 100–500× fewer calls
+   * on large streams with few or no embedded files.
    */
   private List<MagicMatch> findMagicMatches(byte[] data) {
     List<MagicMatch> results = new ArrayList<>();
@@ -680,7 +746,7 @@ public class FileExtractionService {
       if (pi < 0) continue;
 
       int patLen = MAGIC_PATTERNS.get(pi).length;
-      int start  = i - patLen;
+      int start = i - patLen;
       if (start < 0) continue;
 
       // Tika confirmation — only called at actual magic-byte positions
@@ -709,81 +775,82 @@ public class FileExtractionService {
   }
 
   /**
-   * Magic byte sequences searched by the Aho-Corasick automaton.
-   * Covers archives, documents, images, audio/video, executables, crypto, and common text formats.
+   * Magic byte sequences searched by the Aho-Corasick automaton. Covers archives, documents,
+   * images, audio/video, executables, crypto, and common text formats.
    */
   private static List<byte[]> buildMagicPatterns() {
     List<byte[]> p = new ArrayList<>();
     // Archives
-    add(p, 0x50,0x4B,0x03,0x04);                                  // ZIP / OOXML / JAR / APK
-    add(p, 0x50,0x4B,0x05,0x06);                                  // ZIP (empty)
-    add(p, 0x50,0x4B,0x07,0x08);                                  // ZIP (spanned)
-    add(p, 0x1F,0x8B);                                             // GZIP
-    add(p, 0x42,0x5A,0x68);                                        // BZIP2
-    add(p, 0x37,0x7A,0xBC,0xAF,0x27,0x1C);                        // 7-Zip
-    add(p, 0x52,0x61,0x72,0x21,0x1A,0x07);                        // RAR v4
-    add(p, 0xFD,0x37,0x7A,0x58,0x5A,0x00);                        // XZ
-    add(p, 0x28,0xB5,0x2F,0xFD);                                   // Zstandard
-    add(p, 0x60,0xEA);                                             // ARJ
-    add(p, 0x30,0x37,0x30,0x37,0x30,0x31);                        // CPIO new ASCII (070701)
-    add(p, 0x30,0x37,0x30,0x37,0x30,0x32);                        // CPIO new CRC  (070702)
-    add(p, 0xC7,0x71);                                             // CPIO binary
-    add(p, 0x71,0xC7);                                             // CPIO binary (BE)
+    add(p, 0x50, 0x4B, 0x03, 0x04); // ZIP / OOXML / JAR / APK
+    add(p, 0x50, 0x4B, 0x05, 0x06); // ZIP (empty)
+    add(p, 0x50, 0x4B, 0x07, 0x08); // ZIP (spanned)
+    add(p, 0x1F, 0x8B); // GZIP
+    add(p, 0x42, 0x5A, 0x68); // BZIP2
+    add(p, 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C); // 7-Zip
+    add(p, 0x52, 0x61, 0x72, 0x21, 0x1A, 0x07); // RAR v4
+    add(p, 0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00); // XZ
+    add(p, 0x28, 0xB5, 0x2F, 0xFD); // Zstandard
+    add(p, 0x60, 0xEA); // ARJ
+    add(p, 0x30, 0x37, 0x30, 0x37, 0x30, 0x31); // CPIO new ASCII (070701)
+    add(p, 0x30, 0x37, 0x30, 0x37, 0x30, 0x32); // CPIO new CRC  (070702)
+    add(p, 0xC7, 0x71); // CPIO binary
+    add(p, 0x71, 0xC7); // CPIO binary (BE)
     // Documents
-    add(p, 0x25,0x50,0x44,0x46);                                   // PDF
-    add(p, 0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1);             // OLE2 (DOC / XLS / PPT)
-    add(p, 0x7B,0x5C,0x72,0x74,0x66);                             // RTF
-    add(p, 0x25,0x21);                                             // PostScript
+    add(p, 0x25, 0x50, 0x44, 0x46); // PDF
+    add(p, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1); // OLE2 (DOC / XLS / PPT)
+    add(p, 0x7B, 0x5C, 0x72, 0x74, 0x66); // RTF
+    add(p, 0x25, 0x21); // PostScript
     // Images
-    add(p, 0xFF,0xD8,0xFF);                                        // JPEG
-    add(p, 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A);             // PNG
-    add(p, 0x47,0x49,0x46,0x38,0x37,0x61);                        // GIF87a
-    add(p, 0x47,0x49,0x46,0x38,0x39,0x61);                        // GIF89a
-    add(p, 0x42,0x4D);                                             // BMP
-    add(p, 0x49,0x49,0x2A,0x00);                                   // TIFF LE
-    add(p, 0x4D,0x4D,0x00,0x2A);                                   // TIFF BE
-    add(p, 0x52,0x49,0x46,0x46);                                   // RIFF (WAV / AVI / WebP)
-    add(p, 0x00,0x00,0x01,0x00);                                   // ICO
-    add(p, 0x0A,0x05);                                             // PCX v5
-    add(p, 0x0A,0x03);                                             // PCX v3
-    add(p, 0x0A,0x02);                                             // PCX v2
-    add(p, 0x38,0x42,0x50,0x53);                                   // Photoshop PSD
-    add(p, 0xFF,0x0A);                                             // JPEG XL codestream
-    add(p, 0x00,0x00,0x00,0x0C,0x4A,0x58,0x4C,0x20);             // JPEG XL ISO box
+    add(p, 0xFF, 0xD8, 0xFF); // JPEG
+    add(p, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A); // PNG
+    add(p, 0x47, 0x49, 0x46, 0x38, 0x37, 0x61); // GIF87a
+    add(p, 0x47, 0x49, 0x46, 0x38, 0x39, 0x61); // GIF89a
+    add(p, 0x42, 0x4D); // BMP
+    add(p, 0x49, 0x49, 0x2A, 0x00); // TIFF LE
+    add(p, 0x4D, 0x4D, 0x00, 0x2A); // TIFF BE
+    add(p, 0x52, 0x49, 0x46, 0x46); // RIFF (WAV / AVI / WebP)
+    add(p, 0x00, 0x00, 0x01, 0x00); // ICO
+    add(p, 0x0A, 0x05); // PCX v5
+    add(p, 0x0A, 0x03); // PCX v3
+    add(p, 0x0A, 0x02); // PCX v2
+    add(p, 0x38, 0x42, 0x50, 0x53); // Photoshop PSD
+    add(p, 0xFF, 0x0A); // JPEG XL codestream
+    add(p, 0x00, 0x00, 0x00, 0x0C, 0x4A, 0x58, 0x4C, 0x20); // JPEG XL ISO box
     // Audio / Video
-    add(p, 0xFF,0xFB);                                             // MP3 (MPEG-1 L3)
-    add(p, 0xFF,0xFA);                                             // MP3 (MPEG-1 L3 protected)
-    add(p, 0xFF,0xF3);                                             // MP3 (MPEG-2 L3)
-    add(p, 0xFF,0xF2);                                             // MP3 (MPEG-2.5 L3)
-    add(p, 0x49,0x44,0x33);                                        // MP3 ID3 tag
-    add(p, 0x0B,0x77);                                             // AC3 / Dolby Digital
-    add(p, 0x66,0x4C,0x61,0x43);                                   // FLAC
-    add(p, 0x4F,0x67,0x67,0x53);                                   // OGG
-    add(p, 0x1A,0x45,0xDF,0xA3);                                   // MKV / WebM
-    add(p, 0x4D,0x54,0x68,0x64);                                   // MIDI
+    add(p, 0xFF, 0xFB); // MP3 (MPEG-1 L3)
+    add(p, 0xFF, 0xFA); // MP3 (MPEG-1 L3 protected)
+    add(p, 0xFF, 0xF3); // MP3 (MPEG-2 L3)
+    add(p, 0xFF, 0xF2); // MP3 (MPEG-2.5 L3)
+    add(p, 0x49, 0x44, 0x33); // MP3 ID3 tag
+    add(p, 0x0B, 0x77); // AC3 / Dolby Digital
+    add(p, 0x66, 0x4C, 0x61, 0x43); // FLAC
+    add(p, 0x4F, 0x67, 0x67, 0x53); // OGG
+    add(p, 0x1A, 0x45, 0xDF, 0xA3); // MKV / WebM
+    add(p, 0x4D, 0x54, 0x68, 0x64); // MIDI
     // Executables
-    add(p, 0x7F,0x45,0x4C,0x46);                                   // ELF
-    add(p, 0x4D,0x5A);                                             // PE (EXE / DLL)
-    add(p, 0xCA,0xFE,0xBA,0xBE);                                   // Java class / Mach-O fat
-    add(p, 0xCE,0xFA,0xED,0xFE);                                   // Mach-O 32-bit LE
-    add(p, 0xCF,0xFA,0xED,0xFE);                                   // Mach-O 64-bit LE
-    add(p, 0xFE,0xED,0xFA,0xCE);                                   // Mach-O 32-bit BE
-    add(p, 0xFE,0xED,0xFA,0xCF);                                   // Mach-O 64-bit BE
+    add(p, 0x7F, 0x45, 0x4C, 0x46); // ELF
+    add(p, 0x4D, 0x5A); // PE (EXE / DLL)
+    add(p, 0xCA, 0xFE, 0xBA, 0xBE); // Java class / Mach-O fat
+    add(p, 0xCE, 0xFA, 0xED, 0xFE); // Mach-O 32-bit LE
+    add(p, 0xCF, 0xFA, 0xED, 0xFE); // Mach-O 64-bit LE
+    add(p, 0xFE, 0xED, 0xFA, 0xCE); // Mach-O 32-bit BE
+    add(p, 0xFE, 0xED, 0xFA, 0xCF); // Mach-O 64-bit BE
     // Crypto / certificates
-    add(p, 0x2D,0x2D,0x2D,0x2D,0x2D);                             // PEM (-----)
-    add(p, 0x30,0x82);                                             // DER / ASN.1 / PKCS
+    add(p, 0x2D, 0x2D, 0x2D, 0x2D, 0x2D); // PEM (-----)
+    add(p, 0x30, 0x82); // DER / ASN.1 / PKCS
     // Database
-    add(p, 0x53,0x51,0x4C,0x69,0x74,0x65,0x20,0x66,
-           0x6F,0x72,0x6D,0x61,0x74,0x20,0x33,0x00);              // SQLite 3
+    add(
+        p, 0x53, 0x51, 0x4C, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x33,
+        0x00); // SQLite 3
     // Flash
-    add(p, 0x46,0x57,0x53);                                        // SWF (FWS)
-    add(p, 0x43,0x57,0x53);                                        // SWF compressed (CWS)
-    add(p, 0x5A,0x57,0x53);                                        // SWF LZMA (ZWS)
+    add(p, 0x46, 0x57, 0x53); // SWF (FWS)
+    add(p, 0x43, 0x57, 0x53); // SWF compressed (CWS)
+    add(p, 0x5A, 0x57, 0x53); // SWF LZMA (ZWS)
     // Text / markup
-    add(p, 0x3C,0x3F,0x78,0x6D,0x6C);                             // <?xml
-    add(p, 0x3C,0x68,0x74,0x6D,0x6C);                             // <html
-    add(p, 0x3C,0x48,0x54,0x4D,0x4C);                             // <HTML
-    add(p, 0x3C,0x21,0x44,0x4F,0x43,0x54);                        // <!DOCTYPE
+    add(p, 0x3C, 0x3F, 0x78, 0x6D, 0x6C); // <?xml
+    add(p, 0x3C, 0x68, 0x74, 0x6D, 0x6C); // <html
+    add(p, 0x3C, 0x48, 0x54, 0x4D, 0x4C); // <HTML
+    add(p, 0x3C, 0x21, 0x44, 0x4F, 0x43, 0x54); // <!DOCTYPE
     return Collections.unmodifiableList(p);
   }
 
@@ -798,8 +865,8 @@ public class FileExtractionService {
   // File handling helpers
   // -------------------------------------------------------------------------
 
-  private void processLocalFile(
-      FileEntity file, UUID conversationId, File localFile, String method) throws Exception {
+  private void processLocalFile(FileEntity file, UUID conversationId, File localFile, String method)
+      throws Exception {
     byte[] data = Files.readAllBytes(localFile.toPath());
     if (data.length == 0) return;
     if (data.length > MAX_EXTRACTED_FILE_BYTES) {

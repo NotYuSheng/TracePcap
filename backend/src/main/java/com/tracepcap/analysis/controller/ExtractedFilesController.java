@@ -31,8 +31,7 @@ public class ExtractedFilesController {
   @GetMapping
   @Operation(summary = "List all files extracted from a PCAP capture")
   public ResponseEntity<List<ExtractedFileResponse>> listExtractions(
-      @PathVariable UUID fileId,
-      @RequestParam(required = false) UUID conversationId) {
+      @PathVariable UUID fileId, @RequestParam(required = false) UUID conversationId) {
 
     List<ExtractedFileEntity> entities =
         conversationId != null
@@ -48,16 +47,13 @@ public class ExtractedFilesController {
   @GetMapping("/{extractionId}/download")
   @Operation(summary = "Download an extracted file")
   public ResponseEntity<StreamingResponseBody> download(
-      @PathVariable UUID fileId,
-      @PathVariable UUID extractionId) {
+      @PathVariable UUID fileId, @PathVariable UUID extractionId) {
 
     ExtractedFileEntity entity =
         extractedFileRepository
             .findById(extractionId)
             .orElseThrow(
-                () ->
-                    new ResourceNotFoundException(
-                        "Extracted file not found: " + extractionId));
+                () -> new ResourceNotFoundException("Extracted file not found: " + extractionId));
 
     // Verify the entity belongs to the requested file
     if (!entity.getFile().getId().equals(fileId)) {

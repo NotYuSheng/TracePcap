@@ -102,8 +102,8 @@ public class CustomSignatureService {
 
   /**
    * Returns a map of IP address → custom device type for any IPs that were involved in
-   * conversations matched by a rule containing a {@code device_type} field. Call this after
-   * {@link #applySignatures} so the conversations already carry their matched rule names.
+   * conversations matched by a rule containing a {@code device_type} field. Call this after {@link
+   * #applySignatures} so the conversations already carry their matched rule names.
    *
    * <p>Example YAML:
    *
@@ -322,8 +322,7 @@ public class CustomSignatureService {
 
       final String needle = hexNeedle;
       boolean found =
-          packets.stream()
-              .anyMatch(p -> p.getPayload() != null && p.getPayload().contains(needle));
+          packets.stream().anyMatch(p -> p.getPayload() != null && p.getPayload().contains(needle));
 
       if (matchAll && !found) return false;
       if (!matchAll && found) return true;

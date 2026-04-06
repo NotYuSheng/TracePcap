@@ -23,8 +23,8 @@ public class AnalysisRecordService {
   private final AnalysisResultRepository analysisResultRepository;
 
   /**
-   * Creates and immediately commits an IN_PROGRESS analysis record. Uses REQUIRES_NEW so the
-   * insert is visible to polling queries before the long-running analysis transaction completes.
+   * Creates and immediately commits an IN_PROGRESS analysis record. Uses REQUIRES_NEW so the insert
+   * is visible to polling queries before the long-running analysis transaction completes.
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public AnalysisResultEntity createInProgress(FileEntity file) {

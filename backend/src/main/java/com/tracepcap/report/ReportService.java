@@ -31,7 +31,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -80,11 +79,9 @@ public class ReportService {
             .findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
-    AnalysisResultEntity analysis =
-        analysisResultRepository.findByFileId(fileId).orElse(null);
+    AnalysisResultEntity analysis = analysisResultRepository.findByFileId(fileId).orElse(null);
 
-    List<HostClassificationEntity> hosts =
-        hostClassificationRepository.findByFileId(fileId);
+    List<HostClassificationEntity> hosts = hostClassificationRepository.findByFileId(fileId);
 
     List<ConversationEntity> topConversations =
         conversationRepository.findTopByFileIdOrderByTotalBytesDesc(
@@ -100,17 +97,14 @@ public class ReportService {
 
     List<Object[]> appStats = conversationRepository.findApplicationStatsByFileId(fileId);
     List<Object[]> l7Stats = conversationRepository.findL7ProtocolStatsByFileId(fileId);
-    List<Object[]> categoryStats =
-        conversationRepository.findCategoryDistributionByFileId(fileId);
+    List<Object[]> categoryStats = conversationRepository.findCategoryDistributionByFileId(fileId);
 
     List<String> fileTypes = conversationRepository.findDistinctFileTypesByFileId(fileId);
-    List<String> httpUserAgents =
-        conversationRepository.findDistinctHttpUserAgentsByFileId(fileId);
+    List<String> httpUserAgents = conversationRepository.findDistinctHttpUserAgentsByFileId(fileId);
     List<String> riskTypes = conversationRepository.findDistinctRiskTypesByFileId(fileId);
     List<String> customSigs = conversationRepository.findDistinctCustomSignaturesByFileId(fileId);
 
-    List<Object[]> geoCountries =
-        ipGeoInfoRepository.findDistinctCountriesByFileId(fileId);
+    List<Object[]> geoCountries = ipGeoInfoRepository.findDistinctCountriesByFileId(fileId);
 
     long totalConversations = conversationRepository.countByFileId(fileId);
     long riskCount = conversationRepository.countAtRiskByFileId(fileId);
@@ -127,8 +121,15 @@ public class ReportService {
       addCover(document, file);
       addFileInfo(document, file, sec++);
       addExecutiveSummary(
-          document, file, analysis, hosts.size(), totalConversations,
-          riskCount, extractedFiles.size(), geoCountries.size(), sec++);
+          document,
+          file,
+          analysis,
+          hosts.size(),
+          totalConversations,
+          riskCount,
+          extractedFiles.size(),
+          geoCountries.size(),
+          sec++);
 
       if (analysis != null && analysis.getProtocolStats() != null) {
         addProtocolDistribution(document, analysis.getProtocolStats(), sec++);
@@ -181,7 +182,8 @@ public class ReportService {
       }
 
       addTopologyDiagram(document, request.getForceDirectedImage(), "Force-Directed Layout", sec++);
-      addTopologyDiagram(document, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++);
+      addTopologyDiagram(
+          document, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++);
 
     } catch (Exception e) {
       log.error("PDF generation failed for file {}", fileId, e);
@@ -210,9 +212,7 @@ public class ReportService {
     doc.add(title);
 
     Paragraph gen =
-        centred(
-            new Paragraph(
-                "Report generated: " + LocalDateTime.now().format(DT_FMT), metaF));
+        centred(new Paragraph("Report generated: " + LocalDateTime.now().format(DT_FMT), metaF));
     gen.setSpacingBefore(6);
     doc.add(gen);
 
@@ -255,15 +255,22 @@ public class ReportService {
       throws Exception {
     addSectionHeader(doc, sec + ". Executive Summary");
 
-    String packets = analysis != null && analysis.getPacketCount() != null
-        ? String.valueOf(analysis.getPacketCount()) : "—";
-    String totalBytes = analysis != null && analysis.getTotalBytes() != null
-        ? formatBytes(analysis.getTotalBytes()) : "—";
-    String duration = analysis != null && analysis.getDurationMs() != null
-        ? formatDuration(analysis.getDurationMs()) : "—";
-    String timeRange = analysis != null
-        && analysis.getStartTime() != null && analysis.getEndTime() != null
-        ? formatDt(analysis.getStartTime()) + "  →  " + formatDt(analysis.getEndTime()) : "—";
+    String packets =
+        analysis != null && analysis.getPacketCount() != null
+            ? String.valueOf(analysis.getPacketCount())
+            : "—";
+    String totalBytes =
+        analysis != null && analysis.getTotalBytes() != null
+            ? formatBytes(analysis.getTotalBytes())
+            : "—";
+    String duration =
+        analysis != null && analysis.getDurationMs() != null
+            ? formatDuration(analysis.getDurationMs())
+            : "—";
+    String timeRange =
+        analysis != null && analysis.getStartTime() != null && analysis.getEndTime() != null
+            ? formatDt(analysis.getStartTime()) + "  →  " + formatDt(analysis.getEndTime())
+            : "—";
 
     String[][] rows = {
       {"Total Packets", packets},
@@ -295,16 +302,21 @@ public class ReportService {
 
     List<Map.Entry<String, Object>> sorted =
         protocolStats.entrySet().stream()
-            .sorted((a, b) ->
-                Long.compare(getStatLong(b.getValue(), "packetCount"),
-                    getStatLong(a.getValue(), "packetCount")))
+            .sorted(
+                (a, b) ->
+                    Long.compare(
+                        getStatLong(b.getValue(), "packetCount"),
+                        getStatLong(a.getValue(), "packetCount")))
             .toList();
 
     Font f = cellFont();
     for (int i = 0; i < sorted.size(); i++) {
       var e = sorted.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f,
+      addRow(
+          table,
+          bg,
+          f,
           e.getKey(),
           String.valueOf(getStatLong(e.getValue(), "packetCount")),
           formatBytes(getStatLong(e.getValue(), "bytes")),
@@ -354,7 +366,10 @@ public class ReportService {
     for (int i = 0; i < appStats.size(); i++) {
       Object[] row = appStats.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f,
+      addRow(
+          table,
+          bg,
+          f,
           nvl((String) row[0]),
           String.valueOf(((Number) row[1]).longValue()),
           formatBytes(((Number) row[2]).longValue()));
@@ -379,7 +394,10 @@ public class ReportService {
     for (int i = 0; i < l7Stats.size(); i++) {
       Object[] row = l7Stats.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f,
+      addRow(
+          table,
+          bg,
+          f,
           nvl((String) row[0]),
           String.valueOf(((Number) row[1]).longValue()),
           formatBytes(((Number) row[2]).longValue()));
@@ -401,15 +419,22 @@ public class ReportService {
     table.setSpacingAfter(12);
     addTableHeader(
         table,
-        "IP Address", "MAC Address", "Manufacturer",
-        "Device Type", "TTL Fingerprint", "Conf.", "Classification Evidence");
+        "IP Address",
+        "MAC Address",
+        "Manufacturer",
+        "Device Type",
+        "TTL Fingerprint",
+        "Conf.",
+        "Classification Evidence");
 
     Font f = cellFont();
     for (int i = 0; i < hosts.size(); i++) {
       HostClassificationEntity h = hosts.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       addRow(
-          table, bg, f,
+          table,
+          bg,
+          f,
           nvl(h.getIp()),
           nvl(h.getMac()),
           nvl(h.getManufacturer()),
@@ -422,12 +447,13 @@ public class ReportService {
 
     // Legend
     Font legendFont = new Font(Font.HELVETICA, 8, Font.ITALIC, new Color(100, 116, 139));
-    Paragraph legend = new Paragraph(
-        "Evidence signals: MAC OUI vendor lookup · TTL OS fingerprint (64=Linux/Android/iOS,"
-            + " 128=Windows, 255=Network device) · nDPI application profile · Traffic pattern"
-            + " analysis (peer count, port behaviour, initiation ratio). Confidence reflects the"
-            + " margin between the winning classification score and the second-best score.",
-        legendFont);
+    Paragraph legend =
+        new Paragraph(
+            "Evidence signals: MAC OUI vendor lookup · TTL OS fingerprint (64=Linux/Android/iOS,"
+                + " 128=Windows, 255=Network device) · nDPI application profile · Traffic pattern"
+                + " analysis (peer count, port behaviour, initiation ratio). Confidence reflects the"
+                + " margin between the winning classification score and the second-best score.",
+            legendFont);
     legend.setSpacingBefore(2);
     legend.setSpacingAfter(10);
     doc.add(legend);
@@ -454,8 +480,7 @@ public class ReportService {
     }
 
     if (h.getTtl() != null) {
-      sb.append("; TTL ").append(h.getTtl()).append(" → ")
-          .append(ttlOs(h.getTtl()));
+      sb.append("; TTL ").append(h.getTtl()).append(" → ").append(ttlOs(h.getTtl()));
     }
 
     if (h.getConfidence() == 100) {
@@ -469,12 +494,17 @@ public class ReportService {
     String lower = manufacturer.toLowerCase();
     if (lower.contains("apple") || lower.contains("samsung") || lower.contains("xiaomi"))
       return "MOBILE";
-    if (lower.contains("cisco") || lower.contains("huawei") || lower.contains("tp-link")
-        || lower.contains("netgear") || lower.contains("ubiquiti"))
-      return "ROUTER";
-    if (lower.contains("dell") || lower.contains("intel") || lower.contains("lenovo")
-        || lower.contains("hewlett") || lower.contains("hp inc") || lower.contains("acer"))
-      return "LAPTOP_DESKTOP";
+    if (lower.contains("cisco")
+        || lower.contains("huawei")
+        || lower.contains("tp-link")
+        || lower.contains("netgear")
+        || lower.contains("ubiquiti")) return "ROUTER";
+    if (lower.contains("dell")
+        || lower.contains("intel")
+        || lower.contains("lenovo")
+        || lower.contains("hewlett")
+        || lower.contains("hp inc")
+        || lower.contains("acer")) return "LAPTOP_DESKTOP";
     if (lower.contains("raspberry") || lower.contains("espressif") || lower.contains("arduino"))
       return "IOT";
     return null;
@@ -492,7 +522,8 @@ public class ReportService {
   // ══════════════════════════════════════════════════════════════════════════
 
   private void addGeoSummary(Document doc, List<Object[]> geoCountries, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". Geographic Distribution (" + geoCountries.size() + " countries)");
+    addSectionHeader(
+        doc, sec + ". Geographic Distribution (" + geoCountries.size() + " countries)");
 
     PdfPTable table = new PdfPTable(new float[] {2, 5});
     table.setWidthPercentage(60);
@@ -551,24 +582,28 @@ public class ReportService {
   // Section: Security Findings
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addSecurityFindings(Document doc, List<ConversationEntity> risky, int sec) throws Exception {
-    addSectionHeader(doc,
-        sec + ". Security Findings (" + risky.size() + " at-risk conversations)");
+  private void addSecurityFindings(Document doc, List<ConversationEntity> risky, int sec)
+      throws Exception {
+    addSectionHeader(doc, sec + ". Security Findings (" + risky.size() + " at-risk conversations)");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 2, 2, 5});
     table.setWidthPercentage(100);
     table.setSpacingBefore(6);
     table.setSpacingAfter(12);
-    addTableHeader(table,
-        "Source", "Destination", "Protocol", "Application", "Bytes", "Risk Flags");
+    addTableHeader(
+        table, "Source", "Destination", "Protocol", "Application", "Bytes", "Risk Flags");
 
     Font f = cellFont();
     for (ConversationEntity c : risky) {
       String src = endpoint(c.getSrcIp(), c.getSrcPort());
       String dst = endpoint(c.getDstIp(), c.getDstPort());
       String risks = joinRisks(c.getFlowRisks(), c.getCustomSignatures());
-      addRow(table, C_RISK_BG, f,
-          src, dst,
+      addRow(
+          table,
+          C_RISK_BG,
+          f,
+          src,
+          dst,
           nvl(c.getProtocol()),
           nvl(c.getAppName()),
           c.getTotalBytes() != null ? formatBytes(c.getTotalBytes()) : "—",
@@ -581,24 +616,34 @@ public class ReportService {
   // Section: TLS Analysis
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addTlsAnalysis(Document doc, List<ConversationEntity> tlsConvs, int sec) throws Exception {
-    addSectionHeader(doc,
-        sec + ". TLS / HTTPS Analysis (" + tlsConvs.size() + " encrypted conversations)");
+  private void addTlsAnalysis(Document doc, List<ConversationEntity> tlsConvs, int sec)
+      throws Exception {
+    addSectionHeader(
+        doc, sec + ". TLS / HTTPS Analysis (" + tlsConvs.size() + " encrypted conversations)");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 3, 3, 3, 4, 3, 3});
     table.setWidthPercentage(100);
     table.setSpacingBefore(6);
     table.setSpacingAfter(12);
-    addTableHeader(table,
-        "Source", "Destination", "Hostname (SNI)",
-        "JA3 Client", "JA3 Server",
-        "Subject (CN)", "Valid From", "Valid To");
+    addTableHeader(
+        table,
+        "Source",
+        "Destination",
+        "Hostname (SNI)",
+        "JA3 Client",
+        "JA3 Server",
+        "Subject (CN)",
+        "Valid From",
+        "Valid To");
 
     Font f = new Font(Font.HELVETICA, 7, Font.NORMAL, C_TEXT);
     for (int i = 0; i < tlsConvs.size(); i++) {
       ConversationEntity c = tlsConvs.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f,
+      addRow(
+          table,
+          bg,
+          f,
           endpoint(c.getSrcIp(), c.getSrcPort()),
           endpoint(c.getDstIp(), c.getDstPort()),
           nvl(c.getHostname()),
@@ -624,24 +669,37 @@ public class ReportService {
   // Section: Top Conversations
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addTopConversations(Document doc, List<ConversationEntity> convs, int sec) throws Exception {
+  private void addTopConversations(Document doc, List<ConversationEntity> convs, int sec)
+      throws Exception {
     addSectionHeader(doc, sec + ". Top Conversations by Traffic (top " + convs.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {3, 3, 2, 3, 3, 2, 2, 2});
     table.setWidthPercentage(100);
     table.setSpacingBefore(6);
     table.setSpacingAfter(12);
-    addTableHeader(table,
-        "Source", "Destination", "Protocol",
-        "Application", "Hostname", "Packets", "Bytes", "Duration");
+    addTableHeader(
+        table,
+        "Source",
+        "Destination",
+        "Protocol",
+        "Application",
+        "Hostname",
+        "Packets",
+        "Bytes",
+        "Duration");
 
     Font f = cellFont();
     for (int i = 0; i < convs.size(); i++) {
       ConversationEntity c = convs.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      long ms = (c.getStartTime() != null && c.getEndTime() != null)
-          ? java.time.Duration.between(c.getStartTime(), c.getEndTime()).toMillis() : 0;
-      addRow(table, bg, f,
+      long ms =
+          (c.getStartTime() != null && c.getEndTime() != null)
+              ? java.time.Duration.between(c.getStartTime(), c.getEndTime()).toMillis()
+              : 0;
+      addRow(
+          table,
+          bg,
+          f,
           endpoint(c.getSrcIp(), c.getSrcPort()),
           endpoint(c.getDstIp(), c.getDstPort()),
           nvl(c.getProtocol()),
@@ -658,8 +716,10 @@ public class ReportService {
   // Section: Detected File Types
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addDetectedFileTypes(Document doc, List<String> fileTypes, int sec) throws Exception {
-    addSectionHeader(doc, sec + ". Detected File Types in Packet Payloads (" + fileTypes.size() + ")");
+  private void addDetectedFileTypes(Document doc, List<String> fileTypes, int sec)
+      throws Exception {
+    addSectionHeader(
+        doc, sec + ". Detected File Types in Packet Payloads (" + fileTypes.size() + ")");
     doc.add(tagTable(fileTypes));
   }
 
@@ -667,7 +727,8 @@ public class ReportService {
   // Section: Extracted Files
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addExtractedFiles(Document doc, List<ExtractedFileEntity> files, int sec) throws Exception {
+  private void addExtractedFiles(Document doc, List<ExtractedFileEntity> files, int sec)
+      throws Exception {
     addSectionHeader(doc, sec + ". Extracted Files (" + files.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {4, 3, 2, 2, 7});
@@ -680,7 +741,10 @@ public class ReportService {
     for (int i = 0; i < files.size(); i++) {
       ExtractedFileEntity ef = files.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f,
+      addRow(
+          table,
+          bg,
+          f,
           nvl(ef.getFilename()),
           nvl(ef.getMimeType()),
           ef.getFileSize() != null ? formatBytes(ef.getFileSize()) : "—",
@@ -719,7 +783,7 @@ public class ReportService {
 
     // Usable area: landscape height minus top+bottom margins (100), title (21),
     // image spacingBefore (8), and disclaimer with its spacing (40).
-    float usableW = landscape.getWidth()  - 80f;
+    float usableW = landscape.getWidth() - 80f;
     float usableH = landscape.getHeight() - 100f - 21f - 8f - 40f;
 
     byte[] imageBytes;
@@ -738,10 +802,11 @@ public class ReportService {
     doc.add(img);
 
     Font disclaimerFont = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(120, 120, 120));
-    Paragraph disclaimer = new Paragraph(
-        "Note: This diagram is automatically generated and may not render all connections accurately for large or complex network captures. "
-        + "For a complete view, consider taking a manual screenshot from the Network Diagram page.",
-        disclaimerFont);
+    Paragraph disclaimer =
+        new Paragraph(
+            "Note: This diagram is automatically generated and may not render all connections accurately for large or complex network captures. "
+                + "For a complete view, consider taking a manual screenshot from the Network Diagram page.",
+            disclaimerFont);
     disclaimer.setAlignment(Element.ALIGN_CENTER);
     disclaimer.setSpacingBefore(6);
     doc.add(disclaimer);

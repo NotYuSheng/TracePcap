@@ -44,7 +44,14 @@ public class FilterService {
     try {
       ProcessBuilder pb =
           new ProcessBuilder(
-              "tshark", "-r", pcapFile.getAbsolutePath(), "-2", "-R", displayFilter.trim(), "-c", "1");
+              "tshark",
+              "-r",
+              pcapFile.getAbsolutePath(),
+              "-2",
+              "-R",
+              displayFilter.trim(),
+              "-c",
+              "1");
       pb.redirectErrorStream(true);
       Process process = pb.start();
 

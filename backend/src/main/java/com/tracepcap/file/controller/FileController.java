@@ -36,9 +36,13 @@ public class FileController {
   public ResponseEntity<FileUploadResponse> uploadFile(
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "enableNdpi", defaultValue = "true") boolean enableNdpi,
-      @RequestParam(value = "enableFileExtraction", defaultValue = "true") boolean enableFileExtraction) {
-    log.info("Received file upload request: {} (ndpi={}, extraction={})",
-        file.getOriginalFilename(), enableNdpi, enableFileExtraction);
+      @RequestParam(value = "enableFileExtraction", defaultValue = "true")
+          boolean enableFileExtraction) {
+    log.info(
+        "Received file upload request: {} (ndpi={}, extraction={})",
+        file.getOriginalFilename(),
+        enableNdpi,
+        enableFileExtraction);
 
     FileUploadResponse response = fileService.uploadFile(file, enableNdpi, enableFileExtraction);
 

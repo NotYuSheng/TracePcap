@@ -159,7 +159,8 @@ public class StoryService {
    * @param question the user's question
    * @return the LLM's answer
    */
-  public StoryAnswerResponse askQuestion(UUID storyId, String question, List<StoryQuestionRequest.HistoryEntry> history) {
+  public StoryAnswerResponse askQuestion(
+      UUID storyId, String question, List<StoryQuestionRequest.HistoryEntry> history) {
     StoryEntity story =
         storyRepository
             .findById(storyId)
@@ -344,12 +345,14 @@ public class StoryService {
     GeoIpService.GeoResult dstGeo = geoMap.get(dstIp);
     if (srcGeo == null && dstGeo == null) return "";
 
-    String srcPart = srcGeo != null && srcGeo.countryCode() != null
-        ? srcGeo.countryCode() + (srcGeo.org() != null ? "/" + srcGeo.org() : "")
-        : "private";
-    String dstPart = dstGeo != null && dstGeo.countryCode() != null
-        ? dstGeo.countryCode() + (dstGeo.org() != null ? "/" + dstGeo.org() : "")
-        : "private";
+    String srcPart =
+        srcGeo != null && srcGeo.countryCode() != null
+            ? srcGeo.countryCode() + (srcGeo.org() != null ? "/" + srcGeo.org() : "")
+            : "private";
+    String dstPart =
+        dstGeo != null && dstGeo.countryCode() != null
+            ? dstGeo.countryCode() + (dstGeo.org() != null ? "/" + dstGeo.org() : "")
+            : "private";
     return " [" + srcPart + " -> " + dstPart + "]";
   }
 
@@ -367,7 +370,8 @@ public class StoryService {
     return " [TLS: " + String.join(", ", parts) + "]";
   }
 
-  private String buildUserPrompt(FileEntity file, AnalysisResultEntity analysis, String additionalContext) {
+  private String buildUserPrompt(
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext) {
 
     int maxConversations =
         llmConfig.getStory() != null ? llmConfig.getStory().getMaxConversations() : 20;
@@ -387,7 +391,11 @@ public class StoryService {
     Map<String, GeoIpService.GeoResult> geoMap;
     try {
       Set<String> promptIps = new HashSet<>();
-      topConversations.forEach(c -> { promptIps.add(c.getSrcIp()); promptIps.add(c.getDstIp()); });
+      topConversations.forEach(
+          c -> {
+            promptIps.add(c.getSrcIp());
+            promptIps.add(c.getDstIp());
+          });
       geoMap = geoIpService.lookupExternal(promptIps);
     } catch (Exception e) {
       log.warn("Geo lookup failed during story generation: {}", e.getMessage());
@@ -675,12 +683,13 @@ public class StoryService {
   private List<String> parseSuggestedQuestions(Object data) {
     if (data == null) return new ArrayList<>();
     try {
-      return ((List<Object>) data).stream()
-          .filter(q -> q instanceof String)
-          .map(q -> (String) q)
-          .filter(q -> !q.isBlank())
-          .limit(3)
-          .collect(Collectors.toList());
+      return ((List<Object>) data)
+          .stream()
+              .filter(q -> q instanceof String)
+              .map(q -> (String) q)
+              .filter(q -> !q.isBlank())
+              .limit(3)
+              .collect(Collectors.toList());
     } catch (Exception e) {
       log.warn("Failed to parse suggestedQuestions: {}", e.getMessage());
       return new ArrayList<>();
