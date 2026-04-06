@@ -46,7 +46,12 @@ function buildDeviceSignals(info: NodeClassificationInfo): string[] {
   const signals: string[] = [];
   if (info.manufacturer) signals.push(`MAC OUI matched: ${info.manufacturer}`);
   if (info.ttl != null) {
-    const os = info.ttl <= 64 ? 'Linux / Android / iOS' : info.ttl <= 128 ? 'Windows' : 'Network device (Cisco / BSD)';
+    const os =
+      info.ttl <= 64
+        ? 'Linux / Android / iOS'
+        : info.ttl <= 128
+          ? 'Windows'
+          : 'Network device (Cisco / BSD)';
     signals.push(`TTL ${info.ttl} → ${os}`);
   }
   if ((info.deviceConfidence ?? 0) >= 60) signals.push('Application traffic profile analysed');
@@ -57,10 +62,10 @@ function buildDeviceSignals(info: NodeClassificationInfo): string[] {
 function headerStyleFromBadgeClass(badgeClass: string): React.CSSProperties {
   if (badgeClass.includes('bg-warning')) return { backgroundColor: '#ffc107', color: '#000' };
   if (badgeClass.includes('bg-success')) return { backgroundColor: '#198754', color: '#fff' };
-  if (badgeClass.includes('bg-info'))    return { backgroundColor: '#0dcaf0', color: '#000' };
-  if (badgeClass.includes('bg-danger'))  return { backgroundColor: '#dc3545', color: '#fff' };
+  if (badgeClass.includes('bg-info')) return { backgroundColor: '#0dcaf0', color: '#000' };
+  if (badgeClass.includes('bg-danger')) return { backgroundColor: '#dc3545', color: '#fff' };
   if (badgeClass.includes('bg-primary')) return { backgroundColor: '#0d6efd', color: '#fff' };
-  if (badgeClass.includes('bg-dark'))    return { backgroundColor: '#212529', color: '#fff' };
+  if (badgeClass.includes('bg-dark')) return { backgroundColor: '#212529', color: '#fff' };
   return { backgroundColor: '#6c757d', color: '#fff' };
 }
 
@@ -112,9 +117,19 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
         <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>Classification</span>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: 'inherit', fontSize: '1.1rem', lineHeight: 1, cursor: 'pointer', padding: '0 0 0 8px' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'inherit',
+            fontSize: '1.1rem',
+            lineHeight: 1,
+            cursor: 'pointer',
+            padding: '0 0 0 8px',
+          }}
           aria-label="Close"
-        >×</button>
+        >
+          ×
+        </button>
       </div>
 
       <div style={{ padding: '12px 14px' }}>
@@ -122,29 +137,54 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
 
         {/* Type row */}
         <div className="d-flex align-items-start gap-2 mb-2">
-          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Type</span>
+          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>
+            Type
+          </span>
           <div>
             <span className={`badge ${info.typeBadgeClass}`}>{info.typeLabel}</span>
-            {evText && <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>{evText}</div>}
+            {evText && (
+              <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+                {evText}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Device row */}
         {info.deviceType && (
           <div className="d-flex align-items-start gap-2 mb-2">
-            <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Device</span>
+            <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>
+              Device
+            </span>
             <div style={{ flex: 1 }}>
               <span className="badge" style={{ backgroundColor: deviceBg, color: '#fff' }}>
                 {deviceTypeLabel(info.deviceType)}
               </span>
               {deviceSignals.length > 0 && (
                 <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
-                  {deviceSignals.map((s, i) => <li key={i}>{s}</li>)}
+                  {deviceSignals.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
                 </ul>
               )}
               <div className="d-flex align-items-center gap-2 mt-1">
-                <div style={{ flex: 1, background: '#e9ecef', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
-                  <div style={{ width: `${confidence}%`, height: '100%', backgroundColor: deviceBg, borderRadius: '4px' }} />
+                <div
+                  style={{
+                    flex: 1,
+                    background: '#e9ecef',
+                    borderRadius: '4px',
+                    height: '4px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${confidence}%`,
+                      height: '100%',
+                      backgroundColor: deviceBg,
+                      borderRadius: '4px',
+                    }}
+                  />
                 </div>
                 <span style={{ fontSize: '0.72rem', color: '#6c757d', whiteSpace: 'nowrap' }}>
                   {confidence}% — {confidenceLevel(confidence)}
@@ -156,7 +196,9 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
 
         {/* Role row */}
         <div className="d-flex align-items-start gap-2 mb-2">
-          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Role</span>
+          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>
+            Role
+          </span>
           <div>
             <span className="badge bg-secondary">
               {info.role.charAt(0).toUpperCase() + info.role.slice(1)}
@@ -170,12 +212,28 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
         {/* Legend */}
         <table className="table table-sm table-bordered mb-0 mt-2" style={{ fontSize: '0.72rem' }}>
           <thead className="table-light">
-            <tr><th></th><th>Source</th><th>Signal used</th></tr>
+            <tr>
+              <th></th>
+              <th>Source</th>
+              <th>Signal used</th>
+            </tr>
           </thead>
           <tbody>
-            <tr><td>Type</td><td>Network topology</td><td>Ports listened on, peer count</td></tr>
-            <tr><td>Device</td><td>Hardware fingerprinting</td><td>MAC OUI, TTL, app profile</td></tr>
-            <tr><td>Role</td><td>TCP session direction</td><td>Who initiates</td></tr>
+            <tr>
+              <td>Type</td>
+              <td>Network topology</td>
+              <td>Ports listened on, peer count</td>
+            </tr>
+            <tr>
+              <td>Device</td>
+              <td>Hardware fingerprinting</td>
+              <td>MAC OUI, TTL, app profile</td>
+            </tr>
+            <tr>
+              <td>Role</td>
+              <td>TCP session direction</td>
+              <td>Who initiates</td>
+            </tr>
           </tbody>
         </table>
       </div>

@@ -103,7 +103,7 @@ export const useAnalysisData = (fileId: string) => {
       setTimeout(() => {
         console.warn(
           `[useAnalysisData] Analysis for ${fileId} has exceeded ${analysisTimeoutMs / 1000}s — ` +
-          'still polling; large files may take longer than expected.'
+            'still polling; large files may take longer than expected.'
         );
       }, analysisTimeoutMs);
     };

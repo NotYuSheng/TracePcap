@@ -66,57 +66,60 @@ export function useConversationFilters() {
   // so it doesn't need to capture `filters` and stays stable.
   const setFilters = useCallback(
     (update: Partial<ConversationFilters>) => {
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
 
-        const cur: ConversationFilters = {
-          ip: prev.get('ip') ?? '',
-          port: prev.get('port') ?? '',
-          payloadContains: prev.get('payloadContains') ?? '',
-          protocols: splitComma(prev.get('protocols')),
-          l7Protocols: splitComma(prev.get('l7Protocols')),
-          apps: splitComma(prev.get('apps')),
-          categories: splitComma(prev.get('categories')),
-          hasRisks: prev.get('hasRisks') === 'true',
-          fileTypes: splitComma(prev.get('fileTypes')),
-          riskTypes: splitComma(prev.get('riskTypes')),
-          customSignatures: splitComma(prev.get('customSignatures')),
-          deviceTypes: splitComma(prev.get('deviceTypes')),
-          countries: splitComma(prev.get('countries')),
-          sortBy: (prev.get('sortBy') ?? '') as SortField,
-          sortDir: (prev.get('sortDir') ?? 'asc') as SortDir,
-          page: Math.max(1, parseInt(prev.get('page') ?? '1')),
-          pageSize: parseInt(prev.get('pageSize') ?? '25'),
-        };
+          const cur: ConversationFilters = {
+            ip: prev.get('ip') ?? '',
+            port: prev.get('port') ?? '',
+            payloadContains: prev.get('payloadContains') ?? '',
+            protocols: splitComma(prev.get('protocols')),
+            l7Protocols: splitComma(prev.get('l7Protocols')),
+            apps: splitComma(prev.get('apps')),
+            categories: splitComma(prev.get('categories')),
+            hasRisks: prev.get('hasRisks') === 'true',
+            fileTypes: splitComma(prev.get('fileTypes')),
+            riskTypes: splitComma(prev.get('riskTypes')),
+            customSignatures: splitComma(prev.get('customSignatures')),
+            deviceTypes: splitComma(prev.get('deviceTypes')),
+            countries: splitComma(prev.get('countries')),
+            sortBy: (prev.get('sortBy') ?? '') as SortField,
+            sortDir: (prev.get('sortDir') ?? 'asc') as SortDir,
+            page: Math.max(1, parseInt(prev.get('page') ?? '1')),
+            pageSize: parseInt(prev.get('pageSize') ?? '25'),
+          };
 
-        const merged = { ...cur, ...update };
-        const newPage = update.page ?? 1;
+          const merged = { ...cur, ...update };
+          const newPage = update.page ?? 1;
 
-        const set = (key: string, val: string | undefined) => {
-          if (val) next.set(key, val);
-          else next.delete(key);
-        };
+          const set = (key: string, val: string | undefined) => {
+            if (val) next.set(key, val);
+            else next.delete(key);
+          };
 
-        set('ip', merged.ip || undefined);
-        set('port', merged.port || undefined);
-        set('payloadContains', merged.payloadContains || undefined);
-        set('protocols', joinComma(merged.protocols));
-        set('l7Protocols', joinComma(merged.l7Protocols));
-        set('apps', joinComma(merged.apps));
-        set('categories', joinComma(merged.categories));
-        set('hasRisks', merged.hasRisks ? 'true' : undefined);
-        set('fileTypes', joinComma(merged.fileTypes));
-        set('riskTypes', joinComma(merged.riskTypes));
-        set('customSignatures', joinComma(merged.customSignatures));
-        set('deviceTypes', joinComma(merged.deviceTypes ?? []));
-        set('countries', joinComma(merged.countries ?? []));
-        set('sortBy', merged.sortBy || undefined);
-        set('sortDir', merged.sortBy ? merged.sortDir : undefined);
-        set('page', newPage > 1 ? String(newPage) : undefined);
-        set('pageSize', merged.pageSize !== 25 ? String(merged.pageSize) : undefined);
+          set('ip', merged.ip || undefined);
+          set('port', merged.port || undefined);
+          set('payloadContains', merged.payloadContains || undefined);
+          set('protocols', joinComma(merged.protocols));
+          set('l7Protocols', joinComma(merged.l7Protocols));
+          set('apps', joinComma(merged.apps));
+          set('categories', joinComma(merged.categories));
+          set('hasRisks', merged.hasRisks ? 'true' : undefined);
+          set('fileTypes', joinComma(merged.fileTypes));
+          set('riskTypes', joinComma(merged.riskTypes));
+          set('customSignatures', joinComma(merged.customSignatures));
+          set('deviceTypes', joinComma(merged.deviceTypes ?? []));
+          set('countries', joinComma(merged.countries ?? []));
+          set('sortBy', merged.sortBy || undefined);
+          set('sortDir', merged.sortBy ? merged.sortDir : undefined);
+          set('page', newPage > 1 ? String(newPage) : undefined);
+          set('pageSize', merged.pageSize !== 25 ? String(merged.pageSize) : undefined);
 
-        return next;
-      }, { replace: true });
+          return next;
+        },
+        { replace: true }
+      );
     },
     [setSearchParams]
   );

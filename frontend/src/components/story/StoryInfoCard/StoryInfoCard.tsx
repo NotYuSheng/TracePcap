@@ -5,7 +5,10 @@ interface StoryInfoCardProps {
   onAdditionalContextChange?: (value: string) => void;
 }
 
-export const StoryInfoCard = ({ additionalContext, onAdditionalContextChange }: StoryInfoCardProps) => {
+export const StoryInfoCard = ({
+  additionalContext,
+  onAdditionalContextChange,
+}: StoryInfoCardProps) => {
   const [collapsed, setCollapsed] = useState(true);
 
   return (
@@ -29,13 +32,13 @@ export const StoryInfoCard = ({ additionalContext, onAdditionalContextChange }: 
           <ul className="small text-muted mb-3">
             <li>File metadata, traffic summary, protocol breakdown, and category distribution</li>
             <li>
-              The top <strong>N</strong> conversations by volume, including nDPI app names, categories,
-              TLS certificate details, and risk flags (configurable via{' '}
+              The top <strong>N</strong> conversations by volume, including nDPI app names,
+              categories, TLS certificate details, and risk flags (configurable via{' '}
               <code>STORY_MAX_CONVERSATIONS</code>, default 20)
             </li>
             <li>
-              Security alerts listing up to <strong>N</strong> at-risk conversations — the LLM is told
-              the total count even when the list is truncated
+              Security alerts listing up to <strong>N</strong> at-risk conversations — the LLM is
+              told the total count even when the list is truncated
             </li>
           </ul>
           <p className="text-muted small mb-2">
@@ -63,7 +66,7 @@ export const StoryInfoCard = ({ additionalContext, onAdditionalContextChange }: 
                   '• Specific IPs, ports, or time ranges to focus on'
                 }
                 value={additionalContext}
-                onChange={(e) => onAdditionalContextChange(e.target.value)}
+                onChange={e => onAdditionalContextChange(e.target.value)}
               />
             </div>
           )}

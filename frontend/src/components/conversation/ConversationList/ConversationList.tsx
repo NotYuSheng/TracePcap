@@ -17,7 +17,9 @@ function countryFlag(code: string): string {
 function GeoCell({ geo }: { geo?: ConversationGeoInfo }) {
   if (!geo?.countryCode) return <span className="text-muted">—</span>;
   return (
-    <span title={`${geo.country}${geo.org ? ` · ${geo.org}` : ''}${geo.asn ? ` (${geo.asn})` : ''}`}>
+    <span
+      title={`${geo.country}${geo.org ? ` · ${geo.org}` : ''}${geo.asn ? ` (${geo.asn})` : ''}`}
+    >
       {countryFlag(geo.countryCode)} {geo.countryCode}
     </span>
   );
@@ -65,7 +67,9 @@ export const ConversationList = ({
   const hasCustomRules = conversations.some(
     c => c.customSignatures && c.customSignatures.length > 0
   );
-  const hasFileTypes = conversations.some(c => c.detectedFileTypes && c.detectedFileTypes.length > 0);
+  const hasFileTypes = conversations.some(
+    c => c.detectedFileTypes && c.detectedFileTypes.length > 0
+  );
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -110,7 +114,9 @@ export const ConversationList = ({
               {col('category') && hasCategories && <th>Category</th>}
               {col('risks') && hasRisks && <th>Risks</th>}
               {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
-              {col('fileTypes') && hasFileTypes && <th style={{ whiteSpace: 'nowrap' }}>File Type</th>}
+              {col('fileTypes') && hasFileTypes && (
+                <th style={{ whiteSpace: 'nowrap' }}>File Type</th>
+              )}
               {col('srcCountry') && <th style={{ whiteSpace: 'nowrap' }}>Src Country</th>}
               {col('dstCountry') && <th style={{ whiteSpace: 'nowrap' }}>Dst Country</th>}
               {col('packets') && <SortableHeader field="packets" label="Packets" />}
@@ -268,7 +274,8 @@ export const ConversationList = ({
                   )}
                   {col('fileTypes') && hasFileTypes && (
                     <td>
-                      {conversation.detectedFileTypes && conversation.detectedFileTypes.length > 0 ? (
+                      {conversation.detectedFileTypes &&
+                      conversation.detectedFileTypes.length > 0 ? (
                         <div className="d-inline-flex flex-wrap gap-1">
                           {conversation.detectedFileTypes.map(ft => (
                             <span
@@ -285,8 +292,16 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {col('srcCountry') && <td><GeoCell geo={conversation.srcGeo} /></td>}
-                  {col('dstCountry') && <td><GeoCell geo={conversation.dstGeo} /></td>}
+                  {col('srcCountry') && (
+                    <td>
+                      <GeoCell geo={conversation.srcGeo} />
+                    </td>
+                  )}
+                  {col('dstCountry') && (
+                    <td>
+                      <GeoCell geo={conversation.dstGeo} />
+                    </td>
+                  )}
                   {col('packets') && <td>{conversation.packetCount.toLocaleString()}</td>}
                   {col('bytes') && <td>{formatBytes(conversation.totalBytes)}</td>}
                   {col('duration') && <td>{formatDuration(duration)}</td>}

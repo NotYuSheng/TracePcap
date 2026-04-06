@@ -95,7 +95,6 @@
   border: 1px solid #dee2e6;
 }
 
-
 /* Fullscreen: card fills viewport, graph body fills the card */
 .card:fullscreen {
   display: flex;

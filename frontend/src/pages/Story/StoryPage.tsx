@@ -39,11 +39,14 @@ export const StoryPage = () => {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    apiClient.get<{ llmTimeoutMs?: number }>('/system/limits')
+    apiClient
+      .get<{ llmTimeoutMs?: number }>('/system/limits')
       .then(res => {
         if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs);
       })
-      .catch(() => {/* keep default */})
+      .catch(() => {
+        /* keep default */
+      })
       .finally(() => setLoadingLimits(false));
   }, []);
 
@@ -66,12 +69,19 @@ export const StoryPage = () => {
     try {
       setGenerating(true);
       setError(null);
-      const generatedStory = await storyService.generateStory(fileId, additionalContext, llmTimeoutMs);
+      const generatedStory = await storyService.generateStory(
+        fileId,
+        additionalContext,
+        llmTimeoutMs
+      );
       setStory(generatedStory);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
+      const isTimeout =
+        (err as { code?: string })?.code === 'ECONNABORTED' ||
+        msg.toLowerCase().includes('timeout') ||
+        msg.toLowerCase().includes('exceeded');
       if (isTimeout) {
         const minutes = Math.round(llmTimeoutMs / 60000);
         setError(
@@ -116,7 +126,14 @@ export const StoryPage = () => {
 
   // Auto-generate story if none exists yet — wait for limits to load so the correct timeout is used
   useEffect(() => {
-    if (!loadingStory && !loadingLimits && !story && !generating && !error && !autoTriggeredRef.current) {
+    if (
+      !loadingStory &&
+      !loadingLimits &&
+      !story &&
+      !generating &&
+      !error &&
+      !autoTriggeredRef.current
+    ) {
       autoTriggeredRef.current = true;
       handleGenerateStory();
     }
@@ -165,9 +182,8 @@ export const StoryPage = () => {
   if (generating && !story) {
     const minutes = Math.floor(elapsedSeconds / 60);
     const seconds = elapsedSeconds % 60;
-    const elapsed = minutes > 0
-      ? `${minutes}m ${seconds.toString().padStart(2, '0')}s`
-      : `${seconds}s`;
+    const elapsed =
+      minutes > 0 ? `${minutes}m ${seconds.toString().padStart(2, '0')}s` : `${seconds}s`;
     const timeoutMinutes = Math.round(llmTimeoutMs / 60000);
     return (
       <div className="text-center py-5">

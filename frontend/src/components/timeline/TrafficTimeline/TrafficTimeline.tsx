@@ -27,7 +27,9 @@ const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
 /** Derive the effective bin interval (seconds) from the returned data. */
 function effectiveInterval(data: TimelineDataPoint[]): number | null {
   if (data.length < 2) return null;
-  return Math.round((data[data.length - 1].timestamp - data[0].timestamp) / (data.length - 1) / 1000);
+  return Math.round(
+    (data[data.length - 1].timestamp - data[0].timestamp) / (data.length - 1) / 1000
+  );
 }
 
 /** Format seconds as a human-readable label, e.g. 90 → "1m 30s". */
@@ -98,7 +100,11 @@ interface TrafficTimelineProps {
   onGranularityChange: (g: number | 'auto') => void;
 }
 
-export const TrafficTimeline = ({ data, granularity, onGranularityChange }: TrafficTimelineProps) => {
+export const TrafficTimeline = ({
+  data,
+  granularity,
+  onGranularityChange,
+}: TrafficTimelineProps) => {
   const [viewMode, setViewMode] = useState<'packets' | 'bytes'>('packets');
 
   const autoLabel = useMemo(() => {

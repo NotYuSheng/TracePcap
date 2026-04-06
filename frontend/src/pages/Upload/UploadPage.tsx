@@ -86,11 +86,7 @@ export const UploadPage = () => {
           </Row>
 
           {/* Pre-upload: analysis options confirmation */}
-          <Modal
-            show={pendingFiles !== null}
-            onHide={handleCancelPending}
-            centered
-          >
+          <Modal show={pendingFiles !== null} onHide={handleCancelPending} centered>
             <Modal.Header closeButton>
               <Modal.Title>
                 <i className="bi bi-sliders me-2" />
@@ -99,7 +95,8 @@ export const UploadPage = () => {
             </Modal.Header>
             <Modal.Body>
               <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
-                Select which optional stages to run. Disabling stages reduces analysis time for large captures.
+                Select which optional stages to run. Disabling stages reduces analysis time for
+                large captures.
               </p>
 
               <div className="d-flex flex-column gap-3">
@@ -133,8 +130,8 @@ export const UploadPage = () => {
                   <div>
                     <div className="fw-semibold">Embedded file extraction</div>
                     <div className="text-muted" style={{ fontSize: '0.82rem' }}>
-                      Extracts files transferred over HTTP and raw TCP/UDP streams.
-                      Adds ~1–2 min for large captures.
+                      Extracts files transferred over HTTP and raw TCP/UDP streams. Adds ~1–2 min
+                      for large captures.
                     </div>
                   </div>
                 </label>
@@ -163,7 +160,9 @@ export const UploadPage = () => {
           {/* Post-upload: progress / completion */}
           <Modal
             show={uploads.length > 0}
-            onHide={() => { if (!isUploading) clearUploads(); }}
+            onHide={() => {
+              if (!isUploading) clearUploads();
+            }}
             centered
             backdrop={isUploading ? 'static' : true}
             keyboard={!isUploading}
@@ -172,7 +171,11 @@ export const UploadPage = () => {
               <Modal.Title>
                 {isUploading ? (
                   <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"
+                    />
                     Uploading…
                   </>
                 ) : (
@@ -194,7 +197,11 @@ export const UploadPage = () => {
                     error={u.error}
                     isDuplicate={u.isDuplicate}
                     onAnalyze={u.fileId ? () => navigate(`/analysis/${u.fileId}`) : undefined}
-                    onOpenExisting={u.duplicateOfFileId ? () => navigate(`/analysis/${u.duplicateOfFileId}`) : undefined}
+                    onOpenExisting={
+                      u.duplicateOfFileId
+                        ? () => navigate(`/analysis/${u.duplicateOfFileId}`)
+                        : undefined
+                    }
                   />
                 ))}
               </div>

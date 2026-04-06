@@ -65,8 +65,15 @@ const elk = new ELK();
 // ---------------------------------------------------------------------------
 
 const SPECIFIC_NODE_TYPES = new Set([
-  'dns-server', 'web-server', 'ssh-server', 'ftp-server',
-  'mail-server', 'dhcp-server', 'ntp-server', 'database-server', 'router',
+  'dns-server',
+  'web-server',
+  'ssh-server',
+  'ftp-server',
+  'mail-server',
+  'dhcp-server',
+  'ntp-server',
+  'database-server',
+  'router',
 ]);
 
 function getNodeColor(nodeData: {
@@ -83,24 +90,27 @@ function getNodeColor(nodeData: {
   if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType])
     return NODE_TYPE_COLORS[nodeData.nodeType];
   switch (nodeData.role) {
-    case 'server': return '#2ecc71';
-    case 'both':   return '#9b59b6';
-    default:       return '#95a5a6';
+    case 'server':
+      return '#2ecc71';
+    case 'both':
+      return '#9b59b6';
+    default:
+      return '#95a5a6';
   }
 }
 
 const NODE_ICONS: Record<string, string> = {
-  'router':          'bi-router',
-  'web-server':      'bi-globe',
-  'dns-server':      'bi-search',
-  'ssh-server':      'bi-terminal',
-  'ftp-server':      'bi-hdd-network',
-  'mail-server':     'bi-envelope',
-  'dhcp-server':     'bi-broadcast',
-  'ntp-server':      'bi-clock',
+  router: 'bi-router',
+  'web-server': 'bi-globe',
+  'dns-server': 'bi-search',
+  'ssh-server': 'bi-terminal',
+  'ftp-server': 'bi-hdd-network',
+  'mail-server': 'bi-envelope',
+  'dhcp-server': 'bi-broadcast',
+  'ntp-server': 'bi-clock',
   'database-server': 'bi-database',
-  'client':          'bi-laptop',
-  'anomaly':         'bi-exclamation-triangle-fill',
+  client: 'bi-laptop',
+  anomaly: 'bi-exclamation-triangle-fill',
 };
 
 function getNodeIcon(nodeData: { nodeType?: string; isAnomaly: boolean }): string {
@@ -131,7 +141,7 @@ function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
       continue;
     }
     const dominant = group.reduce((best, e) =>
-      e.data.packetCount > best.data.packetCount ? e : best,
+      e.data.packetCount > best.data.packetCount ? e : best
     );
     const totalPackets = group.reduce((s, e) => s + e.data.packetCount, 0);
     const totalBytes = group.reduce((s, e) => s + e.data.totalBytes, 0);
@@ -204,7 +214,7 @@ const ELK_OPTIONS: Record<string, Record<string, string>> = {
 async function computeLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  layoutType: 'forceDirected2d' | 'hierarchicalTd',
+  layoutType: 'forceDirected2d' | 'hierarchicalTd'
 ): Promise<{ nodes: Node[]; edges: Edge[] }> {
   const dedupedEdges = deduplicateEdges(edges);
   const offsetMap = assignEdgeOffsets(dedupedEdges);
@@ -216,9 +226,7 @@ async function computeLayout(
     edges: dedupedEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
   });
 
-  const posMap = new Map(
-    (graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]),
-  );
+  const posMap = new Map((graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
 
   const rfNodes: Node[] = nodes.map(n => ({
     id: n.id,
@@ -259,8 +267,18 @@ function NetworkNode({ data }: NodeProps) {
   const { label, color, icon } = data as FlowNodeData;
   return (
     <div className="network-flow-node" style={{ borderColor: color }}>
-      <Handle type="target" position={Position.Top} className="network-flow-handle" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-      <Handle type="source" position={Position.Top} className="network-flow-handle" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="network-flow-handle"
+        style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        className="network-flow-handle"
+        style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+      />
       <div className="network-flow-icon" style={{ color }}>
         <i className={`bi ${icon}`} />
       </div>
@@ -290,8 +308,8 @@ function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: Ed
   const tx = targetX + px;
   const ty = targetY + py;
 
-  const labelX = sx + (tx - sx) * 0.30;
-  const labelY = sy + (ty - sy) * 0.30;
+  const labelX = sx + (tx - sx) * 0.3;
+  const labelY = sy + (ty - sy) * 0.3;
 
   // Arrow at midpoint, pointing toward target
   const arrowX = (sx + tx) / 2;
@@ -347,11 +365,11 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setRfNodes(nds => applyNodeChanges(changes, nds)),
-    [],
+    []
   );
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => setRfEdges(eds => applyEdgeChanges(changes, eds)),
-    [],
+    []
   );
   const [layouting, setLayouting] = useState(false);
 
@@ -384,28 +402,34 @@ export const NetworkGraph = memo(function NetworkGraph({
         setLayouting(false);
       });
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [visibleNodes, edges, layoutType]);
 
   // Signal the caller once the layout has been computed and painted.
   // Works for both the normal case (rfNodes set after ELK) and the empty-data
   // case (visibleNodes.length === 0, layouting never becomes true).
   const onLayoutCompleteRef = useRef(onLayoutComplete);
-  useEffect(() => { onLayoutCompleteRef.current = onLayoutComplete; });
+  useEffect(() => {
+    onLayoutCompleteRef.current = onLayoutComplete;
+  });
 
   useEffect(() => {
-    const idle =
-      !layouting && (rfNodes.length > 0 || visibleNodes.length === 0);
+    const idle = !layouting && (rfNodes.length > 0 || visibleNodes.length === 0);
     if (!idle) return;
     const id = requestAnimationFrame(() => onLayoutCompleteRef.current?.());
     return () => cancelAnimationFrame(id);
   }, [layouting, rfNodes.length, visibleNodes.length]);
 
-  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    if (!onNodeClick) return;
-    const original = nodes.find(n => n.id === node.id);
-    if (original) onNodeClick(original);
-  }, [nodes, onNodeClick]);
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (!onNodeClick) return;
+      const original = nodes.find(n => n.id === node.id);
+      if (original) onNodeClick(original);
+    },
+    [nodes, onNodeClick]
+  );
 
   if (nodes.length === 0) {
     return (

@@ -62,16 +62,29 @@ interface ConversationDetailApiResponse extends ConversationApiResponse {
   packets: PacketApiResponse[];
 }
 
-const L2_PROTOCOLS = new Set(['ARP', 'STP', 'RSTP', 'LLDP', 'CDP', 'LOOP', 'EAPOL', 'LACP', 'PVST']);
+const L2_PROTOCOLS = new Set([
+  'ARP',
+  'STP',
+  'RSTP',
+  'LLDP',
+  'CDP',
+  'LOOP',
+  'EAPOL',
+  'LACP',
+  'PVST',
+]);
 const L3_PROTOCOLS = new Set(['ICMP', 'ICMPV6', 'IGMP', 'OSPF', 'GRE', 'VRRP']);
 
 function getProtocol(protocolName: string): Protocol {
   const name = protocolName.toUpperCase();
   const layer: Protocol['layer'] =
-    name === 'TCP' || name === 'UDP' ? 'transport'
-    : L3_PROTOCOLS.has(name) ? 'network'
-    : L2_PROTOCOLS.has(name) ? 'link'
-    : 'application';
+    name === 'TCP' || name === 'UDP'
+      ? 'transport'
+      : L3_PROTOCOLS.has(name)
+        ? 'network'
+        : L2_PROTOCOLS.has(name)
+          ? 'link'
+          : 'application';
   return { layer, name };
 }
 
@@ -322,9 +335,7 @@ export const conversationService = {
    * Reconstruct the full TCP/UDP session for a conversation and decode the application payload.
    */
   reconstructSession: async (conversationId: string): Promise<SessionData> => {
-    const response = await apiClient.get<SessionData>(
-      `/conversations/${conversationId}/session`
-    );
+    const response = await apiClient.get<SessionData>(`/conversations/${conversationId}/session`);
     return response.data;
   },
 

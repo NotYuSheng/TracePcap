@@ -2,7 +2,10 @@ import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateActio
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
-import { useNetworkData, CONVERSATION_LIMIT_ENABLED } from '@/features/network/hooks/useNetworkData';
+import {
+  useNetworkData,
+  CONVERSATION_LIMIT_ENABLED,
+} from '@/features/network/hooks/useNetworkData';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
@@ -16,7 +19,8 @@ interface AnalysisOutletContext {
 
 /** Returns true if an edge's protocol/app matches a legend key (e.g. HTTPS, ICMP, STP). */
 function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean {
-  if (key === 'HTTPS') return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+  if (key === 'HTTPS')
+    return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
   if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
   if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
   return proto === key || app.includes(key);
@@ -24,7 +28,7 @@ function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean 
 
 function toggleSet(setter: Dispatch<SetStateAction<string[]>>) {
   return (val: string) =>
-    setter(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+    setter(prev => (prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]));
 }
 
 function formatBytes(bytes: number): string {
@@ -115,7 +119,9 @@ export const NetworkDiagramPage = () => {
 
   const presentDeviceTypes = useMemo(() => {
     const types = new Set<string>();
-    nodes.forEach(n => { if (n.data.deviceType) types.add(n.data.deviceType); });
+    nodes.forEach(n => {
+      if (n.data.deviceType) types.add(n.data.deviceType);
+    });
     return types;
   }, [nodes]);
 
@@ -124,28 +130,36 @@ export const NetworkDiagramPage = () => {
     edges.forEach(edge => {
       const proto = edge.data.protocol.toUpperCase();
       const app = (edge.data.appName ?? '').toUpperCase();
-      ['HTTP', 'HTTPS', 'DNS', 'TCP', 'UDP', 'ICMP', 'ARP', 'STP', 'LLDP', 'CDP', 'EAPOL'].forEach(key => {
-        if (edgeMatchesLegendKey(proto, app, key)) keys.add(key);
-      });
+      ['HTTP', 'HTTPS', 'DNS', 'TCP', 'UDP', 'ICMP', 'ARP', 'STP', 'LLDP', 'CDP', 'EAPOL'].forEach(
+        key => {
+          if (edgeMatchesLegendKey(proto, app, key)) keys.add(key);
+        }
+      );
     });
     return keys;
   }, [edges]);
 
   const presentAppNames = useMemo(() => {
     const names = new Set<string>();
-    edges.forEach(e => { if (e.data.appName) names.add(e.data.appName); });
+    edges.forEach(e => {
+      if (e.data.appName) names.add(e.data.appName);
+    });
     return [...names].sort();
   }, [edges]);
 
   const presentL7Protocols = useMemo(() => {
     const vals = new Set<string>();
-    edges.forEach(e => { if (e.data.l7Protocol) vals.add(e.data.l7Protocol); });
+    edges.forEach(e => {
+      if (e.data.l7Protocol) vals.add(e.data.l7Protocol);
+    });
     return [...vals].sort();
   }, [edges]);
 
   const presentCategories = useMemo(() => {
     const vals = new Set<string>();
-    edges.forEach(e => { if (e.data.category) vals.add(e.data.category); });
+    edges.forEach(e => {
+      if (e.data.category) vals.add(e.data.category);
+    });
     return [...vals].sort();
   }, [edges]);
 
@@ -213,32 +227,39 @@ export const NetworkDiagramPage = () => {
     }
 
     if (activeCustomSigs.length > 0) {
-      filtered = filtered.filter(e => activeCustomSigs.some(s => e.data.customSignatures?.includes(s)));
+      filtered = filtered.filter(e =>
+        activeCustomSigs.some(s => e.data.customSignatures?.includes(s))
+      );
     }
 
     if (activeFileTypes.length > 0) {
-      filtered = filtered.filter(e => activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f)));
+      filtered = filtered.filter(e =>
+        activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f))
+      );
     }
 
     if (activeCountries.length > 0) {
-      filtered = filtered.filter(e =>
-        activeCountries.includes(e.data.srcCountry ?? '') ||
-        activeCountries.includes(e.data.dstCountry ?? '')
+      filtered = filtered.filter(
+        e =>
+          activeCountries.includes(e.data.srcCountry ?? '') ||
+          activeCountries.includes(e.data.dstCountry ?? '')
       );
     }
 
     if (activeNodeFilters.length > 0) {
       const matchingIds = new Set(
-        nodes.filter(n =>
-          activeNodeFilters.some(key => {
-            if (key.startsWith('nt:')) {
-              const nt = key.slice(3);
-              return nt === 'anomaly' ? n.data.isAnomaly : n.data.nodeType === nt;
-            }
-            if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
-            return false;
-          })
-        ).map(n => n.id)
+        nodes
+          .filter(n =>
+            activeNodeFilters.some(key => {
+              if (key.startsWith('nt:')) {
+                const nt = key.slice(3);
+                return nt === 'anomaly' ? n.data.isAnomaly : n.data.nodeType === nt;
+              }
+              if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
+              return false;
+            })
+          )
+          .map(n => n.id)
       );
       filtered = filtered.filter(e => matchingIds.has(e.source) || matchingIds.has(e.target));
     }
@@ -251,18 +272,26 @@ export const NetworkDiagramPage = () => {
     }
 
     const hasActiveFilters =
-      activeLegendProtocols.length > 0 || activeNodeFilters.length > 0 ||
-      activeAppFilters.length > 0 || activeL7Protocols.length > 0 ||
-      activeCategories.length > 0 || activeRiskTypes.length > 0 ||
-      activeCustomSigs.length > 0 || activeFileTypes.length > 0 ||
-      activeCountries.length > 0 || hasRisksOnly || ipFilter.length > 0 || portFilter.length > 0;
+      activeLegendProtocols.length > 0 ||
+      activeNodeFilters.length > 0 ||
+      activeAppFilters.length > 0 ||
+      activeL7Protocols.length > 0 ||
+      activeCategories.length > 0 ||
+      activeRiskTypes.length > 0 ||
+      activeCustomSigs.length > 0 ||
+      activeFileTypes.length > 0 ||
+      activeCountries.length > 0 ||
+      hasRisksOnly ||
+      ipFilter.length > 0 ||
+      portFilter.length > 0;
 
     const ipLower = ipFilter.toLowerCase();
     let visibleNodes = nodes;
     if (ipFilter) {
-      visibleNodes = nodes.filter(n =>
-        n.data.ip.toLowerCase().includes(ipLower) ||
-        (n.data.hostname ?? '').toLowerCase().includes(ipLower)
+      visibleNodes = nodes.filter(
+        n =>
+          n.data.ip.toLowerCase().includes(ipLower) ||
+          (n.data.hostname ?? '').toLowerCase().includes(ipLower)
       );
     }
 
@@ -272,24 +301,46 @@ export const NetworkDiagramPage = () => {
         filtered = filtered.filter(e => matchedByIp.has(e.source) || matchedByIp.has(e.target));
       }
       const visibleNodeIds = new Set<string>();
-      filtered.forEach(e => { visibleNodeIds.add(e.source); visibleNodeIds.add(e.target); });
-      visibleNodes = nodes.filter(n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id)));
+      filtered.forEach(e => {
+        visibleNodeIds.add(e.source);
+        visibleNodeIds.add(e.target);
+      });
+      visibleNodes = nodes.filter(
+        n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id))
+      );
     }
 
     return { filteredNodes: visibleNodes, filteredEdges: filtered };
   }, [
-    nodes, edges,
-    activeLegendProtocols, activeNodeFilters, activeAppFilters,
-    activeL7Protocols, activeCategories, activeRiskTypes,
-    activeCustomSigs, activeFileTypes, activeCountries,
-    hasRisksOnly, ipFilter, portFilter,
+    nodes,
+    edges,
+    activeLegendProtocols,
+    activeNodeFilters,
+    activeAppFilters,
+    activeL7Protocols,
+    activeCategories,
+    activeRiskTypes,
+    activeCustomSigs,
+    activeFileTypes,
+    activeCountries,
+    hasRisksOnly,
+    ipFilter,
+    portFilter,
   ]);
 
   const activeFilterCount =
-    activeLegendProtocols.length + activeNodeFilters.length + activeAppFilters.length +
-    activeL7Protocols.length + activeCategories.length + activeRiskTypes.length +
-    activeCustomSigs.length + activeFileTypes.length + activeCountries.length +
-    (ipFilter ? 1 : 0) + (portFilter ? 1 : 0) + (hasRisksOnly ? 1 : 0);
+    activeLegendProtocols.length +
+    activeNodeFilters.length +
+    activeAppFilters.length +
+    activeL7Protocols.length +
+    activeCategories.length +
+    activeRiskTypes.length +
+    activeCustomSigs.length +
+    activeFileTypes.length +
+    activeCountries.length +
+    (ipFilter ? 1 : 0) +
+    (portFilter ? 1 : 0) +
+    (hasRisksOnly ? 1 : 0);
 
   if (loading) {
     return <LoadingSpinner size="large" message="Building network topology..." fullPage />;
@@ -307,27 +358,29 @@ export const NetworkDiagramPage = () => {
         Network Topology Diagram
       </h4>
 
-      {CONVERSATION_LIMIT_ENABLED && (
-        stats.isLimited ? (
+      {CONVERSATION_LIMIT_ENABLED &&
+        (stats.isLimited ? (
           <div className="alert alert-warning mb-3">
             <i className="bi bi-exclamation-triangle me-2"></i>
-            <strong>Performance limit active:</strong> Showing top {stats.displayedConversations?.toLocaleString()} of{' '}
-            {stats.totalConversations?.toLocaleString()} conversations by packet count.{' '}
-            Set <code>VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false</code> to render all.
+            <strong>Performance limit active:</strong> Showing top{' '}
+            {stats.displayedConversations?.toLocaleString()} of{' '}
+            {stats.totalConversations?.toLocaleString()} conversations by packet count. Set{' '}
+            <code>VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false</code> to render all.
           </div>
         ) : (
           <div className="alert alert-info mb-3">
             <i className="bi bi-info-circle me-2"></i>
             <strong>Performance limit enabled</strong> — all{' '}
-            {stats.totalConversations?.toLocaleString()}{' '}
-            conversations are within the 500-connection limit and fully rendered.
+            {stats.totalConversations?.toLocaleString()} conversations are within the 500-connection
+            limit and fully rendered.
           </div>
-        )
-      )}
+        ))}
 
       {/* Row 1: Network Statistics */}
       <div className="card mb-3">
-        <div className="card-header"><strong>Diagram Overview</strong></div>
+        <div className="card-header">
+          <strong>Diagram Overview</strong>
+        </div>
         <div className="card-body py-2 px-3">
           <div className="d-flex align-items-center gap-3 flex-wrap">
             {[
@@ -337,7 +390,9 @@ export const NetworkDiagramPage = () => {
               { label: 'Data', value: formatBytes(stats.totalBytes) },
             ].map(({ label, value }) => (
               <div key={label} className="text-center px-3 py-1 bg-light rounded border">
-                <div style={{ fontSize: '0.7rem', color: '#6c757d', textTransform: 'uppercase' }}>{label}</div>
+                <div style={{ fontSize: '0.7rem', color: '#6c757d', textTransform: 'uppercase' }}>
+                  {label}
+                </div>
                 <div style={{ fontSize: '1rem', fontWeight: 600 }}>{value}</div>
               </div>
             ))}
@@ -351,52 +406,52 @@ export const NetworkDiagramPage = () => {
       {/* Row 2: Legend & Filters */}
       <div className="mb-3">
         <NetworkControls
-            activeLegendProtocols={activeLegendProtocols}
-            onLegendProtocolClick={toggleLegendProtocol}
-            onLegendProtocolClear={() => setActiveLegendProtocols([])}
-            activeNodeFilters={activeNodeFilters}
-            onNodeFilterClick={toggleNodeFilter}
-            onNodeFilterClear={() => setActiveNodeFilters([])}
-            presentNodeTypes={presentNodeTypes}
-            presentEdgeLegendKeys={presentEdgeLegendKeys}
-            presentDeviceTypes={presentDeviceTypes}
-            ipFilter={ipFilter}
-            onIpFilterChange={setIpFilter}
-            portFilter={portFilter}
-            onPortFilterChange={setPortFilter}
-            activeAppFilters={activeAppFilters}
-            onAppFilterClick={toggleAppFilter}
-            onAppFilterClear={() => setActiveAppFilters([])}
-            presentAppNames={presentAppNames}
-            activeL7Protocols={activeL7Protocols}
-            onL7ProtocolClick={toggleL7Protocol}
-            onL7ProtocolClear={() => setActiveL7Protocols([])}
-            presentL7Protocols={presentL7Protocols}
-            activeCategories={activeCategories}
-            onCategoryClick={toggleCategory}
-            onCategoryClear={() => setActiveCategories([])}
-            presentCategories={presentCategories}
-            activeRiskTypes={activeRiskTypes}
-            onRiskTypeClick={toggleRiskType}
-            onRiskTypeClear={() => setActiveRiskTypes([])}
-            presentRiskTypes={presentRiskTypes}
-            activeCustomSigs={activeCustomSigs}
-            onCustomSigClick={toggleCustomSig}
-            onCustomSigClear={() => setActiveCustomSigs([])}
-            presentCustomSigs={presentCustomSigs}
-            activeFileTypes={activeFileTypes}
-            onFileTypeClick={toggleFileType}
-            onFileTypeClear={() => setActiveFileTypes([])}
-            presentFileTypes={presentFileTypes}
-            activeCountries={activeCountries}
-            onCountryClick={toggleCountry}
-            onCountryClear={() => setActiveCountries([])}
-            presentCountries={presentCountries}
-            hasRisksOnly={hasRisksOnly}
-            onHasRisksOnlyChange={setHasRisksOnly}
-            activeFilterCount={activeFilterCount}
-            onClearAllFilters={clearAllFilters}
-          />
+          activeLegendProtocols={activeLegendProtocols}
+          onLegendProtocolClick={toggleLegendProtocol}
+          onLegendProtocolClear={() => setActiveLegendProtocols([])}
+          activeNodeFilters={activeNodeFilters}
+          onNodeFilterClick={toggleNodeFilter}
+          onNodeFilterClear={() => setActiveNodeFilters([])}
+          presentNodeTypes={presentNodeTypes}
+          presentEdgeLegendKeys={presentEdgeLegendKeys}
+          presentDeviceTypes={presentDeviceTypes}
+          ipFilter={ipFilter}
+          onIpFilterChange={setIpFilter}
+          portFilter={portFilter}
+          onPortFilterChange={setPortFilter}
+          activeAppFilters={activeAppFilters}
+          onAppFilterClick={toggleAppFilter}
+          onAppFilterClear={() => setActiveAppFilters([])}
+          presentAppNames={presentAppNames}
+          activeL7Protocols={activeL7Protocols}
+          onL7ProtocolClick={toggleL7Protocol}
+          onL7ProtocolClear={() => setActiveL7Protocols([])}
+          presentL7Protocols={presentL7Protocols}
+          activeCategories={activeCategories}
+          onCategoryClick={toggleCategory}
+          onCategoryClear={() => setActiveCategories([])}
+          presentCategories={presentCategories}
+          activeRiskTypes={activeRiskTypes}
+          onRiskTypeClick={toggleRiskType}
+          onRiskTypeClear={() => setActiveRiskTypes([])}
+          presentRiskTypes={presentRiskTypes}
+          activeCustomSigs={activeCustomSigs}
+          onCustomSigClick={toggleCustomSig}
+          onCustomSigClear={() => setActiveCustomSigs([])}
+          presentCustomSigs={presentCustomSigs}
+          activeFileTypes={activeFileTypes}
+          onFileTypeClick={toggleFileType}
+          onFileTypeClear={() => setActiveFileTypes([])}
+          presentFileTypes={presentFileTypes}
+          activeCountries={activeCountries}
+          onCountryClick={toggleCountry}
+          onCountryClear={() => setActiveCountries([])}
+          presentCountries={presentCountries}
+          hasRisksOnly={hasRisksOnly}
+          onHasRisksOnlyChange={setHasRisksOnly}
+          activeFilterCount={activeFilterCount}
+          onClearAllFilters={clearAllFilters}
+        />
       </div>
 
       {/* Row 3: Graph full width */}

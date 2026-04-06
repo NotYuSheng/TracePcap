@@ -98,7 +98,11 @@ export const FileList = () => {
         <Card.Body className="p-0">
           {loading ? (
             <div className="text-center text-muted py-4">
-              <div className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+              <div
+                className="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              />
               Loading files…
             </div>
           ) : files.length === 0 ? (
@@ -106,7 +110,10 @@ export const FileList = () => {
               <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
             </div>
           ) : (
-            <div className="list-group list-group-flush" style={{ maxHeight: '13.5rem', overflowY: 'auto' }}>
+            <div
+              className="list-group list-group-flush"
+              style={{ maxHeight: '13.5rem', overflowY: 'auto' }}
+            >
               {files.map(file => (
                 <div
                   key={file.fileId}
@@ -123,9 +130,13 @@ export const FileList = () => {
                       <div>
                         <div className="fw-medium">{file.fileName}</div>
                         <small className="text-muted">
-                          {formatFileSize(file.fileSize)} • {formatDate(parseDateTime(file.uploadedAt))}
+                          {formatFileSize(file.fileSize)} •{' '}
+                          {formatDate(parseDateTime(file.uploadedAt))}
                           {file.status.toLowerCase() !== 'completed' && (
-                            <span className="ms-2 badge bg-secondary" style={{ fontSize: '0.7rem' }}>
+                            <span
+                              className="ms-2 badge bg-secondary"
+                              style={{ fontSize: '0.7rem' }}
+                            >
                               {file.status.toLowerCase()}
                             </span>
                           )}
