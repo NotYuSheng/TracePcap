@@ -383,6 +383,14 @@ export function ConversationFilterPanel({
                             inspection (e.g. YouTube, WhatsApp).{' '}
                             <strong>Detection accuracy may vary</strong> — treat results as
                             indicative, not definitive.
+                            <br />
+                            <a
+                              href="/ndpi-reference.html"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              View protocol reference →
+                            </a>
                           </>
                         }
                       />

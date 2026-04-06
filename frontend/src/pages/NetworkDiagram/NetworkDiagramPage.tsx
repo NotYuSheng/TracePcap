@@ -458,10 +458,10 @@ export const NetworkDiagramPage = () => {
       <div className="row">
         <div className="col-12">
           <div className="card" ref={graphCardRef}>
-            <div className="card-header d-flex justify-content-between align-items-center py-1 px-2">
+            <div className="card-header d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
               <button
-                className="btn btn-sm btn-light"
+                className="btn btn-link btn-sm p-0 text-muted"
                 onClick={toggleFullscreen}
                 title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               >

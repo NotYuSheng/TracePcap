@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
   PROTOCOL_COLORS,
   PROTOCOL_LABELS,
@@ -15,7 +15,29 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './NetworkControls.css';
+
+function InfoPopover({ id, title, body }: { id: string; title: string; body: ReactNode }) {
+  const popover = (
+    <Popover id={id} style={{ maxWidth: '280px' }}>
+      <Popover.Header>{title}</Popover.Header>
+      <Popover.Body className="small">{body}</Popover.Body>
+    </Popover>
+  );
+  return (
+    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+      <button
+        type="button"
+        className="btn btn-link p-0 text-muted ms-1"
+        style={{ lineHeight: 1 }}
+        aria-label={`About ${title}`}
+      >
+        <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
+      </button>
+    </OverlayTrigger>
+  );
+}
 
 interface NetworkControlsProps {
   activeLegendProtocols: string[];
@@ -282,6 +304,13 @@ export function NetworkControls({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Node Types"
+                    info={
+                      <InfoPopover
+                        id="nc-info-nodetypes"
+                        title="Node Types"
+                        body="Filter by the role of each node in the network graph — e.g. Client, Server, Gateway. Roles are inferred from port usage and traffic direction."
+                      />
+                    }
                     onSelectAll={() =>
                       allNodeKeys.forEach(k => {
                         if (!activeNodeFilters.includes(k)) onNodeFilterClick(k);
@@ -340,6 +369,13 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Edge Protocols"
+                      info={
+                        <InfoPopover
+                          id="nc-info-edgeprotocols"
+                          title="Edge Protocols"
+                          body="Filter edges (connections) by their transport protocol — TCP, UDP, or ICMP. Hiding a protocol removes all edges using it from the graph."
+                        />
+                      }
                       onSelectAll={() =>
                         presentEdgeLegendKeys.forEach(k => {
                           if (!activeLegendProtocols.includes(k)) onLegendProtocolClick(k);
@@ -377,6 +413,13 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="L7 Protocol"
+                      info={
+                        <InfoPopover
+                          id="nc-info-l7protocol"
+                          title="L7 Protocol"
+                          body="Layer 7 application-layer protocol identified by Wireshark's deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
+                        />
+                      }
                       onSelectAll={() =>
                         presentL7Protocols.forEach(p => {
                           if (!activeL7Protocols.includes(p)) onL7ProtocolClick(p);
@@ -413,6 +456,28 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Applications"
+                      info={
+                        <InfoPopover
+                          id="nc-info-app"
+                          title="Application"
+                          body={
+                            <>
+                              Application or service identified by <strong>nDPI</strong> deep packet
+                              inspection (e.g. YouTube, WhatsApp).{' '}
+                              <strong>Detection accuracy may vary</strong> — treat results as
+                              indicative, not definitive.
+                              <br />
+                              <a
+                                href="/ndpi-reference.html"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View protocol reference →
+                              </a>
+                            </>
+                          }
+                        />
+                      }
                       onSelectAll={() =>
                         presentAppNames.forEach(a => {
                           if (!activeAppFilters.includes(a)) onAppFilterClick(a);
@@ -449,6 +514,26 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Category"
+                      info={
+                        <InfoPopover
+                          id="nc-info-cat"
+                          title="Category"
+                          body={
+                            <>
+                              Broad traffic category assigned by <strong>nDPI</strong> (e.g. Web,
+                              Media, VPN). Select multiple to show any of them.
+                              <br />
+                              <a
+                                href="/ndpi-reference.html"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View protocol reference →
+                              </a>
+                            </>
+                          }
+                        />
+                      }
                       onSelectAll={() =>
                         presentCategories.forEach(c => {
                           if (!activeCategories.includes(c)) onCategoryClick(c);
@@ -485,6 +570,27 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Risk Type"
+                      info={
+                        <InfoPopover
+                          id="nc-info-risk"
+                          title="Risk Type"
+                          body={
+                            <>
+                              Filter by <strong>nDPI</strong> risk flags assigned to a
+                              conversation. Examples: clear-text credentials, unsafe protocols,
+                              known malicious signatures.
+                              <br />
+                              <a
+                                href="/ndpi-reference.html"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View protocol reference →
+                              </a>
+                            </>
+                          }
+                        />
+                      }
                       onSelectAll={() =>
                         presentRiskTypes.forEach(r => {
                           if (!activeRiskTypes.includes(r)) onRiskTypeClick(r);
@@ -520,6 +626,13 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Custom Rules"
+                      info={
+                        <InfoPopover
+                          id="nc-info-customrules"
+                          title="Custom Rules"
+                          body="Filter by your own custom detection rules defined in signatures.yml. Only rules that matched at least one conversation in this file are shown."
+                        />
+                      }
                       onSelectAll={() =>
                         presentCustomSigs.forEach(s => {
                           if (!activeCustomSigs.includes(s)) onCustomSigClick(s);
@@ -556,6 +669,13 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="File Types"
+                      info={
+                        <InfoPopover
+                          id="nc-info-filetypes"
+                          title="File Types"
+                          body="Shows only conversations containing at least one packet where a file signature (magic bytes) was detected in the payload — e.g. PDF, ZIP, PNG."
+                        />
+                      }
                       onSelectAll={() =>
                         presentFileTypes.forEach(f => {
                           if (!activeFileTypes.includes(f)) onFileTypeClick(f);
@@ -592,6 +712,13 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Country"
+                      info={
+                        <InfoPopover
+                          id="nc-info-country"
+                          title="Country filter"
+                          body="Filter by the country of external IP addresses (source or destination). Based on ip-api.com geolocation data."
+                        />
+                      }
                       onSelectAll={() =>
                         presentCountries.forEach(c => {
                           if (!activeCountries.includes(c)) onCountryClick(c);
