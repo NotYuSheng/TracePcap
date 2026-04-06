@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { uploadService, type AnalysisOptions } from '../services/uploadService';
 
 export interface UploadEntry {
-  id: string;       // local key
-  fileId?: string;  // backend ID, set on success
+  id: string; // local key
+  fileId?: string; // backend ID, set on success
   fileName: string;
   progress: number;
   isUploading: boolean;
@@ -19,7 +19,10 @@ export const useFileUpload = () => {
     setUploads(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)));
 
   const uploadFiles = useCallback(
-    async (files: File[], options: AnalysisOptions = { enableNdpi: true, enableFileExtraction: true }) => {
+    async (
+      files: File[],
+      options: AnalysisOptions = { enableNdpi: true, enableFileExtraction: true }
+    ) => {
       const entries: UploadEntry[] = files.map((f, i) => ({
         id: `${Date.now()}-${i}`,
         fileName: f.name,
@@ -34,9 +37,13 @@ export const useFileUpload = () => {
         const file = files[i];
         const entryId = entries[i].id;
         try {
-          const result = await uploadService.uploadPcap(file, progress => {
-            update(entryId, { progress });
-          }, options);
+          const result = await uploadService.uploadPcap(
+            file,
+            progress => {
+              update(entryId, { progress });
+            },
+            options
+          );
 
           update(entryId, { isUploading: false, progress: 100, fileId: result.fileId });
         } catch (err: any) {
@@ -65,4 +72,3 @@ export const useFileUpload = () => {
 
   return { uploadFiles, uploads, clearUploads, isUploading };
 };
-

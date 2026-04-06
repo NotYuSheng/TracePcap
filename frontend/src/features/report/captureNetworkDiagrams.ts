@@ -44,7 +44,7 @@ let captureSeq = 0;
 async function captureLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  layoutType: 'forceDirected2d' | 'hierarchicalTd',
+  layoutType: 'forceDirected2d' | 'hierarchicalTd'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const id = `__nr-capture-${++captureSeq}`;
@@ -71,8 +71,7 @@ async function captureLayout(
 
     // Override the component's 70vh height so it fills the capture area.
     const styleEl = document.createElement('style');
-    styleEl.textContent =
-      `#${id} .network-graph-container { height:${CAPTURE_H}px !important; }`;
+    styleEl.textContent = `#${id} .network-graph-container { height:${CAPTURE_H}px !important; }`;
 
     document.head.appendChild(styleEl);
     document.body.appendChild(overlay);
@@ -96,28 +95,30 @@ async function captureLayout(
       // internal async paint passes all need to complete before we snapshot.
       // rAFs alone are not enough for force-directed layouts with many edges —
       // a short setTimeout gives the browser time to finish all pending work.
-      setTimeout(() =>
-        requestAnimationFrame(async () => {
-          try {
-            const dataUrl = await toPng(container, {
-              width: CAPTURE_W,
-              height: CAPTURE_H,
-              pixelRatio: 6,
-              // Skip re-fetching web fonts (Bootstrap Icons) — those fetches
-              // fail when Vite-bundled with hashed asset URLs.  Edge lines,
-              // labels and colours are all captured; only icon glyphs are
-              // absent.
-              skipFonts: true,
-            });
-            cleanup();
-            resolve(dataUrl.split(',')[1]);
-          } catch (err) {
-            console.error('[captureNetworkDiagrams] toPng failed:', err);
-            cleanup();
-            reject(err);
-          }
-        })
-      , 500);
+      setTimeout(
+        () =>
+          requestAnimationFrame(async () => {
+            try {
+              const dataUrl = await toPng(container, {
+                width: CAPTURE_W,
+                height: CAPTURE_H,
+                pixelRatio: 6,
+                // Skip re-fetching web fonts (Bootstrap Icons) — those fetches
+                // fail when Vite-bundled with hashed asset URLs.  Edge lines,
+                // labels and colours are all captured; only icon glyphs are
+                // absent.
+                skipFonts: true,
+              });
+              cleanup();
+              resolve(dataUrl.split(',')[1]);
+            } catch (err) {
+              console.error('[captureNetworkDiagrams] toPng failed:', err);
+              cleanup();
+              reject(err);
+            }
+          }),
+        500
+      );
     };
 
     root.render(
@@ -126,7 +127,7 @@ async function captureLayout(
         edges,
         layoutType,
         onLayoutComplete: handleLayoutComplete,
-      }),
+      })
     );
 
     // Safety valve — 30 s should be ample even for large captures.
@@ -144,35 +145,51 @@ async function captureLayout(
 
 export interface DiagramImages {
   forceDirected: string; // base64 PNG
-  hierarchical: string;  // base64 PNG
+  hierarchical: string; // base64 PNG
 }
 
 export async function captureNetworkDiagrams(
   fileId: string,
-  analysisSummary?: AnalysisSummary,
+  analysisSummary?: AnalysisSummary
 ): Promise<DiagramImages> {
   const response = await conversationService.getConversations(fileId, {
-    ip: '', port: '', payloadContains: '',
-    protocols: [], l7Protocols: [], apps: [], categories: [],
-    hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [],
-    deviceTypes: [], countries: [],
-    sortBy: '', sortDir: 'asc',
-    page: 1, pageSize: 10000,
+    ip: '',
+    port: '',
+    payloadContains: '',
+    protocols: [],
+    l7Protocols: [],
+    apps: [],
+    categories: [],
+    hasRisks: false,
+    fileTypes: [],
+    riskTypes: [],
+    customSignatures: [],
+    deviceTypes: [],
+    countries: [],
+    sortBy: '',
+    sortDir: 'asc',
+    page: 1,
+    pageSize: 10000,
   });
 
   let hostClassifications;
   try {
     hostClassifications = await conversationService.getHostClassifications(fileId);
-  } catch { /* optional — best effort */ }
+  } catch {
+    /* optional — best effort */
+  }
 
   const { nodes, edges } = networkService.buildNetworkGraph(
-    response.data, analysisSummary, MAX_CONVERSATIONS, hostClassifications,
+    response.data,
+    analysisSummary,
+    MAX_CONVERSATIONS,
+    hostClassifications
   );
 
   // Sequential — both layouts share the module-level ELK singleton inside
   // NetworkGraph.tsx; running them in parallel risks a layout race condition.
   const forceDirected = await captureLayout(nodes, edges, 'forceDirected2d');
-  const hierarchical  = await captureLayout(nodes, edges, 'hierarchicalTd');
+  const hierarchical = await captureLayout(nodes, edges, 'hierarchicalTd');
 
   return { forceDirected, hierarchical };
 }

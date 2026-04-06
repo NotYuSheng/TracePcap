@@ -41,19 +41,18 @@ const ExtractionInfoCard = () => {
           <ul className="mb-3">
             <li>
               <strong>HTTP</strong> — tshark's <code>--export-objects http</code> exports HTTP
-              objects from the capture, including GET response bodies, POST request bodies, and
-              POST response bodies. This covers images, documents, HTML pages, scripts,
-              ad-tracking payloads, and anything else transferred over HTTP. Use the{' '}
-              <strong>MIME type</strong> column to identify what each entry actually is. Where
-              the source TCP stream can be determined, a link to the originating conversation is
-              shown.
+              objects from the capture, including GET response bodies, POST request bodies, and POST
+              response bodies. This covers images, documents, HTML pages, scripts, ad-tracking
+              payloads, and anything else transferred over HTTP. Use the <strong>MIME type</strong>{' '}
+              column to identify what each entry actually is. Where the source TCP stream can be
+              determined, a link to the originating conversation is shown.
             </li>
             <li>
               <strong>Raw stream</strong> — for non-HTTP conversations, the TCP/UDP stream is
-              reconstructed and scanned in a single pass using an Aho-Corasick automaton built
-              from known file magic bytes. Candidate positions are then confirmed with Apache
-              Tika's MIME detection. Any byte range matching a known file signature is extracted
-              and stored with its detected MIME type.
+              reconstructed and scanned in a single pass using an Aho-Corasick automaton built from
+              known file magic bytes. Candidate positions are then confirmed with Apache Tika's MIME
+              detection. Any byte range matching a known file signature is extracted and stored with
+              its detected MIME type.
             </li>
           </ul>
           <p className="mb-0">
@@ -78,10 +77,8 @@ function mimeIcon(mimeType: string | null): string {
 }
 
 function methodBadge(method: string | null) {
-  if (method === 'tshark_http')
-    return <span className="badge bg-primary">HTTP</span>;
-  if (method === 'magic_bytes')
-    return <span className="badge bg-secondary">Raw stream</span>;
+  if (method === 'tshark_http') return <span className="badge bg-primary">HTTP</span>;
+  if (method === 'magic_bytes') return <span className="badge bg-secondary">Raw stream</span>;
   return <span className="badge bg-light text-dark">{method ?? '—'}</span>;
 }
 
@@ -108,11 +105,7 @@ const CopyHash = ({ hash }: { hash: string }) => {
   }, [hash]);
   return (
     <span className="d-inline-flex align-items-center gap-1">
-      <span
-        className="font-monospace text-muted"
-        style={{ fontSize: '0.75em' }}
-        title={hash}
-      >
+      <span className="font-monospace text-muted" style={{ fontSize: '0.75em' }} title={hash}>
         {hash.substring(0, 8)}…{hash.substring(hash.length - 8)}
       </span>
       <button
@@ -202,7 +195,9 @@ export const ExtractedFilesPage = () => {
             Files detected and extracted from HTTP transfers and raw packet streams.
           </small>
         </div>
-        <span className="badge bg-secondary fs-6">{files.length} file{files.length !== 1 ? 's' : ''}</span>
+        <span className="badge bg-secondary fs-6">
+          {files.length} file{files.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       <ExtractionInfoCard />
@@ -250,7 +245,11 @@ export const ExtractedFilesPage = () => {
                         {file.fileSize != null ? formatBytes(file.fileSize) : '—'}
                       </td>
                       <td>
-                        {file.sha256 ? <CopyHash hash={file.sha256} /> : <span className="text-muted">—</span>}
+                        {file.sha256 ? (
+                          <CopyHash hash={file.sha256} />
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
                       </td>
                       <td>
                         {file.conversationId ? (
@@ -258,7 +257,9 @@ export const ExtractedFilesPage = () => {
                             className="btn btn-link btn-sm p-0"
                             style={{ fontSize: '0.8em' }}
                             onClick={() =>
-                              navigate(`/analysis/${fileId}/conversations?highlight=${file.conversationId}`)
+                              navigate(
+                                `/analysis/${fileId}/conversations?highlight=${file.conversationId}`
+                              )
                             }
                           >
                             View conversation
@@ -301,9 +302,7 @@ export const ExtractedFilesPage = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>
-            You are about to download a file that was extracted from a packet capture:
-          </p>
+          <p>You are about to download a file that was extracted from a packet capture:</p>
           <div className="alert alert-secondary font-monospace" style={{ fontSize: '0.85em' }}>
             {pendingDownload?.filename ?? '(unnamed)'}{' '}
             {pendingDownload?.fileSize != null && (

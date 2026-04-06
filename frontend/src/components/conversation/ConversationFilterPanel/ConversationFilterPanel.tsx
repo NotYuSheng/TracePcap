@@ -68,7 +68,6 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
   );
 }
 
-
 function countryFlag(code: string): string {
   return code
     .toUpperCase()
@@ -130,10 +129,7 @@ export function ConversationFilterPanel({
   const handlePayloadChange = (value: string) => {
     setPayloadInput(value);
     if (payloadDebounceRef.current) clearTimeout(payloadDebounceRef.current);
-    payloadDebounceRef.current = setTimeout(
-      () => onFiltersChange({ payloadContains: value }),
-      300
-    );
+    payloadDebounceRef.current = setTimeout(() => onFiltersChange({ payloadContains: value }), 300);
   };
 
   const toggle = <K extends keyof ConversationFilters>(
@@ -637,21 +633,26 @@ export function ConversationFilterPanel({
                     onDeselectAll={() => onFiltersChange({ countries: [] })}
                   />
                   <div className="d-flex flex-wrap gap-1 mt-1">
-                    {countryOptions.map(o => o.split('|')).filter(([code]) => code).map(([code, name]) => {
-                      const selected = (filters.countries ?? []).includes(code);
-                      return (
-                        <button
-                          key={code}
-                          type="button"
-                          className={`badge rounded-pill border-0 filter-pill ${selected ? 'active' : ''}`}
-                          style={selected ? { backgroundColor: '#0d6efd', color: '#fff' } : undefined}
-                          title={name}
-                          onClick={() => toggle('countries', code, filters.countries ?? [])}
-                        >
-                          {countryFlag(code)} {code}
-                        </button>
-                      );
-                    })}
+                    {countryOptions
+                      .map(o => o.split('|'))
+                      .filter(([code]) => code)
+                      .map(([code, name]) => {
+                        const selected = (filters.countries ?? []).includes(code);
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            className={`badge rounded-pill border-0 filter-pill ${selected ? 'active' : ''}`}
+                            style={
+                              selected ? { backgroundColor: '#0d6efd', color: '#fff' } : undefined
+                            }
+                            title={name}
+                            onClick={() => toggle('countries', code, filters.countries ?? [])}
+                          >
+                            {countryFlag(code)} {code}
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               )}
@@ -679,7 +680,9 @@ export function ConversationFilterPanel({
                         key={dt}
                         type="button"
                         className={`badge rounded-pill border-0 filter-pill ${selected ? 'active' : ''}`}
-                        style={selected ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                        style={
+                          selected ? { backgroundColor: bg, color: getTextColor(bg) } : undefined
+                        }
                         onClick={() => toggle('deviceTypes', dt, filters.deviceTypes ?? [])}
                       >
                         {deviceTypeLabel(dt)}

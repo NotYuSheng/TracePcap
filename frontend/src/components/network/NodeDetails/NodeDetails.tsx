@@ -148,15 +148,24 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                   <dd className="col-7 mb-1">
                     {(() => {
                       // Pick the single most informative badge label + style
-                      const isGeneric = node.data.nodeType === 'client' || node.data.nodeType === 'unknown';
+                      const isGeneric =
+                        node.data.nodeType === 'client' || node.data.nodeType === 'unknown';
                       let badgeContent: React.ReactNode;
                       if (!isGeneric) {
                         // Specific type is the clearest signal
-                        badgeContent = <span className={`badge ${typeInfo.badgeClass}`}>{typeInfo.label}</span>;
+                        badgeContent = (
+                          <span className={`badge ${typeInfo.badgeClass}`}>{typeInfo.label}</span>
+                        );
                       } else if (node.data.deviceType) {
                         // Device type is more informative than "client/unknown"
                         badgeContent = (
-                          <span className="badge" style={{ backgroundColor: deviceTypeColor(node.data.deviceType), color: '#fff' }}>
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: deviceTypeColor(node.data.deviceType),
+                              color: '#fff',
+                            }}
+                          >
                             {deviceTypeLabel(node.data.deviceType)}
                           </span>
                         );
@@ -173,7 +182,10 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
                           role="button"
                           title="Click for classification details"
                           style={{ cursor: 'pointer' }}
-                          onClick={e => { e.stopPropagation(); setClassificationPopupOpen(true); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setClassificationPopupOpen(true);
+                          }}
                         >
                           {badgeContent}
                         </span>

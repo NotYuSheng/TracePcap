@@ -36,12 +36,16 @@ export const UploadProgress = ({
     <div className={`upload-status-card ${stateClass}`}>
       {/* Icon */}
       <div className="usc-icon">
-        <i className={`bi ${error ? 'bi-file-earmark-x' : isDone ? 'bi-file-earmark-check' : 'bi-file-earmark-arrow-up'}`}></i>
+        <i
+          className={`bi ${error ? 'bi-file-earmark-x' : isDone ? 'bi-file-earmark-check' : 'bi-file-earmark-arrow-up'}`}
+        ></i>
       </div>
 
       {/* File name + progress bar */}
       <div className="usc-body">
-        <div className="usc-filename" title={fileName}>{fileName}</div>
+        <div className="usc-filename" title={fileName}>
+          {fileName}
+        </div>
         <div className="progress usc-bar">
           <div
             className={`progress-bar ${
@@ -63,7 +67,8 @@ export const UploadProgress = ({
         {isDone && isDuplicate && (
           <div className="usc-duplicate-warning">
             <i className="bi bi-exclamation-triangle-fill me-1"></i>
-            This file has already been uploaded. To reprocess it, open the existing analysis, delete it, then re-upload.
+            This file has already been uploaded. To reprocess it, open the existing analysis, delete
+            it, then re-upload.
           </div>
         )}
       </div>

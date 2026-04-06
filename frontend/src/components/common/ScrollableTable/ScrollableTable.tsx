@@ -81,9 +81,15 @@ export const ScrollableTable = ({ children, maxHeight = '62vh' }: ScrollableTabl
       if (scrollRef.current && Math.abs(dy) > DEAD) scrollRef.current.scrollTop += dy * SPD;
       panRaf.current = requestAnimationFrame(panTick.current);
     };
-    const onMove = (e: MouseEvent) => { panMouse.current = { x: e.clientX, y: e.clientY }; };
-    const onClick = (e: MouseEvent) => { if (panActive.current && e.button !== 1) stopPan(); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') stopPan(); };
+    const onMove = (e: MouseEvent) => {
+      panMouse.current = { x: e.clientX, y: e.clientY };
+    };
+    const onClick = (e: MouseEvent) => {
+      if (panActive.current && e.button !== 1) stopPan();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') stopPan();
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mousedown', onClick);
     window.addEventListener('keydown', onKey);
@@ -99,7 +105,10 @@ export const ScrollableTable = ({ children, maxHeight = '62vh' }: ScrollableTabl
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (e.button !== 1) return;
       e.preventDefault();
-      if (panActive.current) { stopPan(); return; }
+      if (panActive.current) {
+        stopPan();
+        return;
+      }
       panActive.current = true;
       panOrigin.current = { x: e.clientX, y: e.clientY };
       panMouse.current = { x: e.clientX, y: e.clientY };

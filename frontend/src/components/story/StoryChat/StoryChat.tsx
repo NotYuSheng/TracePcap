@@ -36,7 +36,11 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
     setLoading(true);
 
     try {
-      const { answer, followUpQuestions } = await storyService.askQuestion(storyId, question, messages);
+      const { answer, followUpQuestions } = await storyService.askQuestion(
+        storyId,
+        question,
+        messages
+      );
       setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
       setCurrentSuggestions(followUpQuestions ?? []);
     } catch {
@@ -87,9 +91,7 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
                 )}
                 <div
                   className={`px-3 py-2 rounded-3 small ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-white'
-                      : 'bg-light text-dark border'
+                    msg.role === 'user' ? 'bg-primary text-white' : 'bg-light text-dark border'
                   }`}
                   style={{ maxWidth: '80%', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}
                 >
@@ -106,7 +108,10 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
                   <i className="bi bi-cpu text-white" style={{ fontSize: '0.7rem' }}></i>
                 </div>
                 <div className="px-3 py-2 rounded-3 small bg-light border text-muted">
-                  <span className="spinner-border spinner-border-sm me-2" style={{ width: '0.7rem', height: '0.7rem' }}></span>
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    style={{ width: '0.7rem', height: '0.7rem' }}
+                  ></span>
                   Thinking...
                 </div>
               </div>
@@ -114,9 +119,7 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
           </div>
         )}
 
-        {error && (
-          <div className="mx-3 mt-3 alert alert-danger small py-2 mb-0">{error}</div>
-        )}
+        {error && <div className="mx-3 mt-3 alert alert-danger small py-2 mb-0">{error}</div>}
 
         {currentSuggestions.length > 0 && !loading && (
           <div className="px-3 pb-2 pt-3 d-flex flex-wrap gap-2">
@@ -125,7 +128,11 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
                 key={i}
                 className="btn btn-outline-secondary btn-sm text-start"
                 style={{ fontSize: '0.78rem', maxWidth: '100%' }}
-                onClick={() => { setCurrentSuggestions([]); setInput(q); inputRef.current?.focus(); }}
+                onClick={() => {
+                  setCurrentSuggestions([]);
+                  setInput(q);
+                  inputRef.current?.focus();
+                }}
                 disabled={loading}
               >
                 <i className="bi bi-lightbulb me-1 text-warning"></i>
@@ -153,10 +160,11 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
             disabled={loading || !input.trim()}
             style={{ height: '58px', width: '42px' }}
           >
-            {loading
-              ? <span className="spinner-border spinner-border-sm"></span>
-              : <i className="bi bi-send-fill"></i>
-            }
+            {loading ? (
+              <span className="spinner-border spinner-border-sm"></span>
+            ) : (
+              <i className="bi bi-send-fill"></i>
+            )}
           </button>
         </div>
       </div>

@@ -24,9 +24,11 @@ function buildSignals(info: DeviceClassificationInfo): string[] {
   if (info.manufacturer) signals.push(`MAC OUI matched: ${info.manufacturer}`);
   if (info.ttl != null) {
     const os =
-      info.ttl <= 64 ? 'Linux / Android / iOS' :
-      info.ttl <= 128 ? 'Windows' :
-      'Network device (Cisco / BSD)';
+      info.ttl <= 64
+        ? 'Linux / Android / iOS'
+        : info.ttl <= 128
+          ? 'Windows'
+          : 'Network device (Cisco / BSD)';
     signals.push(`TTL ${info.ttl} → ${os}`);
   }
   if (info.confidence >= 60) signals.push('Application traffic profile analysed');
@@ -80,9 +82,19 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
         <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>Classification</span>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.1rem', lineHeight: 1, cursor: 'pointer', padding: '0 0 0 8px' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#fff',
+            fontSize: '1.1rem',
+            lineHeight: 1,
+            cursor: 'pointer',
+            padding: '0 0 0 8px',
+          }}
           aria-label="Close"
-        >×</button>
+        >
+          ×
+        </button>
       </div>
 
       <div style={{ padding: '12px 14px' }}>
@@ -102,10 +114,16 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
           if (!typeLabel) return null;
           return (
             <div className="d-flex align-items-start gap-2 mb-2">
-              <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Type</span>
+              <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>
+                Type
+              </span>
               <div>
                 <span className="badge bg-secondary">{typeLabel}</span>
-                {typeNote && <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>{typeNote}</div>}
+                {typeNote && (
+                  <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                    {typeNote}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -113,19 +131,38 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
 
         {/* Device row */}
         <div className="d-flex align-items-start gap-2 mb-2">
-          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Device</span>
+          <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>
+            Device
+          </span>
           <div style={{ flex: 1 }}>
             <span className="badge" style={{ backgroundColor: badgeBg, color: '#fff' }}>
               {deviceTypeLabel(info.deviceType)}
             </span>
             {signals.length > 0 && (
               <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
-                {signals.map((s, i) => <li key={i}>{s}</li>)}
+                {signals.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
               </ul>
             )}
             <div className="d-flex align-items-center gap-2 mt-1">
-              <div style={{ flex: 1, background: '#e9ecef', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${info.confidence}%`, height: '100%', backgroundColor: badgeBg, borderRadius: '4px' }} />
+              <div
+                style={{
+                  flex: 1,
+                  background: '#e9ecef',
+                  borderRadius: '4px',
+                  height: '4px',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${info.confidence}%`,
+                    height: '100%',
+                    backgroundColor: badgeBg,
+                    borderRadius: '4px',
+                  }}
+                />
               </div>
               <span style={{ fontSize: '0.72rem', color: '#6c757d', whiteSpace: 'nowrap' }}>
                 {info.confidence}% — {level}
@@ -137,13 +174,17 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
         {/* Role row */}
         {info.role && (
           <div className="d-flex align-items-start gap-2 mb-0">
-            <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>Role</span>
+            <span className="text-muted small" style={{ minWidth: '52px', paddingTop: '2px' }}>
+              Role
+            </span>
             <div>
               <span className={`badge ${info.role === 'client' ? 'bg-primary' : 'bg-success'}`}>
                 {info.role.charAt(0).toUpperCase() + info.role.slice(1)}
               </span>
               <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
-                {info.role === 'client' ? 'Initiated this conversation' : 'Received this conversation'}
+                {info.role === 'client'
+                  ? 'Initiated this conversation'
+                  : 'Received this conversation'}
               </div>
             </div>
           </div>

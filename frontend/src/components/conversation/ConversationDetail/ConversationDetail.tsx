@@ -33,7 +33,9 @@ function countryFlag(code: string): string {
 }
 
 function isPrivateIp(ip: string): boolean {
-  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(
+    ip
+  );
 }
 
 function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: string; ip: string }) {
@@ -42,7 +44,9 @@ function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: str
     return (
       <>
         <dt className="col-sm-4">{label} Country:</dt>
-        <dd className="col-sm-8"><span className="text-muted">Internal</span></dd>
+        <dd className="col-sm-8">
+          <span className="text-muted">Internal</span>
+        </dd>
       </>
     );
   }
@@ -88,7 +92,12 @@ export const ConversationDetail = ({
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
   const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
 
-  const openDevicePopup = (cls: HostClassification, ip: string, role: 'client' | 'server', e: React.MouseEvent) => {
+  const openDevicePopup = (
+    cls: HostClassification,
+    ip: string,
+    role: 'client' | 'server',
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     setDevicePopup({
       ip,
@@ -147,9 +156,7 @@ export const ConversationDetail = ({
           {extractedCount != null && extractedCount > 0 && fileId && (
             <button
               className="btn btn-sm btn-outline-warning"
-              onClick={() =>
-                navigate(`/analysis/${fileId}/extracted-files`)
-              }
+              onClick={() => navigate(`/analysis/${fileId}/extracted-files`)}
               title="Files extracted from this conversation's stream"
             >
               <i className="bi bi-file-earmark-arrow-down me-1"></i>
@@ -167,7 +174,12 @@ export const ConversationDetail = ({
                   {srcClass && (
                     <span
                       className="ms-2 badge"
-                      style={{ backgroundColor: deviceTypeColor(srcClass.deviceType), color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
+                      style={{
+                        backgroundColor: deviceTypeColor(srcClass.deviceType),
+                        color: '#fff',
+                        fontSize: '0.7em',
+                        cursor: 'pointer',
+                      }}
                       title="Click for details"
                       onClick={e => openDevicePopup(srcClass, source.ip, 'client', e)}
                     >
@@ -181,7 +193,12 @@ export const ConversationDetail = ({
                   {dstClass && (
                     <span
                       className="ms-2 badge"
-                      style={{ backgroundColor: deviceTypeColor(dstClass.deviceType), color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
+                      style={{
+                        backgroundColor: deviceTypeColor(dstClass.deviceType),
+                        color: '#fff',
+                        fontSize: '0.7em',
+                        cursor: 'pointer',
+                      }}
                       title="Click for details"
                       onClick={e => openDevicePopup(dstClass, destination.ip, 'server', e)}
                     >
@@ -539,10 +556,7 @@ export const ConversationDetail = ({
 
         {activeTab === 'session' && (
           <div className="card-body">
-            <SessionTab
-              conversationId={conversation.id}
-              protocol={conversation.protocol.name}
-            />
+            <SessionTab conversationId={conversation.id} protocol={conversation.protocol.name} />
           </div>
         )}
       </div>

@@ -6,7 +6,9 @@
   scrollbar-color: #adb5bd transparent;
 }
 
-.sct-top-scrollbar::-webkit-scrollbar { height: 6px; }
+.sct-top-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
 
 .sct-top-scrollbar::-webkit-scrollbar-track {
   background: #f1f3f5;
@@ -18,7 +20,9 @@
   border-radius: 3px;
 }
 
-.sct-top-scrollbar-inner { height: 1px; }
+.sct-top-scrollbar-inner {
+  height: 1px;
+}
 
 /* Scroll container */
 .sct-scroll {
@@ -27,7 +31,10 @@
   scrollbar-color: #adb5bd transparent;
 }
 
-.sct-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.sct-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
 .sct-scroll::-webkit-scrollbar-track {
   background: #f1f3f5;

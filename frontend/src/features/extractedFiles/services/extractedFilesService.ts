@@ -19,10 +19,10 @@ export async function getExtractedFiles(fileId: string): Promise<ExtractedFile[]
 
 export async function getExtractionsByConversation(
   fileId: string,
-  conversationId: string,
+  conversationId: string
 ): Promise<ExtractedFile[]> {
   const response = await apiClient.get<ExtractedFile[]>(
-    `${API_ENDPOINTS.EXTRACTED_FILES(fileId)}?conversationId=${conversationId}`,
+    `${API_ENDPOINTS.EXTRACTED_FILES(fileId)}?conversationId=${conversationId}`
   );
   return response.data;
 }

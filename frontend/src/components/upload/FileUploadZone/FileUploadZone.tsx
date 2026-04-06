@@ -63,7 +63,8 @@ export const FileUploadZone = ({
                 <strong>Click to browse</strong> or drag &amp; drop
               </p>
               <small className="text-muted">
-                {acceptedFileTypes.join(', ')} &middot; up to {Math.round(maxSize / 1024 / 1024)} MB each &middot; multiple files
+                {acceptedFileTypes.join(', ')} &middot; up to {Math.round(maxSize / 1024 / 1024)} MB
+                each &middot; multiple files
               </small>
             </>
           )}

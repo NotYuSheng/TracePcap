@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
-import type { SessionData, SessionChunk, HttpExchange } from '@/features/conversation/services/conversationService';
+import type {
+  SessionData,
+  SessionChunk,
+  HttpExchange,
+} from '@/features/conversation/services/conversationService';
 import { formatBytes } from '@/utils/formatters';
 
 interface SessionTabProps {
@@ -85,11 +89,7 @@ function ChunkSpan({ chunk }: { chunk: SessionChunk }) {
   const isClient = chunk.direction === 'CLIENT';
   const color = isClient ? CLIENT_COLOR : SERVER_COLOR;
 
-  return (
-    <span style={{ color }}>
-      {chunk.text}
-    </span>
-  );
+  return <span style={{ color }}>{chunk.text}</span>;
 }
 
 // ─── HTTP exchange ────────────────────────────────────────────────────────────
@@ -324,8 +324,8 @@ export function SessionTab({ conversationId }: SessionTabProps) {
             <span className="badge bg-info text-dark">{session.detectedProtocol}</span>
           )}
           <small className="text-muted">
-            ↑ {formatBytes(session.totalClientBytes)} client &nbsp;·&nbsp;
-            ↓ {formatBytes(session.totalServerBytes)} server
+            ↑ {formatBytes(session.totalClientBytes)} client &nbsp;·&nbsp; ↓{' '}
+            {formatBytes(session.totalServerBytes)} server
           </small>
           {session.truncated && (
             <span className="badge bg-warning text-dark" title="Session truncated at 1 MB">
@@ -383,9 +383,7 @@ export function SessionTab({ conversationId }: SessionTabProps) {
       )}
 
       {/* Interleaved raw stream (Wireshark-style) */}
-      {(!hasHttp || activeView === 'raw') && (
-        <InterleavedStream chunks={session.chunks} />
-      )}
+      {(!hasHttp || activeView === 'raw') && <InterleavedStream chunks={session.chunks} />}
     </div>
   );
 }

@@ -7,7 +7,13 @@ import {
   DEFAULT_EDGE_COLOR,
 } from '@/features/network/constants';
 import { DEVICE_TYPES, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
-import { getAppColor, getL7ProtocolColor, getCategoryColor, getTextColor, RISK_BADGE } from '@/utils/appColors';
+import {
+  getAppColor,
+  getL7ProtocolColor,
+  getCategoryColor,
+  getTextColor,
+  RISK_BADGE,
+} from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import './NetworkControls.css';
 
@@ -59,29 +65,72 @@ interface NetworkControlsProps {
   onClearAllFilters: () => void;
 }
 
-function edgeLegendLabel(key: string): string { return PROTOCOL_LABELS[key] ?? key; }
-function edgeLegendColor(key: string): string { return PROTOCOL_COLORS[key] ?? DEFAULT_EDGE_COLOR; }
+function edgeLegendLabel(key: string): string {
+  return PROTOCOL_LABELS[key] ?? key;
+}
+function edgeLegendColor(key: string): string {
+  return PROTOCOL_COLORS[key] ?? DEFAULT_EDGE_COLOR;
+}
 function nodeLegendLabel(key: string): string {
   return NODE_TYPE_LABELS[key] ?? key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
-function nodeLegendColor(key: string): string { return NODE_TYPE_COLORS[key] ?? '#95a5a6'; }
+function nodeLegendColor(key: string): string {
+  return NODE_TYPE_COLORS[key] ?? '#95a5a6';
+}
 function countryFlag(code: string): string {
-  return code.toUpperCase().split('').map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)).join('');
+  return code
+    .toUpperCase()
+    .split('')
+    .map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
 }
 
 export function NetworkControls({
-  activeLegendProtocols, onLegendProtocolClick, onLegendProtocolClear, presentEdgeLegendKeys,
-  activeNodeFilters, onNodeFilterClick, onNodeFilterClear, presentNodeTypes, presentDeviceTypes,
-  ipFilter, onIpFilterChange, portFilter, onPortFilterChange,
-  activeAppFilters, onAppFilterClick, onAppFilterClear, presentAppNames,
-  activeL7Protocols, onL7ProtocolClick, onL7ProtocolClear, presentL7Protocols,
-  activeCategories, onCategoryClick, onCategoryClear, presentCategories,
-  activeRiskTypes, onRiskTypeClick, onRiskTypeClear, presentRiskTypes,
-  activeCustomSigs, onCustomSigClick, onCustomSigClear, presentCustomSigs,
-  activeFileTypes, onFileTypeClick, onFileTypeClear, presentFileTypes,
-  activeCountries, onCountryClick, onCountryClear, presentCountries,
-  hasRisksOnly, onHasRisksOnlyChange,
-  activeFilterCount, onClearAllFilters,
+  activeLegendProtocols,
+  onLegendProtocolClick,
+  onLegendProtocolClear,
+  presentEdgeLegendKeys,
+  activeNodeFilters,
+  onNodeFilterClick,
+  onNodeFilterClear,
+  presentNodeTypes,
+  presentDeviceTypes,
+  ipFilter,
+  onIpFilterChange,
+  portFilter,
+  onPortFilterChange,
+  activeAppFilters,
+  onAppFilterClick,
+  onAppFilterClear,
+  presentAppNames,
+  activeL7Protocols,
+  onL7ProtocolClick,
+  onL7ProtocolClear,
+  presentL7Protocols,
+  activeCategories,
+  onCategoryClick,
+  onCategoryClear,
+  presentCategories,
+  activeRiskTypes,
+  onRiskTypeClick,
+  onRiskTypeClear,
+  presentRiskTypes,
+  activeCustomSigs,
+  onCustomSigClick,
+  onCustomSigClear,
+  presentCustomSigs,
+  activeFileTypes,
+  onFileTypeClick,
+  onFileTypeClear,
+  presentFileTypes,
+  activeCountries,
+  onCountryClick,
+  onCountryClear,
+  presentCountries,
+  hasRisksOnly,
+  onHasRisksOnlyChange,
+  activeFilterCount,
+  onClearAllFilters,
 }: NetworkControlsProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showColorInfo, setShowColorInfo] = useState(false);
@@ -90,8 +139,12 @@ export function NetworkControls({
   const ipDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setIpInput(ipFilter); }, [ipFilter]);
-  useEffect(() => { setPortInput(portFilter); }, [portFilter]);
+  useEffect(() => {
+    setIpInput(ipFilter);
+  }, [ipFilter]);
+  useEffect(() => {
+    setPortInput(portFilter);
+  }, [portFilter]);
 
   useEffect(() => {
     return () => {
@@ -128,7 +181,6 @@ export function NetworkControls({
     <>
       <div className="nc-filter-panel">
         <div className="card">
-
           {/* Card header — click anywhere to toggle */}
           <div
             className="card-header d-flex justify-content-between align-items-center"
@@ -144,7 +196,10 @@ export function NetworkControls({
             <div className="d-flex align-items-center gap-2">
               <button
                 className="btn btn-link btn-sm p-0 text-muted"
-                onClick={e => { e.stopPropagation(); setShowColorInfo(true); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  setShowColorInfo(true);
+                }}
                 title="How are node colours determined?"
               >
                 <i className="bi bi-info-circle me-1"></i>Node colours
@@ -157,12 +212,13 @@ export function NetworkControls({
           {isOpen && (
             <div className="card-body p-3">
               <div className="row g-3">
-
                 {/* IP / Hostname */}
                 <div className="col-md-3">
                   <label className="filter-section-label d-block mb-2">IP / Hostname</label>
                   <div className="input-group input-group-sm">
-                    <span className="input-group-text"><i className="bi bi-search" /></span>
+                    <span className="input-group-text">
+                      <i className="bi bi-search" />
+                    </span>
                     <input
                       type="text"
                       className="form-control"
@@ -171,7 +227,13 @@ export function NetworkControls({
                       onChange={e => handleIpChange(e.target.value)}
                     />
                     {ipInput && (
-                      <button type="button" className="btn btn-outline-secondary" onClick={() => handleIpChange('')}>×</button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => handleIpChange('')}
+                      >
+                        ×
+                      </button>
                     )}
                   </div>
                 </div>
@@ -189,7 +251,13 @@ export function NetworkControls({
                       onChange={e => handlePortChange(e.target.value)}
                     />
                     {portInput && (
-                      <button type="button" className="btn btn-outline-secondary" onClick={() => handlePortChange('')}>×</button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => handlePortChange('')}
+                      >
+                        ×
+                      </button>
                     )}
                   </div>
                 </div>
@@ -214,7 +282,11 @@ export function NetworkControls({
                 <div className="col-12">
                   <PillSectionHeader
                     label="Node Types"
-                    onSelectAll={() => allNodeKeys.forEach(k => { if (!activeNodeFilters.includes(k)) onNodeFilterClick(k); })}
+                    onSelectAll={() =>
+                      allNodeKeys.forEach(k => {
+                        if (!activeNodeFilters.includes(k)) onNodeFilterClick(k);
+                      })
+                    }
                     onDeselectAll={onNodeFilterClear}
                   />
                   <div className="d-flex flex-wrap gap-1 mt-1">
@@ -227,7 +299,11 @@ export function NetworkControls({
                           key={fkey}
                           type="button"
                           className={legendPillClass(isActive)}
-                          style={isActive ? { backgroundColor: color, color: getTextColor(color) } : undefined}
+                          style={
+                            isActive
+                              ? { backgroundColor: color, color: getTextColor(color) }
+                              : undefined
+                          }
                           onClick={() => onNodeFilterClick(fkey)}
                         >
                           <span className="nc-dot" style={{ background: color }} />
@@ -244,7 +320,11 @@ export function NetworkControls({
                           key={fkey}
                           type="button"
                           className={legendPillClass(isActive)}
-                          style={isActive ? { backgroundColor: color, color: getTextColor(color) } : undefined}
+                          style={
+                            isActive
+                              ? { backgroundColor: color, color: getTextColor(color) }
+                              : undefined
+                          }
                           onClick={() => onNodeFilterClick(fkey)}
                         >
                           <span className="nc-dot" style={{ background: color }} />
@@ -260,7 +340,11 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Edge Protocols"
-                      onSelectAll={() => presentEdgeLegendKeys.forEach(k => { if (!activeLegendProtocols.includes(k)) onLegendProtocolClick(k); })}
+                      onSelectAll={() =>
+                        presentEdgeLegendKeys.forEach(k => {
+                          if (!activeLegendProtocols.includes(k)) onLegendProtocolClick(k);
+                        })
+                      }
                       onDeselectAll={onLegendProtocolClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
@@ -272,7 +356,11 @@ export function NetworkControls({
                             key={key}
                             type="button"
                             className={legendPillClass(isActive)}
-                            style={isActive ? { backgroundColor: color, color: getTextColor(color) } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: color, color: getTextColor(color) }
+                                : undefined
+                            }
                             onClick={() => onLegendProtocolClick(key)}
                           >
                             <span className="nc-dot" style={{ background: color }} />
@@ -289,7 +377,11 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="L7 Protocol"
-                      onSelectAll={() => presentL7Protocols.forEach(p => { if (!activeL7Protocols.includes(p)) onL7ProtocolClick(p); })}
+                      onSelectAll={() =>
+                        presentL7Protocols.forEach(p => {
+                          if (!activeL7Protocols.includes(p)) onL7ProtocolClick(p);
+                        })
+                      }
                       onDeselectAll={onL7ProtocolClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
@@ -297,11 +389,19 @@ export function NetworkControls({
                         const isActive = activeL7Protocols.includes(proto);
                         const bg = getL7ProtocolColor(proto);
                         return (
-                          <button key={proto} type="button"
+                          <button
+                            key={proto}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: bg, color: getTextColor(bg) }
+                                : undefined
+                            }
                             onClick={() => onL7ProtocolClick(proto)}
-                          >{proto}</button>
+                          >
+                            {proto}
+                          </button>
                         );
                       })}
                     </div>
@@ -313,7 +413,11 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Applications"
-                      onSelectAll={() => presentAppNames.forEach(a => { if (!activeAppFilters.includes(a)) onAppFilterClick(a); })}
+                      onSelectAll={() =>
+                        presentAppNames.forEach(a => {
+                          if (!activeAppFilters.includes(a)) onAppFilterClick(a);
+                        })
+                      }
                       onDeselectAll={onAppFilterClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1 filter-pill-scroll">
@@ -321,11 +425,19 @@ export function NetworkControls({
                         const isActive = activeAppFilters.includes(app);
                         const bg = getAppColor(app);
                         return (
-                          <button key={app} type="button"
+                          <button
+                            key={app}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: bg, color: getTextColor(bg) }
+                                : undefined
+                            }
                             onClick={() => onAppFilterClick(app)}
-                          >{app}</button>
+                          >
+                            {app}
+                          </button>
                         );
                       })}
                     </div>
@@ -337,7 +449,11 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Category"
-                      onSelectAll={() => presentCategories.forEach(c => { if (!activeCategories.includes(c)) onCategoryClick(c); })}
+                      onSelectAll={() =>
+                        presentCategories.forEach(c => {
+                          if (!activeCategories.includes(c)) onCategoryClick(c);
+                        })
+                      }
                       onDeselectAll={onCategoryClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
@@ -345,11 +461,19 @@ export function NetworkControls({
                         const isActive = activeCategories.includes(cat);
                         const bg = getCategoryColor(cat);
                         return (
-                          <button key={cat} type="button"
+                          <button
+                            key={cat}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: bg, color: getTextColor(bg) }
+                                : undefined
+                            }
                             onClick={() => onCategoryClick(cat)}
-                          >{cat}</button>
+                          >
+                            {cat}
+                          </button>
                         );
                       })}
                     </div>
@@ -361,18 +485,30 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Risk Type"
-                      onSelectAll={() => presentRiskTypes.forEach(r => { if (!activeRiskTypes.includes(r)) onRiskTypeClick(r); })}
+                      onSelectAll={() =>
+                        presentRiskTypes.forEach(r => {
+                          if (!activeRiskTypes.includes(r)) onRiskTypeClick(r);
+                        })
+                      }
                       onDeselectAll={onRiskTypeClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
                       {presentRiskTypes.map(risk => {
                         const isActive = activeRiskTypes.includes(risk);
                         return (
-                          <button key={risk} type="button"
+                          <button
+                            key={risk}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text }
+                                : undefined
+                            }
                             onClick={() => onRiskTypeClick(risk)}
-                          >{risk.replace(/_/g, ' ')}</button>
+                          >
+                            {risk.replace(/_/g, ' ')}
+                          </button>
                         );
                       })}
                     </div>
@@ -384,7 +520,11 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Custom Rules"
-                      onSelectAll={() => presentCustomSigs.forEach(s => { if (!activeCustomSigs.includes(s)) onCustomSigClick(s); })}
+                      onSelectAll={() =>
+                        presentCustomSigs.forEach(s => {
+                          if (!activeCustomSigs.includes(s)) onCustomSigClick(s);
+                        })
+                      }
                       onDeselectAll={onCustomSigClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
@@ -392,11 +532,19 @@ export function NetworkControls({
                         const isActive = activeCustomSigs.includes(sig);
                         const bg = getAppColor(sig);
                         return (
-                          <button key={sig} type="button"
+                          <button
+                            key={sig}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: bg, color: getTextColor(bg) }
+                                : undefined
+                            }
                             onClick={() => onCustomSigClick(sig)}
-                          >{sig.replace(/_/g, ' ')}</button>
+                          >
+                            {sig.replace(/_/g, ' ')}
+                          </button>
                         );
                       })}
                     </div>
@@ -408,7 +556,11 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="File Types"
-                      onSelectAll={() => presentFileTypes.forEach(f => { if (!activeFileTypes.includes(f)) onFileTypeClick(f); })}
+                      onSelectAll={() =>
+                        presentFileTypes.forEach(f => {
+                          if (!activeFileTypes.includes(f)) onFileTypeClick(f);
+                        })
+                      }
                       onDeselectAll={onFileTypeClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
@@ -416,11 +568,19 @@ export function NetworkControls({
                         const isActive = activeFileTypes.includes(ft);
                         const bg = getAppColor(ft);
                         return (
-                          <button key={ft} type="button"
+                          <button
+                            key={ft}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: bg, color: getTextColor(bg) } : undefined}
+                            style={
+                              isActive
+                                ? { backgroundColor: bg, color: getTextColor(bg) }
+                                : undefined
+                            }
                             onClick={() => onFileTypeClick(ft)}
-                          >{ft}</button>
+                          >
+                            {ft}
+                          </button>
                         );
                       })}
                     </div>
@@ -432,36 +592,49 @@ export function NetworkControls({
                   <div className="col-12">
                     <PillSectionHeader
                       label="Country"
-                      onSelectAll={() => presentCountries.forEach(c => { if (!activeCountries.includes(c)) onCountryClick(c); })}
+                      onSelectAll={() =>
+                        presentCountries.forEach(c => {
+                          if (!activeCountries.includes(c)) onCountryClick(c);
+                        })
+                      }
                       onDeselectAll={onCountryClear}
                     />
                     <div className="d-flex flex-wrap gap-1 mt-1">
                       {presentCountries.map(code => {
                         const isActive = activeCountries.includes(code);
                         return (
-                          <button key={code} type="button"
+                          <button
+                            key={code}
+                            type="button"
                             className={filterPillClass(isActive)}
-                            style={isActive ? { backgroundColor: '#0d6efd', color: '#fff' } : undefined}
+                            style={
+                              isActive ? { backgroundColor: '#0d6efd', color: '#fff' } : undefined
+                            }
                             onClick={() => onCountryClick(code)}
-                          >{countryFlag(code)} {code}</button>
+                          >
+                            {countryFlag(code)} {code}
+                          </button>
                         );
                       })}
                     </div>
                   </div>
                 )}
-
               </div>
 
               {activeFilterCount > 0 && (
                 <div className="mt-3 pt-2 border-top">
-                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClearAllFilters}>
-                    <i className="bi bi-x-circle me-1" />Clear filters
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={onClearAllFilters}
+                  >
+                    <i className="bi bi-x-circle me-1" />
+                    Clear filters
                   </button>
                 </div>
               )}
             </div>
           )}
-
         </div>
       </div>
 
@@ -470,40 +643,65 @@ export function NetworkControls({
         <div
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowColorInfo(false); }}
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowColorInfo(false);
+          }}
         >
           <div className="modal-dialog modal-dialog-scrollable">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  <i className="bi bi-palette me-2" />Node Colour Priority
+                  <i className="bi bi-palette me-2" />
+                  Node Colour Priority
                 </h5>
-                <button type="button" className="btn-close" onClick={() => setShowColorInfo(false)} />
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowColorInfo(false)}
+                />
               </div>
               <div className="modal-body">
                 <p className="text-muted small mb-3">
-                  Each node's colour is determined by the first rule that matches, in order of priority:
+                  Each node's colour is determined by the first rule that matches, in order of
+                  priority:
                 </p>
                 <ol className="ps-3" style={{ lineHeight: '2' }}>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['anomaly'], color: '#fff' }}>Anomaly</span>
+                    <span
+                      className="badge me-2"
+                      style={{ backgroundColor: NODE_TYPE_COLORS['anomaly'], color: '#fff' }}
+                    >
+                      Anomaly
+                    </span>
                     <strong>Anomaly detected</strong> — always shown in red regardless of type.
                   </li>
                   <li>
                     <span className="badge bg-warning text-dark me-2">Specific server role</span>
-                    <strong>Port-based server classification</strong> — DNS, web, SSH, FTP, mail, DHCP, NTP, database, and router nodes keep their dedicated colours.
+                    <strong>Port-based server classification</strong> — DNS, web, SSH, FTP, mail,
+                    DHCP, NTP, database, and router nodes keep their dedicated colours.
                   </li>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: '#8b5cf6', color: '#fff' }}>Device type</span>
+                    <span
+                      className="badge me-2"
+                      style={{ backgroundColor: '#8b5cf6', color: '#fff' }}
+                    >
+                      Device type
+                    </span>
                     <strong>Device classification</strong> — Mobile, Laptop/Desktop, IoT, etc.
                   </li>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}>Client</span>
+                    <span
+                      className="badge me-2"
+                      style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}
+                    >
+                      Client
+                    </span>
                     <strong>Generic node type</strong> — port-based classification colour.
                   </li>
                   <li>
                     <span className="badge bg-secondary me-2">Role fallback</span>
-                    <strong>Traffic role</strong> — green for server, purple for both, grey otherwise.
+                    <strong>Traffic role</strong> — green for server, purple for both, grey
+                    otherwise.
                   </li>
                 </ol>
               </div>
