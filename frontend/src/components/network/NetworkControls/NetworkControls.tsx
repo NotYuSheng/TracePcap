@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
   PROTOCOL_COLORS,
   PROTOCOL_LABELS,
@@ -18,7 +18,7 @@ import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSect
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './NetworkControls.css';
 
-function InfoPopover({ id, title, body }: { id: string; title: string; body: React.ReactNode }) {
+function InfoPopover({ id, title, body }: { id: string; title: string; body: ReactNode }) {
   const popover = (
     <Popover id={id} style={{ maxWidth: '280px' }}>
       <Popover.Header>{title}</Popover.Header>
@@ -518,7 +518,20 @@ export function NetworkControls({
                         <InfoPopover
                           id="nc-info-cat"
                           title="Category"
-                          body="Broad traffic category assigned by nDPI (e.g. Web, Media, VPN). Select multiple to show any of them."
+                          body={
+                            <>
+                              Broad traffic category assigned by <strong>nDPI</strong> (e.g. Web,
+                              Media, VPN). Select multiple to show any of them.
+                              <br />
+                              <a
+                                href="/ndpi-reference.html"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View protocol reference →
+                              </a>
+                            </>
+                          }
                         />
                       }
                       onSelectAll={() =>
@@ -561,7 +574,21 @@ export function NetworkControls({
                         <InfoPopover
                           id="nc-info-risk"
                           title="Risk Type"
-                          body="Filter by nDPI risk flags assigned to a conversation. Examples: clear-text credentials, unsafe protocols, known malicious signatures."
+                          body={
+                            <>
+                              Filter by <strong>nDPI</strong> risk flags assigned to a
+                              conversation. Examples: clear-text credentials, unsafe protocols,
+                              known malicious signatures.
+                              <br />
+                              <a
+                                href="/ndpi-reference.html"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View protocol reference →
+                              </a>
+                            </>
+                          }
                         />
                       }
                       onSelectAll={() =>
