@@ -14,17 +14,15 @@ import lombok.NoArgsConstructor;
 public class SessionResponse {
 
   /**
-   * Detected application protocol: "HTTP", "SMTP", "FTP", "DNS", "TLS", or "RAW".
-   * Derived from conversation metadata and stream content.
+   * Detected application protocol: "HTTP", "SMTP", "FTP", "DNS", "TLS", or "RAW". Derived from
+   * conversation metadata and stream content.
    */
   private String detectedProtocol;
 
   /** Ordered client/server data chunks representing the full reconstructed stream. */
   private List<Chunk> chunks;
 
-  /**
-   * Parsed HTTP request/response pairs. Only populated when {@code detectedProtocol} is "HTTP".
-   */
+  /** Parsed HTTP request/response pairs. Only populated when {@code detectedProtocol} is "HTTP". */
   private List<HttpExchange> httpExchanges;
 
   /** True when the session exceeded the 1 MB size limit and was truncated. */
@@ -77,8 +75,8 @@ public class SessionResponse {
     private Map<String, String> headers;
 
     /**
-     * Decoded body text. {@code null} when the body is binary; in that case check
-     * {@code bodyBinary} and {@code bodyLength}.
+     * Decoded body text. {@code null} when the body is binary; in that case check {@code
+     * bodyBinary} and {@code bodyLength}.
      */
     private String body;
 

@@ -11,9 +11,7 @@ class FileSignatureDetectorTest {
   private static final byte[] JPEG_MAGIC = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0};
 
   // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
-  private static final byte[] PNG_MAGIC = {
-    (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-  };
+  private static final byte[] PNG_MAGIC = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
   private static byte[] httpResponse(String headers, byte[] body) {
     byte[] headerBytes = headers.getBytes(StandardCharsets.US_ASCII);
@@ -43,16 +41,16 @@ class FileSignatureDetectorTest {
 
   @Test
   void skipHttpResponseHeaders_httpHeadersOnly_returnsNull() {
-    byte[] payload = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n\r\n"
-        .getBytes(StandardCharsets.ISO_8859_1);
+    byte[] payload =
+        "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1);
 
     assertThat(FileSignatureDetector.skipHttpResponseHeaders(payload)).isNull();
   }
 
   @Test
   void skipHttpResponseHeaders_httpNoTerminator_returnsNull() {
-    byte[] payload = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n"
-        .getBytes(StandardCharsets.ISO_8859_1);
+    byte[] payload =
+        "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n".getBytes(StandardCharsets.ISO_8859_1);
 
     assertThat(FileSignatureDetector.skipHttpResponseHeaders(payload)).isNull();
   }
@@ -90,8 +88,8 @@ class FileSignatureDetectorTest {
 
   @Test
   void detect_httpResponseHeadersOnly_returnsNull() {
-    byte[] payload = "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n\r\n"
-        .getBytes(StandardCharsets.ISO_8859_1);
+    byte[] payload =
+        "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1);
 
     assertThat(FileSignatureDetector.detect(payload)).isNull();
   }

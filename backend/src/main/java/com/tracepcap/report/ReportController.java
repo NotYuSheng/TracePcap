@@ -22,8 +22,7 @@ public class ReportController {
   @PostMapping("/{fileId}/report")
   @Operation(summary = "Generate and download a PDF analysis report for a PCAP file")
   public ResponseEntity<StreamingResponseBody> downloadReport(
-      @PathVariable UUID fileId,
-      @RequestBody(required = false) ReportRequest request) {
+      @PathVariable UUID fileId, @RequestBody(required = false) ReportRequest request) {
 
     log.info("POST /api/files/{}/report", fileId);
 

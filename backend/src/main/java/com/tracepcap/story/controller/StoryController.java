@@ -32,8 +32,7 @@ public class StoryController {
       summary = "Generate story",
       description = "Generate an AI-powered narrative story for a PCAP file")
   public ResponseEntity<StoryResponse> generateStory(
-      @PathVariable UUID fileId,
-      @RequestBody(required = false) GenerateStoryRequest request) {
+      @PathVariable UUID fileId, @RequestBody(required = false) GenerateStoryRequest request) {
     log.info("Received story generation request for file: {}", fileId);
 
     String additionalContext = request != null ? request.getAdditionalContext() : null;
@@ -53,18 +52,23 @@ public class StoryController {
   }
 
   @PostMapping("/{storyId}/ask")
-  @Operation(summary = "Ask a question", description = "Ask the LLM a question about an existing story")
+  @Operation(
+      summary = "Ask a question",
+      description = "Ask the LLM a question about an existing story")
   public ResponseEntity<StoryAnswerResponse> askQuestion(
       @PathVariable UUID storyId, @RequestBody StoryQuestionRequest request) {
     log.info("Received question for story: {}", storyId);
 
-    StoryAnswerResponse answer = storyService.askQuestion(storyId, request.getQuestion(), request.getHistory());
+    StoryAnswerResponse answer =
+        storyService.askQuestion(storyId, request.getQuestion(), request.getHistory());
 
     return ResponseEntity.ok(answer);
   }
 
   @GetMapping("/file/{fileId}")
-  @Operation(summary = "Get story by file", description = "Get the latest story for a file, if one exists")
+  @Operation(
+      summary = "Get story by file",
+      description = "Get the latest story for a file, if one exists")
   public ResponseEntity<StoryResponse> getStoryByFileId(@PathVariable UUID fileId) {
     log.info("Fetching latest story for file: {}", fileId);
 

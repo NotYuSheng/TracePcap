@@ -118,16 +118,21 @@ public class PcapParserService {
           // Extract TTL (field 14) and source MAC (field 15) — best-effort, may be absent
           Integer ttl = null;
           if (f.length > 14 && !f[14].isEmpty()) {
-            try { ttl = Integer.parseInt(firstValue(f[14])); } catch (NumberFormatException ignored) {}
+            try {
+              ttl = Integer.parseInt(firstValue(f[14]));
+            } catch (NumberFormatException ignored) {
+            }
           }
-          String srcMac = (f.length > 15 && !f[15].isEmpty()) ? firstValue(f[15]).toLowerCase() : null;
+          String srcMac =
+              (f.length > 15 && !f[15].isEmpty()) ? firstValue(f[15]).toLowerCase() : null;
 
           // Layer-2 address fallback for non-IP protocols (ARP, STP, LLDP, CDP, etc.).
           // For ARP: use the embedded protocol (IP) addresses from the ARP payload.
           // For other pure L2 frames: use Ethernet MAC addresses as node identifiers.
           String arpSrcIp = (f.length > 16 && !f[16].isEmpty()) ? firstValue(f[16]) : null;
           String arpDstIp = (f.length > 17 && !f[17].isEmpty()) ? firstValue(f[17]) : null;
-          String dstMac   = (f.length > 18 && !f[18].isEmpty()) ? firstValue(f[18]).toLowerCase() : null;
+          String dstMac =
+              (f.length > 18 && !f[18].isEmpty()) ? firstValue(f[18]).toLowerCase() : null;
           if (srcIp == null) srcIp = (arpSrcIp != null) ? arpSrcIp : srcMac;
           if (dstIp == null) dstIp = (arpDstIp != null) ? arpDstIp : dstMac;
 
@@ -318,8 +323,10 @@ public class PcapParserService {
     private Map<String, Long> protocolCounts;
     private Map<String, Long> protocolBytes;
     private List<ConversationInfo> conversations;
+
     /** First-seen TTL value per source IP address. */
     private Map<String, Integer> hostTtls = new HashMap<>();
+
     /** First-seen Ethernet source MAC address per source IP address. */
     private Map<String, String> hostMacs = new HashMap<>();
   }

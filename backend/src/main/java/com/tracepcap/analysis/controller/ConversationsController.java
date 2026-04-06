@@ -93,7 +93,9 @@ public class ConversationsController {
                       + " LAPTOP_DESKTOP, SERVER, IOT, UNKNOWN, or custom)")
           @RequestParam(required = false)
           String deviceTypes,
-      @Parameter(description = "Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG)")
+      @Parameter(
+              description =
+                  "Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG)")
           @RequestParam(required = false)
           String countries) {
 
@@ -161,7 +163,9 @@ public class ConversationsController {
     return ResponseEntity.ok(analysisService.getDistinctCustomSignatures(fileId));
   }
 
-  /** Returns the distinct country codes seen in external IPs for this file, as "CC|Country" strings. */
+  /**
+   * Returns the distinct country codes seen in external IPs for this file, as "CC|Country" strings.
+   */
   @GetMapping("/{fileId}/countries")
   @Operation(summary = "List distinct country codes seen in external IPs for a file")
   public ResponseEntity<List<String>> getCountries(@PathVariable UUID fileId) {
@@ -269,8 +273,22 @@ public class ConversationsController {
 
     ConversationFilterParams params =
         buildFilterParams(
-            ip, port, protocols, l7Protocols, apps, categories, hasRisks, fileTypes, riskTypes,
-            customSignatures, payloadContains, sortBy, sortDir, search, deviceTypes, countries);
+            ip,
+            port,
+            protocols,
+            l7Protocols,
+            apps,
+            categories,
+            hasRisks,
+            fileTypes,
+            riskTypes,
+            customSignatures,
+            payloadContains,
+            sortBy,
+            sortDir,
+            search,
+            deviceTypes,
+            countries);
 
     String filename = analysisService.getBulkPcapFilename(fileId);
     response.setContentType("application/vnd.tcpdump.pcap");

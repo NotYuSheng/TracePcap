@@ -82,8 +82,7 @@ public class SessionReconstructionService {
   // Core reconstruction
   // -------------------------------------------------------------------------
 
-  private SessionResponse doReconstruct(ConversationEntity conv, File pcapFile)
-      throws Exception {
+  private SessionResponse doReconstruct(ConversationEntity conv, File pcapFile) throws Exception {
 
     // The stored protocol is the highest-level protocol tshark saw (HTTP, TLS, DNS, etc.).
     // We need the transport layer, so try tcp then udp regardless of what is stored.
@@ -160,10 +159,7 @@ public class SessionReconstructionService {
   }
 
   private Integer queryStreamIndex(
-      File pcapFile,
-      String transport,
-      String srcIp, Integer srcPort,
-      String dstIp, Integer dstPort)
+      File pcapFile, String transport, String srcIp, Integer srcPort, String dstIp, Integer dstPort)
       throws Exception {
 
     String streamField = transport + ".stream";
@@ -172,10 +168,14 @@ public class SessionReconstructionService {
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
-            "-r", pcapFile.getAbsolutePath(),
-            "-Y", filter,
-            "-e", streamField,
-            "-T", "fields");
+            "-r",
+            pcapFile.getAbsolutePath(),
+            "-Y",
+            filter,
+            "-e",
+            streamField,
+            "-T",
+            "fields");
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
     Process process = pb.start();
 
@@ -199,18 +199,14 @@ public class SessionReconstructionService {
   }
 
   private String buildFilter(
-      String transport,
-      String srcIp, Integer srcPort,
-      String dstIp, Integer dstPort) {
+      String transport, String srcIp, Integer srcPort, String dstIp, Integer dstPort) {
 
     String ipProto = (srcIp != null && srcIp.contains(":")) ? "ipv6" : "ip";
     StringBuilder sb = new StringBuilder();
     sb.append(ipProto).append(".src==").append(srcIp);
-    if (srcPort != null)
-      sb.append(" && ").append(transport).append(".srcport==").append(srcPort);
+    if (srcPort != null) sb.append(" && ").append(transport).append(".srcport==").append(srcPort);
     sb.append(" && ").append(ipProto).append(".dst==").append(dstIp);
-    if (dstPort != null)
-      sb.append(" && ").append(transport).append(".dstport==").append(dstPort);
+    if (dstPort != null) sb.append(" && ").append(transport).append(".dstport==").append(dstPort);
     return sb.toString();
   }
 
@@ -219,8 +215,8 @@ public class SessionReconstructionService {
   // -------------------------------------------------------------------------
 
   /**
-   * Runs {@code tshark -q -z follow,<proto>,raw,<N>} and returns the ordered raw byte chunks.
-   * Each chunk is tagged CLIENT (Node0) or SERVER (Node1) based on the follow header.
+   * Runs {@code tshark -q -z follow,<proto>,raw,<N>} and returns the ordered raw byte chunks. Each
+   * chunk is tagged CLIENT (Node0) or SERVER (Node1) based on the follow header.
    */
   private List<RawChunk> runFollowCommand(
       File pcapFile, String proto, int streamIndex, ConversationEntity conv) throws Exception {
@@ -228,9 +224,11 @@ public class SessionReconstructionService {
     List<String> cmd =
         List.of(
             "tshark",
-            "-r", pcapFile.getAbsolutePath(),
+            "-r",
+            pcapFile.getAbsolutePath(),
             "-q",
-            "-z", "follow," + proto + ",raw," + streamIndex);
+            "-z",
+            "follow," + proto + ",raw," + streamIndex);
 
     ProcessBuilder pb = new ProcessBuilder(cmd);
     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
@@ -351,11 +349,18 @@ public class SessionReconstructionService {
     // Sniff first client bytes
     for (RawChunk chunk : chunks) {
       if ("CLIENT".equals(chunk.direction) && chunk.data.length >= 4) {
-        String prefix = new String(Arrays.copyOf(chunk.data, Math.min(8, chunk.data.length)),
-            StandardCharsets.US_ASCII);
-        if (prefix.startsWith("GET ") || prefix.startsWith("POST") || prefix.startsWith("HEAD")
-            || prefix.startsWith("PUT ") || prefix.startsWith("DELE") || prefix.startsWith("OPTI")
-            || prefix.startsWith("PATC") || prefix.startsWith("HTTP")) {
+        String prefix =
+            new String(
+                Arrays.copyOf(chunk.data, Math.min(8, chunk.data.length)),
+                StandardCharsets.US_ASCII);
+        if (prefix.startsWith("GET ")
+            || prefix.startsWith("POST")
+            || prefix.startsWith("HEAD")
+            || prefix.startsWith("PUT ")
+            || prefix.startsWith("DELE")
+            || prefix.startsWith("OPTI")
+            || prefix.startsWith("PATC")
+            || prefix.startsWith("HTTP")) {
           return "HTTP";
         }
         if (prefix.startsWith("EHLO") || prefix.startsWith("HELO") || prefix.startsWith("MAIL")) {
@@ -421,8 +426,10 @@ public class SessionReconstructionService {
     List<SessionResponse.HttpExchange> exchanges = new ArrayList<>();
     int count = Math.max(requests.size(), responses.size());
     for (int i = 0; i < count; i++) {
-      SessionResponse.HttpMessage req = i < requests.size() ? parseHttpMessage(requests.get(i)) : null;
-      SessionResponse.HttpMessage resp = i < responses.size() ? parseHttpMessage(responses.get(i)) : null;
+      SessionResponse.HttpMessage req =
+          i < requests.size() ? parseHttpMessage(requests.get(i)) : null;
+      SessionResponse.HttpMessage resp =
+          i < responses.size() ? parseHttpMessage(responses.get(i)) : null;
       if (req != null || resp != null) {
         exchanges.add(SessionResponse.HttpExchange.builder().request(req).response(resp).build());
       }
@@ -445,6 +452,7 @@ public class SessionReconstructionService {
    *
    * <p>Rather than scanning the whole buffer for start-line patterns (which causes false positives
    * when those strings appear inside a message body), this method:
+   *
    * <ol>
    *   <li>Anchors to the first message at position 0 (or skips leading garbage).
    *   <li>Parses headers to determine body length via {@code Content-Length} or chunked encoding.
@@ -504,8 +512,7 @@ public class SessionReconstructionService {
 
       // Parse headers for body length
       String headerSection =
-          new String(
-              Arrays.copyOfRange(stream, msgStart, headerEnd), StandardCharsets.ISO_8859_1);
+          new String(Arrays.copyOfRange(stream, msgStart, headerEnd), StandardCharsets.ISO_8859_1);
       String[] lines = headerSection.split("\r?\n", -1);
 
       int contentLength = -1;
@@ -514,8 +521,7 @@ public class SessionReconstructionService {
         String lower = lines[i].toLowerCase(java.util.Locale.ROOT);
         if (lower.startsWith("content-length:")) {
           try {
-            contentLength =
-                Integer.parseInt(lines[i].substring(lines[i].indexOf(':') + 1).trim());
+            contentLength = Integer.parseInt(lines[i].substring(lines[i].indexOf(':') + 1).trim());
           } catch (NumberFormatException ignored) {
           }
         } else if (lower.startsWith("transfer-encoding:") && lower.contains("chunked")) {
@@ -606,7 +612,8 @@ public class SessionReconstructionService {
     }
 
     // Extract body
-    byte[] bodyBytes = bodyStart < raw.length ? Arrays.copyOfRange(raw, bodyStart, raw.length) : new byte[0];
+    byte[] bodyBytes =
+        bodyStart < raw.length ? Arrays.copyOfRange(raw, bodyStart, raw.length) : new byte[0];
 
     // Handle chunked transfer encoding — decode chunks
     String transferEncoding = headers.getOrDefault("transfer-encoding", "");
@@ -667,11 +674,15 @@ public class SessionReconstructionService {
         // Read chunk size line
         int lineEnd = indexOf(data, pos, "\r\n".getBytes(StandardCharsets.US_ASCII));
         if (lineEnd < 0) break;
-        String sizeLine = new String(Arrays.copyOfRange(data, pos, lineEnd), StandardCharsets.US_ASCII).trim();
+        String sizeLine =
+            new String(Arrays.copyOfRange(data, pos, lineEnd), StandardCharsets.US_ASCII).trim();
         // Strip chunk extensions (e.g. "1a;ext=val")
         int semi = sizeLine.indexOf(';');
         if (semi >= 0) sizeLine = sizeLine.substring(0, semi).trim();
-        if (sizeLine.isEmpty()) { pos = lineEnd + 2; continue; }
+        if (sizeLine.isEmpty()) {
+          pos = lineEnd + 2;
+          continue;
+        }
         int chunkSize = Integer.parseInt(sizeLine, 16);
         if (chunkSize == 0) break;
         pos = lineEnd + 2;
@@ -764,10 +775,7 @@ public class SessionReconstructionService {
   }
 
   private SessionResponse error(String message) {
-    return SessionResponse.builder()
-        .errorMessage(message)
-        .chunks(List.of())
-        .build();
+    return SessionResponse.builder().errorMessage(message).chunks(List.of()).build();
   }
 
   // -------------------------------------------------------------------------
@@ -775,7 +783,7 @@ public class SessionReconstructionService {
   // -------------------------------------------------------------------------
 
   private static class StreamLocation {
-    final String proto;      // "tcp" or "udp"
+    final String proto; // "tcp" or "udp"
     final int streamIndex;
 
     StreamLocation(String proto, int streamIndex) {

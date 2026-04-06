@@ -23,8 +23,8 @@ public class LlmClient {
   private volatile Integer modelContextLength;
 
   /**
-   * Query the LLM server for model capabilities on startup. Runs in a background thread so it
-   * does not delay application startup when the LLM server is unavailable.
+   * Query the LLM server for model capabilities on startup. Runs in a background thread so it does
+   * not delay application startup when the LLM server is unavailable.
    */
   @PostConstruct
   public void initializeModelCapabilities() {

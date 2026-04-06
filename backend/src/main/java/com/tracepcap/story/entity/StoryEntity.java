@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 /** Entity representing a generated story/narrative for a PCAP file */
 @Entity
 @Table(name = "stories")

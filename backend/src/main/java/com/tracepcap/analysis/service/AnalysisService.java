@@ -101,177 +101,200 @@ public class AnalysisService {
       long t = System.currentTimeMillis();
       File tempFile = File.createTempFile("pcap-", ".pcap");
       try {
-      storageService.downloadFileToLocal(file.getMinioPath(), tempFile);
-      log.info("[{}] [1/7] Download: {}ms", fileId, System.currentTimeMillis() - t);
+        storageService.downloadFileToLocal(file.getMinioPath(), tempFile);
+        log.info("[{}] [1/7] Download: {}ms", fileId, System.currentTimeMillis() - t);
 
-      // Stage 2: PCAP parse
-      t = System.currentTimeMillis();
-      PcapParserService.PcapAnalysisResult parseResult =
-          pcapParserService.analyzePcapFile(tempFile);
-      log.info("[{}] [2/7] PCAP parse: {}ms  ({} packets, {} conversations)",
-          fileId, System.currentTimeMillis() - t,
-          parseResult.getPacketCount(), parseResult.getConversations().size());
+        // Stage 2: PCAP parse
+        t = System.currentTimeMillis();
+        PcapParserService.PcapAnalysisResult parseResult =
+            pcapParserService.analyzePcapFile(tempFile);
+        log.info(
+            "[{}] [2/7] PCAP parse: {}ms  ({} packets, {} conversations)",
+            fileId,
+            System.currentTimeMillis() - t,
+            parseResult.getPacketCount(),
+            parseResult.getConversations().size());
 
-      // Stage 3: nDPI + tshark enrichment
-      t = System.currentTimeMillis();
-      if (file.isEnableNdpi()) {
-        ndpiService.enrich(tempFile, parseResult.getConversations());
-        tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
-        log.info("[{}] [3/7] nDPI + tshark enrichment: {}ms", fileId, System.currentTimeMillis() - t);
-      } else {
-        log.info("[{}] [3/7] nDPI + tshark enrichment: skipped", fileId);
-      }
-
-      // Stage 4: Signatures, device classification, geo-IP
-      t = System.currentTimeMillis();
-      customSignatureService.applySignatures(parseResult.getConversations());
-      Map<String, String> deviceOverrides =
-          customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
-      List<HostClassificationEntity> hostClassifications =
-          deviceClassifierService.classify(
-              file,
-              parseResult.getConversations(),
-              parseResult.getHostTtls(),
-              parseResult.getHostMacs(),
-              deviceOverrides);
-      hostClassificationRepository.saveAll(hostClassifications);
-      try {
-        Set<String> allIps =
-            parseResult.getConversations().stream()
-                .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
-                .collect(Collectors.toSet());
-        geoIpService.lookupExternal(allIps);
-      } catch (Exception e) {
-        log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
-      }
-      log.info("[{}] [4/7] Signatures + classification + geo-IP: {}ms", fileId, System.currentTimeMillis() - t);
-
-      // Stage 5: Persist analysis result
-      t = System.currentTimeMillis();
-      analysis.setPacketCount(parseResult.getPacketCount());
-      analysis.setTotalBytes(parseResult.getTotalBytes());
-      analysis.setStartTime(parseResult.getStartTime());
-      analysis.setEndTime(parseResult.getEndTime());
-      if (parseResult.getStartTime() != null && parseResult.getEndTime() != null) {
-        Duration duration = Duration.between(parseResult.getStartTime(), parseResult.getEndTime());
-        analysis.setDurationMs(duration.toMillis());
-      }
-      Map<String, Object> protocolStats = new HashMap<>();
-      parseResult
-          .getProtocolCounts()
-          .forEach(
-              (protocol, count) -> {
-                Map<String, Object> stat = new HashMap<>();
-                stat.put("packetCount", count);
-                stat.put("bytes", parseResult.getProtocolBytes().getOrDefault(protocol, 0L));
-                stat.put("percentage", (count.doubleValue() / parseResult.getPacketCount()) * 100);
-                protocolStats.put(protocol, stat);
-              });
-      analysis.setProtocolStats(protocolStats);
-      analysis.setStatus(AnalysisResultEntity.AnalysisStatus.COMPLETED);
-      analysisResultRepository.save(analysis);
-      log.info("[{}] [5/7] Analysis result saved: {}ms", fileId, System.currentTimeMillis() - t);
-
-      // Stage 6: DB inserts (conversations + packets)
-      t = System.currentTimeMillis();
-      int convIndex = 0;
-      long packetsInserted = 0;
-      List<UUID> savedConversationIds = new ArrayList<>();
-      for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
-        ConversationEntity conversation =
-            ConversationEntity.builder()
-                .file(file)
-                .srcIp(convInfo.getSrcIp())
-                .srcPort(convInfo.getSrcPort())
-                .dstIp(convInfo.getDstIp())
-                .dstPort(convInfo.getDstPort())
-                .protocol(convInfo.getProtocol())
-                .appName(convInfo.getAppName())
-                .tsharkProtocol(convInfo.getTsharkProtocol())
-                .category(convInfo.getCategory())
-                .hostname(convInfo.getHostname())
-                .ja3Client(convInfo.getJa3Client())
-                .ja3Server(convInfo.getJa3Server())
-                .tlsIssuer(convInfo.getTlsIssuer())
-                .tlsSubject(convInfo.getTlsSubject())
-                .tlsNotBefore(convInfo.getTlsNotBefore())
-                .tlsNotAfter(convInfo.getTlsNotAfter())
-                .flowRisks(toNullableArray(convInfo.getFlowRisks()))
-                .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
-                .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
-                .packetCount(convInfo.getPacketCount())
-                .totalBytes(convInfo.getTotalBytes())
-                .startTime(convInfo.getStartTime())
-                .endTime(convInfo.getEndTime())
-                .build();
-        ConversationEntity savedConversation = conversationRepository.save(conversation);
-        savedConversationIds.add(savedConversation.getId());
-
-        List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
-        if (!packetInfos.isEmpty()) {
-          for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
-            int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
-            List<PacketEntity> batch =
-                packetInfos.subList(i, end).stream()
-                    .map(
-                        pktInfo ->
-                            PacketEntity.builder()
-                                .file(file)
-                                .conversation(savedConversation)
-                                .packetNumber(pktInfo.getPacketNumber())
-                                .timestamp(pktInfo.getTimestamp())
-                                .srcIp(pktInfo.getSrcIp())
-                                .srcPort(pktInfo.getSrcPort())
-                                .dstIp(pktInfo.getDstIp())
-                                .dstPort(pktInfo.getDstPort())
-                                .protocol(pktInfo.getProtocol())
-                                .packetSize(pktInfo.getPacketSize())
-                                .info(pktInfo.getInfo())
-                                .payload(pktInfo.getPayload())
-                                .detectedFileType(pktInfo.getDetectedFileType())
-                                .build())
-                    .collect(Collectors.toList());
-            packetRepository.saveAll(batch);
-            packetsInserted += batch.size();
-          }
-          packetInfos.clear();
+        // Stage 3: nDPI + tshark enrichment
+        t = System.currentTimeMillis();
+        if (file.isEnableNdpi()) {
+          ndpiService.enrich(tempFile, parseResult.getConversations());
+          tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
+          log.info(
+              "[{}] [3/7] nDPI + tshark enrichment: {}ms", fileId, System.currentTimeMillis() - t);
+        } else {
+          log.info("[{}] [3/7] nDPI + tshark enrichment: skipped", fileId);
         }
 
-        if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
-          entityManager.flush();
-          entityManager.clear();
-          log.info("[{}] [6/7] DB insert progress: {}/{} conversations, {} packets",
-              fileId, convIndex, parseResult.getConversations().size(), packetsInserted);
-        }
-      }
-      log.info("[{}] [6/7] DB inserts done: {}ms  ({} conversations, {} packets)",
-          fileId, System.currentTimeMillis() - t,
-          parseResult.getConversations().size(), packetsInserted);
-
-      // Stage 7: File extraction
-      t = System.currentTimeMillis();
-      if (file.isEnableFileExtraction()) {
+        // Stage 4: Signatures, device classification, geo-IP
+        t = System.currentTimeMillis();
+        customSignatureService.applySignatures(parseResult.getConversations());
+        Map<String, String> deviceOverrides =
+            customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
+        List<HostClassificationEntity> hostClassifications =
+            deviceClassifierService.classify(
+                file,
+                parseResult.getConversations(),
+                parseResult.getHostTtls(),
+                parseResult.getHostMacs(),
+                deviceOverrides);
+        hostClassificationRepository.saveAll(hostClassifications);
         try {
-          fileExtractionService.extractFiles(file, tempFile, savedConversationIds);
-          log.info("[{}] [7/7] File extraction: {}ms", fileId, System.currentTimeMillis() - t);
+          Set<String> allIps =
+              parseResult.getConversations().stream()
+                  .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+                  .collect(Collectors.toSet());
+          geoIpService.lookupExternal(allIps);
         } catch (Exception e) {
-          log.warn("[{}] [7/7] File extraction failed ({}ms): {}", fileId, System.currentTimeMillis() - t, e.getMessage());
+          log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
         }
-      } else {
-        log.info("[{}] [7/7] File extraction: skipped", fileId);
-      }
+        log.info(
+            "[{}] [4/7] Signatures + classification + geo-IP: {}ms",
+            fileId,
+            System.currentTimeMillis() - t);
 
-      // Update file status
-      file.setStatus(com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED);
-      file.setPacketCount(
-          parseResult.getPacketCount() != null ? parseResult.getPacketCount().intValue() : null);
-      file.setTotalBytes(parseResult.getTotalBytes());
-      file.setStartTime(parseResult.getStartTime());
-      file.setEndTime(parseResult.getEndTime());
-      file.setDuration(analysis.getDurationMs());
-      fileRepository.save(file);
+        // Stage 5: Persist analysis result
+        t = System.currentTimeMillis();
+        analysis.setPacketCount(parseResult.getPacketCount());
+        analysis.setTotalBytes(parseResult.getTotalBytes());
+        analysis.setStartTime(parseResult.getStartTime());
+        analysis.setEndTime(parseResult.getEndTime());
+        if (parseResult.getStartTime() != null && parseResult.getEndTime() != null) {
+          Duration duration =
+              Duration.between(parseResult.getStartTime(), parseResult.getEndTime());
+          analysis.setDurationMs(duration.toMillis());
+        }
+        Map<String, Object> protocolStats = new HashMap<>();
+        parseResult
+            .getProtocolCounts()
+            .forEach(
+                (protocol, count) -> {
+                  Map<String, Object> stat = new HashMap<>();
+                  stat.put("packetCount", count);
+                  stat.put("bytes", parseResult.getProtocolBytes().getOrDefault(protocol, 0L));
+                  stat.put(
+                      "percentage", (count.doubleValue() / parseResult.getPacketCount()) * 100);
+                  protocolStats.put(protocol, stat);
+                });
+        analysis.setProtocolStats(protocolStats);
+        analysis.setStatus(AnalysisResultEntity.AnalysisStatus.COMPLETED);
+        analysisResultRepository.save(analysis);
+        log.info("[{}] [5/7] Analysis result saved: {}ms", fileId, System.currentTimeMillis() - t);
 
-      log.info("[{}] Analysis complete: total {}ms", fileId, System.currentTimeMillis() - analysisStart);
+        // Stage 6: DB inserts (conversations + packets)
+        t = System.currentTimeMillis();
+        int convIndex = 0;
+        long packetsInserted = 0;
+        List<UUID> savedConversationIds = new ArrayList<>();
+        for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
+          ConversationEntity conversation =
+              ConversationEntity.builder()
+                  .file(file)
+                  .srcIp(convInfo.getSrcIp())
+                  .srcPort(convInfo.getSrcPort())
+                  .dstIp(convInfo.getDstIp())
+                  .dstPort(convInfo.getDstPort())
+                  .protocol(convInfo.getProtocol())
+                  .appName(convInfo.getAppName())
+                  .tsharkProtocol(convInfo.getTsharkProtocol())
+                  .category(convInfo.getCategory())
+                  .hostname(convInfo.getHostname())
+                  .ja3Client(convInfo.getJa3Client())
+                  .ja3Server(convInfo.getJa3Server())
+                  .tlsIssuer(convInfo.getTlsIssuer())
+                  .tlsSubject(convInfo.getTlsSubject())
+                  .tlsNotBefore(convInfo.getTlsNotBefore())
+                  .tlsNotAfter(convInfo.getTlsNotAfter())
+                  .flowRisks(toNullableArray(convInfo.getFlowRisks()))
+                  .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
+                  .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
+                  .packetCount(convInfo.getPacketCount())
+                  .totalBytes(convInfo.getTotalBytes())
+                  .startTime(convInfo.getStartTime())
+                  .endTime(convInfo.getEndTime())
+                  .build();
+          ConversationEntity savedConversation = conversationRepository.save(conversation);
+          savedConversationIds.add(savedConversation.getId());
+
+          List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
+          if (!packetInfos.isEmpty()) {
+            for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
+              int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
+              List<PacketEntity> batch =
+                  packetInfos.subList(i, end).stream()
+                      .map(
+                          pktInfo ->
+                              PacketEntity.builder()
+                                  .file(file)
+                                  .conversation(savedConversation)
+                                  .packetNumber(pktInfo.getPacketNumber())
+                                  .timestamp(pktInfo.getTimestamp())
+                                  .srcIp(pktInfo.getSrcIp())
+                                  .srcPort(pktInfo.getSrcPort())
+                                  .dstIp(pktInfo.getDstIp())
+                                  .dstPort(pktInfo.getDstPort())
+                                  .protocol(pktInfo.getProtocol())
+                                  .packetSize(pktInfo.getPacketSize())
+                                  .info(pktInfo.getInfo())
+                                  .payload(pktInfo.getPayload())
+                                  .detectedFileType(pktInfo.getDetectedFileType())
+                                  .build())
+                      .collect(Collectors.toList());
+              packetRepository.saveAll(batch);
+              packetsInserted += batch.size();
+            }
+            packetInfos.clear();
+          }
+
+          if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
+            entityManager.flush();
+            entityManager.clear();
+            log.info(
+                "[{}] [6/7] DB insert progress: {}/{} conversations, {} packets",
+                fileId,
+                convIndex,
+                parseResult.getConversations().size(),
+                packetsInserted);
+          }
+        }
+        log.info(
+            "[{}] [6/7] DB inserts done: {}ms  ({} conversations, {} packets)",
+            fileId,
+            System.currentTimeMillis() - t,
+            parseResult.getConversations().size(),
+            packetsInserted);
+
+        // Stage 7: File extraction
+        t = System.currentTimeMillis();
+        if (file.isEnableFileExtraction()) {
+          try {
+            fileExtractionService.extractFiles(file, tempFile, savedConversationIds);
+            log.info("[{}] [7/7] File extraction: {}ms", fileId, System.currentTimeMillis() - t);
+          } catch (Exception e) {
+            log.warn(
+                "[{}] [7/7] File extraction failed ({}ms): {}",
+                fileId,
+                System.currentTimeMillis() - t,
+                e.getMessage());
+          }
+        } else {
+          log.info("[{}] [7/7] File extraction: skipped", fileId);
+        }
+
+        // Update file status
+        file.setStatus(com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED);
+        file.setPacketCount(
+            parseResult.getPacketCount() != null ? parseResult.getPacketCount().intValue() : null);
+        file.setTotalBytes(parseResult.getTotalBytes());
+        file.setStartTime(parseResult.getStartTime());
+        file.setEndTime(parseResult.getEndTime());
+        file.setDuration(analysis.getDurationMs());
+        fileRepository.save(file);
+
+        log.info(
+            "[{}] Analysis complete: total {}ms",
+            fileId,
+            System.currentTimeMillis() - analysisStart);
 
       } finally {
         tempFile.delete();
@@ -285,7 +308,8 @@ public class AnalysisService {
       try {
         analysisRecordService.markFailed(analysis.getId(), e.getMessage());
       } catch (Exception markEx) {
-        log.error("Failed to mark analysis {} as FAILED: {}", analysis.getId(), markEx.getMessage());
+        log.error(
+            "Failed to mark analysis {} as FAILED: {}", analysis.getId(), markEx.getMessage());
       }
 
       throw new RuntimeException("Failed to analyze file", e);
@@ -595,8 +619,8 @@ public class AnalysisService {
   }
 
   /**
-   * Returns a descriptive filename for a conversation PCAP export, e.g.
-   * {@code tracepcap_capture_04-01-2026_14-30-00.pcap}.
+   * Returns a descriptive filename for a conversation PCAP export, e.g. {@code
+   * tracepcap_capture_04-01-2026_14-30-00.pcap}.
    */
   @Transactional(readOnly = true)
   public String getConversationPcapFilename(UUID conversationId) {
@@ -608,18 +632,15 @@ public class AnalysisService {
     return buildConversationPcapFilename(conv);
   }
 
-  /**
-   * Returns a descriptive filename for a bulk (filtered) PCAP export.
-   */
+  /** Returns a descriptive filename for a bulk (filtered) PCAP export. */
   @Transactional(readOnly = true)
   public String getBulkPcapFilename(UUID fileId) {
     FileEntity file =
         fileRepository
             .findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
-    String base = file.getFileName() != null
-        ? file.getFileName().replaceAll("\\.[^.]+$", "")
-        : "capture";
+    String base =
+        file.getFileName() != null ? file.getFileName().replaceAll("\\.[^.]+$", "") : "capture";
     String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
     return "tracepcap_" + base + "_" + ts + ".pcap";
   }
@@ -629,9 +650,10 @@ public class AnalysisService {
           .withZone(java.time.ZoneId.of("Asia/Singapore"));
 
   private static String buildConversationPcapFilename(ConversationEntity conv) {
-    String base = conv.getFile() != null && conv.getFile().getFileName() != null
-        ? conv.getFile().getFileName().replaceAll("\\.[^.]+$", "")
-        : "capture";
+    String base =
+        conv.getFile() != null && conv.getFile().getFileName() != null
+            ? conv.getFile().getFileName().replaceAll("\\.[^.]+$", "")
+            : "capture";
     String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
     return "tracepcap_" + base + "_" + ts + ".pcap";
   }
@@ -652,9 +674,7 @@ public class AnalysisService {
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
     List<Long> frameNumbers =
-        packetRepository
-            .findByConversationIdOrderByPacketNumberAsc(conversationId)
-            .stream()
+        packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId).stream()
             .map(PacketEntity::getPacketNumber)
             .collect(Collectors.toList());
 
@@ -672,21 +692,31 @@ public class AnalysisService {
       storageService.downloadFileToLocal(conv.getFile().getMinioPath(), tempInput);
 
       // Use compact set syntax to avoid exceeding OS arg-length limits on large conversations
-      String filter = "frame.number in {"
-          + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
-          + "}";
+      String filter =
+          "frame.number in {"
+              + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
+              + "}";
 
-      log.info("Exporting PCAP for conversationId={}, {} frames", conversationId, frameNumbers.size());
-      ProcessBuilder pb = new ProcessBuilder(
-          "tshark", "-r", tempInput.getAbsolutePath(),
-          "-Y", filter,
-          "-w", tempOutput.getAbsolutePath());
+      log.info(
+          "Exporting PCAP for conversationId={}, {} frames", conversationId, frameNumbers.size());
+      ProcessBuilder pb =
+          new ProcessBuilder(
+              "tshark",
+              "-r",
+              tempInput.getAbsolutePath(),
+              "-Y",
+              filter,
+              "-w",
+              tempOutput.getAbsolutePath());
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
       try {
         int exitCode = proc.waitFor();
         if (exitCode != 0) {
-          log.error("tshark exited with code {} during PCAP export for conversationId={}", exitCode, conversationId);
+          log.error(
+              "tshark exited with code {} during PCAP export for conversationId={}",
+              exitCode,
+              conversationId);
           throw new IOException("tshark failed to filter PCAP (exit code " + exitCode + ")");
         }
       } catch (InterruptedException e) {
@@ -722,12 +752,11 @@ public class AnalysisService {
    *
    * @param fileId the file whose conversations should be exported
    * @param params filter parameters (same as the listing endpoint)
-   * @param out    the output stream to write the filtered PCAP bytes to
+   * @param out the output stream to write the filtered PCAP bytes to
    */
   @Transactional(readOnly = true)
   public void exportConversationsAsPcap(
-      UUID fileId, ConversationFilterParams params, java.io.OutputStream out)
-      throws IOException {
+      UUID fileId, ConversationFilterParams params, java.io.OutputStream out) throws IOException {
 
     FileEntity file =
         fileRepository
@@ -736,13 +765,15 @@ public class AnalysisService {
 
     List<ConversationResponse> conversations = getConversationsForExport(fileId, params);
 
-    List<UUID> conversationIds = conversations.stream()
-        .map(ConversationResponse::getConversationId)
-        .collect(Collectors.toList());
+    List<UUID> conversationIds =
+        conversations.stream()
+            .map(ConversationResponse::getConversationId)
+            .collect(Collectors.toList());
 
-    List<Long> frameNumbers = conversationIds.isEmpty()
-        ? List.of()
-        : packetRepository.findPacketNumbersByConversationIds(conversationIds);
+    List<Long> frameNumbers =
+        conversationIds.isEmpty()
+            ? List.of()
+            : packetRepository.findPacketNumbersByConversationIds(conversationIds);
 
     File tempInput = null;
     File tempOutput = null;
@@ -758,18 +789,28 @@ public class AnalysisService {
       // NOTE: for very large exports the filter string can approach OS ARG_MAX (~2 MB on Linux);
       // this is unlikely in practice for filtered exports but may occur for unfiltered bulk exports
       // of large capture files.
-      String filter = frameNumbers.isEmpty()
-          ? "frame.number == 0"
-          : "frame.number in {"
-              + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
-              + "}";
-      List<String> cmd = new ArrayList<>(
-          Arrays.asList("tshark", "-r", tempInput.getAbsolutePath(),
-              "-Y", filter,
-              "-w", tempOutput.getAbsolutePath()));
+      String filter =
+          frameNumbers.isEmpty()
+              ? "frame.number == 0"
+              : "frame.number in {"
+                  + frameNumbers.stream().map(Object::toString).collect(Collectors.joining(","))
+                  + "}";
+      List<String> cmd =
+          new ArrayList<>(
+              Arrays.asList(
+                  "tshark",
+                  "-r",
+                  tempInput.getAbsolutePath(),
+                  "-Y",
+                  filter,
+                  "-w",
+                  tempOutput.getAbsolutePath()));
 
-      log.info("Exporting PCAP for fileId={} with {} conversations ({} frames)",
-          fileId, conversations.size(), frameNumbers.size());
+      log.info(
+          "Exporting PCAP for fileId={} with {} conversations ({} frames)",
+          fileId,
+          conversations.size(),
+          frameNumbers.size());
       ProcessBuilder pb = new ProcessBuilder(cmd);
       pb.redirectError(ProcessBuilder.Redirect.DISCARD);
       Process proc = pb.start();
@@ -796,7 +837,6 @@ public class AnalysisService {
    * Builds a tshark display filter expression that matches exactly the given set of conversations.
    * Each conversation contributes one OR-clause matching its 5-tuple.
    */
-
   private List<ConversationResponse> mapConversationsWithFileTypes(
       List<ConversationEntity> conversations) {
     if (conversations.isEmpty()) return List.of();

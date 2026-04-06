@@ -7,7 +7,6 @@ import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -55,10 +54,7 @@ public class DeviceClassifierService {
   /** OUI (lower-case "aa:bb:cc") → short vendor name from the manuf file */
   private Map<String, String> ouiVendor = Collections.emptyMap();
 
-  /**
-   * Vendor name substring (lower-case) → device-type hint.
-   * Checked in order; first match wins.
-   */
+  /** Vendor name substring (lower-case) → device-type hint. Checked in order; first match wins. */
   private static final Map<String, String> VENDOR_HINT_OVERLAY = new LinkedHashMap<>();
 
   static {
@@ -106,8 +102,10 @@ public class DeviceClassifierService {
         String oui = ouiKey(rawOui);
         if (oui == null) continue;
 
-        String name = (parts.length >= 3 && !parts[2].isBlank() && !parts[2].trim().startsWith("#"))
-            ? parts[2] : parts[1];
+        String name =
+            (parts.length >= 3 && !parts[2].isBlank() && !parts[2].trim().startsWith("#"))
+                ? parts[2]
+                : parts[1];
         int hashIdx = name.indexOf('#');
         if (hashIdx != -1) name = name.substring(0, hashIdx);
         name = name.trim();
@@ -132,20 +130,57 @@ public class DeviceClassifierService {
   /** nDPI apps strongly associated with mobile devices */
   private static final Set<String> MOBILE_APPS =
       Set.of(
-          "Instagram", "TikTok", "Snapchat", "WhatsApp", "WeChat", "Line", "Viber",
-          "Telegram", "Signal", "iMessage", "FaceTime", "AirDrop", "Siri");
+          "Instagram",
+          "TikTok",
+          "Snapchat",
+          "WhatsApp",
+          "WeChat",
+          "Line",
+          "Viber",
+          "Telegram",
+          "Signal",
+          "iMessage",
+          "FaceTime",
+          "AirDrop",
+          "Siri");
 
   /** nDPI apps/categories suggesting a laptop/desktop */
   private static final Set<String> DESKTOP_APPS =
       Set.of(
-          "Zoom", "Teams", "Slack", "Discord", "Skype", "WebEx", "GoToMeeting",
-          "BitTorrent", "Steam", "Battle.net", "League of Legends", "Valorant",
-          "Remote Desktop", "SSH", "SMB", "NFS", "VNC", "TeamViewer");
+          "Zoom",
+          "Teams",
+          "Slack",
+          "Discord",
+          "Skype",
+          "WebEx",
+          "GoToMeeting",
+          "BitTorrent",
+          "Steam",
+          "Battle.net",
+          "League of Legends",
+          "Valorant",
+          "Remote Desktop",
+          "SSH",
+          "SMB",
+          "NFS",
+          "VNC",
+          "TeamViewer");
 
   /** nDPI apps associated with server or infrastructure roles */
   private static final Set<String> SERVER_APPS =
-      Set.of("PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "Kafka",
-             "RabbitMQ", "Memcached", "LDAP", "Kerberos", "SNMP", "Syslog");
+      Set.of(
+          "PostgreSQL",
+          "MySQL",
+          "MongoDB",
+          "Redis",
+          "Elasticsearch",
+          "Kafka",
+          "RabbitMQ",
+          "Memcached",
+          "LDAP",
+          "Kerberos",
+          "SNMP",
+          "Syslog");
 
   /** nDPI categories strongly associated with IoT / embedded devices */
   private static final Set<String> IOT_CATEGORIES = Set.of("IoT-Scada", "Cloud");
@@ -288,9 +323,8 @@ public class DeviceClassifierService {
   }
 
   /**
-   * Core classifier: weighs signals and returns the most likely device type.
-   * Populates {@code scoresOut} with the final per-type scores so the caller
-   * can compute a margin-based confidence.
+   * Core classifier: weighs signals and returns the most likely device type. Populates {@code
+   * scoresOut} with the final per-type scores so the caller can compute a margin-based confidence.
    */
   private String scoreAndClassify(
       String ip, HostProfile p, Integer ttl, String ouiHint, Map<String, Integer> scoresOut) {
@@ -344,8 +378,7 @@ public class DeviceClassifierService {
     }
 
     // Only receives on well-known ports, never initiates → server
-    boolean receivesOnWellKnown =
-        p.receivedOnPorts.stream().anyMatch(port -> port < 1024);
+    boolean receivesOnWellKnown = p.receivedOnPorts.stream().anyMatch(port -> port < 1024);
     boolean neverInitiates = p.initiatedCount == 0;
     if (neverInitiates && receivesOnWellKnown) {
       scores.merge(SERVER, 35, Integer::sum);
@@ -384,18 +417,16 @@ public class DeviceClassifierService {
   }
 
   /**
-   * Confidence based on the score margin between the winning type and the
-   * second-best type. A large margin means the classification is unambiguous;
-   * a small margin means the signals are conflicted.
+   * Confidence based on the score margin between the winning type and the second-best type. A large
+   * margin means the classification is unambiguous; a small margin means the signals are
+   * conflicted.
    *
    * <p>Scale: margin ≥ 60 → 100 %, scaled linearly down to 0 % at margin = 0.
    */
   private int computeConfidence(Map<String, Integer> scores) {
-    List<Integer> sorted = scores.values().stream()
-        .sorted(Comparator.reverseOrder())
-        .toList();
+    List<Integer> sorted = scores.values().stream().sorted(Comparator.reverseOrder()).toList();
     if (sorted.isEmpty() || sorted.get(0) == 0) return 0;
-    int best   = sorted.get(0);
+    int best = sorted.get(0);
     int second = sorted.size() > 1 ? sorted.get(1) : 0;
     int margin = best - second;
     // Clamp margin to [0, 60] and scale to [0, 100]
@@ -403,9 +434,9 @@ public class DeviceClassifierService {
   }
 
   /**
-   * Normalises an observed IP TTL to the most likely initial value (64, 128, or 255).
-   * The initial TTL decrements by 1 per hop, so we pick the nearest standard value that
-   * is >= the observed value.
+   * Normalises an observed IP TTL to the most likely initial value (64, 128, or 255). The initial
+   * TTL decrements by 1 per hop, so we pick the nearest standard value that is >= the observed
+   * value.
    */
   private int normaliseTtl(int ttl) {
     if (ttl > 128) return 255;

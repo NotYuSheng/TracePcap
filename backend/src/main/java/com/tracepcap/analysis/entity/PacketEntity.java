@@ -59,8 +59,8 @@ public class PacketEntity {
 
   /**
    * First {@value #PAYLOAD_BYTE_LIMIT} bytes of the raw frame, stored as a lowercase hex string.
-   * Keeping this small is critical for insert throughput: each extra byte here costs 2 DB chars
-   * per packet, and large captures can have 600k+ packets.
+   * Keeping this small is critical for insert throughput: each extra byte here costs 2 DB chars per
+   * packet, and large captures can have 600k+ packets.
    */
   public static final int PAYLOAD_BYTE_LIMIT = 64;
 

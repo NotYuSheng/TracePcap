@@ -42,7 +42,8 @@ public class FileServiceImpl implements FileService {
 
   @Override
   @Transactional
-  public FileUploadResponse uploadFile(MultipartFile file, boolean enableNdpi, boolean enableFileExtraction) {
+  public FileUploadResponse uploadFile(
+      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction) {
     log.info("Starting file upload: {}", file.getOriginalFilename());
 
     // Validate file
@@ -52,7 +53,8 @@ public class FileServiceImpl implements FileService {
     String fileHash = computeSha256(file);
 
     // Reject if a file with the same hash already exists
-    Optional<FileEntity> existing = fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+    Optional<FileEntity> existing =
+        fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
     if (existing.isPresent()) {
       throw new DuplicateFileException(existing.get().getId());
     }
@@ -209,7 +211,8 @@ public class FileServiceImpl implements FileService {
       }
       return HexFormat.of().formatHex(digest.digest());
     } catch (Exception e) {
-      log.error("Failed to compute SHA-256 for file {}: {}", file.getOriginalFilename(), e.getMessage());
+      log.error(
+          "Failed to compute SHA-256 for file {}: {}", file.getOriginalFilename(), e.getMessage());
       throw new InvalidFileException("Could not process file: failed to compute hash", e);
     }
   }

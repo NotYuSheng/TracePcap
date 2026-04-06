@@ -90,15 +90,14 @@ public interface ConversationRepository
   List<Object[]> findL7ProtocolStatsByFileId(@Param("fileId") UUID fileId);
 
   /**
-   * Lightweight edge data for topology diagrams.
-   * Returns (srcIp, dstIp, protocol, sumBytes, sumPackets), ordered by sumBytes DESC.
+   * Lightweight edge data for topology diagrams. Returns (srcIp, dstIp, protocol, sumBytes,
+   * sumPackets), ordered by sumBytes DESC.
    */
   @Query(
       "SELECT c.srcIp, c.dstIp, c.protocol, SUM(c.totalBytes), SUM(c.packetCount)"
           + " FROM ConversationEntity c WHERE c.file.id = :fileId"
           + " GROUP BY c.srcIp, c.dstIp, c.protocol ORDER BY SUM(c.totalBytes) DESC")
-  List<Object[]> findEdgeDataForDiagramByFileId(
-      @Param("fileId") UUID fileId, Pageable pageable);
+  List<Object[]> findEdgeDataForDiagramByFileId(@Param("fileId") UUID fileId, Pageable pageable);
 
   /** Conversations that have TLS metadata (JA3 hashes or certificate info). */
   @Query(
@@ -182,14 +181,18 @@ public interface ConversationRepository
       // each value to its common pre-normalisation variants on the Java side so no DB-side function
       // is applied to the column and any index on tshark_protocol remains usable.
       if (params.getL7Protocols() != null && !params.getL7Protocols().isEmpty()) {
-        List<String> variants = params.getL7Protocols().stream()
-            .filter(p -> p != null && !p.isEmpty())
-            .flatMap(p -> {
-              String titleCase = Character.toUpperCase(p.charAt(0)) + p.substring(1).toLowerCase();
-              return java.util.stream.Stream.of(p, titleCase, p.toLowerCase(), "The " + titleCase);
-            })
-            .distinct()
-            .collect(java.util.stream.Collectors.toList());
+        List<String> variants =
+            params.getL7Protocols().stream()
+                .filter(p -> p != null && !p.isEmpty())
+                .flatMap(
+                    p -> {
+                      String titleCase =
+                          Character.toUpperCase(p.charAt(0)) + p.substring(1).toLowerCase();
+                      return java.util.stream.Stream.of(
+                          p, titleCase, p.toLowerCase(), "The " + titleCase);
+                    })
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
         predicates.add(root.get("tsharkProtocol").in(variants));
       }
 
@@ -267,20 +270,15 @@ public interface ConversationRepository
                     host.get("deviceType").in(params.getDeviceTypes())));
 
         predicates.add(
-            cb.or(
-                root.get("srcIp").in(deviceTypeSub),
-                root.get("dstIp").in(deviceTypeSub)));
+            cb.or(root.get("srcIp").in(deviceTypeSub), root.get("dstIp").in(deviceTypeSub)));
       }
 
       // Country filter — srcIp or dstIp resolves to one of the given country codes
       if (params.getCountries() != null && !params.getCountries().isEmpty()) {
         Subquery<String> countrySub = query.subquery(String.class);
         var geo = countrySub.from(IpGeoInfoEntity.class);
-        countrySub
-            .select(geo.get("ip"))
-            .where(geo.get("countryCode").in(params.getCountries()));
-        predicates.add(
-            cb.or(root.get("srcIp").in(countrySub), root.get("dstIp").in(countrySub)));
+        countrySub.select(geo.get("ip")).where(geo.get("countryCode").in(params.getCountries()));
+        predicates.add(cb.or(root.get("srcIp").in(countrySub), root.get("dstIp").in(countrySub)));
       }
 
       // Payload contains — EXISTS subquery: match hex-encoded payload of any packet
@@ -309,8 +307,8 @@ public interface ConversationRepository
    * <ul>
    *   <li>Inputs starting with {@code 0x}, or containing only hex chars plus spaces/colons, are
    *       treated as hex (separators stripped).
-   *   <li>All other inputs are treated as ASCII and each character is converted to its two-digit hex
-   *       equivalent.
+   *   <li>All other inputs are treated as ASCII and each character is converted to its two-digit
+   *       hex equivalent.
    * </ul>
    */
   static String toHexNeedle(String input) {

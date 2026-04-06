@@ -122,10 +122,8 @@ public class StorageServiceImpl implements StorageService {
     try {
       ensureBucketExists();
       minioClient.putObject(
-          PutObjectArgs.builder()
-              .bucket(minioConfig.getBucket())
-              .object(path)
-              .stream(new ByteArrayInputStream(data), data.length, -1)
+          PutObjectArgs.builder().bucket(minioConfig.getBucket()).object(path).stream(
+                  new ByteArrayInputStream(data), data.length, -1)
               .contentType(contentType != null ? contentType : "application/octet-stream")
               .build());
       log.info("Uploaded {} bytes to MinIO path: {}", data.length, path);

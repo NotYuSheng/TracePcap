@@ -78,13 +78,18 @@ public final class FileSignatureDetector {
    */
   static byte[] skipHttpResponseHeaders(byte[] bytes) {
     if (bytes.length < 5
-        || bytes[0] != 'H' || bytes[1] != 'T' || bytes[2] != 'T'
-        || bytes[3] != 'P' || bytes[4] != '/') {
+        || bytes[0] != 'H'
+        || bytes[1] != 'T'
+        || bytes[2] != 'T'
+        || bytes[3] != 'P'
+        || bytes[4] != '/') {
       return bytes;
     }
     for (int i = 0; i < bytes.length - 3; i++) {
-      if (bytes[i] == '\r' && bytes[i + 1] == '\n'
-          && bytes[i + 2] == '\r' && bytes[i + 3] == '\n') {
+      if (bytes[i] == '\r'
+          && bytes[i + 1] == '\n'
+          && bytes[i + 2] == '\r'
+          && bytes[i + 3] == '\n') {
         int bodyStart = i + 4;
         return bodyStart < bytes.length ? Arrays.copyOfRange(bytes, bodyStart, bytes.length) : null;
       }

@@ -29,8 +29,7 @@ class TsharkEnrichmentServiceTest {
 
   @Test
   void extractAppLayerProto_httpOverTcp_returnsHttp() {
-    assertThat(
-            TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:http", "TCP"))
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:http", "TCP"))
         .isEqualTo("HTTP");
   }
 
@@ -49,17 +48,14 @@ class TsharkEnrichmentServiceTest {
   @Test
   void extractAppLayerProto_httpOverTls_returnsDeepestLayer() {
     // Tunnelled stack: deepest wins
-    assertThat(
-            TsharkEnrichmentService.extractAppLayerProto(
-                "eth:ethertype:ip:tcp:tls:http", "TCP"))
+    assertThat(TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:tcp:tls:http", "TCP"))
         .isEqualTo("HTTP");
   }
 
   @Test
   void extractAppLayerProto_quicHttp2_returnsHttp2() {
     assertThat(
-            TsharkEnrichmentService.extractAppLayerProto(
-                "eth:ethertype:ip:udp:quic:http2", "UDP"))
+            TsharkEnrichmentService.extractAppLayerProto("eth:ethertype:ip:udp:quic:http2", "UDP"))
         .isEqualTo("HTTP2");
   }
 
@@ -105,8 +101,7 @@ class TsharkEnrichmentServiceTest {
 
   @Test
   void normalizeL7Protocol_stripsLeadingTheArticle() {
-    assertThat(TsharkEnrichmentService.normalizeL7Protocol("The Microsoft"))
-        .isEqualTo("MICROSOFT");
+    assertThat(TsharkEnrichmentService.normalizeL7Protocol("The Microsoft")).isEqualTo("MICROSOFT");
   }
 
   @Test
