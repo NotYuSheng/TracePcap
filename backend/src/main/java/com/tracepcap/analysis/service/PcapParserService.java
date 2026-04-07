@@ -81,11 +81,23 @@ public class PcapParserService {
             "arp.dst.proto_ipv4",
             "-e",
             "eth.dst");
-    pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+    pb.redirectErrorStream(false);
 
     long packetNumber = 0;
     try {
       Process process = pb.start();
+
+      // Drain stderr in a background thread so it doesn't block stdout
+      StringBuilder stderrBuf = new StringBuilder();
+      Thread stderrThread = new Thread(() -> {
+        try (BufferedReader err =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+          String l;
+          while ((l = err.readLine()) != null) stderrBuf.append(l).append('\n');
+        } catch (Exception ignored) {}
+      });
+      stderrThread.setDaemon(true);
+      stderrThread.start();
 
       try (BufferedReader reader =
           new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -221,10 +233,12 @@ public class PcapParserService {
         }
       }
 
+      stderrThread.join(5000);
       int exitCode = process.waitFor();
       if (exitCode != 0 && packetNumber == 0) {
-        log.error("tshark exited with code {} and parsed 0 packets", exitCode);
-        throw new RuntimeException("tshark failed to parse PCAP file (exit " + exitCode + ")");
+        String stderr = stderrBuf.toString().trim();
+        log.error("tshark exited with code {} and parsed 0 packets. stderr: {}", exitCode, stderr);
+        throw new RuntimeException("tshark failed to parse PCAP file (exit " + exitCode + "): " + stderr);
       }
 
     } catch (RuntimeException e) {
