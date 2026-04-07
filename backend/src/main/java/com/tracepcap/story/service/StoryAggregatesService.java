@@ -212,8 +212,11 @@ public class StoryAggregatesService {
       String proto = String.valueOf(row[3]);
       String app = row[4] != null ? String.valueOf(row[4]) : null;
       FlowKey key = new FlowKey(src, dst, port, proto, app);
+      LocalDateTime ts = row[5] instanceof java.sql.Timestamp t
+          ? t.toLocalDateTime()
+          : (LocalDateTime) row[5];
       groups.computeIfAbsent(key, k -> new ArrayList<>())
-          .add((LocalDateTime) row[5]);
+          .add(ts);
     }
 
     List<BeaconCandidate> candidates = new ArrayList<>();
