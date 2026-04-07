@@ -93,13 +93,17 @@ public class StoryAggregatesService {
     // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();
     Map<String, Long> ipFlows = new HashMap<>();
+    Map<String, Boolean> privateCache = new HashMap<>();
     for (ConversationEntity c : all) {
       String dst = c.getDstIp();
       String src = c.getSrcIp();
       // Prefer dstIp as the "remote" endpoint; fall back to srcIp if dst is private/null
-      String ip = (dst != null && !isPrivate(dst)) ? dst
-                : (src != null && !isPrivate(src)) ? src
-                : null;
+      String ip = null;
+      if (dst != null && !privateCache.computeIfAbsent(dst, StoryAggregatesService::isPrivate)) {
+        ip = dst;
+      } else if (src != null && !privateCache.computeIfAbsent(src, StoryAggregatesService::isPrivate)) {
+        ip = src;
+      }
       if (ip != null) {
         ipBytes.merge(ip, c.getTotalBytes(), Long::sum);
         ipFlows.merge(ip, 1L, Long::sum);
