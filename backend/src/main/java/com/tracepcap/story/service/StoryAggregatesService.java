@@ -90,12 +90,17 @@ public class StoryAggregatesService {
     // Fetch all conversations to get dst IPs and their byte counts
     List<ConversationEntity> all = conversationRepository.findByFileId(fileId);
 
-    // Group external dstIps → total bytes
+    // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();
     Map<String, Long> ipFlows = new HashMap<>();
     for (ConversationEntity c : all) {
-      String ip = c.getDstIp();
-      if (ip != null && !isPrivate(ip)) {
+      String dst = c.getDstIp();
+      String src = c.getSrcIp();
+      // Prefer dstIp as the "remote" endpoint; fall back to srcIp if dst is private/null
+      String ip = (dst != null && !isPrivate(dst)) ? dst
+                : (src != null && !isPrivate(src)) ? src
+                : null;
+      if (ip != null) {
         ipBytes.merge(ip, c.getTotalBytes(), Long::sum);
         ipFlows.merge(ip, 1L, Long::sum);
       }
