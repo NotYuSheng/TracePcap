@@ -31,6 +31,14 @@
   color: #58151c;
 }
 
+[data-theme='dark'] .error-title {
+  color: #f8d7da;
+}
+
+[data-theme='dark'] .error-text {
+  color: #f1aeb5;
+}
+
 .error-content button {
   display: flex;
   align-items: center;

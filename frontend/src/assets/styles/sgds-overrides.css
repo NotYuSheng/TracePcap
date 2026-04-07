@@ -33,6 +33,11 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
+  /* ── Bootstrap utility tokens (text-muted, text-body, etc.) ── */
+  --bs-body-color: var(--tp-text);
+  --bs-secondary-color: var(--tp-text-muted);
+  --bs-tertiary-color: var(--tp-text-muted);
+
   /* ── SGDS global tokens ── */
   --sgds-body-bg: var(--tp-bg);
   --sgds-body-color: var(--tp-text);
@@ -305,6 +310,10 @@
   background-color: var(--tp-bg-subtle) !important;
   color: var(--tp-text) !important;
   border-color: var(--tp-border) !important;
+}
+
+[data-theme='dark'] .text-body {
+  color: var(--tp-text) !important;
 }
 
 /* Bootstrap utility classes */

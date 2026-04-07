@@ -90,12 +90,21 @@ public class StoryAggregatesService {
     // Fetch all conversations to get dst IPs and their byte counts
     List<ConversationEntity> all = conversationRepository.findByFileId(fileId);
 
-    // Group external dstIps → total bytes
+    // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();
     Map<String, Long> ipFlows = new HashMap<>();
+    Map<String, Boolean> privateCache = new HashMap<>();
     for (ConversationEntity c : all) {
-      String ip = c.getDstIp();
-      if (ip != null && !isPrivate(ip)) {
+      String dst = c.getDstIp();
+      String src = c.getSrcIp();
+      // Prefer dstIp as the "remote" endpoint; fall back to srcIp if dst is private/null
+      String ip = null;
+      if (dst != null && !privateCache.computeIfAbsent(dst, StoryAggregatesService::isPrivate)) {
+        ip = dst;
+      } else if (src != null && !privateCache.computeIfAbsent(src, StoryAggregatesService::isPrivate)) {
+        ip = src;
+      }
+      if (ip != null) {
         ipBytes.merge(ip, c.getTotalBytes(), Long::sum);
         ipFlows.merge(ip, 1L, Long::sum);
       }
@@ -207,8 +216,11 @@ public class StoryAggregatesService {
       String proto = String.valueOf(row[3]);
       String app = row[4] != null ? String.valueOf(row[4]) : null;
       FlowKey key = new FlowKey(src, dst, port, proto, app);
+      LocalDateTime ts = row[5] instanceof java.sql.Timestamp t
+          ? t.toLocalDateTime()
+          : (LocalDateTime) row[5];
       groups.computeIfAbsent(key, k -> new ArrayList<>())
-          .add((LocalDateTime) row[5]);
+          .add(ts);
     }
 
     List<BeaconCandidate> candidates = new ArrayList<>();
