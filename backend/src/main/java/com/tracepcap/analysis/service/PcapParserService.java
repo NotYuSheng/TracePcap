@@ -88,7 +88,7 @@ public class PcapParserService {
       Process process = pb.start();
 
       // Drain stderr in a background thread so it doesn't block stdout
-      StringBuffer stderrBuf = new StringBuffer();
+      StringBuilder stderrBuf = new StringBuilder();
       Thread stderrThread = new Thread(() -> {
         try (BufferedReader err =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
