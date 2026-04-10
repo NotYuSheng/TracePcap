@@ -316,6 +316,11 @@
   color: var(--tp-text) !important;
 }
 
+[data-theme='dark'] .text-muted {
+  color: var(--tp-text-muted) !important;
+}
+
+
 /* Bootstrap utility classes */
 [data-theme='dark'] .bg-light,
 [data-theme='dark'] .bg-white {

@@ -91,10 +91,14 @@ public class PcapParserService {
       StringBuffer stderrBuf = new StringBuffer();
       Thread stderrThread = new Thread(() -> {
         try (BufferedReader err =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+            new BufferedReader(new InputStreamReader(process.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
           String l;
-          while ((l = err.readLine()) != null) stderrBuf.append(l).append('\n');
-        } catch (Exception ignored) {}
+          while ((l = err.readLine()) != null) {
+            if (stderrBuf.length() < 10_000) stderrBuf.append(l).append('\n');
+          }
+        } catch (Exception e) {
+          log.warn("Failed to drain tshark stderr", e);
+        }
       });
       stderrThread.setDaemon(true);
       stderrThread.start();

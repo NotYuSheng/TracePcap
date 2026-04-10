@@ -9,10 +9,12 @@ MAX_UPLOAD_MB=$(( MEM * 25 / 100 ))
 # Nginx body limit = max upload + 50 MB multipart overhead buffer
 NGINX_MAX_BODY_SIZE="$(( MAX_UPLOAD_MB + 50 ))M"
 
-# Proxy timeout = 45% of APP_MEMORY_MB, clamped to [300, 900] seconds
+# Proxy timeout = max(45% of APP_MEMORY_MB, LLM_TIMEOUT + 60s buffer), floor 300s
 NGINX_PROXY_TIMEOUT=$(( MEM * 45 / 100 ))
 if [ "$NGINX_PROXY_TIMEOUT" -lt 300 ]; then NGINX_PROXY_TIMEOUT=300; fi
-if [ "$NGINX_PROXY_TIMEOUT" -gt 900 ]; then NGINX_PROXY_TIMEOUT=900; fi
+LLM_TIMEOUT_S=${LLM_TIMEOUT:-300}
+LLM_PROXY_TIMEOUT=$(( LLM_TIMEOUT_S + 60 ))
+if [ "$NGINX_PROXY_TIMEOUT" -lt "$LLM_PROXY_TIMEOUT" ]; then NGINX_PROXY_TIMEOUT=$LLM_PROXY_TIMEOUT; fi
 
 export NGINX_MAX_BODY_SIZE
 export NGINX_PROXY_TIMEOUT
