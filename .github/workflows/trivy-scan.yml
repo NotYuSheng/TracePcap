@@ -1,0 +1,77 @@
+name: Trivy Image Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to scan (default: latest)"
+        required: false
+        default: "latest"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      actions: read           # required for SARIF upload in private repos
+      security-events: write  # required for SARIF upload to Security tab
+
+    strategy:
+      matrix:
+        include:
+          - name: tracepcap-backend
+          - name: tracepcap-nginx
+
+    steps:
+      - name: Resolve image reference
+        run: |
+          REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_OWNER_LOWER}/${{ matrix.name }}:${{ github.event.inputs.image_tag }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Trivy scan (SARIF)
+        # Note: severity filtering is ignored in SARIF mode — all severities are
+        # included in the SARIF file; use the Security tab UI to filter by severity.
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+          ignore-unfixed: true
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true  # silently skip if Advanced Security is not enabled
+        with:
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-${{ matrix.name }}
+
+      - name: Run Trivy scan (table summary)
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          output: trivy-${{ matrix.name }}-summary.txt
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+
+      - name: Write results to job summary
+        if: always()
+        run: |
+          echo "## Trivy Scan — \`${{ matrix.name }}:${{ github.event.inputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat trivy-${{ matrix.name }}-summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Log out of GitHub Container Registry
+        if: always()
+        run: docker logout ghcr.io
