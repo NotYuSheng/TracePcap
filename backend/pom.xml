@@ -24,6 +24,9 @@
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <springdoc.version>2.3.0</springdoc.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <!-- CVE fixes: override versions managed by Spring Boot parent -->
+        <postgresql.version>42.7.2</postgresql.version>
+        <tomcat.version>10.1.35</tomcat.version>
     </properties>
 
     <dependencies>
@@ -132,7 +135,7 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>2.9.2</version>
+            <version>3.2.2</version>
         </dependency>
 
         <!-- PDF report generation -->
