@@ -68,15 +68,14 @@ export const ComparePage = () => {
 
   useEffect(() => {
     if (fileIds.length < 2) return;
-    apiClient
-      .get(API_ENDPOINTS.FILES_LIST, { params: { sort: 'uploadedAt,desc', size: 50 } })
-      .then(res => {
-        const list: { fileId: string; fileName: string }[] = res.data.content ?? [];
-        setFileNames(fileIds.map((id, i) => list.find(f => f.fileId === id)?.fileName ?? `File ${i + 1}`));
-      })
-      .catch(() => {
-        setFileNames(fileIds.map((_, i) => `File ${i + 1}`));
-      });
+    Promise.all(
+      fileIds.map((id, i) =>
+        apiClient
+          .get(API_ENDPOINTS.FILE_METADATA(id))
+          .then(res => res.data.fileName as string)
+          .catch(() => `File ${i + 1}`)
+      )
+    ).then(setFileNames);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileIds.join(',')]);
 
@@ -581,7 +580,11 @@ export const ComparePage = () => {
         <NodeDetails
           node={selectedNode}
           edges={mergedEdges}
-          fileId={fileIds[0]}
+          fileId={
+            selectedNode.data.sources?.[0]
+              ? (fileIds[labels.indexOf(selectedNode.data.sources[0])] ?? fileIds[0])
+              : fileIds[0]
+          }
           onClose={() => setSelectedNode(null)}
         />
       )}
