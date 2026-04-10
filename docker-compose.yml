@@ -110,6 +110,8 @@ services:
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # LLM timeout — nginx proxy_read_timeout is set to max(memory-derived, LLM_TIMEOUT+60s)
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       # Timezone Configuration
       TZ: Asia/Singapore
     ports:
