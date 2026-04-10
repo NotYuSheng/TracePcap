@@ -39,17 +39,31 @@ interface NetworkGraphProps {
   onLayoutChange?: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
   /** Called once after ELK layout completes and ReactFlow has painted. */
   onLayoutComplete?: () => void;
+  /**
+   * In compare mode, the label of the "primary" (File A) source.
+   * Nodes/edges exclusive to the secondary source (File B) are rendered with
+   * a dashed style to visually distinguish them.
+   */
+  primarySource?: string;
 }
 
 interface FlowNodeData extends Record<string, unknown> {
   label: string;
   color: string;
   icon: string;
+  /** Which file(s) this node appears in — set only in compare mode. */
+  sources?: string[];
+  /** Label of the primary (File A) source — used to determine dashed styling. */
+  primarySource?: string;
 }
 
 interface FlowEdgeData extends Record<string, unknown> {
   label: string;
   offset: number; // perpendicular pixel offset for parallel edges
+  /** Which file(s) this edge appears in — set only in compare mode. */
+  sources?: string[];
+  /** Label of the primary (File A) source — used to determine dashed styling. */
+  primarySource?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +229,8 @@ const ELK_OPTIONS: Record<string, Record<string, string>> = {
 async function computeLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  layoutType: 'forceDirected2d' | 'hierarchicalTd'
+  layoutType: 'forceDirected2d' | 'hierarchicalTd',
+  primarySource?: string
 ): Promise<{ nodes: Node[]; edges: Edge[] }> {
   const dedupedEdges = deduplicateEdges(edges);
   const offsetMap = assignEdgeOffsets(dedupedEdges);
@@ -237,6 +252,8 @@ async function computeLayout(
       label: n.label,
       color: getNodeColor(n.data),
       icon: getNodeIcon(n.data),
+      sources: n.data.sources,
+      primarySource,
     },
     width: NODE_WIDTH,
     height: NODE_HEIGHT,
@@ -244,15 +261,17 @@ async function computeLayout(
 
   const rfEdges: Edge[] = dedupedEdges.map(e => {
     const color = getProtocolColor(e.data.protocol);
+    const sources = e.data.sources;
+    const isShared = sources && sources.length >= 2;
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       type: 'networkEdge',
-      data: { label: e.label, offset: offsetMap.get(e.id) ?? 0 },
+      data: { label: e.label, offset: offsetMap.get(e.id) ?? 0, sources, primarySource },
       style: {
         stroke: color,
-        strokeWidth: 1.5,
+        strokeWidth: isShared ? 2.5 : 1.5,
       },
     };
   });
@@ -265,9 +284,19 @@ async function computeLayout(
 // ---------------------------------------------------------------------------
 
 function NetworkNode({ data }: NodeProps) {
-  const { label, color, icon } = data as FlowNodeData;
+  const { label, color, icon, sources, primarySource } = data as FlowNodeData;
+  const isSecondaryOnly =
+    sources?.length === 1 && primarySource !== undefined && sources[0] !== primarySource;
+  const isShared = sources !== undefined && sources.length >= 2;
   return (
-    <div className="network-flow-node" style={{ borderColor: color }}>
+    <div
+      className="network-flow-node"
+      style={{
+        borderColor: color,
+        borderStyle: isSecondaryOnly ? 'dashed' : 'solid',
+        opacity: isSecondaryOnly ? 0.8 : 1,
+      }}
+    >
       <Handle
         type="target"
         position={Position.Top}
@@ -284,6 +313,19 @@ function NetworkNode({ data }: NodeProps) {
         <i className={`bi ${icon}`} />
       </div>
       <span className="network-flow-label">{label}</span>
+      {isShared && (
+        <i
+          className="bi bi-layers-fill"
+          style={{
+            position: 'absolute',
+            bottom: 2,
+            right: 2,
+            fontSize: '0.6rem',
+            color,
+            opacity: 0.85,
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -293,7 +335,12 @@ function NetworkNode({ data }: NodeProps) {
 // ---------------------------------------------------------------------------
 
 function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: EdgeProps) {
-  const { label, offset } = (data ?? { label: '', offset: 0 }) as FlowEdgeData;
+  const { label, offset, sources, primarySource } = (data ?? { label: '', offset: 0 }) as FlowEdgeData;
+  const isSecondaryOnly =
+    sources?.length === 1 && primarySource !== undefined && sources[0] !== primarySource;
+  const edgeStyle = isSecondaryOnly
+    ? { ...style, strokeDasharray: '6 3' }
+    : style;
 
   // Use a canonical direction for the perpendicular so that A→B and B→A
   // both receive the same perpendicular unit vector.
@@ -322,7 +369,7 @@ function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: Ed
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={style} />
+      <BaseEdge id={id} path={edgePath} style={edgeStyle} />
       <polygon
         points="-6,-3.5 6,0 -6,3.5"
         transform={`translate(${arrowX},${arrowY}) rotate(${angle})`}
@@ -360,6 +407,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   layoutType = 'forceDirected2d',
   onLayoutChange,
   onLayoutComplete,
+  primarySource,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -403,7 +451,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     }
 
     setLayouting(true);
-    computeLayout(visibleNodes, edges, layoutType)
+    computeLayout(visibleNodes, edges, layoutType, primarySource)
       .then(({ nodes: n, edges: e }) => {
         if (!active) return;
         setRfNodes(n);
@@ -419,7 +467,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     return () => {
       active = false;
     };
-  }, [visibleNodes, edges, layoutType]);
+  }, [visibleNodes, edges, layoutType, primarySource]);
 
   // Signal the caller once the layout has been computed and painted.
   // Works for both the normal case (rfNodes set after ELK) and the empty-data

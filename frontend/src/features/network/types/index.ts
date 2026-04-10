@@ -52,6 +52,8 @@ export interface NodeData {
   manufacturer?: string;
   /** TTL observed for this host. */
   ttl?: number;
+  /** Which file(s) this node appears in — set only in compare mode. */
+  sources?: string[];
 }
 
 export interface GraphEdge {
@@ -80,6 +82,8 @@ export interface EdgeData {
   srcCountry?: string;
   dstCountry?: string;
   hasRisks?: boolean;
+  /** Which file(s) this edge appears in — set only in compare mode. */
+  sources?: string[];
 }
 
 export interface NetworkGraphData {

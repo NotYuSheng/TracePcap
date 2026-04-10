@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { isAxiosError } from 'axios';
 import { Card, Modal } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
@@ -22,6 +22,28 @@ export const FileList = () => {
   const [loading, setLoading] = useState(true);
   const [pendingDeleteFile, setPendingDeleteFile] = useState<FileMetadata | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
+  const [showInfo, setShowInfo] = useState(false);
+  const infoRef = useRef<HTMLDivElement>(null);
+
+  // Close info popover when clicking outside
+  useEffect(() => {
+    if (!showInfo) return;
+    const handler = (e: MouseEvent) => {
+      if (infoRef.current && !infoRef.current.contains(e.target as Node)) {
+        setShowInfo(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showInfo]);
+
+  const toggleCompareSelect = (fileId: string) =>
+    setSelectedForCompare(prev => {
+      const next = new Set(prev);
+      next.has(fileId) ? next.delete(fileId) : next.add(fileId);
+      return next;
+    });
 
   const fetchFiles = async () => {
     try {
@@ -80,19 +102,70 @@ export const FileList = () => {
     <>
       <Card className="file-list-card mt-4">
         <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">
-            <i className="bi bi-folder2-open me-2"></i>
-            All Uploads
-          </h5>
+          <div className="d-flex align-items-center gap-1">
+            <h5 className="mb-0">
+              <i className="bi bi-folder2-open me-2"></i>
+              All Uploads
+            </h5>
+            <div ref={infoRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="btn btn-link p-0 text-muted"
+                style={{ lineHeight: 1 }}
+                onClick={() => setShowInfo(v => !v)}
+                aria-label="About file actions"
+              >
+                <i className="bi bi-info-circle" style={{ fontSize: '0.85rem' }}></i>
+              </button>
+              {showInfo && (
+                <div
+                  className="card shadow"
+                  style={{
+                    position: 'absolute',
+                    top: '1.6rem',
+                    left: 0,
+                    zIndex: 100,
+                    width: '260px',
+                    fontSize: '0.82rem',
+                  }}
+                >
+                  <div className="card-body py-2 px-3">
+                    <p className="mb-1">
+                      <i className="bi bi-graph-up me-1 text-primary"></i>
+                      Click <strong>Analyze</strong> on any file to open its individual analysis.
+                    </p>
+                    <p className="mb-0">
+                      <i className="bi bi-diagram-3 me-1 text-primary"></i>
+                      Select <strong>two or more</strong> files using the checkboxes, then click <strong>Compare selected</strong> for cross-PCAP topology analysis.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           {files.length > 0 && (
-            <button
-              type="button"
-              className="btn btn-outline-danger btn-sm"
-              onClick={() => setConfirmDeleteAll(true)}
-            >
-              <i className="bi bi-trash me-1"></i>
-              Delete all
-            </button>
+            <div className="d-flex gap-2">
+              {selectedForCompare.size >= 2 && (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() =>
+                    navigate(`/compare?files=${[...selectedForCompare].join(',')}`)
+                  }
+                >
+                  <i className="bi bi-diagram-3 me-1"></i>
+                  Compare selected ({selectedForCompare.size})
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => setConfirmDeleteAll(true)}
+              >
+                <i className="bi bi-trash me-1"></i>
+                Delete all
+              </button>
+            </div>
           )}
         </Card.Header>
         <Card.Body className="p-0">
@@ -117,12 +190,22 @@ export const FileList = () => {
               {files.map(file => (
                 <div
                   key={file.fileId}
-                  className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/analysis/${file.fileId}`)}
+                  className="list-group-item d-flex justify-content-between align-items-center"
                 >
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="form-check-input mt-0 flex-shrink-0"
+                        checked={selectedForCompare.has(file.fileId)}
+                        disabled={file.status.toLowerCase() !== 'completed'}
+                        title={
+                          file.status.toLowerCase() !== 'completed'
+                            ? 'File must be fully processed to compare'
+                            : 'Select for comparison'
+                        }
+                        onChange={() => toggleCompareSelect(file.fileId)}
+                      />
                       <i
                         className="bi bi-file-earmark-binary text-primary"
                         style={{ fontSize: '1.2rem' }}
@@ -147,20 +230,14 @@ export const FileList = () => {
                   <div className="d-flex gap-2 align-items-center">
                     <button
                       className="btn btn-outline-primary btn-sm"
-                      onClick={e => {
-                        e.stopPropagation();
-                        navigate(`/analysis/${file.fileId}`);
-                      }}
+                      onClick={() => navigate(`/analysis/${file.fileId}`)}
                     >
                       <i className="bi bi-graph-up me-1"></i>
                       Analyze
                     </button>
                     <button
                       className="btn btn-link btn-sm p-0 text-danger"
-                      onClick={e => {
-                        e.stopPropagation();
-                        setPendingDeleteFile(file);
-                      }}
+                      onClick={() => setPendingDeleteFile(file)}
                       title="Delete this file"
                     >
                       <i className="bi bi-trash"></i>

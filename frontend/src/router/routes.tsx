@@ -8,6 +8,7 @@ import { StoryPage } from '@pages/Story';
 import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
 import { ExtractedFilesPage } from '@pages/ExtractedFiles';
+import { ComparePage } from '@pages/Compare/ComparePage';
 import { NotFoundPage } from '@pages/NotFound';
 
 export const router = createBrowserRouter([
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
             element: <ExtractedFilesPage />,
           },
         ],
+      },
+      {
+        path: 'compare',
+        element: <ComparePage />,
       },
       {
         path: '*',

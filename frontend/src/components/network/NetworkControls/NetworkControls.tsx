@@ -85,6 +85,8 @@ interface NetworkControlsProps {
   onHasRisksOnlyChange: (val: boolean) => void;
   activeFilterCount: number;
   onClearAllFilters: () => void;
+  /** Whether the panel starts collapsed. Defaults to false (expanded). */
+  defaultCollapsed?: boolean;
 }
 
 function edgeLegendLabel(key: string): string {
@@ -153,8 +155,9 @@ export function NetworkControls({
   onHasRisksOnlyChange,
   activeFilterCount,
   onClearAllFilters,
+  defaultCollapsed = false,
 }: NetworkControlsProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   const [showColorInfo, setShowColorInfo] = useState(false);
   const [ipInput, setIpInput] = useState(ipFilter);
   const [portInput, setPortInput] = useState(portFilter);
