@@ -1,0 +1,5 @@
+# Normalize line endings on commit
+* text=auto
+
+# Force LF for shell scripts — CRLF breaks shebangs on Linux/macOS
+*.sh text eol=lf
