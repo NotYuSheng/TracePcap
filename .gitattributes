@@ -1,0 +1,6 @@
+# Normalize line endings on commit
+* text=auto
+
+# Force LF for scripts with shebangs — CRLF breaks them on Linux/macOS
+*.sh text eol=lf
+*.py text eol=lf
