@@ -1,3 +1,9 @@
+/* Multi-select action modal buttons */
+.multiselect-action-btn:hover .text-muted,
+.multiselect-action-btn:hover small {
+  color: inherit !important;
+}
+
 /* File List Card Styles */
 .file-list-card {
   box-shadow: 0 2px 4px rgb(0 0 0 / 10%);

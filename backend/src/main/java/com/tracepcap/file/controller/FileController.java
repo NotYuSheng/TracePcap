@@ -2,6 +2,7 @@ package com.tracepcap.file.controller;
 
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
+import com.tracepcap.file.dto.MergeFilesRequest;
 import com.tracepcap.file.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -100,5 +101,23 @@ public class FileController {
     fileService.deleteFile(UUID.fromString(fileId));
 
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/merge")
+  @Operation(
+      summary = "Merge PCAP files",
+      description = "Merge two or more PCAP files into a single new file and trigger analysis")
+  public ResponseEntity<FileUploadResponse> mergeFiles(
+      @RequestBody MergeFilesRequest request,
+      @RequestParam(value = "enableNdpi", defaultValue = "true") boolean enableNdpi,
+      @RequestParam(value = "enableFileExtraction", defaultValue = "true")
+          boolean enableFileExtraction) {
+
+    log.info("Received merge request for {} files", request.getFileIds().size());
+
+    FileUploadResponse response =
+        fileService.mergeFiles(request.getFileIds(), request.getMergedFileName(), enableNdpi, enableFileExtraction);
+
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 }
