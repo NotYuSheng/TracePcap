@@ -54,6 +54,19 @@ export interface NodeData {
   ttl?: number;
   /** Which file(s) this node appears in — set only in compare mode. */
   sources?: string[];
+  // ── Cluster fields — only set on synthetic cluster nodes ─────────────────
+  /** True when this node represents a collapsed /24 subnet cluster. */
+  isCluster?: boolean;
+  /** Cluster identifier, e.g. "cluster:192.168.1.0/24". */
+  clusterId?: string;
+  /** Number of real nodes inside this cluster. */
+  memberCount?: number;
+  /** IDs of the real nodes inside this cluster. */
+  memberIds?: string[];
+  /** Breakdown of roles among cluster members. */
+  roleBreakdown?: { client: number; server: number; both: number; unknown: number };
+  /** Top protocols seen on edges between cluster members. */
+  dominantProtocols?: string[];
 }
 
 export interface GraphEdge {
@@ -93,6 +106,8 @@ export interface NetworkGraphData {
   isLimited?: boolean;
   totalConversations?: number;
   displayedConversations?: number;
+  /** Number of nodes hidden by the significance filter (0 when all nodes are shown). */
+  hiddenNodes?: number;
 }
 
 export interface NetworkStats {

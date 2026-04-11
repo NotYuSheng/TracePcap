@@ -282,17 +282,68 @@ function markAnomalies(nodeMap: NodeMap, analysisSummary?: AnalysisSummary) {
 }
 
 /**
+ * Select the most significant nodes to render in the topology diagram.
+ *
+ * Significance score (0–1 base + anomaly bonus):
+ *   0.5 × (totalBytes / maxBytes)         — traffic dominance
+ *   0.3 × (nodeHasRisk ? 1 : 0)           — connected to a risky edge
+ *   0.2 × (connections / maxConnections)  — structural hub-ness
+ *   1.0 × (isAnomaly ? 1 : 0)             — anomaly bonus (ensures inclusion)
+ *
+ * Anomaly nodes are always included regardless of limit.
+ * Returns the selected nodes and the count of nodes that were hidden.
+ */
+function selectSignificantNodes(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  limit: number
+): { significantNodes: GraphNode[]; hiddenCount: number } {
+  if (nodes.length <= limit) {
+    return { significantNodes: nodes, hiddenCount: 0 };
+  }
+
+  // Build per-node risk flag from edges
+  const nodeHasRisk = new Map<string, boolean>();
+  for (const e of edges) {
+    if (e.data.hasRisks || (e.data.flowRisks?.length ?? 0) > 0) {
+      nodeHasRisk.set(e.source, true);
+      nodeHasRisk.set(e.target, true);
+    }
+  }
+
+  // Normalisation denominators (avoid division by zero)
+  const maxBytes = Math.max(1, ...nodes.map(n => n.data.totalBytes));
+  const maxConns = Math.max(1, ...nodes.map(n => n.data.connections));
+
+  const scored = nodes.map(n => ({
+    node: n,
+    score:
+      0.5 * (n.data.totalBytes / maxBytes) +
+      0.3 * (nodeHasRisk.get(n.id) ? 1 : 0) +
+      0.2 * (n.data.connections / maxConns) +
+      1.0 * (n.data.isAnomaly ? 1 : 0),
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+
+  const significantNodes = scored.slice(0, limit).map(s => s.node);
+  return { significantNodes, hiddenCount: nodes.length - significantNodes.length };
+}
+
+/**
  * Transform conversations into graph nodes and edges
  * @param conversations - Array of conversations to visualize
  * @param analysisSummary - Optional analysis summary for anomaly detection
  * @param maxConversations - Maximum number of conversations to render (default: 500)
  * @param hostClassifications - Optional per-IP device classifications from the backend
+ * @param maxNodes - Maximum number of nodes to render (default: 50, 0 = no limit)
  */
 export function buildNetworkGraph(
   conversations: Conversation[],
   analysisSummary?: AnalysisSummary,
   maxConversations: number = 500,
-  hostClassifications?: HostClassification[]
+  hostClassifications?: HostClassification[],
+  maxNodes: number = 50
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const edges: GraphEdge[] = [];
@@ -388,21 +439,37 @@ export function buildNetworkGraph(
     markAnomalies(nodeMap, analysisSummary);
   }
 
+  // Apply significance-based node cap: keep the top-N most significant nodes
+  // and drop edges where either endpoint was hidden.
+  const allNodes = Array.from(Object.values(nodeMap));
+  const allEdges = edges;
+
+  const { significantNodes, hiddenCount } =
+    maxNodes > 0
+      ? selectSignificantNodes(allNodes, allEdges, maxNodes)
+      : { significantNodes: allNodes, hiddenCount: 0 };
+
+  const sigNodeIds = new Set(significantNodes.map(n => n.id));
+  const significantEdges = allEdges.filter(
+    e => sigNodeIds.has(e.source) && sigNodeIds.has(e.target)
+  );
+
   // Calculate statistics, then override packet/byte totals with the authoritative
   // figures from the analysis summary when available. The per-conversation sum
   // misses non-flow traffic (ARP, ICMP, malformed frames, etc.).
-  const stats = calculateNetworkStats(nodeMap, edges);
+  const stats = calculateNetworkStats(nodeMap, significantEdges);
   if (analysisSummary?.totalPackets != null) {
     stats.totalPackets = analysisSummary.totalPackets;
   }
 
   return {
-    nodes: Array.from(Object.values(nodeMap)),
-    edges,
+    nodes: significantNodes,
+    edges: significantEdges,
     stats,
     isLimited: conversations.length > maxConversations,
     totalConversations: conversations.length,
     displayedConversations: limitedConversations.length,
+    hiddenNodes: hiddenCount,
   };
 }
 

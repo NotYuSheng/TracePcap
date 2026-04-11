@@ -5,6 +5,7 @@ import type { GraphNode } from '@/features/network/types';
 import {
   useNetworkData,
   CONVERSATION_LIMIT_ENABLED,
+  MAX_DIAGRAM_NODES,
 } from '@/features/network/hooks/useNetworkData';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
@@ -41,7 +42,13 @@ function formatBytes(bytes: number): string {
 
 export const NetworkDiagramPage = () => {
   const { fileId, data } = useOutletContext<AnalysisOutletContext>();
-  const { nodes, edges, stats, loading, error, refetch } = useNetworkData(fileId, data);
+  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
+  const [sliderOpen, setSliderOpen] = useState(false);
+  const { nodes, edges, stats, loading, error, refetch, hiddenNodes } = useNetworkData(
+    fileId,
+    data,
+    nodeLimit
+  );
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   // Edge legend / protocol filter
@@ -402,6 +409,37 @@ export const NetworkDiagramPage = () => {
           </div>
         </div>
       </div>
+
+      {hiddenNodes > 0 && (
+        <div className="alert alert-info mb-3">
+          <i className="bi bi-info-circle me-2"></i>
+          Showing the <strong>{nodeLimit} most significant nodes</strong> ({hiddenNodes} hidden by
+          significance filter). All conversations are available in the Conversations tab.{' '}
+          <button
+            className="btn btn-link btn-sm p-0"
+            onClick={() => setSliderOpen(s => !s)}
+          >
+            {sliderOpen ? 'Hide slider \u25b2' : 'Show more \u25bc'}
+          </button>
+          {sliderOpen && (
+            <div className="mt-2 d-flex align-items-center gap-2">
+              <span className="text-muted small">10</span>
+              <input
+                type="range"
+                min={10}
+                max={200}
+                step={10}
+                value={nodeLimit}
+                onChange={e => setNodeLimit(Number(e.target.value))}
+                className="form-range"
+                style={{ width: 160 }}
+              />
+              <span className="text-muted small">200</span>
+              <span className="badge bg-secondary ms-1">{nodeLimit} nodes</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Row 2: Legend & Filters */}
       <div className="mb-3">

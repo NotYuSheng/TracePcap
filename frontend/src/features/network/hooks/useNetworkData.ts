@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { networkService } from '../services/networkService';
 import type { NetworkGraphData, GraphNode, GraphEdge, NetworkStats } from '../types';
+
+export const MAX_DIAGRAM_NODES = 50;
 import type { AnalysisSummary } from '@/types';
 
 interface UseNetworkDataReturn extends NetworkGraphData {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  hiddenNodes: number;
 }
 
 export const CONVERSATION_LIMIT_ENABLED =
@@ -22,11 +25,13 @@ const MAX_CONVERSATIONS = 500;
  */
 export function useNetworkData(
   fileId: string,
-  analysisSummary?: AnalysisSummary
+  analysisSummary?: AnalysisSummary,
+  maxNodes: number = MAX_DIAGRAM_NODES
 ): UseNetworkDataReturn {
   const maxConversations = CONVERSATION_LIMIT_ENABLED ? MAX_CONVERSATIONS : Infinity;
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
+  const [hiddenNodes, setHiddenNodes] = useState(0);
   const [stats, setStats] = useState<NetworkStats>({
     totalNodes: 0,
     totalEdges: 0,
@@ -78,16 +83,18 @@ export function useNetworkData(
         // If the endpoint isn't available (e.g. older analysis), silently skip
       }
 
-      // Transform to graph data with conversation limit
+      // Transform to graph data with conversation limit and node significance cap
       const graphData = networkService.buildNetworkGraph(
         conversations,
         analysisSummary,
         maxConversations,
-        hostClassifications
+        hostClassifications,
+        maxNodes
       );
 
       setNodes(graphData.nodes);
       setEdges(graphData.edges);
+      setHiddenNodes(graphData.hiddenNodes ?? 0);
       setStats({
         ...graphData.stats,
         isLimited: graphData.isLimited,
@@ -105,7 +112,8 @@ export function useNetworkData(
 
   useEffect(() => {
     fetchData();
-  }, [fileId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileId, maxNodes]);
 
   return {
     nodes,
@@ -114,5 +122,6 @@ export function useNetworkData(
     loading,
     error,
     refetch: fetchData,
+    hiddenNodes,
   };
 }
