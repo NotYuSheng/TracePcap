@@ -9,11 +9,15 @@ import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.event.FileUploadedEvent;
 import com.tracepcap.file.mapper.FileMapper;
 import com.tracepcap.file.repository.FileRepository;
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
+import java.util.concurrent.TimeUnit;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -239,15 +243,29 @@ public class FileServiceImpl implements FileService {
           .redirectErrorStream(true)
           .start();
 
-      String output = new String(process.getInputStream().readAllBytes());
-      int exitCode = process.waitFor();
+      // Drain stdout/stderr in a background thread to prevent blocking
+      final StringBuilder processOutput = new StringBuilder();
+      Thread drainThread = new Thread(() -> {
+        try {
+          processOutput.append(new String(process.getInputStream().readAllBytes()));
+        } catch (IOException ignored) {}
+      });
+      drainThread.setDaemon(true);
+      drainThread.start();
+
+      boolean finished = process.waitFor(5, TimeUnit.MINUTES);
+      drainThread.join(5000);
+      if (!finished) {
+        process.destroyForcibly();
+        throw new InvalidFileException("mergecap timed out after 5 minutes");
+      }
+      int exitCode = process.exitValue();
       if (exitCode != 0) {
-        throw new InvalidFileException("mergecap failed (exit " + exitCode + "): " + output);
+        throw new InvalidFileException("mergecap failed (exit " + exitCode + "): " + processOutput);
       }
 
-      // Compute hash of the merged file to detect duplicates
-      byte[] mergedBytes = Files.readAllBytes(tempOutput.toPath());
-      String fileHash = computeSha256FromBytes(mergedBytes);
+      // Compute hash by streaming the merged file (avoids loading it fully into memory)
+      String fileHash = computeSha256FromFile(tempOutput);
 
       Optional<FileEntity> existing =
           fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
@@ -260,17 +278,17 @@ public class FileServiceImpl implements FileService {
           ? sanitizeMergedFileName(mergedFileName)
           : buildAutoMergedName(fileIds);
 
-      // Upload merged file to MinIO
+      // Stream-upload the merged file to MinIO (avoids loading it fully into memory)
       UUID newFileId = UUID.randomUUID();
       String storedName = newFileId + ".pcap";
-      storageService.uploadBytes(mergedBytes, storedName, "application/vnd.tcpdump.pcap");
+      storageService.uploadFile(tempOutput, storedName, "application/vnd.tcpdump.pcap");
 
       // Persist metadata
       FileEntity fileEntity =
           FileEntity.builder()
               .id(newFileId)
               .fileName(mergedName)
-              .fileSize((long) mergedBytes.length)
+              .fileSize(tempOutput.length())
               .minioPath(storedName)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -334,10 +352,14 @@ public class FileServiceImpl implements FileService {
     return safe;
   }
 
-  private String computeSha256FromBytes(byte[] data) {
+  private String computeSha256FromFile(File file) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      return HexFormat.of().formatHex(digest.digest(data));
+      try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(file)), digest)) {
+        byte[] buf = new byte[8192];
+        while (is.read(buf) != -1) { /* drain to feed the digest */ }
+      }
+      return HexFormat.of().formatHex(digest.digest());
     } catch (Exception e) {
       throw new InvalidFileException("Could not compute hash of merged file", e);
     }

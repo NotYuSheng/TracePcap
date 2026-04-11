@@ -64,4 +64,14 @@ public interface StorageService {
    * @return the storage path
    */
   String uploadBytes(byte[] data, String path, String contentType);
+
+  /**
+   * Upload a local file to storage via streaming (avoids loading the whole file into memory).
+   *
+   * @param source the local file to upload
+   * @param path the destination path in storage
+   * @param contentType MIME type of the content
+   * @return the storage path
+   */
+  String uploadFile(java.io.File source, String path, String contentType);
 }
