@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { networkService } from '../services/networkService';
 import type { GraphNode, GraphEdge, NetworkStats } from '../types';
+import type { Conversation, HostClassification } from '@/types';
 
 export const MAX_DIAGRAM_NODES = 50;
 import type { AnalysisSummary } from '@/types';
@@ -23,10 +24,12 @@ export const CONVERSATION_LIMIT_ENABLED =
 const MAX_CONVERSATIONS = 500;
 
 /**
- * Custom hook for fetching and transforming network data into graph format
- * Follows the same pattern as useAnalysisData
- * @param fileId - The file ID to fetch conversations for
- * @param analysisSummary - Optional analysis summary for anomaly detection
+ * Custom hook for fetching and transforming network data into graph format.
+ *
+ * Fetch and transform are intentionally split:
+ *  - Raw conversations + host classifications are fetched once per fileId change.
+ *  - buildNetworkGraph (pure transformation) re-runs client-side whenever
+ *    maxNodes or analysisSummary changes, avoiding redundant network requests.
  */
 export function useNetworkData(
   fileId: string,
@@ -34,6 +37,11 @@ export function useNetworkData(
   maxNodes: number = MAX_DIAGRAM_NODES
 ): UseNetworkDataReturn {
   const maxConversations = CONVERSATION_LIMIT_ENABLED ? MAX_CONVERSATIONS : Infinity;
+
+  // Raw data cached after the initial fetch — transform re-runs without re-fetching
+  const conversationsRef = useRef<Conversation[]>([]);
+  const hostClassificationsRef = useRef<HostClassification[] | undefined>(undefined);
+
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [hiddenNodes, setHiddenNodes] = useState(0);
@@ -49,6 +57,34 @@ export function useNetworkData(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** Apply buildNetworkGraph to the currently cached raw data. */
+  const applyTransform = (
+    conversations: Conversation[],
+    hostClassifications: HostClassification[] | undefined,
+    summary: AnalysisSummary | undefined,
+    limit: number
+  ) => {
+    const graphData = networkService.buildNetworkGraph(
+      conversations,
+      summary,
+      maxConversations,
+      hostClassifications,
+      limit
+    );
+    setNodes(graphData.nodes);
+    setEdges(graphData.edges);
+    setHiddenNodes(graphData.hiddenNodes ?? 0);
+    setHiddenNodesList(graphData.hiddenNodesList ?? []);
+    setCrossEdges(graphData.crossEdges ?? []);
+    setStats({
+      ...graphData.stats,
+      isLimited: graphData.isLimited,
+      totalConversations: graphData.totalConversations,
+      displayedConversations: graphData.displayedConversations,
+    });
+  };
+
+  /** Full fetch + transform — runs when fileId changes. */
   const fetchData = async () => {
     if (!fileId) {
       setLoading(false);
@@ -59,57 +95,40 @@ export function useNetworkData(
       setLoading(true);
       setError(null);
 
-      // Fetch conversations from API
-      // For network visualization, fetch all conversations (use large page size)
-      const response = await conversationService.getConversations(fileId, {
-        ip: '',
-        port: '',
-        payloadContains: '',
-        protocols: [],
-        l7Protocols: [],
-        apps: [],
-        categories: [],
-        hasRisks: false,
-        fileTypes: [],
-        riskTypes: [],
-        customSignatures: [],
-        deviceTypes: [],
-        countries: [],
-        sortBy: '',
-        sortDir: 'asc',
-        page: 1,
-        pageSize: 10000,
-      });
+      const [response] = await Promise.all([
+        conversationService.getConversations(fileId, {
+          ip: '',
+          port: '',
+          payloadContains: '',
+          protocols: [],
+          l7Protocols: [],
+          apps: [],
+          categories: [],
+          hasRisks: false,
+          fileTypes: [],
+          riskTypes: [],
+          customSignatures: [],
+          deviceTypes: [],
+          countries: [],
+          sortBy: '',
+          sortDir: 'asc',
+          page: 1,
+          pageSize: 10000,
+        }),
+      ]);
       const conversations = response.data;
 
-      // Fetch host classifications in parallel with conversation fetch (best-effort)
-      let hostClassifications;
+      let hostClassifications: HostClassification[] | undefined;
       try {
         hostClassifications = await conversationService.getHostClassifications(fileId);
       } catch {
         // If the endpoint isn't available (e.g. older analysis), silently skip
       }
 
-      // Transform to graph data with conversation limit and node significance cap
-      const graphData = networkService.buildNetworkGraph(
-        conversations,
-        analysisSummary,
-        maxConversations,
-        hostClassifications,
-        maxNodes
-      );
+      conversationsRef.current = conversations;
+      hostClassificationsRef.current = hostClassifications;
 
-      setNodes(graphData.nodes);
-      setEdges(graphData.edges);
-      setHiddenNodes(graphData.hiddenNodes ?? 0);
-      setHiddenNodesList(graphData.hiddenNodesList ?? []);
-      setCrossEdges(graphData.crossEdges ?? []);
-      setStats({
-        ...graphData.stats,
-        isLimited: graphData.isLimited,
-        totalConversations: graphData.totalConversations,
-        displayedConversations: graphData.displayedConversations,
-      });
+      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load network data';
       setError(errorMessage);
@@ -119,10 +138,23 @@ export function useNetworkData(
     }
   };
 
+  // Re-fetch only when the file changes
   useEffect(() => {
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId, maxNodes]);
+  }, [fileId]);
+
+  // Re-transform (no network request) when maxNodes or analysisSummary changes
+  useEffect(() => {
+    if (conversationsRef.current.length === 0) return;
+    applyTransform(
+      conversationsRef.current,
+      hostClassificationsRef.current,
+      analysisSummary,
+      maxNodes
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxNodes, analysisSummary]);
 
   return {
     nodes,

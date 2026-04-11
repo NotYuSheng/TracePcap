@@ -234,9 +234,6 @@ function finalizeNodeRole(node: GraphNode, srcPort: number, dstPort: number) {
 }
 
 /**
- * Mark nodes involved in anomalies
- */
-/**
  * Select the most significant nodes to render in the topology diagram.
  *
  * Significance score (0–1):
@@ -269,8 +266,8 @@ function selectSignificantNodes(
   }
 
   // Normalisation denominators (avoid division by zero)
-  const maxBytes = Math.max(1, ...nodes.map(n => n.data.totalBytes));
-  const maxConns = Math.max(1, ...nodes.map(n => n.data.connections));
+  const maxBytes = nodes.reduce((max, n) => Math.max(max, n.data.totalBytes), 1);
+  const maxConns = nodes.reduce((max, n) => Math.max(max, n.data.connections), 1);
 
   const scored = nodes.map(n => ({
     node: n,
