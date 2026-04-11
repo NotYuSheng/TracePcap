@@ -22,6 +22,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import ELK from 'elkjs';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
+import { ClusterNode, type ClusterFlowNodeData } from './ClusterNode';
 import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
 import { deviceTypeColor } from '@/utils/deviceType';
 import { useStore } from '@/store';
@@ -35,6 +36,8 @@ interface NetworkGraphProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
   onNodeClick?: (node: GraphNode) => void;
+  /** Called when the user clicks the expand button on a cluster node. */
+  onClusterClick?: (clusterId: string) => void;
   layoutType?: 'forceDirected2d' | 'hierarchicalTd';
   onLayoutChange?: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
   /** Called once after ELK layout completes and ReactFlow has painted. */
@@ -45,6 +48,10 @@ interface NetworkGraphProps {
    * a dashed style to visually distinguish them.
    */
   primarySource?: string;
+  /** Hidden nodes (not rendered due to significance cap). */
+  hiddenNodesList?: GraphNode[];
+  /** Edges connecting a visible node to a hidden node. */
+  crossEdges?: GraphEdge[];
 }
 
 interface FlowNodeData extends Record<string, unknown> {
@@ -72,6 +79,8 @@ interface FlowEdgeData extends Record<string, unknown> {
 
 const NODE_WIDTH = 56;
 const NODE_HEIGHT = 56;
+const CLUSTER_WIDTH = 140;
+const CLUSTER_HEIGHT = 90;
 
 const elk = new ELK();
 
@@ -93,11 +102,9 @@ const SPECIFIC_NODE_TYPES = new Set([
 
 function getNodeColor(nodeData: {
   role: string;
-  isAnomaly: boolean;
   nodeType?: string;
   deviceType?: string;
 }): string {
-  if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
   if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
     return NODE_TYPE_COLORS[nodeData.nodeType];
   if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
@@ -125,11 +132,9 @@ const NODE_ICONS: Record<string, string> = {
   'ntp-server': 'bi-clock',
   'database-server': 'bi-database',
   client: 'bi-laptop',
-  anomaly: 'bi-exclamation-triangle-fill',
 };
 
-function getNodeIcon(nodeData: { nodeType?: string; isAnomaly: boolean }): string {
-  if (nodeData.isAnomaly) return NODE_ICONS['anomaly'];
+function getNodeIcon(nodeData: { nodeType?: string }): string {
   return NODE_ICONS[nodeData.nodeType ?? ''] ?? 'bi-pc-display';
 }
 
@@ -230,34 +235,67 @@ async function computeLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
   layoutType: 'forceDirected2d' | 'hierarchicalTd',
-  primarySource?: string
+  primarySource?: string,
+  onClusterClick?: (clusterId: string) => void
 ): Promise<{ nodes: Node[]; edges: Edge[] }> {
-  const dedupedEdges = deduplicateEdges(edges);
+  // Drop edges whose source or target doesn't exist in the node list.
+  // This guards against stale edges after clustering or filtering — ELK will
+  // error on edges that reference unknown node IDs.
+  const nodeIdSet = new Set(nodes.map(n => n.id));
+  const validEdges = edges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
+  const dedupedEdges = deduplicateEdges(validEdges);
   const offsetMap = assignEdgeOffsets(dedupedEdges);
 
   const graph = await elk.layout({
     id: 'root',
     layoutOptions: ELK_OPTIONS[layoutType],
-    children: nodes.map(n => ({ id: n.id, width: NODE_WIDTH, height: NODE_HEIGHT })),
+    children: nodes.map(n => ({
+      id: n.id,
+      width: n.data.isCluster ? CLUSTER_WIDTH : NODE_WIDTH,
+      height: n.data.isCluster ? CLUSTER_HEIGHT : NODE_HEIGHT,
+    })),
     edges: dedupedEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
   });
 
   const posMap = new Map((graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
 
-  const rfNodes: Node[] = nodes.map(n => ({
-    id: n.id,
-    type: 'networkNode',
-    position: posMap.get(n.id) ?? { x: 0, y: 0 },
-    data: {
-      label: n.label,
-      color: getNodeColor(n.data),
-      icon: getNodeIcon(n.data),
-      sources: n.data.sources,
-      primarySource,
-    },
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-  }));
+  const rfNodes: Node[] = nodes.map(n => {
+    if (n.data.isCluster) {
+      const clusterData: ClusterFlowNodeData = {
+        label: n.label,
+        clusterId: n.data.clusterId!,
+        memberCount: n.data.memberCount ?? 0,
+        statsText: n.data.hostname ?? '',
+        hasAnomaly: false,
+        roleBreakdown: n.data.roleBreakdown ?? { client: 0, server: 0, both: 0, unknown: 0 },
+        onExpand: onClusterClick ?? (() => {}),
+        sources: n.data.sources,
+        primarySource,
+      };
+      return {
+        id: n.id,
+        type: 'clusterNode',
+        position: posMap.get(n.id) ?? { x: 0, y: 0 },
+        data: clusterData,
+        width: CLUSTER_WIDTH,
+        height: CLUSTER_HEIGHT,
+      };
+    }
+    return {
+      id: n.id,
+      type: 'networkNode',
+      position: posMap.get(n.id) ?? { x: 0, y: 0 },
+      data: {
+        label: n.label,
+        color: getNodeColor(n.data),
+        icon: getNodeIcon(n.data),
+        sources: n.data.sources,
+        primarySource,
+      },
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+    };
+  });
 
   const rfEdges: Edge[] = dedupedEdges.map(e => {
     const color = getProtocolColor(e.data.protocol);
@@ -393,7 +431,7 @@ function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: Ed
 // Stable type maps
 // ---------------------------------------------------------------------------
 
-const nodeTypes: NodeTypes = { networkNode: NetworkNode };
+const nodeTypes: NodeTypes = { networkNode: NetworkNode, clusterNode: ClusterNode };
 const edgeTypes: EdgeTypes = { networkEdge: NetworkEdge };
 
 // ---------------------------------------------------------------------------
@@ -404,10 +442,13 @@ export const NetworkGraph = memo(function NetworkGraph({
   nodes,
   edges,
   onNodeClick,
+  onClusterClick,
   layoutType = 'forceDirected2d',
   onLayoutChange,
   onLayoutComplete,
   primarySource,
+  hiddenNodesList = [],
+  crossEdges = [],
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -424,6 +465,9 @@ export const NetworkGraph = memo(function NetworkGraph({
     themeMode === 'dark' || (themeMode === 'system' && sysDark);
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setRfNodes(nds => applyNodeChanges(changes, nds)),
@@ -451,7 +495,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     }
 
     setLayouting(true);
-    computeLayout(visibleNodes, edges, layoutType, primarySource)
+    computeLayout(visibleNodes, edges, layoutType, primarySource, onClusterClick)
       .then(({ nodes: n, edges: e }) => {
         if (!active) return;
         setRfNodes(n);
@@ -467,7 +511,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     return () => {
       active = false;
     };
-  }, [visibleNodes, edges, layoutType, primarySource]);
+  }, [visibleNodes, edges, layoutType, primarySource, onClusterClick]);
 
   // Signal the caller once the layout has been computed and painted.
   // Works for both the normal case (rfNodes set after ELK) and the empty-data
@@ -486,11 +530,79 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      // Cluster nodes handle their own expand click via the button in ClusterNode
       if (!onNodeClick) return;
       const original = nodes.find(n => n.id === node.id);
-      if (original) onNodeClick(original);
+      if (original && !original.data.isCluster) onNodeClick(original);
     },
     [nodes, onNodeClick]
+  );
+
+  const handleNodeMouseEnter = useCallback((event: React.MouseEvent, node: Node) => {
+    setHoveredNodeId(node.id);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setTooltipPos({ x: event.clientX - rect.left + 12, y: event.clientY - rect.top + 12 });
+    }
+  }, []);
+
+  const handleNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+    setTooltipPos(null);
+  }, []);
+
+  // When a node is hovered, dim all nodes/edges not connected to it.
+  const { dimmedNodeIds, dimmedEdgeIds } = useMemo(() => {
+    if (!hoveredNodeId) return { dimmedNodeIds: new Set<string>(), dimmedEdgeIds: new Set<string>() };
+    const connectedEdgeIds = new Set<string>();
+    const neighborIds = new Set<string>([hoveredNodeId]);
+    rfEdges.forEach(e => {
+      if (e.source === hoveredNodeId || e.target === hoveredNodeId) {
+        connectedEdgeIds.add(e.id);
+        neighborIds.add(e.source);
+        neighborIds.add(e.target);
+      }
+    });
+    const dimNodes = new Set(rfNodes.map(n => n.id).filter(id => !neighborIds.has(id)));
+    const dimEdges = new Set(rfEdges.map(e => e.id).filter(id => !connectedEdgeIds.has(id)));
+    return { dimmedNodeIds: dimNodes, dimmedEdgeIds: dimEdges };
+  }, [hoveredNodeId, rfNodes, rfEdges]);
+
+  // Build a lookup map for hidden nodes by ID
+  const hiddenNodeMap = useMemo(
+    () => new Map(hiddenNodesList.map(n => [n.id, n])),
+    [hiddenNodesList]
+  );
+
+  // When hovering, find hidden neighbors via cross-edges
+  const hiddenNeighbors = useMemo<GraphNode[]>(() => {
+    if (!hoveredNodeId || crossEdges.length === 0) return [];
+    const neighborIds = new Set<string>();
+    for (const e of crossEdges) {
+      if (e.source === hoveredNodeId) neighborIds.add(e.target);
+      else if (e.target === hoveredNodeId) neighborIds.add(e.source);
+    }
+    console.debug('[HiddenTooltip] hoveredNode:', hoveredNodeId, 'crossEdges:', crossEdges.length, 'hiddenNodes:', hiddenNodesList.length, 'neighborIds:', [...neighborIds]);
+    return [...neighborIds]
+      .map(id => hiddenNodeMap.get(id))
+      .filter((n): n is GraphNode => n !== undefined);
+  }, [hoveredNodeId, crossEdges, hiddenNodeMap, hiddenNodesList.length]);
+
+  // Apply/remove "dimmed" className without recomputing layout.
+  const displayNodes = useMemo(
+    () =>
+      hoveredNodeId
+        ? rfNodes.map(n => ({ ...n, className: dimmedNodeIds.has(n.id) ? 'nf-dimmed' : '' }))
+        : rfNodes,
+    [hoveredNodeId, rfNodes, dimmedNodeIds]
+  );
+
+  const displayEdges = useMemo(
+    () =>
+      hoveredNodeId
+        ? rfEdges.map(e => ({ ...e, className: dimmedEdgeIds.has(e.id) ? 'nf-dimmed' : '' }))
+        : rfEdges,
+    [hoveredNodeId, rfEdges, dimmedEdgeIds]
   );
 
   if (nodes.length === 0) {
@@ -504,7 +616,30 @@ export const NetworkGraph = memo(function NetworkGraph({
   }
 
   return (
-    <div className="network-graph-container">
+    <div className="network-graph-container" ref={containerRef}>
+      {tooltipPos && hiddenNeighbors.length > 0 && (
+        <div
+          className="nf-hidden-tooltip"
+          style={{ left: tooltipPos.x, top: tooltipPos.y }}
+        >
+          <div className="nf-hidden-tooltip-title">
+            Hidden neighbors ({hiddenNeighbors.length})
+          </div>
+          <ul className="nf-hidden-tooltip-list">
+            {hiddenNeighbors.slice(0, 10).map(n => (
+              <li key={n.id}>
+                {n.data.ip}
+                {n.data.hostname ? ` (${n.data.hostname})` : ''}
+              </li>
+            ))}
+            {hiddenNeighbors.length > 10 && (
+              <li className="nf-hidden-tooltip-more">
+                +{hiddenNeighbors.length - 10} more
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
       {layouting && (
         <div className="network-graph-layouting">
           <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
@@ -512,13 +647,15 @@ export const NetworkGraph = memo(function NetworkGraph({
         </div>
       )}
       <ReactFlow
-        nodes={rfNodes}
-        edges={rfEdges}
+        nodes={displayNodes}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeClick={handleNodeClick}
+        onNodeMouseEnter={handleNodeMouseEnter}
+        onNodeMouseLeave={handleNodeMouseLeave}
         fitView
         fitViewOptions={{ padding: 0.15 }}
         nodesConnectable={false}

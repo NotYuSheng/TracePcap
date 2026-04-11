@@ -189,7 +189,7 @@ export const FileList = () => {
                     </p>
                     <p className="mb-0">
                       <i className="bi bi-diagram-3 me-1 text-primary"></i>
-                      Select <strong>two or more</strong> files using the checkboxes, then click <strong>Compare selected</strong> for cross-PCAP topology analysis.
+                      Select <strong>two or more</strong> files using the checkboxes, then click <strong>Multi-Analysis</strong> for cross-PCAP topology analysis.
                     </p>
                   </div>
                 </div>
@@ -208,7 +208,7 @@ export const FileList = () => {
                   }}
                 >
                   <i className="bi bi-diagram-3 me-1"></i>
-                  Compare selected ({selectedForCompare.size})
+                  Multi-Analysis ({selectedForCompare.size})
                 </button>
               )}
               <button

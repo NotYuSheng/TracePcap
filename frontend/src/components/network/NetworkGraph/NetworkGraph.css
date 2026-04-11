@@ -144,3 +144,131 @@
   background: #0d6efd;
   color: #fff;
 }
+
+/* ── Hidden neighbor tooltip ────────────────────────────────────────────── */
+.nf-hidden-tooltip {
+  position: absolute;
+  z-index: 30;
+  background: var(--tp-surface, #fff);
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  padding: 8px 10px;
+  font-size: 11px;
+  pointer-events: none;
+  max-width: 220px;
+}
+
+.nf-hidden-tooltip-title {
+  font-weight: 600;
+  color: var(--tp-text-muted, #6c757d);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.nf-hidden-tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nf-hidden-tooltip-list li {
+  font-family: monospace;
+  color: var(--tp-text, #212529);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nf-hidden-tooltip-more {
+  color: var(--tp-text-muted, #6c757d) !important;
+  font-family: inherit !important;
+  font-style: italic;
+}
+
+/* ── Hover highlight — dim non-neighbors ───────────────────────────────── */
+.react-flow__node.nf-dimmed {
+  opacity: 0.12;
+  transition: opacity 0.15s;
+}
+
+.react-flow__edge.nf-dimmed {
+  opacity: 0.08;
+  transition: opacity 0.15s;
+}
+
+/* Non-dimmed nodes/edges get a smooth transition back */
+.react-flow__node,
+.react-flow__edge {
+  transition: opacity 0.15s;
+}
+
+/* ── Cluster node ───────────────────────────────────────────────────────── */
+.network-flow-cluster-node {
+  border-radius: 10px;
+  border: 2px dashed #7f8c8d;
+  background: var(--tp-surface, #fff);
+  padding: 8px 10px;
+  min-width: 140px;
+  width: 140px;
+  position: relative;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+  transition: box-shadow 0.15s;
+}
+
+.network-flow-cluster-node:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+}
+
+.network-flow-cluster-node.has-anomaly {
+  border-color: #e74c3c;
+}
+
+.network-flow-cluster-header {
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--tp-text, #212529);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 16px; /* room for expand button */
+}
+
+.network-flow-cluster-stats {
+  color: var(--tp-text-muted, #6c757d);
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.network-flow-cluster-rolebar {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.network-flow-cluster-expand {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--tp-text-muted, #6c757d);
+  line-height: 1;
+}
+
+.network-flow-cluster-expand:hover {
+  color: var(--tp-text, #212529);
+}

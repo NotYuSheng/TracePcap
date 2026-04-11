@@ -116,7 +116,6 @@ function createNode(ip: string, hostname?: string, mac?: string): GraphNode {
       role: 'unknown',
       protocols: [],
       connections: 0,
-      isAnomaly: false,
       nodeType: isL2 ? 'l2-device' : 'unknown',
       nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
     },
@@ -235,50 +234,61 @@ function finalizeNodeRole(node: GraphNode, srcPort: number, dstPort: number) {
 }
 
 /**
- * Mark nodes involved in anomalies
+ * Select the most significant nodes to render in the topology diagram.
+ *
+ * Significance score (0–1):
+ *   0.5 × (totalBytes / maxBytes)         — traffic dominance
+ *   0.3 × (nodeHasRisk ? 1 : 0)           — connected to a risky edge
+ *   0.2 × (connections / maxConnections)  — structural hub-ness
+ *
+ * Returns the selected nodes and the count of nodes that were hidden.
  */
-function markAnomalies(nodeMap: NodeMap, analysisSummary?: AnalysisSummary) {
-  if (!analysisSummary?.fiveWs?.why?.anomalies) {
-    return;
+function selectSignificantNodes(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  limit: number
+): { significantNodes: GraphNode[]; hiddenCount: number; hiddenNodesList: GraphNode[]; crossEdges: GraphEdge[] } {
+  if (nodes.length <= limit) {
+    return { significantNodes: nodes, hiddenCount: 0, hiddenNodesList: [], crossEdges: [] };
   }
 
-  const anomalies = analysisSummary.fiveWs.why.anomalies;
-
-  // Extract IPs from suspicious activity
-  const suspiciousActivity = analysisSummary.fiveWs.why.suspiciousActivity || [];
-  const suspiciousIps = new Set<string>();
-
-  suspiciousActivity.forEach(activity => {
-    if (activity.source?.ip) {
-      suspiciousIps.add(activity.source.ip);
+  // Build per-node risk flag from edges — includes nDPI flow risks and custom rule matches
+  const nodeHasRisk = new Map<string, boolean>();
+  for (const e of edges) {
+    if (
+      e.data.hasRisks ||
+      (e.data.flowRisks?.length ?? 0) > 0 ||
+      (e.data.customSignatures?.length ?? 0) > 0
+    ) {
+      nodeHasRisk.set(e.source, true);
+      nodeHasRisk.set(e.target, true);
     }
-    if (activity.destination?.ip) {
-      suspiciousIps.add(activity.destination.ip);
-    }
-  });
+  }
 
-  // Mark nodes as anomalies
-  suspiciousIps.forEach(ip => {
-    if (nodeMap[ip]) {
-      nodeMap[ip].data.isAnomaly = true;
-    }
-  });
+  // Normalisation denominators (avoid division by zero)
+  const maxBytes = nodes.reduce((max, n) => Math.max(max, n.data.totalBytes), 1);
+  const maxConns = nodes.reduce((max, n) => Math.max(max, n.data.connections), 1);
 
-  // Also check if anomaly descriptions mention IPs
-  anomalies.forEach(anomaly => {
-    if (anomaly.severity === 'high' || anomaly.severity === 'critical') {
-      // Try to extract IP addresses from description
-      const ipRegex = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-      const matches = anomaly.description.match(ipRegex);
-      if (matches) {
-        matches.forEach(ip => {
-          if (nodeMap[ip]) {
-            nodeMap[ip].data.isAnomaly = true;
-          }
-        });
-      }
-    }
-  });
+  const scored = nodes.map(n => ({
+    node: n,
+    score:
+      0.5 * (n.data.totalBytes / maxBytes) +
+      0.3 * (nodeHasRisk.get(n.id) ? 1 : 0) +
+      0.2 * (n.data.connections / maxConns),
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+
+  const significantNodes = scored.slice(0, limit).map(s => s.node);
+  const sigNodeIds = new Set(significantNodes.map(n => n.id));
+  const hiddenNodesList = nodes.filter(n => !sigNodeIds.has(n.id));
+
+  // Cross-edges: exactly one endpoint is hidden (visible ↔ hidden connections)
+  const crossEdges = edges.filter(
+    e => sigNodeIds.has(e.source) !== sigNodeIds.has(e.target)
+  );
+
+  return { significantNodes, hiddenCount: hiddenNodesList.length, hiddenNodesList, crossEdges };
 }
 
 /**
@@ -287,12 +297,14 @@ function markAnomalies(nodeMap: NodeMap, analysisSummary?: AnalysisSummary) {
  * @param analysisSummary - Optional analysis summary for anomaly detection
  * @param maxConversations - Maximum number of conversations to render (default: 500)
  * @param hostClassifications - Optional per-IP device classifications from the backend
+ * @param maxNodes - Maximum number of nodes to render (default: 50, 0 = no limit)
  */
 export function buildNetworkGraph(
   conversations: Conversation[],
   analysisSummary?: AnalysisSummary,
   maxConversations: number = 500,
-  hostClassifications?: HostClassification[]
+  hostClassifications?: HostClassification[],
+  maxNodes: number = 50
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const edges: GraphEdge[] = [];
@@ -383,26 +395,39 @@ export function buildNetworkGraph(
     });
   }
 
-  // Mark anomalies if analysis data is available
-  if (analysisSummary) {
-    markAnomalies(nodeMap, analysisSummary);
-  }
+  // Apply significance-based node cap: keep the top-N most significant nodes
+  // and drop edges where either endpoint was hidden.
+  const allNodes = Array.from(Object.values(nodeMap));
+  const allEdges = edges;
+
+  const { significantNodes, hiddenCount, hiddenNodesList, crossEdges } =
+    maxNodes > 0
+      ? selectSignificantNodes(allNodes, allEdges, maxNodes)
+      : { significantNodes: allNodes, hiddenCount: 0, hiddenNodesList: [], crossEdges: [] };
+
+  const sigNodeIds = new Set(significantNodes.map(n => n.id));
+  const significantEdges = allEdges.filter(
+    e => sigNodeIds.has(e.source) && sigNodeIds.has(e.target)
+  );
 
   // Calculate statistics, then override packet/byte totals with the authoritative
   // figures from the analysis summary when available. The per-conversation sum
   // misses non-flow traffic (ARP, ICMP, malformed frames, etc.).
-  const stats = calculateNetworkStats(nodeMap, edges);
+  const stats = calculateNetworkStats(nodeMap, significantEdges);
   if (analysisSummary?.totalPackets != null) {
     stats.totalPackets = analysisSummary.totalPackets;
   }
 
   return {
-    nodes: Array.from(Object.values(nodeMap)),
-    edges,
+    nodes: significantNodes,
+    edges: significantEdges,
     stats,
     isLimited: conversations.length > maxConversations,
     totalConversations: conversations.length,
     displayedConversations: limitedConversations.length,
+    hiddenNodes: hiddenCount,
+    hiddenNodesList,
+    crossEdges,
   };
 }
 
