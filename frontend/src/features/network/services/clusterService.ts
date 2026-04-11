@@ -161,7 +161,6 @@ export function applySubnetClustering(
     let totalBytes = 0;
     let totalConnections = 0;
     const roleBreakdown = { client: 0, server: 0, both: 0, unknown: 0 };
-    let hasAnomaly = false;
     const allSources = new Set<string>();
 
     for (const m of members) {
@@ -169,7 +168,6 @@ export function applySubnetClustering(
       totalConnections += m.data.connections;
       roleBreakdown[m.data.role as keyof typeof roleBreakdown] =
         (roleBreakdown[m.data.role as keyof typeof roleBreakdown] ?? 0) + 1;
-      if (m.data.isAnomaly) hasAnomaly = true;
       m.data.sources?.forEach(s => allSources.add(s));
     }
 
@@ -195,7 +193,6 @@ export function applySubnetClustering(
       role: 'unknown',
       protocols: dominantProtocols,
       connections: totalConnections,
-      isAnomaly: hasAnomaly,
       nodeType: 'unknown',
       nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
       sources: allSources.size > 0 ? [...allSources] : undefined,

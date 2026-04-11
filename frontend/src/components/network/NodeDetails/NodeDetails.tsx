@@ -211,13 +211,6 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
               </div>
             </div>
 
-            {node.data.isAnomaly && (
-              <div className="alert alert-danger py-2 mb-3">
-                <i className="bi bi-exclamation-triangle me-2"></i>
-                <strong>Anomaly Detected</strong>
-              </div>
-            )}
-
             {/* Protocols */}
             <div className="mb-3">
               <h6 className="border-bottom pb-1 mb-2">Protocols</h6>

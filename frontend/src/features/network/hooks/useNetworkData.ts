@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { networkService } from '../services/networkService';
-import type { NetworkGraphData, GraphNode, GraphEdge, NetworkStats } from '../types';
+import type { GraphNode, GraphEdge, NetworkStats } from '../types';
 
 export const MAX_DIAGRAM_NODES = 50;
 import type { AnalysisSummary } from '@/types';
 
-interface UseNetworkDataReturn extends NetworkGraphData {
+interface UseNetworkDataReturn {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  stats: NetworkStats;
   loading: boolean;
   error: string | null;
   refetch: () => void;
   hiddenNodes: number;
+  hiddenNodesList: GraphNode[];
+  crossEdges: GraphEdge[];
 }
 
 export const CONVERSATION_LIMIT_ENABLED =
@@ -32,6 +37,8 @@ export function useNetworkData(
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [hiddenNodes, setHiddenNodes] = useState(0);
+  const [hiddenNodesList, setHiddenNodesList] = useState<GraphNode[]>([]);
+  const [crossEdges, setCrossEdges] = useState<GraphEdge[]>([]);
   const [stats, setStats] = useState<NetworkStats>({
     totalNodes: 0,
     totalEdges: 0,
@@ -95,6 +102,8 @@ export function useNetworkData(
       setNodes(graphData.nodes);
       setEdges(graphData.edges);
       setHiddenNodes(graphData.hiddenNodes ?? 0);
+      setHiddenNodesList(graphData.hiddenNodesList ?? []);
+      setCrossEdges(graphData.crossEdges ?? []);
       setStats({
         ...graphData.stats,
         isLimited: graphData.isLimited,
@@ -123,5 +132,7 @@ export function useNetworkData(
     error,
     refetch: fetchData,
     hiddenNodes,
+    hiddenNodesList,
+    crossEdges,
   };
 }

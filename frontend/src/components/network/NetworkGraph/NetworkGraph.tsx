@@ -48,6 +48,10 @@ interface NetworkGraphProps {
    * a dashed style to visually distinguish them.
    */
   primarySource?: string;
+  /** Hidden nodes (not rendered due to significance cap). */
+  hiddenNodesList?: GraphNode[];
+  /** Edges connecting a visible node to a hidden node. */
+  crossEdges?: GraphEdge[];
 }
 
 interface FlowNodeData extends Record<string, unknown> {
@@ -98,11 +102,9 @@ const SPECIFIC_NODE_TYPES = new Set([
 
 function getNodeColor(nodeData: {
   role: string;
-  isAnomaly: boolean;
   nodeType?: string;
   deviceType?: string;
 }): string {
-  if (nodeData.isAnomaly) return NODE_TYPE_COLORS['anomaly'];
   if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
     return NODE_TYPE_COLORS[nodeData.nodeType];
   if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
@@ -130,11 +132,9 @@ const NODE_ICONS: Record<string, string> = {
   'ntp-server': 'bi-clock',
   'database-server': 'bi-database',
   client: 'bi-laptop',
-  anomaly: 'bi-exclamation-triangle-fill',
 };
 
-function getNodeIcon(nodeData: { nodeType?: string; isAnomaly: boolean }): string {
-  if (nodeData.isAnomaly) return NODE_ICONS['anomaly'];
+function getNodeIcon(nodeData: { nodeType?: string }): string {
   return NODE_ICONS[nodeData.nodeType ?? ''] ?? 'bi-pc-display';
 }
 
@@ -266,7 +266,7 @@ async function computeLayout(
         clusterId: n.data.clusterId!,
         memberCount: n.data.memberCount ?? 0,
         statsText: n.data.hostname ?? '',
-        hasAnomaly: n.data.isAnomaly,
+        hasAnomaly: false,
         roleBreakdown: n.data.roleBreakdown ?? { client: 0, server: 0, both: 0, unknown: 0 },
         onExpand: onClusterClick ?? (() => {}),
         sources: n.data.sources,
@@ -447,6 +447,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   onLayoutChange,
   onLayoutComplete,
   primarySource,
+  hiddenNodesList = [],
+  crossEdges = [],
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -464,6 +466,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setRfNodes(nds => applyNodeChanges(changes, nds)),
@@ -534,12 +538,17 @@ export const NetworkGraph = memo(function NetworkGraph({
     [nodes, onNodeClick]
   );
 
-  const handleNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
+  const handleNodeMouseEnter = useCallback((event: React.MouseEvent, node: Node) => {
     setHoveredNodeId(node.id);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setTooltipPos({ x: event.clientX - rect.left + 12, y: event.clientY - rect.top + 12 });
+    }
   }, []);
 
   const handleNodeMouseLeave = useCallback(() => {
     setHoveredNodeId(null);
+    setTooltipPos(null);
   }, []);
 
   // When a node is hovered, dim all nodes/edges not connected to it.
@@ -558,6 +567,26 @@ export const NetworkGraph = memo(function NetworkGraph({
     const dimEdges = new Set(rfEdges.map(e => e.id).filter(id => !connectedEdgeIds.has(id)));
     return { dimmedNodeIds: dimNodes, dimmedEdgeIds: dimEdges };
   }, [hoveredNodeId, rfNodes, rfEdges]);
+
+  // Build a lookup map for hidden nodes by ID
+  const hiddenNodeMap = useMemo(
+    () => new Map(hiddenNodesList.map(n => [n.id, n])),
+    [hiddenNodesList]
+  );
+
+  // When hovering, find hidden neighbors via cross-edges
+  const hiddenNeighbors = useMemo<GraphNode[]>(() => {
+    if (!hoveredNodeId || crossEdges.length === 0) return [];
+    const neighborIds = new Set<string>();
+    for (const e of crossEdges) {
+      if (e.source === hoveredNodeId) neighborIds.add(e.target);
+      else if (e.target === hoveredNodeId) neighborIds.add(e.source);
+    }
+    console.debug('[HiddenTooltip] hoveredNode:', hoveredNodeId, 'crossEdges:', crossEdges.length, 'hiddenNodes:', hiddenNodesList.length, 'neighborIds:', [...neighborIds]);
+    return [...neighborIds]
+      .map(id => hiddenNodeMap.get(id))
+      .filter((n): n is GraphNode => n !== undefined);
+  }, [hoveredNodeId, crossEdges, hiddenNodeMap, hiddenNodesList.length]);
 
   // Apply/remove "dimmed" className without recomputing layout.
   const displayNodes = useMemo(
@@ -587,7 +616,30 @@ export const NetworkGraph = memo(function NetworkGraph({
   }
 
   return (
-    <div className="network-graph-container">
+    <div className="network-graph-container" ref={containerRef}>
+      {tooltipPos && hiddenNeighbors.length > 0 && (
+        <div
+          className="nf-hidden-tooltip"
+          style={{ left: tooltipPos.x, top: tooltipPos.y }}
+        >
+          <div className="nf-hidden-tooltip-title">
+            Hidden neighbors ({hiddenNeighbors.length})
+          </div>
+          <ul className="nf-hidden-tooltip-list">
+            {hiddenNeighbors.slice(0, 10).map(n => (
+              <li key={n.id}>
+                {n.data.ip}
+                {n.data.hostname ? ` (${n.data.hostname})` : ''}
+              </li>
+            ))}
+            {hiddenNeighbors.length > 10 && (
+              <li className="nf-hidden-tooltip-more">
+                +{hiddenNeighbors.length - 10} more
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
       {layouting && (
         <div className="network-graph-layouting">
           <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />

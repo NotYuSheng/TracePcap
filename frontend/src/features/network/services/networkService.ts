@@ -116,7 +116,6 @@ function createNode(ip: string, hostname?: string, mac?: string): GraphNode {
       role: 'unknown',
       protocols: [],
       connections: 0,
-      isAnomaly: false,
       nodeType: isL2 ? 'l2-device' : 'unknown',
       nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
     },
@@ -237,75 +236,33 @@ function finalizeNodeRole(node: GraphNode, srcPort: number, dstPort: number) {
 /**
  * Mark nodes involved in anomalies
  */
-function markAnomalies(nodeMap: NodeMap, analysisSummary?: AnalysisSummary) {
-  if (!analysisSummary?.fiveWs?.why?.anomalies) {
-    return;
-  }
-
-  const anomalies = analysisSummary.fiveWs.why.anomalies;
-
-  // Extract IPs from suspicious activity
-  const suspiciousActivity = analysisSummary.fiveWs.why.suspiciousActivity || [];
-  const suspiciousIps = new Set<string>();
-
-  suspiciousActivity.forEach(activity => {
-    if (activity.source?.ip) {
-      suspiciousIps.add(activity.source.ip);
-    }
-    if (activity.destination?.ip) {
-      suspiciousIps.add(activity.destination.ip);
-    }
-  });
-
-  // Mark nodes as anomalies
-  suspiciousIps.forEach(ip => {
-    if (nodeMap[ip]) {
-      nodeMap[ip].data.isAnomaly = true;
-    }
-  });
-
-  // Also check if anomaly descriptions mention IPs
-  anomalies.forEach(anomaly => {
-    if (anomaly.severity === 'high' || anomaly.severity === 'critical') {
-      // Try to extract IP addresses from description
-      const ipRegex = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-      const matches = anomaly.description.match(ipRegex);
-      if (matches) {
-        matches.forEach(ip => {
-          if (nodeMap[ip]) {
-            nodeMap[ip].data.isAnomaly = true;
-          }
-        });
-      }
-    }
-  });
-}
-
 /**
  * Select the most significant nodes to render in the topology diagram.
  *
- * Significance score (0–1 base + anomaly bonus):
+ * Significance score (0–1):
  *   0.5 × (totalBytes / maxBytes)         — traffic dominance
  *   0.3 × (nodeHasRisk ? 1 : 0)           — connected to a risky edge
  *   0.2 × (connections / maxConnections)  — structural hub-ness
- *   1.0 × (isAnomaly ? 1 : 0)             — anomaly bonus (ensures inclusion)
  *
- * Anomaly nodes are always included regardless of limit.
  * Returns the selected nodes and the count of nodes that were hidden.
  */
 function selectSignificantNodes(
   nodes: GraphNode[],
   edges: GraphEdge[],
   limit: number
-): { significantNodes: GraphNode[]; hiddenCount: number } {
+): { significantNodes: GraphNode[]; hiddenCount: number; hiddenNodesList: GraphNode[]; crossEdges: GraphEdge[] } {
   if (nodes.length <= limit) {
-    return { significantNodes: nodes, hiddenCount: 0 };
+    return { significantNodes: nodes, hiddenCount: 0, hiddenNodesList: [], crossEdges: [] };
   }
 
-  // Build per-node risk flag from edges
+  // Build per-node risk flag from edges — includes nDPI flow risks and custom rule matches
   const nodeHasRisk = new Map<string, boolean>();
   for (const e of edges) {
-    if (e.data.hasRisks || (e.data.flowRisks?.length ?? 0) > 0) {
+    if (
+      e.data.hasRisks ||
+      (e.data.flowRisks?.length ?? 0) > 0 ||
+      (e.data.customSignatures?.length ?? 0) > 0
+    ) {
       nodeHasRisk.set(e.source, true);
       nodeHasRisk.set(e.target, true);
     }
@@ -320,14 +277,21 @@ function selectSignificantNodes(
     score:
       0.5 * (n.data.totalBytes / maxBytes) +
       0.3 * (nodeHasRisk.get(n.id) ? 1 : 0) +
-      0.2 * (n.data.connections / maxConns) +
-      1.0 * (n.data.isAnomaly ? 1 : 0),
+      0.2 * (n.data.connections / maxConns),
   }));
 
   scored.sort((a, b) => b.score - a.score);
 
   const significantNodes = scored.slice(0, limit).map(s => s.node);
-  return { significantNodes, hiddenCount: nodes.length - significantNodes.length };
+  const sigNodeIds = new Set(significantNodes.map(n => n.id));
+  const hiddenNodesList = nodes.filter(n => !sigNodeIds.has(n.id));
+
+  // Cross-edges: exactly one endpoint is hidden (visible ↔ hidden connections)
+  const crossEdges = edges.filter(
+    e => sigNodeIds.has(e.source) !== sigNodeIds.has(e.target)
+  );
+
+  return { significantNodes, hiddenCount: hiddenNodesList.length, hiddenNodesList, crossEdges };
 }
 
 /**
@@ -434,20 +398,15 @@ export function buildNetworkGraph(
     });
   }
 
-  // Mark anomalies if analysis data is available
-  if (analysisSummary) {
-    markAnomalies(nodeMap, analysisSummary);
-  }
-
   // Apply significance-based node cap: keep the top-N most significant nodes
   // and drop edges where either endpoint was hidden.
   const allNodes = Array.from(Object.values(nodeMap));
   const allEdges = edges;
 
-  const { significantNodes, hiddenCount } =
+  const { significantNodes, hiddenCount, hiddenNodesList, crossEdges } =
     maxNodes > 0
       ? selectSignificantNodes(allNodes, allEdges, maxNodes)
-      : { significantNodes: allNodes, hiddenCount: 0 };
+      : { significantNodes: allNodes, hiddenCount: 0, hiddenNodesList: [], crossEdges: [] };
 
   const sigNodeIds = new Set(significantNodes.map(n => n.id));
   const significantEdges = allEdges.filter(
@@ -470,6 +429,8 @@ export function buildNetworkGraph(
     totalConversations: conversations.length,
     displayedConversations: limitedConversations.length,
     hiddenNodes: hiddenCount,
+    hiddenNodesList,
+    crossEdges,
   };
 }
 

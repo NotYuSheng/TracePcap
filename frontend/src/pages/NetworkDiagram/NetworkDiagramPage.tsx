@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Modal } from '@govtechsg/sgds-react';
 import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
 import {
@@ -43,8 +44,10 @@ function formatBytes(bytes: number): string {
 export const NetworkDiagramPage = () => {
   const { fileId, data } = useOutletContext<AnalysisOutletContext>();
   const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
-  const [sliderOpen, setSliderOpen] = useState(false);
-  const { nodes, edges, stats, loading, error, refetch, hiddenNodes } = useNetworkData(
+  // Draft value for the custom node count input — only applied on Enter/blur
+  const [customInput, setCustomInput] = useState('');
+  const [showSignificanceModal, setShowSignificanceModal] = useState(false);
+  const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } = useNetworkData(
     fileId,
     data,
     nodeLimit
@@ -118,7 +121,6 @@ export const NetworkDiagramPage = () => {
   const presentNodeTypes = useMemo(() => {
     const types = new Set<string>();
     nodes.forEach(n => {
-      if (n.data.isAnomaly) types.add('anomaly');
       types.add(n.data.nodeType);
     });
     return types;
@@ -260,7 +262,7 @@ export const NetworkDiagramPage = () => {
             activeNodeFilters.some(key => {
               if (key.startsWith('nt:')) {
                 const nt = key.slice(3);
-                return nt === 'anomaly' ? n.data.isAnomaly : n.data.nodeType === nt;
+                return n.data.nodeType === nt;
               }
               if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
               return false;
@@ -410,36 +412,69 @@ export const NetworkDiagramPage = () => {
         </div>
       </div>
 
-      {hiddenNodes > 0 && (
-        <div className="alert alert-info mb-3">
-          <i className="bi bi-info-circle me-2"></i>
-          Showing the <strong>{nodeLimit} most significant nodes</strong> ({hiddenNodes} hidden by
-          significance filter). All conversations are available in the Conversations tab.{' '}
-          <button
-            className="btn btn-link btn-sm p-0"
-            onClick={() => setSliderOpen(s => !s)}
-          >
-            {sliderOpen ? 'Hide slider \u25b2' : 'Show more \u25bc'}
-          </button>
-          {sliderOpen && (
-            <div className="mt-2 d-flex align-items-center gap-2">
-              <span className="text-muted small">10</span>
-              <input
-                type="range"
-                min={10}
-                max={200}
-                step={10}
-                value={nodeLimit}
-                onChange={e => setNodeLimit(Number(e.target.value))}
-                className="form-range"
-                style={{ width: 160 }}
-              />
-              <span className="text-muted small">200</span>
-              <span className="badge bg-secondary ms-1">{nodeLimit} nodes</span>
+      {hiddenNodes > 0 && (() => {
+        const totalNodes = stats.totalNodes;
+        const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
+        const applyCustom = () => {
+          const n = parseInt(customInput, 10);
+          if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));
+          setCustomInput('');
+        };
+        return (
+          <div className="alert alert-info mb-3">
+            <div className="d-flex align-items-start gap-2 flex-wrap">
+              <button
+                className="btn btn-link p-0 border-0 mt-1 flex-shrink-0"
+                style={{ lineHeight: 1 }}
+                title="How is significance determined?"
+                onClick={() => setShowSignificanceModal(true)}
+              >
+                <i className="bi bi-info-circle"></i>
+              </button>
+              <div className="flex-grow-1">
+                <div>
+                  Showing the <strong>{nodeLimit} most significant nodes</strong>
+                  {' '}({hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.
+                </div>
+                <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                  <span className="text-muted small fw-semibold me-1">Show:</span>
+                  {presets.map(p => (
+                    <button
+                      key={p}
+                      className={`btn btn-sm ${nodeLimit === p ? 'btn-info' : 'btn-outline-secondary'}`}
+                      style={{ minWidth: 52 }}
+                      onClick={() => setNodeLimit(p)}
+                    >
+                      Top {p}
+                    </button>
+                  ))}
+                  <button
+                    className={`btn btn-sm ${nodeLimit >= totalNodes ? 'btn-info' : 'btn-outline-secondary'}`}
+                    style={{ minWidth: 52 }}
+                    onClick={() => setNodeLimit(totalNodes)}
+                  >
+                    All {totalNodes}
+                  </button>
+                  <span className="text-muted small ms-2 me-1">or</span>
+                  <div className="input-group input-group-sm" style={{ width: 120 }}>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm"
+                      placeholder="Custom…"
+                      min={1}
+                      max={totalNodes}
+                      value={customInput}
+                      onChange={e => setCustomInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                      onBlur={applyCustom}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {/* Row 2: Legend & Filters */}
       <div className="mb-3">
@@ -511,6 +546,8 @@ export const NetworkDiagramPage = () => {
                 key={layoutType}
                 nodes={filteredNodes}
                 edges={filteredEdges}
+                hiddenNodesList={hiddenNodesList}
+                crossEdges={crossEdges}
                 onNodeClick={node => setSelectedNode(node)}
                 layoutType={layoutType}
                 onLayoutChange={setLayoutType}
@@ -528,6 +565,50 @@ export const NetworkDiagramPage = () => {
           onClose={() => setSelectedNode(null)}
         />
       )}
+
+      <Modal show={showSignificanceModal} onHide={() => setShowSignificanceModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>How node significance is determined</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-3">
+            When a PCAP has more nodes than the current display limit, TracePcap ranks every host
+            by a significance score and shows only the top-ranked ones. The score is a weighted sum
+            of three signals:
+          </p>
+          <table className="table table-sm table-bordered mb-3">
+            <thead>
+              <tr>
+                <th>Signal</th>
+                <th style={{ width: 70 }}>Weight</th>
+                <th>What it measures</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><i className="bi bi-graph-up me-1 text-primary"></i>Traffic volume</td>
+                <td>50%</td>
+                <td>Bytes transferred relative to the busiest node in the capture</td>
+              </tr>
+              <tr>
+                <td><i className="bi bi-shield-exclamation me-1 text-danger"></i>Risk signals</td>
+                <td>30%</td>
+                <td>Whether any conversation involving this host has a flagged <strong>flow risk</strong> (nDPI risk flags) or a <strong>custom rule</strong> match</td>
+              </tr>
+              <tr>
+                <td><i className="bi bi-diagram-2 me-1 text-success"></i>Connectivity</td>
+                <td>20%</td>
+                <td>Number of distinct peers relative to the most-connected node</td>
+              </tr>
+            </tbody>
+          </table>
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-secondary" onClick={() => setShowSignificanceModal(false)}>
+            Close
+          </button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

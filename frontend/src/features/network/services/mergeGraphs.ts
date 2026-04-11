@@ -68,7 +68,6 @@ export function mergeGraphs(
             totalBytes: existing.data.totalBytes + node.data.totalBytes,
             connections: existing.data.connections + node.data.connections,
             protocols: [...new Set([...existing.data.protocols, ...node.data.protocols])],
-            isAnomaly: existing.data.isAnomaly || node.data.isAnomaly,
             sources: [...(existing.data.sources ?? []), label],
           },
         });

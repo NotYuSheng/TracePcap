@@ -41,7 +41,6 @@ export interface NodeData {
   role: 'client' | 'server' | 'both' | 'unknown';
   protocols: string[];
   connections: number;
-  isAnomaly: boolean;
   nodeType: NodeType;
   nodeTypeEvidence: NodeTypeEvidence;
   /** Device type from backend classification (e.g. ROUTER, MOBILE, SERVER). */
@@ -108,6 +107,10 @@ export interface NetworkGraphData {
   displayedConversations?: number;
   /** Number of nodes hidden by the significance filter (0 when all nodes are shown). */
   hiddenNodes?: number;
+  /** The actual hidden node objects (not rendered due to significance cap). */
+  hiddenNodesList?: GraphNode[];
+  /** Edges where exactly one endpoint is a hidden node (cross-boundary edges). */
+  crossEdges?: GraphEdge[];
 }
 
 export interface NetworkStats {

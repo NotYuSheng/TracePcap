@@ -155,7 +155,6 @@ export const ComparePage = () => {
   const presentNodeTypes = useMemo(() => {
     const types = new Set<string>();
     mergedNodes.forEach(n => {
-      if (n.data.isAnomaly) types.add('anomaly');
       types.add(n.data.nodeType);
     });
     return types;
@@ -294,7 +293,7 @@ export const ComparePage = () => {
             activeNodeFilters.some(key => {
               if (key.startsWith('nt:')) {
                 const nt = key.slice(3);
-                return nt === 'anomaly' ? n.data.isAnomaly : n.data.nodeType === nt;
+                return n.data.nodeType === nt;
               }
               if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
               return false;
