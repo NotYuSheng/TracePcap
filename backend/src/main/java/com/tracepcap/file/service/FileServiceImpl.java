@@ -9,9 +9,17 @@ import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.event.FileUploadedEvent;
 import com.tracepcap.file.mapper.FileMapper;
 import com.tracepcap.file.repository.FileRepository;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
+import java.util.concurrent.TimeUnit;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
@@ -196,6 +204,165 @@ public class FileServiceImpl implements FileService {
   private String getFileExtension(String filename) {
     int lastDotIndex = filename.lastIndexOf('.');
     return lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
+  }
+
+  @Override
+  @Transactional
+  public FileUploadResponse mergeFiles(
+      List<UUID> fileIds, String mergedFileName, boolean enableNdpi, boolean enableFileExtraction) {
+    if (fileIds == null || fileIds.size() < 2) {
+      throw new InvalidFileException("At least two files are required for merging");
+    }
+
+    log.info("Starting PCAP merge for {} files: {}", fileIds.size(), fileIds);
+
+    List<File> tempInputs = new ArrayList<>();
+    File tempOutput = null;
+
+    try {
+      // Download each source file to a local temp file
+      for (UUID fileId : fileIds) {
+        FileEntity entity = getFileById(fileId);
+        File tmp = File.createTempFile("merge-input-" + fileId, ".pcap");
+        storageService.downloadFileToLocal(entity.getMinioPath(), tmp);
+        tempInputs.add(tmp);
+      }
+
+      // Build mergecap command
+      tempOutput = File.createTempFile("merge-output-", ".pcap");
+      List<String> cmd = new ArrayList<>();
+      cmd.add("mergecap");
+      cmd.add("-w");
+      cmd.add(tempOutput.getAbsolutePath());
+      for (File f : tempInputs) {
+        cmd.add(f.getAbsolutePath());
+      }
+
+      log.info("Running mergecap: {}", cmd);
+      Process process = new ProcessBuilder(cmd)
+          .redirectErrorStream(true)
+          .start();
+
+      // Drain stdout/stderr in a background thread to prevent blocking
+      final StringBuilder processOutput = new StringBuilder();
+      Thread drainThread = new Thread(() -> {
+        try {
+          processOutput.append(new String(process.getInputStream().readAllBytes()));
+        } catch (IOException ignored) {}
+      });
+      drainThread.setDaemon(true);
+      drainThread.start();
+
+      boolean finished = process.waitFor(5, TimeUnit.MINUTES);
+      drainThread.join(5000);
+      if (!finished) {
+        process.destroyForcibly();
+        throw new InvalidFileException("mergecap timed out after 5 minutes");
+      }
+      int exitCode = process.exitValue();
+      if (exitCode != 0) {
+        throw new InvalidFileException("mergecap failed (exit " + exitCode + "): " + processOutput);
+      }
+
+      // Compute hash by streaming the merged file (avoids loading it fully into memory)
+      String fileHash = computeSha256FromFile(tempOutput);
+
+      Optional<FileEntity> existing =
+          fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+      if (existing.isPresent()) {
+        throw new DuplicateFileException(existing.get().getId());
+      }
+
+      // Use caller-supplied name or auto-generate from source names
+      String mergedName = (mergedFileName != null && !mergedFileName.isBlank())
+          ? sanitizeMergedFileName(mergedFileName)
+          : buildAutoMergedName(fileIds);
+
+      // Stream-upload the merged file to MinIO (avoids loading it fully into memory)
+      UUID newFileId = UUID.randomUUID();
+      String storedName = newFileId + ".pcap";
+      storageService.uploadFile(tempOutput, storedName, "application/vnd.tcpdump.pcap");
+
+      // Persist metadata
+      FileEntity fileEntity =
+          FileEntity.builder()
+              .id(newFileId)
+              .fileName(mergedName)
+              .fileSize(tempOutput.length())
+              .minioPath(storedName)
+              .uploadedAt(LocalDateTime.now())
+              .status(FileEntity.FileStatus.PROCESSING)
+              .fileHash(fileHash)
+              .enableNdpi(enableNdpi)
+              .enableFileExtraction(enableFileExtraction)
+              .build();
+
+      fileEntity = fileRepository.save(fileEntity);
+      log.info("Merged PCAP saved: {} (ID: {})", mergedName, newFileId);
+
+      // Trigger async analysis
+      eventPublisher.publishEvent(new FileUploadedEvent(this, newFileId));
+
+      return fileMapper.toUploadResponse(fileEntity);
+
+    } catch (InvalidFileException | DuplicateFileException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("Failed to merge PCAP files", e);
+      throw new InvalidFileException("Failed to merge files: " + e.getMessage(), e);
+    } finally {
+      for (File f : tempInputs) {
+        try { Files.deleteIfExists(f.toPath()); } catch (IOException ignored) {}
+      }
+      if (tempOutput != null) {
+        try { Files.deleteIfExists(tempOutput.toPath()); } catch (IOException ignored) {}
+      }
+    }
+  }
+
+  private String buildAutoMergedName(List<UUID> fileIds) {
+    final int MAX_PART = 20;
+    final int MAX_SHOWN = 3;
+    List<String> parts = new ArrayList<>();
+    for (int i = 0; i < Math.min(MAX_SHOWN, fileIds.size()); i++) {
+      try {
+        String base = getFileById(fileIds.get(i)).getFileName().replaceFirst("\\.[^.]+$", "");
+        parts.add(base.length() > MAX_PART ? base.substring(0, MAX_PART) : base);
+      } catch (Exception ignored) {
+        parts.add(fileIds.get(i).toString().substring(0, 8));
+      }
+    }
+    String joined = String.join("+", parts);
+    if (fileIds.size() > MAX_SHOWN) {
+      joined += "+" + (fileIds.size() - MAX_SHOWN) + "_more";
+    }
+    return "merged_" + joined + ".pcap";
+  }
+
+  private String sanitizeMergedFileName(String name) {
+    // Strip any path separators and control characters, ensure .pcap extension
+    String safe = name.replaceAll("[/\\\\<>:\"|?*\\p{Cntrl}]", "_").trim();
+    if (safe.isBlank()) {
+      safe = "merged";
+    }
+    // Ensure it ends with .pcap
+    if (!safe.toLowerCase().endsWith(".pcap")) {
+      safe = safe + ".pcap";
+    }
+    return safe;
+  }
+
+  private String computeSha256FromFile(File file) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(file)), digest)) {
+        byte[] buf = new byte[8192];
+        while (is.read(buf) != -1) { /* drain to feed the digest */ }
+      }
+      return HexFormat.of().formatHex(digest.digest());
+    } catch (Exception e) {
+      throw new InvalidFileException("Could not compute hash of merged file", e);
+    }
   }
 
   /** Compute SHA-256 hex digest of the uploaded file using a streaming approach */

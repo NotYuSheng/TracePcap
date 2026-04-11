@@ -5,6 +5,7 @@ export const API_ENDPOINTS = {
   FILE_METADATA: (fileId: string) => `/files/${fileId}`,
   FILE_DELETE: (fileId: string) => `/files/${fileId}`,
   FILE_DOWNLOAD: (fileId: string) => `/files/${fileId}/download`,
+  FILES_MERGE: '/files/merge',
 
   // Analysis (Not yet implemented in backend)
   ANALYSIS_SUMMARY: (fileId: string) => `/analysis/${fileId}/summary`,

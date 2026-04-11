@@ -8,6 +8,8 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import './FileList.css';
 
+type MultiSelectAction = 'analyze' | 'merge';
+
 interface FileMetadata {
   fileId: string;
   fileName: string;
@@ -24,6 +26,10 @@ export const FileList = () => {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [showInfo, setShowInfo] = useState(false);
+  const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [mergedFileName, setMergedFileName] = useState('');
   const infoRef = useRef<HTMLDivElement>(null);
 
   // Close info popover when clicking outside
@@ -44,6 +50,53 @@ export const FileList = () => {
       next.has(fileId) ? next.delete(fileId) : next.add(fileId);
       return next;
     });
+
+  const buildAutoMergeName = (selectedIds: Set<string>): string => {
+    const MAX_PART = 20;
+    const MAX_SHOWN = 3;
+    const selected = files.filter(f => selectedIds.has(f.fileId));
+    const parts = selected.slice(0, MAX_SHOWN).map(f => {
+      const base = f.fileName.replace(/\.[^.]+$/, '');
+      return base.length > MAX_PART ? base.slice(0, MAX_PART) : base;
+    });
+    const suffix = selected.length > MAX_SHOWN ? `+${selected.length - MAX_SHOWN}_more` : '';
+    return `merged_${parts.join('+')}${suffix}`;
+  };
+
+  const handleRowClick = (fileId: string, status: string) => {
+    if (status.toLowerCase() !== 'completed') return;
+    toggleCompareSelect(fileId);
+  };
+
+  const handleMultiSelectAction = async (action: MultiSelectAction) => {
+    setShowMultiSelectModal(false);
+    if (action === 'analyze') {
+      navigate(`/compare?files=${[...selectedForCompare].join(',')}`);
+      return;
+    }
+
+    // Permanently merge
+    setMergeError(null);
+    setMerging(true);
+    try {
+      const name = mergedFileName.trim() || buildAutoMergeName(selectedForCompare);
+      const res = await apiClient.post(API_ENDPOINTS.FILES_MERGE, {
+        fileIds: [...selectedForCompare],
+        mergedFileName: name.endsWith('.pcap') ? name : `${name}.pcap`,
+      });
+      const newFileId: string = res.data.fileId;
+      setSelectedForCompare(new Set());
+      navigate(`/analysis/${newFileId}`);
+    } catch (err) {
+      const message =
+        isAxiosError(err) && err.response?.data?.message
+          ? err.response.data.message
+          : 'Failed to merge files. Please try again.';
+      setMergeError(message);
+    } finally {
+      setMerging(false);
+    }
+  };
 
   const fetchFiles = async () => {
     try {
@@ -149,9 +202,10 @@ export const FileList = () => {
                 <button
                   type="button"
                   className="btn btn-outline-primary btn-sm"
-                  onClick={() =>
-                    navigate(`/compare?files=${[...selectedForCompare].join(',')}`)
-                  }
+                  onClick={() => {
+                    setMergedFileName(buildAutoMergeName(selectedForCompare));
+                    setShowMultiSelectModal(true);
+                  }}
                 >
                   <i className="bi bi-diagram-3 me-1"></i>
                   Compare selected ({selectedForCompare.size})
@@ -191,6 +245,8 @@ export const FileList = () => {
                 <div
                   key={file.fileId}
                   className="list-group-item d-flex justify-content-between align-items-center"
+                  style={file.status.toLowerCase() === 'completed' ? { cursor: 'pointer' } : undefined}
+                  onClick={() => handleRowClick(file.fileId, file.status)}
                 >
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2">
@@ -205,6 +261,7 @@ export const FileList = () => {
                             : 'Select for comparison'
                         }
                         onChange={() => toggleCompareSelect(file.fileId)}
+                        onClick={e => e.stopPropagation()}
                       />
                       <i
                         className="bi bi-file-earmark-binary text-primary"
@@ -227,7 +284,7 @@ export const FileList = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="d-flex gap-2 align-items-center">
+                  <div className="d-flex gap-2 align-items-center" onClick={e => e.stopPropagation()}>
                     <button
                       className="btn btn-outline-primary btn-sm"
                       onClick={() => navigate(`/analysis/${file.fileId}`)}
@@ -274,6 +331,83 @@ export const FileList = () => {
           </button>
           <button type="button" className="btn btn-outline-danger" onClick={handleConfirmDelete}>
             Delete
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Merge in-progress overlay */}
+      <Modal show={merging} onHide={() => {}} centered backdrop="static" keyboard={false}>
+        <Modal.Body className="text-center py-4">
+          <div className="spinner-border text-primary mb-3" role="status" aria-hidden="true" />
+          <p className="mb-0 fw-semibold">Merging files…</p>
+          <small className="text-muted">This may take a moment.</small>
+        </Modal.Body>
+      </Modal>
+
+      {/* Multi-select action modal */}
+      <Modal show={showMultiSelectModal} onHide={() => { setShowMultiSelectModal(false); setMergeError(null); }} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Analyze {selectedForCompare.size} Files</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {mergeError && (
+            <div className="alert alert-danger py-2 mb-3" role="alert">
+              <i className="bi bi-exclamation-triangle me-2"></i>
+              {mergeError}
+            </div>
+          )}
+          <p className="mb-3">How would you like to process the selected files?</p>
+          <div className="d-flex flex-column gap-3">
+            <button
+              type="button"
+              className="btn btn-outline-primary text-start p-3 multiselect-action-btn"
+              onClick={() => handleMultiSelectAction('analyze')}
+            >
+              <div className="fw-semibold mb-1">
+                <i className="bi bi-diagram-3 me-2"></i>
+                Analyze Together
+              </div>
+              <small className="text-muted">
+                View a joint topology diagram overlaying all selected files. The original files remain separate.
+              </small>
+            </button>
+            <div className="border rounded p-3" style={{ borderColor: '#6c757d' }}>
+              <div className="fw-semibold mb-1">
+                <i className="bi bi-layers me-2"></i>
+                Permanently Merge
+              </div>
+              <small className="text-muted d-block mb-2">
+                Combine all selected files into a single new PCAP file for unified analysis.
+              </small>
+              <div className="input-group input-group-sm mb-2" onClick={e => e.stopPropagation()}>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={mergedFileName}
+                  onChange={e => setMergedFileName(e.target.value)}
+                  placeholder="merged file name"
+                  aria-label="Merged file name"
+                />
+                <span className="input-group-text">.pcap</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm w-100"
+                onClick={() => handleMultiSelectAction('merge')}
+                disabled={!mergedFileName.trim()}
+              >
+                Merge &amp; Analyze
+              </button>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => { setShowMultiSelectModal(false); setMergeError(null); }}
+          >
+            Cancel
           </button>
         </Modal.Footer>
       </Modal>

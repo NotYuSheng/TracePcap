@@ -4,6 +4,7 @@ import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.entity.FileEntity;
 import java.io.InputStream;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -67,4 +68,14 @@ public interface FileService {
    * @return file entity
    */
   FileEntity getFileById(UUID fileId);
+
+  /**
+   * Merge multiple PCAP files into a single new file and trigger analysis.
+   *
+   * @param fileIds ordered list of file IDs to merge
+   * @param enableNdpi whether to run nDPI on the merged file
+   * @param enableFileExtraction whether to run file extraction on the merged file
+   * @return upload response for the newly created merged file
+   */
+  FileUploadResponse mergeFiles(List<UUID> fileIds, String mergedFileName, boolean enableNdpi, boolean enableFileExtraction);
 }

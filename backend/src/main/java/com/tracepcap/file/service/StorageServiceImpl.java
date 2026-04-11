@@ -4,8 +4,10 @@ import com.tracepcap.common.exception.StorageException;
 import com.tracepcap.config.MinioConfig;
 import io.minio.*;
 import io.minio.http.Method;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
@@ -131,6 +133,25 @@ public class StorageServiceImpl implements StorageService {
     } catch (Exception e) {
       log.error("Failed to upload bytes to path: {}", path, e);
       throw new StorageException("Failed to upload bytes to storage", e);
+    }
+  }
+
+  @Override
+  public String uploadFile(File source, String path, String contentType) {
+    try {
+      ensureBucketExists();
+      try (InputStream stream = new BufferedInputStream(new FileInputStream(source))) {
+        minioClient.putObject(
+            PutObjectArgs.builder().bucket(minioConfig.getBucket()).object(path).stream(
+                    stream, source.length(), -1)
+                .contentType(contentType != null ? contentType : "application/octet-stream")
+                .build());
+      }
+      log.info("Successfully streamed file to MinIO: {}", path);
+      return path;
+    } catch (Exception e) {
+      log.error("Failed to stream file to MinIO: {}", path, e);
+      throw new StorageException("Failed to upload file to storage", e);
     }
   }
 
