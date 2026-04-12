@@ -23,6 +23,10 @@ public class LlmClient {
 
   private final LlmConfig llmConfig;
   private final RestTemplate llmRestTemplate;
+  private static final Pattern PATTERN_PROMPT_TOKENS = Pattern.compile("\\((\\d+) in the messages");
+  private static final Pattern PATTERN_CONTEXT_LENGTH = Pattern.compile("maximum context length is (\\d+)");
+  private static final Pattern PATTERN_CONTEXT_LENGTH_ALT = Pattern.compile("context length is (\\d+)");
+
   private volatile Integer effectiveMaxTokens;
   private volatile Integer modelContextLength;
 
@@ -213,9 +217,9 @@ public class LlmClient {
       // Detect context-length exceeded (OpenAI-compatible 400 response)
       String msg = e.getMessage() != null ? e.getMessage() : "";
       if (msg.contains("maximum context length")) {
-        int promptTokens = parseGroup(msg, "\\((\\d+) in the messages");
-        int contextTokens = parseGroup(msg, "maximum context length is (\\d+)");
-        if (contextTokens == 0) contextTokens = parseGroup(msg, "context length is (\\d+)");
+        int promptTokens = parseGroup(msg, PATTERN_PROMPT_TOKENS);
+        int contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH);
+        if (contextTokens == 0) contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH_ALT);
         throw new ContextLengthExceededException(promptTokens, contextTokens, userPrompt);
       }
       log.error("Error calling LLM API", e);
@@ -223,8 +227,8 @@ public class LlmClient {
     }
   }
 
-  private static int parseGroup(String text, String regex) {
-    Matcher m = Pattern.compile(regex).matcher(text);
+  private static int parseGroup(String text, Pattern pattern) {
+    Matcher m = pattern.matcher(text);
     return m.find() ? Integer.parseInt(m.group(1)) : 0;
   }
 

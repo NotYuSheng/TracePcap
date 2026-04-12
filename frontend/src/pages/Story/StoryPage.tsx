@@ -82,7 +82,6 @@ export const StoryPage = () => {
   const [editablePrompt, setEditablePrompt] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
-  const [, setLoadingLimits] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -93,8 +92,7 @@ export const StoryPage = () => {
       })
       .catch(() => {
         /* keep default */
-      })
-      .finally(() => setLoadingLimits(false));
+      });
   }, []);
 
   useEffect(() => {
@@ -133,7 +131,7 @@ export const StoryPage = () => {
       const status = (err as { response?: { status?: number } })?.response?.status;
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
       const serverMsg: string = (data.message as string) ?? '';
-      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
+      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout');
       if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
         setContextError({
           promptText: (data.promptText as string) ?? '',

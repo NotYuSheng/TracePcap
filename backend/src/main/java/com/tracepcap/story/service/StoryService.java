@@ -46,17 +46,17 @@ public class StoryService {
    * @param fileId the file ID
    * @return generated story response
    */
-  @Transactional
   public StoryResponse generateStory(UUID fileId, String additionalContext) {
     return generateStory(fileId, additionalContext, null, null, null);
   }
 
-  @Transactional
   public StoryResponse generateStory(UUID fileId, String additionalContext, String customPrompt) {
     return generateStory(fileId, additionalContext, customPrompt, null, null);
   }
 
-  @Transactional
+  // Not annotated @Transactional: LLM calls can take several minutes and holding an open DB
+  // connection for that duration risks connection pool exhaustion. The delete and save operations
+  // inside are each transactional by default (Spring's per-operation default).
   public StoryResponse generateStory(UUID fileId, String additionalContext, String customPrompt,
       Integer maxFindings, Integer maxRiskMatrix) {
     log.info("Generating story for file: {}", fileId);
