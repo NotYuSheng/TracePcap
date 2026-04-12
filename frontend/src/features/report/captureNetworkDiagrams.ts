@@ -26,17 +26,8 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { toPng } from 'html-to-image';
-import { conversationService } from '@/features/conversation/services/conversationService';
-import { networkService } from '@/features/network/services/networkService';
 import { NetworkGraph } from '@/components/network/NetworkGraph/NetworkGraph';
-import { CONVERSATION_LIMIT_ENABLED } from '@/features/network/hooks/useNetworkData';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import type { ConversationFilters } from '@/features/conversation/types';
-import type { AnalysisSummary } from '@/types';
-
-// Match the same conversation cap the Network Diagram page uses so the report
-// shows identical edges.  If the env flag disables the limit, capture all.
-const MAX_CONVERSATIONS = CONVERSATION_LIMIT_ENABLED ? 500 : Infinity;
 const CAPTURE_W = 1400;
 const CAPTURE_H = 860;
 
@@ -161,46 +152,15 @@ export interface DiagramImages {
   hierarchical: string; // base64 PNG
 }
 
+/**
+ * Captures both ELK layouts for the given pre-filtered nodes and edges.
+ * The caller is responsible for passing exactly the nodes/edges currently
+ * visible on screen so the report matches what the user sees.
+ */
 export async function captureNetworkDiagrams(
-  fileId: string,
-  analysisSummary?: AnalysisSummary,
-  sessionFilters?: Partial<ConversationFilters>
+  nodes: GraphNode[],
+  edges: GraphEdge[]
 ): Promise<DiagramImages> {
-  const response = await conversationService.getConversations(fileId, {
-    ip: '',
-    port: '',
-    payloadContains: '',
-    protocols: [],
-    l7Protocols: [],
-    apps: [],
-    categories: [],
-    hasRisks: false,
-    fileTypes: [],
-    riskTypes: [],
-    customSignatures: [],
-    deviceTypes: [],
-    countries: [],
-    ...sessionFilters,
-    sortBy: '',
-    sortDir: 'asc',
-    page: 1,
-    pageSize: 10000,
-  });
-
-  let hostClassifications;
-  try {
-    hostClassifications = await conversationService.getHostClassifications(fileId);
-  } catch {
-    /* optional — best effort */
-  }
-
-  const { nodes, edges } = networkService.buildNetworkGraph(
-    response.data,
-    analysisSummary,
-    MAX_CONVERSATIONS,
-    hostClassifications
-  );
-
   // Sequential — both layouts share the module-level ELK singleton inside
   // NetworkGraph.tsx; running them in parallel risks a layout race condition.
   const forceDirected = await captureLayout(nodes, edges, 'forceDirected2d');

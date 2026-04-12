@@ -1,23 +1,108 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { AnalysisLoadingView } from './AnalysisLoadingView';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
+import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
+import type { GraphNode, GraphEdge } from '@/features/network/types';
+import type { AnalysisData } from '@/types';
+
+export interface NetworkGraphState {
+  filteredNodes: GraphNode[];
+  filteredEdges: GraphEdge[];
+  activeFilterLabels: string[];
+}
+
+export interface NetworkDiagramFilterState {
+  nodeLimit: number;
+  setNodeLimit: Dispatch<SetStateAction<number>>;
+  ipFilter: string;
+  setIpFilter: Dispatch<SetStateAction<string>>;
+  portFilter: string;
+  setPortFilter: Dispatch<SetStateAction<string>>;
+  hasRisksOnly: boolean;
+  setHasRisksOnly: Dispatch<SetStateAction<boolean>>;
+  activeLegendProtocols: string[];
+  setActiveLegendProtocols: Dispatch<SetStateAction<string[]>>;
+  activeNodeFilters: string[];
+  setActiveNodeFilters: Dispatch<SetStateAction<string[]>>;
+  activeAppFilters: string[];
+  setActiveAppFilters: Dispatch<SetStateAction<string[]>>;
+  activeL7Protocols: string[];
+  setActiveL7Protocols: Dispatch<SetStateAction<string[]>>;
+  activeCategories: string[];
+  setActiveCategories: Dispatch<SetStateAction<string[]>>;
+  activeRiskTypes: string[];
+  setActiveRiskTypes: Dispatch<SetStateAction<string[]>>;
+  activeCustomSigs: string[];
+  setActiveCustomSigs: Dispatch<SetStateAction<string[]>>;
+  activeFileTypes: string[];
+  setActiveFileTypes: Dispatch<SetStateAction<string[]>>;
+  activeCountries: string[];
+  setActiveCountries: Dispatch<SetStateAction<string[]>>;
+}
+
+export interface AnalysisOutletContext {
+  data: AnalysisData;
+  fileId: string;
+  networkGraphStateRef: React.MutableRefObject<NetworkGraphState>;
+  networkDiagramFilters: NetworkDiagramFilterState;
+}
+
+// Re-export so NetworkDiagramPage can import from one place
+export type { AnalysisData };
 
 export const AnalysisPage = () => {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
-  const { filters } = useConversationFilters();
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportStep, setReportStep] = useState<string | null>(null);
+
+  // ── Network diagram filter state (lifted here so it survives tab switches) ──
+  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
+  const [ipFilter, setIpFilter] = useState('');
+  const [portFilter, setPortFilter] = useState('');
+  const [hasRisksOnly, setHasRisksOnly] = useState(false);
+  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
+  const [activeNodeFilters, setActiveNodeFilters] = useState<string[]>([]);
+  const [activeAppFilters, setActiveAppFilters] = useState<string[]>([]);
+  const [activeL7Protocols, setActiveL7Protocols] = useState<string[]>([]);
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);
+  const [activeRiskTypes, setActiveRiskTypes] = useState<string[]>([]);
+  const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
+  const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
+  const [activeCountries, setActiveCountries] = useState<string[]>([]);
+
+  const networkDiagramFilters: NetworkDiagramFilterState = {
+    nodeLimit, setNodeLimit,
+    ipFilter, setIpFilter,
+    portFilter, setPortFilter,
+    hasRisksOnly, setHasRisksOnly,
+    activeLegendProtocols, setActiveLegendProtocols,
+    activeNodeFilters, setActiveNodeFilters,
+    activeAppFilters, setActiveAppFilters,
+    activeL7Protocols, setActiveL7Protocols,
+    activeCategories, setActiveCategories,
+    activeRiskTypes, setActiveRiskTypes,
+    activeCustomSigs, setActiveCustomSigs,
+    activeFileTypes, setActiveFileTypes,
+    activeCountries, setActiveCountries,
+  };
+
+  // NetworkDiagramPage writes its current filtered nodes/edges here so the
+  // report captures exactly what the user sees.
+  const networkGraphStateRef = useRef<NetworkGraphState>({
+    filteredNodes: [],
+    filteredEdges: [],
+    activeFilterLabels: [],
+  });
 
   useEffect(() => {
     const path = location.pathname;
@@ -40,14 +125,18 @@ export const AnalysisPage = () => {
     setReportError(null);
     setReportStep('Rendering network diagrams…');
     try {
-      // Render both ELK layouts and capture as PNG
-      const diagrams = await captureNetworkDiagrams(fileId, data ?? undefined, filters);
+      const { filteredNodes, filteredEdges, activeFilterLabels } = networkGraphStateRef.current;
+
+      const diagrams = await captureNetworkDiagrams(filteredNodes, filteredEdges);
 
       setReportStep('Building PDF…');
-      // POST diagrams + fileId → receive PDF blob
       const response = await apiClient.post(
         API_ENDPOINTS.REPORT_DOWNLOAD(fileId),
-        { forceDirectedImage: diagrams.forceDirected, hierarchicalImage: diagrams.hierarchical },
+        {
+          forceDirectedImage: diagrams.forceDirected,
+          hierarchicalImage: diagrams.hierarchical,
+          activeFilters: activeFilterLabels,
+        },
         { responseType: 'blob' }
       );
 
@@ -189,7 +278,7 @@ export const AnalysisPage = () => {
       {/* Tab Content */}
       <div className="card">
         <div className="card-body">
-          <Outlet context={{ data, fileId }} />
+          <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters } satisfies AnalysisOutletContext} />
         </div>
       </div>
     </div>

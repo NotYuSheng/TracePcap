@@ -243,7 +243,7 @@ function finalizeNodeRole(node: GraphNode, srcPort: number, dstPort: number) {
  *
  * Returns the selected nodes and the count of nodes that were hidden.
  */
-function selectSignificantNodes(
+export function selectSignificantNodes(
   nodes: GraphNode[],
   edges: GraphEdge[],
   limit: number

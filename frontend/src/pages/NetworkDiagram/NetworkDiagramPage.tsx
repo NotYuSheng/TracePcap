@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Modal } from '@govtechsg/sgds-react';
-import type { AnalysisData } from '@/types';
 import type { GraphNode } from '@/features/network/types';
 import {
   useNetworkData,
@@ -13,11 +12,7 @@ import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
-
-interface AnalysisOutletContext {
-  data: AnalysisData;
-  fileId: string;
-}
+import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 
 /** Returns true if an edge's protocol/app matches a legend key (e.g. HTTPS, ICMP, STP). */
 function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean {
@@ -42,8 +37,25 @@ function formatBytes(bytes: number): string {
 }
 
 export const NetworkDiagramPage = () => {
-  const { fileId, data } = useOutletContext<AnalysisOutletContext>();
-  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
+  const { fileId, data, networkGraphStateRef, networkDiagramFilters } =
+    useOutletContext<AnalysisOutletContext>();
+
+  const {
+    nodeLimit, setNodeLimit,
+    ipFilter, setIpFilter,
+    portFilter, setPortFilter,
+    hasRisksOnly, setHasRisksOnly,
+    activeLegendProtocols, setActiveLegendProtocols,
+    activeNodeFilters, setActiveNodeFilters,
+    activeAppFilters, setActiveAppFilters,
+    activeL7Protocols, setActiveL7Protocols,
+    activeCategories, setActiveCategories,
+    activeRiskTypes, setActiveRiskTypes,
+    activeCustomSigs, setActiveCustomSigs,
+    activeFileTypes, setActiveFileTypes,
+    activeCountries, setActiveCountries,
+  } = networkDiagramFilters;
+
   // Draft value for the custom node count input — only applied on Enter/blur
   const [customInput, setCustomInput] = useState('');
   const [showSignificanceModal, setShowSignificanceModal] = useState(false);
@@ -51,21 +63,6 @@ export const NetworkDiagramPage = () => {
     useNetworkData(fileId, data, nodeLimit);
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  // Edge legend / protocol filter
-  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
-  // Node type / device type filter
-  const [activeNodeFilters, setActiveNodeFilters] = useState<string[]>([]);
-  // New per-field filters
-  const [ipFilter, setIpFilter] = useState('');
-  const [portFilter, setPortFilter] = useState('');
-  const [activeAppFilters, setActiveAppFilters] = useState<string[]>([]);
-  const [activeL7Protocols, setActiveL7Protocols] = useState<string[]>([]);
-  const [activeCategories, setActiveCategories] = useState<string[]>([]);
-  const [activeRiskTypes, setActiveRiskTypes] = useState<string[]>([]);
-  const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
-  const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
-  const [activeCountries, setActiveCountries] = useState<string[]>([]);
-  const [hasRisksOnly, setHasRisksOnly] = useState(false);
 
   const toggleLegendProtocol = toggleSet(setActiveLegendProtocols);
   const toggleNodeFilter = toggleSet(setActiveNodeFilters);
@@ -348,6 +345,28 @@ export const NetworkDiagramPage = () => {
     (portFilter ? 1 : 0) +
     (hasRisksOnly ? 1 : 0);
 
+  // Keep the parent's ref up to date with the currently visible graph state so
+  // the report button captures exactly what the user sees.
+  useEffect(() => {
+    if (!networkGraphStateRef) return;
+    const labels: string[] = [];
+    if (ipFilter) labels.push(`IP: ${ipFilter}`);
+    if (portFilter) labels.push(`Port: ${portFilter}`);
+    if (hasRisksOnly) labels.push('Has Risks: Yes');
+    if (activeLegendProtocols.length > 0)
+      labels.push(`Protocol: ${activeLegendProtocols.join(', ')}`);
+    if (activeNodeFilters.length > 0) labels.push(`Node type: ${activeNodeFilters.join(', ')}`);
+    if (activeAppFilters.length > 0) labels.push(`App: ${activeAppFilters.join(', ')}`);
+    if (activeL7Protocols.length > 0) labels.push(`L7: ${activeL7Protocols.join(', ')}`);
+    if (activeCategories.length > 0) labels.push(`Category: ${activeCategories.join(', ')}`);
+    if (activeRiskTypes.length > 0) labels.push(`Risk type: ${activeRiskTypes.join(', ')}`);
+    if (activeCustomSigs.length > 0)
+      labels.push(`Custom signature: ${activeCustomSigs.join(', ')}`);
+    if (activeFileTypes.length > 0) labels.push(`File type: ${activeFileTypes.join(', ')}`);
+    if (activeCountries.length > 0) labels.push(`Country: ${activeCountries.join(', ')}`);
+    networkGraphStateRef.current = { filteredNodes, filteredEdges, activeFilterLabels: labels };
+  });
+
   if (loading) {
     return <LoadingSpinner size="large" message="Building network topology..." fullPage />;
   }
@@ -409,7 +428,7 @@ export const NetworkDiagramPage = () => {
         </div>
       </div>
 
-      {hiddenNodes > 0 &&
+      {stats.totalNodes > MAX_DIAGRAM_NODES &&
         (() => {
           const totalNodes = stats.totalNodes;
           const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
@@ -431,8 +450,18 @@ export const NetworkDiagramPage = () => {
                 </button>
                 <div className="flex-grow-1">
                   <div>
-                    Showing the <strong>{nodeLimit} most significant nodes</strong> ({hiddenNodes}{' '}
-                    hidden). Ranked by traffic volume, risk signals, and connectivity.
+                    {hiddenNodes > 0 ? (
+                      <>
+                        Showing the <strong>{nodeLimit} most significant nodes</strong> (
+                        {hiddenNodes} hidden). Ranked by traffic volume, risk signals, and
+                        connectivity.
+                      </>
+                    ) : (
+                      <>
+                        Showing <strong>all {totalNodes} nodes</strong>. Ranked by traffic volume,
+                        risk signals, and connectivity.
+                      </>
+                    )}
                   </div>
                   <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
                     <span className="text-muted small fw-semibold me-1">Show:</span>
