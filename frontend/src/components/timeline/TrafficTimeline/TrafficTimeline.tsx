@@ -219,7 +219,7 @@ export const TrafficTimeline = ({
               viewMode === 'packets' ? formatNumber(value) : formatBytes(value)
             }
           />
-          <Tooltip content={<CustomTooltip viewMode={viewMode} />} />
+          <Tooltip content={<CustomTooltip viewMode={viewMode} />} wrapperStyle={{ zIndex: 9999 }} />
           {viewMode === 'packets' ? (
             <>
               <Legend />

@@ -1,7 +1,10 @@
 package com.tracepcap.story.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.tracepcap.common.exception.ContextLengthExceededException;
 import com.tracepcap.common.exception.LlmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import com.tracepcap.config.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
@@ -177,9 +180,22 @@ public class LlmClient {
     } catch (LlmException e) {
       throw e;
     } catch (Exception e) {
+      // Detect context-length exceeded (OpenAI-compatible 400 response)
+      String msg = e.getMessage() != null ? e.getMessage() : "";
+      if (msg.contains("maximum context length")) {
+        int promptTokens = parseGroup(msg, "\\((\\d+) in the messages");
+        int contextTokens = parseGroup(msg, "maximum context length is (\\d+)");
+        if (contextTokens == 0) contextTokens = parseGroup(msg, "context length is (\\d+)");
+        throw new ContextLengthExceededException(promptTokens, contextTokens, userPrompt);
+      }
       log.error("Error calling LLM API", e);
       throw new LlmException("Failed to reach the LLM service: " + e.getMessage(), e);
     }
+  }
+
+  private static int parseGroup(String text, String regex) {
+    Matcher m = Pattern.compile(regex).matcher(text);
+    return m.find() ? Integer.parseInt(m.group(1)) : 0;
   }
 
   /** OpenAI Chat Completion Request format */

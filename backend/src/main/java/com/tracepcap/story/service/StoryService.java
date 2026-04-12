@@ -48,6 +48,17 @@ public class StoryService {
    */
   @Transactional
   public StoryResponse generateStory(UUID fileId, String additionalContext) {
+    return generateStory(fileId, additionalContext, null, null, null);
+  }
+
+  @Transactional
+  public StoryResponse generateStory(UUID fileId, String additionalContext, String customPrompt) {
+    return generateStory(fileId, additionalContext, customPrompt, null, null);
+  }
+
+  @Transactional
+  public StoryResponse generateStory(UUID fileId, String additionalContext, String customPrompt,
+      Integer maxFindings, Integer maxRiskMatrix) {
     log.info("Generating story for file: {}", fileId);
 
     // Delete any existing stories for this file so we always generate fresh
@@ -71,6 +82,29 @@ public class StoryService {
     LocalDateTime generatedAt = LocalDateTime.now();
 
     try {
+      // If the user supplied a pre-edited custom prompt (retry after context-length error),
+      // skip all prompt-building phases and send it directly to the LLM.
+      if (customPrompt != null && !customPrompt.isBlank()) {
+        log.info("Using user-supplied custom prompt for file: {}", fileId);
+        StoryAggregates aggregates = storyAggregatesService.compute(
+            fileId, List.of(), conversationRepository.countByFileId(fileId));
+        List<Finding> findings = findingsService.detectAll(
+            fileId, conversationRepository.countByFileId(fileId), analysis.getTotalBytes());
+        String storyContent = llmClient.generateCompletion(buildSystemPrompt(), customPrompt);
+        StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
+        storyResponse.setAggregates(aggregates);
+        storyResponse.setFindings(findings);
+        StoryEntity story = StoryEntity.builder()
+            .id(storyId).fileId(fileId).generatedAt(generatedAt)
+            .status(StoryEntity.StoryStatus.COMPLETED)
+            .modelUsed(llmConfig.getApi().getModel())
+            .content(objectMapper.writeValueAsString(storyResponse))
+            .build();
+        storyRepository.save(story);
+        log.info("Successfully generated story from custom prompt for file: {}", fileId);
+        return storyResponse;
+      }
+
       long totalConversations = conversationRepository.countByFileId(fileId);
 
       // Run all deterministic detectors
@@ -98,11 +132,10 @@ public class StoryService {
       // Phase 1: LLM generates hypotheses + queries
       List<InvestigationStep> investigationSteps = List.of();
       try {
-        String phase1Json =
-            llmClient.generateCompletion(
-                buildHypothesisSystemPrompt(),
-                buildHypothesisUserPrompt(
-                    file, analysis, additionalContext, aggregates, findings, timelineBins));
+        String phase1Json = llmClient.generateCompletion(
+            buildHypothesisSystemPrompt(),
+            buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins, maxFindings, maxRiskMatrix)
+        );
         var phase1 = parseHypothesesAndQueries(phase1Json);
         investigationSteps =
             investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
@@ -114,17 +147,10 @@ public class StoryService {
       }
 
       // Phase 2: LLM writes narrative with investigation results
-      String storyContent =
-          llmClient.generateCompletion(
-              buildSystemPrompt(),
-              buildNarrativeUserPrompt(
-                  file,
-                  analysis,
-                  additionalContext,
-                  aggregates,
-                  findings,
-                  timelineBins,
-                  investigationSteps));
+      String storyContent = llmClient.generateCompletion(
+          buildSystemPrompt(),
+          buildNarrativeUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins, investigationSteps, maxFindings, maxRiskMatrix)
+      );
 
       // Parse LLM response and attach aggregates + findings
       StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
@@ -318,12 +344,13 @@ public class StoryService {
    * Build the base prompt context with findings and aggregates. Callers append their own closing
    * instruction.
    */
+  private static final int DEFAULT_MAX_FINDINGS = 20;
+  private static final int DEFAULT_MAX_RISK_MATRIX = 15;
+
   private String buildBasePromptContext(
-      FileEntity file,
-      AnalysisResultEntity analysis,
-      String additionalContext,
-      StoryAggregates agg,
-      List<Finding> findings) {
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      StoryAggregates agg, List<Finding> findings,
+      Integer maxFindingsOverride, Integer maxRiskMatrixOverride) {
 
     UUID fileId = file.getId();
     List<Object[]> categoryRows = conversationRepository.findCategoryDistributionByFileId(fileId);
@@ -380,13 +407,15 @@ public class StoryService {
     }
 
     // ── Deterministic Findings ──────────────────────────────────────────────
-    prompt.append(
-        String.format(
-            "## Deterministic Findings — %d findings, ordered by severity\n", findings.size()));
+    int maxF = maxFindingsOverride != null && maxFindingsOverride > 0
+        ? maxFindingsOverride : DEFAULT_MAX_FINDINGS;
+    List<Finding> cappedFindings = findings.size() > maxF ? findings.subList(0, maxF) : findings;
+    prompt.append(String.format(
+        "## Deterministic Findings — %d findings shown (of %d total), ordered by severity\n",
+        cappedFindings.size(), findings.size()));
     prompt.append("(These are computed from the full dataset. Treat them as ground truth.)\n");
-    for (Finding f : findings) {
-      prompt.append(
-          String.format("\n### [%s] %s — %s\n", f.getSeverity(), f.getType(), f.getTitle()));
+    for (Finding f : cappedFindings) {
+      prompt.append(String.format("\n### [%s] %s — %s\n", f.getSeverity(), f.getType(), f.getTitle()));
       prompt.append(f.getSummary()).append("\n");
       if (f.getMetrics() != null && !f.getMetrics().isEmpty()) {
         prompt.append("Metrics: ");
@@ -424,7 +453,11 @@ public class StoryService {
 
     if (agg.getProtocolRiskMatrix() != null && !agg.getProtocolRiskMatrix().isEmpty()) {
       prompt.append("### Protocol Risk Matrix\n");
-      for (StoryAggregates.ProtocolRiskEntry e : agg.getProtocolRiskMatrix()) {
+      int maxR = maxRiskMatrixOverride != null && maxRiskMatrixOverride > 0
+          ? maxRiskMatrixOverride : DEFAULT_MAX_RISK_MATRIX;
+      List<StoryAggregates.ProtocolRiskEntry> riskMatrix = agg.getProtocolRiskMatrix().size() > maxR
+          ? agg.getProtocolRiskMatrix().subList(0, maxR) : agg.getProtocolRiskMatrix();
+      for (StoryAggregates.ProtocolRiskEntry e : riskMatrix) {
         double riskPct = e.getTotal() > 0 ? e.getAtRisk() * 100.0 / e.getTotal() : 0;
         prompt.append(
             String.format(
@@ -532,16 +565,12 @@ public class StoryService {
 
   /** Build hypothesis user prompt for Phase 1 */
   private String buildHypothesisUserPrompt(
-      FileEntity file,
-      AnalysisResultEntity analysis,
-      String additionalContext,
-      StoryAggregates aggregates,
-      List<Finding> findings,
-      List<TimelineDataDto> timelineBins) {
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      StoryAggregates aggregates, List<Finding> findings, List<TimelineDataDto> timelineBins,
+      Integer maxFindings, Integer maxRiskMatrix) {
 
-    StringBuilder prompt =
-        new StringBuilder(
-            buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
+    StringBuilder prompt = new StringBuilder(
+        buildBasePromptContext(file, analysis, additionalContext, aggregates, findings, maxFindings, maxRiskMatrix));
 
     appendTimelineBins(prompt, timelineBins);
 
@@ -554,17 +583,13 @@ public class StoryService {
 
   /** Build the full narrative user prompt for Phase 2 */
   private String buildNarrativeUserPrompt(
-      FileEntity file,
-      AnalysisResultEntity analysis,
-      String additionalContext,
-      StoryAggregates aggregates,
-      List<Finding> findings,
-      List<TimelineDataDto> timelineBins,
-      List<InvestigationStep> investigationSteps) {
+      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      StoryAggregates aggregates, List<Finding> findings,
+      List<TimelineDataDto> timelineBins, List<InvestigationStep> investigationSteps,
+      Integer maxFindings, Integer maxRiskMatrix) {
 
-    StringBuilder prompt =
-        new StringBuilder(
-            buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
+    StringBuilder prompt = new StringBuilder(
+        buildBasePromptContext(file, analysis, additionalContext, aggregates, findings, maxFindings, maxRiskMatrix));
 
     appendTimelineBins(prompt, timelineBins);
 

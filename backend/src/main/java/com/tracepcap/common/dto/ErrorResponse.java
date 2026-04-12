@@ -26,4 +26,12 @@ public class ErrorResponse {
   private String path;
 
   private String existingFileId;
+
+  private String errorCode;
+
+  private String promptText;
+
+  private Integer promptTokens;
+
+  private Integer contextLength;
 }

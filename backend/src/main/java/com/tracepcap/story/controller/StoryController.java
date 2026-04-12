@@ -36,7 +36,10 @@ public class StoryController {
     log.info("Received story generation request for file: {}", fileId);
 
     String additionalContext = request != null ? request.getAdditionalContext() : null;
-    StoryResponse story = storyService.generateStory(fileId, additionalContext);
+    String customPrompt = request != null ? request.getCustomPrompt() : null;
+    Integer maxFindings = request != null ? request.getMaxFindings() : null;
+    Integer maxRiskMatrix = request != null ? request.getMaxRiskMatrix() : null;
+    StoryResponse story = storyService.generateStory(fileId, additionalContext, customPrompt, maxFindings, maxRiskMatrix);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(story);
   }

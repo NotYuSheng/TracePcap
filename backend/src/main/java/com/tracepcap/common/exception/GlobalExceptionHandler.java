@@ -84,6 +84,27 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
   }
 
+  @ExceptionHandler(ContextLengthExceededException.class)
+  public ResponseEntity<ErrorResponse> handleContextLengthExceededException(
+      ContextLengthExceededException ex, HttpServletRequest request) {
+    log.error("LLM context length exceeded: {}", ex.getMessage());
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+            .error("Unprocessable Entity")
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .errorCode("CONTEXT_LENGTH_EXCEEDED")
+            .promptText(ex.getPrompt())
+            .promptTokens(ex.getPromptTokens())
+            .contextLength(ex.getContextLength())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
+  }
+
   @ExceptionHandler(LlmException.class)
   public ResponseEntity<ErrorResponse> handleLlmException(
       LlmException ex, HttpServletRequest request) {
