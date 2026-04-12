@@ -28,16 +28,18 @@ public class FanOutDetector {
       metrics.put("distinctDstIps", distinctDsts);
       metrics.put("totalFlows", totalFlows);
 
-      findings.add(Finding.builder()
-          .type(FindingType.FAN_OUT)
-          .severity(severity)
-          .title(String.format("Fan-Out: %s → %d distinct destinations", srcIp, distinctDsts))
-          .summary(String.format(
-              "%s initiated %d flows to %d distinct destination IPs — pattern consistent with scanning or lateral movement.",
-              srcIp, totalFlows, distinctDsts))
-          .metrics(metrics)
-          .affectedIps(List.of(srcIp))
-          .build());
+      findings.add(
+          Finding.builder()
+              .type(FindingType.FAN_OUT)
+              .severity(severity)
+              .title(String.format("Fan-Out: %s → %d distinct destinations", srcIp, distinctDsts))
+              .summary(
+                  String.format(
+                      "%s initiated %d flows to %d distinct destination IPs — pattern consistent with scanning or lateral movement.",
+                      srcIp, totalFlows, distinctDsts))
+              .metrics(metrics)
+              .affectedIps(List.of(srcIp))
+              .build());
     }
     return findings;
   }

@@ -45,14 +45,18 @@ public class BeaconDetector {
       double mean = intervals.stream().mapToLong(Long::longValue).average().orElse(0);
       if (mean < 1000) continue;
 
-      double variance = intervals.stream().mapToDouble(v -> Math.pow(v - mean, 2)).average().orElse(0);
+      double variance =
+          intervals.stream().mapToDouble(v -> Math.pow(v - mean, 2)).average().orElse(0);
       double cv = Math.sqrt(variance) / mean;
       if (cv >= 0.3) continue;
 
       FlowKey k = e.getKey();
       Severity severity = cv < 0.1 ? Severity.CRITICAL : Severity.HIGH;
       long intervalSec = (long) (mean / 1000);
-      String interval = intervalSec < 60 ? intervalSec + "s" : (intervalSec / 60) + "m " + (intervalSec % 60) + "s";
+      String interval =
+          intervalSec < 60
+              ? intervalSec + "s"
+              : (intervalSec / 60) + "m " + (intervalSec % 60) + "s";
 
       Map<String, Object> metrics = new LinkedHashMap<>();
       metrics.put("flowCount", times.size());
@@ -60,23 +64,41 @@ public class BeaconDetector {
       metrics.put("cv", Math.round(cv * 1000.0) / 1000.0);
       metrics.put("dstPort", k.port().isEmpty() ? null : k.port());
 
-      findings.add(Finding.builder()
-          .type(FindingType.BEACON)
-          .severity(severity)
-          .title(String.format("Beacon: %s → %s:%s", k.src(), k.dst().isEmpty() ? "?" : k.dst(), k.port().isEmpty() ? "*" : k.port()))
-          .summary(String.format(
-              "%s connecting to %s:%s (%s) with %d flows, avg interval %s, jitter %.1f%% (CV=%.3f) — highly periodic traffic consistent with C2 keepalive.",
-              k.src(), k.dst().isEmpty() ? "?" : k.dst(), k.port().isEmpty() ? "*" : k.port(),
-              k.proto(), times.size(), interval, cv * 100, cv))
-          .metrics(metrics)
-          .affectedIps(List.of(k.src(), k.dst()).stream().filter(s -> !s.isEmpty()).collect(Collectors.toList()))
-          .build());
+      findings.add(
+          Finding.builder()
+              .type(FindingType.BEACON)
+              .severity(severity)
+              .title(
+                  String.format(
+                      "Beacon: %s → %s:%s",
+                      k.src(),
+                      k.dst().isEmpty() ? "?" : k.dst(),
+                      k.port().isEmpty() ? "*" : k.port()))
+              .summary(
+                  String.format(
+                      "%s connecting to %s:%s (%s) with %d flows, avg interval %s, jitter %.1f%% (CV=%.3f) — highly periodic traffic consistent with C2 keepalive.",
+                      k.src(),
+                      k.dst().isEmpty() ? "?" : k.dst(),
+                      k.port().isEmpty() ? "*" : k.port(),
+                      k.proto(),
+                      times.size(),
+                      interval,
+                      cv * 100,
+                      cv))
+              .metrics(metrics)
+              .affectedIps(
+                  List.of(k.src(), k.dst()).stream()
+                      .filter(s -> !s.isEmpty())
+                      .collect(Collectors.toList()))
+              .build());
     }
 
-    findings.sort(Comparator.comparingDouble(f -> {
-      Object cv = f.getMetrics() != null ? f.getMetrics().get("cv") : null;
-      return cv instanceof Number ? ((Number) cv).doubleValue() : 1.0;
-    }));
+    findings.sort(
+        Comparator.comparingDouble(
+            f -> {
+              Object cv = f.getMetrics() != null ? f.getMetrics().get("cv") : null;
+              return cv instanceof Number ? ((Number) cv).doubleValue() : 1.0;
+            }));
     return findings.stream().limit(5).collect(Collectors.toList());
   }
 }

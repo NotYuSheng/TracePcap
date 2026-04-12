@@ -61,8 +61,8 @@ public interface ConversationRepository
       @Param("fileId") UUID fileId, @Param("lim") int lim);
 
   /**
-   * Returns the top-N at-risk conversations for a file, ordered by risk count descending then
-   * bytes descending. Used for guaranteed risk-slot selection in story prompt construction.
+   * Returns the top-N at-risk conversations for a file, ordered by risk count descending then bytes
+   * descending. Used for guaranteed risk-slot selection in story prompt construction.
    */
   @Query(
       value =
@@ -172,8 +172,8 @@ public interface ConversationRepository
   List<ConversationEntity> findTlsConversationsByFileId(@Param("fileId") UUID fileId);
 
   /**
-   * Returns flow tuples (srcIp, dstIp, dstPort, protocol, appName, startTime) for groups that
-   * have at least 3 conversations, ordered for efficient beacon detection grouping.
+   * Returns flow tuples (srcIp, dstIp, dstPort, protocol, appName, startTime) for groups that have
+   * at least 3 conversations, ordered for efficient beacon detection grouping.
    */
   @Query(
       value =
@@ -200,9 +200,9 @@ public interface ConversationRepository
   List<String> findDistinctRiskTypesByFileId(@Param("fileId") UUID fileId);
 
   /**
-   * For each distinct risk type in the file, returns aggregate stats:
-   * [risk_type, conversation_count, total_bytes, distinct_src_ips, distinct_dst_ips].
-   * Used to build risk-type cluster summaries for the story prompt.
+   * For each distinct risk type in the file, returns aggregate stats: [risk_type,
+   * conversation_count, total_bytes, distinct_src_ips, distinct_dst_ips]. Used to build risk-type
+   * cluster summaries for the story prompt.
    */
   @Query(
       value =
@@ -221,8 +221,8 @@ public interface ConversationRepository
   List<Object[]> findRiskTypeStatsByFileId(@Param("fileId") UUID fileId);
 
   /**
-   * Returns the single highest-bytes conversation that contains the given risk type.
-   * Used for diversity-aware example selection in story prompt construction.
+   * Returns the single highest-bytes conversation that contains the given risk type. Used for
+   * diversity-aware example selection in story prompt construction.
    */
   @Query(
       value =
@@ -260,8 +260,8 @@ public interface ConversationRepository
   List<Object[]> findFanOutCandidatesByFileId(@Param("fileId") UUID fileId);
 
   /**
-   * Returns top senders by total bytes for volume anomaly detection.
-   * Columns: [src_ip, total_bytes, flow_count]
+   * Returns top senders by total bytes for volume anomaly detection. Columns: [src_ip, total_bytes,
+   * flow_count]
    */
   @Query(
       value =
@@ -272,8 +272,8 @@ public interface ConversationRepository
   List<Object[]> findTopSendersByFileId(@Param("fileId") UUID fileId);
 
   /**
-   * Returns long-duration sessions exceeding the given threshold in seconds.
-   * Columns: [src_ip, dst_ip, dst_port, protocol, app_name, duration_ms, total_bytes, packet_count]
+   * Returns long-duration sessions exceeding the given threshold in seconds. Columns: [src_ip,
+   * dst_ip, dst_port, protocol, app_name, duration_ms, total_bytes, packet_count]
    */
   @Query(
       value =

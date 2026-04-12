@@ -74,14 +74,18 @@ public class StoryService {
       long totalConversations = conversationRepository.countByFileId(fileId);
 
       // Run all deterministic detectors
-      List<Finding> findings = findingsService.detectAll(fileId, totalConversations, analysis.getTotalBytes());
+      List<Finding> findings =
+          findingsService.detectAll(fileId, totalConversations, analysis.getTotalBytes());
       log.info("Detected {} findings for file: {}", findings.size(), fileId);
 
       // Pre-compute aggregates over the full dataset for the aggregates panel and prompt context
       StoryAggregates aggregates =
           storyAggregatesService.compute(fileId, List.of(), totalConversations);
-      log.info("Computed aggregates for file: {} ({} beacon candidates, {} ASN entries)",
-          fileId, aggregates.getBeaconCandidates().size(), aggregates.getTopExternalAsns().size());
+      log.info(
+          "Computed aggregates for file: {} ({} beacon candidates, {} ASN entries)",
+          fileId,
+          aggregates.getBeaconCandidates().size(),
+          aggregates.getTopExternalAsns().size());
 
       // Fetch timeline bins for LLM context (max 50 bins)
       List<TimelineDataDto> timelineBins = List.of();
@@ -94,22 +98,33 @@ public class StoryService {
       // Phase 1: LLM generates hypotheses + queries
       List<InvestigationStep> investigationSteps = List.of();
       try {
-        String phase1Json = llmClient.generateCompletion(
-            buildHypothesisSystemPrompt(),
-            buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins)
-        );
+        String phase1Json =
+            llmClient.generateCompletion(
+                buildHypothesisSystemPrompt(),
+                buildHypothesisUserPrompt(
+                    file, analysis, additionalContext, aggregates, findings, timelineBins));
         var phase1 = parseHypothesesAndQueries(phase1Json);
-        investigationSteps = investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
-        log.info("Investigation complete: {} steps for file: {}", investigationSteps.size(), fileId);
+        investigationSteps =
+            investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
+        log.info(
+            "Investigation complete: {} steps for file: {}", investigationSteps.size(), fileId);
       } catch (Exception e) {
-        log.warn("Investigation phase failed, falling back to direct narrative: {}", e.getMessage());
+        log.warn(
+            "Investigation phase failed, falling back to direct narrative: {}", e.getMessage());
       }
 
       // Phase 2: LLM writes narrative with investigation results
-      String storyContent = llmClient.generateCompletion(
-          buildSystemPrompt(),
-          buildNarrativeUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins, investigationSteps)
-      );
+      String storyContent =
+          llmClient.generateCompletion(
+              buildSystemPrompt(),
+              buildNarrativeUserPrompt(
+                  file,
+                  analysis,
+                  additionalContext,
+                  aggregates,
+                  findings,
+                  timelineBins,
+                  investigationSteps));
 
       // Parse LLM response and attach aggregates + findings
       StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
@@ -300,17 +315,22 @@ public class StoryService {
   }
 
   /**
-   * Build the base prompt context with findings and aggregates. Callers append their own closing instruction.
+   * Build the base prompt context with findings and aggregates. Callers append their own closing
+   * instruction.
    */
   private String buildBasePromptContext(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
-      StoryAggregates agg, List<Finding> findings) {
+      FileEntity file,
+      AnalysisResultEntity analysis,
+      String additionalContext,
+      StoryAggregates agg,
+      List<Finding> findings) {
 
     UUID fileId = file.getId();
     List<Object[]> categoryRows = conversationRepository.findCategoryDistributionByFileId(fileId);
 
     StringBuilder prompt = new StringBuilder();
-    prompt.append("Analyze this network traffic capture and write a narrative from the findings below:\n\n");
+    prompt.append(
+        "Analyze this network traffic capture and write a narrative from the findings below:\n\n");
 
     prompt.append("## File Information\n");
     prompt.append(String.format("- Filename: %s\n", file.getFileName()));
@@ -323,23 +343,31 @@ public class StoryService {
     prompt.append(String.format("- Duration: %d ms\n", analysis.getDurationMs()));
     prompt.append(String.format("- Start Time: %s\n", analysis.getStartTime()));
     prompt.append(String.format("- End Time: %s\n", analysis.getEndTime()));
-    long totalConversations = agg.getCoverage() != null ? agg.getCoverage().getTotalConversations() : 0;
+    long totalConversations =
+        agg.getCoverage() != null ? agg.getCoverage().getTotalConversations() : 0;
     prompt.append(String.format("- Total Conversations: %d\n\n", totalConversations));
 
     if (analysis.getProtocolStats() != null && !analysis.getProtocolStats().isEmpty()) {
       prompt.append("## Protocol Breakdown\n");
-      analysis.getProtocolStats().forEach((protocol, statsObj) -> {
-        if (statsObj instanceof Map) {
-          @SuppressWarnings("unchecked")
-          Map<String, Object> stats = (Map<String, Object>) statsObj;
-          Object packets = stats.get("packetCount");
-          Object bytes = stats.get("bytes");
-          Object pct = stats.get("percentage");
-          prompt.append(String.format("- %s: %s packets, %s bytes (%.1f%%)\n",
-              protocol, packets, bytes,
-              pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
-        }
-      });
+      analysis
+          .getProtocolStats()
+          .forEach(
+              (protocol, statsObj) -> {
+                if (statsObj instanceof Map) {
+                  @SuppressWarnings("unchecked")
+                  Map<String, Object> stats = (Map<String, Object>) statsObj;
+                  Object packets = stats.get("packetCount");
+                  Object bytes = stats.get("bytes");
+                  Object pct = stats.get("percentage");
+                  prompt.append(
+                      String.format(
+                          "- %s: %s packets, %s bytes (%.1f%%)\n",
+                          protocol,
+                          packets,
+                          bytes,
+                          pct instanceof Number ? ((Number) pct).doubleValue() : 0.0));
+                }
+              });
       prompt.append("\n");
     }
 
@@ -352,17 +380,20 @@ public class StoryService {
     }
 
     // ── Deterministic Findings ──────────────────────────────────────────────
-    prompt.append(String.format(
-        "## Deterministic Findings — %d findings, ordered by severity\n", findings.size()));
+    prompt.append(
+        String.format(
+            "## Deterministic Findings — %d findings, ordered by severity\n", findings.size()));
     prompt.append("(These are computed from the full dataset. Treat them as ground truth.)\n");
     for (Finding f : findings) {
-      prompt.append(String.format("\n### [%s] %s — %s\n", f.getSeverity(), f.getType(), f.getTitle()));
+      prompt.append(
+          String.format("\n### [%s] %s — %s\n", f.getSeverity(), f.getType(), f.getTitle()));
       prompt.append(f.getSummary()).append("\n");
       if (f.getMetrics() != null && !f.getMetrics().isEmpty()) {
         prompt.append("Metrics: ");
-        prompt.append(f.getMetrics().entrySet().stream()
-            .map(e -> e.getKey() + ": " + e.getValue())
-            .collect(Collectors.joining(", ")));
+        prompt.append(
+            f.getMetrics().entrySet().stream()
+                .map(e -> e.getKey() + ": " + e.getValue())
+                .collect(Collectors.joining(", ")));
         prompt.append("\n");
       }
       if (f.getAffectedIps() != null && !f.getAffectedIps().isEmpty()) {
@@ -384,8 +415,10 @@ public class StoryService {
         String label = e.getOrg() != null ? e.getOrg() : "Unknown";
         if (e.getAsn() != null) label = e.getAsn() + " " + label;
         if (e.getCountry() != null) label += " (" + e.getCountry() + ")";
-        prompt.append(String.format("%d. %s — %d flows, %.1f%% of bytes\n",
-            i + 1, label, e.getFlowCount(), e.getPct()));
+        prompt.append(
+            String.format(
+                "%d. %s — %d flows, %.1f%% of bytes\n",
+                i + 1, label, e.getFlowCount(), e.getPct()));
       }
     }
 
@@ -393,16 +426,20 @@ public class StoryService {
       prompt.append("### Protocol Risk Matrix\n");
       for (StoryAggregates.ProtocolRiskEntry e : agg.getProtocolRiskMatrix()) {
         double riskPct = e.getTotal() > 0 ? e.getAtRisk() * 100.0 / e.getTotal() : 0;
-        prompt.append(String.format("- %s: %d total, %d at-risk (%.1f%%)\n",
-            e.getProtocol(), e.getTotal(), e.getAtRisk(), riskPct));
+        prompt.append(
+            String.format(
+                "- %s: %d total, %d at-risk (%.1f%%)\n",
+                e.getProtocol(), e.getTotal(), e.getAtRisk(), riskPct));
       }
     }
 
     StoryAggregates.TlsAnomalySummary tls = agg.getTlsAnomalySummary();
     if (tls != null && tls.getTotal() > 0) {
       prompt.append("### TLS Anomaly Summary\n");
-      prompt.append(String.format("- Self-signed: %d, Expired: %d, Unknown CA: %d (of %d total TLS flows)\n",
-          tls.getSelfSigned(), tls.getExpired(), tls.getUnknownCa(), tls.getTotal()));
+      prompt.append(
+          String.format(
+              "- Self-signed: %d, Expired: %d, Unknown CA: %d (of %d total TLS flows)\n",
+              tls.getSelfSigned(), tls.getExpired(), tls.getUnknownCa(), tls.getTotal()));
     }
 
     if (agg.getBeaconCandidates() != null && !agg.getBeaconCandidates().isEmpty()) {
@@ -410,14 +447,21 @@ public class StoryService {
       for (StoryAggregates.BeaconCandidate b : agg.getBeaconCandidates()) {
         String app = b.getAppName() != null ? " [" + b.getAppName() + "]" : "";
         long intervalSec = b.getAvgIntervalMs() / 1000;
-        String interval = intervalSec < 60
-            ? intervalSec + "s"
-            : (intervalSec / 60) + "m " + (intervalSec % 60) + "s";
-        prompt.append(String.format("- %s -> %s:%s (%s%s) — %d flows, avg interval %s, jitter %.0f%%\n",
-            b.getSrcIp(),
-            b.getDstIp() != null ? b.getDstIp() : "?",
-            b.getDstPort() != null ? b.getDstPort() : "*",
-            b.getProtocol(), app, b.getFlowCount(), interval, b.getCv() * 100));
+        String interval =
+            intervalSec < 60
+                ? intervalSec + "s"
+                : (intervalSec / 60) + "m " + (intervalSec % 60) + "s";
+        prompt.append(
+            String.format(
+                "- %s -> %s:%s (%s%s) — %d flows, avg interval %s, jitter %.0f%%\n",
+                b.getSrcIp(),
+                b.getDstIp() != null ? b.getDstIp() : "?",
+                b.getDstPort() != null ? b.getDstPort() : "*",
+                b.getProtocol(),
+                app,
+                b.getFlowCount(),
+                interval,
+                b.getCv() * 100));
       }
     }
     prompt.append("\n");
@@ -488,15 +532,21 @@ public class StoryService {
 
   /** Build hypothesis user prompt for Phase 1 */
   private String buildHypothesisUserPrompt(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
-      StoryAggregates aggregates, List<Finding> findings, List<TimelineDataDto> timelineBins) {
+      FileEntity file,
+      AnalysisResultEntity analysis,
+      String additionalContext,
+      StoryAggregates aggregates,
+      List<Finding> findings,
+      List<TimelineDataDto> timelineBins) {
 
-    StringBuilder prompt = new StringBuilder(
-        buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
+    StringBuilder prompt =
+        new StringBuilder(
+            buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
 
     appendTimelineBins(prompt, timelineBins);
 
-    prompt.append("Based on the findings, aggregates, and timeline above, generate hypotheses and specify database queries to investigate the most suspicious activity.\n");
+    prompt.append(
+        "Based on the findings, aggregates, and timeline above, generate hypotheses and specify database queries to investigate the most suspicious activity.\n");
     prompt.append("Respond ONLY with valid JSON.");
 
     return prompt.toString();
@@ -504,27 +554,37 @@ public class StoryService {
 
   /** Build the full narrative user prompt for Phase 2 */
   private String buildNarrativeUserPrompt(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
-      StoryAggregates aggregates, List<Finding> findings,
-      List<TimelineDataDto> timelineBins, List<InvestigationStep> investigationSteps) {
+      FileEntity file,
+      AnalysisResultEntity analysis,
+      String additionalContext,
+      StoryAggregates aggregates,
+      List<Finding> findings,
+      List<TimelineDataDto> timelineBins,
+      List<InvestigationStep> investigationSteps) {
 
-    StringBuilder prompt = new StringBuilder(
-        buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
+    StringBuilder prompt =
+        new StringBuilder(
+            buildBasePromptContext(file, analysis, additionalContext, aggregates, findings));
 
     appendTimelineBins(prompt, timelineBins);
 
     if (!investigationSteps.isEmpty()) {
       prompt.append("## Investigation Results\n");
-      prompt.append("The following targeted queries were executed against the full dataset to gather evidence for each hypothesis.\n\n");
+      prompt.append(
+          "The following targeted queries were executed against the full dataset to gather evidence for each hypothesis.\n\n");
       for (InvestigationStep step : investigationSteps) {
         InvestigationQuery q = step.getQuery();
         prompt.append(String.format("### Query %s: \"%s\"\n", q.getId(), q.getLabel()));
         if (step.getHypothesis() != null) {
-          prompt.append(String.format("Hypothesis [%s]: %s\n",
-              step.getHypothesis().getConfidence(), step.getHypothesis().getHypothesis()));
+          prompt.append(
+              String.format(
+                  "Hypothesis [%s]: %s\n",
+                  step.getHypothesis().getConfidence(), step.getHypothesis().getHypothesis()));
         }
-        prompt.append(String.format("Total matching conversations: %d (showing top %d)\n",
-            step.getConversationCount(), step.getConversations().size()));
+        prompt.append(
+            String.format(
+                "Total matching conversations: %d (showing top %d)\n",
+                step.getConversationCount(), step.getConversations().size()));
         if (!step.getConversations().isEmpty()) {
           prompt.append("| src | dst | port | proto | app | bytes | start | risks |\n");
           prompt.append("|-----|-----|------|-------|-----|-------|-------|-------|\n");
@@ -532,9 +592,17 @@ public class StoryService {
             String risks = ev.getFlowRisks() != null ? String.join(",", ev.getFlowRisks()) : "";
             String app = ev.getAppName() != null ? ev.getAppName() : "-";
             String start = ev.getStartTime() != null ? ev.getStartTime().substring(11, 19) : "-";
-            prompt.append(String.format("| %s | %s | %d | %s | %s | %d | %s | %s |\n",
-                ev.getSrcIp(), ev.getDstIp(), ev.getDstPort() != null ? ev.getDstPort() : 0,
-                ev.getProtocol(), app, ev.getTotalBytes() != null ? ev.getTotalBytes() : 0, start, risks));
+            prompt.append(
+                String.format(
+                    "| %s | %s | %d | %s | %s | %d | %s | %s |\n",
+                    ev.getSrcIp(),
+                    ev.getDstIp(),
+                    ev.getDstPort() != null ? ev.getDstPort() : 0,
+                    ev.getProtocol(),
+                    app,
+                    ev.getTotalBytes() != null ? ev.getTotalBytes() : 0,
+                    start,
+                    risks));
           }
         } else {
           prompt.append("No matching conversations found.\n");
@@ -543,7 +611,8 @@ public class StoryService {
       }
     }
 
-    prompt.append("Write the final narrative story using all evidence above. Confirm or refute each hypothesis using the investigation results. Respond ONLY with valid JSON.");
+    prompt.append(
+        "Write the final narrative story using all evidence above. Confirm or refute each hypothesis using the investigation results. Respond ONLY with valid JSON.");
 
     return prompt.toString();
   }
@@ -557,11 +626,14 @@ public class StoryService {
     for (TimelineDataDto bin : bins) {
       String ts = bin.getTimestamp() != null ? bin.getTimestamp().toString().substring(0, 19) : "-";
       long bytes = bin.getBytes() != null ? bin.getBytes() : 0;
-      String bytesHuman = bytes > 1_048_576 ? String.format("%.1fMB", bytes / 1_048_576.0)
-          : bytes > 1024 ? String.format("%.1fKB", bytes / 1024.0)
-          : bytes + "B";
-      prompt.append(String.format("| %s | %d | %s |\n",
-          ts, bin.getPacketCount() != null ? bin.getPacketCount() : 0, bytesHuman));
+      String bytesHuman =
+          bytes > 1_048_576
+              ? String.format("%.1fMB", bytes / 1_048_576.0)
+              : bytes > 1024 ? String.format("%.1fKB", bytes / 1024.0) : bytes + "B";
+      prompt.append(
+          String.format(
+              "| %s | %d | %s |\n",
+              ts, bin.getPacketCount() != null ? bin.getPacketCount() : 0, bytesHuman));
     }
     prompt.append("\n");
   }

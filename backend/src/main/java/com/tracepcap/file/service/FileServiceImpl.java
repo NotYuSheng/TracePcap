@@ -17,7 +17,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
-import java.util.concurrent.TimeUnit;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +24,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -239,17 +239,18 @@ public class FileServiceImpl implements FileService {
       }
 
       log.info("Running mergecap: {}", cmd);
-      Process process = new ProcessBuilder(cmd)
-          .redirectErrorStream(true)
-          .start();
+      Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
 
       // Drain stdout/stderr in a background thread to prevent blocking
       final StringBuilder processOutput = new StringBuilder();
-      Thread drainThread = new Thread(() -> {
-        try {
-          processOutput.append(new String(process.getInputStream().readAllBytes()));
-        } catch (IOException ignored) {}
-      });
+      Thread drainThread =
+          new Thread(
+              () -> {
+                try {
+                  processOutput.append(new String(process.getInputStream().readAllBytes()));
+                } catch (IOException ignored) {
+                }
+              });
       drainThread.setDaemon(true);
       drainThread.start();
 
@@ -274,9 +275,10 @@ public class FileServiceImpl implements FileService {
       }
 
       // Use caller-supplied name or auto-generate from source names
-      String mergedName = (mergedFileName != null && !mergedFileName.isBlank())
-          ? sanitizeMergedFileName(mergedFileName)
-          : buildAutoMergedName(fileIds);
+      String mergedName =
+          (mergedFileName != null && !mergedFileName.isBlank())
+              ? sanitizeMergedFileName(mergedFileName)
+              : buildAutoMergedName(fileIds);
 
       // Stream-upload the merged file to MinIO (avoids loading it fully into memory)
       UUID newFileId = UUID.randomUUID();
@@ -312,10 +314,16 @@ public class FileServiceImpl implements FileService {
       throw new InvalidFileException("Failed to merge files: " + e.getMessage(), e);
     } finally {
       for (File f : tempInputs) {
-        try { Files.deleteIfExists(f.toPath()); } catch (IOException ignored) {}
+        try {
+          Files.deleteIfExists(f.toPath());
+        } catch (IOException ignored) {
+        }
       }
       if (tempOutput != null) {
-        try { Files.deleteIfExists(tempOutput.toPath()); } catch (IOException ignored) {}
+        try {
+          Files.deleteIfExists(tempOutput.toPath());
+        } catch (IOException ignored) {
+        }
       }
     }
   }
@@ -355,9 +363,12 @@ public class FileServiceImpl implements FileService {
   private String computeSha256FromFile(File file) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      try (InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(file)), digest)) {
+      try (InputStream is =
+          new DigestInputStream(new BufferedInputStream(new FileInputStream(file)), digest)) {
         byte[] buf = new byte[8192];
-        while (is.read(buf) != -1) { /* drain to feed the digest */ }
+        while (is.read(buf) != -1) {
+          /* drain to feed the digest */
+        }
       }
       return HexFormat.of().formatHex(digest.digest());
     } catch (Exception e) {

@@ -9,9 +9,21 @@ public final class TlsAnomalyUtil {
 
   static final Set<String> KNOWN_CA_KEYWORDS =
       Set.of(
-          "let's encrypt", "digicert", "comodo", "sectigo", "globalsign",
-          "godaddy", "entrust", "amazon", "microsoft", "google", "apple",
-          "verisign", "thawte", "isrg", "zerossl");
+          "let's encrypt",
+          "digicert",
+          "comodo",
+          "sectigo",
+          "globalsign",
+          "godaddy",
+          "entrust",
+          "amazon",
+          "microsoft",
+          "google",
+          "apple",
+          "verisign",
+          "thawte",
+          "isrg",
+          "zerossl");
 
   private TlsAnomalyUtil() {}
 
@@ -22,8 +34,7 @@ public final class TlsAnomalyUtil {
   }
 
   public static boolean isExpired(ConversationEntity conv) {
-    return conv.getTlsNotAfter() != null
-        && conv.getTlsNotAfter().isBefore(LocalDateTime.now());
+    return conv.getTlsNotAfter() != null && conv.getTlsNotAfter().isBefore(LocalDateTime.now());
   }
 
   public static boolean isSelfSigned(ConversationEntity conv) {

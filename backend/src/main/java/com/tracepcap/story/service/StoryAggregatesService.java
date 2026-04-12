@@ -13,7 +13,6 @@ import com.tracepcap.story.dto.StoryAggregates.TlsAnomalySummary;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,7 +41,8 @@ public class StoryAggregatesService {
       long totalBytes = conversationRepository.sumTotalBytesByFileId(fileId);
 
       return StoryAggregates.builder()
-          .coverage(computeCoverage(shownConversations, totalConversations, totalPackets, totalBytes))
+          .coverage(
+              computeCoverage(shownConversations, totalConversations, totalPackets, totalBytes))
           .topExternalAsns(computeTopAsns(fileId, totalBytes))
           .protocolRiskMatrix(computeProtocolRiskMatrix(fileId))
           .tlsAnomalySummary(computeTlsSummary(fileId))
@@ -52,10 +52,11 @@ public class StoryAggregatesService {
     } catch (Exception e) {
       log.error("Failed to compute story aggregates for file {}: {}", fileId, e.getMessage(), e);
       return StoryAggregates.builder()
-          .coverage(Coverage.builder()
-              .totalConversations(totalConversations)
-              .shownConversations(shownConversations.size())
-              .build())
+          .coverage(
+              Coverage.builder()
+                  .totalConversations(totalConversations)
+                  .shownConversations(shownConversations.size())
+                  .build())
           .topExternalAsns(List.of())
           .protocolRiskMatrix(List.of())
           .tlsAnomalySummary(TlsAnomalySummary.builder().build())
@@ -68,13 +69,11 @@ public class StoryAggregatesService {
   // ── Coverage ──────────────────────────────────────────────────────────────
 
   private Coverage computeCoverage(
-      List<ConversationEntity> shown, long totalConversations,
-      long totalPackets, long totalBytes) {
+      List<ConversationEntity> shown, long totalConversations, long totalPackets, long totalBytes) {
     long shownPackets = shown.stream().mapToLong(ConversationEntity::getPacketCount).sum();
     long shownBytes = shown.stream().mapToLong(ConversationEntity::getTotalBytes).sum();
-    double bytesCoveragePct = totalBytes > 0
-        ? Math.round(shownBytes * 1000.0 / totalBytes) / 10.0
-        : 0.0;
+    double bytesCoveragePct =
+        totalBytes > 0 ? Math.round(shownBytes * 1000.0 / totalBytes) / 10.0 : 0.0;
     return Coverage.builder()
         .totalConversations(totalConversations)
         .shownConversations(shown.size())
@@ -101,7 +100,8 @@ public class StoryAggregatesService {
       String ip = null;
       if (dst != null && !privateCache.computeIfAbsent(dst, StoryAggregatesService::isPrivate)) {
         ip = dst;
-      } else if (src != null && !privateCache.computeIfAbsent(src, StoryAggregatesService::isPrivate)) {
+      } else if (src != null
+          && !privateCache.computeIfAbsent(src, StoryAggregatesService::isPrivate)) {
         ip = src;
       }
       if (ip != null) {
@@ -113,10 +113,9 @@ public class StoryAggregatesService {
     if (ipBytes.isEmpty()) return List.of();
 
     // Bulk geo lookup
-    Map<String, IpGeoInfoEntity> geoByIp = ipGeoInfoRepository
-        .findAllByIpIn(ipBytes.keySet())
-        .stream()
-        .collect(Collectors.toMap(IpGeoInfoEntity::getIp, g -> g, (a, b) -> a));
+    Map<String, IpGeoInfoEntity> geoByIp =
+        ipGeoInfoRepository.findAllByIpIn(ipBytes.keySet()).stream()
+            .collect(Collectors.toMap(IpGeoInfoEntity::getIp, g -> g, (a, b) -> a));
 
     // Group by (asn, org, country)
     record AsnKey(String asn, String org, String country) {}
@@ -124,9 +123,10 @@ public class StoryAggregatesService {
     Map<AsnKey, Long> asnFlows = new HashMap<>();
     for (Map.Entry<String, Long> e : ipBytes.entrySet()) {
       IpGeoInfoEntity geo = geoByIp.get(e.getKey());
-      AsnKey key = geo != null
-          ? new AsnKey(geo.getAsn(), geo.getOrg(), geo.getCountryCode())
-          : new AsnKey(null, "Unknown", null);
+      AsnKey key =
+          geo != null
+              ? new AsnKey(geo.getAsn(), geo.getOrg(), geo.getCountryCode())
+              : new AsnKey(null, "Unknown", null);
       asnBytes.merge(key, e.getValue(), Long::sum);
       asnFlows.merge(key, ipFlows.getOrDefault(e.getKey(), 0L), Long::sum);
     }
@@ -134,14 +134,19 @@ public class StoryAggregatesService {
     return asnBytes.entrySet().stream()
         .sorted(Map.Entry.<AsnKey, Long>comparingByValue().reversed())
         .limit(7)
-        .map(e -> AsnEntry.builder()
-            .asn(e.getKey().asn())
-            .org(e.getKey().org())
-            .country(e.getKey().country())
-            .bytes(e.getValue())
-            .pct(totalBytes > 0 ? Math.round(e.getValue() * 1000.0 / totalBytes) / 10.0 : 0.0)
-            .flowCount(asnFlows.getOrDefault(e.getKey(), 0L))
-            .build())
+        .map(
+            e ->
+                AsnEntry.builder()
+                    .asn(e.getKey().asn())
+                    .org(e.getKey().org())
+                    .country(e.getKey().country())
+                    .bytes(e.getValue())
+                    .pct(
+                        totalBytes > 0
+                            ? Math.round(e.getValue() * 1000.0 / totalBytes) / 10.0
+                            : 0.0)
+                    .flowCount(asnFlows.getOrDefault(e.getKey(), 0L))
+                    .build())
         .collect(Collectors.toList());
   }
 
@@ -156,7 +161,8 @@ public class StoryAggregatesService {
         try {
           int second = Integer.parseInt(parts[1]);
           if (second >= 16 && second <= 31) return true;
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
       }
     }
     // 192.168.x.x
@@ -168,11 +174,13 @@ public class StoryAggregatesService {
 
   private List<ProtocolRiskEntry> computeProtocolRiskMatrix(UUID fileId) {
     return conversationRepository.findProtocolRiskMatrixByFileId(fileId).stream()
-        .map(row -> ProtocolRiskEntry.builder()
-            .protocol(String.valueOf(row[0]))
-            .total(((Number) row[1]).longValue())
-            .atRisk(((Number) row[2]).longValue())
-            .build())
+        .map(
+            row ->
+                ProtocolRiskEntry.builder()
+                    .protocol(String.valueOf(row[0]))
+                    .total(((Number) row[1]).longValue())
+                    .atRisk(((Number) row[2]).longValue())
+                    .build())
         .collect(Collectors.toList());
   }
 
@@ -182,9 +190,10 @@ public class StoryAggregatesService {
     List<ConversationEntity> tlsConvs = conversationRepository.findTlsConversationsByFileId(fileId);
     long selfSigned = tlsConvs.stream().filter(TlsAnomalyUtil::isSelfSigned).count();
     long expired = tlsConvs.stream().filter(TlsAnomalyUtil::isExpired).count();
-    long unknownCa = tlsConvs.stream()
-        .filter(c -> !TlsAnomalyUtil.isSelfSigned(c) && TlsAnomalyUtil.isUnknownCa(c))
-        .count();
+    long unknownCa =
+        tlsConvs.stream()
+            .filter(c -> !TlsAnomalyUtil.isSelfSigned(c) && TlsAnomalyUtil.isUnknownCa(c))
+            .count();
     return TlsAnomalySummary.builder()
         .selfSigned(selfSigned)
         .expired(expired)
@@ -216,11 +225,9 @@ public class StoryAggregatesService {
       String proto = String.valueOf(row[3]);
       String app = row[4] != null ? String.valueOf(row[4]) : null;
       FlowKey key = new FlowKey(src, dst, port, proto, app);
-      LocalDateTime ts = row[5] instanceof java.sql.Timestamp t
-          ? t.toLocalDateTime()
-          : (LocalDateTime) row[5];
-      groups.computeIfAbsent(key, k -> new ArrayList<>())
-          .add(ts);
+      LocalDateTime ts =
+          row[5] instanceof java.sql.Timestamp t ? t.toLocalDateTime() : (LocalDateTime) row[5];
+      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(ts);
     }
 
     List<BeaconCandidate> candidates = new ArrayList<>();
@@ -239,24 +246,24 @@ public class StoryAggregatesService {
       double mean = intervals.stream().mapToLong(Long::longValue).average().orElse(0);
       if (mean < 1000) continue; // ignore sub-second intervals (not beaconing)
 
-      double variance = intervals.stream()
-          .mapToDouble(v -> Math.pow(v - mean, 2))
-          .average().orElse(0);
+      double variance =
+          intervals.stream().mapToDouble(v -> Math.pow(v - mean, 2)).average().orElse(0);
       double stddev = Math.sqrt(variance);
       double cv = stddev / mean;
 
       if (cv < 0.3) {
         FlowKey k = e.getKey();
-        candidates.add(BeaconCandidate.builder()
-            .srcIp(k.src())
-            .dstIp(k.dst().isEmpty() ? null : k.dst())
-            .dstPort(k.port().isEmpty() ? null : parsePort(k.port()))
-            .protocol(k.proto())
-            .appName(k.app())
-            .flowCount(times.size())
-            .avgIntervalMs(Math.round(mean))
-            .cv(Math.round(cv * 1000.0) / 1000.0)
-            .build());
+        candidates.add(
+            BeaconCandidate.builder()
+                .srcIp(k.src())
+                .dstIp(k.dst().isEmpty() ? null : k.dst())
+                .dstPort(k.port().isEmpty() ? null : parsePort(k.port()))
+                .protocol(k.proto())
+                .appName(k.app())
+                .flowCount(times.size())
+                .avgIntervalMs(Math.round(mean))
+                .cv(Math.round(cv * 1000.0) / 1000.0)
+                .build());
       }
     }
 
@@ -266,6 +273,10 @@ public class StoryAggregatesService {
   }
 
   private static Integer parsePort(String s) {
-    try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
+    try {
+      return Integer.parseInt(s);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 }

@@ -29,7 +29,10 @@ public class StoryResponse {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private List<Finding> findings;
 
-  /** LLM-directed investigation steps: hypotheses, queries, and retrieved conversation evidence. Null for legacy cached stories. */
+  /**
+   * LLM-directed investigation steps: hypotheses, queries, and retrieved conversation evidence.
+   * Null for legacy cached stories.
+   */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private List<InvestigationStep> investigationSteps;
 }

@@ -17,7 +17,8 @@ public class LongSessionDetector {
   private final ConversationRepository conversationRepository;
 
   public List<Finding> detect(UUID fileId) {
-    List<Object[]> rows = conversationRepository.findLongSessionsByFileId(fileId, THRESHOLD_SECONDS);
+    List<Object[]> rows =
+        conversationRepository.findLongSessionsByFileId(fileId, THRESHOLD_SECONDS);
     List<Finding> findings = new ArrayList<>();
 
     for (Object[] row : rows) {
@@ -31,9 +32,10 @@ public class LongSessionDetector {
       long packetCount = ((Number) row[7]).longValue();
 
       long durationSec = (long) (durationMs / 1000);
-      String durationStr = durationSec < 3600
-          ? (durationSec / 60) + "m " + (durationSec % 60) + "s"
-          : (durationSec / 3600) + "h " + ((durationSec % 3600) / 60) + "m";
+      String durationStr =
+          durationSec < 3600
+              ? (durationSec / 60) + "m " + (durationSec % 60) + "s"
+              : (durationSec / 3600) + "h " + ((durationSec % 3600) / 60) + "m";
 
       Severity severity = durationSec > 3600 ? Severity.HIGH : Severity.MEDIUM;
       Map<String, Object> metrics = new LinkedHashMap<>();
@@ -43,16 +45,21 @@ public class LongSessionDetector {
       if (dstPortObj != null) metrics.put("dstPort", ((Number) dstPortObj).intValue());
 
       String appLabel = appName != null && !appName.isBlank() ? " [" + appName + "]" : "";
-      findings.add(Finding.builder()
-          .type(FindingType.LONG_SESSION)
-          .severity(severity)
-          .title(String.format("Long Session: %s → %s (%s%s, %s)", srcIp, dstIp, protocol, appLabel, durationStr))
-          .summary(String.format(
-              "Session from %s to %s lasted %s, transferring %d bytes across %d packets. Persistent sessions may indicate C2, data staging, or remote access.",
-              srcIp, dstIp, durationStr, totalBytes, packetCount))
-          .metrics(metrics)
-          .affectedIps(List.of(srcIp, dstIp))
-          .build());
+      findings.add(
+          Finding.builder()
+              .type(FindingType.LONG_SESSION)
+              .severity(severity)
+              .title(
+                  String.format(
+                      "Long Session: %s → %s (%s%s, %s)",
+                      srcIp, dstIp, protocol, appLabel, durationStr))
+              .summary(
+                  String.format(
+                      "Session from %s to %s lasted %s, transferring %d bytes across %d packets. Persistent sessions may indicate C2, data staging, or remote access.",
+                      srcIp, dstIp, durationStr, totalBytes, packetCount))
+              .metrics(metrics)
+              .affectedIps(List.of(srcIp, dstIp))
+              .build());
     }
     return findings;
   }
