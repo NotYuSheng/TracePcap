@@ -152,6 +152,20 @@ public class LlmClient {
    * @return the generated text
    */
   public String generateCompletion(String systemPrompt, String userPrompt) {
+    // Pre-flight context-length check — fail immediately without calling the LLM server.
+    // Estimate token count using the ~4 chars/token heuristic (good enough for a guard).
+    // Only fires when modelContextLength is known (LLM_CONTEXT_LENGTH set or auto-detected).
+    if (modelContextLength != null) {
+      int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 4;
+      int responseReserve = getEffectiveMaxTokens();
+      if (estimatedPromptTokens + responseReserve > modelContextLength) {
+        log.warn(
+            "Pre-flight check: estimated prompt ({} tokens) + response reserve ({} tokens) exceeds context length ({}). Failing early.",
+            estimatedPromptTokens, responseReserve, modelContextLength);
+        throw new ContextLengthExceededException(estimatedPromptTokens, modelContextLength, userPrompt);
+      }
+    }
+
     try {
       log.info("Sending request to LLM API: {}", llmConfig.getApi().getBaseUrl());
 

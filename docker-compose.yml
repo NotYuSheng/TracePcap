@@ -83,6 +83,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
+      LLM_CONTEXT_LENGTH: ${LLM_CONTEXT_LENGTH:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       # Timezone Configuration
       TZ: Asia/Singapore
