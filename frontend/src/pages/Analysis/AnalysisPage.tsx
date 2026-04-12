@@ -79,9 +79,13 @@ export const AnalysisPage = () => {
       {reportStep && (
         <div
           style={{
-            position: 'fixed', inset: 0, zIndex: 10001,
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10001,
             background: 'rgba(0,0,0,0.55)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <div className="card shadow-lg p-4 text-center" style={{ minWidth: 320 }}>

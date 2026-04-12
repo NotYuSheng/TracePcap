@@ -59,10 +59,7 @@ async function fetchGraphForFile(fileId: string) {
   );
 }
 
-export function useCompareData(
-  fileIds: string[],
-  labels: string[]
-): UseCompareDataReturn {
+export function useCompareData(fileIds: string[], labels: string[]): UseCompareDataReturn {
   const [mergedNodes, setMergedNodes] = useState<GraphNode[]>([]);
   const [mergedEdges, setMergedEdges] = useState<GraphEdge[]>([]);
   const [perFileStats, setPerFileStats] = useState<FileStats[]>([]);

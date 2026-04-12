@@ -100,11 +100,7 @@ const SPECIFIC_NODE_TYPES = new Set([
   'router',
 ]);
 
-function getNodeColor(nodeData: {
-  role: string;
-  nodeType?: string;
-  deviceType?: string;
-}): string {
+function getNodeColor(nodeData: { role: string; nodeType?: string; deviceType?: string }): string {
   if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
     return NODE_TYPE_COLORS[nodeData.nodeType];
   if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
@@ -373,12 +369,13 @@ function NetworkNode({ data }: NodeProps) {
 // ---------------------------------------------------------------------------
 
 function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: EdgeProps) {
-  const { label, offset, sources, primarySource } = (data ?? { label: '', offset: 0 }) as FlowEdgeData;
+  const { label, offset, sources, primarySource } = (data ?? {
+    label: '',
+    offset: 0,
+  }) as FlowEdgeData;
   const isSecondaryOnly =
     sources?.length === 1 && primarySource !== undefined && sources[0] !== primarySource;
-  const edgeStyle = isSecondaryOnly
-    ? { ...style, strokeDasharray: '6 3' }
-    : style;
+  const edgeStyle = isSecondaryOnly ? { ...style, strokeDasharray: '6 3' } : style;
 
   // Use a canonical direction for the perpendicular so that A→B and B→A
   // both receive the same perpendicular unit vector.
@@ -461,8 +458,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [themeMode]);
-  const darkMode =
-    themeMode === 'dark' || (themeMode === 'system' && sysDark);
+  const darkMode = themeMode === 'dark' || (themeMode === 'system' && sysDark);
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -553,7 +549,8 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   // When a node is hovered, dim all nodes/edges not connected to it.
   const { dimmedNodeIds, dimmedEdgeIds } = useMemo(() => {
-    if (!hoveredNodeId) return { dimmedNodeIds: new Set<string>(), dimmedEdgeIds: new Set<string>() };
+    if (!hoveredNodeId)
+      return { dimmedNodeIds: new Set<string>(), dimmedEdgeIds: new Set<string>() };
     const connectedEdgeIds = new Set<string>();
     const neighborIds = new Set<string>([hoveredNodeId]);
     rfEdges.forEach(e => {
@@ -582,7 +579,16 @@ export const NetworkGraph = memo(function NetworkGraph({
       if (e.source === hoveredNodeId) neighborIds.add(e.target);
       else if (e.target === hoveredNodeId) neighborIds.add(e.source);
     }
-    console.debug('[HiddenTooltip] hoveredNode:', hoveredNodeId, 'crossEdges:', crossEdges.length, 'hiddenNodes:', hiddenNodesList.length, 'neighborIds:', [...neighborIds]);
+    console.debug(
+      '[HiddenTooltip] hoveredNode:',
+      hoveredNodeId,
+      'crossEdges:',
+      crossEdges.length,
+      'hiddenNodes:',
+      hiddenNodesList.length,
+      'neighborIds:',
+      [...neighborIds]
+    );
     return [...neighborIds]
       .map(id => hiddenNodeMap.get(id))
       .filter((n): n is GraphNode => n !== undefined);
@@ -618,13 +624,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   return (
     <div className="network-graph-container" ref={containerRef}>
       {tooltipPos && hiddenNeighbors.length > 0 && (
-        <div
-          className="nf-hidden-tooltip"
-          style={{ left: tooltipPos.x, top: tooltipPos.y }}
-        >
-          <div className="nf-hidden-tooltip-title">
-            Hidden neighbors ({hiddenNeighbors.length})
-          </div>
+        <div className="nf-hidden-tooltip" style={{ left: tooltipPos.x, top: tooltipPos.y }}>
+          <div className="nf-hidden-tooltip-title">Hidden neighbors ({hiddenNeighbors.length})</div>
           <ul className="nf-hidden-tooltip-list">
             {hiddenNeighbors.slice(0, 10).map(n => (
               <li key={n.id}>
@@ -633,9 +634,7 @@ export const NetworkGraph = memo(function NetworkGraph({
               </li>
             ))}
             {hiddenNeighbors.length > 10 && (
-              <li className="nf-hidden-tooltip-more">
-                +{hiddenNeighbors.length - 10} more
-              </li>
+              <li className="nf-hidden-tooltip-more">+{hiddenNeighbors.length - 10} more</li>
             )}
           </ul>
         </div>

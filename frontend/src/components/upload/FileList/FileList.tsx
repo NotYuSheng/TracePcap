@@ -189,7 +189,8 @@ export const FileList = () => {
                     </p>
                     <p className="mb-0">
                       <i className="bi bi-diagram-3 me-1 text-primary"></i>
-                      Select <strong>two or more</strong> files using the checkboxes, then click <strong>Multi-Analysis</strong> for cross-PCAP topology analysis.
+                      Select <strong>two or more</strong> files using the checkboxes, then click{' '}
+                      <strong>Multi-Analysis</strong> for cross-PCAP topology analysis.
                     </p>
                   </div>
                 </div>
@@ -245,7 +246,9 @@ export const FileList = () => {
                 <div
                   key={file.fileId}
                   className="list-group-item d-flex justify-content-between align-items-center"
-                  style={file.status.toLowerCase() === 'completed' ? { cursor: 'pointer' } : undefined}
+                  style={
+                    file.status.toLowerCase() === 'completed' ? { cursor: 'pointer' } : undefined
+                  }
                   onClick={() => handleRowClick(file.fileId, file.status)}
                 >
                   <div className="flex-grow-1">
@@ -284,7 +287,10 @@ export const FileList = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="d-flex gap-2 align-items-center" onClick={e => e.stopPropagation()}>
+                  <div
+                    className="d-flex gap-2 align-items-center"
+                    onClick={e => e.stopPropagation()}
+                  >
                     <button
                       className="btn btn-outline-primary btn-sm"
                       onClick={() => navigate(`/analysis/${file.fileId}`)}
@@ -345,7 +351,14 @@ export const FileList = () => {
       </Modal>
 
       {/* Multi-select action modal */}
-      <Modal show={showMultiSelectModal} onHide={() => { setShowMultiSelectModal(false); setMergeError(null); }} centered>
+      <Modal
+        show={showMultiSelectModal}
+        onHide={() => {
+          setShowMultiSelectModal(false);
+          setMergeError(null);
+        }}
+        centered
+      >
         <Modal.Header closeButton>
           <Modal.Title>Analyze {selectedForCompare.size} Files</Modal.Title>
         </Modal.Header>
@@ -368,7 +381,8 @@ export const FileList = () => {
                 Analyze Together
               </div>
               <small className="text-muted">
-                View a joint topology diagram overlaying all selected files. The original files remain separate.
+                View a joint topology diagram overlaying all selected files. The original files
+                remain separate.
               </small>
             </button>
             <div className="border rounded p-3" style={{ borderColor: '#6c757d' }}>
@@ -405,7 +419,10 @@ export const FileList = () => {
           <button
             type="button"
             className="btn btn-outline-secondary"
-            onClick={() => { setShowMultiSelectModal(false); setMergeError(null); }}
+            onClick={() => {
+              setShowMultiSelectModal(false);
+              setMergeError(null);
+            }}
           >
             Cancel
           </button>

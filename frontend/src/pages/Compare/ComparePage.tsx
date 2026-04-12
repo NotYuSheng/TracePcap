@@ -76,11 +76,13 @@ export const ComparePage = () => {
           .catch(() => `File ${i + 1}`)
       )
     ).then(setFileNames);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileIds.join(',')]);
 
-  const { mergedNodes, mergedEdges, perFileStats, labels, loading, error } =
-    useCompareData(fileIds, fileNames ?? []);
+  const { mergedNodes, mergedEdges, perFileStats, labels, loading, error } = useCompareData(
+    fileIds,
+    fileNames ?? []
+  );
 
   // ── Hidden sources toggle ────────────────────────────────────────────────
   const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set());
@@ -414,7 +416,10 @@ export const ComparePage = () => {
           <span key={label}>
             <span
               className="badge"
-              style={{ fontSize: '0.8rem', backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }}
+              style={{
+                fontSize: '0.8rem',
+                backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length],
+              }}
             >
               <i className="bi bi-file-earmark-binary me-1" />
               {label}
@@ -436,7 +441,10 @@ export const ComparePage = () => {
                 <div className="mb-2">
                   <span
                     className="badge"
-                    style={{ fontSize: '0.7rem', backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length] }}
+                    style={{
+                      fontSize: '0.7rem',
+                      backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length],
+                    }}
                   >
                     {label}
                   </span>
@@ -449,7 +457,13 @@ export const ComparePage = () => {
                     { name: 'Data', value: formatBytes(stats.totalBytes) },
                   ].map(({ name, value }) => (
                     <div key={name} className="text-center px-2 py-1 tp-stat-box rounded border">
-                      <div style={{ fontSize: '0.65rem', color: '#6c757d', textTransform: 'uppercase' }}>
+                      <div
+                        style={{
+                          fontSize: '0.65rem',
+                          color: '#6c757d',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         {name}
                       </div>
                       <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{value}</div>

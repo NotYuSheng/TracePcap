@@ -30,21 +30,35 @@ function NarrativeInfoPopover() {
     <Popover id="info-narrative" style={{ maxWidth: '340px' }}>
       <Popover.Header>Narrative — How it works</Popover.Header>
       <Popover.Body className="small">
-        <p className="mb-2">The narrative is written by the LLM using deterministic findings computed from the full dataset — it writes prose, not analysis. Every CRITICAL and HIGH finding is guaranteed to appear in at least one highlight and timeline event.</p>
-        <p className="mb-2"><strong>Not included:</strong> packet payloads, HTTP bodies, DNS query names, TLS SNI, or raw conversation lists (replaced by structured findings).</p>
-        <p className="mb-0"><strong>Limitations:</strong> Treat this as a starting point for investigation. The LLM cannot invent findings not listed in the Deterministic Findings panel above.</p>
+        <p className="mb-2">
+          The narrative is written by the LLM using deterministic findings computed from the full
+          dataset — it writes prose, not analysis. Every CRITICAL and HIGH finding is guaranteed to
+          appear in at least one highlight and timeline event.
+        </p>
+        <p className="mb-2">
+          <strong>Not included:</strong> packet payloads, HTTP bodies, DNS query names, TLS SNI, or
+          raw conversation lists (replaced by structured findings).
+        </p>
+        <p className="mb-0">
+          <strong>Limitations:</strong> Treat this as a starting point for investigation. The LLM
+          cannot invent findings not listed in the Deterministic Findings panel above.
+        </p>
       </Popover.Body>
     </Popover>
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button type="button" className="btn btn-link p-0 text-muted ms-2" style={{ lineHeight: 1 }} aria-label="About Narrative">
+      <button
+        type="button"
+        className="btn btn-link p-0 text-muted ms-2"
+        style={{ lineHeight: 1 }}
+        aria-label="About Narrative"
+      >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
       </button>
     </OverlayTrigger>
   );
 }
-
 
 export const StoryPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
@@ -102,8 +116,12 @@ export const StoryPage = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      const serverMsg: string = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '';
-      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('exceeded');
+      const serverMsg: string =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '';
+      const isTimeout =
+        (err as { code?: string })?.code === 'ECONNABORTED' ||
+        msg.toLowerCase().includes('timeout') ||
+        msg.toLowerCase().includes('exceeded');
       if (isTimeout) {
         const minutes = Math.round(llmTimeoutMs / 60000);
         setError(
@@ -180,7 +198,6 @@ export const StoryPage = () => {
       fetchTimeline();
     }
   }, [fileId, granularity]);
-
 
   if (loadingStory) {
     return (
@@ -283,7 +300,6 @@ export const StoryPage = () => {
         </div>
       </div>
 
-
       {/* Traffic Timeline Visualization */}
       {!loadingTimeline && timelineData.length > 0 && (
         <div className="row mb-4">
@@ -332,7 +348,10 @@ export const StoryPage = () => {
       <div className="row">
         {/* Narrative Section */}
         <div className="col-lg-8">
-          <h5 className="mb-3 d-flex align-items-center">Narrative<NarrativeInfoPopover /></h5>
+          <h5 className="mb-3 d-flex align-items-center">
+            Narrative
+            <NarrativeInfoPopover />
+          </h5>
           <NarrativeView sections={story.narrative} />
         </div>
 

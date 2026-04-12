@@ -27,12 +27,12 @@
 :root {
   --tp-bg: #f8fafc;
   --tp-bg-subtle: #f8f9fa;
-  --tp-surface: #ffffff;
+  --tp-surface: #fff;
   --tp-surface-hover: #f8f9fa;
   --tp-border: #dee2e6;
   --tp-text: #212529;
   --tp-text-muted: #6c757d;
-  --tp-header-bg: #ffffff;
+  --tp-header-bg: #fff;
   --tp-footer-bg: #f8f9fa;
   --tp-scrollbar: #adb5bd;
 }

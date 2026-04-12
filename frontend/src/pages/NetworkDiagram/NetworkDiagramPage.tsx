@@ -47,11 +47,8 @@ export const NetworkDiagramPage = () => {
   // Draft value for the custom node count input — only applied on Enter/blur
   const [customInput, setCustomInput] = useState('');
   const [showSignificanceModal, setShowSignificanceModal] = useState(false);
-  const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } = useNetworkData(
-    fileId,
-    data,
-    nodeLimit
-  );
+  const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } =
+    useNetworkData(fileId, data, nodeLimit);
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   // Edge legend / protocol filter
@@ -412,69 +409,70 @@ export const NetworkDiagramPage = () => {
         </div>
       </div>
 
-      {hiddenNodes > 0 && (() => {
-        const totalNodes = stats.totalNodes;
-        const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
-        const applyCustom = () => {
-          const n = parseInt(customInput, 10);
-          if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));
-          setCustomInput('');
-        };
-        return (
-          <div className="alert alert-info mb-3">
-            <div className="d-flex align-items-start gap-2 flex-wrap">
-              <button
-                className="btn btn-link p-0 border-0 mt-1 flex-shrink-0"
-                style={{ lineHeight: 1 }}
-                title="How is significance determined?"
-                onClick={() => setShowSignificanceModal(true)}
-              >
-                <i className="bi bi-info-circle"></i>
-              </button>
-              <div className="flex-grow-1">
-                <div>
-                  Showing the <strong>{nodeLimit} most significant nodes</strong>
-                  {' '}({hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.
-                </div>
-                <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                  <span className="text-muted small fw-semibold me-1">Show:</span>
-                  {presets.map(p => (
+      {hiddenNodes > 0 &&
+        (() => {
+          const totalNodes = stats.totalNodes;
+          const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
+          const applyCustom = () => {
+            const n = parseInt(customInput, 10);
+            if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));
+            setCustomInput('');
+          };
+          return (
+            <div className="alert alert-info mb-3">
+              <div className="d-flex align-items-start gap-2 flex-wrap">
+                <button
+                  className="btn btn-link p-0 border-0 mt-1 flex-shrink-0"
+                  style={{ lineHeight: 1 }}
+                  title="How is significance determined?"
+                  onClick={() => setShowSignificanceModal(true)}
+                >
+                  <i className="bi bi-info-circle"></i>
+                </button>
+                <div className="flex-grow-1">
+                  <div>
+                    Showing the <strong>{nodeLimit} most significant nodes</strong> ({hiddenNodes}{' '}
+                    hidden). Ranked by traffic volume, risk signals, and connectivity.
+                  </div>
+                  <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                    <span className="text-muted small fw-semibold me-1">Show:</span>
+                    {presets.map(p => (
+                      <button
+                        key={p}
+                        className={`btn btn-sm ${nodeLimit === p ? 'btn-info' : 'btn-outline-secondary'}`}
+                        style={{ minWidth: 52 }}
+                        onClick={() => setNodeLimit(p)}
+                      >
+                        Top {p}
+                      </button>
+                    ))}
                     <button
-                      key={p}
-                      className={`btn btn-sm ${nodeLimit === p ? 'btn-info' : 'btn-outline-secondary'}`}
+                      className={`btn btn-sm ${nodeLimit >= totalNodes ? 'btn-info' : 'btn-outline-secondary'}`}
                       style={{ minWidth: 52 }}
-                      onClick={() => setNodeLimit(p)}
+                      onClick={() => setNodeLimit(totalNodes)}
                     >
-                      Top {p}
+                      All {totalNodes}
                     </button>
-                  ))}
-                  <button
-                    className={`btn btn-sm ${nodeLimit >= totalNodes ? 'btn-info' : 'btn-outline-secondary'}`}
-                    style={{ minWidth: 52 }}
-                    onClick={() => setNodeLimit(totalNodes)}
-                  >
-                    All {totalNodes}
-                  </button>
-                  <span className="text-muted small ms-2 me-1">or</span>
-                  <div className="input-group input-group-sm" style={{ width: 120 }}>
-                    <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      placeholder="Custom…"
-                      min={1}
-                      max={totalNodes}
-                      value={customInput}
-                      onChange={e => setCustomInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && applyCustom()}
-                      onBlur={applyCustom}
-                    />
+                    <span className="text-muted small ms-2 me-1">or</span>
+                    <div className="input-group input-group-sm" style={{ width: 120 }}>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        placeholder="Custom…"
+                        min={1}
+                        max={totalNodes}
+                        value={customInput}
+                        onChange={e => setCustomInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                        onBlur={applyCustom}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Row 2: Legend & Filters */}
       <div className="mb-3">
@@ -572,9 +570,9 @@ export const NetworkDiagramPage = () => {
         </Modal.Header>
         <Modal.Body>
           <p className="text-muted small mb-3">
-            When a PCAP has more nodes than the current display limit, TracePcap ranks every host
-            by a significance score and shows only the top-ranked ones. The score is a weighted sum
-            of three signals:
+            When a PCAP has more nodes than the current display limit, TracePcap ranks every host by
+            a significance score and shows only the top-ranked ones. The score is a weighted sum of
+            three signals:
           </p>
           <table className="table table-sm table-bordered mb-3">
             <thead>
@@ -586,17 +584,27 @@ export const NetworkDiagramPage = () => {
             </thead>
             <tbody>
               <tr>
-                <td><i className="bi bi-graph-up me-1 text-primary"></i>Traffic volume</td>
+                <td>
+                  <i className="bi bi-graph-up me-1 text-primary"></i>Traffic volume
+                </td>
                 <td>50%</td>
                 <td>Bytes transferred relative to the busiest node in the capture</td>
               </tr>
               <tr>
-                <td><i className="bi bi-shield-exclamation me-1 text-danger"></i>Risk signals</td>
+                <td>
+                  <i className="bi bi-shield-exclamation me-1 text-danger"></i>Risk signals
+                </td>
                 <td>30%</td>
-                <td>Whether any conversation involving this host has a flagged <strong>flow risk</strong> (nDPI risk flags) or a <strong>custom rule</strong> match</td>
+                <td>
+                  Whether any conversation involving this host has a flagged{' '}
+                  <strong>flow risk</strong> (nDPI risk flags) or a <strong>custom rule</strong>{' '}
+                  match
+                </td>
               </tr>
               <tr>
-                <td><i className="bi bi-diagram-2 me-1 text-success"></i>Connectivity</td>
+                <td>
+                  <i className="bi bi-diagram-2 me-1 text-success"></i>Connectivity
+                </td>
                 <td>20%</td>
                 <td>Number of distinct peers relative to the most-connected node</td>
               </tr>

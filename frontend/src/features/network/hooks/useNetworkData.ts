@@ -141,7 +141,7 @@ export function useNetworkData(
   // Re-fetch only when the file changes
   useEffect(() => {
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId]);
 
   // Re-transform (no network request) when maxNodes or analysisSummary changes
@@ -153,7 +153,7 @@ export function useNetworkData(
       analysisSummary,
       maxNodes
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxNodes, analysisSummary]);
 
   return {
