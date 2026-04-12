@@ -30,9 +30,8 @@ public class FindingsService {
   public List<Finding> detectAll(UUID fileId, long totalConversations, long totalBytes) {
     // Load full conversation list once — shared across detectors that need it
     List<ConversationEntity> all = conversationRepository.findByFileId(fileId);
-    List<ConversationEntity> tlsConversations = all.stream()
-        .filter(c -> c.getTlsIssuer() != null)
-        .collect(Collectors.toList());
+    List<ConversationEntity> tlsConversations =
+        all.stream().filter(c -> c.getTlsIssuer() != null).collect(Collectors.toList());
 
     List<Finding> findings = new ArrayList<>();
 
@@ -42,18 +41,24 @@ public class FindingsService {
     runDetector("Volume", () -> findings.addAll(volumeDetector.detect(fileId, totalBytes)));
     runDetector("FanOut", () -> findings.addAll(fanOutDetector.detect(fileId)));
     runDetector("LongSession", () -> findings.addAll(longSessionDetector.detect(fileId)));
-    runDetector("UnknownApp", () -> findings.addAll(unknownAppDetector.detect(fileId, totalConversations)));
-    runDetector("PortProtocolMismatch", () -> findings.addAll(portProtocolMismatchDetector.detect(all)));
+    runDetector(
+        "UnknownApp", () -> findings.addAll(unknownAppDetector.detect(fileId, totalConversations)));
+    runDetector(
+        "PortProtocolMismatch", () -> findings.addAll(portProtocolMismatchDetector.detect(all)));
 
     // Sort by severity (CRITICAL first), then by type for stable ordering
-    findings.sort(Comparator
-        .comparingInt((Finding f) -> f.getSeverity().ordinal())
-        .thenComparing(f -> f.getType().name()));
+    findings.sort(
+        Comparator.comparingInt((Finding f) -> f.getSeverity().ordinal())
+            .thenComparing(f -> f.getType().name()));
 
-    log.info("Findings for file {}: {} total ({} CRITICAL, {} HIGH, {} MEDIUM, {} LOW)",
-        fileId, findings.size(),
-        count(findings, Severity.CRITICAL), count(findings, Severity.HIGH),
-        count(findings, Severity.MEDIUM), count(findings, Severity.LOW));
+    log.info(
+        "Findings for file {}: {} total ({} CRITICAL, {} HIGH, {} MEDIUM, {} LOW)",
+        fileId,
+        findings.size(),
+        count(findings, Severity.CRITICAL),
+        count(findings, Severity.HIGH),
+        count(findings, Severity.MEDIUM),
+        count(findings, Severity.LOW));
     return findings;
   }
 

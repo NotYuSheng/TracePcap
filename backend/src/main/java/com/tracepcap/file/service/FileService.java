@@ -77,5 +77,6 @@ public interface FileService {
    * @param enableFileExtraction whether to run file extraction on the merged file
    * @return upload response for the newly created merged file
    */
-  FileUploadResponse mergeFiles(List<UUID> fileIds, String mergedFileName, boolean enableNdpi, boolean enableFileExtraction);
+  FileUploadResponse mergeFiles(
+      List<UUID> fileIds, String mergedFileName, boolean enableNdpi, boolean enableFileExtraction);
 }

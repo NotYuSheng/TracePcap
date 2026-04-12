@@ -28,7 +28,9 @@ public class StoryAggregates {
   /** Unknown application percentage across all conversations (0–100). */
   private double unknownAppPct;
 
-  /** Flows exhibiting periodic beaconing behaviour (CV of inter-arrival times &lt; 0.3, ≥3 flows). */
+  /**
+   * Flows exhibiting periodic beaconing behaviour (CV of inter-arrival times &lt; 0.3, ≥3 flows).
+   */
   private List<BeaconCandidate> beaconCandidates;
 
   @Data

@@ -114,10 +114,13 @@ public class FileController {
       @RequestParam(value = "enableFileExtraction", defaultValue = "true")
           boolean enableFileExtraction) {
 
-    log.info("Received merge request for {} files", request.getFileIds() != null ? request.getFileIds().size() : 0);
+    log.info(
+        "Received merge request for {} files",
+        request.getFileIds() != null ? request.getFileIds().size() : 0);
 
     FileUploadResponse response =
-        fileService.mergeFiles(request.getFileIds(), request.getMergedFileName(), enableNdpi, enableFileExtraction);
+        fileService.mergeFiles(
+            request.getFileIds(), request.getMergedFileName(), enableNdpi, enableFileExtraction);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }

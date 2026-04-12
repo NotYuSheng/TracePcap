@@ -89,17 +89,21 @@ public class PcapParserService {
 
       // Drain stderr in a background thread so it doesn't block stdout
       StringBuffer stderrBuf = new StringBuffer();
-      Thread stderrThread = new Thread(() -> {
-        try (BufferedReader err =
-            new BufferedReader(new InputStreamReader(process.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-          String l;
-          while ((l = err.readLine()) != null) {
-            if (stderrBuf.length() < 10_000) stderrBuf.append(l).append('\n');
-          }
-        } catch (Exception e) {
-          log.warn("Failed to drain tshark stderr", e);
-        }
-      });
+      Thread stderrThread =
+          new Thread(
+              () -> {
+                try (BufferedReader err =
+                    new BufferedReader(
+                        new InputStreamReader(
+                            process.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                  String l;
+                  while ((l = err.readLine()) != null) {
+                    if (stderrBuf.length() < 10_000) stderrBuf.append(l).append('\n');
+                  }
+                } catch (Exception e) {
+                  log.warn("Failed to drain tshark stderr", e);
+                }
+              });
       stderrThread.setDaemon(true);
       stderrThread.start();
 
@@ -242,7 +246,8 @@ public class PcapParserService {
       if (exitCode != 0 && packetNumber == 0) {
         String stderr = stderrBuf.toString().trim();
         log.error("tshark exited with code {} and parsed 0 packets. stderr: {}", exitCode, stderr);
-        throw new RuntimeException("tshark failed to parse PCAP file (exit " + exitCode + "): " + stderr);
+        throw new RuntimeException(
+            "tshark failed to parse PCAP file (exit " + exitCode + "): " + stderr);
       }
 
     } catch (RuntimeException e) {

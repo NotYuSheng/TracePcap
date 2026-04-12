@@ -27,15 +27,17 @@ public class UnknownAppDetector {
     metrics.put("totalConversations", totalConversations);
     metrics.put("pct", Math.round(pct * 10.0) / 10.0);
 
-    return List.of(Finding.builder()
-        .type(FindingType.UNKNOWN_APP)
-        .severity(severity)
-        .title(String.format("%.1f%% of Traffic Has Unknown Application", pct))
-        .summary(String.format(
-            "%d of %d conversations (%,.1f%%) could not be identified by nDPI. Unclassified traffic limits visibility and may conceal tunnelling or custom protocols.",
-            unknown, totalConversations, pct))
-        .metrics(metrics)
-        .affectedIps(List.of())
-        .build());
+    return List.of(
+        Finding.builder()
+            .type(FindingType.UNKNOWN_APP)
+            .severity(severity)
+            .title(String.format("%.1f%% of Traffic Has Unknown Application", pct))
+            .summary(
+                String.format(
+                    "%d of %d conversations (%,.1f%%) could not be identified by nDPI. Unclassified traffic limits visibility and may conceal tunnelling or custom protocols.",
+                    unknown, totalConversations, pct))
+            .metrics(metrics)
+            .affectedIps(List.of())
+            .build());
   }
 }

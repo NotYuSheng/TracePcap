@@ -34,7 +34,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -841,8 +840,10 @@ public class ReportService {
   private void addStoryNotGenerated(Document doc, int sec) throws Exception {
     addSectionHeader(doc, sec + ". AI-Generated Narrative");
     Font f = new Font(Font.HELVETICA, 10, Font.ITALIC, C_TEXT);
-    Paragraph p = new Paragraph(
-        "No story has been generated for this capture. Visit the Story tab to generate one before exporting the report.", f);
+    Paragraph p =
+        new Paragraph(
+            "No story has been generated for this capture. Visit the Story tab to generate one before exporting the report.",
+            f);
     p.setSpacingBefore(8);
     p.setSpacingAfter(8);
     doc.add(p);
@@ -853,9 +854,9 @@ public class ReportService {
   // ══════════════════════════════════════════════════════════════════════════
 
   private static final Color C_SEVERITY_CRITICAL = new Color(220, 38, 38);
-  private static final Color C_SEVERITY_HIGH     = new Color(234, 88, 12);
-  private static final Color C_SEVERITY_MEDIUM   = new Color(202, 138, 4);
-  private static final Color C_SEVERITY_LOW      = new Color(100, 116, 139);
+  private static final Color C_SEVERITY_HIGH = new Color(234, 88, 12);
+  private static final Color C_SEVERITY_MEDIUM = new Color(202, 138, 4);
+  private static final Color C_SEVERITY_LOW = new Color(100, 116, 139);
 
   private void addAiNarrative(Document doc, StoryResponse story, int sec) throws Exception {
     addSectionHeader(doc, sec + ". AI-Generated Narrative");
@@ -888,7 +889,10 @@ public class ReportService {
       for (int i = 0; i < story.getTimeline().size(); i++) {
         var event = story.getTimeline().get(i);
         Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-        addRow(table, bg, f,
+        addRow(
+            table,
+            bg,
+            f,
             nvl(event.getTitle()),
             nvl(event.getDescription()),
             event.getType() != null ? event.getType().name() : "—");
@@ -909,17 +913,19 @@ public class ReportService {
 
     String[] severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW"};
     for (String sev : severities) {
-      List<Finding> group = findings.stream()
-          .filter(f -> f.getSeverity() != null && sev.equals(f.getSeverity().name()))
-          .collect(java.util.stream.Collectors.toList());
+      List<Finding> group =
+          findings.stream()
+              .filter(f -> f.getSeverity() != null && sev.equals(f.getSeverity().name()))
+              .collect(java.util.stream.Collectors.toList());
       if (group.isEmpty()) continue;
 
-      Color sevColor = switch (sev) {
-        case "CRITICAL" -> C_SEVERITY_CRITICAL;
-        case "HIGH"     -> C_SEVERITY_HIGH;
-        case "MEDIUM"   -> C_SEVERITY_MEDIUM;
-        default         -> C_SEVERITY_LOW;
-      };
+      Color sevColor =
+          switch (sev) {
+            case "CRITICAL" -> C_SEVERITY_CRITICAL;
+            case "HIGH" -> C_SEVERITY_HIGH;
+            case "MEDIUM" -> C_SEVERITY_MEDIUM;
+            default -> C_SEVERITY_LOW;
+          };
 
       Font sevFont = new Font(Font.HELVETICA, 10, Font.BOLD, Color.WHITE);
       PdfPTable banner = new PdfPTable(1);
@@ -943,10 +949,12 @@ public class ReportService {
         Finding finding = group.get(i);
         Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
         String type = finding.getType() != null ? finding.getType().name().replace("_", " ") : "—";
-        String ips = finding.getAffectedIps() != null
-            ? String.join(", ", finding.getAffectedIps())
-            : "—";
-        addRow(table, bg, f,
+        String ips =
+            finding.getAffectedIps() != null ? String.join(", ", finding.getAffectedIps()) : "—";
+        addRow(
+            table,
+            bg,
+            f,
             type,
             nvl(finding.getTitle()),
             nvl(finding.getSummary()),
@@ -958,7 +966,9 @@ public class ReportService {
       for (Finding finding : group) {
         if (finding.getMetrics() != null && !finding.getMetrics().isEmpty()) {
           StringBuilder metrics = new StringBuilder("  Metrics — ");
-          finding.getMetrics().forEach((k, v) -> metrics.append(k).append(": ").append(v).append("  "));
+          finding
+              .getMetrics()
+              .forEach((k, v) -> metrics.append(k).append(": ").append(v).append("  "));
           Paragraph mp = new Paragraph(metrics.toString(), bodyFont);
           mp.setSpacingAfter(4);
           doc.add(mp);
@@ -984,7 +994,8 @@ public class ReportService {
 
       if (step.getHypothesis() != null) {
         Paragraph hyp = new Paragraph();
-        hyp.add(new Phrase("Hypothesis [" + step.getHypothesis().getConfidence() + "]: ", boldFont));
+        hyp.add(
+            new Phrase("Hypothesis [" + step.getHypothesis().getConfidence() + "]: ", boldFont));
         hyp.add(new Phrase(step.getHypothesis().getHypothesis(), bodyFont));
         hyp.setSpacingAfter(6);
         doc.add(hyp);
@@ -992,9 +1003,12 @@ public class ReportService {
 
       long total = step.getConversationCount();
       int shown = step.getConversations() != null ? step.getConversations().size() : 0;
-      Paragraph countLine = new Paragraph(
-          "Matching conversations: " + total + (shown < total ? " (showing top " + shown + ")" : ""),
-          bodyFont);
+      Paragraph countLine =
+          new Paragraph(
+              "Matching conversations: "
+                  + total
+                  + (shown < total ? " (showing top " + shown + ")" : ""),
+              bodyFont);
       countLine.setSpacingAfter(4);
       doc.add(countLine);
 
@@ -1009,7 +1023,10 @@ public class ReportService {
           var ev = step.getConversations().get(i);
           Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
           String risks = ev.getFlowRisks() != null ? String.join(", ", ev.getFlowRisks()) : "—";
-          addRow(table, bg, f,
+          addRow(
+              table,
+              bg,
+              f,
               nvl(ev.getSrcIp()),
               nvl(ev.getDstIp()),
               ev.getDstPort() != null ? String.valueOf(ev.getDstPort()) : "—",
