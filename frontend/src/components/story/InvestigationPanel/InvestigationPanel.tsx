@@ -11,15 +11,30 @@ function InfoPopover() {
     <Popover id="info-investigation" style={{ maxWidth: '340px' }}>
       <Popover.Header>Investigation — How it works</Popover.Header>
       <Popover.Body className="small">
-        <p className="mb-2">Before writing the narrative, the LLM analyses the deterministic findings and traffic timeline, then generates hypotheses and targeted queries to retrieve real conversation evidence from the database.</p>
-        <p className="mb-2">Each query returns the top 10 matching conversations by volume. The LLM uses this evidence to confirm or refute its hypotheses in the final narrative.</p>
-        <p className="mb-0"><strong>Limitations:</strong> Query generation is LLM-driven and may not cover every finding. Queries cap at 5 per generation.</p>
+        <p className="mb-2">
+          Before writing the narrative, the LLM analyses the deterministic findings and traffic
+          timeline, then generates hypotheses and targeted queries to retrieve real conversation
+          evidence from the database.
+        </p>
+        <p className="mb-2">
+          Each query returns the top 10 matching conversations by volume. The LLM uses this evidence
+          to confirm or refute its hypotheses in the final narrative.
+        </p>
+        <p className="mb-0">
+          <strong>Limitations:</strong> Query generation is LLM-driven and may not cover every
+          finding. Queries cap at 5 per generation.
+        </p>
       </Popover.Body>
     </Popover>
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button type="button" className="btn btn-link p-0 text-muted ms-2" style={{ lineHeight: 1 }} aria-label="About Investigation">
+      <button
+        type="button"
+        className="btn btn-link p-0 text-muted ms-2"
+        style={{ lineHeight: 1 }}
+        aria-label="About Investigation"
+      >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
       </button>
     </OverlayTrigger>
@@ -54,13 +69,17 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
           <span className="badge bg-secondary font-monospace">{step.query.id}</span>
           <span className="fw-semibold small">{step.query.label}</span>
           {step.hypothesis && (
-            <span className={`badge ${confidenceBadge[step.hypothesis.confidence] ?? 'bg-secondary'}`}>
+            <span
+              className={`badge ${confidenceBadge[step.hypothesis.confidence] ?? 'bg-secondary'}`}
+            >
               {step.hypothesis.confidence}
             </span>
           )}
         </div>
         <div className="d-flex align-items-center gap-2 text-muted small flex-shrink-0 ms-2">
-          <span>{step.conversationCount} conversation{step.conversationCount !== 1 ? 's' : ''}</span>
+          <span>
+            {step.conversationCount} conversation{step.conversationCount !== 1 ? 's' : ''}
+          </span>
           <i className={`bi bi-chevron-${expanded ? 'up' : 'down'}`}></i>
         </div>
       </button>
@@ -74,9 +93,7 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
             </p>
           )}
 
-          {!hasResults && (
-            <p className="text-muted small mb-0">No matching conversations found.</p>
-          )}
+          {!hasResults && <p className="text-muted small mb-0">No matching conversations found.</p>}
 
           {hasResults && (
             <>
@@ -103,13 +120,23 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
                         <td>{conv.protocol}</td>
                         <td>{conv.appName ?? '-'}</td>
                         <td>{conv.totalBytes != null ? formatBytes(conv.totalBytes) : '-'}</td>
-                        <td className="text-muted">{conv.startTime ? conv.startTime.substring(11, 19) : '-'}</td>
+                        <td className="text-muted">
+                          {conv.startTime ? conv.startTime.substring(11, 19) : '-'}
+                        </td>
                         <td>
-                          {conv.flowRisks && conv.flowRisks.length > 0
-                            ? conv.flowRisks.map(r => (
-                                <span key={r} className="badge bg-danger me-1" style={{ fontSize: '0.65rem' }}>{r}</span>
-                              ))
-                            : <span className="text-muted">-</span>}
+                          {conv.flowRisks && conv.flowRisks.length > 0 ? (
+                            conv.flowRisks.map(r => (
+                              <span
+                                key={r}
+                                className="badge bg-danger me-1"
+                                style={{ fontSize: '0.65rem' }}
+                              >
+                                {r}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-muted">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -118,7 +145,8 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
               </div>
               {step.conversationCount > step.conversations.length && (
                 <p className="text-muted small mt-1 mb-0">
-                  Showing top {step.conversations.length} of {step.conversationCount.toLocaleString()} total matches.
+                  Showing top {step.conversations.length} of{' '}
+                  {step.conversationCount.toLocaleString()} total matches.
                 </p>
               )}
             </>
@@ -142,14 +170,20 @@ export const InvestigationPanel = ({ steps }: InvestigationPanelProps) => {
           <InfoPopover />
         </h6>
         <div className="d-flex gap-2">
-          <span className="badge bg-primary">{steps.length} quer{steps.length !== 1 ? 'ies' : 'y'}</span>
-          <span className="badge bg-secondary">{hypothesisCount} hypothesis{hypothesisCount !== 1 ? 'es' : ''}</span>
+          <span className="badge bg-primary">
+            {steps.length} quer{steps.length !== 1 ? 'ies' : 'y'}
+          </span>
+          <span className="badge bg-secondary">
+            {hypothesisCount} hypothesis{hypothesisCount !== 1 ? 'es' : ''}
+          </span>
           <span className="badge bg-success">{withEvidenceCount} with evidence</span>
         </div>
       </div>
       <div className="card-body">
         <p className="text-muted small mb-3">
-          The LLM analysed the findings and timeline, then issued {steps.length} targeted quer{steps.length !== 1 ? 'ies' : 'y'} to retrieve real conversation evidence before writing the narrative.
+          The LLM analysed the findings and timeline, then issued {steps.length} targeted quer
+          {steps.length !== 1 ? 'ies' : 'y'} to retrieve real conversation evidence before writing
+          the narrative.
         </p>
         {steps.map(step => (
           <QueryResultTable key={step.query.id} step={step} />

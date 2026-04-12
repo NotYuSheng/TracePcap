@@ -247,7 +247,12 @@ function selectSignificantNodes(
   nodes: GraphNode[],
   edges: GraphEdge[],
   limit: number
-): { significantNodes: GraphNode[]; hiddenCount: number; hiddenNodesList: GraphNode[]; crossEdges: GraphEdge[] } {
+): {
+  significantNodes: GraphNode[];
+  hiddenCount: number;
+  hiddenNodesList: GraphNode[];
+  crossEdges: GraphEdge[];
+} {
   if (nodes.length <= limit) {
     return { significantNodes: nodes, hiddenCount: 0, hiddenNodesList: [], crossEdges: [] };
   }
@@ -284,9 +289,7 @@ function selectSignificantNodes(
   const hiddenNodesList = nodes.filter(n => !sigNodeIds.has(n.id));
 
   // Cross-edges: exactly one endpoint is hidden (visible ↔ hidden connections)
-  const crossEdges = edges.filter(
-    e => sigNodeIds.has(e.source) !== sigNodeIds.has(e.target)
-  );
+  const crossEdges = edges.filter(e => sigNodeIds.has(e.source) !== sigNodeIds.has(e.target));
 
   return { significantNodes, hiddenCount: hiddenNodesList.length, hiddenNodesList, crossEdges };
 }

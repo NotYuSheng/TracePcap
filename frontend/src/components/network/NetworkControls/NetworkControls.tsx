@@ -579,9 +579,9 @@ export function NetworkControls({
                           title="Risk Type"
                           body={
                             <>
-                              Filter by <strong>nDPI</strong> risk flags assigned to a
-                              conversation. Examples: clear-text credentials, unsafe protocols,
-                              known malicious signatures.
+                              Filter by <strong>nDPI</strong> risk flags assigned to a conversation.
+                              Examples: clear-text credentials, unsafe protocols, known malicious
+                              signatures.
                               <br />
                               <a
                                 href="/ndpi-reference.html"

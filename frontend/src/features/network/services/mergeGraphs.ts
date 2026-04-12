@@ -36,10 +36,7 @@ function edgeKey(e: GraphEdge): string {
  * Each resulting node/edge carries a `sources` array indicating which file(s)
  * it appears in, which drives the visual encoding in NetworkGraph.
  */
-export function mergeGraphs(
-  graphs: NetworkGraphData[],
-  labels: string[]
-): NetworkGraphData {
+export function mergeGraphs(graphs: NetworkGraphData[], labels: string[]): NetworkGraphData {
   const nodeMap = new Map<string, GraphNode>();
   const edgeMap = new Map<string, GraphEdge>();
 

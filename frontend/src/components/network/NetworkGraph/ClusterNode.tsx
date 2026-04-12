@@ -89,19 +89,29 @@ export function ClusterNode({ data }: NodeProps) {
       <div className="network-flow-cluster-stats">{statsText}</div>
 
       {/* Role mini-bar */}
-      <div className="network-flow-cluster-rolebar" title="Role breakdown: client / server / both / unknown">
+      <div
+        className="network-flow-cluster-rolebar"
+        title="Role breakdown: client / server / both / unknown"
+      >
         {clientPct > 0 && (
-          <div style={{ width: `${clientPct}%`, background: '#3498db' }} title={`${roleBreakdown?.client ?? 0} clients`} />
+          <div
+            style={{ width: `${clientPct}%`, background: '#3498db' }}
+            title={`${roleBreakdown?.client ?? 0} clients`}
+          />
         )}
         {serverPct > 0 && (
-          <div style={{ width: `${serverPct}%`, background: '#2ecc71' }} title={`${roleBreakdown?.server ?? 0} servers`} />
+          <div
+            style={{ width: `${serverPct}%`, background: '#2ecc71' }}
+            title={`${roleBreakdown?.server ?? 0} servers`}
+          />
         )}
         {bothPct > 0 && (
-          <div style={{ width: `${bothPct}%`, background: '#9b59b6' }} title={`${roleBreakdown?.both ?? 0} both`} />
+          <div
+            style={{ width: `${bothPct}%`, background: '#9b59b6' }}
+            title={`${roleBreakdown?.both ?? 0} both`}
+          />
         )}
-        {unknownPct > 0 && (
-          <div style={{ width: `${unknownPct}%`, background: '#95a5a6' }} />
-        )}
+        {unknownPct > 0 && <div style={{ width: `${unknownPct}%`, background: '#95a5a6' }} />}
       </div>
     </div>
   );

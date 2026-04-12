@@ -1,26 +1,42 @@
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
-import type {
-  StoryAggregates,
-  AsnEntry,
-  ProtocolRiskEntry,
-  BeaconCandidate,
-} from '@/types';
+import type { StoryAggregates, AsnEntry, ProtocolRiskEntry, BeaconCandidate } from '@/types';
 
 function InfoPopover() {
   const popover = (
     <Popover id="info-aggregates" style={{ maxWidth: '340px' }}>
       <Popover.Header>Traffic Intelligence — How it works</Popover.Header>
       <Popover.Body className="small">
-        <p className="mb-2">These figures are computed deterministically from <strong>all conversations</strong> in the dataset — not just the LLM evidence sample — so they accurately reflect the full capture.</p>
-        <p className="mb-2"><strong>Beacon detection</strong> uses a statistical heuristic: flows with ≥ 3 connections to the same destination are tested for periodicity using the coefficient of variation (CV) of inter-arrival times. A low CV (&lt; 0.1) suggests highly regular, automated traffic. <strong>Limitations:</strong> short captures may produce false positives; legitimate software (e.g. NTP, telemetry) can appear beacon-like.</p>
-        <p className="mb-2"><strong>TLS health</strong> is based on certificate issuer metadata extracted during analysis. Certificates are not re-validated at display time.</p>
-        <p className="mb-0"><strong>ASN / geo data</strong> is enriched via an external API at analysis time and may not reflect recent IP reassignments.</p>
+        <p className="mb-2">
+          These figures are computed deterministically from <strong>all conversations</strong> in
+          the dataset — not just the LLM evidence sample — so they accurately reflect the full
+          capture.
+        </p>
+        <p className="mb-2">
+          <strong>Beacon detection</strong> uses a statistical heuristic: flows with ≥ 3 connections
+          to the same destination are tested for periodicity using the coefficient of variation (CV)
+          of inter-arrival times. A low CV (&lt; 0.1) suggests highly regular, automated traffic.{' '}
+          <strong>Limitations:</strong> short captures may produce false positives; legitimate
+          software (e.g. NTP, telemetry) can appear beacon-like.
+        </p>
+        <p className="mb-2">
+          <strong>TLS health</strong> is based on certificate issuer metadata extracted during
+          analysis. Certificates are not re-validated at display time.
+        </p>
+        <p className="mb-0">
+          <strong>ASN / geo data</strong> is enriched via an external API at analysis time and may
+          not reflect recent IP reassignments.
+        </p>
       </Popover.Body>
     </Popover>
   );
   return (
     <OverlayTrigger trigger="click" placement="left" overlay={popover} rootClose>
-      <button type="button" className="btn btn-link p-0 text-muted ms-1" style={{ lineHeight: 1 }} aria-label="About Traffic Intelligence">
+      <button
+        type="button"
+        className="btn btn-link p-0 text-muted ms-1"
+        style={{ lineHeight: 1 }}
+        aria-label="About Traffic Intelligence"
+      >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
       </button>
     </OverlayTrigger>
@@ -48,9 +64,7 @@ function CoverageBanner({ aggregates }: { aggregates: StoryAggregates }) {
   const cov = aggregates.coverage;
   const riskTotal = aggregates.protocolRiskMatrix.reduce((s, r) => s + r.atRisk, 0);
   const riskPct =
-    cov.totalConversations > 0
-      ? ((riskTotal / cov.totalConversations) * 100).toFixed(1)
-      : '0.0';
+    cov.totalConversations > 0 ? ((riskTotal / cov.totalConversations) * 100).toFixed(1) : '0.0';
 
   return (
     <div className="d-flex flex-wrap gap-3 mb-0">
@@ -65,7 +79,9 @@ function CoverageBanner({ aggregates }: { aggregates: StoryAggregates }) {
       </div>
       <div className="vr d-none d-md-block" />
       <div className="text-center px-3">
-        <div className={`fs-5 fw-semibold ${Number(riskPct) > 10 ? 'text-danger' : Number(riskPct) > 0 ? 'text-warning' : 'text-success'}`}>
+        <div
+          className={`fs-5 fw-semibold ${Number(riskPct) > 10 ? 'text-danger' : Number(riskPct) > 0 ? 'text-warning' : 'text-success'}`}
+        >
           {riskPct}%
         </div>
         <div className="text-muted small">Flows At Risk</div>
@@ -79,8 +95,12 @@ function CoverageBanner({ aggregates }: { aggregates: StoryAggregates }) {
         <>
           <div className="vr d-none d-md-block" />
           <div className="text-center px-3">
-            <div className={`fs-5 fw-semibold ${(aggregates.tlsAnomalySummary.selfSigned + aggregates.tlsAnomalySummary.expired + aggregates.tlsAnomalySummary.unknownCa) > 0 ? 'text-warning' : 'text-success'}`}>
-              {aggregates.tlsAnomalySummary.selfSigned + aggregates.tlsAnomalySummary.expired + aggregates.tlsAnomalySummary.unknownCa}
+            <div
+              className={`fs-5 fw-semibold ${aggregates.tlsAnomalySummary.selfSigned + aggregates.tlsAnomalySummary.expired + aggregates.tlsAnomalySummary.unknownCa > 0 ? 'text-warning' : 'text-success'}`}
+            >
+              {aggregates.tlsAnomalySummary.selfSigned +
+                aggregates.tlsAnomalySummary.expired +
+                aggregates.tlsAnomalySummary.unknownCa}
             </div>
             <div className="text-muted small">TLS Anomalies</div>
           </div>
@@ -91,7 +111,8 @@ function CoverageBanner({ aggregates }: { aggregates: StoryAggregates }) {
 }
 
 function TopAsnsTable({ entries }: { entries: AsnEntry[] }) {
-  if (entries.length === 0) return <p className="text-muted small mb-0">No external destinations detected.</p>;
+  if (entries.length === 0)
+    return <p className="text-muted small mb-0">No external destinations detected.</p>;
 
   return (
     <table className="table table-sm table-hover mb-0 small">
@@ -113,7 +134,11 @@ function TopAsnsTable({ entries }: { entries: AsnEntry[] }) {
                 </span>
               )}
               {e.org ?? 'Unknown'}
-              {e.asn && <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>({e.asn})</span>}
+              {e.asn && (
+                <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>
+                  ({e.asn})
+                </span>
+              )}
             </td>
             <td className="text-end">{e.flowCount.toLocaleString()}</td>
             <td className="text-end">{fmtBytes(e.bytes)}</td>
@@ -168,7 +193,8 @@ function ProtocolRiskTable({ entries }: { entries: ProtocolRiskEntry[] }) {
 
 function TlsBadges({ aggregates }: { aggregates: StoryAggregates }) {
   const tls = aggregates.tlsAnomalySummary;
-  if (tls.total === 0) return <p className="text-muted small mb-0">No TLS conversations detected.</p>;
+  if (tls.total === 0)
+    return <p className="text-muted small mb-0">No TLS conversations detected.</p>;
 
   const anomalies = tls.selfSigned + tls.expired + tls.unknownCa;
   if (anomalies === 0) {
@@ -184,32 +210,28 @@ function TlsBadges({ aggregates }: { aggregates: StoryAggregates }) {
     <div className="d-flex flex-wrap gap-2 align-items-center">
       <span className="text-muted small">{tls.total} TLS flows —</span>
       {tls.selfSigned > 0 && (
-        <span className="badge bg-warning text-dark">
-          {tls.selfSigned} self-signed
-        </span>
+        <span className="badge bg-warning text-dark">{tls.selfSigned} self-signed</span>
       )}
-      {tls.expired > 0 && (
-        <span className="badge bg-danger">
-          {tls.expired} expired
-        </span>
-      )}
+      {tls.expired > 0 && <span className="badge bg-danger">{tls.expired} expired</span>}
       {tls.unknownCa > 0 && (
-        <span className="badge bg-secondary">
-          {tls.unknownCa} unknown issuer
-        </span>
+        <span className="badge bg-secondary">{tls.unknownCa} unknown issuer</span>
       )}
     </div>
   );
 }
 
 function BeaconList({ candidates }: { candidates: BeaconCandidate[] }) {
-  if (candidates.length === 0) return <p className="text-muted small mb-0">No beacon-like patterns detected.</p>;
+  if (candidates.length === 0)
+    return <p className="text-muted small mb-0">No beacon-like patterns detected.</p>;
 
   return (
     <div className="d-flex flex-column gap-2">
       {candidates.map((b, i) => (
         <div key={i} className="d-flex align-items-start gap-2 small">
-          <span className="badge bg-danger mt-1" style={{ minWidth: '1.5rem', textAlign: 'center' }}>
+          <span
+            className="badge bg-danger mt-1"
+            style={{ minWidth: '1.5rem', textAlign: 'center' }}
+          >
             {i + 1}
           </span>
           <div>
@@ -244,7 +266,10 @@ export const AggregatesPanel = ({ aggregates }: Props) => {
     <div className="card mb-4">
       <div className="card-header d-flex align-items-center gap-2">
         <i className="bi bi-bar-chart-line text-primary" />
-        <h6 className="mb-0 d-flex align-items-center">Traffic Intelligence — Full Dataset<InfoPopover /></h6>
+        <h6 className="mb-0 d-flex align-items-center">
+          Traffic Intelligence — Full Dataset
+          <InfoPopover />
+        </h6>
         {(hasBeacons || hasTlsAnomalies) && (
           <span className="badge bg-danger ms-auto">Findings</span>
         )}
@@ -285,7 +310,9 @@ export const AggregatesPanel = ({ aggregates }: Props) => {
             <h6 className="text-muted text-uppercase small fw-semibold mb-2 d-flex align-items-center gap-2">
               Beacon Candidates
               {hasBeacons && (
-                <span className="badge bg-danger fw-normal">{aggregates.beaconCandidates.length}</span>
+                <span className="badge bg-danger fw-normal">
+                  {aggregates.beaconCandidates.length}
+                </span>
               )}
             </h6>
             <BeaconList candidates={aggregates.beaconCandidates} />

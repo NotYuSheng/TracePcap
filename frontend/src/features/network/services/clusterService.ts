@@ -218,10 +218,7 @@ export function applySubnetClustering(
   };
 
   // Aggregate by (resolvedSource, resolvedTarget, protocol)
-  const edgeAgg = new Map<
-    string,
-    { edge: GraphEdge; packetCount: number; totalBytes: number }
-  >();
+  const edgeAgg = new Map<string, { edge: GraphEdge; packetCount: number; totalBytes: number }>();
 
   for (const edge of edges) {
     const rs = resolve(edge.source);
@@ -246,15 +243,17 @@ export function applySubnetClustering(
     }
   }
 
-  const outputEdges: GraphEdge[] = [...edgeAgg.values()].map(({ edge, packetCount, totalBytes }) => {
-    const raw = edge.data.appName ?? edge.data.protocol;
-    const displayName = raw.charAt(0).toUpperCase() + raw.slice(1);
-    return {
-      ...edge,
-      label: `${displayName} (${packetCount.toLocaleString()})`,
-      data: { ...edge.data, packetCount, totalBytes },
-    };
-  });
+  const outputEdges: GraphEdge[] = [...edgeAgg.values()].map(
+    ({ edge, packetCount, totalBytes }) => {
+      const raw = edge.data.appName ?? edge.data.protocol;
+      const displayName = raw.charAt(0).toUpperCase() + raw.slice(1);
+      return {
+        ...edge,
+        label: `${displayName} (${packetCount.toLocaleString()})`,
+        data: { ...edge.data, packetCount, totalBytes },
+      };
+    }
+  );
 
   return { nodes: outputNodes, edges: outputEdges };
 }

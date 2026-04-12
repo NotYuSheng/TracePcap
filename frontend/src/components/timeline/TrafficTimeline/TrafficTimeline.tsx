@@ -27,9 +27,18 @@ const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
 
 // Distinct colours for protocols — cycles if more than 12
 const PROTOCOL_COLORS = [
-  '#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0',
-  '#6f42c1', '#fd7e14', '#20c997', '#d63384', '#6c757d',
-  '#0dcaf0', '#adb5bd',
+  '#0d6efd',
+  '#198754',
+  '#dc3545',
+  '#ffc107',
+  '#0dcaf0',
+  '#6f42c1',
+  '#fd7e14',
+  '#20c997',
+  '#d63384',
+  '#6c757d',
+  '#0dcaf0',
+  '#adb5bd',
 ];
 
 function protocolColor(index: number): string {
@@ -121,19 +130,21 @@ export const TrafficTimeline = ({
   }, [data]);
 
   // Build chart data: each bin gets a key per protocol (packets mode) or total bytes
-  const chartData = useMemo(() =>
-    data.map(point => {
-      const entry: Record<string, number | string> = { timestamp: point.timestamp };
-      if (viewMode === 'packets') {
-        allProtocols.forEach(proto => {
-          entry[proto] = point.protocols?.[proto] ?? 0;
-        });
-      } else {
-        entry['bytes'] = point.bytes;
-      }
-      return entry;
-    }),
-  [data, viewMode, allProtocols]);
+  const chartData = useMemo(
+    () =>
+      data.map(point => {
+        const entry: Record<string, number | string> = { timestamp: point.timestamp };
+        if (viewMode === 'packets') {
+          allProtocols.forEach(proto => {
+            entry[proto] = point.protocols?.[proto] ?? 0;
+          });
+        } else {
+          entry['bytes'] = point.bytes;
+        }
+        return entry;
+      }),
+    [data, viewMode, allProtocols]
+  );
 
   const xAxisTickFormatter = useMemo(() => {
     const secs = effectiveInterval(data);
@@ -196,7 +207,11 @@ export const TrafficTimeline = ({
       </div>
 
       <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} barCategoryGap="20%">
+        <BarChart
+          data={chartData}
+          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          barCategoryGap="20%"
+        >
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="timestamp" tickFormatter={xAxisTickFormatter} />
           <YAxis
@@ -209,7 +224,13 @@ export const TrafficTimeline = ({
             <>
               <Legend />
               {allProtocols.map((proto, i) => (
-                <Bar key={proto} dataKey={proto} stackId="a" fill={protocolColor(i)} isAnimationActive={false} />
+                <Bar
+                  key={proto}
+                  dataKey={proto}
+                  stackId="a"
+                  fill={protocolColor(i)}
+                  isAnimationActive={false}
+                />
               ))}
             </>
           ) : (
@@ -224,7 +245,8 @@ export const TrafficTimeline = ({
 
       <div className="mt-3">
         <small className="text-muted">
-          <strong>Tip:</strong> Hover over a bar to see the protocol breakdown for that time window. Each colour represents a distinct protocol. Use granularity to zoom in or out.
+          <strong>Tip:</strong> Hover over a bar to see the protocol breakdown for that time window.
+          Each colour represents a distinct protocol. Use granularity to zoom in or out.
         </small>
       </div>
     </div>
