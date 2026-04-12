@@ -129,7 +129,6 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
                 className="btn btn-outline-secondary btn-sm text-start"
                 style={{ fontSize: '0.78rem', maxWidth: '100%' }}
                 onClick={() => {
-                  setCurrentSuggestions([]);
                   setInput(q);
                   inputRef.current?.focus();
                 }}
