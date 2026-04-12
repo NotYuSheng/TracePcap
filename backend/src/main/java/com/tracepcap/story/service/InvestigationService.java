@@ -102,10 +102,8 @@ public class InvestigationService {
       if (q.getMaxBytes() != null && byteFilterSafe) predicates.add(cb.lessThanOrEqualTo(root.get("totalBytes"), q.getMaxBytes()));
 
       if (Boolean.TRUE.equals(q.getHasRisks())) {
-        predicates.add(cb.isNotNull(root.get("flowRisks")));
-        // array_length(flow_risks, 1) IS NOT NULL means the array is non-empty
-        predicates.add(cb.isNotNull(
-            cb.function("array_length", Integer.class, root.get("flowRisks"), cb.literal(1))));
+        predicates.add(cb.greaterThan(
+            cb.function("cardinality", Integer.class, root.get("flowRisks")), 0));
       }
 
       if (Boolean.TRUE.equals(q.getHasTlsAnomaly())) {
