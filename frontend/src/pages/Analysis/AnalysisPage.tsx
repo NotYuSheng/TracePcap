@@ -60,6 +60,7 @@ export const AnalysisPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
+  const { filters } = useConversationFilters();
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
