@@ -23,6 +23,7 @@ public class LlmConfig {
     private String model;
     private Double temperature;
     private Integer maxTokens;
+    private Integer contextLength;
     private Integer timeoutSeconds;
   }
 

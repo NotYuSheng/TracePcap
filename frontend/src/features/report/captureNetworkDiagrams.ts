@@ -31,6 +31,7 @@ import { networkService } from '@/features/network/services/networkService';
 import { NetworkGraph } from '@/components/network/NetworkGraph/NetworkGraph';
 import { CONVERSATION_LIMIT_ENABLED } from '@/features/network/hooks/useNetworkData';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
+import type { ConversationFilters } from '@/features/conversation/types';
 import type { AnalysisSummary } from '@/types';
 
 // Match the same conversation cap the Network Diagram page uses so the report
@@ -162,7 +163,8 @@ export interface DiagramImages {
 
 export async function captureNetworkDiagrams(
   fileId: string,
-  analysisSummary?: AnalysisSummary
+  analysisSummary?: AnalysisSummary,
+  sessionFilters?: Partial<ConversationFilters>
 ): Promise<DiagramImages> {
   const response = await conversationService.getConversations(fileId, {
     ip: '',
@@ -178,6 +180,7 @@ export async function captureNetworkDiagrams(
     customSignatures: [],
     deviceTypes: [],
     countries: [],
+    ...sessionFilters,
     sortBy: '',
     sortDir: 'asc',
     page: 1,

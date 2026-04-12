@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { AnalysisLoadingView } from './AnalysisLoadingView';
@@ -12,6 +13,7 @@ export const AnalysisPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
+  const { filters } = useConversationFilters();
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export const AnalysisPage = () => {
     setReportStep('Rendering network diagrams…');
     try {
       // Render both ELK layouts and capture as PNG
-      const diagrams = await captureNetworkDiagrams(fileId, data ?? undefined);
+      const diagrams = await captureNetworkDiagrams(fileId, data ?? undefined, filters);
 
       setReportStep('Building PDF…');
       // POST diagrams + fileId → receive PDF blob

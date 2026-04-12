@@ -1,7 +1,10 @@
 package com.tracepcap.story.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.tracepcap.common.exception.ContextLengthExceededException;
 import com.tracepcap.common.exception.LlmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import com.tracepcap.config.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
@@ -20,6 +23,10 @@ public class LlmClient {
 
   private final LlmConfig llmConfig;
   private final RestTemplate llmRestTemplate;
+  private static final Pattern PATTERN_PROMPT_TOKENS = Pattern.compile("\\((\\d+) in the messages");
+  private static final Pattern PATTERN_CONTEXT_LENGTH = Pattern.compile("maximum context length is (\\d+)");
+  private static final Pattern PATTERN_CONTEXT_LENGTH_ALT = Pattern.compile("context length is (\\d+)");
+
   private volatile Integer effectiveMaxTokens;
   private volatile Integer modelContextLength;
 
@@ -37,20 +44,40 @@ public class LlmClient {
         .start(
             () -> {
               try {
-                log.info("Querying LLM server for model capabilities...");
-                ModelInfo modelInfo = queryModelCapabilities();
+                // If LLM_CONTEXT_LENGTH is explicitly configured, use it directly and skip
+                // the /v1/models auto-detection call.
+                if (llmConfig.getApi().getContextLength() != null) {
+                  modelContextLength = llmConfig.getApi().getContextLength();
+                  log.info(
+                      "Using configured context length for model '{}': {}",
+                      llmConfig.getApi().getModel(),
+                      modelContextLength);
+                } else {
+                  log.info("Querying LLM server for model capabilities...");
+                  ModelInfo modelInfo = queryModelCapabilities();
+                  if (modelInfo != null && modelInfo.getContextLength() != null) {
+                    modelContextLength = modelInfo.getContextLength();
+                    log.info(
+                        "Auto-detected context length for model '{}': {}",
+                        llmConfig.getApi().getModel(),
+                        modelContextLength);
+                  } else {
+                    log.warn(
+                        "Could not determine model context length, using configured max_tokens: {}",
+                        llmConfig.getApi().getMaxTokens());
+                  }
+                }
 
-                if (modelInfo != null && modelInfo.getContextLength() != null) {
-                  modelContextLength = modelInfo.getContextLength();
-
-                  // Set effective max tokens to 80% of context length to leave room for prompt
-                  // or use configured value if it's smaller
+                if (modelContextLength != null) {
+                  // Guard: cap effectiveMaxTokens so it never exceeds 80% of the context window.
+                  // LLM_MAX_TOKENS controls response length; this guard prevents accidentally
+                  // reserving more tokens for the response than the context window can support.
                   int recommendedMaxTokens = (int) (modelContextLength * 0.8);
                   effectiveMaxTokens =
                       Math.min(llmConfig.getApi().getMaxTokens(), recommendedMaxTokens);
 
                   log.info(
-                      "Model '{}' capabilities detected: context_length={}, configured_max_tokens={}, effective_max_tokens={}",
+                      "Model '{}': context_length={}, configured_max_tokens={}, effective_max_tokens={}",
                       llmConfig.getApi().getModel(),
                       modelContextLength,
                       llmConfig.getApi().getMaxTokens(),
@@ -58,19 +85,15 @@ public class LlmClient {
 
                   if (llmConfig.getApi().getMaxTokens() > recommendedMaxTokens) {
                     log.warn(
-                        "Configured max_tokens ({}) exceeds recommended limit ({}). Using {} tokens.",
+                        "Configured LLM_MAX_TOKENS ({}) exceeds 80% of context window ({}). Using {} tokens for responses.",
                         llmConfig.getApi().getMaxTokens(),
-                        recommendedMaxTokens,
+                        modelContextLength,
                         effectiveMaxTokens);
                   }
-                } else {
-                  log.warn(
-                      "Could not determine model capabilities, using configured max_tokens: {}",
-                      llmConfig.getApi().getMaxTokens());
                 }
               } catch (Exception e) {
                 log.warn(
-                    "Failed to query model capabilities: {}. Using configured max_tokens: {}",
+                    "Failed to initialise model capabilities: {}. Using configured max_tokens: {}",
                     e.getMessage(),
                     llmConfig.getApi().getMaxTokens());
               }
@@ -133,6 +156,20 @@ public class LlmClient {
    * @return the generated text
    */
   public String generateCompletion(String systemPrompt, String userPrompt) {
+    // Pre-flight context-length check — fail immediately without calling the LLM server.
+    // Estimate token count using the ~4 chars/token heuristic (good enough for a guard).
+    // Only fires when modelContextLength is known (LLM_CONTEXT_LENGTH set or auto-detected).
+    if (modelContextLength != null) {
+      int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 4;
+      int responseReserve = getEffectiveMaxTokens();
+      if (estimatedPromptTokens + responseReserve > modelContextLength) {
+        log.warn(
+            "Pre-flight check: estimated prompt ({} tokens) + response reserve ({} tokens) exceeds context length ({}). Failing early.",
+            estimatedPromptTokens, responseReserve, modelContextLength);
+        throw new ContextLengthExceededException(estimatedPromptTokens, modelContextLength, userPrompt);
+      }
+    }
+
     try {
       log.info("Sending request to LLM API: {}", llmConfig.getApi().getBaseUrl());
 
@@ -177,9 +214,22 @@ public class LlmClient {
     } catch (LlmException e) {
       throw e;
     } catch (Exception e) {
+      // Detect context-length exceeded (OpenAI-compatible 400 response)
+      String msg = e.getMessage() != null ? e.getMessage() : "";
+      if (msg.contains("maximum context length")) {
+        int promptTokens = parseGroup(msg, PATTERN_PROMPT_TOKENS);
+        int contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH);
+        if (contextTokens == 0) contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH_ALT);
+        throw new ContextLengthExceededException(promptTokens, contextTokens, userPrompt);
+      }
       log.error("Error calling LLM API", e);
       throw new LlmException("Failed to reach the LLM service: " + e.getMessage(), e);
     }
+  }
+
+  private static int parseGroup(String text, Pattern pattern) {
+    Matcher m = pattern.matcher(text);
+    return m.find() ? Integer.parseInt(m.group(1)) : 0;
   }
 
   /** OpenAI Chat Completion Request format */

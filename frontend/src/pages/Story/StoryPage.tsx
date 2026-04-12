@@ -66,14 +66,22 @@ export const StoryPage = () => {
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [additionalContext, setAdditionalContext] = useState('');
+  const [maxFindings, setMaxFindings] = useState(20);
+  const [maxRiskMatrix, setMaxRiskMatrix] = useState(15);
+  const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
+  const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
   const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contextError, setContextError] = useState<{
+    promptText: string;
+    promptTokens: number;
+    contextLength: number;
+  } | null>(null);
+  const [editablePrompt, setEditablePrompt] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
-  const [loadingLimits, setLoadingLimits] = useState(true);
-  const autoTriggeredRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -84,8 +92,7 @@ export const StoryPage = () => {
       })
       .catch(() => {
         /* keep default */
-      })
-      .finally(() => setLoadingLimits(false));
+      });
   }, []);
 
   useEffect(() => {
@@ -103,26 +110,36 @@ export const StoryPage = () => {
     };
   }, [generating]);
 
-  const handleGenerateStory = useCallback(async () => {
+  const handleGenerateStory = useCallback(async (customPrompt?: string) => {
     try {
       setGenerating(true);
       setError(null);
+      setContextError(null);
       const generatedStory = await storyService.generateStory(
         fileId,
         additionalContext,
-        llmTimeoutMs
+        llmTimeoutMs,
+        customPrompt,
+        maxFindings,
+        maxRiskMatrix
       );
       setStory(generatedStory);
+      if (generatedStory.findings?.length) setTotalFindings(generatedStory.findings.length);
+      if (generatedStory.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(generatedStory.aggregates.protocolRiskMatrix.length);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const status = (err as { response?: { status?: number } })?.response?.status;
-      const serverMsg: string =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? '';
-      const isTimeout =
-        (err as { code?: string })?.code === 'ECONNABORTED' ||
-        msg.toLowerCase().includes('timeout') ||
-        msg.toLowerCase().includes('exceeded');
-      if (isTimeout) {
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
+      const serverMsg: string = (data.message as string) ?? '';
+      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout');
+      if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
+        setContextError({
+          promptText: (data.promptText as string) ?? '',
+          promptTokens: (data.promptTokens as number) ?? 0,
+          contextLength: (data.contextLength as number) ?? 0,
+        });
+        setEditablePrompt((data.promptText as string) ?? '');
+      } else if (isTimeout) {
         const minutes = Math.round(llmTimeoutMs / 60000);
         setError(
           `Story generation timed out after ${minutes} minute${minutes !== 1 ? 's' : ''}. The LLM is taking too long to respond. Try again or reduce the capture size.`
@@ -137,14 +154,18 @@ export const StoryPage = () => {
     } finally {
       setGenerating(false);
     }
-  }, [fileId, additionalContext, llmTimeoutMs]);
+  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix]);
 
   useEffect(() => {
     const fetchExistingStory = async () => {
       try {
         setLoadingStory(true);
         const existing = await storyService.getStoryByFileId(fileId);
-        if (existing) setStory(existing);
+        if (existing) {
+          setStory(existing);
+          if (existing.findings?.length) setTotalFindings(existing.findings.length);
+          if (existing.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(existing.aggregates.protocolRiskMatrix.length);
+        }
       } catch (err) {
         console.error('Failed to load existing story:', err);
       } finally {
@@ -159,20 +180,6 @@ export const StoryPage = () => {
     }
   }, [fileId]);
 
-  // Auto-generate story if none exists yet — wait for limits to load so the correct timeout is used
-  useEffect(() => {
-    if (
-      !loadingStory &&
-      !loadingLimits &&
-      !story &&
-      !generating &&
-      !error &&
-      !autoTriggeredRef.current
-    ) {
-      autoTriggeredRef.current = true;
-      handleGenerateStory();
-    }
-  }, [loadingStory, loadingLimits, story, generating, error, handleGenerateStory]);
 
   useEffect(() => {
     const fetchTimeline = async () => {
@@ -229,12 +236,59 @@ export const StoryPage = () => {
     );
   }
 
+  if (contextError && !story) {
+    const remaining = contextError.contextLength - contextError.promptTokens;
+    return (
+      <div className="py-4">
+        <div className="alert alert-danger mb-3" role="alert">
+          <h5 className="alert-heading">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            Prompt Too Large for Model
+          </h5>
+          <p className="mb-0">
+            The prompt used <strong>{contextError.promptTokens.toLocaleString()}</strong> tokens
+            but the model's context window is{' '}
+            <strong>{contextError.contextLength.toLocaleString()}</strong> tokens, leaving only{' '}
+            <strong>{remaining.toLocaleString()}</strong> for the response.
+          </p>
+        </div>
+        <p className="text-muted small mb-2">
+          Edit the prompt below to reduce its size (e.g. remove findings or aggregates sections),
+          then retry:
+        </p>
+        <textarea
+          className="form-control form-control-sm font-monospace mb-3"
+          rows={20}
+          value={editablePrompt}
+          onChange={e => setEditablePrompt(e.target.value)}
+        />
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-primary"
+            onClick={() => handleGenerateStory(editablePrompt)}
+            disabled={generating}
+          >
+            <i className="bi bi-arrow-repeat me-2"></i>
+            Retry with edited prompt
+          </button>
+          <button
+            className="btn btn-outline-secondary"
+            onClick={() => { setContextError(null); setEditablePrompt(''); }}
+            disabled={generating}
+          >
+            Start over
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (error && !story) {
     return (
       <ErrorMessage
         title="Failed to Generate Story"
         message={error}
-        onRetry={handleGenerateStory}
+        onRetry={() => handleGenerateStory()}
       />
     );
   }
@@ -246,6 +300,12 @@ export const StoryPage = () => {
           <StoryInfoCard
             additionalContext={additionalContext}
             onAdditionalContextChange={setAdditionalContext}
+            maxFindings={maxFindings}
+            onMaxFindingsChange={setMaxFindings}
+            totalFindings={totalFindings}
+            maxRiskMatrix={maxRiskMatrix}
+            onMaxRiskMatrixChange={setMaxRiskMatrix}
+            totalRiskMatrix={totalRiskMatrix}
           />
         </div>
 
@@ -254,7 +314,7 @@ export const StoryPage = () => {
           <p className="text-muted mb-4">
             Generate an AI-powered narrative analysis of this network capture
           </p>
-          <button className="btn btn-primary" onClick={handleGenerateStory}>
+          <button className="btn btn-primary" onClick={() => handleGenerateStory()}>
             <i className="bi bi-magic me-2"></i>
             Generate Story
           </button>
@@ -272,7 +332,7 @@ export const StoryPage = () => {
             <h4 className="mb-0">Network Traffic Story</h4>
             <button
               className="btn btn-outline-primary btn-sm"
-              onClick={handleGenerateStory}
+              onClick={() => handleGenerateStory()}
               disabled={generating}
               title={generating ? 'Generating...' : 'Regenerate'}
             >
@@ -289,6 +349,12 @@ export const StoryPage = () => {
           <StoryInfoCard
             additionalContext={additionalContext}
             onAdditionalContextChange={setAdditionalContext}
+            maxFindings={maxFindings}
+            onMaxFindingsChange={setMaxFindings}
+            totalFindings={totalFindings}
+            maxRiskMatrix={maxRiskMatrix}
+            onMaxRiskMatrixChange={setMaxRiskMatrix}
+            totalRiskMatrix={totalRiskMatrix}
           />
         </div>
       </div>

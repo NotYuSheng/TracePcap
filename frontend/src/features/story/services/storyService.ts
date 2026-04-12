@@ -9,14 +9,21 @@ export const storyService = {
   generateStory: async (
     fileId: string,
     additionalContext?: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    customPrompt?: string,
+    maxFindings?: number,
+    maxRiskMatrix?: number
   ): Promise<Story> => {
-    const body = additionalContext?.trim()
-      ? { additionalContext: additionalContext.trim() }
-      : undefined;
-    const response = await apiClient.post<Story>(API_ENDPOINTS.GENERATE_STORY(fileId), body, {
-      ...(timeoutMs !== undefined && { timeout: timeoutMs }),
-    });
+    const body: Record<string, string | number> = {};
+    if (additionalContext?.trim()) body.additionalContext = additionalContext.trim();
+    if (customPrompt?.trim()) body.customPrompt = customPrompt.trim();
+    if (maxFindings !== undefined) body.maxFindings = maxFindings;
+    if (maxRiskMatrix !== undefined) body.maxRiskMatrix = maxRiskMatrix;
+    const response = await apiClient.post<Story>(
+      API_ENDPOINTS.GENERATE_STORY(fileId),
+      Object.keys(body).length > 0 ? body : undefined,
+      { ...(timeoutMs !== undefined && { timeout: timeoutMs }) }
+    );
     return response.data;
   },
 

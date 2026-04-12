@@ -3,11 +3,95 @@ import { useState } from 'react';
 interface StoryInfoCardProps {
   additionalContext?: string;
   onAdditionalContextChange?: (value: string) => void;
+  maxFindings?: number;
+  onMaxFindingsChange?: (value: number) => void;
+  totalFindings?: number;
+  maxRiskMatrix?: number;
+  onMaxRiskMatrixChange?: (value: number) => void;
+  totalRiskMatrix?: number;
+}
+
+const DEFAULT_MAX_FINDINGS = 20;
+const DEFAULT_MAX_RISK_MATRIX = 15;
+
+function CapControl({
+  label,
+  value,
+  defaultValue,
+  presets,
+  total,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  defaultValue: number;
+  presets: number[];
+  total?: number;
+  onChange: (n: number) => void;
+}) {
+  const [customInput, setCustomInput] = useState('');
+  const applyCustom = () => {
+    const n = parseInt(customInput, 10);
+    if (!isNaN(n) && n > 0) onChange(n);
+    setCustomInput('');
+  };
+
+  return (
+    <div className="d-flex align-items-center gap-2 flex-wrap">
+      <span className="text-muted small fw-semibold" style={{ minWidth: 140 }}>{label}:</span>
+      {presets.map(p => (
+        <button
+          key={p}
+          type="button"
+          className={`btn btn-sm ${value === p ? 'btn-info' : 'btn-outline-secondary'}`}
+          style={{ minWidth: 44 }}
+          onClick={() => onChange(p)}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        type="button"
+        className={`btn btn-sm ${total !== undefined && value >= total ? 'btn-info' : 'btn-outline-secondary'}`}
+        style={{ minWidth: 44 }}
+        onClick={() => onChange(total ?? 999999)}
+      >
+        {total !== undefined ? `All ${total}` : 'All'}
+      </button>
+      {value !== defaultValue && !presets.includes(value) && (total === undefined || value < total) && (
+        <button
+          type="button"
+          className="btn btn-sm btn-info"
+          style={{ minWidth: 44 }}
+        >
+          {value}
+        </button>
+      )}
+      <div className="input-group input-group-sm" style={{ width: 110 }}>
+        <input
+          type="number"
+          className="form-control form-control-sm"
+          placeholder="Custom…"
+          min={1}
+          value={customInput}
+          onChange={e => setCustomInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && applyCustom()}
+          onBlur={applyCustom}
+        />
+      </div>
+    </div>
+  );
 }
 
 export const StoryInfoCard = ({
   additionalContext,
   onAdditionalContextChange,
+  maxFindings = DEFAULT_MAX_FINDINGS,
+  onMaxFindingsChange,
+  totalFindings,
+  maxRiskMatrix = DEFAULT_MAX_RISK_MATRIX,
+  onMaxRiskMatrixChange,
+  totalRiskMatrix,
 }: StoryInfoCardProps) => {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -50,6 +134,39 @@ export const StoryInfoCard = ({
             <li>DNS query names and TLS SNI</li>
             <li>Raw conversation lists (replaced by structured findings)</li>
           </ul>
+
+          {(onMaxFindingsChange || onMaxRiskMatrixChange) && (
+            <div className="mt-3 pt-3 border-top">
+              <label className="form-label small fw-semibold mb-2">
+                Prompt limits{' '}
+                <span className="text-muted fw-normal">
+                  (reduce if generation fails due to context length)
+                </span>
+              </label>
+              <div className="d-flex flex-column gap-2">
+                {onMaxFindingsChange && (
+                  <CapControl
+                    label="Max findings"
+                    value={maxFindings}
+                    defaultValue={DEFAULT_MAX_FINDINGS}
+                    presets={[5, 10, 20, 50]}
+                    total={totalFindings}
+                    onChange={onMaxFindingsChange}
+                  />
+                )}
+                {onMaxRiskMatrixChange && (
+                  <CapControl
+                    label="Max risk matrix rows"
+                    value={maxRiskMatrix}
+                    defaultValue={DEFAULT_MAX_RISK_MATRIX}
+                    presets={[5, 10, 15, 30]}
+                    total={totalRiskMatrix}
+                    onChange={onMaxRiskMatrixChange}
+                  />
+                )}
+              </div>
+            </div>
+          )}
 
           {onAdditionalContextChange !== undefined && (
             <div className="mt-3 pt-3 border-top">
