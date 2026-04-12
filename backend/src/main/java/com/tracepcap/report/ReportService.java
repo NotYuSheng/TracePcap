@@ -803,6 +803,7 @@ public class ReportService {
     Font valueFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
     for (int i = 0; i < filters.size(); i++) {
       String filter = filters.get(i);
+      if (filter == null) continue;
       int colon = filter.indexOf(':');
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       PdfPCell cell = new PdfPCell();

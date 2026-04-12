@@ -86,14 +86,40 @@ public class StoryService {
       // skip all prompt-building phases and send it directly to the LLM.
       if (customPrompt != null && !customPrompt.isBlank()) {
         log.info("Using user-supplied custom prompt for file: {}", fileId);
+        long totalConvsCustom = conversationRepository.countByFileId(fileId);
         StoryAggregates aggregates = storyAggregatesService.compute(
-            fileId, List.of(), conversationRepository.countByFileId(fileId));
+            fileId, List.of(), totalConvsCustom);
         List<Finding> findings = findingsService.detectAll(
-            fileId, conversationRepository.countByFileId(fileId), analysis.getTotalBytes());
+            fileId, totalConvsCustom, analysis.getTotalBytes());
+
+        // Re-run Phase 1 so investigation steps are preserved in the response.
+        // The custom prompt already encodes the narrative context, but structured
+        // investigation results are attached separately and displayed in the UI.
+        List<InvestigationStep> investigationSteps = List.of();
+        List<TimelineDataDto> timelineBinsCustom = List.of();
+        try {
+          timelineBinsCustom = timelineService.getTimelineData(fileId, 1, 50);
+        } catch (Exception e) {
+          log.warn("Failed to fetch timeline bins for custom prompt retry: {}", e.getMessage());
+        }
+        try {
+          String phase1Json = llmClient.generateCompletion(
+              buildHypothesisSystemPrompt(),
+              buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings,
+                  timelineBinsCustom, maxFindings, maxRiskMatrix));
+          var phase1 = parseHypothesesAndQueries(phase1Json);
+          investigationSteps =
+              investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
+          log.info("Custom prompt retry investigation complete: {} steps", investigationSteps.size());
+        } catch (Exception e) {
+          log.warn("Investigation phase skipped during custom prompt retry: {}", e.getMessage());
+        }
+
         String storyContent = llmClient.generateCompletion(buildSystemPrompt(), customPrompt);
         StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
         storyResponse.setAggregates(aggregates);
         storyResponse.setFindings(findings);
+        storyResponse.setInvestigationSteps(investigationSteps.isEmpty() ? null : investigationSteps);
         StoryEntity story = StoryEntity.builder()
             .id(storyId).fileId(fileId).generatedAt(generatedAt)
             .status(StoryEntity.StoryStatus.COMPLETED)

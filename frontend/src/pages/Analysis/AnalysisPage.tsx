@@ -128,7 +128,33 @@ export const AnalysisPage = () => {
     try {
       const { filteredNodes, filteredEdges, activeFilterLabels } = networkGraphStateRef.current;
 
-      const diagrams = await captureNetworkDiagrams(filteredNodes, filteredEdges);
+      // If the user never visited the Network Diagram tab the ref will be empty.
+      // Fall back to a fresh unfiltered fetch so the PDF always contains diagrams.
+      let diagramNodes = filteredNodes;
+      let diagramEdges = filteredEdges;
+      if (diagramNodes.length === 0) {
+        setReportStep('Fetching network data…');
+        const { conversationService } = await import(
+          '@/features/conversation/services/conversationService'
+        );
+        const { networkService } = await import('@/features/network/services/networkService');
+        const [convResponse, hostClassifications] = await Promise.all([
+          conversationService.getConversations(fileId, {
+            ip: '', port: '', payloadContains: '', protocols: [], l7Protocols: [], apps: [],
+            categories: [], hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [],
+            deviceTypes: [], countries: [], sortBy: '', sortDir: 'asc', page: 1, pageSize: 10000,
+          }),
+          conversationService.getHostClassifications(fileId).catch(() => undefined),
+        ]);
+        const graph = networkService.buildNetworkGraph(
+          convResponse.data, data ?? undefined, 500, hostClassifications
+        );
+        diagramNodes = graph.nodes;
+        diagramEdges = graph.edges;
+        setReportStep('Rendering network diagrams…');
+      }
+
+      const diagrams = await captureNetworkDiagrams(diagramNodes, diagramEdges);
 
       setReportStep('Building PDF…');
       const response = await apiClient.post(
