@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import type { GraphNode } from '@/features/network/types';
 import { useCompareData } from '@/features/network/hooks/useCompareData';
@@ -79,10 +80,11 @@ export const ComparePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileIds.join(',')]);
 
-  const { mergedNodes, mergedEdges, perFileStats, labels, loading, error } = useCompareData(
-    fileIds,
-    fileNames ?? []
-  );
+  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
+  const [customInput, setCustomInput] = useState('');
+
+  const { mergedNodes, mergedEdges, totalNodes, hiddenNodes, perFileStats, labels, loading, error } =
+    useCompareData(fileIds, fileNames ?? [], nodeLimit);
 
   // ── Hidden sources toggle ────────────────────────────────────────────────
   const [hiddenSources, setHiddenSources] = useState<Set<string>>(new Set());
@@ -478,6 +480,72 @@ export const ComparePage = () => {
           </div>
         </div>
       </div>
+
+      {totalNodes > MAX_DIAGRAM_NODES &&
+        (() => {
+          const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
+          const applyCustom = () => {
+            const n = parseInt(customInput, 10);
+            if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));
+            setCustomInput('');
+          };
+          return (
+            <div className="alert alert-info mb-3">
+              <div className="d-flex align-items-start gap-2 flex-wrap">
+                <div className="flex-grow-1">
+                  <div>
+                    {hiddenNodes > 0 ? (
+                      <>
+                        Showing the <strong>{nodeLimit} most significant nodes</strong> (
+                        {hiddenNodes} hidden). Ranked by traffic volume, risk signals, and
+                        connectivity.
+                      </>
+                    ) : (
+                      <>
+                        Showing <strong>all {totalNodes} nodes</strong>. Ranked by traffic volume,
+                        risk signals, and connectivity.
+                      </>
+                    )}
+                  </div>
+                  <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                    <span className="text-muted small fw-semibold me-1">Show:</span>
+                    {presets.map(p => (
+                      <button
+                        key={p}
+                        className={`btn btn-sm ${nodeLimit === p ? 'btn-info' : 'btn-outline-secondary'}`}
+                        style={{ minWidth: 52 }}
+                        onClick={() => setNodeLimit(p)}
+                      >
+                        Top {p}
+                      </button>
+                    ))}
+                    <button
+                      className={`btn btn-sm ${nodeLimit >= totalNodes ? 'btn-info' : 'btn-outline-secondary'}`}
+                      style={{ minWidth: 52 }}
+                      onClick={() => setNodeLimit(totalNodes)}
+                    >
+                      All {totalNodes}
+                    </button>
+                    <span className="text-muted small ms-2 me-1">or</span>
+                    <div className="input-group input-group-sm" style={{ width: 120 }}>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        placeholder="Custom…"
+                        min={1}
+                        max={totalNodes}
+                        value={customInput}
+                        onChange={e => setCustomInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                        onBlur={applyCustom}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* Filters */}
       <div className="mb-3">

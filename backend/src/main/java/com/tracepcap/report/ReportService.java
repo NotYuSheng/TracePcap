@@ -202,6 +202,10 @@ public class ReportService {
         addExtractedFiles(document, extractedFiles, sec++);
       }
 
+      if (request.getActiveFilters() != null && !request.getActiveFilters().isEmpty()) {
+        addNetworkDiagramFilters(document, request.getActiveFilters(), sec++);
+      }
+
       addTopologyDiagram(document, request.getForceDirectedImage(), "Force-Directed Layout", sec++);
       addTopologyDiagram(
           document, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++);
@@ -771,6 +775,50 @@ public class ReportService {
           ef.getFileSize() != null ? formatBytes(ef.getFileSize()) : "—",
           nvl(ef.getExtractionMethod()),
           nvl(ef.getSha256()));
+    }
+    doc.add(table);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section: Network Diagram Filters Applied
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private void addNetworkDiagramFilters(Document doc, List<String> filters, int sec)
+      throws Exception {
+    addSectionHeader(doc, sec + ". Network Diagram — Active Filters");
+
+    Font bodyFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
+    Paragraph intro =
+        new Paragraph(
+            "The network topology diagrams in this report were generated with the following filters applied:",
+            bodyFont);
+    intro.setSpacingBefore(6);
+    intro.setSpacingAfter(8);
+    doc.add(intro);
+
+    PdfPTable table = new PdfPTable(1);
+    table.setWidthPercentage(100);
+    table.setSpacingAfter(12);
+    Font labelFont = new Font(Font.HELVETICA, 10, Font.BOLD, C_LABEL);
+    Font valueFont = new Font(Font.HELVETICA, 10, Font.NORMAL, C_TEXT);
+    for (int i = 0; i < filters.size(); i++) {
+      String filter = filters.get(i);
+      if (filter == null) continue;
+      int colon = filter.indexOf(':');
+      Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
+      PdfPCell cell = new PdfPCell();
+      cell.setBackgroundColor(bg);
+      cell.setPadding(6);
+      cell.setBorder(Rectangle.NO_BORDER);
+      if (colon > 0) {
+        Phrase phrase = new Phrase();
+        phrase.add(new Phrase(filter.substring(0, colon + 1) + " ", labelFont));
+        phrase.add(new Phrase(filter.substring(colon + 1).trim(), valueFont));
+        cell.setPhrase(phrase);
+      } else {
+        cell.setPhrase(new Phrase(filter, valueFont));
+      }
+      table.addCell(cell);
     }
     doc.add(table);
   }

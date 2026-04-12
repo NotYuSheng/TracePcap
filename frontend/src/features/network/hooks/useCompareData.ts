@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
-import { networkService } from '../services/networkService';
+import { networkService, selectSignificantNodes } from '../services/networkService';
 import { mergeGraphs } from '../services/mergeGraphs';
 import type { GraphNode, GraphEdge } from '../types';
 
@@ -21,6 +21,8 @@ export interface FileStats {
 export interface UseCompareDataReturn {
   mergedNodes: GraphNode[];
   mergedEdges: GraphEdge[];
+  totalNodes: number;
+  hiddenNodes: number;
   perFileStats: FileStats[];
   labels: string[];
   loading: boolean;
@@ -55,13 +57,18 @@ async function fetchGraphForFile(fileId: string) {
     response.data,
     undefined,
     MAX_CONVERSATIONS,
-    hostClassifications
+    hostClassifications,
+    0 // no per-file limit — significance filtering is applied after merge
   );
 }
 
-export function useCompareData(fileIds: string[], labels: string[]): UseCompareDataReturn {
-  const [mergedNodes, setMergedNodes] = useState<GraphNode[]>([]);
-  const [mergedEdges, setMergedEdges] = useState<GraphEdge[]>([]);
+export function useCompareData(
+  fileIds: string[],
+  labels: string[],
+  nodeLimit: number
+): UseCompareDataReturn {
+  const [allMergedNodes, setAllMergedNodes] = useState<GraphNode[]>([]);
+  const [allMergedEdges, setAllMergedEdges] = useState<GraphEdge[]>([]);
   const [perFileStats, setPerFileStats] = useState<FileStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +94,8 @@ export function useCompareData(fileIds: string[], labels: string[]): UseCompareD
 
         const merged = mergeGraphs(graphs, labels);
 
-        setMergedNodes(merged.nodes);
-        setMergedEdges(merged.edges);
+        setAllMergedNodes(merged.nodes);
+        setAllMergedEdges(merged.edges);
         setPerFileStats(
           graphs.map((g, i) => ({
             label: labels[i],
@@ -115,5 +122,27 @@ export function useCompareData(fileIds: string[], labels: string[]): UseCompareD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileIdsKey, labelsKey]);
 
-  return { mergedNodes, mergedEdges, perFileStats, labels, loading, error };
+  const { mergedNodes, mergedEdges, hiddenNodes } = useMemo(() => {
+    const { significantNodes, hiddenCount } = selectSignificantNodes(
+      allMergedNodes,
+      allMergedEdges,
+      nodeLimit
+    );
+    const sigIds = new Set(significantNodes.map(n => n.id));
+    const visibleEdges = allMergedEdges.filter(
+      e => sigIds.has(e.source) && sigIds.has(e.target)
+    );
+    return { mergedNodes: significantNodes, mergedEdges: visibleEdges, hiddenNodes: hiddenCount };
+  }, [allMergedNodes, allMergedEdges, nodeLimit]);
+
+  return {
+    mergedNodes,
+    mergedEdges,
+    totalNodes: allMergedNodes.length,
+    hiddenNodes,
+    perFileStats,
+    labels,
+    loading,
+    error,
+  };
 }

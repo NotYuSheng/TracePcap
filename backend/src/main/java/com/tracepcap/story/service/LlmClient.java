@@ -157,10 +157,12 @@ public class LlmClient {
    */
   public String generateCompletion(String systemPrompt, String userPrompt) {
     // Pre-flight context-length check — fail immediately without calling the LLM server.
-    // Estimate token count using the ~4 chars/token heuristic (good enough for a guard).
+    // Use ~2 chars/token (conservative) rather than 4 — technical content such as network
+    // logs, JSON, and hex strings tokenises more densely and can easily fall below 3 chars/token.
+    // A tighter estimate means fewer false passes that still fail at the server side.
     // Only fires when modelContextLength is known (LLM_CONTEXT_LENGTH set or auto-detected).
     if (modelContextLength != null) {
-      int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 4;
+      int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 2;
       int responseReserve = getEffectiveMaxTokens();
       if (estimatedPromptTokens + responseReserve > modelContextLength) {
         log.warn(
@@ -214,15 +216,36 @@ public class LlmClient {
     } catch (LlmException e) {
       throw e;
     } catch (Exception e) {
-      // Detect context-length exceeded (OpenAI-compatible 400 response)
+      // Detect context-length exceeded errors.
+      // Primary: OpenAI-compatible "maximum context length" message with token counts.
+      // Fallback: any HTTP 400 whose message hints at context/token overflow — different
+      // providers (Ollama, LM Studio, vLLM) use varying formats so regex may not match.
       String msg = e.getMessage() != null ? e.getMessage() : "";
-      if (msg.contains("maximum context length")) {
+      boolean isHttp400 = msg.contains("400");
+      boolean looksLikeContextError = msg.contains("maximum context length")
+          || msg.contains("context_length_exceeded")
+          || msg.contains("context window")
+          || msg.contains("token limit");
+      if (looksLikeContextError) {
         int promptTokens = parseGroup(msg, PATTERN_PROMPT_TOKENS);
         int contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH);
         if (contextTokens == 0) contextTokens = parseGroup(msg, PATTERN_CONTEXT_LENGTH_ALT);
+        // If regex couldn't extract counts, use the pre-flight estimate as a best-effort value
+        // so the UI shows something meaningful rather than "0 tokens".
+        if (promptTokens == 0) {
+          promptTokens = (systemPrompt.length() + userPrompt.length()) / 2;
+        }
+        if (contextTokens == 0 && modelContextLength != null) {
+          contextTokens = modelContextLength;
+        }
         throw new ContextLengthExceededException(promptTokens, contextTokens, userPrompt);
       }
-      log.error("Error calling LLM API", e);
+      // Re-classify ambiguous HTTP 400s that don't match the patterns above
+      if (isHttp400) {
+        log.warn("LLM returned HTTP 400 — likely context length or bad request: {}", msg);
+      } else {
+        log.error("Error calling LLM API", e);
+      }
       throw new LlmException("Failed to reach the LLM service: " + e.getMessage(), e);
     }
   }
