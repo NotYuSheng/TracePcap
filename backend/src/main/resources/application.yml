@@ -139,6 +139,7 @@ llm:
     model: ${LLM_MODEL:gpt-4}
     temperature: ${LLM_TEMPERATURE:0.7}
     max-tokens: ${LLM_MAX_TOKENS:2000}
+    context-length: ${LLM_CONTEXT_LENGTH:#{null}}
     timeout-seconds: ${LLM_TIMEOUT:300}
   retry:
     max-attempts: 3

@@ -40,20 +40,40 @@ public class LlmClient {
         .start(
             () -> {
               try {
-                log.info("Querying LLM server for model capabilities...");
-                ModelInfo modelInfo = queryModelCapabilities();
+                // If LLM_CONTEXT_LENGTH is explicitly configured, use it directly and skip
+                // the /v1/models auto-detection call.
+                if (llmConfig.getApi().getContextLength() != null) {
+                  modelContextLength = llmConfig.getApi().getContextLength();
+                  log.info(
+                      "Using configured context length for model '{}': {}",
+                      llmConfig.getApi().getModel(),
+                      modelContextLength);
+                } else {
+                  log.info("Querying LLM server for model capabilities...");
+                  ModelInfo modelInfo = queryModelCapabilities();
+                  if (modelInfo != null && modelInfo.getContextLength() != null) {
+                    modelContextLength = modelInfo.getContextLength();
+                    log.info(
+                        "Auto-detected context length for model '{}': {}",
+                        llmConfig.getApi().getModel(),
+                        modelContextLength);
+                  } else {
+                    log.warn(
+                        "Could not determine model context length, using configured max_tokens: {}",
+                        llmConfig.getApi().getMaxTokens());
+                  }
+                }
 
-                if (modelInfo != null && modelInfo.getContextLength() != null) {
-                  modelContextLength = modelInfo.getContextLength();
-
-                  // Set effective max tokens to 80% of context length to leave room for prompt
-                  // or use configured value if it's smaller
+                if (modelContextLength != null) {
+                  // Guard: cap effectiveMaxTokens so it never exceeds 80% of the context window.
+                  // LLM_MAX_TOKENS controls response length; this guard prevents accidentally
+                  // reserving more tokens for the response than the context window can support.
                   int recommendedMaxTokens = (int) (modelContextLength * 0.8);
                   effectiveMaxTokens =
                       Math.min(llmConfig.getApi().getMaxTokens(), recommendedMaxTokens);
 
                   log.info(
-                      "Model '{}' capabilities detected: context_length={}, configured_max_tokens={}, effective_max_tokens={}",
+                      "Model '{}': context_length={}, configured_max_tokens={}, effective_max_tokens={}",
                       llmConfig.getApi().getModel(),
                       modelContextLength,
                       llmConfig.getApi().getMaxTokens(),
@@ -61,19 +81,15 @@ public class LlmClient {
 
                   if (llmConfig.getApi().getMaxTokens() > recommendedMaxTokens) {
                     log.warn(
-                        "Configured max_tokens ({}) exceeds recommended limit ({}). Using {} tokens.",
+                        "Configured LLM_MAX_TOKENS ({}) exceeds 80% of context window ({}). Using {} tokens for responses.",
                         llmConfig.getApi().getMaxTokens(),
-                        recommendedMaxTokens,
+                        modelContextLength,
                         effectiveMaxTokens);
                   }
-                } else {
-                  log.warn(
-                      "Could not determine model capabilities, using configured max_tokens: {}",
-                      llmConfig.getApi().getMaxTokens());
                 }
               } catch (Exception e) {
                 log.warn(
-                    "Failed to query model capabilities: {}. Using configured max_tokens: {}",
+                    "Failed to initialise model capabilities: {}. Using configured max_tokens: {}",
                     e.getMessage(),
                     llmConfig.getApi().getMaxTokens());
               }
