@@ -848,7 +848,7 @@ public class ReportService {
     doc.newPage();
     // Verify the page size took effect; if the writer still reports portrait
     // dimensions, force one more page turn.
-    if (writer.getPageSize().getHeight() < writer.getPageSize().getWidth() == false
+    if (writer.getPageSize().getHeight() >= writer.getPageSize().getWidth()
         && writer.getPageSize().getWidth() < pageW - 1f) {
       doc.newPage();
     }

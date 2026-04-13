@@ -177,7 +177,7 @@ export const AnalysisPage = () => {
           conversationService.getHostClassifications(fileId).catch(() => undefined),
         ]);
         const graph = networkService.buildNetworkGraph(
-          convResponse.data, data ?? undefined, nodeLimit, hostClassifications
+          convResponse.data, data ?? undefined, 500, hostClassifications, nodeLimit
         );
 
         // Apply the same client-side filters the diagram tab would use.
