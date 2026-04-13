@@ -7,6 +7,7 @@ import {
   CONVERSATION_LIMIT_ENABLED,
   MAX_DIAGRAM_NODES,
 } from '@/features/network/hooks/useNetworkData';
+import { nodeFilterLabel } from '@/features/network/constants';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
@@ -355,7 +356,8 @@ export const NetworkDiagramPage = () => {
     if (hasRisksOnly) labels.push('Has Risks: Yes');
     if (activeLegendProtocols.length > 0)
       labels.push(`Protocol: ${activeLegendProtocols.join(', ')}`);
-    if (activeNodeFilters.length > 0) labels.push(`Node type: ${activeNodeFilters.join(', ')}`);
+    if (activeNodeFilters.length > 0)
+      labels.push(`Node type: ${activeNodeFilters.map(nodeFilterLabel).join(', ')}`);
     if (activeAppFilters.length > 0) labels.push(`App: ${activeAppFilters.join(', ')}`);
     if (activeL7Protocols.length > 0) labels.push(`L7: ${activeL7Protocols.join(', ')}`);
     if (activeCategories.length > 0) labels.push(`Category: ${activeCategories.join(', ')}`);
@@ -364,7 +366,11 @@ export const NetworkDiagramPage = () => {
       labels.push(`Custom signature: ${activeCustomSigs.join(', ')}`);
     if (activeFileTypes.length > 0) labels.push(`File type: ${activeFileTypes.join(', ')}`);
     if (activeCountries.length > 0) labels.push(`Country: ${activeCountries.join(', ')}`);
-    networkGraphStateRef.current = { filteredNodes, filteredEdges, activeFilterLabels: labels };
+    const nodeLimitNote =
+      hiddenNodes > 0
+        ? `Showing the ${nodeLimit} most significant nodes (${hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.`
+        : null;
+    networkGraphStateRef.current = { filteredNodes, filteredEdges, activeFilterLabels: labels, nodeLimitNote };
   });
 
   if (loading) {
