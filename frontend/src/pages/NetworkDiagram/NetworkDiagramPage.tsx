@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Modal } from '@govtechsg/sgds-react';
 import type { GraphNode } from '@/features/network/types';
@@ -7,8 +7,9 @@ import {
   CONVERSATION_LIMIT_ENABLED,
   MAX_DIAGRAM_NODES,
 } from '@/features/network/hooks/useNetworkData';
-import { buildActiveFilterLabels } from '@/features/network/constants';
+import { buildActiveFilterLabels, toggleSet } from '@/features/network/constants';
 import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
+import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
@@ -16,18 +17,6 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 
-function toggleSet(setter: Dispatch<SetStateAction<string[]>>) {
-  return (val: string) =>
-    setter(prev => (prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]));
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
 
 export const NetworkDiagramPage = () => {
   const { fileId, data, networkGraphStateRef, networkDiagramFilters } =

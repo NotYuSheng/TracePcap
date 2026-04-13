@@ -84,6 +84,15 @@ export function nodeFilterLabel(key: string): string {
 }
 
 /**
+ * Returns a toggle callback that adds/removes a value from a string-array state.
+ * Used in network diagram filter panels to toggle protocol/node/app filters.
+ */
+export function toggleSet(setter: React.Dispatch<React.SetStateAction<string[]>>) {
+  return (val: string) =>
+    setter(prev => (prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]));
+}
+
+/**
  * Builds the list of human-readable active-filter labels from a filter state
  * snapshot. Used in both NetworkDiagramPage (ref sync) and AnalysisPage (PDF
  * report). Centralised here so the two sites stay in sync automatically.
