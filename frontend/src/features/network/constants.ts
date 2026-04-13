@@ -59,6 +59,31 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
 };
 
 /**
+ * Converts a raw activeNodeFilters key (e.g. "nt:router", "dt:IOT") to a
+ * human-readable label using the existing display maps.
+ */
+export function nodeFilterLabel(key: string): string {
+  if (key.startsWith('nt:')) {
+    const type = key.slice(3);
+    return NODE_TYPE_LABELS[type] ?? type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  if (key.startsWith('dt:')) {
+    // Inline the deviceTypeLabel logic to avoid a circular import.
+    const dt = key.slice(3);
+    switch (dt) {
+      case 'ROUTER': return 'Router';
+      case 'MOBILE': return 'Mobile';
+      case 'LAPTOP_DESKTOP': return 'Laptop / Desktop';
+      case 'SERVER': return 'Server';
+      case 'IOT': return 'IoT Device';
+      case 'UNKNOWN': return 'Unknown';
+      default: return dt;
+    }
+  }
+  return key;
+}
+
+/**
  * Single source of truth for node type colors used in
  * NetworkGraph (node fill) and NetworkControls (legend).
  */

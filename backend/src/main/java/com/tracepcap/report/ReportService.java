@@ -8,6 +8,8 @@ import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.ColumnText;
+import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
@@ -118,7 +120,7 @@ public class ReportService {
 
     Document document = new Document(PageSize.A4, 40, 40, 60, 40);
     try {
-      PdfWriter.getInstance(document, out);
+      PdfWriter writer = PdfWriter.getInstance(document, out);
       document.open();
 
       // ── Sections ──────────────────────────────────────────────────────────
@@ -202,13 +204,15 @@ public class ReportService {
         addExtractedFiles(document, extractedFiles, sec++);
       }
 
-      if (request.getActiveFilters() != null && !request.getActiveFilters().isEmpty()) {
-        addNetworkDiagramFilters(document, request.getActiveFilters(), sec++);
-      }
-
-      addTopologyDiagram(document, request.getForceDirectedImage(), "Force-Directed Layout", sec++);
+      List<String> activeFilters =
+          request.getActiveFilters() != null ? request.getActiveFilters() : List.of();
+      String nodeLimitNote = request.getNodeLimitNote();
       addTopologyDiagram(
-          document, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++);
+          document, writer, request.getForceDirectedImage(), "Force-Directed Layout", sec++,
+          activeFilters, nodeLimitNote);
+      addTopologyDiagram(
+          document, writer, request.getHierarchicalImage(), "Hierarchical Layout (Top-Down)", sec++,
+          activeFilters, nodeLimitNote);
 
     } catch (Exception e) {
       log.error("PDF generation failed for file {}", fileId, e);
@@ -828,57 +832,177 @@ public class ReportService {
   // ══════════════════════════════════════════════════════════════════════════
 
   private void addTopologyDiagram(
-      Document doc, String base64Image, String layoutName, int sectionNum) throws Exception {
+      Document doc, PdfWriter writer, String base64Image, String layoutName, int sectionNum,
+      List<String> activeFilters, String nodeLimitNote)
+      throws Exception {
 
-    // Each topology diagram gets its own full landscape page.
-    // Use an explicit Rectangle rather than rotate() so the size is applied
-    // unambiguously regardless of the previous page's orientation.
-    Rectangle landscape = new Rectangle(PageSize.A4.getHeight(), PageSize.A4.getWidth());
-    doc.setPageSize(landscape);
+    // ── Page setup ────────────────────────────────────────────────────────────
+    // setPageSize only takes effect on the next newPage(). Calling newPage()
+    // twice guarantees the landscape size is active before we draw anything:
+    // the first call closes the previous page with its current size, the second
+    // opens a fresh page with the new landscape size.
+    float pageW = PageSize.A4.getHeight(); // 841.89 pt
+    float pageH = PageSize.A4.getWidth();  // 595.28 pt
+    doc.setPageSize(new Rectangle(pageW, pageH));
+    doc.setMargins(40, 40, 40, 40);
     doc.newPage();
+    // Verify the page size took effect; if the writer still reports portrait
+    // dimensions, force one more page turn.
+    if (writer.getPageSize().getHeight() < writer.getPageSize().getWidth() == false
+        && writer.getPageSize().getWidth() < pageW - 1f) {
+      doc.newPage();
+    }
 
-    // Compact title — avoids the ~50pt overhead of the banner-style section
-    // header so the image fits on the same page without shrinking.
+    // ── Constants ─────────────────────────────────────────────────────────────
+    final int   BADGE_COLS = 5;
+    final float MARGIN     = 40f;
+    final float TITLE_H    = 16f;  // 11pt font + leading
+    final float TITLE_GAP  = 6f;   // gap between title bottom and image top
+    final float FOOTER_GAP = 8f;   // gap between image bottom and topmost footer element
+
+    List<String> nonNullFilters =
+        (activeFilters != null)
+            ? activeFilters.stream().filter(f -> f != null)
+                .collect(java.util.stream.Collectors.toList())
+            : List.of();
+    boolean hasFilters  = !nonNullFilters.isEmpty();
+    boolean hasNodeNote = nodeLimitNote != null && !nodeLimitNote.isBlank();
+
+    float contentW = pageW - MARGIN * 2;
+
+    Font disclaimerFont = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(120, 120, 120));
+    Font noteFont       = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(80, 80, 80));
+
+    // ── Build badge chips table so getTotalHeight() is exact ─────────────────
+    // (disclaimer + note are built below as a single combined table)
+
+    // Badge chips (optional)
+    PdfPTable badges = null;
+    float badgesH = 0f;
+    if (hasFilters) {
+      Font labelFont = new Font(Font.HELVETICA, 7f, Font.BOLD,   new Color(30, 64, 175));
+      Font valueFont = new Font(Font.HELVETICA, 7f, Font.NORMAL, new Color(30, 41,  59));
+      Color chipBg   = new Color(219, 234, 254);
+      int cols = Math.min(nonNullFilters.size(), BADGE_COLS);
+      badges = new PdfPTable(cols);
+      badges.setTotalWidth(contentW);
+      for (String filter : nonNullFilters) {
+        int colon = filter.indexOf(':');
+        Phrase phrase = new Phrase();
+        if (colon > 0) {
+          phrase.add(new Phrase(filter.substring(0, colon + 1) + " ", labelFont));
+          phrase.add(new Phrase(filter.substring(colon + 1).trim(), valueFont));
+        } else {
+          phrase.add(new Phrase(filter, valueFont));
+        }
+        PdfPCell chip = new PdfPCell(phrase);
+        chip.setBackgroundColor(chipBg);
+        chip.setPaddingTop(2); chip.setPaddingBottom(2);
+        chip.setPaddingLeft(5); chip.setPaddingRight(5);
+        chip.setBorderColor(new Color(147, 197, 253));
+        chip.setBorderWidth(0.5f);
+        badges.addCell(chip);
+      }
+      int remainder = nonNullFilters.size() % cols;
+      if (remainder != 0) {
+        for (int p = remainder; p < cols; p++) {
+          PdfPCell empty = new PdfPCell(new Phrase(""));
+          empty.setBorder(Rectangle.NO_BORDER);
+          badges.addCell(empty);
+        }
+      }
+      badgesH = badges.getTotalHeight();
+    }
+
+    // ── Merge disclaimer + note into one table for exact combined height ───────
+    // Building them separately risks coordinate drift; one table guarantees
+    // the text block height is measured as a single unit.
+    PdfPTable textFooter = new PdfPTable(1);
+    textFooter.setTotalWidth(contentW);
+    if (hasNodeNote) {
+      PdfPCell noteCell2 = new PdfPCell(new Phrase(nodeLimitNote, noteFont));
+      noteCell2.setBorder(Rectangle.NO_BORDER);
+      noteCell2.setHorizontalAlignment(Element.ALIGN_CENTER);
+      noteCell2.setPaddingTop(0); noteCell2.setPaddingBottom(2);
+      textFooter.addCell(noteCell2);
+    }
+    PdfPCell discCell2 = new PdfPCell(new Phrase(
+        "Note: This diagram is automatically generated and may not render all connections accurately "
+            + "for large or complex network captures. For a complete view, consider taking a manual "
+            + "screenshot from the Network Diagram page.",
+        disclaimerFont));
+    discCell2.setBorder(Rectangle.NO_BORDER);
+    discCell2.setHorizontalAlignment(Element.ALIGN_CENTER);
+    discCell2.setPaddingTop(0); discCell2.setPaddingBottom(0);
+    textFooter.addCell(discCell2);
+    float textFooterH = textFooter.getTotalHeight();
+
+    // ── Exact footer height ───────────────────────────────────────────────────
+    float footerH = FOOTER_GAP + textFooterH + badgesH;
+
+    // ── Derive image slot ─────────────────────────────────────────────────────
+    float titleTop = pageH - MARGIN;
+    float imageTop = titleTop - TITLE_H - TITLE_GAP;
+    float imageBot = MARGIN + footerH;
+    float usableH  = imageTop - imageBot;
+
+    log.info("Topology diagram '{}': pageH={} footerH={} (textFooter={} badges={}) imageBot={} usableH={}",
+        layoutName, pageH, footerH, textFooterH, badgesH, imageBot, usableH);
+
+    // ── Draw title ────────────────────────────────────────────────────────────
+    PdfContentByte cb = writer.getDirectContent();
     Font titleFont = new Font(Font.HELVETICA, 11, Font.BOLD, C_HEADER_BG);
-    Paragraph title = new Paragraph(sectionNum + ". Network Topology — " + layoutName, titleFont);
-    title.setSpacingBefore(4);
-    title.setSpacingAfter(6);
-    doc.add(title);
+    ColumnText ctTitle = new ColumnText(cb);
+    ctTitle.setSimpleColumn(MARGIN, titleTop - TITLE_H, MARGIN + contentW, titleTop);
+    ctTitle.setAlignment(Element.ALIGN_LEFT);
+    ctTitle.addText(new Phrase(sectionNum + ". Network Topology \u2014 " + layoutName, titleFont));
+    ctTitle.go();
 
     if (base64Image == null || base64Image.isBlank()) {
-      doc.add(new Paragraph("Diagram image not provided.", cellFont()));
+      ColumnText ctErr = new ColumnText(cb);
+      ctErr.setSimpleColumn(MARGIN, imageBot, MARGIN + contentW, imageTop);
+      ctErr.addText(new Phrase("Diagram image not provided.", cellFont()));
+      ctErr.go();
+      doc.add(new Paragraph(" "));
       return;
     }
 
-    // Usable area: landscape height minus top+bottom margins (100), title (21),
-    // image spacingBefore (8), and disclaimer with its spacing (40).
-    float usableW = landscape.getWidth() - 80f;
-    float usableH = landscape.getHeight() - 100f - 21f - 8f - 40f;
-
+    // ── Draw image ────────────────────────────────────────────────────────────
     byte[] imageBytes;
     try {
       String data = base64Image.contains(",") ? base64Image.split(",")[1] : base64Image;
       imageBytes = Base64.getDecoder().decode(data);
     } catch (IllegalArgumentException e) {
       log.warn("Invalid base64 image data for layout: {}", layoutName);
-      doc.add(new Paragraph("Invalid diagram image data.", cellFont()));
+      ColumnText ctErr = new ColumnText(cb);
+      ctErr.setSimpleColumn(MARGIN, imageBot, MARGIN + contentW, imageTop);
+      ctErr.addText(new Phrase("Invalid diagram image data.", cellFont()));
+      ctErr.go();
+      doc.add(new Paragraph(" "));
       return;
     }
     Image img = Image.getInstance(imageBytes);
-    img.scaleToFit(usableW, usableH);
-    img.setAlignment(Image.ALIGN_CENTER);
-    img.setSpacingBefore(8);
-    doc.add(img);
+    img.scaleToFit(contentW, usableH);
+    float imgX = MARGIN + (contentW - img.getScaledWidth()) / 2f;
+    float imgY = imageTop - img.getScaledHeight();
+    img.setAbsolutePosition(imgX, imgY);
+    cb.addImage(img);
 
-    Font disclaimerFont = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(120, 120, 120));
-    Paragraph disclaimer =
-        new Paragraph(
-            "Note: This diagram is automatically generated and may not render all connections accurately for large or complex network captures. "
-                + "For a complete view, consider taking a manual screenshot from the Network Diagram page.",
-            disclaimerFont);
-    disclaimer.setAlignment(Element.ALIGN_CENTER);
-    disclaimer.setSpacingBefore(6);
-    doc.add(disclaimer);
+    // ── Draw footer bottom-up — two elements, exact heights, no estimates ─────
+    float y = MARGIN;
+
+    // 1. Badge chips (bottom-most)
+    if (badges != null) {
+      badges.writeSelectedRows(0, -1, MARGIN, y + badgesH, cb);
+      y += badgesH;
+    }
+
+    // 2. Text block (node note + disclaimer) directly above badges
+    y += FOOTER_GAP;
+    textFooter.writeSelectedRows(0, -1, MARGIN, y + textFooterH, cb);
+
+    // Advance iText's flow cursor so the next section opens a new page.
+    doc.add(new Paragraph(" "));
   }
 
   // ══════════════════════════════════════════════════════════════════════════

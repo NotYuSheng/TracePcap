@@ -7,6 +7,7 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
 import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
+import { nodeFilterLabel } from '@/features/network/constants';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import type { AnalysisData } from '@/types';
 
@@ -14,6 +15,7 @@ export interface NetworkGraphState {
   filteredNodes: GraphNode[];
   filteredEdges: GraphEdge[];
   activeFilterLabels: string[];
+  nodeLimitNote: string | null;
 }
 
 export interface NetworkDiagramFilterState {
@@ -60,7 +62,6 @@ export const AnalysisPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
-  const { filters } = useConversationFilters();
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -103,6 +104,7 @@ export const AnalysisPage = () => {
     filteredNodes: [],
     filteredEdges: [],
     activeFilterLabels: [],
+    nodeLimitNote: null,
   });
 
   useEffect(() => {
@@ -126,12 +128,40 @@ export const AnalysisPage = () => {
     setReportError(null);
     setReportStep('Rendering network diagrams…');
     try {
-      const { filteredNodes, filteredEdges, activeFilterLabels } = networkGraphStateRef.current;
+      const { filteredNodes, filteredEdges, nodeLimitNote: refNodeLimitNote } = networkGraphStateRef.current;
 
-      // If the user never visited the Network Diagram tab the ref will be empty.
-      // Fall back to a fresh unfiltered fetch so the PDF always contains diagrams.
+      // Build filter labels from the lifted state — always accurate regardless
+      // of whether the Network Diagram tab has been visited.
+      const activeFilterLabels: string[] = [];
+      if (ipFilter) activeFilterLabels.push(`IP: ${ipFilter}`);
+      if (portFilter) activeFilterLabels.push(`Port: ${portFilter}`);
+      if (hasRisksOnly) activeFilterLabels.push('Has Risks: Yes');
+      if (activeLegendProtocols.length > 0)
+        activeFilterLabels.push(`Protocol: ${activeLegendProtocols.join(', ')}`);
+      if (activeNodeFilters.length > 0)
+        activeFilterLabels.push(`Node type: ${activeNodeFilters.map(nodeFilterLabel).join(', ')}`);
+      if (activeAppFilters.length > 0)
+        activeFilterLabels.push(`App: ${activeAppFilters.join(', ')}`);
+      if (activeL7Protocols.length > 0)
+        activeFilterLabels.push(`L7: ${activeL7Protocols.join(', ')}`);
+      if (activeCategories.length > 0)
+        activeFilterLabels.push(`Category: ${activeCategories.join(', ')}`);
+      if (activeRiskTypes.length > 0)
+        activeFilterLabels.push(`Risk type: ${activeRiskTypes.join(', ')}`);
+      if (activeCustomSigs.length > 0)
+        activeFilterLabels.push(`Custom signature: ${activeCustomSigs.join(', ')}`);
+      if (activeFileTypes.length > 0)
+        activeFilterLabels.push(`File type: ${activeFileTypes.join(', ')}`);
+      if (activeCountries.length > 0)
+        activeFilterLabels.push(`Country: ${activeCountries.join(', ')}`);
+
       let diagramNodes = filteredNodes;
       let diagramEdges = filteredEdges;
+      let nodeLimitNote: string | null = refNodeLimitNote ?? null;
+
+      // If the user never visited the Network Diagram tab the ref will be empty.
+      // Fetch the raw graph then apply the same client-side filters so the PDF
+      // matches what the user would see on the diagram tab.
       if (diagramNodes.length === 0) {
         setReportStep('Fetching network data…');
         const { conversationService } = await import(
@@ -147,10 +177,78 @@ export const AnalysisPage = () => {
           conversationService.getHostClassifications(fileId).catch(() => undefined),
         ]);
         const graph = networkService.buildNetworkGraph(
-          convResponse.data, data ?? undefined, 500, hostClassifications
+          convResponse.data, data ?? undefined, nodeLimit, hostClassifications
         );
-        diagramNodes = graph.nodes;
-        diagramEdges = graph.edges;
+
+        // Apply the same client-side filters the diagram tab would use.
+        let fe = graph.edges;
+        if (hasRisksOnly) fe = fe.filter(e => e.data.hasRisks);
+        if (activeLegendProtocols.length > 0)
+          fe = fe.filter(e => activeLegendProtocols.some(k => {
+            const p = e.data.protocol.toUpperCase();
+            const a = (e.data.appName ?? '').toUpperCase();
+            if (k === 'HTTPS') return p === 'HTTPS' || a.includes('TLS') || a.includes('SSL') || a.includes('HTTPS');
+            if (k === 'ICMP') return p === 'ICMP' || p === 'ICMPV6';
+            if (k === 'STP') return p === 'STP' || p === 'RSTP';
+            return p === k || a.includes(k);
+          }));
+        if (activeAppFilters.length > 0)
+          fe = fe.filter(e => activeAppFilters.includes(e.data.appName ?? ''));
+        if (activeL7Protocols.length > 0)
+          fe = fe.filter(e => activeL7Protocols.includes(e.data.l7Protocol ?? ''));
+        if (activeCategories.length > 0)
+          fe = fe.filter(e => activeCategories.includes(e.data.category ?? ''));
+        if (activeRiskTypes.length > 0)
+          fe = fe.filter(e => activeRiskTypes.some(r => e.data.flowRisks?.includes(r)));
+        if (activeCustomSigs.length > 0)
+          fe = fe.filter(e => activeCustomSigs.some(s => e.data.customSignatures?.includes(s)));
+        if (activeFileTypes.length > 0)
+          fe = fe.filter(e => activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f)));
+        if (activeCountries.length > 0)
+          fe = fe.filter(e =>
+            activeCountries.includes(e.data.srcCountry ?? '') ||
+            activeCountries.includes(e.data.dstCountry ?? '')
+          );
+        if (activeNodeFilters.length > 0) {
+          const matchIds = new Set(
+            graph.nodes.filter(n => activeNodeFilters.some(k => {
+              if (k.startsWith('nt:')) return n.data.nodeType === k.slice(3);
+              if (k.startsWith('dt:')) return n.data.deviceType === k.slice(3);
+              return false;
+            })).map(n => n.id)
+          );
+          fe = fe.filter(e => matchIds.has(e.source) || matchIds.has(e.target));
+        }
+        if (portFilter) {
+          const portNum = parseInt(portFilter, 10);
+          if (!isNaN(portNum))
+            fe = fe.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
+        }
+
+        const visibleIds = new Set<string>();
+        fe.forEach(e => { visibleIds.add(e.source); visibleIds.add(e.target); });
+        let fn = graph.nodes.filter(n => visibleIds.has(n.id));
+        if (ipFilter) {
+          const ipLower = ipFilter.toLowerCase();
+          const ipMatchIds = new Set(
+            graph.nodes
+              .filter(n => n.data.ip.toLowerCase().includes(ipLower) ||
+                (n.data.hostname ?? '').toLowerCase().includes(ipLower))
+              .map(n => n.id)
+          );
+          fe = fe.filter(e => ipMatchIds.has(e.source) || ipMatchIds.has(e.target));
+          fn = graph.nodes.filter(n => {
+            const inEdge = fe.some(e => e.source === n.id || e.target === n.id);
+            return inEdge || ipMatchIds.has(n.id);
+          });
+        }
+
+        // If all filters are default (no active filters), use the full graph.
+        diagramNodes = fn.length > 0 || activeFilterLabels.length > 0 ? fn : graph.nodes;
+        diagramEdges = fn.length > 0 || activeFilterLabels.length > 0 ? fe : graph.edges;
+        if (graph.hiddenNodes && graph.hiddenNodes > 0) {
+          nodeLimitNote = `Showing the ${nodeLimit} most significant nodes (${graph.hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.`;
+        }
         setReportStep('Rendering network diagrams…');
       }
 
@@ -163,6 +261,7 @@ export const AnalysisPage = () => {
           forceDirectedImage: diagrams.forceDirected,
           hierarchicalImage: diagrams.hierarchical,
           activeFilters: activeFilterLabels,
+          nodeLimitNote,
         },
         { responseType: 'blob' }
       );
