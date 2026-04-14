@@ -12,5 +12,7 @@ public interface HostClassificationRepository
 
   List<HostClassificationEntity> findByFileId(UUID fileId);
 
+  long countByFileId(UUID fileId);
+
   void deleteByFileId(UUID fileId);
 }

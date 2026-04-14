@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
 
 // ── Helpers (same as NetworkDiagramPage) ────────────────────────────────────
 
@@ -142,6 +143,10 @@ export const ComparePage = () => {
 
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportStep, setReportStep] = useState<string | null>(null);
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -386,6 +391,70 @@ export const ComparePage = () => {
     (portFilter ? 1 : 0) +
     (hasRisksOnly ? 1 : 0);
 
+  // ── Download report ───────────────────────────────────────────────────────
+
+  const handleDownloadReport = async () => {
+    setReportLoading(true);
+    setReportError(null);
+    setReportStep('Rendering network diagrams…');
+    try {
+      const images = await captureNetworkDiagrams(filteredNodes, filteredEdges);
+
+      setReportStep('Building PDF…');
+
+      // Build active filter labels
+      const activeFilterLabels: string[] = [];
+      if (ipFilter) activeFilterLabels.push(`IP: ${ipFilter}`);
+      if (portFilter) activeFilterLabels.push(`Port: ${portFilter}`);
+      if (hasRisksOnly) activeFilterLabels.push('Has Risks: Yes');
+      if (activeLegendProtocols.length > 0)
+        activeFilterLabels.push(`Protocol: ${activeLegendProtocols.join(', ')}`);
+      if (activeAppFilters.length > 0)
+        activeFilterLabels.push(`App: ${activeAppFilters.join(', ')}`);
+      if (activeL7Protocols.length > 0)
+        activeFilterLabels.push(`L7: ${activeL7Protocols.join(', ')}`);
+      if (activeCategories.length > 0)
+        activeFilterLabels.push(`Category: ${activeCategories.join(', ')}`);
+      if (activeRiskTypes.length > 0)
+        activeFilterLabels.push(`Risk type: ${activeRiskTypes.join(', ')}`);
+      if (hiddenSources.size > 0)
+        activeFilterLabels.push(`Hidden sources: ${[...hiddenSources].join(', ')}`);
+
+      let nodeLimitNote: string | null = null;
+      if (hiddenNodes > 0) {
+        nodeLimitNote = `Showing the ${nodeLimit} most significant nodes (${hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.`;
+      }
+
+      const response = await apiClient.post(
+        API_ENDPOINTS.COMPARE_REPORT_DOWNLOAD,
+        {
+          fileIds,
+          fileLabels: labels,
+          forceDirectedImage: images.forceDirected,
+          hierarchicalImage: images.hierarchical,
+          activeFilters: activeFilterLabels,
+          nodeLimitNote,
+        },
+        { responseType: 'blob' }
+      );
+
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.href = url;
+      const joined = fileIds.join('-');
+      const safeIds = joined.length > 180 ? `${fileIds[0]}-and-${fileIds.length - 1}-more` : joined;
+      a.download = `tracepcap-compare-report-${safeIds}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[ComparePage] Report download failed:', err);
+      setReportError('Failed to generate report. Please try again.');
+    } finally {
+      setReportLoading(false);
+      setReportStep(null);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (fileNames === null || loading) {
@@ -400,16 +469,57 @@ export const ComparePage = () => {
 
   return (
     <div className="network-diagram-page">
+      {reportStep && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10001,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div className="card shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
+            <div className="spinner-border text-primary mb-3" role="status" />
+            <h6 className="mb-1">Generating Report</h6>
+            <p className="text-muted small mb-0">{reportStep}</p>
+            <p className="text-muted small mt-1">This may take up to 60 seconds.</p>
+          </div>
+        </div>
+      )}
+
       {/* Back link + header */}
       <div className="d-flex align-items-center gap-3 mb-3">
         <Link to="/" className="btn btn-link btn-sm p-0 text-muted text-decoration-none">
           <i className="bi bi-arrow-left me-1" />
           Back
         </Link>
-        <h4 className="mb-0">
+        <h4 className="mb-0 flex-grow-1">
           <i className="bi bi-diagram-3 me-2" />
           Compare Topology
         </h4>
+        <div className="d-flex flex-column align-items-end gap-1">
+          <button
+            className="btn btn-outline-primary btn-sm"
+            onClick={handleDownloadReport}
+            disabled={reportLoading}
+          >
+            {reportLoading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                Generating report…
+              </>
+            ) : (
+              <>
+                <i className="bi bi-file-earmark-pdf me-2"></i>
+                Download Report
+              </>
+            )}
+          </button>
+          {reportError && <small className="text-danger">{reportError}</small>}
+        </div>
       </div>
 
       {/* File labels row */}
