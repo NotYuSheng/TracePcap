@@ -441,7 +441,9 @@ export const ComparePage = () => {
       const url = URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `tracepcap-compare-report-${fileIds.join('-')}.pdf`;
+      const joined = fileIds.join('-');
+      const safeIds = joined.length > 180 ? `${fileIds[0]}-and-${fileIds.length - 1}-more` : joined;
+      a.download = `tracepcap-compare-report-${safeIds}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {

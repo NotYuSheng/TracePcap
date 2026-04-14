@@ -51,9 +51,16 @@ public class ReportController {
     StreamingResponseBody body = out -> compareReportService.generateReport(request, out);
 
     // Build filename: tracepcap-compare-report-<id1>-<id2>-....pdf
-    String ids = request.getFileIds() != null
-        ? request.getFileIds().stream().map(UUID::toString).collect(java.util.stream.Collectors.joining("-"))
-        : "unknown";
+    // Cap at a safe length to avoid filesystem limits (ext4/NTFS: 255 chars).
+    String ids;
+    if (request.getFileIds() == null || request.getFileIds().isEmpty()) {
+      ids = "unknown";
+    } else {
+      String joined = request.getFileIds().stream()
+          .map(UUID::toString)
+          .collect(java.util.stream.Collectors.joining("-"));
+      ids = joined.length() > 180 ? request.getFileIds().get(0) + "-and-" + (request.getFileIds().size() - 1) + "-more" : joined;
+    }
     String filename = "tracepcap-compare-report-" + ids + ".pdf";
 
     return ResponseEntity.ok()

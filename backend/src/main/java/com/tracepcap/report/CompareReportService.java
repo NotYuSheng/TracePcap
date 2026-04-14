@@ -63,6 +63,10 @@ public class CompareReportService {
 
   @Transactional(readOnly = true)
   public void generateReport(CompareReportRequest request, OutputStream out) {
+    if (request.getFileIds() == null || request.getFileIds().size() < 2) {
+      throw new IllegalArgumentException("At least two file IDs are required for a compare report");
+    }
+
     List<UUID> fileIds     = request.getFileIds();
     List<String> labels    = request.getFileLabels();
 
@@ -173,7 +177,7 @@ public class CompareReportService {
 
       long totalConvs = conversationRepository.countByFileId(id);
       long riskCount  = conversationRepository.countAtRiskByFileId(id);
-      long hostCount  = hostClassificationRepository.findByFileId(id).size();
+      long hostCount  = hostClassificationRepository.countByFileId(id);
 
       var analysis = analysisResultRepository.findByFileId(id).orElse(null);
       String packets  = analysis != null && analysis.getPacketCount() != null
