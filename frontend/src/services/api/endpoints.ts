@@ -44,4 +44,5 @@ export const API_ENDPOINTS = {
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
+  COMPARE_REPORT_DOWNLOAD: '/files/compare/report',
 } as const;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import {
@@ -9,8 +9,10 @@ import {
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { ScrollableTable } from '@components/common/ScrollableTable';
+import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Modal } from '@govtechsg/sgds-react';
 import { formatBytes } from '@/utils/formatters';
+import '@components/conversation/ConversationFilterPanel/ConversationFilterPanel.css';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -129,6 +131,14 @@ export const ExtractedFilesPage = () => {
   const [pendingDownload, setPendingDownload] = useState<ExtractedFile | null>(null);
   const [sortBy, setSortBy] = useState<SortField | ''>('');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [mimeTypeFilter, setMimeTypeFilter] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const allMimeTypes = useMemo(
+    () =>
+      [...new Set(files.map(f => f.mimeType).filter((m): m is string => m !== null))].sort(),
+    [files]
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -184,7 +194,11 @@ export const ExtractedFilesPage = () => {
   if (loading) return <LoadingSpinner message="Loading extracted files…" />;
   if (error) return <ErrorMessage title="Failed to load extracted files" message={error} />;
 
-  const sorted = sortFiles(files, sortBy, sortDir);
+  const filtered =
+    mimeTypeFilter.length > 0
+      ? files.filter(f => f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))
+      : files;
+  const sorted = sortFiles(filtered, sortBy, sortDir);
 
   return (
     <div>
@@ -196,11 +210,76 @@ export const ExtractedFilesPage = () => {
           </small>
         </div>
         <span className="badge bg-secondary fs-6">
-          {files.length} file{files.length !== 1 ? 's' : ''}
+          {mimeTypeFilter.length > 0
+            ? `${sorted.length} / ${files.length}`
+            : files.length}{' '}
+          file{files.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       <ExtractionInfoCard />
+
+      {/* Filter panel */}
+      {allMimeTypes.length > 0 && (
+        <div className="conversation-filter-panel mb-3">
+          <div className="d-flex align-items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => setFilterOpen(o => !o)}
+            >
+              <i className="bi bi-funnel me-1"></i>
+              Filters
+              {mimeTypeFilter.length > 0 && (
+                <span className="badge bg-primary ms-2">{mimeTypeFilter.length}</span>
+              )}
+              <i className={`bi ms-2 ${filterOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
+            </button>
+          </div>
+          {filterOpen && (
+            <div className="card mt-2 filter-panel-body">
+              <div className="card-body p-3">
+                <PillSectionHeader
+                  label="MIME Type"
+                  onSelectAll={() => setMimeTypeFilter(allMimeTypes)}
+                  onDeselectAll={() => setMimeTypeFilter([])}
+                />
+                <div className="d-flex flex-wrap gap-1">
+                  {allMimeTypes.map(mt => {
+                    const isActive = mimeTypeFilter.includes(mt);
+                    return (
+                      <button
+                        key={mt}
+                        type="button"
+                        className={`badge rounded-pill border-0 filter-pill ${isActive ? 'active' : ''}`}
+                        onClick={() =>
+                          setMimeTypeFilter(prev =>
+                            prev.includes(mt) ? prev.filter(v => v !== mt) : [...prev, mt]
+                          )
+                        }
+                      >
+                        <i className={`bi ${mimeIcon(mt)} me-1`}></i>
+                        {mt}
+                      </button>
+                    );
+                  })}
+                </div>
+                {mimeTypeFilter.length > 0 && (
+                  <div className="mt-3 pt-2 border-top">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => setMimeTypeFilter([])}
+                    >
+                      <i className="bi bi-x-circle me-1"></i>Clear filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header d-flex justify-content-between align-items-center">
@@ -208,10 +287,12 @@ export const ExtractedFilesPage = () => {
           <small className="text-muted">Click a column header to sort</small>
         </div>
         <div className="card-body p-0" style={{ position: 'relative' }}>
-          {files.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="text-center py-5 text-muted">
               <i className="bi bi-inbox fs-1 d-block mb-2"></i>
-              No files were extracted from this capture.
+              {mimeTypeFilter.length > 0
+                ? 'No files match the selected MIME type filter.'
+                : 'No files were extracted from this capture.'}
             </div>
           ) : (
             <ScrollableTable>

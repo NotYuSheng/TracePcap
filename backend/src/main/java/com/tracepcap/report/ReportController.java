@@ -18,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 public class ReportController {
 
   private final ReportService reportService;
+  private final CompareReportService compareReportService;
 
   @PostMapping("/{fileId}/report")
   @Operation(summary = "Generate and download a PDF analysis report for a PCAP file")
@@ -34,6 +35,39 @@ public class ReportController {
             HttpHeaders.CONTENT_DISPOSITION,
             ContentDisposition.builder("attachment")
                 .filename("tracepcap-report-" + fileId + ".pdf")
+                .build()
+                .toString())
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(body);
+  }
+
+  @PostMapping("/compare/report")
+  @Operation(summary = "Generate and download a PDF compare-topology report for multiple PCAP files")
+  public ResponseEntity<StreamingResponseBody> downloadCompareReport(
+      @RequestBody CompareReportRequest request) {
+
+    log.info("POST /api/files/compare/report — {} files", request.getFileIds() != null ? request.getFileIds().size() : 0);
+
+    StreamingResponseBody body = out -> compareReportService.generateReport(request, out);
+
+    // Build filename: tracepcap-compare-report-<id1>-<id2>-....pdf
+    // Cap at a safe length to avoid filesystem limits (ext4/NTFS: 255 chars).
+    String ids;
+    if (request.getFileIds() == null || request.getFileIds().isEmpty()) {
+      ids = "unknown";
+    } else {
+      String joined = request.getFileIds().stream()
+          .map(UUID::toString)
+          .collect(java.util.stream.Collectors.joining("-"));
+      ids = joined.length() > 180 ? request.getFileIds().get(0) + "-and-" + (request.getFileIds().size() - 1) + "-more" : joined;
+    }
+    String filename = "tracepcap-compare-report-" + ids + ".pdf";
+
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.builder("attachment")
+                .filename(filename)
                 .build()
                 .toString())
         .contentType(MediaType.APPLICATION_PDF)
