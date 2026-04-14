@@ -35,7 +35,7 @@ services:
 
   # MinIO Object Storage
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
     container_name: tracepcap-minio
     command: server /data --console-address ":9001"
     environment:
@@ -48,7 +48,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -57,7 +57,7 @@ services:
 
   # MinIO Client (mc) - Create bucket on startup
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
     container_name: tracepcap-minio-init
     depends_on:
       - minio
@@ -86,7 +86,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: tracepcap-files
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
-      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-https://api.openai.com/v1}
+      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:11434/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
       LLM_MODEL: ${LLM_MODEL:-gpt-4}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}

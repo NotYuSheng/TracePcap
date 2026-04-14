@@ -55,8 +55,8 @@ echo "=== [1/3] Pulling third-party images ==="
 # --- Docker Hub ---
 DOCKERHUB_IMAGES=(
   "postgres:15-alpine"
-  "minio/minio:latest"
-  "minio/mc:latest"
+  "minio/minio:RELEASE.2024-11-07T00-52-20Z"
+  "minio/mc:RELEASE.2024-11-21T17-21-54Z"
 )
 
 for img in "${DOCKERHUB_IMAGES[@]}"; do
@@ -78,7 +78,7 @@ docker build \
 
 echo "  Building nginx (frontend)..."
 docker build \
-  --build-arg VITE_API_BASE_URL=/api \
+  --build-arg "VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}" \
   --build-arg "VITE_SUPPORTED_FILE_TYPES=${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}" \
   --build-arg "VITE_ANALYSIS_OPTIONS=${VITE_ANALYSIS_OPTIONS:-false}" \
   --build-arg "VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}" \
@@ -92,11 +92,12 @@ docker build \
 echo ""
 echo "=== [3/3] Saving images to images/ ==="
 
-save_image "postgres:15-alpine" "postgres_15-alpine.tar"
-save_image "minio/minio:latest" "minio_minio.tar"
-save_image "minio/mc:latest"    "minio_mc.tar"
-save_image "$BACKEND_IMAGE"     "tracepcap-backend.tar"
-save_image "$NGINX_IMAGE"       "tracepcap-nginx.tar"
+for img in "${DOCKERHUB_IMAGES[@]}"; do
+  filename="$(echo "$img" | tr '/:' '_').tar"
+  save_image "$img" "$filename"
+done
+save_image "$BACKEND_IMAGE" "tracepcap-backend.tar"
+save_image "$NGINX_IMAGE"   "tracepcap-nginx.tar"
 
 # ---------------------------------------------------------------------------
 # Summary
