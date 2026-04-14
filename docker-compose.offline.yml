@@ -86,7 +86,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: tracepcap-files
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
-      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:11434/v1}
+      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:1234/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
       LLM_MODEL: ${LLM_MODEL:-gpt-4}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}

@@ -231,7 +231,7 @@ bash scripts/load-images.sh
 docker compose -f docker-compose.offline.yml up -d
 ```
 
-> **Note**: The offline compose file defaults `LLM_API_BASE_URL` to `http://localhost:11434/v1` (Ollama). Configure a locally-hosted LLM in `.env` before starting if you want AI features.
+> **Note**: The offline compose file defaults `LLM_API_BASE_URL` to `http://localhost:1234/v1` (LM Studio). Configure a locally-hosted LLM in `.env` before starting if you want AI features.
 
 ---
 
