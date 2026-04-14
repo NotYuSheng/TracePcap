@@ -554,10 +554,9 @@ export function applyNetworkFilters(
         .map(n => n.id)
     );
     fe = fe.filter(e => ipMatchIds.has(e.source) || ipMatchIds.has(e.target));
-    fn = allNodes.filter(n => {
-      const inEdge = fe.some(e => e.source === n.id || e.target === n.id);
-      return inEdge || ipMatchIds.has(n.id);
-    });
+    const ipVisibleIds = new Set<string>();
+    fe.forEach(e => { ipVisibleIds.add(e.source); ipVisibleIds.add(e.target); });
+    fn = allNodes.filter(n => ipVisibleIds.has(n.id) || ipMatchIds.has(n.id));
   }
 
   return { filteredNodes: fn, filteredEdges: fe };

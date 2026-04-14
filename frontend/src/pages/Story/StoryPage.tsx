@@ -144,7 +144,7 @@ export const StoryPage = () => {
         setError(
           `Story generation timed out after ${minutes} minute${minutes !== 1 ? 's' : ''}. The LLM is taking too long to respond. Try again or reduce the capture size.`
         );
-      } else if (status === 502 || serverMsg.toLowerCase().includes('llm') || serverMsg.toLowerCase().includes('reach')) {
+      } else if (status === 502) {
         setError(
           'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
         );
