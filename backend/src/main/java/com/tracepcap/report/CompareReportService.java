@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +45,6 @@ public class CompareReportService {
   private static final Color C_ROW_ALT    = new Color(239, 246, 255);
   private static final Color C_DIVIDER    = new Color(147, 197, 253);
   private static final Color C_TEXT       = new Color(30,  41,  59);
-  private static final Color C_LABEL      = new Color(30,  41,  59);
   private static final Color C_RISK_BG    = new Color(254, 226, 226);
 
   private static final DateTimeFormatter DT_FMT =
@@ -129,7 +127,6 @@ public class CompareReportService {
       throws Exception {
     Font appF   = new Font(Font.HELVETICA, 11, Font.BOLD,   new Color(100, 116, 139));
     Font titleF = new Font(Font.HELVETICA, 22, Font.BOLD,   C_HEADER_BG);
-    Font subF   = new Font(Font.HELVETICA, 11, Font.NORMAL, new Color(71, 85, 105));
     Font metaF  = new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(100, 116, 139));
 
     Paragraph app = centred(new Paragraph("TracePcap — Compare Network Topology Report", appF));
@@ -274,8 +271,7 @@ public class CompareReportService {
     final float FOOTER_GAP  = 8f;
 
     List<String> nonNullFilters = (activeFilters != null)
-        ? activeFilters.stream().filter(f -> f != null)
-            .collect(java.util.stream.Collectors.toList())
+        ? activeFilters.stream().filter(f -> f != null).toList()
         : List.of();
     boolean hasFilters  = !nonNullFilters.isEmpty();
     boolean hasNodeNote = nodeLimitNote != null && !nodeLimitNote.isBlank();
@@ -368,7 +364,8 @@ public class CompareReportService {
 
     byte[] imageBytes;
     try {
-      String data = base64Image.contains(",") ? base64Image.split(",")[1] : base64Image;
+      int commaIndex = base64Image.indexOf(',');
+      String data = (commaIndex >= 0) ? base64Image.substring(commaIndex + 1) : base64Image;
       imageBytes = Base64.getDecoder().decode(data);
     } catch (IllegalArgumentException e) {
       log.warn("Invalid base64 image data for layout: {}", layoutName);
