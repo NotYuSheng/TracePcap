@@ -162,6 +162,7 @@
   --sgds-card-color: var(--tp-text);
 
   color: var(--tp-text);
+  overflow: hidden;
 }
 
 /* List group */

@@ -7,6 +7,8 @@ import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.service.TimelineService;
+import com.tracepcap.common.exception.ContextLengthExceededException;
+import com.tracepcap.common.exception.LlmException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.config.LlmConfig;
 import com.tracepcap.file.entity.FileEntity;
@@ -216,6 +218,8 @@ public class StoryService {
               .build();
 
       storyRepository.save(failedStory);
+      if (e instanceof LlmException) throw (LlmException) e;
+      if (e instanceof ContextLengthExceededException) throw (ContextLengthExceededException) e;
       throw new RuntimeException("Failed to generate story: " + e.getMessage(), e);
     }
   }

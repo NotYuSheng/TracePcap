@@ -13,7 +13,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
-import { DEVICE_TYPES, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import './ConversationFilterPanel.css';
 
 interface ProtocolStat {
@@ -40,6 +40,7 @@ interface ConversationFilterPanelProps {
   customSignatureOptions: string[];
   signatureSeverities?: Record<string, string>;
   countryOptions: string[];
+  presentDeviceTypes?: string[];
   activeFilterCount: number;
   visibleColumns: Set<ColumnKey>;
   onToggleColumn: (key: ColumnKey) => void;
@@ -89,6 +90,7 @@ export function ConversationFilterPanel({
   customSignatureOptions,
   signatureSeverities = {},
   countryOptions,
+  presentDeviceTypes,
   activeFilterCount,
   visibleColumns,
   onToggleColumn,
@@ -666,6 +668,7 @@ export function ConversationFilterPanel({
               )}
 
               {/* Device type filter */}
+              {presentDeviceTypes && presentDeviceTypes.length > 0 && (
               <div className="col-12">
                 <PillSectionHeader
                   label="Device Type"
@@ -676,11 +679,11 @@ export function ConversationFilterPanel({
                       body="Filter by the classified device type of hosts in each conversation. Device types are inferred from traffic patterns and port usage. Click on a device type badge in the conversation details to see the confidence score and evidence."
                     />
                   }
-                  onSelectAll={() => onFiltersChange({ deviceTypes: [...DEVICE_TYPES] })}
+                  onSelectAll={() => onFiltersChange({ deviceTypes: presentDeviceTypes })}
                   onDeselectAll={() => onFiltersChange({ deviceTypes: [] })}
                 />
                 <div className="d-flex flex-wrap gap-1 mt-1">
-                  {DEVICE_TYPES.map(dt => {
+                  {presentDeviceTypes.map(dt => {
                     const selected = (filters.deviceTypes ?? []).includes(dt);
                     const bg = deviceTypeColor(dt);
                     return (
@@ -699,6 +702,7 @@ export function ConversationFilterPanel({
                   })}
                 </div>
               </div>
+              )}
 
               {/* Column visibility */}
               {!hideColumnToggle && (
