@@ -199,6 +199,42 @@ Navigate to **http://localhost:80/swagger-ui.html** to explore the API interacti
 
 TracePcap is designed for self-hosted deployment:
 
+### Offline / Air-gapped Deployment
+
+For environments without internet access, use the offline deployment workflow:
+
+**On an internet-connected machine:**
+
+```bash
+# Pull all third-party images, build local images, and save everything as .tar files
+bash scripts/pull-and-save-images.sh
+```
+
+This creates a `images/` directory containing `.tar` files for all services.
+
+**Transfer to the offline machine:**
+
+```
+images/                      # all .tar files
+docker-compose.offline.yml
+scripts/load-images.sh
+.env                         # copy from .env.example and configure
+```
+
+**On the offline machine:**
+
+```bash
+# Load all images into Docker
+bash scripts/load-images.sh
+
+# Start the stack
+docker compose -f docker-compose.offline.yml up -d
+```
+
+> **Note**: The offline compose file defaults `LLM_API_BASE_URL` to `http://localhost:11434/v1` (Ollama). Configure a locally-hosted LLM in `.env` before starting if you want AI features.
+
+---
+
 - **Development**: Use built-in configuration with exposed ports
 - **Production**:
   - Change default MinIO credentials in `docker-compose.yml`
