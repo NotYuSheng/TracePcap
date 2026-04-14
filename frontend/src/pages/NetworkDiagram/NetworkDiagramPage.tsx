@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Modal } from '@govtechsg/sgds-react';
 import type { GraphNode } from '@/features/network/types';
@@ -7,7 +7,9 @@ import {
   CONVERSATION_LIMIT_ENABLED,
   MAX_DIAGRAM_NODES,
 } from '@/features/network/hooks/useNetworkData';
-import { nodeFilterLabel } from '@/features/network/constants';
+import { buildActiveFilterLabels, toggleSet } from '@/features/network/constants';
+import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
+import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
@@ -15,27 +17,6 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 
-/** Returns true if an edge's protocol/app matches a legend key (e.g. HTTPS, ICMP, STP). */
-function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean {
-  if (key === 'HTTPS')
-    return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
-  if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
-  if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
-  return proto === key || app.includes(key);
-}
-
-function toggleSet(setter: Dispatch<SetStateAction<string[]>>) {
-  return (val: string) =>
-    setter(prev => (prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]));
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
 
 export const NetworkDiagramPage = () => {
   const { fileId, data, networkGraphStateRef, networkDiagramFilters } =
@@ -350,22 +331,12 @@ export const NetworkDiagramPage = () => {
   // the report button captures exactly what the user sees.
   useEffect(() => {
     if (!networkGraphStateRef) return;
-    const labels: string[] = [];
-    if (ipFilter) labels.push(`IP: ${ipFilter}`);
-    if (portFilter) labels.push(`Port: ${portFilter}`);
-    if (hasRisksOnly) labels.push('Has Risks: Yes');
-    if (activeLegendProtocols.length > 0)
-      labels.push(`Protocol: ${activeLegendProtocols.join(', ')}`);
-    if (activeNodeFilters.length > 0)
-      labels.push(`Node type: ${activeNodeFilters.map(nodeFilterLabel).join(', ')}`);
-    if (activeAppFilters.length > 0) labels.push(`App: ${activeAppFilters.join(', ')}`);
-    if (activeL7Protocols.length > 0) labels.push(`L7: ${activeL7Protocols.join(', ')}`);
-    if (activeCategories.length > 0) labels.push(`Category: ${activeCategories.join(', ')}`);
-    if (activeRiskTypes.length > 0) labels.push(`Risk type: ${activeRiskTypes.join(', ')}`);
-    if (activeCustomSigs.length > 0)
-      labels.push(`Custom signature: ${activeCustomSigs.join(', ')}`);
-    if (activeFileTypes.length > 0) labels.push(`File type: ${activeFileTypes.join(', ')}`);
-    if (activeCountries.length > 0) labels.push(`Country: ${activeCountries.join(', ')}`);
+    const labels = buildActiveFilterLabels({
+      ipFilter, portFilter, hasRisksOnly,
+      activeLegendProtocols, activeNodeFilters, activeAppFilters,
+      activeL7Protocols, activeCategories, activeRiskTypes,
+      activeCustomSigs, activeFileTypes, activeCountries,
+    });
     const nodeLimitNote =
       hiddenNodes > 0
         ? `Showing the ${nodeLimit} most significant nodes (${hiddenNodes} hidden). Ranked by traffic volume, risk signals, and connectivity.`

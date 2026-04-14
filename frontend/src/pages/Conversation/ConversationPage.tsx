@@ -287,6 +287,7 @@ export const ConversationPage = () => {
   }));
   const appOptions = (data.detectedApplications ?? []).map(a => ({ name: a.name }));
   const categoryOptions = (data.categoryDistribution ?? []).map(c => ({ category: c.category }));
+  const presentDeviceTypes = [...new Set(Array.from(hostClassMap.values()).map(h => h.deviceType).filter(Boolean))];
 
   // CSV export URL
   const exportUrl = conversationService.getExportUrl(fileId, filters);
@@ -347,6 +348,7 @@ export const ConversationPage = () => {
             customSignatureOptions={customSignatureOptions}
             signatureSeverities={signatureSeverities}
             countryOptions={countryOptions}
+            presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
             visibleColumns={visibleColumns}
             onToggleColumn={toggleColumn}

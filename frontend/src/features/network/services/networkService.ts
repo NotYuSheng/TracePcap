@@ -434,6 +434,136 @@ export function buildNetworkGraph(
   };
 }
 
+/** Returns true if an edge's protocol/app matches a legend key (e.g. HTTPS, ICMP, STP). */
+export function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean {
+  if (key === 'HTTPS')
+    return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
+  if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
+  if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
+  return proto === key || app.includes(key);
+}
+
+/**
+ * Apply the standard set of client-side network-diagram filters to a graph.
+ * Used in both NetworkDiagramPage (live UI) and AnalysisPage (PDF fallback).
+ * Centralised here so both sites stay in sync automatically.
+ */
+export function applyNetworkFilters(
+  allNodes: GraphNode[],
+  allEdges: GraphEdge[],
+  filters: {
+    hasRisksOnly: boolean;
+    activeLegendProtocols: string[];
+    activeAppFilters: string[];
+    activeL7Protocols: string[];
+    activeCategories: string[];
+    activeRiskTypes: string[];
+    activeCustomSigs: string[];
+    activeFileTypes: string[];
+    activeCountries: string[];
+    activeNodeFilters: string[];
+    portFilter: string;
+    ipFilter: string;
+  }
+): { filteredNodes: GraphNode[]; filteredEdges: GraphEdge[] } {
+  const {
+    hasRisksOnly,
+    activeLegendProtocols,
+    activeAppFilters,
+    activeL7Protocols,
+    activeCategories,
+    activeRiskTypes,
+    activeCustomSigs,
+    activeFileTypes,
+    activeCountries,
+    activeNodeFilters,
+    portFilter,
+    ipFilter,
+  } = filters;
+
+  let fe = allEdges;
+
+  if (hasRisksOnly) fe = fe.filter(e => e.data.hasRisks);
+
+  if (activeLegendProtocols.length > 0)
+    fe = fe.filter(e => {
+      const p = e.data.protocol.toUpperCase();
+      const a = (e.data.appName ?? '').toUpperCase();
+      return activeLegendProtocols.some(k => edgeMatchesLegendKey(p, a, k));
+    });
+
+  if (activeAppFilters.length > 0)
+    fe = fe.filter(e => activeAppFilters.includes(e.data.appName ?? ''));
+
+  if (activeL7Protocols.length > 0)
+    fe = fe.filter(e => activeL7Protocols.includes(e.data.l7Protocol ?? ''));
+
+  if (activeCategories.length > 0)
+    fe = fe.filter(e => activeCategories.includes(e.data.category ?? ''));
+
+  if (activeRiskTypes.length > 0)
+    fe = fe.filter(e => activeRiskTypes.some(r => e.data.flowRisks?.includes(r)));
+
+  if (activeCustomSigs.length > 0)
+    fe = fe.filter(e => activeCustomSigs.some(s => e.data.customSignatures?.includes(s)));
+
+  if (activeFileTypes.length > 0)
+    fe = fe.filter(e => activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f)));
+
+  if (activeCountries.length > 0)
+    fe = fe.filter(
+      e =>
+        activeCountries.includes(e.data.srcCountry ?? '') ||
+        activeCountries.includes(e.data.dstCountry ?? '')
+    );
+
+  if (activeNodeFilters.length > 0) {
+    const matchIds = new Set(
+      allNodes
+        .filter(n =>
+          activeNodeFilters.some(k => {
+            if (k.startsWith('nt:')) return n.data.nodeType === k.slice(3);
+            if (k.startsWith('dt:')) return n.data.deviceType === k.slice(3);
+            return false;
+          })
+        )
+        .map(n => n.id)
+    );
+    fe = fe.filter(e => matchIds.has(e.source) || matchIds.has(e.target));
+  }
+
+  if (portFilter) {
+    const portNum = parseInt(portFilter, 10);
+    if (!isNaN(portNum))
+      fe = fe.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
+  }
+
+  const visibleIds = new Set<string>();
+  fe.forEach(e => { visibleIds.add(e.source); visibleIds.add(e.target); });
+  let fn = allNodes.filter(n => visibleIds.has(n.id));
+
+  if (ipFilter) {
+    const ipLower = ipFilter.toLowerCase();
+    const ipMatchIds = new Set(
+      allNodes
+        .filter(
+          n =>
+            n.data.ip.toLowerCase().includes(ipLower) ||
+            (n.data.hostname ?? '').toLowerCase().includes(ipLower)
+        )
+        .map(n => n.id)
+    );
+    fe = fe.filter(e => ipMatchIds.has(e.source) || ipMatchIds.has(e.target));
+    const ipVisibleIds = new Set<string>();
+    fe.forEach(e => { ipVisibleIds.add(e.source); ipVisibleIds.add(e.target); });
+    fn = allNodes.filter(n => ipVisibleIds.has(n.id) || ipMatchIds.has(n.id));
+  }
+
+  return { filteredNodes: fn, filteredEdges: fe };
+}
+
 export const networkService = {
   buildNetworkGraph,
+  applyNetworkFilters,
+  edgeMatchesLegendKey,
 };

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import type { GraphNode } from '@/features/network/types';
@@ -10,30 +10,10 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { toggleSet } from '@/features/network/constants';
+import { edgeMatchesLegendKey, applyNetworkFilters } from '@/features/network/services/networkService';
+import { formatBytes } from '@/utils/formatters';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
-
-// ── Helpers (same as NetworkDiagramPage) ────────────────────────────────────
-
-function edgeMatchesLegendKey(proto: string, app: string, key: string): boolean {
-  if (key === 'HTTPS')
-    return proto === 'HTTPS' || app.includes('TLS') || app.includes('SSL') || app.includes('HTTPS');
-  if (key === 'ICMP') return proto === 'ICMP' || proto === 'ICMPV6';
-  if (key === 'STP') return proto === 'STP' || proto === 'RSTP';
-  return proto === key || app.includes(key);
-}
-
-function toggleSet(setter: Dispatch<SetStateAction<string[]>>) {
-  return (val: string) =>
-    setter(prev => (prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]));
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
 
 // Distinct colours for up to ~8 files; cycles if more.
 const SOURCE_COLORS = [
@@ -245,120 +225,21 @@ export const ComparePage = () => {
   // ── Filter logic ─────────────────────────────────────────────────────────
 
   const { filteredNodes, filteredEdges } = useMemo(() => {
-    let filtered = mergedEdges;
+    // Source (file) filter — hide edges belonging only to a hidden source (compare-specific)
+    const sourceFilteredEdges =
+      hiddenSources.size > 0
+        ? mergedEdges.filter(e => {
+            const sources = e.data.sources;
+            if (!sources) return true;
+            return sources.some(s => !hiddenSources.has(s));
+          })
+        : mergedEdges;
 
-    // Source (file) filter — hide edges belonging only to a hidden source
-    if (hiddenSources.size > 0) {
-      filtered = filtered.filter(e => {
-        const sources = e.data.sources;
-        if (!sources) return true;
-        return sources.some(s => !hiddenSources.has(s));
-      });
-    }
-
-    if (hasRisksOnly) filtered = filtered.filter(e => e.data.hasRisks);
-
-    if (activeLegendProtocols.length > 0) {
-      filtered = filtered.filter(edge => {
-        const proto = edge.data.protocol.toUpperCase();
-        const app = (edge.data.appName ?? '').toUpperCase();
-        return activeLegendProtocols.some(key => edgeMatchesLegendKey(proto, app, key));
-      });
-    }
-
-    if (activeAppFilters.length > 0)
-      filtered = filtered.filter(e => activeAppFilters.includes(e.data.appName ?? ''));
-
-    if (activeL7Protocols.length > 0)
-      filtered = filtered.filter(e => activeL7Protocols.includes(e.data.l7Protocol ?? ''));
-
-    if (activeCategories.length > 0)
-      filtered = filtered.filter(e => activeCategories.includes(e.data.category ?? ''));
-
-    if (activeRiskTypes.length > 0)
-      filtered = filtered.filter(e => activeRiskTypes.some(r => e.data.flowRisks?.includes(r)));
-
-    if (activeCustomSigs.length > 0)
-      filtered = filtered.filter(e =>
-        activeCustomSigs.some(s => e.data.customSignatures?.includes(s))
-      );
-
-    if (activeFileTypes.length > 0)
-      filtered = filtered.filter(e =>
-        activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f))
-      );
-
-    if (activeCountries.length > 0)
-      filtered = filtered.filter(
-        e =>
-          activeCountries.includes(e.data.srcCountry ?? '') ||
-          activeCountries.includes(e.data.dstCountry ?? '')
-      );
-
-    if (activeNodeFilters.length > 0) {
-      const matchingIds = new Set(
-        mergedNodes
-          .filter(n =>
-            activeNodeFilters.some(key => {
-              if (key.startsWith('nt:')) {
-                const nt = key.slice(3);
-                return n.data.nodeType === nt;
-              }
-              if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
-              return false;
-            })
-          )
-          .map(n => n.id)
-      );
-      filtered = filtered.filter(e => matchingIds.has(e.source) || matchingIds.has(e.target));
-    }
-
-    if (portFilter) {
-      const portNum = parseInt(portFilter, 10);
-      if (!isNaN(portNum))
-        filtered = filtered.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
-    }
-
-    const hasActiveFilters =
-      activeLegendProtocols.length > 0 ||
-      activeNodeFilters.length > 0 ||
-      activeAppFilters.length > 0 ||
-      activeL7Protocols.length > 0 ||
-      activeCategories.length > 0 ||
-      activeRiskTypes.length > 0 ||
-      activeCustomSigs.length > 0 ||
-      activeFileTypes.length > 0 ||
-      activeCountries.length > 0 ||
-      hasRisksOnly ||
-      ipFilter.length > 0 ||
-      portFilter.length > 0 ||
-      hiddenSources.size > 0;
-
-    const ipLower = ipFilter.toLowerCase();
-    let visibleNodes = mergedNodes;
-    if (ipFilter) {
-      visibleNodes = mergedNodes.filter(
-        n =>
-          n.data.ip.toLowerCase().includes(ipLower) ||
-          (n.data.hostname ?? '').toLowerCase().includes(ipLower)
-      );
-    }
-
-    if (hasActiveFilters) {
-      const matchedByIp = new Set(visibleNodes.map(n => n.id));
-      if (ipFilter)
-        filtered = filtered.filter(e => matchedByIp.has(e.source) || matchedByIp.has(e.target));
-      const visibleNodeIds = new Set<string>();
-      filtered.forEach(e => {
-        visibleNodeIds.add(e.source);
-        visibleNodeIds.add(e.target);
-      });
-      visibleNodes = mergedNodes.filter(
-        n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id))
-      );
-    }
-
-    return { filteredNodes: visibleNodes, filteredEdges: filtered };
+    return applyNetworkFilters(mergedNodes, sourceFilteredEdges, {
+      hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols,
+      activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes,
+      activeCountries, activeNodeFilters, portFilter, ipFilter,
+    });
   }, [
     mergedNodes,
     mergedEdges,

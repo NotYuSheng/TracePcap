@@ -84,6 +84,59 @@ export function nodeFilterLabel(key: string): string {
 }
 
 /**
+ * Returns a toggle callback that adds/removes a value from a string-array state.
+ * Used in network diagram filter panels to toggle protocol/node/app filters.
+ */
+export function toggleSet(setter: React.Dispatch<React.SetStateAction<string[]>>) {
+  return (val: string) =>
+    setter(prev => (prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]));
+}
+
+/**
+ * Builds the list of human-readable active-filter labels from a filter state
+ * snapshot. Used in both NetworkDiagramPage (ref sync) and AnalysisPage (PDF
+ * report). Centralised here so the two sites stay in sync automatically.
+ */
+export function buildActiveFilterLabels(filters: {
+  ipFilter: string;
+  portFilter: string;
+  hasRisksOnly: boolean;
+  activeLegendProtocols: string[];
+  activeNodeFilters: string[];
+  activeAppFilters: string[];
+  activeL7Protocols: string[];
+  activeCategories: string[];
+  activeRiskTypes: string[];
+  activeCustomSigs: string[];
+  activeFileTypes: string[];
+  activeCountries: string[];
+}): string[] {
+  const labels: string[] = [];
+  if (filters.ipFilter) labels.push(`IP: ${filters.ipFilter}`);
+  if (filters.portFilter) labels.push(`Port: ${filters.portFilter}`);
+  if (filters.hasRisksOnly) labels.push('Has Risks: Yes');
+  if (filters.activeLegendProtocols.length > 0)
+    labels.push(`Protocol: ${filters.activeLegendProtocols.join(', ')}`);
+  if (filters.activeNodeFilters.length > 0)
+    labels.push(`Node type: ${filters.activeNodeFilters.map(nodeFilterLabel).join(', ')}`);
+  if (filters.activeAppFilters.length > 0)
+    labels.push(`App: ${filters.activeAppFilters.join(', ')}`);
+  if (filters.activeL7Protocols.length > 0)
+    labels.push(`L7: ${filters.activeL7Protocols.join(', ')}`);
+  if (filters.activeCategories.length > 0)
+    labels.push(`Category: ${filters.activeCategories.join(', ')}`);
+  if (filters.activeRiskTypes.length > 0)
+    labels.push(`Risk type: ${filters.activeRiskTypes.join(', ')}`);
+  if (filters.activeCustomSigs.length > 0)
+    labels.push(`Custom signature: ${filters.activeCustomSigs.join(', ')}`);
+  if (filters.activeFileTypes.length > 0)
+    labels.push(`File type: ${filters.activeFileTypes.join(', ')}`);
+  if (filters.activeCountries.length > 0)
+    labels.push(`Country: ${filters.activeCountries.join(', ')}`);
+  return labels;
+}
+
+/**
  * Single source of truth for node type colors used in
  * NetworkGraph (node fill) and NetworkControls (legend).
  */

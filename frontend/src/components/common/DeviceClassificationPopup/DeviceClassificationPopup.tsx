@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react';
-import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { useRef } from 'react';
+import { deviceTypeLabel, deviceTypeColor, confidenceLevel, buildDeviceSignals } from '@/utils/deviceType';
 import { portToServiceLabel } from '@/utils/portUtils';
+import { useClickOutside } from '@/utils/useClickOutside';
 
 export interface DeviceClassificationInfo {
   ip: string;
@@ -12,30 +13,6 @@ export interface DeviceClassificationInfo {
   conversationPort?: number;
 }
 
-function confidenceLevel(pct: number): string {
-  if (pct >= 75) return 'Strong';
-  if (pct >= 50) return 'Moderate';
-  if (pct >= 25) return 'Low';
-  return 'Uncertain';
-}
-
-function buildSignals(info: DeviceClassificationInfo): string[] {
-  const signals: string[] = [];
-  if (info.manufacturer) signals.push(`MAC OUI matched: ${info.manufacturer}`);
-  if (info.ttl != null) {
-    const os =
-      info.ttl <= 64
-        ? 'Linux / Android / iOS'
-        : info.ttl <= 128
-          ? 'Windows'
-          : 'Network device (Cisco / BSD)';
-    signals.push(`TTL ${info.ttl} → ${os}`);
-  }
-  if (info.confidence >= 60) signals.push('Application traffic profile analysed');
-  if (info.confidence >= 25) signals.push('Network traffic patterns analysed');
-  return signals;
-}
-
 interface DeviceClassificationPopupProps {
   info: DeviceClassificationInfo;
   onClose: () => void;
@@ -43,19 +20,11 @@ interface DeviceClassificationPopupProps {
 
 export function DeviceClassificationPopup({ info, onClose }: DeviceClassificationPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
-  const signals = buildSignals(info);
+  const signals = buildDeviceSignals({ manufacturer: info.manufacturer, ttl: info.ttl, confidence: info.confidence });
   const level = confidenceLevel(info.confidence);
   const badgeBg = deviceTypeColor(info.deviceType);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [onClose]);
+  useClickOutside(popupRef, onClose);
 
   return (
     <div

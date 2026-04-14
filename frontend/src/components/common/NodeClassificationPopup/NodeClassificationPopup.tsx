@@ -1,7 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import type { NodeType, NodeTypeEvidence } from '@/features/network/types';
 import type { DeviceType } from '@/types';
-import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { deviceTypeLabel, deviceTypeColor, confidenceLevel, buildDeviceSignals } from '@/utils/deviceType';
+import { useClickOutside } from '@/utils/useClickOutside';
 
 export interface NodeClassificationInfo {
   ip: string;
@@ -21,13 +22,6 @@ export interface NodeClassificationInfo {
   ttl?: number;
 }
 
-function confidenceLevel(pct: number): string {
-  if (pct >= 75) return 'Strong';
-  if (pct >= 50) return 'Moderate';
-  if (pct >= 25) return 'Low';
-  return 'Uncertain';
-}
-
 function typeEvidence(nodeType: NodeType, ev: NodeTypeEvidence): string {
   switch (nodeType) {
     case 'router':
@@ -40,23 +34,6 @@ function typeEvidence(nodeType: NodeType, ev: NodeTypeEvidence): string {
         ? `${ev.connectionCount} connection${ev.connectionCount !== 1 ? 's' : ''} on port ${ev.dominantPort}`
         : '';
   }
-}
-
-function buildDeviceSignals(info: NodeClassificationInfo): string[] {
-  const signals: string[] = [];
-  if (info.manufacturer) signals.push(`MAC OUI matched: ${info.manufacturer}`);
-  if (info.ttl != null) {
-    const os =
-      info.ttl <= 64
-        ? 'Linux / Android / iOS'
-        : info.ttl <= 128
-          ? 'Windows'
-          : 'Network device (Cisco / BSD)';
-    signals.push(`TTL ${info.ttl} → ${os}`);
-  }
-  if ((info.deviceConfidence ?? 0) >= 60) signals.push('Application traffic profile analysed');
-  if ((info.deviceConfidence ?? 0) >= 25) signals.push('Network traffic patterns analysed');
-  return signals;
 }
 
 function headerStyleFromBadgeClass(badgeClass: string): React.CSSProperties {
@@ -80,17 +57,9 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
   const evText = typeEvidence(info.nodeType, info.typeEvidence);
   const deviceBg = info.deviceType ? deviceTypeColor(info.deviceType) : undefined;
   const confidence = info.deviceConfidence ?? 0;
-  const deviceSignals = buildDeviceSignals(info);
+  const deviceSignals = buildDeviceSignals({ manufacturer: info.manufacturer, ttl: info.ttl, confidence });
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [onClose]);
+  useClickOutside(popupRef, onClose);
 
   return (
     <div

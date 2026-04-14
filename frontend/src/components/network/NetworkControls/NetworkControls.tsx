@@ -304,7 +304,7 @@ export function NetworkControls({
                 </div>
 
                 {/* Node Types */}
-                <div className="col-12">
+                {(presentNodeTypes.size > 0 || presentDeviceTypes.size > 0) && <div className="col-12">
                   <PillSectionHeader
                     label="Node Types"
                     info={
@@ -365,7 +365,7 @@ export function NetworkControls({
                       );
                     })}
                   </div>
-                </div>
+                </div>}
 
                 {/* Edge Protocols */}
                 {presentEdgeLegendKeys.size > 0 && (
