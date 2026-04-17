@@ -20,12 +20,13 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import ELK from 'elkjs';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { ClusterNode, type ClusterFlowNodeData } from './ClusterNode';
 import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
 import { deviceTypeColor } from '@/utils/deviceType';
 import { useStore } from '@/store';
+import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import './NetworkGraph.css';
 
 // ---------------------------------------------------------------------------
@@ -81,8 +82,6 @@ const NODE_WIDTH = 56;
 const NODE_HEIGHT = 56;
 const CLUSTER_WIDTH = 140;
 const CLUSTER_HEIGHT = 90;
-
-const elk = new ELK();
 
 // ---------------------------------------------------------------------------
 // Node helpers
@@ -205,27 +204,8 @@ function assignEdgeOffsets(edges: GraphEdge[]): Map<string, number> {
 }
 
 // ---------------------------------------------------------------------------
-// ELK layout
+// ELK layout (server-side)
 // ---------------------------------------------------------------------------
-
-const ELK_OPTIONS: Record<string, Record<string, string>> = {
-  hierarchicalTd: {
-    'elk.algorithm': 'layered',
-    'elk.direction': 'DOWN',
-    'elk.separateConnectedComponents': 'true',
-    'elk.spacing.componentComponent': '80',
-    'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-    'elk.spacing.nodeNode': '40',
-    'elk.edgeRouting': 'SPLINES',
-  },
-  forceDirected2d: {
-    'elk.algorithm': 'org.eclipse.elk.force',
-    'elk.separateConnectedComponents': 'true',
-    'elk.spacing.nodeNode': '80',
-    'elk.force.iterations': '500',
-    'elk.force.repulsion': '5.0',
-  },
-};
 
 async function computeLayout(
   nodes: GraphNode[],
@@ -234,26 +214,26 @@ async function computeLayout(
   primarySource?: string,
   onClusterClick?: (clusterId: string) => void
 ): Promise<{ nodes: Node[]; edges: Edge[] }> {
-  // Drop edges whose source or target doesn't exist in the node list.
-  // This guards against stale edges after clustering or filtering — ELK will
-  // error on edges that reference unknown node IDs.
   const nodeIdSet = new Set(nodes.map(n => n.id));
   const validEdges = edges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
   const dedupedEdges = deduplicateEdges(validEdges);
   const offsetMap = assignEdgeOffsets(dedupedEdges);
 
-  const graph = await elk.layout({
-    id: 'root',
-    layoutOptions: ELK_OPTIONS[layoutType],
-    children: nodes.map(n => ({
+  const response = await apiClient.post<{
+    positions: Array<{ id: string; x: number; y: number }>;
+  }>(API_ENDPOINTS.GRAPH_LAYOUT, {
+    layoutType,
+    nodes: nodes.map(n => ({
       id: n.id,
       width: n.data.isCluster ? CLUSTER_WIDTH : NODE_WIDTH,
       height: n.data.isCluster ? CLUSTER_HEIGHT : NODE_HEIGHT,
     })),
-    edges: dedupedEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    edges: dedupedEdges.map(e => ({ id: e.id, source: e.source, target: e.target })),
   });
 
-  const posMap = new Map((graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
+  const posMap = new Map(
+    response.data.positions.map(p => [p.id, { x: p.x, y: p.y }])
+  );
 
   const rfNodes: Node[] = nodes.map(n => {
     if (n.data.isCluster) {
