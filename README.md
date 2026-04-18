@@ -26,7 +26,7 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 
 <div align="center">
 
-![Lanturn Demo](https://raw.githubusercontent.com/NotYuSheng/Lanturn/main/sample-files/Lanturn-Demo.gif)
+![Lanturn Demo](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
 
 </div>
 
