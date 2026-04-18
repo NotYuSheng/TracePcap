@@ -1,9 +1,9 @@
-package com.tracepcap.file.controller;
+package com.lanturn.file.controller;
 
-import com.tracepcap.file.dto.FileMetadataDto;
-import com.tracepcap.file.dto.FileUploadResponse;
-import com.tracepcap.file.dto.MergeFilesRequest;
-import com.tracepcap.file.service.FileService;
+import com.lanturn.file.dto.FileMetadataDto;
+import com.lanturn.file.dto.FileUploadResponse;
+import com.lanturn.file.dto.MergeFilesRequest;
+import com.lanturn.file.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

@@ -1,6 +1,6 @@
-package com.tracepcap.analysis.repository;
+package com.lanturn.analysis.repository;
 
-import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

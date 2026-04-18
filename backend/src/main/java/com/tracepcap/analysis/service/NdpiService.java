@@ -1,6 +1,6 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.ConversationEntity;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;

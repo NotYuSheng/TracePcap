@@ -7,13 +7,13 @@
 
 /* Base styles */
 :root {
-  /* Custom variables for TracePcap theme */
-  --tracepcap-primary: #0076d1;
-  --tracepcap-secondary: #5925dc;
-  --tracepcap-success: #1d8348;
-  --tracepcap-danger: #c0392b;
-  --tracepcap-warning: #f39c12;
-  --tracepcap-info: #2980b9;
+  /* Custom variables for Lanturn theme */
+  --lanturn-primary: #0076d1;
+  --lanturn-secondary: #5925dc;
+  --lanturn-success: #1d8348;
+  --lanturn-danger: #c0392b;
+  --lanturn-warning: #f39c12;
+  --lanturn-info: #2980b9;
 
   /* Network visualization colors */
   --network-client: #3498db;

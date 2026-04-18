@@ -1,7 +1,7 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.file.entity.FileEntity;
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
 import java.nio.file.Files;

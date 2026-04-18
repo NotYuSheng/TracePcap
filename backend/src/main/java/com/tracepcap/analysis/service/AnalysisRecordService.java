@@ -1,8 +1,8 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.analysis.entity.AnalysisResultEntity;
+import com.lanturn.analysis.repository.AnalysisResultRepository;
+import com.lanturn.file.entity.FileEntity;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

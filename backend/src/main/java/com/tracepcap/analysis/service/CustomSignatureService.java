@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -49,7 +49,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 @Service
 public class CustomSignatureService {
 
-  @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
+  @Value("${lanturn.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
 
   /**

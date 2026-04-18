@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.dto.SessionResponse;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.file.service.StorageService;
+import com.lanturn.analysis.dto.SessionResponse;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.file.service.StorageService;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;

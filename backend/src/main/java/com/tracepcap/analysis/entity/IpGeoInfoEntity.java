@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.entity;
+package com.lanturn.analysis.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

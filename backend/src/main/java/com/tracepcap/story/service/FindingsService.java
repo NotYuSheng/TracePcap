@@ -1,10 +1,10 @@
-package com.tracepcap.story.service;
+package com.lanturn.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.story.dto.Finding;
-import com.tracepcap.story.dto.Severity;
-import com.tracepcap.story.service.detector.*;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.story.dto.Finding;
+import com.lanturn.story.dto.Severity;
+import com.lanturn.story.service.detector.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;

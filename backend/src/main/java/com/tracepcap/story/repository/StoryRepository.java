@@ -1,6 +1,6 @@
-package com.tracepcap.story.repository;
+package com.lanturn.story.repository;
 
-import com.tracepcap.story.entity.StoryEntity;
+import com.lanturn.story.entity.StoryEntity;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

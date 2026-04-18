@@ -1,14 +1,14 @@
 spring:
   application:
-    name: tracepcap
+    name: lanturn
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
   # Database Configuration
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/tracepcap}
-    username: ${DATABASE_USERNAME:tracepcap_user}
-    password: ${DATABASE_PASSWORD:tracepcap_pass}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/lanturn}
+    username: ${DATABASE_USERNAME:lanturn_user}
+    password: ${DATABASE_PASSWORD:lanturn_pass}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -60,7 +60,7 @@ minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:minioadmin}
-  bucket: ${MINIO_BUCKET:tracepcap-files}
+  bucket: ${MINIO_BUCKET:lanturn-files}
   max-file-size: ${MAX_UPLOAD_SIZE_BYTES:536870912}
   presigned-url-expiry: 300  # 5 minutes in seconds
   retention-hours: 12  # Files are deleted after 12 hours
@@ -96,7 +96,7 @@ management:
 logging:
   level:
     root: INFO
-    com.tracepcap: DEBUG
+    com.lanturn: DEBUG
     org.springframework.web: INFO
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
@@ -146,7 +146,7 @@ llm:
     backoff-ms: 1000
 
 # Application-specific Configuration
-tracepcap:
+lanturn:
   analysis:
     batch-size: 1000
     timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:300}

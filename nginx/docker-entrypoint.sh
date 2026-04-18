@@ -19,7 +19,7 @@ if [ "$NGINX_PROXY_TIMEOUT" -lt "$LLM_PROXY_TIMEOUT" ]; then NGINX_PROXY_TIMEOUT
 export NGINX_MAX_BODY_SIZE
 export NGINX_PROXY_TIMEOUT
 
-echo "TracePcap nginx starting:"
+echo "Lanturn nginx starting:"
 echo "  APP_MEMORY_MB    = ${MEM} MB"
 echo "  Max upload size  = ${MAX_UPLOAD_MB} MB"
 echo "  Nginx body limit = ${NGINX_MAX_BODY_SIZE}"

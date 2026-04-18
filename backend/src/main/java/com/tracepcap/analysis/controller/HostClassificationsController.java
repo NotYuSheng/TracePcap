@@ -1,8 +1,8 @@
-package com.tracepcap.analysis.controller;
+package com.lanturn.analysis.controller;
 
-import com.tracepcap.analysis.dto.HostClassificationResponse;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.lanturn.analysis.dto.HostClassificationResponse;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.repository.HostClassificationRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
 import java.util.UUID;

@@ -20,8 +20,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 IMAGES_DIR="$ROOT_DIR/images"
 
-BACKEND_IMAGE="tracepcap-backend:latest"
-NGINX_IMAGE="tracepcap-nginx:latest"
+BACKEND_IMAGE="lanturn-backend:latest"
+NGINX_IMAGE="lanturn-nginx:latest"
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -96,8 +96,8 @@ for img in "${DOCKERHUB_IMAGES[@]}"; do
   filename="$(echo "$img" | tr '/:' '_').tar"
   save_image "$img" "$filename"
 done
-save_image "$BACKEND_IMAGE" "tracepcap-backend.tar"
-save_image "$NGINX_IMAGE"   "tracepcap-nginx.tar"
+save_image "$BACKEND_IMAGE" "lanturn-backend.tar"
+save_image "$NGINX_IMAGE"   "lanturn-nginx.tar"
 
 # ---------------------------------------------------------------------------
 # Summary

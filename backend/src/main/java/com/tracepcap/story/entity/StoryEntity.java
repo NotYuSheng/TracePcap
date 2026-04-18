@@ -1,4 +1,4 @@
-package com.tracepcap.story.entity;
+package com.lanturn.story.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

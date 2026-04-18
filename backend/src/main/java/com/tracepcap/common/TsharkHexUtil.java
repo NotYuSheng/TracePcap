@@ -1,4 +1,4 @@
-package com.tracepcap.common;
+package com.lanturn.common;
 
 /** Utility methods for handling hex strings produced by tshark field output. */
 public final class TsharkHexUtil {

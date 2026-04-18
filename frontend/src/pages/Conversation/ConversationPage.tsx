@@ -14,10 +14,10 @@ import { ErrorMessage } from '@components/common/ErrorMessage';
 import { Pagination } from '@components/common/Pagination';
 import { formatIpPort } from '@/utils/formatters';
 
-/** Produces a consistent export filename: tracepcap_<base>[_<ipSuffix>]_<timestamp>.<ext> */
+/** Produces a consistent export filename: lanturn_<base>[_<ipSuffix>]_<timestamp>.<ext> */
 function makeExportFilename(base: string, ext: string, ipSuffix?: string): string {
   const ts = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
-  return ipSuffix ? `tracepcap_${base}_${ipSuffix}_${ts}.${ext}` : `tracepcap_${base}_${ts}.${ext}`;
+  return ipSuffix ? `lanturn_${base}_${ipSuffix}_${ts}.${ext}` : `lanturn_${base}_${ts}.${ext}`;
 }
 
 interface AnalysisOutletContext {

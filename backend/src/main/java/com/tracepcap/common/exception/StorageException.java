@@ -1,4 +1,4 @@
-package com.tracepcap.common.exception;
+package com.lanturn.common.exception;
 
 /** Exception thrown when storage operations fail */
 public class StorageException extends RuntimeException {

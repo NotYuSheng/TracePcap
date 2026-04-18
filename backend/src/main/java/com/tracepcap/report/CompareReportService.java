@@ -1,4 +1,4 @@
-package com.tracepcap.report;
+package com.lanturn.report;
 
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
@@ -13,13 +13,13 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.repository.FileRepository;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.repository.AnalysisResultRepository;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.HostClassificationRepository;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.repository.FileRepository;
 import java.awt.Color;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
@@ -129,7 +129,7 @@ public class CompareReportService {
     Font titleF = new Font(Font.HELVETICA, 22, Font.BOLD,   C_HEADER_BG);
     Font metaF  = new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(100, 116, 139));
 
-    Paragraph app = centred(new Paragraph("TracePcap — Compare Network Topology Report", appF));
+    Paragraph app = centred(new Paragraph("Lanturn — Compare Network Topology Report", appF));
     app.setSpacingBefore(36);
     doc.add(app);
 

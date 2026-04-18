@@ -1,4 +1,4 @@
-package com.tracepcap.report;
+package com.lanturn.report;
 
 import java.util.List;
 import lombok.Data;

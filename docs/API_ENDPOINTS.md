@@ -1,4 +1,4 @@
-# TracePcap Backend API Endpoints
+# Lanturn Backend API Endpoints
 
 ## Base URL
 ```
@@ -8,7 +8,7 @@ http://localhost:8080/api
 ## Architecture Overview
 
 **Storage Layer:**
-- **MinIO**: Object storage for PCAP files (`tracepcap-files` bucket)
+- **MinIO**: Object storage for PCAP files (`lanturn-files` bucket)
 - **PostgreSQL**: Metadata, analysis results, conversations, and timeline data
 
 **Upload Flow:**
@@ -25,7 +25,7 @@ Client → Spring Boot → MinIO (file storage)
 **File Lifecycle:**
 1. Client uploads PCAP file via `POST /api/files`
 2. Backend validates file (type, size, format)
-3. Backend uploads to MinIO: `s3://tracepcap-files/{fileId}.pcap`
+3. Backend uploads to MinIO: `s3://lanturn-files/{fileId}.pcap`
 4. Backend saves metadata to PostgreSQL
 5. Backend triggers async analysis job
 6. Analysis worker reads file from MinIO
@@ -38,7 +38,7 @@ minio:
   endpoint: http://localhost:9000
   access-key: minioadmin
   secret-key: minioadmin
-  bucket: tracepcap-files
+  bucket: lanturn-files
   max-file-size: 104857600  # 100MB
   retention-days: 90  # Auto-delete after 90 days
 ```
@@ -60,7 +60,7 @@ Response: 201 Created
   "fileSize": 1048576,
   "uploadedAt": 1738368000000,
   "status": "processing",
-  "storageLocation": "s3://tracepcap-files/uuid-v4.pcap"
+  "storageLocation": "s3://lanturn-files/uuid-v4.pcap"
 }
 
 Backend Processing:
@@ -68,7 +68,7 @@ Backend Processing:
 2. Validates file size (max 100MB)
 3. Validates PCAP file format (magic bytes)
 4. Generates UUID for fileId
-5. Uploads to MinIO: tracepcap-files/{fileId}.pcap
+5. Uploads to MinIO: lanturn-files/{fileId}.pcap
 6. Saves metadata to PostgreSQL files table
 7. Triggers async analysis job
 8. Returns 201 with file metadata
@@ -125,7 +125,7 @@ DELETE /api/files/{fileId}
 Response: 204 No Content
 
 Backend Processing:
-1. Deletes file from MinIO: tracepcap-files/{fileId}.pcap
+1. Deletes file from MinIO: lanturn-files/{fileId}.pcap
 2. Deletes metadata from PostgreSQL files table
 3. Deletes associated analysis data (cascading delete)
 4. Deletes conversations, timeline, and story data
@@ -658,7 +658,7 @@ Response: 200 OK
   "totalSizeBytes": 2147483648,
   "totalSizeFormatted": "2.0 GB",
   "minioHealth": "UP",
-  "bucketName": "tracepcap-files",
+  "bucketName": "lanturn-files",
   "oldestFile": {
     "fileId": "uuid-v4",
     "fileName": "old-capture.pcap",
@@ -721,7 +721,7 @@ Request Body:
 Response: 200 OK
 {
   "fileId": "uuid-v4",
-  "uploadUrl": "http://localhost:9000/tracepcap-files/uuid-v4.pcap?X-Amz-...",
+  "uploadUrl": "http://localhost:9000/lanturn-files/uuid-v4.pcap?X-Amz-...",
   "expiresAt": 1738368300000,
   "expiresInSeconds": 300
 }
@@ -777,7 +777,7 @@ Message Format:
 8. Packet payload is base64-encoded for transport
 
 ### MinIO Storage
-9. Files are stored in MinIO bucket: `tracepcap-files`
+9. Files are stored in MinIO bucket: `lanturn-files`
 10. File naming convention: `{fileId}.pcap` (UUID + extension)
 11. MinIO pre-signed URLs expire after 5 minutes (download) or 5 minutes (upload)
 12. Automatic retention: Files older than 90 days are auto-deleted (configurable)

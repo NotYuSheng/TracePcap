@@ -1,9 +1,9 @@
-/* SGDS Custom Overrides for TracePcap */
+/* SGDS Custom Overrides for Lanturn */
 
 /* Override primary colors */
 .btn-primary {
-  background-color: var(--tracepcap-primary);
-  border-color: var(--tracepcap-primary);
+  background-color: var(--lanturn-primary);
+  border-color: var(--lanturn-primary);
 }
 
 .btn-primary:hover {

@@ -1,12 +1,12 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.ExtractedFileEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.ExtractedFileRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.service.StorageService;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.ExtractedFileEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.ExtractedFileRepository;
+import com.lanturn.analysis.repository.PacketRepository;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.*;

@@ -1,9 +1,9 @@
-package com.tracepcap.story.service.detector;
+package com.lanturn.story.service.detector;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.story.dto.Finding;
-import com.tracepcap.story.dto.FindingType;
-import com.tracepcap.story.dto.Severity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.story.dto.Finding;
+import com.lanturn.story.dto.FindingType;
+import com.lanturn.story.dto.Severity;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;

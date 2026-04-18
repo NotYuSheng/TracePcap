@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.controller;
+package com.lanturn.analysis.controller;
 
-import com.tracepcap.analysis.dto.ExtractedFileResponse;
-import com.tracepcap.analysis.entity.ExtractedFileEntity;
-import com.tracepcap.analysis.repository.ExtractedFileRepository;
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.file.service.StorageService;
+import com.lanturn.analysis.dto.ExtractedFileResponse;
+import com.lanturn.analysis.entity.ExtractedFileEntity;
+import com.lanturn.analysis.repository.ExtractedFileRepository;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.file.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.io.InputStream;
 import java.util.List;

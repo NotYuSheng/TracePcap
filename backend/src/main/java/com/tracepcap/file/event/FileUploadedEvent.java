@@ -1,4 +1,4 @@
-package com.tracepcap.file.event;
+package com.lanturn.file.event;
 
 import java.util.UUID;
 import lombok.Getter;

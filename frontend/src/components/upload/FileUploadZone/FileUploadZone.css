@@ -10,7 +10,7 @@
 }
 
 .upload-card:hover {
-  border-color: var(--tracepcap-primary, #0076d1);
+  border-color: var(--lanturn-primary, #0076d1);
   box-shadow: 0 2px 8px rgb(0 118 209 / 15%);
 }
 
@@ -43,7 +43,7 @@
 
 .upload-dropzone:hover,
 .upload-dropzone.drag-active {
-  border-color: var(--tracepcap-primary, #0076d1);
+  border-color: var(--lanturn-primary, #0076d1);
   background: #eff6ff;
 }
 

@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.repository;
+package com.lanturn.analysis.repository;
 
-import com.tracepcap.analysis.dto.ConversationFilterParams;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.entity.PacketEntity;
+import com.lanturn.analysis.dto.ConversationFilterParams;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.entity.IpGeoInfoEntity;
+import com.lanturn.analysis.entity.PacketEntity;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;

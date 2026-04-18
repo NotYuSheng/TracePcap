@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate demo_all_rules.pcap — a single capture that exercises every
-TracePcap custom signature match type.
+Lanturn custom signature match type.
 
 Run:  python3 gen_demo.py
 Output:  demo_all_rules.pcap  (in the same directory)
@@ -323,6 +323,6 @@ else:
 os.remove(synthetic_path)
 print(f"Output : {output_path}")
 print()
-print("Next step: upload demo_all_rules.pcap to TracePcap, then")
+print("Next step: upload demo_all_rules.pcap to Lanturn, then")
 print("check /api/conversations/<fileId>/custom-signatures to verify all rules fire.")
 print(f"Also update 'suspected_meterpreter_tls' ja3 in signatures.yml to: {ja3_md5}")

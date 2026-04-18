@@ -1,8 +1,8 @@
-package com.tracepcap.file.mapper;
+package com.lanturn.file.mapper;
 
-import com.tracepcap.file.dto.FileMetadataDto;
-import com.tracepcap.file.dto.FileUploadResponse;
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.file.dto.FileMetadataDto;
+import com.lanturn.file.dto.FileUploadResponse;
+import com.lanturn.file.entity.FileEntity;
 import org.springframework.stereotype.Component;
 
 /** Mapper for converting between FileEntity and DTOs */
@@ -16,7 +16,7 @@ public class FileMapper {
         .fileSize(entity.getFileSize())
         .uploadedAt(entity.getUploadedAt())
         .status(entity.getStatus().name().toLowerCase())
-        .storageLocation("s3://tracepcap-files/" + entity.getMinioPath())
+        .storageLocation("s3://lanturn-files/" + entity.getMinioPath())
         .build();
   }
 

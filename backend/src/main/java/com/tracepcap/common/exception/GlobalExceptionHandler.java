@@ -1,6 +1,6 @@
-package com.tracepcap.common.exception;
+package com.lanturn.common.exception;
 
-import com.tracepcap.common.dto.ErrorResponse;
+import com.lanturn.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;

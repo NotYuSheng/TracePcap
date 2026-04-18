@@ -1,4 +1,4 @@
-package com.tracepcap.report;
+package com.lanturn.report;
 
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.UUID;
@@ -34,7 +34,7 @@ public class ReportController {
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
             ContentDisposition.builder("attachment")
-                .filename("tracepcap-report-" + fileId + ".pdf")
+                .filename("lanturn-report-" + fileId + ".pdf")
                 .build()
                 .toString())
         .contentType(MediaType.APPLICATION_PDF)
@@ -50,7 +50,7 @@ public class ReportController {
 
     StreamingResponseBody body = out -> compareReportService.generateReport(request, out);
 
-    // Build filename: tracepcap-compare-report-<id1>-<id2>-....pdf
+    // Build filename: lanturn-compare-report-<id1>-<id2>-....pdf
     // Cap at a safe length to avoid filesystem limits (ext4/NTFS: 255 chars).
     String ids;
     if (request.getFileIds() == null || request.getFileIds().isEmpty()) {
@@ -61,7 +61,7 @@ public class ReportController {
           .collect(java.util.stream.Collectors.joining("-"));
       ids = joined.length() > 180 ? request.getFileIds().get(0) + "-and-" + (request.getFileIds().size() - 1) + "-more" : joined;
     }
-    String filename = "tracepcap-compare-report-" + ids + ".pdf";
+    String filename = "lanturn-compare-report-" + ids + ".pdf";
 
     return ResponseEntity.ok()
         .header(

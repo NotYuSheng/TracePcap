@@ -1,4 +1,4 @@
-package com.tracepcap.common.dto;
+package com.lanturn.common.dto;
 
 import java.util.List;
 import lombok.AllArgsConstructor;

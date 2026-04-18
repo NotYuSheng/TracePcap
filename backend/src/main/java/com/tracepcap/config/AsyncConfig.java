@@ -1,4 +1,4 @@
-package com.tracepcap.config;
+package com.lanturn.config;
 
 import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;

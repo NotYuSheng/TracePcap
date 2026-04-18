@@ -1,8 +1,8 @@
-package com.tracepcap.story.service;
+package com.lanturn.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.story.dto.*;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.story.dto.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

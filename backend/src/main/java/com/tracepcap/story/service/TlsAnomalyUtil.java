@@ -1,6 +1,6 @@
-package com.tracepcap.story.service;
+package com.lanturn.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.ConversationEntity;
 import java.time.LocalDateTime;
 import java.util.Set;
 

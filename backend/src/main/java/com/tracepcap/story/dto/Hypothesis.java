@@ -1,4 +1,4 @@
-package com.tracepcap.story.dto;
+package com.lanturn.story.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

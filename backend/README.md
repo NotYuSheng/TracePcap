@@ -1,6 +1,6 @@
-# TracePcap Backend
+# Lanturn Backend
 
-Spring Boot backend for TracePcap - PCAP file analysis and visualization tool.
+Spring Boot backend for Lanturn - PCAP file analysis and visualization tool.
 
 ## Tech Stack
 
@@ -27,9 +27,9 @@ Spring Boot backend for TracePcap - PCAP file analysis and visualization tool.
 ```bash
 # Create database and user
 psql -U postgres
-CREATE DATABASE tracepcap;
-CREATE USER tracepcap_user WITH PASSWORD 'tracepcap_pass';
-GRANT ALL PRIVILEGES ON DATABASE tracepcap TO tracepcap_user;
+CREATE DATABASE lanturn;
+CREATE USER lanturn_user WITH PASSWORD 'lanturn_pass';
+GRANT ALL PRIVILEGES ON DATABASE lanturn TO lanturn_user;
 ```
 
 ### 2. Set up MinIO
@@ -46,7 +46,7 @@ docker run -d \
   minio/minio server /data --console-address ":9001"
 
 # Access MinIO Console: http://localhost:9001
-# Create bucket: tracepcap-files
+# Create bucket: lanturn-files
 ```
 
 ### 3. Configure Application
@@ -86,7 +86,7 @@ Once running, access API docs at:
 backend/
 ├── src/
 │   ├── main/
-│   │   ├── java/com/tracepcap/
+│   │   ├── java/com/lanturn/
 │   │   │   ├── config/              # Configuration classes
 │   │   │   ├── common/              # Shared utilities
 │   │   │   ├── file/                # File management
@@ -181,10 +181,10 @@ mvn jacoco:report
 # Build JAR
 mvn clean package -DskipTests
 
-# JAR will be at: target/tracepcap-backend-1.0.0-SNAPSHOT.jar
+# JAR will be at: target/lanturn-backend-1.0.0-SNAPSHOT.jar
 
 # Run JAR
-java -jar target/tracepcap-backend-1.0.0-SNAPSHOT.jar --spring.profiles.active=prod
+java -jar target/lanturn-backend-1.0.0-SNAPSHOT.jar --spring.profiles.active=prod
 ```
 
 ## Docker Build
@@ -200,15 +200,15 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ```bash
 # Build image
-docker build -t tracepcap-backend:1.0.0 .
+docker build -t lanturn-backend:1.0.0 .
 
 # Run container
 docker run -d \
   -p 8080:8080 \
   -e SPRING_PROFILES_ACTIVE=prod \
-  -e DATABASE_URL=jdbc:postgresql://host:5432/tracepcap \
+  -e DATABASE_URL=jdbc:postgresql://host:5432/lanturn \
   -e MINIO_ENDPOINT=http://minio:9000 \
-  tracepcap-backend:1.0.0
+  lanturn-backend:1.0.0
 ```
 
 ## Development
@@ -259,7 +259,7 @@ mvn fmt:format
 psql -U postgres -c "SELECT version();"
 
 # Test connection
-psql -U tracepcap_user -d tracepcap
+psql -U lanturn_user -d lanturn
 ```
 
 ### MinIO Connection Issues
@@ -269,7 +269,7 @@ curl http://localhost:9000/minio/health/live
 
 # Create bucket via mc CLI
 mc alias set local http://localhost:9000 minioadmin minioadmin
-mc mb local/tracepcap-files
+mc mb local/lanturn-files
 ```
 
 ### Port Already in Use
@@ -327,10 +327,10 @@ curl http://localhost:8080/actuator/metrics
 ### Logs
 ```bash
 # View logs
-tail -f logs/tracepcap-dev.log
+tail -f logs/lanturn-dev.log
 
 # Search logs
-grep "ERROR" logs/tracepcap-dev.log
+grep "ERROR" logs/lanturn-dev.log
 ```
 
 ## License
@@ -340,8 +340,8 @@ MIT License - see LICENSE file
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/tracepcap/tracepcap/issues
-- Email: support@tracepcap.com
+- GitHub Issues: https://github.com/lanturn/lanturn/issues
+- Email: support@lanturn.com
 
 ## Roadmap
 

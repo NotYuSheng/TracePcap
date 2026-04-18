@@ -1,8 +1,8 @@
-package com.tracepcap.file.service;
+package com.lanturn.file.service;
 
-import com.tracepcap.file.dto.FileMetadataDto;
-import com.tracepcap.file.dto.FileUploadResponse;
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.file.dto.FileMetadataDto;
+import com.lanturn.file.dto.FileUploadResponse;
+import com.lanturn.file.entity.FileEntity;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;

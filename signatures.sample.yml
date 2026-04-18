@@ -1,4 +1,4 @@
-# TracePcap Custom Signatures — Sample File
+# Lanturn Custom Signatures — Sample File
 # ==========================================
 # This file contains demo rules written against demo_all_rules.pcap.
 # Every rule below will trigger on that file, covering all supported match fields.

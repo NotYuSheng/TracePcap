@@ -1,4 +1,4 @@
-package com.tracepcap.common.exception;
+package com.lanturn.common.exception;
 
 import java.util.UUID;
 import lombok.Getter;

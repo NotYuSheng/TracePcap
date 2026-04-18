@@ -22,7 +22,7 @@ fi
 chown spring:spring /app/config/signatures.yml 2>/dev/null || true
 chmod 664 /app/config/signatures.yml 2>/dev/null || true
 
-echo "TracePcap backend starting:"
+echo "Lanturn backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
 echo "  JVM heap (-Xms/-Xmx) = ${JVM_HEAP_MB} MB"
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"

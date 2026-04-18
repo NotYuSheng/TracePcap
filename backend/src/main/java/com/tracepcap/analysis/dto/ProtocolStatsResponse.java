@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.dto;
+package com.lanturn.analysis.dto;
 
 import java.util.Map;
 import java.util.UUID;

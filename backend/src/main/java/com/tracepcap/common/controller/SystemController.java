@@ -1,4 +1,4 @@
-package com.tracepcap.common.controller;
+package com.lanturn.common.controller;
 
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;

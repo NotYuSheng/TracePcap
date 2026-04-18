@@ -12,10 +12,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.tracepcap</groupId>
-    <artifactId>tracepcap-backend</artifactId>
+    <groupId>com.lanturn</groupId>
+    <artifactId>lanturn-backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>TracePcap Backend</name>
+    <name>Lanturn Backend</name>
     <description>PCAP file analysis and visualization backend</description>
 
     <properties>

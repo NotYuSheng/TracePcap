@@ -1,4 +1,4 @@
-package com.tracepcap.config;
+package com.lanturn.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 
 /** Configuration properties for file cleanup */
 @Configuration
-@ConfigurationProperties(prefix = "tracepcap.cleanup")
+@ConfigurationProperties(prefix = "lanturn.cleanup")
 @Data
 public class CleanupProperties {
 

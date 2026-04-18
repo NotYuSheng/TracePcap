@@ -1,14 +1,14 @@
-package com.tracepcap.file.service;
+package com.lanturn.file.service;
 
-import com.tracepcap.common.exception.DuplicateFileException;
-import com.tracepcap.common.exception.InvalidFileException;
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.file.dto.FileMetadataDto;
-import com.tracepcap.file.dto.FileUploadResponse;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.event.FileUploadedEvent;
-import com.tracepcap.file.mapper.FileMapper;
-import com.tracepcap.file.repository.FileRepository;
+import com.lanturn.common.exception.DuplicateFileException;
+import com.lanturn.common.exception.InvalidFileException;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.file.dto.FileMetadataDto;
+import com.lanturn.file.dto.FileUploadResponse;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.event.FileUploadedEvent;
+import com.lanturn.file.mapper.FileMapper;
+import com.lanturn.file.repository.FileRepository;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;

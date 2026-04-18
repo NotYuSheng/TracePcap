@@ -1,4 +1,4 @@
-# TracePcap — Claude Guidelines
+# Lanturn — Claude Guidelines
 
 ## UI Components
 

@@ -1,15 +1,15 @@
-package com.tracepcap.story.service;
+package com.lanturn.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.story.dto.StoryAggregates;
-import com.tracepcap.story.dto.StoryAggregates.AsnEntry;
-import com.tracepcap.story.dto.StoryAggregates.BeaconCandidate;
-import com.tracepcap.story.dto.StoryAggregates.Coverage;
-import com.tracepcap.story.dto.StoryAggregates.ProtocolRiskEntry;
-import com.tracepcap.story.dto.StoryAggregates.TlsAnomalySummary;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.IpGeoInfoEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.IpGeoInfoRepository;
+import com.lanturn.story.dto.StoryAggregates;
+import com.lanturn.story.dto.StoryAggregates.AsnEntry;
+import com.lanturn.story.dto.StoryAggregates.BeaconCandidate;
+import com.lanturn.story.dto.StoryAggregates.Coverage;
+import com.lanturn.story.dto.StoryAggregates.ProtocolRiskEntry;
+import com.lanturn.story.dto.StoryAggregates.TlsAnomalySummary;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;

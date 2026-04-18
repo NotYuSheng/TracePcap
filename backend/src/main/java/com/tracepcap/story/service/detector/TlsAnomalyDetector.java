@@ -1,10 +1,10 @@
-package com.tracepcap.story.service.detector;
+package com.lanturn.story.service.detector;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.story.dto.Finding;
-import com.tracepcap.story.dto.FindingType;
-import com.tracepcap.story.dto.Severity;
-import com.tracepcap.story.service.TlsAnomalyUtil;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.story.dto.Finding;
+import com.lanturn.story.dto.FindingType;
+import com.lanturn.story.dto.Severity;
+import com.lanturn.story.service.TlsAnomalyUtil;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;

@@ -1,10 +1,10 @@
-package com.tracepcap.story.controller;
+package com.lanturn.story.controller;
 
-import com.tracepcap.story.dto.GenerateStoryRequest;
-import com.tracepcap.story.dto.StoryAnswerResponse;
-import com.tracepcap.story.dto.StoryQuestionRequest;
-import com.tracepcap.story.dto.StoryResponse;
-import com.tracepcap.story.service.StoryService;
+import com.lanturn.story.dto.GenerateStoryRequest;
+import com.lanturn.story.dto.StoryAnswerResponse;
+import com.lanturn.story.dto.StoryQuestionRequest;
+import com.lanturn.story.dto.StoryResponse;
+import com.lanturn.story.service.StoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Optional;

@@ -1,4 +1,4 @@
-package com.tracepcap.file.dto;
+package com.lanturn.file.dto;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;

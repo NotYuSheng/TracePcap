@@ -1,4 +1,4 @@
-# TracePcap Custom Signatures
+# Lanturn Custom Signatures
 # ============================
 # Add your own detection rules here. Each matched rule appends its `name` to the
 # conversation's custom rules, making it visible in the Custom Rules filter and

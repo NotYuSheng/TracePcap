@@ -1,4 +1,4 @@
-package com.tracepcap.common.exception;
+package com.lanturn.common.exception;
 
 /** Thrown when the constructed LLM prompt exceeds the model's context window. */
 public class ContextLengthExceededException extends RuntimeException {

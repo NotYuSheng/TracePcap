@@ -1,7 +1,7 @@
-package com.tracepcap.analysis.controller;
+package com.lanturn.analysis.controller;
 
-import com.tracepcap.analysis.dto.TimelineDataDto;
-import com.tracepcap.analysis.service.TimelineService;
+import com.lanturn.analysis.dto.TimelineDataDto;
+import com.lanturn.analysis.service.TimelineService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDateTime;

@@ -1,6 +1,6 @@
-package com.tracepcap.file.repository;
+package com.lanturn.file.repository;
 
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.file.entity.FileEntity;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;

@@ -576,7 +576,7 @@ export const NetworkDiagramPage = () => {
         </Modal.Header>
         <Modal.Body>
           <p className="text-muted small mb-3">
-            When a PCAP has more nodes than the current display limit, TracePcap ranks every host by
+            When a PCAP has more nodes than the current display limit, Lanturn ranks every host by
             a significance score and shows only the top-ranked ones. The score is a weighted sum of
             three signals:
           </p>

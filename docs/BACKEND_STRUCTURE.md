@@ -1,4 +1,4 @@
-# TracePcap Backend - Project Structure
+# Lanturn Backend - Project Structure
 
 ## Architecture
 
@@ -20,13 +20,13 @@ Controller Layer → Service Layer → Repository Layer → Database
 ## Project Structure
 
 ```
-TracePcap/
+Lanturn/
 └── backend/
     ├── src/
     │   ├── main/
     │   │   ├── java/
     │   │   │   └── com/
-    │   │   │       └── tracepcap/
+    │   │   │       └── lanturn/
     │   │   │           ├── TracepcapApplication.java         # Main application class
     │   │   │           │
     │   │   │           ├── config/                           # Configuration classes
@@ -184,7 +184,7 @@ TracePcap/
     │   └── test/
     │       └── java/
     │           └── com/
-    │               └── tracepcap/
+    │               └── lanturn/
     │                   ├── file/
     │                   │   ├── FileServiceTest.java
     │                   │   ├── FileControllerTest.java
@@ -315,13 +315,13 @@ TracePcap/
 ```yaml
 spring:
   application:
-    name: tracepcap
+    name: lanturn
   profiles:
     active: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/tracepcap
-    username: tracepcap_user
-    password: tracepcap_pass
+    url: jdbc:postgresql://localhost:5432/lanturn
+    username: lanturn_user
+    password: lanturn_pass
   jpa:
     hibernate:
       ddl-auto: validate
@@ -335,7 +335,7 @@ minio:
   endpoint: http://localhost:9000
   access-key: minioadmin
   secret-key: minioadmin
-  bucket: tracepcap-files
+  bucket: lanturn-files
   max-file-size: 104857600
 
 server:
@@ -343,7 +343,7 @@ server:
 
 logging:
   level:
-    com.tracepcap: DEBUG
+    com.lanturn: DEBUG
 ```
 
 ## Best Practices Applied

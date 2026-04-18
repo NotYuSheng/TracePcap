@@ -100,7 +100,7 @@ export const MainLayout = () => {
               <div className="d-flex align-items-center gap-3">
                 <Activity size={32} className="text-primary" />
                 <div>
-                  <h4 className="mb-0">TracePcap</h4>
+                  <h4 className="mb-0">Lanturn</h4>
                   <small className="text-muted">Network Analysis</small>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export const MainLayout = () => {
         <Container>
           <Row>
             <Col className="text-center text-muted">
-              <small>TracePcap &copy; 2026 - Network Traffic Analysis and Visualization Tool</small>
+              <small>Lanturn &copy; 2026 - Network Traffic Analysis and Visualization Tool</small>
             </Col>
           </Row>
         </Container>

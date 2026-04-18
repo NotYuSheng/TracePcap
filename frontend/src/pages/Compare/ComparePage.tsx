@@ -324,7 +324,7 @@ export const ComparePage = () => {
       a.href = url;
       const joined = fileIds.join('-');
       const safeIds = joined.length > 180 ? `${fileIds[0]}-and-${fileIds.length - 1}-more` : joined;
-      a.download = `tracepcap-compare-report-${safeIds}.pdf`;
+      a.download = `lanturn-compare-report-${safeIds}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {

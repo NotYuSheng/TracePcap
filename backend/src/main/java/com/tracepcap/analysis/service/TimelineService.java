@@ -1,11 +1,11 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.dto.TimelineDataDto;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.repository.FileRepository;
+import com.lanturn.analysis.dto.TimelineDataDto;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.repository.FileRepository;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -22,7 +22,7 @@ public class TimelineService {
 
   private final FileRepository fileRepository;
   private final ConversationRepository conversationRepository;
-  private final com.tracepcap.config.AnalysisProperties analysisProperties;
+  private final com.lanturn.config.AnalysisProperties analysisProperties;
 
   /**
    * Get timeline data for a file with specified interval

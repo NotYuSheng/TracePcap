@@ -1,7 +1,7 @@
-package com.tracepcap.file.service;
+package com.lanturn.file.service;
 
-import com.tracepcap.common.exception.StorageException;
-import com.tracepcap.config.MinioConfig;
+import com.lanturn.common.exception.StorageException;
+import com.lanturn.config.MinioConfig;
 import io.minio.*;
 import io.minio.http.Method;
 import java.io.BufferedInputStream;

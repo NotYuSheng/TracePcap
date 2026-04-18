@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

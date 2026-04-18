@@ -20,7 +20,7 @@ export const useStore = create<StoreState>()(
         ...createThemeSlice(...a),
       }),
       {
-        name: 'tracepcap-storage',
+        name: 'lanturn-storage',
         partialize: state => ({
           // Only persist certain parts of state
           recentFiles: state.recentFiles,
@@ -30,7 +30,7 @@ export const useStore = create<StoreState>()(
       }
     ),
     {
-      name: 'TracePcap Store',
+      name: 'Lanturn Store',
     }
   )
 );

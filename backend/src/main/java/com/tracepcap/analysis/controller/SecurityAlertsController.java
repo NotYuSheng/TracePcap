@@ -1,7 +1,7 @@
-package com.tracepcap.analysis.controller;
+package com.lanturn.analysis.controller;
 
-import com.tracepcap.analysis.dto.ConversationResponse;
-import com.tracepcap.analysis.service.AnalysisService;
+import com.lanturn.analysis.dto.ConversationResponse;
+import com.lanturn.analysis.service.AnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
 import java.util.UUID;

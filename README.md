@@ -1,4 +1,4 @@
-<h1 align="center">TracePcap</h1>
+<h1 align="center">Lanturn</h1>
 
 <p align="center">
   <strong>Intelligent PCAP file analysis with AI-powered insights and interactive network visualization</strong>
@@ -26,7 +26,7 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 
 <div align="center">
 
-![TracePcap Demo](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Demo.gif)
+![Lanturn Demo](https://raw.githubusercontent.com/NotYuSheng/Lanturn/main/sample-files/Lanturn-Demo.gif)
 
 </div>
 
@@ -68,8 +68,8 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 
 **1. Clone and setup:**
 ```bash
-git clone https://github.com/NotYuSheng/TracePcap.git
-cd TracePcap
+git clone https://github.com/NotYuSheng/Lanturn.git
+cd Lanturn
 cp .env.example .env
 ```
 
@@ -94,7 +94,7 @@ LLM_MAX_TOKENS=2000
 docker compose up -d
 ```
 
-**4. Access TracePcap:**
+**4. Access Lanturn:**
 
 Open **http://localhost:80** in your browser.
 
@@ -151,7 +151,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 docker compose logs -f
 
 # Specific service
-docker compose logs -f tracepcap-backend
+docker compose logs -f lanturn-backend
 docker compose logs -f postgres
 docker compose logs -f minio
 ```
@@ -163,26 +163,26 @@ docker compose logs -f minio
 docker compose restart
 
 # Restart backend only
-docker compose restart tracepcap-backend
+docker compose restart lanturn-backend
 ```
 
 ### Backup Data
 
 ```bash
 # Backup database
-docker exec tracepcap-postgres pg_dump -U tracepcap_user tracepcap > backup.sql
+docker exec lanturn-postgres pg_dump -U lanturn_user lanturn > backup.sql
 
 # Backup MinIO data (PCAP files)
-docker exec tracepcap-minio mc mirror minio/tracepcap-files ./backup-pcaps/
+docker exec lanturn-minio mc mirror minio/lanturn-files ./backup-pcaps/
 
 # Backup all volumes
-sudo tar -czf tracepcap_backup.tar.gz /var/lib/docker/volumes/tracepcap_*
+sudo tar -czf lanturn_backup.tar.gz /var/lib/docker/volumes/lanturn_*
 ```
 
 ### Access Database
 
 ```bash
-docker exec -it tracepcap-postgres psql -U tracepcap_user tracepcap
+docker exec -it lanturn-postgres psql -U lanturn_user lanturn
 ```
 
 ### Access MinIO Console
@@ -197,7 +197,7 @@ Navigate to **http://localhost:80/swagger-ui.html** to explore the API interacti
 
 ## Deployment
 
-TracePcap is designed for self-hosted deployment:
+Lanturn is designed for self-hosted deployment:
 
 ### Offline / Air-gapped Deployment
 
@@ -270,7 +270,7 @@ docker compose -f docker-compose.offline.yml up -d
 
 ## Custom Signature Rules
 
-TracePcap supports user-defined detection rules that are matched against every conversation after nDPI analysis. Matched rule names appear as color-coded badges in the Conversations tab and Overview, alongside nDPI's built-in detections.
+Lanturn supports user-defined detection rules that are matched against every conversation after nDPI analysis. Matched rule names appear as color-coded badges in the Conversations tab and Overview, alongside nDPI's built-in detections.
 
 ### How it works
 

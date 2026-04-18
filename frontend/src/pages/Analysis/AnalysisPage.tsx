@@ -199,7 +199,7 @@ export const AnalysisPage = () => {
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `tracepcap-report-${fileId}.pdf`;
+      a.download = `lanturn-report-${fileId}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {

@@ -1,11 +1,11 @@
-package com.tracepcap.story.service;
+package com.lanturn.story.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.tracepcap.common.exception.ContextLengthExceededException;
-import com.tracepcap.common.exception.LlmException;
+import com.lanturn.common.exception.ContextLengthExceededException;
+import com.lanturn.common.exception.LlmException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import com.tracepcap.config.LlmConfig;
+import com.lanturn.config.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import lombok.Data;

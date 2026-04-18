@@ -1,4 +1,4 @@
-package com.tracepcap.filter.dto;
+package com.lanturn.filter.dto;
 
 import java.util.List;
 import lombok.Builder;

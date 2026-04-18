@@ -14,11 +14,11 @@ spring:
 logging:
   level:
     root: INFO
-    com.tracepcap: INFO
+    com.lanturn: INFO
     org.springframework: WARN
     org.hibernate: WARN
   file:
-    name: logs/tracepcap-dev.log
+    name: logs/lanturn-dev.log
 
 # Development-specific MinIO (uses environment variable or fallback)
 # minio:
@@ -28,9 +28,9 @@ logging:
 
 # Development database (uses environment variables or fallback from main config)
 # spring.datasource:
-#   url: jdbc:postgresql://localhost:5432/tracepcap
-#   username: tracepcap_user
-#   password: tracepcap_pass
+#   url: jdbc:postgresql://localhost:5432/lanturn
+#   username: lanturn_user
+#   password: lanturn_pass
 
 # Disable production optimizations
 server:

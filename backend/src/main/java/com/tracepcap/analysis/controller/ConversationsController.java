@@ -1,12 +1,12 @@
-package com.tracepcap.analysis.controller;
+package com.lanturn.analysis.controller;
 
-import com.tracepcap.analysis.dto.ConversationDetailResponse;
-import com.tracepcap.analysis.dto.ConversationFilterParams;
-import com.tracepcap.analysis.dto.ConversationResponse;
-import com.tracepcap.analysis.dto.SessionResponse;
-import com.tracepcap.analysis.service.AnalysisService;
-import com.tracepcap.analysis.service.SessionReconstructionService;
-import com.tracepcap.common.dto.PagedResponse;
+import com.lanturn.analysis.dto.ConversationDetailResponse;
+import com.lanturn.analysis.dto.ConversationFilterParams;
+import com.lanturn.analysis.dto.ConversationResponse;
+import com.lanturn.analysis.dto.SessionResponse;
+import com.lanturn.analysis.service.AnalysisService;
+import com.lanturn.analysis.service.SessionReconstructionService;
+import com.lanturn.common.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletResponse;

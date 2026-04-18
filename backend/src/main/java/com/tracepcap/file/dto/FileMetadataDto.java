@@ -1,4 +1,4 @@
-package com.tracepcap.file.dto;
+package com.lanturn.file.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;

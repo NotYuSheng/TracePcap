@@ -1,6 +1,6 @@
-package com.tracepcap.analysis.entity;
+package com.lanturn.analysis.entity;
 
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.file.entity.FileEntity;
 import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.AllArgsConstructor;

@@ -1,4 +1,4 @@
-package com.tracepcap.report;
+package com.lanturn.report;
 
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
@@ -13,22 +13,22 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.ExtractedFileEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.ExtractedFileRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.repository.FileRepository;
-import com.tracepcap.story.dto.Finding;
-import com.tracepcap.story.dto.InvestigationStep;
-import com.tracepcap.story.dto.StoryResponse;
-import com.tracepcap.story.service.StoryService;
+import com.lanturn.analysis.entity.AnalysisResultEntity;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.ExtractedFileEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.repository.AnalysisResultRepository;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.ExtractedFileRepository;
+import com.lanturn.analysis.repository.HostClassificationRepository;
+import com.lanturn.analysis.repository.IpGeoInfoRepository;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.repository.FileRepository;
+import com.lanturn.story.dto.Finding;
+import com.lanturn.story.dto.InvestigationStep;
+import com.lanturn.story.dto.StoryResponse;
+import com.lanturn.story.service.StoryService;
 import java.awt.Color;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
@@ -232,7 +232,7 @@ public class ReportService {
     Font subF = new Font(Font.HELVETICA, 13, Font.NORMAL, new Color(71, 85, 105));
     Font metaF = new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(100, 116, 139));
 
-    Paragraph app = centred(new Paragraph("TracePcap — Network Traffic Analysis Report", appF));
+    Paragraph app = centred(new Paragraph("Lanturn — Network Traffic Analysis Report", appF));
     app.setSpacingBefore(36);
     doc.add(app);
 

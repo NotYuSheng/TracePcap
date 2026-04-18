@@ -1,4 +1,4 @@
-package com.tracepcap.config;
+package com.lanturn.config;
 
 import io.minio.MinioClient;
 import lombok.Data;

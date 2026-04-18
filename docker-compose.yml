@@ -2,28 +2,28 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: tracepcap-postgres
+    container_name: lanturn-postgres
     environment:
-      POSTGRES_DB: tracepcap
-      POSTGRES_USER: tracepcap_user
-      POSTGRES_PASSWORD: tracepcap_pass
+      POSTGRES_DB: lanturn
+      POSTGRES_USER: lanturn_user
+      POSTGRES_PASSWORD: lanturn_pass
       TZ: Asia/Singapore
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracepcap_user -d tracepcap"]
+      test: ["CMD-SHELL", "pg_isready -U lanturn_user -d lanturn"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - tracepcap-network
+      - lanturn-network
 
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
-    container_name: tracepcap-minio
+    container_name: lanturn-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -40,40 +40,40 @@ services:
       timeout: 20s
       retries: 3
     networks:
-      - tracepcap-network
+      - lanturn-network
 
   # MinIO Client (mc) - Create bucket on startup
   minio-init:
     image: minio/mc:latest
-    container_name: tracepcap-minio-init
+    container_name: lanturn-minio-init
     depends_on:
       - minio
     entrypoint: >
       /bin/sh -c "
       sleep 5;
       /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
-      /usr/bin/mc mb myminio/tracepcap-files --ignore-existing;
-      /usr/bin/mc anonymous set public myminio/tracepcap-files;
+      /usr/bin/mc mb myminio/lanturn-files --ignore-existing;
+      /usr/bin/mc anonymous set public myminio/lanturn-files;
       exit 0;
       "
     networks:
-      - tracepcap-network
+      - lanturn-network
 
   # Spring Boot Backend
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: tracepcap-backend
+    container_name: lanturn-backend
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DATABASE_URL: jdbc:postgresql://postgres:5432/tracepcap
-      DATABASE_USERNAME: tracepcap_user
-      DATABASE_PASSWORD: tracepcap_pass
+      DATABASE_URL: jdbc:postgresql://postgres:5432/lanturn
+      DATABASE_USERNAME: lanturn_user
+      DATABASE_PASSWORD: lanturn_pass
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: tracepcap-files
+      MINIO_BUCKET: lanturn-files
       # Memory allocation — all limits (JVM heap, max upload, timeouts) are derived
       # from this single value in the container entrypoint script
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
@@ -95,7 +95,7 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - tracepcap-network
+      - lanturn-network
 
   # Nginx - Serves frontend and proxies API to backend
   nginx:
@@ -107,7 +107,7 @@ services:
         VITE_SUPPORTED_FILE_TYPES: ${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}
         VITE_ANALYSIS_OPTIONS: ${VITE_ANALYSIS_OPTIONS:-false}
         VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT: ${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}
-    container_name: tracepcap-nginx
+    container_name: lanturn-nginx
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
@@ -120,7 +120,7 @@ services:
     depends_on:
       - backend
     networks:
-      - tracepcap-network
+      - lanturn-network
 
 volumes:
   postgres_data:
@@ -131,5 +131,5 @@ volumes:
     driver: local
 
 networks:
-  tracepcap-network:
+  lanturn-network:
     driver: bridge

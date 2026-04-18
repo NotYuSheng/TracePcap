@@ -1,25 +1,25 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
-import com.tracepcap.analysis.dto.ConversationDetailResponse;
-import com.tracepcap.analysis.dto.ConversationFilterParams;
-import com.tracepcap.analysis.dto.ConversationResponse;
-import com.tracepcap.analysis.dto.PacketResponse;
-import com.tracepcap.analysis.dto.ProtocolStatsResponse;
-import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.entity.PacketEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
-import com.tracepcap.common.dto.PagedResponse;
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.repository.FileRepository;
-import com.tracepcap.file.service.StorageService;
+import com.lanturn.analysis.dto.AnalysisSummaryResponse;
+import com.lanturn.analysis.dto.ConversationDetailResponse;
+import com.lanturn.analysis.dto.ConversationFilterParams;
+import com.lanturn.analysis.dto.ConversationResponse;
+import com.lanturn.analysis.dto.PacketResponse;
+import com.lanturn.analysis.dto.ProtocolStatsResponse;
+import com.lanturn.analysis.entity.AnalysisResultEntity;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.entity.PacketEntity;
+import com.lanturn.analysis.repository.AnalysisResultRepository;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.HostClassificationRepository;
+import com.lanturn.analysis.repository.IpGeoInfoRepository;
+import com.lanturn.analysis.repository.PacketRepository;
+import com.lanturn.common.dto.PagedResponse;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.repository.FileRepository;
+import com.lanturn.file.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.File;
@@ -47,10 +47,10 @@ public class AnalysisService {
 
   private static final int PACKET_BATCH_SIZE = 1000;
 
-  @Value("${tracepcap.overview.apps-limited:true}")
+  @Value("${lanturn.overview.apps-limited:true}")
   private boolean overviewAppsLimited;
 
-  @Value("${tracepcap.overview.apps-max:100}")
+  @Value("${lanturn.overview.apps-max:100}")
   private int overviewAppsMax;
 
   // Flush interval: how many conversations to process before flushing the JPA session.
@@ -282,7 +282,7 @@ public class AnalysisService {
         }
 
         // Update file status
-        file.setStatus(com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED);
+        file.setStatus(com.lanturn.file.entity.FileEntity.FileStatus.COMPLETED);
         file.setPacketCount(
             parseResult.getPacketCount() != null ? parseResult.getPacketCount().intValue() : null);
         file.setTotalBytes(parseResult.getTotalBytes());
@@ -620,7 +620,7 @@ public class AnalysisService {
 
   /**
    * Returns a descriptive filename for a conversation PCAP export, e.g. {@code
-   * tracepcap_capture_04-01-2026_14-30-00.pcap}.
+   * lanturn_capture_04-01-2026_14-30-00.pcap}.
    */
   @Transactional(readOnly = true)
   public String getConversationPcapFilename(UUID conversationId) {
@@ -642,7 +642,7 @@ public class AnalysisService {
     String base =
         file.getFileName() != null ? file.getFileName().replaceAll("\\.[^.]+$", "") : "capture";
     String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
-    return "tracepcap_" + base + "_" + ts + ".pcap";
+    return "lanturn_" + base + "_" + ts + ".pcap";
   }
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
@@ -655,7 +655,7 @@ public class AnalysisService {
             ? conv.getFile().getFileName().replaceAll("\\.[^.]+$", "")
             : "capture";
     String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
-    return "tracepcap_" + base + "_" + ts + ".pcap";
+    return "lanturn_" + base + "_" + ts + ".pcap";
   }
 
   /**

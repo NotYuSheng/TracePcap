@@ -1,11 +1,11 @@
-package com.tracepcap.analysis.controller;
+package com.lanturn.analysis.controller;
 
-import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
-import com.tracepcap.analysis.dto.ProtocolStatsResponse;
-import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.service.AnalysisService;
-import com.tracepcap.file.entity.FileEntity;
-import com.tracepcap.file.service.FileService;
+import com.lanturn.analysis.dto.AnalysisSummaryResponse;
+import com.lanturn.analysis.dto.ProtocolStatsResponse;
+import com.lanturn.analysis.entity.AnalysisResultEntity;
+import com.lanturn.analysis.service.AnalysisService;
+import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.service.FileService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

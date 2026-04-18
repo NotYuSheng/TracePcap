@@ -1,4 +1,4 @@
-package com.tracepcap.common.exception;
+package com.lanturn.common.exception;
 
 /** Exception thrown when file validation fails */
 public class InvalidFileException extends RuntimeException {

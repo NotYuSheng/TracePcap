@@ -1,7 +1,7 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
-import com.tracepcap.analysis.entity.PacketEntity;
-import com.tracepcap.common.TsharkHexUtil;
+import com.lanturn.analysis.entity.PacketEntity;
+import com.lanturn.common.TsharkHexUtil;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;

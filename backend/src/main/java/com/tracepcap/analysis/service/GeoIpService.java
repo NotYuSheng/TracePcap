@@ -1,9 +1,9 @@
-package com.tracepcap.analysis.service;
+package com.lanturn.analysis.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.lanturn.analysis.entity.IpGeoInfoEntity;
+import com.lanturn.analysis.repository.IpGeoInfoRepository;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.*;
@@ -39,10 +39,10 @@ public class GeoIpService {
       "http://ip-api.com/batch?fields=status,countryCode,country,as,org,query";
   private static final int BATCH_SIZE = 100;
 
-  @Value("${tracepcap.geo.enabled:true}")
+  @Value("${lanturn.geo.enabled:true}")
   private boolean geoEnabled;
 
-  @Value("${tracepcap.geo.timeout-seconds:10}")
+  @Value("${lanturn.geo.timeout-seconds:10}")
   private int timeoutSeconds;
 
   private final IpGeoInfoRepository geoInfoRepository;
