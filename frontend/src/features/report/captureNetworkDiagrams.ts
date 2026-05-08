@@ -1,26 +1,8 @@
 /**
- * Captures both ELK network diagram layouts by rendering the real NetworkGraph
- * React component into a visible-but-covered container and screenshotting it
- * with html-to-image.
+ * Captures both graph layout views by rendering the real NetworkGraph
+ * React component into a visible-but-covered container and screenshotting it.
  *
- * Why html-to-image (not html2canvas):
- *   html2canvas does not reliably capture SVG elements, and ReactFlow renders
- *   all edges as SVG.  html-to-image uses SVG foreignObject serialisation which
- *   handles the ReactFlow SVG+HTML mix correctly.
- *
- * Why skipFonts:true:
- *   html-to-image re-fetches every @font-face file to embed it inline.  The
- *   Bootstrap Icons font is bundled by Vite with hashed asset URLs that fail
- *   when re-fetched (CORS / wrong origin).  Skipping font embedding lets the
- *   capture succeed; node-type icons inside the circles will be blank glyphs,
- *   but all topology edges, labels and colours are preserved.
- *
- * Why visible container + overlay:
- *   Both html-to-image and html2canvas respect CSS opacity.  Using opacity:0
- *   produces a fully transparent PNG.  Instead the container sits at z-index
- *   9999 (fully opaque, fully painted) while a solid white overlay at z-index
- *   10000 hides it from the user.  html-to-image targets the container element
- *   directly and ignores the overlay above it.
+ * React Flow renders via SVG/CSS (no WebGL), so html-to-image works directly.
  */
 
 import { createElement } from 'react';
@@ -28,6 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { toPng } from 'html-to-image';
 import { NetworkGraph } from '@/components/network/NetworkGraph/NetworkGraph';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
+
 const CAPTURE_W = 1400;
 const CAPTURE_H = 860;
 
@@ -38,22 +21,19 @@ async function captureLayout(
   edges: GraphEdge[],
   layoutType: 'forceDirected2d' | 'hierarchicalTd'
 ): Promise<string> {
-  // Force light mode on the html element for the duration of the capture so
-  // the PDF diagram is always rendered on a white background regardless of
-  // the user's current theme setting.
+  // Force light mode so the PDF is always on a white background.
   const prevTheme = document.documentElement.getAttribute('data-theme');
   document.documentElement.setAttribute('data-theme', 'light');
 
   return new Promise((resolve, reject) => {
     const id = `__nr-capture-${++captureSeq}`;
 
-    // Solid white overlay — hides the container from the user while it renders.
+    // Solid white overlay — hides the render container from the user.
     const overlay = document.createElement('div');
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:10000;background:#fff;pointer-events:none';
 
-    // Capture container — on-screen, fully opaque so the capture library gets
-    // real pixels.  Covered by the overlay above.
+    // Capture container — on-screen and fully opaque so React Flow paints.
     const container = document.createElement('div');
     container.id = id;
     container.style.cssText = [
@@ -67,11 +47,6 @@ async function captureLayout(
       'background:#fff',
     ].join(';');
 
-    // Override the component's 70vh height so it fills the capture area.
-    const styleEl = document.createElement('style');
-    styleEl.textContent = `#${id} .network-graph-container { height:${CAPTURE_H}px !important; }`;
-
-    document.head.appendChild(styleEl);
     document.body.appendChild(overlay);
     document.body.appendChild(container);
 
@@ -82,8 +57,6 @@ async function captureLayout(
       root.unmount();
       container.remove();
       overlay.remove();
-      styleEl.remove();
-      // Restore the user's original theme after capture completes.
       if (prevTheme) {
         document.documentElement.setAttribute('data-theme', prevTheme);
       } else {
@@ -95,34 +68,28 @@ async function captureLayout(
       if (done) return;
       done = true;
 
-      // Wait for ReactFlow to fully settle: fitView, edge routing and any
-      // internal async paint passes all need to complete before we snapshot.
-      // rAFs alone are not enough for force-directed layouts with many edges —
-      // a short setTimeout gives the browser time to finish all pending work.
-      setTimeout(
-        () =>
-          requestAnimationFrame(async () => {
-            try {
-              const dataUrl = await toPng(container, {
-                width: CAPTURE_W,
-                height: CAPTURE_H,
-                pixelRatio: 6,
-                // Skip re-fetching web fonts (Bootstrap Icons) — those fetches
-                // fail when Vite-bundled with hashed asset URLs.  Edge lines,
-                // labels and colours are all captured; only icon glyphs are
-                // absent.
-                skipFonts: true,
-              });
-              cleanup();
-              resolve(dataUrl.split(',')[1]);
-            } catch (err) {
-              console.error('[captureNetworkDiagrams] toPng failed:', err);
-              cleanup();
-              reject(err);
-            }
-          }),
-        500
-      );
+      // Give React Flow a frame to finish its final render before screenshotting.
+      requestAnimationFrame(() => {
+        setTimeout(async () => {
+          try {
+            const flowEl = container.querySelector('.react-flow') as HTMLElement;
+            if (!flowEl) throw new Error('react-flow element not found in capture container');
+
+            const dataUrl = await toPng(flowEl, {
+              pixelRatio: 2,
+              backgroundColor: '#ffffff',
+              width: CAPTURE_W,
+              height: CAPTURE_H,
+            });
+            cleanup();
+            resolve(dataUrl.replace(/^data:image\/png;base64,/, ''));
+          } catch (err) {
+            console.error('[captureNetworkDiagrams] html-to-image failed:', err);
+            cleanup();
+            reject(err);
+          }
+        }, 300);
+      });
     };
 
     root.render(
@@ -130,6 +97,7 @@ async function captureLayout(
         nodes,
         edges,
         layoutType,
+        captureMode: true,
         onLayoutComplete: handleLayoutComplete,
       })
     );
@@ -149,22 +117,18 @@ async function captureLayout(
 
 export interface DiagramImages {
   forceDirected: string; // base64 PNG
-  hierarchical: string; // base64 PNG
+  hierarchical:  string; // base64 PNG
 }
 
 /**
- * Captures both ELK layouts for the given pre-filtered nodes and edges.
- * The caller is responsible for passing exactly the nodes/edges currently
- * visible on screen so the report matches what the user sees.
+ * Captures both layouts for the given pre-filtered nodes and edges.
+ * Sequential — avoids layout conflicts between renders.
  */
 export async function captureNetworkDiagrams(
   nodes: GraphNode[],
   edges: GraphEdge[]
 ): Promise<DiagramImages> {
-  // Sequential — both layouts share the module-level ELK singleton inside
-  // NetworkGraph.tsx; running them in parallel risks a layout race condition.
   const forceDirected = await captureLayout(nodes, edges, 'forceDirected2d');
-  const hierarchical = await captureLayout(nodes, edges, 'hierarchicalTd');
-
+  const hierarchical  = await captureLayout(nodes, edges, 'hierarchicalTd');
   return { forceDirected, hierarchical };
 }

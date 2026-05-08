@@ -2,14 +2,18 @@ package com.tracepcap.layout.service;
 
 import com.tracepcap.layout.dto.LayoutRequest;
 import com.tracepcap.layout.dto.LayoutResponse;
+import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.elk.alg.force.options.ForceMetaDataProvider;
 import org.eclipse.elk.alg.force.options.ForceOptions;
+import org.eclipse.elk.alg.layered.options.LayeredMetaDataProvider;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
+import org.eclipse.elk.core.data.LayoutMetaDataService;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.util.BasicProgressMonitor;
@@ -22,6 +26,16 @@ import org.springframework.stereotype.Service;
 public class LayoutService {
 
   private final RecursiveGraphLayoutEngine engine = new RecursiveGraphLayoutEngine();
+
+  @PostConstruct
+  void initElk() {
+    // ELK uses ServiceLoader to discover algorithms, which doesn't work reliably inside a
+    // Spring Boot fat JAR because META-INF/services entries get shadowed. Register explicitly.
+    LayoutMetaDataService.getInstance()
+        .registerLayoutMetaDataProviders(
+            new CoreOptions(), new LayeredMetaDataProvider(), new ForceMetaDataProvider());
+    log.info("ELK layout algorithms registered (layered, force)");
+  }
 
   public LayoutResponse computeLayout(LayoutRequest request) {
     log.debug(

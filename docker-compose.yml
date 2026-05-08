@@ -30,8 +30,8 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
       TZ: Asia/Singapore
     ports:
-      - "9000:9000"  # API
-      - "9001:9001"  # Console
+      - "9010:9000"  # API   (host 9010 to avoid conflict with kms-minio on 9000)
+      - "9011:9001"  # Console (host 9011 to avoid conflict with kms-minio on 9001)
     volumes:
       - minio_data:/data
     healthcheck:

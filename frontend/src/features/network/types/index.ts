@@ -66,6 +66,8 @@ export interface NodeData {
   roleBreakdown?: { client: number; server: number; both: number; unknown: number };
   /** Top protocols seen on edges between cluster members. */
   dominantProtocols?: string[];
+  /** Number of risky edges touching this cluster (edges with flowRisks or customSignatures). */
+  riskCount?: number;
 }
 
 export interface GraphEdge {

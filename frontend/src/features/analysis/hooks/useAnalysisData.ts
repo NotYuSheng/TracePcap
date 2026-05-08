@@ -9,6 +9,7 @@ export const useAnalysisData = (fileId: string) => {
   const [data, setData] = useState<AnalysisSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [slowWarning, setSlowWarning] = useState(false);
 
   const setCurrentFileId = useStore(state => state.setCurrentFileId);
   const setAnalysisSummary = useStore(state => state.setAnalysisSummary);
@@ -98,9 +99,9 @@ export const useAnalysisData = (fileId: string) => {
       // Set up polling every 2 seconds
       pollInterval = setInterval(pollStatus, 2000);
 
-      // After the backend-configured timeout, log a warning but keep polling — large files
-      // can take well over 15 minutes and the analysis is still running on the server.
+      // After the backend-configured timeout, show a visible warning and keep polling.
       setTimeout(() => {
+        if (!cancelled) setSlowWarning(true);
         console.warn(
           `[useAnalysisData] Analysis for ${fileId} has exceeded ${analysisTimeoutMs / 1000}s — ` +
             'still polling; large files may take longer than expected.'
@@ -136,6 +137,7 @@ export const useAnalysisData = (fileId: string) => {
     data,
     loading,
     error,
+    slowWarning,
     refetch,
   };
 };

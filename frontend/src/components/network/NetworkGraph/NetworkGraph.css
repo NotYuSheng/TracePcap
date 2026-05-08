@@ -1,13 +1,11 @@
-.network-graph-container {
+/* ── Wrapper fills its parent (card body, 70vh div, etc.) ───────────────── */
+.network-graph-wrapper {
   position: relative;
   width: 100%;
-  height: 70vh;
-  border: 1px solid var(--tp-border, #dee2e6);
-  border-radius: 0.375rem;
-  overflow: hidden;
-  background: var(--tp-surface, #fff);
+  height: 100%;
 }
 
+/* ── Empty state ────────────────────────────────────────────────────────── */
 .network-graph-empty {
   display: flex;
   flex-direction: column;
@@ -20,7 +18,7 @@
   color: var(--tp-text, #212529);
 }
 
-/* Loading overlay while ELK computes positions */
+/* ── Layout loading overlay ─────────────────────────────────────────────── */
 .network-graph-layouting {
   position: absolute;
   inset: 0;
@@ -34,70 +32,7 @@
   pointer-events: none;
 }
 
-/* Custom node — circular with label floating below */
-.network-flow-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--tp-surface, #fff);
-  border: 2px solid #95a5a6;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 15%);
-  cursor: pointer;
-  transition: box-shadow 0.15s;
-  position: relative;
-}
-
-.network-flow-node:hover {
-  box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
-}
-
-.network-flow-icon {
-  font-size: 20px;
-  line-height: 1;
-}
-
-.network-flow-label {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  color: var(--tp-text, #333);
-  font-size: 10px;
-  font-weight: 500;
-  white-space: nowrap;
-  text-align: center;
-  background: color-mix(in srgb, var(--tp-surface, #fff) 85%, transparent);
-  padding: 1px 4px;
-  border-radius: 3px;
-  pointer-events: none;
-}
-
-/* Hide React Flow handles — present for edge routing but not visible */
-.network-flow-handle {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  width: 6px !important;
-  height: 6px !important;
-}
-
-/* Edge label */
-.network-flow-edge-label {
-  position: absolute;
-  font-size: 10px;
-  background: color-mix(in srgb, var(--tp-surface, #fff) 90%, transparent);
-  color: var(--tp-text, #212529);
-  padding: 1px 5px;
-  border-radius: 3px;
-  white-space: nowrap;
-  pointer-events: all;
-  border: 1px solid var(--tp-border, #dee2e6);
-}
-
-/* Fullscreen: card fills viewport, graph body fills the card */
+/* ── Fullscreen support ─────────────────────────────────────────────────── */
 .card:fullscreen {
   display: flex;
   flex-direction: column;
@@ -110,65 +45,89 @@
   min-height: 0;
 }
 
-.card:fullscreen .network-diagram-graph-body .network-graph-container {
+.card:fullscreen .network-diagram-graph-body .network-graph-wrapper {
   height: 100%;
 }
 
-/* Override React Flow defaults to match app style */
-.react-flow__attribution {
-  display: none;
+/* ── React Flow handle — invisible; connections only from layout, not drag ─ */
+.ng-handle {
+  width: 6px !important;
+  height: 6px !important;
+  background: transparent !important;
+  border: none !important;
+  min-width: unset !important;
+  min-height: unset !important;
 }
 
-.react-flow__controls {
-  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
-  border: 1px solid var(--tp-border, #dee2e6);
-  border-radius: 0.375rem;
-  overflow: hidden;
+/* ── Host node — filled circle, sized by totalBytes ─────────────────────── */
+.ng-host-node {
+  position: relative;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.react-flow__controls-button {
-  border-bottom: 1px solid var(--tp-border, #dee2e6);
-  background: var(--tp-surface, #fff);
-  color: var(--tp-text, #212529);
+.ng-host-node:hover {
+  transform: scale(1.15);
+  z-index: 5;
 }
 
-.react-flow__controls-button:last-child {
-  border-bottom: none;
-}
-
-.react-flow__controls-button:hover {
-  background: var(--tp-surface-hover, #f8f9fa);
-}
-
-.network-layout-controls .react-flow__controls-button.active {
-  background: #0d6efd;
-  color: #fff;
-}
-
-/* ── Hidden neighbor tooltip ────────────────────────────────────────────── */
-.nf-hidden-tooltip {
+/* Label appears below the circle */
+.ng-host-label {
   position: absolute;
-  z-index: 30;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 9px;
+  font-family: monospace;
+  color: var(--tp-text, #212529);
+  background: color-mix(in srgb, var(--tp-surface, #fff) 80%, transparent);
+  padding: 0 2px;
+  border-radius: 2px;
+  pointer-events: none;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+/* ── Hidden-neighbor tooltip (inside host node, shown on hover) ──────────── */
+.ng-hidden-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
   background: var(--tp-surface, #fff);
   border: 1px solid var(--tp-border, #dee2e6);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
-  padding: 8px 10px;
-  font-size: 11px;
+  padding: 6px 8px;
+  min-width: 140px;
+  max-width: 200px;
+  text-align: left;
   pointer-events: none;
-  max-width: 220px;
 }
 
-.nf-hidden-tooltip-title {
+.ng-host-node:hover .ng-hidden-tip {
+  display: block;
+}
+
+.ng-hidden-tip-title {
   font-weight: 600;
   color: var(--tp-text-muted, #6c757d);
-  margin-bottom: 4px;
-  text-transform: uppercase;
   font-size: 10px;
+  text-transform: uppercase;
   letter-spacing: 0.04em;
+  margin-bottom: 4px;
 }
 
-.nf-hidden-tooltip-list {
+.ng-hidden-tip-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -177,98 +136,160 @@
   gap: 2px;
 }
 
-.nf-hidden-tooltip-list li {
+.ng-hidden-tip-list li {
   font-family: monospace;
+  font-size: 11px;
   color: var(--tp-text, #212529);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.nf-hidden-tooltip-more {
+.ng-hidden-tip-more {
   color: var(--tp-text-muted, #6c757d) !important;
   font-family: inherit !important;
   font-style: italic;
 }
 
-/* ── Hover highlight — dim non-neighbors ───────────────────────────────── */
-.react-flow__node.nf-dimmed {
-  opacity: 0.12;
-  transition: opacity 0.15s;
-}
-
-.react-flow__edge.nf-dimmed {
-  opacity: 0.08;
-  transition: opacity 0.15s;
-}
-
-/* Non-dimmed nodes/edges get a smooth transition back */
-.react-flow__node,
-.react-flow__edge {
-  transition: opacity 0.15s;
-}
-
-/* ── Cluster node ───────────────────────────────────────────────────────── */
-.network-flow-cluster-node {
-  border-radius: 10px;
-  border: 2px dashed #7f8c8d;
+/* ── Cluster node — rich card ────────────────────────────────────────────── */
+.ng-cluster-node {
   background: var(--tp-surface, #fff);
-  padding: 8px 10px;
-  min-width: 140px;
-  width: 140px;
-  position: relative;
+  border: 2px solid var(--ng-cluster-accent, #bdc3c7);
+  border-radius: 8px;
+  padding: 8px 10px 6px;
+  width: 160px;
   font-size: 11px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
-  transition: box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  transition: box-shadow 0.15s, transform 0.1s;
+  position: relative;
 }
 
-.network-flow-cluster-node:hover {
-  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+.ng-cluster-node:hover {
+  box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+  transform: scale(1.03);
 }
 
-.network-flow-cluster-node.has-anomaly {
-  border-color: #e74c3c;
+.ng-cluster-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
 }
 
-.network-flow-cluster-header {
+.ng-cluster-label {
   font-family: monospace;
   font-weight: 600;
   font-size: 12px;
   color: var(--tp-text, #212529);
-  white-space: nowrap;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 16px; /* room for expand button */
-}
-
-.network-flow-cluster-stats {
-  color: var(--tp-text-muted, #6c757d);
-  margin-top: 3px;
   white-space: nowrap;
 }
 
-.network-flow-cluster-rolebar {
+.ng-risk-badge {
+  flex-shrink: 0;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.ng-cluster-meta {
+  color: var(--tp-text-muted, #6c757d);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+/* ── Protocol tags ──────────────────────────────────────────────────────── */
+.ng-proto-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.ng-proto-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--tp-text, #212529);
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Role breakdown bar ─────────────────────────────────────────────────── */
+.ng-rolebar {
   display: flex;
   height: 4px;
   border-radius: 2px;
   overflow: hidden;
-  margin-top: 5px;
+  margin-bottom: 5px;
 }
 
-.network-flow-cluster-expand {
-  position: absolute;
-  top: 5px;
-  right: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 11px;
-  cursor: pointer;
-  color: var(--tp-text-muted, #6c757d);
-  line-height: 1;
+.ng-rolebar > div {
+  transition: width 0.3s;
 }
 
-.network-flow-cluster-expand:hover {
+/* ── Expand button ──────────────────────────────────────────────────────── */
+.ng-expand-btn {
+  display: block;
+  width: 100%;
+  padding: 3px 0;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--ng-cluster-accent, #bdc3c7);
+  background: transparent;
   color: var(--tp-text, #212529);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ng-expand-btn:hover {
+  background: color-mix(in srgb, var(--ng-cluster-accent, #bdc3c7) 15%, transparent);
+}
+
+/* ── Layout toggle panel (bottom-right) ─────────────────────────────────── */
+.ng-layout-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+}
+
+.ng-layout-controls button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #212529);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-bottom: 1px solid var(--tp-border, #dee2e6);
+}
+
+.ng-layout-controls button:last-child {
+  border-bottom: none;
+}
+
+.ng-layout-controls button:hover {
+  background: var(--tp-surface-hover, #f8f9fa);
+}
+
+.ng-layout-controls button.active {
+  background: #0d6efd;
+  color: #fff;
 }

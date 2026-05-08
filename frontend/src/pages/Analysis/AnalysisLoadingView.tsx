@@ -9,6 +9,7 @@ interface FileMetadata {
 
 interface Props {
   fileId: string;
+  slowWarning?: boolean;
 }
 
 // Rough estimate: ~0.5 seconds per MB (measured ~0.4 s/MB on 125 MB captures post AC optimisation)
@@ -29,7 +30,7 @@ function formatDuration(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
-export const AnalysisLoadingView = ({ fileId }: Props) => {
+export const AnalysisLoadingView = ({ fileId, slowWarning }: Props) => {
   const [fileMeta, setFileMeta] = useState<FileMetadata | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
@@ -111,11 +112,24 @@ export const AnalysisLoadingView = ({ fileId }: Props) => {
           )}
         </div>
 
+        {/* Slow warning */}
+        {slowWarning && (
+          <div className="alert alert-warning mt-4 mb-0 text-start py-2 px-3" style={{ fontSize: '0.82rem' }}>
+            <i className="bi bi-exclamation-triangle-fill me-2" />
+            <strong>Analysis is taking longer than expected.</strong>
+            <br />
+            This may indicate a storage issue (e.g. insufficient disk space). Check server logs if
+            the analysis does not complete soon.
+          </div>
+        )}
+
         {/* Hint */}
-        <p className="text-muted mt-4 mb-0" style={{ fontSize: '0.78rem' }}>
-          Larger files take longer. You can leave this page and come back — analysis continues in
-          the background.
-        </p>
+        {!slowWarning && (
+          <p className="text-muted mt-4 mb-0" style={{ fontSize: '0.78rem' }}>
+            Larger files take longer. You can leave this page and come back — analysis continues in
+            the background.
+          </p>
+        )}
       </div>
     </div>
   );

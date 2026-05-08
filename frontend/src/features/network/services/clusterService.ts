@@ -154,6 +154,20 @@ export function applySubnetClustering(
     }
   }
 
+  // Count risky edges per cluster (edges where one or both endpoints are in the cluster)
+  const clusterRiskCount = new Map<string, number>();
+  for (const edge of edges) {
+    const isRisky =
+      edge.data.hasRisks ||
+      (edge.data.flowRisks?.length ?? 0) > 0 ||
+      (edge.data.customSignatures?.length ?? 0) > 0;
+    if (!isRisky) continue;
+    const sc = nodeToCluster.get(edge.source);
+    const tc = nodeToCluster.get(edge.target);
+    if (sc && activeClusters.has(sc)) clusterRiskCount.set(sc, (clusterRiskCount.get(sc) ?? 0) + 1);
+    if (tc && activeClusters.has(tc) && tc !== sc) clusterRiskCount.set(tc, (clusterRiskCount.get(tc) ?? 0) + 1);
+  }
+
   // Synthetic cluster nodes
   for (const clusterId of activeClusters) {
     const members = clusterToMembers.get(clusterId)!;
@@ -205,6 +219,7 @@ export function applySubnetClustering(
       dominantProtocols,
       // Reuse hostname as stats display text
       hostname: statsText,
+      riskCount: clusterRiskCount.get(clusterId) ?? 0,
     };
 
     outputNodes.push({ id: clusterId, label, data: clusterData });

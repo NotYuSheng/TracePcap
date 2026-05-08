@@ -4,7 +4,7 @@ import { networkService } from '../services/networkService';
 import type { GraphNode, GraphEdge, NetworkStats } from '../types';
 import type { Conversation, HostClassification } from '@/types';
 
-export const MAX_DIAGRAM_NODES = 50;
+export const MAX_DIAGRAM_NODES = 500;
 import type { AnalysisSummary } from '@/types';
 
 interface UseNetworkDataReturn {
@@ -21,7 +21,7 @@ interface UseNetworkDataReturn {
 
 export const CONVERSATION_LIMIT_ENABLED =
   import.meta.env.VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT !== 'false';
-const MAX_CONVERSATIONS = 500;
+const MAX_CONVERSATIONS = 50_000;
 
 /**
  * Custom hook for fetching and transforming network data into graph format.

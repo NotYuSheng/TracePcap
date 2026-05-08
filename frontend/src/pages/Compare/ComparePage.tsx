@@ -474,7 +474,7 @@ export const ComparePage = () => {
 
       {totalNodes > MAX_DIAGRAM_NODES &&
         (() => {
-          const presets = [25, 50, 100, 200].filter(p => p < totalNodes);
+          const presets = [100, 500, 1000, 2000, 5000].filter(p => p < totalNodes);
           const applyCustom = () => {
             const n = parseInt(customInput, 10);
             if (!isNaN(n) && n > 0) setNodeLimit(Math.min(n, totalNodes));

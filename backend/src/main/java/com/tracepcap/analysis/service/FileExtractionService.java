@@ -246,13 +246,22 @@ public class FileExtractionService {
         }
       }
 
+      int consecutiveFailures = 0;
       for (File f : files) {
         if (!f.isFile()) continue;
         try {
           UUID convId = filenameToConvId.get(f.getName());
           processLocalFile(file, convId, f, "tshark_http");
+          consecutiveFailures = 0;
         } catch (Exception e) {
           log.warn("Failed to store HTTP object {}: {}", f.getName(), e.getMessage());
+          if (++consecutiveFailures >= 5) {
+            log.warn(
+                "Too many consecutive storage failures — aborting HTTP object extraction for {}."
+                    + " Check available disk space.",
+                file.getId());
+            break;
+          }
         }
       }
     } finally {

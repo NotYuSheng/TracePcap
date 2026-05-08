@@ -61,7 +61,7 @@ export const AnalysisPage = () => {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data, loading, error, refetch } = useAnalysisData(fileId!);
+  const { data, loading, error, slowWarning, refetch } = useAnalysisData(fileId!);
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -112,6 +112,7 @@ export const AnalysisPage = () => {
     if (path.includes('/conversations')) setActiveTab('conversations');
     else if (path.includes('/story')) setActiveTab('story');
     else if (path.includes('/filter-generator')) setActiveTab('filter-generator');
+    else if (path.includes('/network-overview')) setActiveTab('network-overview');
     else if (path.includes('/network-diagram')) setActiveTab('network-diagram');
     else if (path.includes('/extracted-files')) setActiveTab('extracted-files');
     else setActiveTab('overview');
@@ -211,7 +212,7 @@ export const AnalysisPage = () => {
     }
   };
 
-  if (loading) return <AnalysisLoadingView fileId={fileId!} />;
+  if (loading) return <AnalysisLoadingView fileId={fileId!} slowWarning={slowWarning} />;
   if (error)
     return (
       <ErrorMessage title="Failed to Load Analysis" message={error.message} onRetry={refetch} />
@@ -318,6 +319,15 @@ export const AnalysisPage = () => {
             onClick={() => handleTabChange('extracted-files')}
           >
             <i className="bi bi-file-earmark-arrow-down me-2"></i>Extracted Files
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            style={{ whiteSpace: 'nowrap' }}
+            className={`nav-link ${activeTab === 'network-overview' ? 'active' : ''}`}
+            onClick={() => handleTabChange('network-overview')}
+          >
+            <i className="bi bi-globe me-2"></i>Network Overview
           </button>
         </li>
         <li className="nav-item">
