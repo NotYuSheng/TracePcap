@@ -9,7 +9,6 @@ import com.tracepcap.story.service.LlmClient;
 import com.tracepcap.tracer.dto.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,8 +22,14 @@ public class ConversationTracerService {
   private final PacketRepository packetRepository;
   private final LlmClient llmClient;
 
-  /** Cache to avoid repeating LLM calls for the same conversation. */
-  private final ConcurrentHashMap<UUID, List<StepExplanation>> explanationCache = new ConcurrentHashMap<>();
+  /** LRU cache (max 500 entries) to avoid repeating LLM calls for the same conversation. */
+  private final Map<UUID, List<StepExplanation>> explanationCache =
+      Collections.synchronizedMap(new LinkedHashMap<>(128, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<UUID, List<StepExplanation>> eldest) {
+          return size() > 500;
+        }
+      });
 
   private static final DateTimeFormatter TS_FMT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
