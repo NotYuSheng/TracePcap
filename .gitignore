@@ -15,3 +15,4 @@ backend/src/main/resources/application-local.yml
 # Keep example files
 !**/.env.example
 sample-files/*.pcap
+!sample-files/demo_all_rules.pcap

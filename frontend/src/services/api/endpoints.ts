@@ -42,6 +42,20 @@ export const API_ENDPOINTS = {
   EXTRACTED_FILE_DOWNLOAD: (fileId: string, extractionId: string) =>
     `/files/${fileId}/extractions/${extractionId}/download`,
 
+  // Network Intelligence
+  NETWORK_INTELLIGENCE_CLUSTERS: (fileId: string, groupBy: string) =>
+    `/network/intelligence/${fileId}/clusters?groupBy=${groupBy}`,
+  NETWORK_INTELLIGENCE_TOP_HOSTS: (fileId: string, sortBy: string, limit: number) =>
+    `/network/intelligence/${fileId}/top-hosts?sortBy=${sortBy}&limit=${limit}`,
+
+  // Conversation Tracer
+  TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,
+  TRACER_EXPLAIN: (conversationId: string) => `/tracer/${conversationId}/explain`,
+
+  // IP Org Rules (Network Labels)
+  IP_ORG_RULES: '/ip-org-rules',
+  IP_ORG_RULE_DELETE: (id: number) => `/ip-org-rules/${id}`,
+
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
   COMPARE_REPORT_DOWNLOAD: '/files/compare/report',

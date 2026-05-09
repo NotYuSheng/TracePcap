@@ -1,0 +1,457 @@
+package com.tracepcap.intelligence.service;
+
+import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.tracepcap.analysis.entity.IpGeoInfoEntity;
+import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.intelligence.dto.*;
+import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
+import java.util.*;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class NetworkIntelligenceService {
+
+  private final ConversationRepository conversationRepository;
+  private final HostClassificationRepository hostClassificationRepository;
+  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final IpOrgRuleService ipOrgRuleService;
+
+  private static final int SAMPLE_IPS_LIMIT = 20;
+  private static final int DOMINANT_PROTOCOLS_LIMIT = 3;
+  private static final int MAX_CLUSTERS = 60;
+  private static final int MAX_EDGES = 200;
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  public ClusterGraphResponse computeClusters(UUID fileId, String groupBy) {
+    log.info("Computing {} clusters for file {}", groupBy, fileId);
+    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+
+    Set<String> allIps = new HashSet<>();
+    for (ConversationEntity c : conversations) {
+      allIps.add(c.getSrcIp());
+      allIps.add(c.getDstIp());
+    }
+
+    Map<String, IpGeoInfoEntity> geoByIp = new HashMap<>();
+    Map<String, HostClassificationEntity> deviceByIp = new HashMap<>();
+    Map<String, String> clusterLabels = new HashMap<>();
+
+    if ("asn".equals(groupBy) || "country".equals(groupBy)) {
+      ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
+    }
+    if ("deviceType".equals(groupBy)) {
+      hostClassificationRepository.findByFileId(fileId).forEach(h -> deviceByIp.put(h.getIp(), h));
+    }
+    List<IpOrgRuleEntity> orgRules = "customOrg".equals(groupBy)
+        ? ipOrgRuleService.loadRules()
+        : List.of();
+
+    // Map each IP to its cluster key
+    Map<String, String> ipToCluster = new HashMap<>();
+    for (String ip : allIps) {
+      String key = getClusterKey(ip, groupBy, geoByIp, deviceByIp, orgRules);
+      ipToCluster.put(ip, key);
+      // Build label alongside so we can look it up later from any IP in the cluster
+      clusterLabels.putIfAbsent(key, buildLabel(ip, key, groupBy, geoByIp, deviceByIp, orgRules));
+    }
+
+    // Aggregate cluster and edge stats
+    Map<String, ClusterAcc> clusters = new LinkedHashMap<>();
+    Map<String, EdgeAcc> edges = new LinkedHashMap<>();
+
+    for (ConversationEntity conv : conversations) {
+      String srcKey = ipToCluster.get(conv.getSrcIp());
+      String dstKey = ipToCluster.get(conv.getDstIp());
+      boolean hasRisk = conv.getFlowRisks() != null && conv.getFlowRisks().length > 0;
+
+      ClusterAcc srcAcc = clusters.computeIfAbsent(srcKey, k -> new ClusterAcc());
+      srcAcc.ips.add(conv.getSrcIp());
+
+      ClusterAcc dstAcc = clusters.computeIfAbsent(dstKey, k -> new ClusterAcc());
+      dstAcc.ips.add(conv.getDstIp());
+
+      if (srcKey.equals(dstKey)) {
+        // Intra-cluster conversation — count once
+        String srcIp = conv.getSrcIp(), dstIp = conv.getDstIp();
+        long bytes = conv.getTotalBytes();
+        srcAcc.totalBytes += bytes;
+        srcAcc.totalPackets += conv.getPacketCount();
+        srcAcc.conversationCount++;
+        srcAcc.ipBytes.merge(srcIp, bytes, Long::sum);
+        srcAcc.ipBytes.merge(dstIp, bytes, Long::sum);
+        srcAcc.ipConversations.merge(srcIp, 1L, Long::sum);
+        srcAcc.ipConversations.merge(dstIp, 1L, Long::sum);
+        srcAcc.ipPeers.computeIfAbsent(srcIp, k -> new HashSet<>()).add(dstIp);
+        srcAcc.ipPeers.computeIfAbsent(dstIp, k -> new HashSet<>()).add(srcIp);
+        if (hasRisk) {
+          srcAcc.riskCount++;
+          srcAcc.ipRisks.merge(srcIp, 1L, Long::sum);
+          srcAcc.ipRisks.merge(dstIp, 1L, Long::sum);
+          if (conv.getFlowRisks() != null) {
+            for (String rt : conv.getFlowRisks()) srcAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
+          }
+        }
+        srcAcc.protocolCounts.merge(conv.getProtocol(), 1L, Long::sum);
+      } else {
+        // Inter-cluster conversation — count for both clusters
+        long bytes = conv.getTotalBytes();
+        long pkts = conv.getPacketCount();
+        String proto = conv.getProtocol();
+
+        String srcIp = conv.getSrcIp(), dstIp = conv.getDstIp();
+        srcAcc.totalBytes += bytes;
+        srcAcc.totalPackets += pkts;
+        srcAcc.conversationCount++;
+        srcAcc.ipBytes.merge(srcIp, bytes, Long::sum);
+        srcAcc.ipConversations.merge(srcIp, 1L, Long::sum);
+        srcAcc.ipPeers.computeIfAbsent(srcIp, k -> new HashSet<>()).add(dstIp);
+        if (hasRisk) {
+          srcAcc.riskCount++;
+          srcAcc.ipRisks.merge(srcIp, 1L, Long::sum);
+          if (conv.getFlowRisks() != null) {
+            for (String rt : conv.getFlowRisks()) srcAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
+          }
+        }
+        srcAcc.protocolCounts.merge(proto, 1L, Long::sum);
+
+        dstAcc.totalBytes += bytes;
+        dstAcc.totalPackets += pkts;
+        dstAcc.conversationCount++;
+        dstAcc.ipBytes.merge(dstIp, bytes, Long::sum);
+        dstAcc.ipConversations.merge(dstIp, 1L, Long::sum);
+        dstAcc.ipPeers.computeIfAbsent(dstIp, k -> new HashSet<>()).add(srcIp);
+        if (hasRisk) {
+          dstAcc.riskCount++;
+          dstAcc.ipRisks.merge(dstIp, 1L, Long::sum);
+          if (conv.getFlowRisks() != null) {
+            for (String rt : conv.getFlowRisks()) dstAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
+          }
+        }
+        dstAcc.protocolCounts.merge(proto, 1L, Long::sum);
+
+        // Normalize edge key so A↔B and B↔A map to same entry
+        String edgeKey = srcKey.compareTo(dstKey) < 0
+            ? srcKey + "|||" + dstKey
+            : dstKey + "|||" + srcKey;
+        EdgeAcc ea = edges.computeIfAbsent(edgeKey, k -> new EdgeAcc(srcKey, dstKey));
+        ea.totalBytes += bytes;
+        ea.conversationCount++;
+        ea.protocolCounts.merge(proto, 1L, Long::sum);
+      }
+    }
+
+    // Build DTOs
+    List<ClusterNodeDto> clusterDtos = clusters.entrySet().stream()
+        .map(e -> {
+          ClusterAcc acc = e.getValue();
+          Comparator<String> byIpBytes = Comparator.comparingLong(
+              (String ip) -> acc.ipBytes.getOrDefault(ip, 0L));
+          List<String> sample = acc.ips.stream()
+              .sorted(byIpBytes.reversed())
+              .limit(SAMPLE_IPS_LIMIT)
+              .collect(Collectors.toList());
+          List<String> protocols = topKeys(acc.protocolCounts, DOMINANT_PROTOCOLS_LIMIT);
+          List<String> topRiskTypes = topKeys(acc.riskTypeCounts, 3);
+          Map<String, Long> ipPeerCounts = new HashMap<>();
+          acc.ipPeers.forEach((ip, peers) -> ipPeerCounts.put(ip, (long) peers.size()));
+          return ClusterNodeDto.builder()
+              .id(e.getKey())
+              .label(clusterLabels.getOrDefault(e.getKey(), e.getKey()))
+              .groupType(groupBy)
+              .hostCount(acc.ips.size())
+              .totalBytes(acc.totalBytes)
+              .totalPackets(acc.totalPackets)
+              .conversationCount(acc.conversationCount)
+              .riskCount(acc.riskCount)
+              .dominantProtocols(protocols)
+              .sampleIps(sample)
+              .topRiskTypes(topRiskTypes)
+              .ipBytes(acc.ipBytes)
+              .ipConversations(acc.ipConversations)
+              .ipRisks(acc.ipRisks)
+              .ipPeers(ipPeerCounts)
+              .build();
+        })
+        .collect(Collectors.toList());
+
+    // Prune to top MAX_CLUSTERS by traffic to keep rendering manageable
+    int totalClusters = clusterDtos.size();
+    if (clusterDtos.size() > MAX_CLUSTERS) {
+      clusterDtos = clusterDtos.stream()
+          .sorted(Comparator.comparingLong(ClusterNodeDto::getTotalBytes).reversed())
+          .limit(MAX_CLUSTERS)
+          .collect(Collectors.toList());
+    }
+    int hiddenClusters = totalClusters - clusterDtos.size();
+
+    // Only keep edges between the surviving clusters, capped at MAX_EDGES by traffic
+    Set<String> keptIds = clusterDtos.stream().map(ClusterNodeDto::getId).collect(Collectors.toSet());
+    List<ClusterEdgeDto> edgeDtos = edges.values().stream()
+        .filter(ea -> keptIds.contains(ea.srcKey) && keptIds.contains(ea.dstKey))
+        .sorted(Comparator.comparingLong((EdgeAcc ea) -> ea.totalBytes).reversed())
+        .limit(MAX_EDGES)
+        .map(ea -> ClusterEdgeDto.builder()
+            .sourceId(ea.srcKey)
+            .targetId(ea.dstKey)
+            .totalBytes(ea.totalBytes)
+            .conversationCount(ea.conversationCount)
+            .dominantProtocol(topKeys(ea.protocolCounts, 1).stream().findFirst().orElse(null))
+            .build())
+        .collect(Collectors.toList());
+
+    return ClusterGraphResponse.builder()
+        .groupType(groupBy)
+        .clusters(clusterDtos)
+        .edges(edgeDtos)
+        .hiddenClusters(hiddenClusters)
+        .build();
+  }
+
+  public TopHostsResponse computeTopHosts(UUID fileId, String sortBy, int limit) {
+    log.info("Computing top hosts for file {} (sortBy={}, limit={})", fileId, sortBy, limit);
+    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+
+    // Aggregate per-IP stats
+    Map<String, HostAcc> hostMap = new LinkedHashMap<>();
+    for (ConversationEntity conv : conversations) {
+      boolean hasRisk = conv.getFlowRisks() != null && conv.getFlowRisks().length > 0;
+
+      HostAcc srcAcc = hostMap.computeIfAbsent(conv.getSrcIp(), k -> new HostAcc());
+      srcAcc.totalBytes += conv.getTotalBytes();
+      srcAcc.packetCount += conv.getPacketCount();
+      srcAcc.conversationCount++;
+      if (hasRisk) srcAcc.riskCount++;
+      srcAcc.clientConversations++;
+      if (conv.getHostname() != null) srcAcc.hostname = conv.getHostname();
+
+      HostAcc dstAcc = hostMap.computeIfAbsent(conv.getDstIp(), k -> new HostAcc());
+      dstAcc.totalBytes += conv.getTotalBytes();
+      dstAcc.packetCount += conv.getPacketCount();
+      dstAcc.conversationCount++;
+      if (hasRisk) dstAcc.riskCount++;
+      dstAcc.serverConversations++;
+    }
+
+    // Enrich with geo and device type
+    Set<String> ips = hostMap.keySet();
+    Map<String, IpGeoInfoEntity> geoByIp = new HashMap<>();
+    ipGeoInfoRepository.findAllByIpIn(ips).forEach(g -> geoByIp.put(g.getIp(), g));
+    Map<String, HostClassificationEntity> deviceByIp = new HashMap<>();
+    hostClassificationRepository.findByFileId(fileId).forEach(h -> deviceByIp.put(h.getIp(), h));
+
+    // Sort and limit
+    Comparator<Map.Entry<String, HostAcc>> comparator = switch (sortBy) {
+      case "packets" -> Comparator.comparingLong(e -> -e.getValue().packetCount);
+      case "conversations" -> Comparator.comparingLong(e -> -e.getValue().conversationCount);
+      case "risks" -> Comparator.comparingLong(e -> -e.getValue().riskCount);
+      default -> Comparator.comparingLong(e -> -e.getValue().totalBytes); // "bytes" is default
+    };
+
+    List<HostSummaryDto> hosts = hostMap.entrySet().stream()
+        .sorted(comparator)
+        .limit(limit)
+        .map(e -> {
+          String ip = e.getKey();
+          HostAcc acc = e.getValue();
+          IpGeoInfoEntity geo = geoByIp.get(ip);
+          HostClassificationEntity device = deviceByIp.get(ip);
+          String role = acc.clientConversations > acc.serverConversations * 2 ? "client"
+              : acc.serverConversations > acc.clientConversations * 2 ? "server"
+              : "both";
+          return HostSummaryDto.builder()
+              .ip(ip)
+              .hostname(acc.hostname)
+              .totalBytes(acc.totalBytes)
+              .packetCount(acc.packetCount)
+              .conversationCount(acc.conversationCount)
+              .riskCount(acc.riskCount)
+              .deviceType(device != null ? device.getDeviceType() : null)
+              .country(geo != null ? geo.getCountryCode() : null)
+              .org(geo != null ? geo.getOrg() : null)
+              .role(role)
+              .build();
+        })
+        .collect(Collectors.toList());
+
+    return TopHostsResponse.builder().hosts(hosts).build();
+  }
+
+  // ── Clustering logic ──────────────────────────────────────────────────────
+
+  private String getClusterKey(String ip, String groupBy,
+      Map<String, IpGeoInfoEntity> geoByIp,
+      Map<String, HostClassificationEntity> deviceByIp,
+      List<IpOrgRuleEntity> orgRules) {
+    return switch (groupBy) {
+      case "asn" -> {
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        if (geo != null && geo.getAsn() != null && !geo.getAsn().isBlank()) {
+          yield "asn:" + geo.getAsn();
+        }
+        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+      }
+      case "country" -> {
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        if (geo != null && geo.getCountryCode() != null && !geo.getCountryCode().isBlank()) {
+          yield "country:" + geo.getCountryCode();
+        }
+        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+      }
+      case "subnet24" -> "subnet24:" + subnetPrefix(ip, 3);
+      case "subnet16" -> "subnet16:" + subnetPrefix(ip, 2);
+      case "deviceType" -> {
+        HostClassificationEntity dev = deviceByIp.get(ip);
+        yield "device:" + (dev != null ? dev.getDeviceType() : "UNKNOWN");
+      }
+      case "customOrg" -> {
+        String label = ipOrgRuleService.matchIp(ip, orgRules);
+        if (label != null) yield "org:" + label;
+        // Fallback: subnet /24
+        yield "subnet24:" + subnetPrefix(ip, 3);
+      }
+      default -> "cluster:all";
+    };
+  }
+
+  private String buildLabel(String ip, String key, String groupBy,
+      Map<String, IpGeoInfoEntity> geoByIp,
+      Map<String, HostClassificationEntity> deviceByIp,
+      List<IpOrgRuleEntity> orgRules) {
+    return switch (groupBy) {
+      case "asn" -> {
+        if (key.equals("cluster:internal")) yield "Internal Network";
+        if (key.equals("cluster:unknown")) yield "Unknown (No ASN)";
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        String asn = key.substring("asn:".length());
+        String org = geo != null && geo.getOrg() != null ? geo.getOrg() : asn;
+        yield org + " (" + asn + ")";
+      }
+      case "country" -> {
+        if (key.equals("cluster:internal")) yield "Internal Network";
+        if (key.equals("cluster:unknown")) yield "Unknown Country";
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        String code = key.substring("country:".length());
+        String name = geo != null && geo.getCountry() != null ? geo.getCountry() : code;
+        yield name + " (" + code + ")";
+      }
+      case "subnet24" -> {
+        String prefix = key.substring("subnet24:".length());
+        yield prefix + ".x";
+      }
+      case "subnet16" -> {
+        String prefix = key.substring("subnet16:".length());
+        yield prefix + ".x.x";
+      }
+      case "deviceType" -> {
+        String type = key.substring("device:".length());
+        yield switch (type) {
+          case "ROUTER" -> "Routers";
+          case "SERVER" -> "Servers";
+          case "MOBILE" -> "Mobile Devices";
+          case "LAPTOP_DESKTOP" -> "Laptops & Desktops";
+          case "IOT" -> "IoT Devices";
+          default -> "Unclassified";
+        };
+      }
+      case "customOrg" -> {
+        if (key.startsWith("org:")) yield key.substring("org:".length());
+        // Fallback subnet24 label
+        String prefix = key.replace("subnet24:", "");
+        yield prefix + ".x (untagged)";
+      }
+      default -> key;
+    };
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+
+  private boolean isPrivateIp(String ip) {
+    if (ip == null) return false;
+    return ip.startsWith("10.")
+        || ip.startsWith("192.168.")
+        || ip.startsWith("127.")
+        || ip.equals("::1")
+        || isPrivate172(ip)
+        || ip.toLowerCase().startsWith("fc")
+        || ip.toLowerCase().startsWith("fd");
+  }
+
+  private boolean isPrivate172(String ip) {
+    if (!ip.startsWith("172.")) return false;
+    try {
+      int second = Integer.parseInt(ip.split("\\.")[1]);
+      return second >= 16 && second <= 31;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private String subnetPrefix(String ip, int octets) {
+    if (ip == null) return "unknown";
+    if (ip.contains(":")) {
+      // IPv6: use first N colon-separated groups
+      String[] parts = ip.split(":");
+      int take = Math.min(octets, parts.length);
+      return String.join(":", Arrays.copyOf(parts, take));
+    }
+    String[] parts = ip.split("\\.");
+    int take = Math.min(octets, parts.length);
+    return String.join(".", Arrays.copyOf(parts, take));
+  }
+
+  private List<String> topKeys(Map<String, Long> counts, int n) {
+    return counts.entrySet().stream()
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+        .limit(n)
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toList());
+  }
+
+  // ── Accumulators (private inner classes) ─────────────────────────────────
+
+  private static class ClusterAcc {
+    Set<String> ips = new LinkedHashSet<>();
+    long totalBytes = 0;
+    long totalPackets = 0;
+    long conversationCount = 0;
+    long riskCount = 0;
+    Map<String, Long> protocolCounts = new HashMap<>();
+    Map<String, Long> riskTypeCounts = new HashMap<>();
+    Map<String, Long> ipBytes = new HashMap<>();
+    Map<String, Long> ipConversations = new HashMap<>();
+    Map<String, Long> ipRisks = new HashMap<>();
+    Map<String, Set<String>> ipPeers = new HashMap<>();
+  }
+
+  private static class EdgeAcc {
+    final String srcKey;
+    final String dstKey;
+    long totalBytes = 0;
+    long conversationCount = 0;
+    Map<String, Long> protocolCounts = new HashMap<>();
+
+    EdgeAcc(String srcKey, String dstKey) {
+      this.srcKey = srcKey;
+      this.dstKey = dstKey;
+    }
+  }
+
+  private static class HostAcc {
+    long totalBytes = 0;
+    long packetCount = 0;
+    long conversationCount = 0;
+    long riskCount = 0;
+    long clientConversations = 0;
+    long serverConversations = 0;
+    String hostname = null;
+  }
+}

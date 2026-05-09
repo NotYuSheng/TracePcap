@@ -8,6 +8,7 @@ import { useConversationFilters } from '@/features/conversation/hooks/useConvers
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ConversationList } from '@components/conversation/ConversationList';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
+import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
 import { ConversationFilterPanel } from '@components/conversation/ConversationFilterPanel';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -45,6 +46,7 @@ export const ConversationPage = () => {
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
+  const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
 
   const toggleColumn = useCallback((key: ColumnKey) => {
     setVisibleColumns(prev => {
@@ -447,6 +449,14 @@ export const ConversationPage = () => {
                 </div>
                 <button
                   type="button"
+                  className="btn btn-sm btn-outline-info ms-2"
+                  onClick={() => setTracerConversationId(selectedConversation.id)}
+                  title="Step through packets with AI explanations"
+                >
+                  <i className="bi bi-play-circle me-1"></i>Trace
+                </button>
+                <button
+                  type="button"
                   className="btn btn-sm btn-outline-secondary ms-2"
                   onClick={() => exportConversationCsv(selectedConversation)}
                   title="Export this conversation as CSV"
@@ -487,6 +497,15 @@ export const ConversationPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Conversation Tracer modal */}
+      {tracerConversationId && (
+        <ConversationTracerModal
+          conversationId={tracerConversationId}
+          fileId={fileId}
+          onClose={() => setTracerConversationId(null)}
+        />
       )}
     </div>
   );
