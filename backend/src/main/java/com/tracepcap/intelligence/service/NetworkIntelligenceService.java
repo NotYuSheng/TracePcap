@@ -163,6 +163,20 @@ public class NetworkIntelligenceService {
           List<String> topRiskTypes = topKeys(acc.riskTypeCounts, 3);
           Map<String, Long> ipPeerCounts = new HashMap<>();
           acc.ipPeers.forEach((ip, peers) -> ipPeerCounts.put(ip, (long) peers.size()));
+          // Attach lat/lon for geo-based groupings so the frontend can position markers
+          Double lat = null;
+          Double lon = null;
+          if ("city".equals(groupBy) || "country".equals(groupBy)) {
+            // Use the first IP in the cluster that has geo coordinates
+            for (String ip : acc.ips) {
+              IpGeoInfoEntity geo = geoByIp.get(ip);
+              if (geo != null && geo.getLat() != null && geo.getLon() != null) {
+                lat = geo.getLat();
+                lon = geo.getLon();
+                break;
+              }
+            }
+          }
           return ClusterNodeDto.builder()
               .id(e.getKey())
               .label(clusterLabels.getOrDefault(e.getKey(), e.getKey()))
@@ -179,6 +193,8 @@ public class NetworkIntelligenceService {
               .ipConversations(acc.ipConversations)
               .ipRisks(acc.ipRisks)
               .ipPeers(ipPeerCounts)
+              .lat(lat)
+              .lon(lon)
               .build();
         })
         .collect(Collectors.toList());

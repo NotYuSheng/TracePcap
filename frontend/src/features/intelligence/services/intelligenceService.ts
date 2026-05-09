@@ -20,6 +20,8 @@ export interface ClusterNode {
   ipConversations: Record<string, number>;
   ipRisks: Record<string, number>;
   ipPeers: Record<string, number>;
+  lat: number | null;
+  lon: number | null;
 }
 
 export interface ClusterEdge {

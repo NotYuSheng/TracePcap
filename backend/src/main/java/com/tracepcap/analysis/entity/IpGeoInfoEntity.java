@@ -43,6 +43,14 @@ public class IpGeoInfoEntity {
   @Column(length = 100)
   private String city;
 
+  /** Approximate latitude of the city/location. */
+  @Column
+  private Double lat;
+
+  /** Approximate longitude of the city/location. */
+  @Column
+  private Double lon;
+
   @UpdateTimestamp
   @Column(name = "looked_up_at", nullable = false)
   private LocalDateTime lookedUpAt;

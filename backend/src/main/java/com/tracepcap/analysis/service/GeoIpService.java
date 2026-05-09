@@ -50,7 +50,8 @@ public class GeoIpService {
   private DatabaseReader dbReader;
 
   public record GeoResult(
-      String country, String countryCode, String asn, String org, String region, String city) {}
+      String country, String countryCode, String asn, String org,
+      String region, String city, Double lat, Double lon) {}
 
   @PostConstruct
   void init() {
@@ -130,7 +131,7 @@ public class GeoIpService {
           e.getIp(),
           new GeoResult(
               e.getCountry(), e.getCountryCode(), e.getAsn(), e.getOrg(),
-              e.getRegion(), e.getCity()));
+              e.getRegion(), e.getCity(), e.getLat(), e.getLon()));
       cachedIps.add(e.getIp());
     }
 
@@ -154,6 +155,8 @@ public class GeoIpService {
                           .org(e.getValue().org())
                           .region(e.getValue().region())
                           .city(e.getValue().city())
+                          .lat(e.getValue().lat())
+                          .lon(e.getValue().lon())
                           .build())
               .collect(Collectors.toList());
       if (!toSave.isEmpty()) {
@@ -181,12 +184,16 @@ public class GeoIpService {
                 : null;
         String city =
             resp.getCity() != null ? resp.getCity().getName() : null;
+        Double lat =
+            resp.getLocation() != null ? resp.getLocation().getLatitude() : null;
+        Double lon =
+            resp.getLocation() != null ? resp.getLocation().getLongitude() : null;
 
         // DB-IP Lite does not include ASN — leave null (ASN data requires a separate DB)
-        result.put(ip, new GeoResult(country, countryCode, null, null, region, city));
+        result.put(ip, new GeoResult(country, countryCode, null, null, region, city, lat, lon));
       } catch (com.maxmind.geoip2.exception.AddressNotFoundException e) {
         // IP not in DB — cache as empty to avoid retrying
-        result.put(ip, new GeoResult(null, null, null, null, null, null));
+        result.put(ip, new GeoResult(null, null, null, null, null, null, null, null));
       } catch (Exception e) {
         log.debug("GeoIP MMDB lookup failed for {}: {}", ip, e.getMessage());
       }
