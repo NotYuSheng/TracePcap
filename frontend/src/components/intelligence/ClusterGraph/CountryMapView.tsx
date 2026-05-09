@@ -103,10 +103,7 @@ export function CountryMapView({
     onSelectCluster(selectedClusterId === clusterId ? null : c);
   }
 
-  function markerRadius(cluster: ClusterNode): number {
-    const ratio = cluster.totalBytes / MAX_BYTES;
-    return 5 + ratio * 18; // 5–23px
-  }
+  const MARKER_RADIUS = 7;
 
   function markerFill(cluster: ClusterNode): string {
     if (colorMode === 'traffic') {
@@ -176,7 +173,7 @@ export function CountryMapView({
           {positioned.map(({ id, lon, lat }) => {
             const cluster = clusterById.get(id);
             if (!cluster) return null;
-            const r = markerRadius(cluster) / zoom;
+            const r = MARKER_RADIUS / zoom;
             const isSelected = selectedClusterId === id;
             const fill = markerFill(cluster);
             const textColor = cluster.totalBytes / MAX_BYTES > 0.55 && colorMode === 'traffic' ? '#fff' : '#212529';
@@ -260,10 +257,10 @@ export function CountryMapView({
           zIndex: 5,
         }}
       >
-        <div>Node size = traffic volume</div>
-        {colorMode === 'risk' && (
-          <div style={{ color: '#e74c3c' }}>● Red = has risk alerts</div>
-        )}
+        {colorMode === 'traffic'
+          ? <div>Dark blue = more traffic</div>
+          : <div style={{ color: '#e74c3c' }}>● Red = has risk alerts</div>
+        }
       </div>
     </div>
   );
