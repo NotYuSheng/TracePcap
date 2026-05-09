@@ -6,12 +6,14 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.intelligence.dto.*;
 import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -23,11 +25,16 @@ public class NetworkIntelligenceService {
   private final HostClassificationRepository hostClassificationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final IpOrgRuleService ipOrgRuleService;
+  private final GeoIpService geoIpService;
 
   private static final int SAMPLE_IPS_LIMIT = 20;
   private static final int DOMINANT_PROTOCOLS_LIMIT = 3;
-  private static final int MAX_CLUSTERS = 60;
-  private static final int MAX_EDGES = 200;
+
+  @Value("${tracepcap.intelligence.max-clusters:60}")
+  private int maxClusters;
+
+  @Value("${tracepcap.intelligence.max-edges:200}")
+  private int maxEdges;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -45,7 +52,10 @@ public class NetworkIntelligenceService {
     Map<String, HostClassificationEntity> deviceByIp = new HashMap<>();
     Map<String, String> clusterLabels = new HashMap<>();
 
-    if ("asn".equals(groupBy) || "country".equals(groupBy)) {
+    if ("asn".equals(groupBy) || "country".equals(groupBy) || "city".equals(groupBy)) {
+      // Ensure all IPs are enriched and cached (handles misses and incomplete entries).
+      // lookupExternal is idempotent: it reads the cache first and only queries the MMDB for misses.
+      geoIpService.lookupExternal(allIps);
       ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
     }
     if ("deviceType".equals(groupBy)) {
@@ -163,6 +173,20 @@ public class NetworkIntelligenceService {
           List<String> topRiskTypes = topKeys(acc.riskTypeCounts, 3);
           Map<String, Long> ipPeerCounts = new HashMap<>();
           acc.ipPeers.forEach((ip, peers) -> ipPeerCounts.put(ip, (long) peers.size()));
+          // Attach lat/lon for geo-based groupings so the frontend can position markers
+          Double lat = null;
+          Double lon = null;
+          if ("city".equals(groupBy) || "country".equals(groupBy)) {
+            // Use the first IP in the cluster that has geo coordinates
+            for (String ip : acc.ips) {
+              IpGeoInfoEntity geo = geoByIp.get(ip);
+              if (geo != null && geo.getLat() != null && geo.getLon() != null) {
+                lat = geo.getLat();
+                lon = geo.getLon();
+                break;
+              }
+            }
+          }
           return ClusterNodeDto.builder()
               .id(e.getKey())
               .label(clusterLabels.getOrDefault(e.getKey(), e.getKey()))
@@ -179,26 +203,28 @@ public class NetworkIntelligenceService {
               .ipConversations(acc.ipConversations)
               .ipRisks(acc.ipRisks)
               .ipPeers(ipPeerCounts)
+              .lat(lat)
+              .lon(lon)
               .build();
         })
         .collect(Collectors.toList());
 
-    // Prune to top MAX_CLUSTERS by traffic to keep rendering manageable
+    // Prune to top maxClusters by traffic to keep rendering manageable
     int totalClusters = clusterDtos.size();
-    if (clusterDtos.size() > MAX_CLUSTERS) {
+    if (clusterDtos.size() > maxClusters) {
       clusterDtos = clusterDtos.stream()
           .sorted(Comparator.comparingLong(ClusterNodeDto::getTotalBytes).reversed())
-          .limit(MAX_CLUSTERS)
+          .limit(maxClusters)
           .collect(Collectors.toList());
     }
     int hiddenClusters = totalClusters - clusterDtos.size();
 
-    // Only keep edges between the surviving clusters, capped at MAX_EDGES by traffic
+    // Only keep edges between the surviving clusters, capped at maxEdges by traffic
     Set<String> keptIds = clusterDtos.stream().map(ClusterNodeDto::getId).collect(Collectors.toSet());
     List<ClusterEdgeDto> edgeDtos = edges.values().stream()
         .filter(ea -> keptIds.contains(ea.srcKey) && keptIds.contains(ea.dstKey))
         .sorted(Comparator.comparingLong((EdgeAcc ea) -> ea.totalBytes).reversed())
-        .limit(MAX_EDGES)
+        .limit(maxEdges)
         .map(ea -> ClusterEdgeDto.builder()
             .sourceId(ea.srcKey)
             .targetId(ea.dstKey)
@@ -306,6 +332,14 @@ public class NetworkIntelligenceService {
         }
         yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
       }
+      case "city" -> {
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        if (geo != null && geo.getCity() != null && !geo.getCity().isBlank()) {
+          String cc = geo.getCountryCode() != null ? geo.getCountryCode() : "XX";
+          yield "city:" + cc + ":" + geo.getCity();
+        }
+        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+      }
       case "subnet24" -> "subnet24:" + subnetPrefix(ip, 3);
       case "subnet16" -> "subnet16:" + subnetPrefix(ip, 2);
       case "deviceType" -> {
@@ -342,6 +376,17 @@ public class NetworkIntelligenceService {
         String code = key.substring("country:".length());
         String name = geo != null && geo.getCountry() != null ? geo.getCountry() : code;
         yield name + " (" + code + ")";
+      }
+      case "city" -> {
+        if (key.equals("cluster:internal")) yield "Internal Network";
+        if (key.equals("cluster:unknown")) yield "Unknown Location";
+        // key format: "city:<CC>:<CityName>"
+        String[] parts = key.split(":", 3);
+        String cityName = parts.length == 3 ? parts[2] : key;
+        String cc = parts.length >= 2 ? parts[1] : "";
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        String country = (geo != null && geo.getCountry() != null) ? geo.getCountry() : cc;
+        yield cityName + ", " + country;
       }
       case "subnet24" -> {
         String prefix = key.substring("subnet24:".length());

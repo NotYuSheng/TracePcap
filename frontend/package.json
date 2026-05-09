@@ -31,7 +31,9 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-dropzone": "^14.4.0",
+    "react-is": "^19.2.6",
     "react-router-dom": "^7.13.0",
+    "react-simple-maps": "^3.0.0",
     "recharts": "^3.7.0",
     "zustand": "^5.0.10"
   },
@@ -42,6 +44,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "@types/react-simple-maps": "^3.0.6",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

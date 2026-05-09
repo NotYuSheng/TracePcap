@@ -1,7 +1,7 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 
-export type GroupBy = 'asn' | 'country' | 'subnet24' | 'subnet16' | 'deviceType' | 'customOrg';
+export type GroupBy = 'asn' | 'country' | 'city' | 'subnet24' | 'subnet16' | 'deviceType' | 'customOrg';
 export type SortBy = 'bytes' | 'packets' | 'conversations' | 'risks';
 
 export interface ClusterNode {
@@ -20,6 +20,8 @@ export interface ClusterNode {
   ipConversations: Record<string, number>;
   ipRisks: Record<string, number>;
   ipPeers: Record<string, number>;
+  lat: number | null;
+  lon: number | null;
 }
 
 export interface ClusterEdge {

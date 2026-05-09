@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -24,6 +24,7 @@ import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } fr
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
 import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
+import { CountryMapView } from './CountryMapView';
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
@@ -33,64 +34,114 @@ const NODE_WIDTH = 160;
 const NODE_HEIGHT = 80;
 const H_GAP = 200;
 const V_GAP = 140;
-const COLS = 6;
 
-function parseOctets(prefix: string): number[] {
-  return prefix.split('.').map(n => parseInt(n, 10) || 0);
-}
 
-function compareOctets(a: number[], b: number[]): number {
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const diff = (a[i] ?? 0) - (b[i] ?? 0);
-    if (diff !== 0) return diff;
+// ── Panel layout (grouped swimlanes with per-group ELK force) ─────────────────
+// Groups nodes by a key function, lays each group out independently with ELK
+// force, then tiles the panels in a 3-column grid with background swimlanes.
+async function computePanelLayout(
+  nodes: Node[],
+  edges: Edge[],
+  getGroup: (node: Node) => string,   // returns group key for a node
+  getLabel: (key: string, members: Node[]) => string, // human-readable group label
+): Promise<{ nodes: Node[]; edges: Edge[] }> {
+  const PAD = 40;
+  const PANEL_GAP = 80;
+  const LABEL_H = 32;
+  const PANEL_COLS = 3;
+
+  const nodeIdSet = new Set(nodes.map(n => n.id));
+  const validEdges = edges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
+
+  // Group nodes
+  const groups = new Map<string, Node[]>();
+  for (const node of nodes) {
+    const key = getGroup(node);
+    const g = groups.get(key) ?? [];
+    g.push(node);
+    groups.set(key, g);
   }
-  return 0;
-}
+  const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 
-/** Deterministic grid layout for subnet strategies, grouped by parent prefix. */
-function computeSubnetLayout(nodes: Node[], groupBy: 'subnet24' | 'subnet16'): Node[] {
-  const GROUP_EXTRA_GAP = 60;
-
-  if (groupBy === 'subnet24') {
-    const getPrefix = (id: string) => id.replace('subnet24:', '');
-    const getParent = (prefix: string) => prefix.split('.').slice(0, 2).join('.');
-
-    const groups = new Map<string, { prefix: string; node: Node }[]>();
-    for (const node of nodes) {
-      const prefix = getPrefix(node.id);
-      const parent = getParent(prefix);
-      const g = groups.get(parent) ?? [];
-      g.push({ prefix, node });
-      groups.set(parent, g);
-    }
-
-    const sortedGroups = [...groups.entries()].sort(([a], [b]) =>
-      compareOctets(parseOctets(a), parseOctets(b))
-    );
-
-    const result: Node[] = [];
-    let yOffset = 0;
-    for (const [, members] of sortedGroups) {
-      members.sort((a, b) => compareOctets(parseOctets(a.prefix), parseOctets(b.prefix)));
-      members.forEach(({ node }, i) => {
-        result.push({
-          ...node,
-          position: { x: (i % COLS) * H_GAP, y: yOffset + Math.floor(i / COLS) * V_GAP },
-        });
+  // Layout each subgraph independently with ELK force, normalised to (0,0)
+  type Panel = { key: string; subNodes: Node[]; w: number; h: number };
+  const panels: Panel[] = [];
+  for (const [key, members] of sortedGroups) {
+    const memberIds = new Set(members.map(n => n.id));
+    const subEdges = validEdges.filter(e => memberIds.has(e.source) && memberIds.has(e.target));
+    let subNodes: Node[];
+    try {
+      const graph = await elk.layout({
+        id: 'root',
+        layoutOptions: {
+          'elk.algorithm': 'org.eclipse.elk.force',
+          'elk.separateConnectedComponents': 'true',
+          'elk.spacing.nodeNode': '60',
+          'elk.force.iterations': '80',
+          'elk.force.repulsion': '5.0',
+        },
+        children: members.map(n => ({ id: n.id, width: NODE_WIDTH, height: NODE_HEIGHT })),
+        edges: subEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
       });
-      yOffset += Math.ceil(members.length / COLS) * V_GAP + GROUP_EXTRA_GAP;
+      const posMap = new Map((graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
+      subNodes = members.map(n => ({ ...n, position: posMap.get(n.id) ?? { x: 0, y: 0 } }));
+    } catch {
+      subNodes = members.map((n, i) => ({ ...n, position: { x: (i % 2) * H_GAP, y: Math.floor(i / 2) * V_GAP } }));
     }
-    return result;
+    const minX = Math.min(...subNodes.map(n => n.position.x));
+    const minY = Math.min(...subNodes.map(n => n.position.y));
+    subNodes = subNodes.map(n => ({ ...n, position: { x: n.position.x - minX, y: n.position.y - minY } }));
+    const w = Math.max(...subNodes.map(n => n.position.x + NODE_WIDTH));
+    const h = Math.max(...subNodes.map(n => n.position.y + NODE_HEIGHT));
+    panels.push({ key, subNodes, w, h });
   }
 
-  // subnet16: simple numeric sort → grid
-  const getPrefix = (id: string) => id.replace('subnet16:', '');
-  return [...nodes]
-    .sort((a, b) => compareOctets(parseOctets(getPrefix(a.id)), parseOctets(getPrefix(b.id))))
-    .map((node, i) => ({
-      ...node,
-      position: { x: (i % COLS) * H_GAP, y: Math.floor(i / COLS) * V_GAP },
-    }));
+  // Tile in a grid, computing row heights dynamically
+  const rowHeights: number[] = [];
+  const panelPositions: { x: number; y: number }[] = [];
+  for (let i = 0; i < panels.length; i++) {
+    const col = i % PANEL_COLS;
+    const row = Math.floor(i / PANEL_COLS);
+    if (col === 0) rowHeights[row] = 0;
+    let x = 0;
+    for (let c = 0; c < col; c++) {
+      x += panels[row * PANEL_COLS + c].w + 2 * PAD + PANEL_GAP;
+    }
+    let y = 0;
+    for (let r = 0; r < row; r++) {
+      y += (rowHeights[r] ?? 0) + 2 * PAD + LABEL_H + PANEL_GAP;
+    }
+    rowHeights[row] = Math.max(rowHeights[row] ?? 0, panels[i].h);
+    panelPositions.push({ x, y });
+  }
+
+  // Build final nodes with swimlane backgrounds
+  const laidOutNodes: Node[] = [];
+  const swimlanes: Node[] = [];
+  for (let i = 0; i < panels.length; i++) {
+    const { key, subNodes } = panels[i];
+    const { x: px, y: py } = panelPositions[i];
+    const panelW = panels[i].w + 2 * PAD;
+    const panelH = panels[i].h + 2 * PAD + LABEL_H;
+    const label = getLabel(key, subNodes);
+    swimlanes.push({
+      id: `__lane__${key}`,
+      type: 'groupLabel',
+      position: { x: px, y: py },
+      data: { label, width: panelW, height: panelH },
+      selectable: false,
+      draggable: false,
+      zIndex: -1,
+      style: { width: panelW, height: panelH, pointerEvents: 'none' },
+    });
+    for (const node of subNodes) {
+      laidOutNodes.push({
+        ...node,
+        position: { x: px + PAD + node.position.x, y: py + LABEL_H + PAD + node.position.y },
+      });
+    }
+  }
+  return { nodes: [...swimlanes, ...laidOutNodes], edges: validEdges };
 }
 
 async function runLayout(
@@ -101,9 +152,40 @@ async function runLayout(
   const nodeIdSet = new Set(nodes.map(n => n.id));
   const validEdges = edges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
 
-  // Subnet strategies + customOrg (which has subnet24 fallback nodes): deterministic grid
-  if (groupBy === 'subnet24' || groupBy === 'subnet16' || groupBy === 'customOrg') {
-    return { nodes: computeSubnetLayout(nodes, 'subnet24'), edges: validEdges };
+  // subnet24: group by /16 parent (first two octets)
+  if (groupBy === 'subnet24') {
+    return computePanelLayout(
+      nodes, edges,
+      node => node.id.replace('subnet24:', '').split('.').slice(0, 2).join('.'),
+      key => `${key}.0.0 /16`,
+    );
+  }
+
+  // subnet16: group by first octet
+  if (groupBy === 'subnet16') {
+    return computePanelLayout(
+      nodes, edges,
+      node => node.id.replace('subnet16:', '').split('.')[0],
+      key => `${key}.0.0.0 /8`,
+    );
+  }
+
+  // customOrg: group by org name (everything after 'customOrg:'); subnet24 fallbacks group together
+  if (groupBy === 'customOrg') {
+    return computePanelLayout(
+      nodes, edges,
+      node => node.id.startsWith('customOrg:') ? node.id.slice(10) : '(Unassigned)',
+      key => key,
+    );
+  }
+
+  // city: group by country code
+  if (groupBy === 'city') {
+    return computePanelLayout(
+      nodes, edges,
+      node => node.id.split(':')[1] ?? '??',
+      (key, members) => members[0].data.label?.toString().split(', ').slice(1).join(', ') || key,
+    );
   }
 
   // Other strategies: ELK force layout
@@ -132,6 +214,7 @@ async function runLayout(
 const GROUP_ICONS: Record<GroupBy, string> = {
   asn: 'bi-building',
   country: 'bi-geo-alt',
+  city: 'bi-pin-map',
   subnet24: 'bi-hdd-network',
   subnet16: 'bi-hdd-network',
   deviceType: 'bi-cpu',
@@ -242,7 +325,32 @@ function IntelEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: Edge
   );
 }
 
-const nodeTypes: NodeTypes = { intelCluster: IntelClusterNode };
+function GroupLabelNode({ data }: NodeProps) {
+  const d = data as { label: string; width: number; height: number };
+  return (
+    <div style={{
+      width: d.width, height: d.height,
+      border: '1.5px solid var(--tp-border, #dee2e6)',
+      borderRadius: 10,
+      background: 'var(--tp-bg-subtle, #f8f9fa)',
+      opacity: 0.5,
+      pointerEvents: 'none',
+      userSelect: 'none',
+      position: 'relative',
+    }}>
+      <div style={{
+        position: 'absolute', top: 8, left: 12,
+        fontSize: 11, fontWeight: 700,
+        color: 'var(--tp-text-muted, #6c757d)',
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+      }}>
+        <i className="bi bi-geo-alt me-1" />{d.label}
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes: NodeTypes = { intelCluster: IntelClusterNode, groupLabel: GroupLabelNode };
 const edgeTypes: EdgeTypes = { intelEdge: IntelEdge };
 
 // ── Auto fit-view after layout ────────────────────────────────────────────────
@@ -262,6 +370,7 @@ function AutoFitView({ version }: { version: number }) {
 const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: 'asn', label: 'ASN / Organization' },
   { value: 'country', label: 'Country' },
+  { value: 'city', label: 'City' },
   { value: 'subnet24', label: 'Subnet /24' },
   { value: 'subnet16', label: 'Subnet /16' },
   { value: 'deviceType', label: 'Device Type' },
@@ -468,10 +577,12 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>('traffic');
   const [layoutVersion, setLayoutVersion] = useState(0);
+  const layoutGen = useRef(0);
 
   const clusterById = new Map((data?.clusters ?? []).map(c => [c.id, c]));
 
   const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
+    if (node.id.startsWith('__lane__')) return;
     const cluster = clusterById.get(node.id);
     setSelectedCluster(prev => prev?.id === node.id ? null : (cluster ?? null));
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -493,6 +604,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       id: c.id,
       type: 'intelCluster',
       position: { x: 0, y: 0 },
+      draggable: true,
       data: {
         label: c.label,
         hostCount: c.hostCount,
@@ -519,19 +631,23 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       },
     }));
 
+    const gen = ++layoutGen.current;
     runLayout(rawNodes, rawEdges, groupBy)
       .then(({ nodes, edges }) => {
+        if (gen !== layoutGen.current) return;
         setRfNodes(nodes);
         setRfEdges(edges);
         setLayoutVersion(v => v + 1);
       })
       .catch(console.error)
-      .finally(() => setLayoutLoading(false));
+      .finally(() => {
+        if (gen === layoutGen.current) setLayoutLoading(false);
+      });
   }, [data, groupBy, colorMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update selected state on nodes without re-running layout
   useEffect(() => {
-    setRfNodes(prev => prev.map(n => ({
+    setRfNodes(prev => prev.map(n => n.id.startsWith('__lane__') ? n : ({
       ...n,
       data: { ...n.data, selected: selectedCluster?.id === n.id },
     })));
@@ -605,13 +721,13 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
 
       {/* Hint when geo-based grouping yields only internal traffic */}
       {data && !loading &&
-        (groupBy === 'asn' || groupBy === 'country') &&
+        (groupBy === 'asn' || groupBy === 'country' || groupBy === 'city') &&
         data.clusters.length <= 2 &&
         data.clusters.every(c => c.label.startsWith('Internal')) && (
         <div className="alert alert-info py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
           <i className="bi bi-info-circle-fill" />
           <span>
-            All hosts are on an internal/private network — {groupBy === 'asn' ? 'ASN' : 'Country'} grouping
+            All hosts are on an internal/private network — {groupBy === 'asn' ? 'ASN' : groupBy === 'country' ? 'Country' : 'City'} grouping
             has no external data to show. Try{' '}
             <strong>Subnet /24</strong> or <strong>Device Type</strong> for a meaningful view.
           </span>
@@ -627,7 +743,35 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
           <i className="bi bi-diagram-3 mb-2" style={{ fontSize: 32, opacity: 0.3 }} />
           <span>No cluster data available</span>
         </div>
+      ) : groupBy === 'country' && data ? (
+        /* ── Country map view ── */
+        <div className="intel-graph-container">
+          {loading && (
+            <div className="intel-graph-layouting">
+              <span className="spinner-border spinner-border-sm" />
+              Loading…
+            </div>
+          )}
+
+          {selectedCluster && (
+            <ClusterPanel
+              cluster={selectedCluster}
+              fileId={fileId}
+              onClose={() => setSelectedCluster(null)}
+              onTrace={id => setTracerConversationId(id)}
+            />
+          )}
+
+          <CountryMapView
+            data={data}
+            colorMode={colorMode}
+            selectedClusterId={selectedCluster?.id ?? null}
+            onSelectCluster={c => setSelectedCluster(c)}
+            fileId={fileId}
+          />
+        </div>
       ) : (
+        /* ── ReactFlow graph view (all other groupBy strategies) ── */
         <div className="intel-graph-container">
           {(loading || layoutLoading) && (
             <div className="intel-graph-layouting">
@@ -657,7 +801,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
             maxZoom={3}
             nodesDraggable
             nodesConnectable={false}
-            elementsSelectable={false}
+            elementsSelectable
           >
             <Background color="#e9ecef" gap={20} />
             <Controls showInteractive={false} />

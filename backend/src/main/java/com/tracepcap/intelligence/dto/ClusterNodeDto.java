@@ -23,4 +23,8 @@ public class ClusterNodeDto {
   private Map<String, Long> ipConversations;
   private Map<String, Long> ipRisks;
   private Map<String, Long> ipPeers;
+  /** Approximate latitude of this cluster's location (city/country centroid). Null if not geo-based. */
+  private Double lat;
+  /** Approximate longitude of this cluster's location (city/country centroid). Null if not geo-based. */
+  private Double lon;
 }

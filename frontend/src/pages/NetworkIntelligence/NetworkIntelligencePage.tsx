@@ -47,6 +47,7 @@ export const NetworkIntelligencePage = () => {
     if (!fileId) return;
     setClusterLoading(true);
     setClusterError(null);
+    setClusterData(null);
     intelligenceService
       .getClusters(fileId, groupBy)
       .then(data => {
