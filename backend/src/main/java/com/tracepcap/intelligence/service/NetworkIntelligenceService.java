@@ -45,7 +45,7 @@ public class NetworkIntelligenceService {
     Map<String, HostClassificationEntity> deviceByIp = new HashMap<>();
     Map<String, String> clusterLabels = new HashMap<>();
 
-    if ("asn".equals(groupBy) || "country".equals(groupBy)) {
+    if ("asn".equals(groupBy) || "country".equals(groupBy) || "city".equals(groupBy)) {
       ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
     }
     if ("deviceType".equals(groupBy)) {
@@ -306,6 +306,14 @@ public class NetworkIntelligenceService {
         }
         yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
       }
+      case "city" -> {
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        if (geo != null && geo.getCity() != null && !geo.getCity().isBlank()) {
+          String cc = geo.getCountryCode() != null ? geo.getCountryCode() : "XX";
+          yield "city:" + cc + ":" + geo.getCity();
+        }
+        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+      }
       case "subnet24" -> "subnet24:" + subnetPrefix(ip, 3);
       case "subnet16" -> "subnet16:" + subnetPrefix(ip, 2);
       case "deviceType" -> {
@@ -342,6 +350,17 @@ public class NetworkIntelligenceService {
         String code = key.substring("country:".length());
         String name = geo != null && geo.getCountry() != null ? geo.getCountry() : code;
         yield name + " (" + code + ")";
+      }
+      case "city" -> {
+        if (key.equals("cluster:internal")) yield "Internal Network";
+        if (key.equals("cluster:unknown")) yield "Unknown Location";
+        // key format: "city:<CC>:<CityName>"
+        String[] parts = key.split(":", 3);
+        String cityName = parts.length == 3 ? parts[2] : key;
+        String cc = parts.length >= 2 ? parts[1] : "";
+        IpGeoInfoEntity geo = geoByIp.get(ip);
+        String country = (geo != null && geo.getCountry() != null) ? geo.getCountry() : cc;
+        yield cityName + ", " + country;
       }
       case "subnet24" -> {
         String prefix = key.substring("subnet24:".length());

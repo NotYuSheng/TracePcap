@@ -1,7 +1,7 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 
-export type GroupBy = 'asn' | 'country' | 'subnet24' | 'subnet16' | 'deviceType' | 'customOrg';
+export type GroupBy = 'asn' | 'country' | 'city' | 'subnet24' | 'subnet16' | 'deviceType' | 'customOrg';
 export type SortBy = 'bytes' | 'packets' | 'conversations' | 'risks';
 
 export interface ClusterNode {

@@ -41,7 +41,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ndpi \
         tzdata \
         gosu && \
-    apt-get purge -y --auto-remove curl gnupg
+    apt-get purge -y --auto-remove gnupg
+
+# Download DB-IP Lite City MMDB (offline GeoIP).
+# The database is published monthly; we pin to a recent date so builds are reproducible.
+# curl is kept for this step then removed.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl && \
+    mkdir -p /app/geoip && \
+    curl -fsSL "https://download.db-ip.com/free/dbip-city-lite-2025-05.mmdb.gz" \
+        | gunzip -c > /app/geoip/dbip-city-lite.mmdb && \
+    apt-get purge -y --auto-remove curl
 
 # Set timezone to Singapore
 ENV TZ=Asia/Singapore

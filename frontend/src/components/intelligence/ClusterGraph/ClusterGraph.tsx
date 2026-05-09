@@ -24,6 +24,7 @@ import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } fr
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
 import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
+import { CountryMapView } from './CountryMapView';
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
@@ -132,6 +133,7 @@ async function runLayout(
 const GROUP_ICONS: Record<GroupBy, string> = {
   asn: 'bi-building',
   country: 'bi-geo-alt',
+  city: 'bi-pin-map',
   subnet24: 'bi-hdd-network',
   subnet16: 'bi-hdd-network',
   deviceType: 'bi-cpu',
@@ -262,6 +264,7 @@ function AutoFitView({ version }: { version: number }) {
 const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: 'asn', label: 'ASN / Organization' },
   { value: 'country', label: 'Country' },
+  { value: 'city', label: 'City' },
   { value: 'subnet24', label: 'Subnet /24' },
   { value: 'subnet16', label: 'Subnet /16' },
   { value: 'deviceType', label: 'Device Type' },
@@ -605,13 +608,13 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
 
       {/* Hint when geo-based grouping yields only internal traffic */}
       {data && !loading &&
-        (groupBy === 'asn' || groupBy === 'country') &&
+        (groupBy === 'asn' || groupBy === 'country' || groupBy === 'city') &&
         data.clusters.length <= 2 &&
         data.clusters.every(c => c.label.startsWith('Internal')) && (
         <div className="alert alert-info py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
           <i className="bi bi-info-circle-fill" />
           <span>
-            All hosts are on an internal/private network — {groupBy === 'asn' ? 'ASN' : 'Country'} grouping
+            All hosts are on an internal/private network — {groupBy === 'asn' ? 'ASN' : groupBy === 'country' ? 'Country' : 'City'} grouping
             has no external data to show. Try{' '}
             <strong>Subnet /24</strong> or <strong>Device Type</strong> for a meaningful view.
           </span>
@@ -627,7 +630,34 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
           <i className="bi bi-diagram-3 mb-2" style={{ fontSize: 32, opacity: 0.3 }} />
           <span>No cluster data available</span>
         </div>
+      ) : groupBy === 'country' && data ? (
+        /* ── Country map view ── */
+        <div className="intel-graph-container">
+          {loading && (
+            <div className="intel-graph-layouting">
+              <span className="spinner-border spinner-border-sm" />
+              Loading…
+            </div>
+          )}
+
+          {selectedCluster && (
+            <ClusterPanel
+              cluster={selectedCluster}
+              fileId={fileId}
+              onClose={() => setSelectedCluster(null)}
+              onTrace={id => setTracerConversationId(id)}
+            />
+          )}
+
+          <CountryMapView
+            data={data}
+            colorMode={colorMode}
+            selectedClusterId={selectedCluster?.id ?? null}
+            onSelectCluster={c => setSelectedCluster(c)}
+          />
+        </div>
       ) : (
+        /* ── ReactFlow graph view (all other groupBy strategies) ── */
         <div className="intel-graph-container">
           {(loading || layoutLoading) && (
             <div className="intel-graph-layouting">
