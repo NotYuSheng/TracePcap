@@ -6,12 +6,14 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.intelligence.dto.*;
 import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -23,11 +25,16 @@ public class NetworkIntelligenceService {
   private final HostClassificationRepository hostClassificationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final IpOrgRuleService ipOrgRuleService;
+  private final GeoIpService geoIpService;
 
   private static final int SAMPLE_IPS_LIMIT = 20;
   private static final int DOMINANT_PROTOCOLS_LIMIT = 3;
-  private static final int MAX_CLUSTERS = 60;
-  private static final int MAX_EDGES = 200;
+
+  @Value("${tracepcap.intelligence.max-clusters:60}")
+  private int maxClusters;
+
+  @Value("${tracepcap.intelligence.max-edges:200}")
+  private int maxEdges;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -47,6 +54,17 @@ public class NetworkIntelligenceService {
 
     if ("asn".equals(groupBy) || "country".equals(groupBy) || "city".equals(groupBy)) {
       ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
+      // If the cache is empty or incomplete (no city/lat data), trigger a fresh geo lookup.
+      // This handles files analysed before the offline MMDB was introduced.
+      boolean needsEnrich = geoByIp.isEmpty()
+          || geoByIp.values().stream().anyMatch(
+              g -> g.getCountryCode() != null && g.getLat() == null);
+      if (needsEnrich) {
+        geoIpService.lookupExternal(allIps);
+        // Reload after enrichment
+        geoByIp.clear();
+        ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
+      }
     }
     if ("deviceType".equals(groupBy)) {
       hostClassificationRepository.findByFileId(fileId).forEach(h -> deviceByIp.put(h.getIp(), h));
@@ -199,22 +217,22 @@ public class NetworkIntelligenceService {
         })
         .collect(Collectors.toList());
 
-    // Prune to top MAX_CLUSTERS by traffic to keep rendering manageable
+    // Prune to top maxClusters by traffic to keep rendering manageable
     int totalClusters = clusterDtos.size();
-    if (clusterDtos.size() > MAX_CLUSTERS) {
+    if (clusterDtos.size() > maxClusters) {
       clusterDtos = clusterDtos.stream()
           .sorted(Comparator.comparingLong(ClusterNodeDto::getTotalBytes).reversed())
-          .limit(MAX_CLUSTERS)
+          .limit(maxClusters)
           .collect(Collectors.toList());
     }
     int hiddenClusters = totalClusters - clusterDtos.size();
 
-    // Only keep edges between the surviving clusters, capped at MAX_EDGES by traffic
+    // Only keep edges between the surviving clusters, capped at maxEdges by traffic
     Set<String> keptIds = clusterDtos.stream().map(ClusterNodeDto::getId).collect(Collectors.toSet());
     List<ClusterEdgeDto> edgeDtos = edges.values().stream()
         .filter(ea -> keptIds.contains(ea.srcKey) && keptIds.contains(ea.dstKey))
         .sorted(Comparator.comparingLong((EdgeAcc ea) -> ea.totalBytes).reversed())
-        .limit(MAX_EDGES)
+        .limit(maxEdges)
         .map(ea -> ClusterEdgeDto.builder()
             .sourceId(ea.srcKey)
             .targetId(ea.dstKey)

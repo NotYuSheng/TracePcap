@@ -367,6 +367,19 @@
   filter: invert(1) grayscale(100%) brightness(200%);
 }
 
+[data-theme='dark'] .btn-light {
+  background-color: var(--tp-surface);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
+[data-theme='dark'] .btn-light:hover,
+[data-theme='dark'] .btn-light:focus {
+  background-color: var(--tp-surface-hover);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
 /* Alerts */
 [data-theme='dark'] .alert-danger {
   background-color: #3d1a1a;

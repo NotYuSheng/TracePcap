@@ -122,17 +122,48 @@ public class GeoIpService {
     List<String> external = ips.stream().filter(ip -> !isPrivate(ip)).collect(Collectors.toList());
     if (external.isEmpty()) return Map.of();
 
-    // Load cached entries
+    // Load cached entries — split into complete (has lat/lon) and incomplete
     Map<String, GeoResult> result = new HashMap<>();
     List<IpGeoInfoEntity> cached = geoInfoRepository.findAllByIpIn(external);
     Set<String> cachedIps = new HashSet<>();
+    List<IpGeoInfoEntity> incompleteEntities = new ArrayList<>();
     for (IpGeoInfoEntity e : cached) {
-      result.put(
-          e.getIp(),
-          new GeoResult(
-              e.getCountry(), e.getCountryCode(), e.getAsn(), e.getOrg(),
-              e.getRegion(), e.getCity(), e.getLat(), e.getLon()));
-      cachedIps.add(e.getIp());
+      if (e.getLat() == null && e.getCountryCode() != null) {
+        // Cached before city/lat/lon columns were added — needs re-lookup
+        incompleteEntities.add(e);
+      } else {
+        result.put(
+            e.getIp(),
+            new GeoResult(
+                e.getCountry(), e.getCountryCode(), e.getAsn(), e.getOrg(),
+                e.getRegion(), e.getCity(), e.getLat(), e.getLon()));
+        cachedIps.add(e.getIp());
+      }
+    }
+
+    // Re-lookup incomplete cached entries and update in place
+    if (!incompleteEntities.isEmpty()) {
+      List<String> incompleteIps = incompleteEntities.stream()
+          .map(IpGeoInfoEntity::getIp).collect(Collectors.toList());
+      Map<String, GeoResult> refreshed = lookupFromMmdb(incompleteIps);
+      for (IpGeoInfoEntity entity : incompleteEntities) {
+        GeoResult r = refreshed.get(entity.getIp());
+        if (r != null) {
+          entity.setRegion(r.region());
+          entity.setCity(r.city());
+          entity.setLat(r.lat());
+          entity.setLon(r.lon());
+          result.put(entity.getIp(), new GeoResult(
+              entity.getCountry(), entity.getCountryCode(), entity.getAsn(), entity.getOrg(),
+              r.region(), r.city(), r.lat(), r.lon()));
+        } else {
+          result.put(entity.getIp(), new GeoResult(
+              entity.getCountry(), entity.getCountryCode(), entity.getAsn(), entity.getOrg(),
+              null, null, null, null));
+        }
+        cachedIps.add(entity.getIp());
+      }
+      geoInfoRepository.saveAll(incompleteEntities);
     }
 
     // Lookup cache misses from MMDB
