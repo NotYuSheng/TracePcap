@@ -9,6 +9,7 @@ import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
 import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { ComparePage } from '@pages/Compare/ComparePage';
+import { NetworkIntelligencePage } from '@pages/NetworkIntelligence';
 import { NotFoundPage } from '@pages/NotFound';
 
 export const router = createBrowserRouter([
@@ -47,6 +48,10 @@ export const router = createBrowserRouter([
           {
             path: 'extracted-files',
             element: <ExtractedFilesPage />,
+          },
+          {
+            path: 'network-intelligence',
+            element: <NetworkIntelligencePage />,
           },
         ],
       },

@@ -300,6 +300,40 @@ packets += [
           ack=5001 + len(tls_server_hello)),
 ]
 
+# ── Network Labels demo traffic ───────────────────────────────────────────────
+# Multiple internal subnets so the Network Labels grouping strategy has something
+# interesting to show. Suggested labels to add in the UI:
+#   10.1.0.0/24  →  Engineering Team
+#   10.2.0.0/24  →  Finance Team
+#   10.3.0.0/24  →  HR Department
+#   10.4.0.0/24  →  Production Servers
+
+ENG1   = "10.1.0.10";  ENG2  = "10.1.0.20"
+FIN1   = "10.2.0.10";  FIN2  = "10.2.0.11"
+HR1    = "10.3.0.10"
+PROD1  = "10.4.0.1";   PROD2 = "10.4.0.2"
+INET1  = "93.184.216.34"    # example.com
+INET2  = "151.101.1.140"    # fastly CDN
+
+# Engineering ↔ Production
+packets += tcp_flow(ENG1, PROD1, 60001, 8080, b"GET /api/data HTTP/1.1\r\nHost: prod\r\n\r\n")
+packets += tcp_flow(ENG2, PROD1, 60002, 8080, b"GET /api/status HTTP/1.1\r\nHost: prod\r\n\r\n")
+packets += tcp_flow(ENG1, PROD2, 60003, 5432)   # DB connection
+
+# Finance ↔ Production
+packets += tcp_flow(FIN1, PROD1, 60010, 8080, b"GET /api/reports HTTP/1.1\r\nHost: prod\r\n\r\n")
+packets += tcp_flow(FIN2, PROD1, 60011, 8080, b"POST /api/invoice HTTP/1.1\r\nHost: prod\r\n\r\n")
+
+# HR ↔ Finance (internal cross-dept)
+packets += tcp_flow(HR1, FIN1, 60020, 445)    # SMB file share
+
+# Engineering → Internet
+packets += tcp_flow(ENG1, INET1, 60030, 80,  b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+packets += tcp_flow(ENG2, INET2, 60031, 443)
+
+# Finance → Internet (should be flagged as unusual in the cluster view)
+packets += tcp_flow(FIN1, INET1, 60040, 80,  b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+
 # ── write synthetic pcap ──────────────────────────────────────────────────────
 synthetic_path = os.path.join(SCRIPT_DIR, "_synthetic_rules.pcap")
 wrpcap(synthetic_path, packets)

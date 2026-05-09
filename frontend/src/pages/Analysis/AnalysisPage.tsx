@@ -114,6 +114,7 @@ export const AnalysisPage = () => {
     else if (path.includes('/filter-generator')) setActiveTab('filter-generator');
     else if (path.includes('/network-diagram')) setActiveTab('network-diagram');
     else if (path.includes('/extracted-files')) setActiveTab('extracted-files');
+    else if (path.includes('/network-intelligence')) setActiveTab('network-intelligence');
     else setActiveTab('overview');
   }, [location.pathname]);
 
@@ -273,7 +274,7 @@ export const AnalysisPage = () => {
       {/* Navigation Tabs */}
       <ul
         className="nav nav-tabs"
-        style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', display: 'flex', borderBottom: 'none' }}
+        style={{ flexWrap: 'wrap', display: 'flex', borderBottom: 'none' }}
       >
         <li className="nav-item">
           <button
@@ -327,6 +328,15 @@ export const AnalysisPage = () => {
             onClick={() => handleTabChange('network-diagram')}
           >
             <i className="bi bi-diagram-3 me-2"></i>Network Diagram
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            style={{ whiteSpace: 'nowrap' }}
+            className={`nav-link ${activeTab === 'network-intelligence' ? 'active' : ''}`}
+            onClick={() => handleTabChange('network-intelligence')}
+          >
+            <i className="bi bi-globe-europe-africa me-2"></i>Network Intelligence
           </button>
         </li>
       </ul>
