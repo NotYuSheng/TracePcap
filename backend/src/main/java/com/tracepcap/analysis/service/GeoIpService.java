@@ -6,6 +6,7 @@ import com.maxmind.geoip2.model.CityResponse;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.io.File;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -71,6 +72,17 @@ public class GeoIpService {
     this.dbReader = reader;
   }
 
+  @PreDestroy
+  void close() {
+    if (dbReader != null) {
+      try {
+        dbReader.close();
+      } catch (Exception e) {
+        log.warn("Failed to close GeoIP database reader: {}", e.getMessage());
+      }
+    }
+  }
+
   private DatabaseReader tryOpenMmdb() {
     // 1. Explicit override path
     if (mmdbPathOverride != null && !mmdbPathOverride.isBlank()) {
@@ -117,7 +129,7 @@ public class GeoIpService {
    * loopback, and link-local addresses are silently skipped.
    */
   public Map<String, GeoResult> lookupExternal(Set<String> ips) {
-    if (!geoEnabled || dbReader == null || ips == null || ips.isEmpty()) return Map.of();
+    if (!geoEnabled || ips == null || ips.isEmpty()) return Map.of();
 
     List<String> external = ips.stream().filter(ip -> !isPrivate(ip)).collect(Collectors.toList());
     if (external.isEmpty()) return Map.of();
@@ -141,8 +153,8 @@ public class GeoIpService {
       }
     }
 
-    // Re-lookup incomplete cached entries and update in place
-    if (!incompleteEntities.isEmpty()) {
+    // Re-lookup incomplete cached entries and update in place (only if the database is available)
+    if (!incompleteEntities.isEmpty() && dbReader != null) {
       List<String> incompleteIps = incompleteEntities.stream()
           .map(IpGeoInfoEntity::getIp).collect(Collectors.toList());
       Map<String, GeoResult> refreshed = lookupFromMmdb(incompleteIps);
@@ -166,10 +178,10 @@ public class GeoIpService {
       geoInfoRepository.saveAll(incompleteEntities);
     }
 
-    // Lookup cache misses from MMDB
+    // Lookup cache misses from MMDB (only if the database is available)
     List<String> misses =
         external.stream().filter(ip -> !cachedIps.contains(ip)).collect(Collectors.toList());
-    if (!misses.isEmpty()) {
+    if (!misses.isEmpty() && dbReader != null) {
       Map<String, GeoResult> fetched = lookupFromMmdb(misses);
       result.putAll(fetched);
 
@@ -226,7 +238,7 @@ public class GeoIpService {
         // IP not in DB — cache as empty to avoid retrying
         result.put(ip, new GeoResult(null, null, null, null, null, null, null, null));
       } catch (Exception e) {
-        log.debug("GeoIP MMDB lookup failed for {}: {}", ip, e.getMessage());
+        log.warn("GeoIP MMDB lookup failed for {}: {}", ip, e.getMessage());
       }
     }
     return result;

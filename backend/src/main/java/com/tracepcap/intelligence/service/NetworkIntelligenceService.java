@@ -53,18 +53,10 @@ public class NetworkIntelligenceService {
     Map<String, String> clusterLabels = new HashMap<>();
 
     if ("asn".equals(groupBy) || "country".equals(groupBy) || "city".equals(groupBy)) {
+      // Ensure all IPs are enriched and cached (handles misses and incomplete entries).
+      // lookupExternal is idempotent: it reads the cache first and only queries the MMDB for misses.
+      geoIpService.lookupExternal(allIps);
       ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
-      // If the cache is empty or incomplete (no city/lat data), trigger a fresh geo lookup.
-      // This handles files analysed before the offline MMDB was introduced.
-      boolean needsEnrich = geoByIp.isEmpty()
-          || geoByIp.values().stream().anyMatch(
-              g -> g.getCountryCode() != null && g.getLat() == null);
-      if (needsEnrich) {
-        geoIpService.lookupExternal(allIps);
-        // Reload after enrichment
-        geoByIp.clear();
-        ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
-      }
     }
     if ("deviceType".equals(groupBy)) {
       hostClassificationRepository.findByFileId(fileId).forEach(h -> deviceByIp.put(h.getIp(), h));

@@ -66,8 +66,8 @@ export function CountryMapView({
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
 
-  const MAX_BYTES = Math.max(...data.clusters.map(c => c.totalBytes), 1);
-  const clusterById = new Map(data.clusters.map(c => [c.id, c]));
+  const MAX_BYTES = useMemo(() => Math.max(...data.clusters.map(c => c.totalBytes), 1), [data.clusters]);
+  const clusterById = useMemo(() => new Map(data.clusters.map(c => [c.id, c])), [data.clusters]);
   const drilledCC = drilledCountryId?.startsWith('country:') ? drilledCountryId.slice(8) : null;
   const isDrilled = drilledCountryId !== null;
 
