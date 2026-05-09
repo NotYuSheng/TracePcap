@@ -670,6 +670,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       {tracerConversationId && (
         <ConversationTracerModal
           conversationId={tracerConversationId}
+          fileId={fileId}
           onClose={() => setTracerConversationId(null)}
         />
       )}

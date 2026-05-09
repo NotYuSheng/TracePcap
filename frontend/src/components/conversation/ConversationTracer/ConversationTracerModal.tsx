@@ -1,93 +1,60 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { tracerService, type TracerStep, type TracerStepsResponse } from '@/features/tracer/tracerService';
+import { conversationService } from '@/features/conversation/services/conversationService';
 
 interface ConversationTracerModalProps {
   conversationId: string;
+  fileId: string;
   onClose: () => void;
 }
 
-// ── Animated arrow ────────────────────────────────────────────────────────────
+// ── SVG star-graph constants ───────────────────────────────────────────────
 
-interface ArrowProps {
-  direction: 'CLIENT' | 'SERVER';
-  label: string;
+const SVG_W = 500;
+const SVG_H = 380;
+const CX = SVG_W / 2;
+const CY = SVG_H / 2;
+const PEER_R = 150; // radius of the peer ring
+const NODE_R = 26;  // node circle radius
+
+function peerPos(index: number, total: number): { x: number; y: number } {
+  // Start from top (−π/2) so single peer appears directly above center
+  const angle = (2 * Math.PI * index) / total - Math.PI / 2;
+  return {
+    x: CX + PEER_R * Math.cos(angle),
+    y: CY + PEER_R * Math.sin(angle),
+  };
 }
 
-function AnimatedArrow({ direction, label }: ArrowProps) {
-  const isLeft = direction === 'SERVER'; // SERVER sends back to client (right→left)
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        justifyContent: 'center',
-        fontSize: 12,
-        color: direction === 'CLIENT' ? '#0072c6' : '#107c10',
-        animation: 'tracerPulse 0.4s ease-out',
-      }}
-    >
-      {isLeft && <span style={{ fontSize: 18 }}>◄</span>}
-      <span
-        style={{
-          background: direction === 'CLIENT' ? '#e8f0fe' : '#e6f4ea',
-          padding: '2px 10px',
-          borderRadius: 12,
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </span>
-      {!isLeft && <span style={{ fontSize: 18 }}>►</span>}
-    </div>
-  );
-}
-
-// ── Host node ─────────────────────────────────────────────────────────────────
-
-function HostNode({ ip, port, label }: { ip: string; port: number | null; label: string }) {
-  return (
-    <div style={{ textAlign: 'center', minWidth: 110 }}>
-      <div
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: '50%',
-          background: '#f0f4ff',
-          border: '2px solid #0072c6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 4px',
-        }}
-      >
-        <i className="bi bi-pc-display" style={{ fontSize: 22, color: '#0072c6' }} />
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 600, fontFamily: 'monospace' }}>{ip}</div>
-      {port != null && port > 0 && (
-        <div style={{ fontSize: 10, color: '#767676' }}>:{port}</div>
-      )}
-      <div style={{ fontSize: 10, color: '#767676' }}>{label}</div>
-    </div>
-  );
+/** Shorten an IP for display inside the small node circle. */
+function shortIp(ip: string): string {
+  if (ip.length <= 15) return ip;
+  // IPv6: show last two groups
+  const parts = ip.split(':');
+  return '…:' + parts.slice(-2).join(':');
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 
-export const ConversationTracerModal = ({ conversationId, onClose }: ConversationTracerModalProps) => {
+export const ConversationTracerModal = ({ conversationId, fileId, onClose }: ConversationTracerModalProps) => {
   const [tracer, setTracer] = useState<TracerStepsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [peers, setPeers] = useState<string[]>([]);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [explanations, setExplanations] = useState<Map<number, string>>(new Map());
   const [explainLoading, setExplainLoading] = useState(false);
 
+  const [dotT, setDotT] = useState(0);
+
   const playInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const rafStart = useRef<number | null>(null);
 
-  // Fetch steps
+  // Fetch tracer steps
   useEffect(() => {
     setLoading(true);
     tracerService.getSteps(conversationId)
@@ -99,7 +66,33 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
       .finally(() => setLoading(false));
   }, [conversationId]);
 
-  // Fetch explanations after steps load
+  // Fetch all conversations for srcIp → build peer list
+  useEffect(() => {
+    if (!tracer || !fileId) return;
+    const srcIp = tracer.srcIp;
+    conversationService.getConversations(fileId, {
+      ip: srcIp,
+      port: '', payloadContains: '',
+      protocols: [], l7Protocols: [], apps: [], categories: [],
+      hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [],
+      deviceTypes: [], countries: [],
+      sortBy: '', sortDir: 'desc',
+      page: 1, pageSize: 50,
+    }).then(result => {
+      const peerSet = new Set<string>();
+      result.data.forEach(c => {
+        const [src, dst] = c.endpoints;
+        peerSet.add(src.ip === srcIp ? dst.ip : src.ip);
+      });
+      // Always include the traced conversation's peer
+      peerSet.add(tracer.dstIp);
+      setPeers([...peerSet].slice(0, 12));
+    }).catch(() => {
+      setPeers([tracer.dstIp]);
+    });
+  }, [tracer, fileId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch LLM explanations after steps load
   useEffect(() => {
     if (!tracer || tracer.steps.length === 0) return;
     setExplainLoading(true);
@@ -118,17 +111,30 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
     if (!isPlaying || !tracer) return;
     playInterval.current = setInterval(() => {
       setCurrentStep(prev => {
-        if (prev >= tracer.steps.length - 1) {
-          setIsPlaying(false);
-          return prev;
-        }
+        if (prev >= tracer.steps.length - 1) { setIsPlaying(false); return prev; }
         return prev + 1;
       });
     }, 1500);
     return () => { if (playInterval.current) clearInterval(playInterval.current); };
   }, [isPlaying, tracer]);
 
-  // Scroll current step into view in the packet list
+  // Animate dot along edge on step change
+  useEffect(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafStart.current = null;
+    setDotT(0);
+    const DURATION = 500;
+    const tick = (ts: number) => {
+      if (rafStart.current === null) rafStart.current = ts;
+      const t = Math.min((ts - rafStart.current) / DURATION, 1);
+      setDotT(t);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [currentStep]);
+
+  // Scroll current step into view
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-step="${currentStep}"]`);
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -149,12 +155,12 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   // Keyboard navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
       if (e.key === 'ArrowRight') next();
       if (e.key === 'ArrowLeft') prev();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
   }, [onClose, next, prev]);
 
   const step: TracerStep | undefined = tracer?.steps[currentStep];
@@ -163,17 +169,24 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
     ? `${tracer.srcIp}${tracer.srcPort ? `:${tracer.srcPort}` : ''} → ${tracer.dstIp}${tracer.dstPort ? `:${tracer.dstPort}` : ''}`
     : 'Loading…';
 
+  // Compute dot position for the current step
+  const activePeerIp = tracer?.dstIp ?? null;
+  const activePeerIdx = peers.indexOf(activePeerIp ?? '');
+  const dotPos = useMemo(() => {
+    if (!step || activePeerIdx < 0) return null;
+    const pos = peerPos(activePeerIdx, peers.length);
+    const [fx, fy, tx, ty] = step.direction === 'CLIENT'
+      ? [CX, CY, pos.x, pos.y]
+      : [pos.x, pos.y, CX, CY];
+    return {
+      x: fx + (tx - fx) * dotT,
+      y: fy + (ty - fy) * dotT,
+      color: step.direction === 'CLIENT' ? '#0072c6' : '#107c10',
+    };
+  }, [step, activePeerIdx, peers.length, dotT]);
+
   return (
     <>
-      {/* CSS animation */}
-      <style>{`
-        @keyframes tracerPulse {
-          from { transform: scale(0.95); opacity: 0.6; }
-          to   { transform: scale(1);    opacity: 1;   }
-        }
-      `}</style>
-
-      {/* Backdrop */}
       <div
         style={{
           position: 'fixed', inset: 0, zIndex: 1060,
@@ -186,20 +199,14 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
         <div
           style={{
             background: '#fff', borderRadius: 10,
-            width: '100%', maxWidth: 700,
+            width: '100%', maxWidth: 720,
             boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
             display: 'flex', flexDirection: 'column',
             maxHeight: '90vh',
           }}
         >
           {/* Header */}
-          <div
-            style={{
-              padding: '12px 16px',
-              borderBottom: '1px solid #dee2e6',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}
-          >
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #dee2e6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="fw-semibold" style={{ fontSize: 14 }}>Conversation Tracer</div>
               <div style={{ fontSize: 11, color: '#767676', fontFamily: 'monospace' }}>{title}</div>
@@ -219,45 +226,110 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
             </div>
           )}
 
-          {error && (
-            <div className="alert alert-danger m-3">{error}</div>
-          )}
+          {error && <div className="alert alert-danger m-3">{error}</div>}
 
           {!loading && !error && tracer && (
             <>
-              {/* Visualization panel */}
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid #dee2e6' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center' }}>
-                  <HostNode ip={tracer.srcIp} port={tracer.srcPort} label="Client" />
-
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    {step ? (
-                      <AnimatedArrow
-                        key={currentStep}
-                        direction={step.direction}
-                        label={`${step.protocol} · ${step.size}B`}
+              {/* Star-graph visualization */}
+              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid #dee2e6' }}>
+                <svg
+                  viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+                  style={{ width: '100%', height: 'auto', maxHeight: 260, display: 'block' }}
+                >
+                  {/* Edges */}
+                  {peers.map((ip, i) => {
+                    const pos = peerPos(i, peers.length);
+                    const isActive = ip === activePeerIp;
+                    return (
+                      <line
+                        key={ip}
+                        x1={CX} y1={CY}
+                        x2={pos.x} y2={pos.y}
+                        stroke={isActive ? '#0072c6' : '#ced4da'}
+                        strokeWidth={isActive ? 2.5 : 1.5}
+                        strokeDasharray={isActive ? undefined : '5 4'}
                       />
-                    ) : (
-                      <div style={{ color: '#ccc' }}>—</div>
-                    )}
-                    {step?.info && (
-                      <div style={{ fontSize: 10, color: '#555', marginTop: 4, fontStyle: 'italic' }}>
-                        {step.info.length > 80 ? step.info.slice(0, 80) + '…' : step.info}
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })}
 
-                  <HostNode ip={tracer.dstIp} port={tracer.dstPort} label="Server" />
-                </div>
+                  {/* Animated dot */}
+                  {dotPos && (
+                    <circle
+                      cx={dotPos.x}
+                      cy={dotPos.y}
+                      r={7}
+                      fill={dotPos.color}
+                      stroke="#fff"
+                      strokeWidth={2}
+                    />
+                  )}
+
+                  {/* Center node (srcIp / host) */}
+                  <circle cx={CX} cy={CY} r={NODE_R} fill="#f0f4ff" stroke="#0072c6" strokeWidth={2} />
+                  <text
+                    x={CX} y={CY + 4}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={8} fontFamily="monospace" fill="#0050a0"
+                  >
+                    {shortIp(tracer.srcIp)}
+                  </text>
+                  <text x={CX} y={CY + NODE_R + 13} textAnchor="middle" fontSize={10} fill="#555">
+                    Host
+                  </text>
+
+                  {/* Peer nodes */}
+                  {peers.map((ip, i) => {
+                    const pos = peerPos(i, peers.length);
+                    const isActive = ip === activePeerIp;
+                    // Place label above or below based on y position
+                    const labelY = pos.y < CY
+                      ? pos.y - NODE_R - 6
+                      : pos.y + NODE_R + 13;
+                    return (
+                      <g key={ip}>
+                        <circle
+                          cx={pos.x} cy={pos.y} r={NODE_R}
+                          fill={isActive ? '#e8f0fe' : '#f8f9fa'}
+                          stroke={isActive ? '#0072c6' : '#adb5bd'}
+                          strokeWidth={isActive ? 2 : 1.5}
+                        />
+                        <text
+                          x={pos.x} y={pos.y + 4}
+                          textAnchor="middle" dominantBaseline="middle"
+                          fontSize={8} fontFamily="monospace"
+                          fill={isActive ? '#0050a0' : '#555'}
+                        >
+                          {shortIp(ip)}
+                        </text>
+                        <text
+                          x={pos.x} y={labelY}
+                          textAnchor="middle" fontSize={10}
+                          fill={isActive ? '#0072c6' : '#777'}
+                          fontWeight={isActive ? 600 : 400}
+                        >
+                          {isActive ? 'Traced' : 'Peer'}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+
+                {/* Step info */}
+                {step?.info && (
+                  <div style={{ fontSize: 10, color: '#555', textAlign: 'center', marginBottom: 6, fontStyle: 'italic' }}>
+                    {step.direction === 'CLIENT' ? '→' : '←'} {step.protocol} · {step.size}B
+                    {' — '}
+                    {step.info.length > 100 ? step.info.slice(0, 100) + '…' : step.info}
+                  </div>
+                )}
 
                 {/* LLM explanation */}
                 <div
                   style={{
-                    marginTop: 14,
-                    minHeight: 52,
+                    minHeight: 44,
                     background: '#f8f9fa',
                     borderRadius: 6,
-                    padding: '8px 12px',
+                    padding: '6px 12px',
                     fontSize: 12,
                     color: '#333',
                     display: 'flex',
@@ -277,30 +349,12 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
               </div>
 
               {/* Navigation */}
-              <div
-                style={{
-                  padding: '10px 16px',
-                  borderBottom: '1px solid #dee2e6',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                }}
-              >
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={prev}
-                  disabled={currentStep === 0}
-                >
-                  ‹ Prev
-                </button>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid #dee2e6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                <button className="btn btn-sm btn-outline-secondary" onClick={prev} disabled={currentStep === 0}>‹ Prev</button>
                 <span style={{ fontSize: 12, color: '#555', minWidth: 90, textAlign: 'center' }}>
                   Step {currentStep + 1} / {tracer.steps.length}
                 </span>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={next}
-                  disabled={currentStep >= tracer.steps.length - 1}
-                >
-                  Next ›
-                </button>
+                <button className="btn btn-sm btn-outline-secondary" onClick={next} disabled={currentStep >= tracer.steps.length - 1}>Next ›</button>
                 <button
                   className={`btn btn-sm ${isPlaying ? 'btn-warning' : 'btn-outline-primary'}`}
                   onClick={togglePlay}
@@ -312,7 +366,7 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
               </div>
 
               {/* Packet list */}
-              <div ref={listRef} style={{ overflowY: 'auto', flex: 1, maxHeight: 220 }}>
+              <div ref={listRef} style={{ overflowY: 'auto', flex: 1, maxHeight: 200 }}>
                 <table className="table table-sm table-hover mb-0" style={{ fontSize: 11 }}>
                   <thead className="table-light sticky-top">
                     <tr>
@@ -345,12 +399,7 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
                           {s.timestamp ? s.timestamp.split(' ')[1] : '—'}
                         </td>
                         <td
-                          style={{
-                            maxWidth: 200,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
+                          style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                           title={s.info ?? ''}
                         >
                           {s.info ?? '—'}
