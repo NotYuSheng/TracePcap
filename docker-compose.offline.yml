@@ -91,7 +91,11 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
+      LLM_CONTEXT_LENGTH: ${LLM_CONTEXT_LENGTH:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
+      # Network Intelligence cluster limits
+      TRACEPCAP_INTELLIGENCE_MAX_CLUSTERS: ${INTELLIGENCE_MAX_CLUSTERS:-60}
+      TRACEPCAP_INTELLIGENCE_MAX_EDGES: ${INTELLIGENCE_MAX_EDGES:-200}
       TZ: Asia/Singapore
     volumes:
       - config_data:/app/config
@@ -111,6 +115,7 @@ services:
     container_name: tracepcap-nginx
     environment:
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       TZ: Asia/Singapore
     ports:
       - "${NGINX_PORT:-80}:80"
