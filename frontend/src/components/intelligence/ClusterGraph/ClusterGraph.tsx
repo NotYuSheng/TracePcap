@@ -588,10 +588,10 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!data || data.clusters.length === 0) {
+    if (!data || data.clusters.length === 0 || groupBy === 'country') {
       setRfNodes([]);
       setRfEdges([]);
-      setSelectedCluster(null);
+      if (groupBy !== 'country') setSelectedCluster(null);
       return;
     }
 
@@ -652,8 +652,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       data: { ...n.data, selected: selectedCluster?.id === n.id },
     })));
   }, [selectedCluster]);
-
-  const isEmpty = !loading && rfNodes.length === 0 && !layoutLoading;
 
   return (
     <div className="intel-cluster-graph-wrapper">
@@ -738,12 +736,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       )}
 
       {/* Graph canvas */}
-      {isEmpty ? (
-        <div className="intel-graph-empty">
-          <i className="bi bi-diagram-3 mb-2" style={{ fontSize: 32, opacity: 0.3 }} />
-          <span>No cluster data available</span>
-        </div>
-      ) : groupBy === 'country' && data ? (
+      {groupBy === 'country' ? (
         /* ── Country map view ── */
         <div className="intel-graph-container">
           {loading && (
@@ -762,13 +755,15 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
             />
           )}
 
-          <CountryMapView
-            data={data}
-            colorMode={colorMode}
-            selectedClusterId={selectedCluster?.id ?? null}
-            onSelectCluster={c => setSelectedCluster(c)}
-            fileId={fileId}
-          />
+          {data && (
+            <CountryMapView
+              data={data}
+              colorMode={colorMode}
+              selectedClusterId={selectedCluster?.id ?? null}
+              onSelectCluster={c => setSelectedCluster(c)}
+              fileId={fileId}
+            />
+          )}
         </div>
       ) : (
         /* ── ReactFlow graph view (all other groupBy strategies) ── */
@@ -789,24 +784,31 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
             />
           )}
 
-          <ReactFlow
-            nodes={rfNodes}
-            edges={rfEdges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onNodeClick={handleNodeClick}
-            fitView
-            fitViewOptions={{ padding: 0.15 }}
-            minZoom={0.1}
-            maxZoom={3}
-            nodesDraggable
-            nodesConnectable={false}
-            elementsSelectable
-          >
-            <Background color="#e9ecef" gap={20} />
-            <Controls showInteractive={false} />
-            <AutoFitView version={layoutVersion} />
-          </ReactFlow>
+          {!loading && !layoutLoading && rfNodes.length === 0 ? (
+            <div className="intel-graph-empty">
+              <i className="bi bi-diagram-3 mb-2" style={{ fontSize: 32, opacity: 0.3 }} />
+              <span>No cluster data available</span>
+            </div>
+          ) : (
+            <ReactFlow
+              nodes={rfNodes}
+              edges={rfEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onNodeClick={handleNodeClick}
+              fitView
+              fitViewOptions={{ padding: 0.15 }}
+              minZoom={0.1}
+              maxZoom={3}
+              nodesDraggable
+              nodesConnectable={false}
+              elementsSelectable
+            >
+              <Background color="#e9ecef" gap={20} />
+              <Controls showInteractive={false} />
+              <AutoFitView version={layoutVersion} />
+            </ReactFlow>
+          )}
         </div>
       )}
 
