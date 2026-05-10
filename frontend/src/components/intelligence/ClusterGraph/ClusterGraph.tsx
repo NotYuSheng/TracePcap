@@ -755,7 +755,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
             />
           )}
 
-          {data && (
+          {data && data.groupType === groupBy && (
             <CountryMapView
               data={data}
               colorMode={colorMode}
