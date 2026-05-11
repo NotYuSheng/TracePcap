@@ -395,6 +395,12 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
   const [ipMetric, setIpMetric] = useState<IpMetric>('bytes');
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (!cluster.sampleIps.length) return;
     setConvosLoading(true);
     conversationService
