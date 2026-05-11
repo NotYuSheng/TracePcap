@@ -198,7 +198,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
       >
         <div
           style={{
-            background: '#fff', borderRadius: 10,
+            background: 'var(--tp-surface)', borderRadius: 10,
             width: '100%', maxWidth: 720,
             boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
             display: 'flex', flexDirection: 'column',
@@ -206,10 +206,10 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
           }}
         >
           {/* Header */}
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #dee2e6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="fw-semibold" style={{ fontSize: 14 }}>Conversation Tracer</div>
-              <div style={{ fontSize: 11, color: '#767676', fontFamily: 'monospace' }}>{title}</div>
+              <div style={{ fontSize: 11, color: 'var(--tp-text-muted)', fontFamily: 'monospace' }}>{title}</div>
               {tracer?.protocol && (
                 <span className="badge bg-secondary ms-0 mt-1" style={{ fontSize: 10 }}>
                   {tracer.protocol}{tracer.appName ? ` / ${tracer.appName}` : ''}
@@ -231,7 +231,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
           {!loading && !error && tracer && (
             <>
               {/* Star-graph visualization */}
-              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid #dee2e6' }}>
+              <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--tp-border)' }}>
                 <svg
                   viewBox={`0 0 ${SVG_W} ${SVG_H}`}
                   style={{ width: '100%', height: 'auto', maxHeight: 260, display: 'block' }}
@@ -245,7 +245,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                         key={ip}
                         x1={CX} y1={CY}
                         x2={pos.x} y2={pos.y}
-                        stroke={isActive ? '#0072c6' : '#ced4da'}
+                        stroke={isActive ? '#0072c6' : 'var(--tp-border)'}
                         strokeWidth={isActive ? 2.5 : 1.5}
                         strokeDasharray={isActive ? undefined : '5 4'}
                       />
@@ -265,7 +265,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                   )}
 
                   {/* Center node (srcIp / host) */}
-                  <circle cx={CX} cy={CY} r={NODE_R} fill="#f0f4ff" stroke="#0072c6" strokeWidth={2} />
+                  <circle cx={CX} cy={CY} r={NODE_R} fill="var(--tp-bg-subtle)" stroke="#0072c6" strokeWidth={2} />
                   <text
                     x={CX} y={CY + 4}
                     textAnchor="middle" dominantBaseline="middle"
@@ -273,7 +273,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                   >
                     {shortIp(tracer.srcIp)}
                   </text>
-                  <text x={CX} y={CY + NODE_R + 13} textAnchor="middle" fontSize={10} fill="#555">
+                  <text x={CX} y={CY + NODE_R + 13} textAnchor="middle" fontSize={10} fill="var(--tp-text-muted)">
                     Host
                   </text>
 
@@ -289,22 +289,22 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                       <g key={ip}>
                         <circle
                           cx={pos.x} cy={pos.y} r={NODE_R}
-                          fill={isActive ? '#e8f0fe' : '#f8f9fa'}
-                          stroke={isActive ? '#0072c6' : '#adb5bd'}
+                          fill={isActive ? 'var(--tp-surface-hover)' : 'var(--tp-bg-subtle)'}
+                          stroke={isActive ? '#0072c6' : 'var(--tp-text-muted)'}
                           strokeWidth={isActive ? 2 : 1.5}
                         />
                         <text
                           x={pos.x} y={pos.y + 4}
                           textAnchor="middle" dominantBaseline="middle"
                           fontSize={8} fontFamily="monospace"
-                          fill={isActive ? '#0050a0' : '#555'}
+                          fill={isActive ? '#0050a0' : 'var(--tp-text-muted)'}
                         >
                           {shortIp(ip)}
                         </text>
                         <text
                           x={pos.x} y={labelY}
                           textAnchor="middle" fontSize={10}
-                          fill={isActive ? '#0072c6' : '#777'}
+                          fill={isActive ? '#0072c6' : 'var(--tp-text-muted)'}
                           fontWeight={isActive ? 600 : 400}
                         >
                           {isActive ? 'Traced' : 'Peer'}
@@ -316,7 +316,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
 
                 {/* Step info */}
                 {step?.info && (
-                  <div style={{ fontSize: 10, color: '#555', textAlign: 'center', marginBottom: 6, fontStyle: 'italic' }}>
+                  <div style={{ fontSize: 10, color: 'var(--tp-text-muted)', textAlign: 'center', marginBottom: 6, fontStyle: 'italic' }}>
                     {step.direction === 'CLIENT' ? '→' : '←'} {step.protocol} · {step.size}B
                     {' — '}
                     {step.info.length > 100 ? step.info.slice(0, 100) + '…' : step.info}
@@ -327,11 +327,11 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                 <div
                   style={{
                     minHeight: 44,
-                    background: '#f8f9fa',
+                    background: 'var(--tp-bg-subtle)',
                     borderRadius: 6,
                     padding: '6px 12px',
                     fontSize: 12,
-                    color: '#333',
+                    color: 'var(--tp-text)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
@@ -349,9 +349,9 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
               </div>
 
               {/* Navigation */}
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid #dee2e6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                 <button className="btn btn-sm btn-outline-secondary" onClick={prev} disabled={currentStep === 0}>‹ Prev</button>
-                <span style={{ fontSize: 12, color: '#555', minWidth: 90, textAlign: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--tp-text-muted)', minWidth: 90, textAlign: 'center' }}>
                   Step {currentStep + 1} / {tracer.steps.length}
                 </span>
                 <button className="btn btn-sm btn-outline-secondary" onClick={next} disabled={currentStep >= tracer.steps.length - 1}>Next ›</button>
