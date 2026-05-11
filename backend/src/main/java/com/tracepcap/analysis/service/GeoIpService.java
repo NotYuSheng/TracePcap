@@ -132,9 +132,8 @@ public class GeoIpService {
     if (!toRefresh.isEmpty()) {
       boolean online = isOnline();
       for (IpGeoInfoEntity entity : toRefresh) {
-        GeoResult r = online
-            ? lookupFromIpInfo(entity.getIp())
-            : lookupFromMmdb(entity.getIp());
+        GeoResult r = online ? lookupFromIpInfo(entity.getIp()) : null;
+        if (r == null) r = lookupFromMmdb(entity.getIp());
         if (r != null) {
           updateEntity(entity, r);
           result.put(entity.getIp(), r);
@@ -176,7 +175,7 @@ public class GeoIpService {
 
   private GeoResult lookupFromIpInfo(String ip) {
     try {
-      URL url = new URL(String.format(IPINFO_URL, ip));
+      URL url = java.net.URI.create(String.format(IPINFO_URL, ip)).toURL();
       HttpURLConnection conn = (HttpURLConnection) url.openConnection();
       conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
       conn.setReadTimeout(READ_TIMEOUT_MS);
@@ -184,7 +183,10 @@ public class GeoIpService {
 
       if (conn.getResponseCode() != 200) return null;
 
-      JsonNode node = objectMapper.readTree(conn.getInputStream());
+      JsonNode node;
+      try (InputStream is = conn.getInputStream()) {
+        node = objectMapper.readTree(is);
+      }
 
       // ipinfo returns "bogon: true" for private IPs — shouldn't happen but guard anyway
       if (node.has("bogon") && node.get("bogon").asBoolean()) return null;
@@ -216,7 +218,7 @@ public class GeoIpService {
 
       // Resolve country name from code
       String country = countryCode != null
-          ? new java.util.Locale("", countryCode).getDisplayCountry()
+          ? new java.util.Locale("", countryCode).getDisplayCountry(java.util.Locale.ENGLISH)
           : null;
 
       return new GeoResult(country, countryCode, asn, orgName, region, city, lat, lon, "ipinfo");
@@ -259,14 +261,17 @@ public class GeoIpService {
       return onlineCache;
     }
     boolean reachable = false;
+    HttpURLConnection conn = null;
     try {
-      HttpURLConnection conn = (HttpURLConnection) new URL(PROBE_URL).openConnection();
+      conn = (HttpURLConnection) java.net.URI.create(PROBE_URL).toURL().openConnection();
       conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
       conn.setReadTimeout(CONNECT_TIMEOUT_MS);
       conn.setRequestMethod("HEAD");
       reachable = conn.getResponseCode() < 400;
-      conn.disconnect();
-    } catch (Exception ignored) {}
+    } catch (Exception ignored) {
+    } finally {
+      if (conn != null) conn.disconnect();
+    }
     onlineCache = reachable;
     onlineCheckedAt = now;
     log.debug("Internet connectivity check: {}", reachable ? "online (ipinfo.io)" : "offline (MMDB)");
