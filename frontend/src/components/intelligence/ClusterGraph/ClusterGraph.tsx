@@ -587,6 +587,8 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   const [layoutVersion, setLayoutVersion] = useState(0);
   const layoutGen = useRef(0);
 
+  const handleClusterPanelClose = useCallback(() => setSelectedCluster(null), []);
+
   const clusterById = new Map((data?.clusters ?? []).map(c => [c.id, c]));
 
   const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
@@ -760,12 +762,12 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
 
       {/* Node detail panel — rendered outside the graph canvas so it isn't
            clipped by overflow:hidden or affected by ReactFlow pane dragging.
-           position:absolute anchors to .intel-cluster-graph-wrapper. */}
+           position:fixed anchors to the viewport. */}
       {selectedCluster && (
         <ClusterPanel
           cluster={selectedCluster}
           fileId={fileId}
-          onClose={() => setSelectedCluster(null)}
+          onClose={handleClusterPanelClose}
         />
       )}
 
