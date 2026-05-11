@@ -143,8 +143,9 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
         data.explanations.forEach(e => map.set(e.stepIndex, e.explanation));
         setExplanations(map);
       })
-      .catch(() => {
-        setExplainError('AI explanation unavailable — could not reach the language model. Check your LLM configuration.');
+      .catch((err) => {
+        const backendError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        setExplainError(backendError || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.');
       })
       .finally(() => setExplainLoading(false));
   }, [tracer, conversationId]);
