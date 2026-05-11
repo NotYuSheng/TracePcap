@@ -9,6 +9,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   useReactFlow,
+  applyNodeChanges,
   type Node,
   type Edge,
   type NodeProps,
@@ -16,6 +17,7 @@ import {
   type NodeTypes,
   type EdgeTypes,
   type NodeMouseHandler,
+  type OnNodesChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './ClusterGraph.css';
@@ -586,10 +588,16 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
     setSelectedCluster(prev => prev?.id === node.id ? null : (cluster ?? null));
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Let ReactFlow own node position/selection changes (enables dragging).
+  const handleNodesChange: OnNodesChange = useCallback((changes) => {
+    setRfNodes(prev => applyNodeChanges(changes, prev));
+  }, []);
+
   useEffect(() => {
     if (!data || data.clusters.length === 0 || groupBy === 'country') {
       setRfNodes([]);
       setRfEdges([]);
+      draggedPositions.current.clear();
       if (groupBy !== 'country') setSelectedCluster(null);
       return;
     }
@@ -642,7 +650,17 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       .finally(() => {
         if (gen === layoutGen.current) setLayoutLoading(false);
       });
-  }, [data, groupBy, colorMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, groupBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update colorMode on node data without re-running layout (preserves drag positions).
+  // Also depends on layoutVersion so the current colorMode is re-applied after a layout
+  // finishes (guards against a race where colorMode changed while ELK was still running).
+  useEffect(() => {
+    setRfNodes(prev => prev.map(n => n.id.startsWith('__lane__') ? n : ({
+      ...n,
+      data: { ...n.data, colorMode },
+    })));
+  }, [colorMode, layoutVersion]);
 
   // Update selected state on nodes without re-running layout
   useEffect(() => {
@@ -792,6 +810,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               edges={rfEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
+              onNodesChange={handleNodesChange}
               onNodeClick={handleNodeClick}
               fitView
               fitViewOptions={{ padding: 0.15 }}
