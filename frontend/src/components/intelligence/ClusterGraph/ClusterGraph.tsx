@@ -416,8 +416,9 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
     <div
       style={{
         position: 'fixed',
-        top: 20,
+        top: '50%',
         right: 20,
+        transform: 'translateY(-50%)',
         width: 300,
         zIndex: 1050,
         background: 'var(--tp-surface, #fff)',
