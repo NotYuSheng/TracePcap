@@ -395,6 +395,12 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
   const [ipMetric, setIpMetric] = useState<IpMetric>('bytes');
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (!cluster.sampleIps.length) return;
     setConvosLoading(true);
     conversationService
@@ -415,11 +421,12 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 10,
-        right: 10,
+        position: 'fixed',
+        top: '50%',
+        right: 20,
+        transform: 'translateY(-50%)',
         width: 300,
-        zIndex: 10,
+        zIndex: 1050,
         background: 'var(--tp-surface, #fff)',
         border: '1px solid var(--tp-border, #dee2e6)',
         borderRadius: 8,
@@ -427,7 +434,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
         fontSize: 13,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 480,
+        maxHeight: 'calc(100vh - 40px)',
       }}
     >
       <div className="d-flex justify-content-between align-items-start p-3 pb-2">
@@ -580,6 +587,8 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   const [layoutVersion, setLayoutVersion] = useState(0);
   const layoutGen = useRef(0);
 
+  const handleClusterPanelClose = useCallback(() => setSelectedCluster(null), []);
+
   const clusterById = new Map((data?.clusters ?? []).map(c => [c.id, c]));
 
   const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
@@ -597,7 +606,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
     if (!data || data.clusters.length === 0 || groupBy === 'country') {
       setRfNodes([]);
       setRfEdges([]);
-      draggedPositions.current.clear();
       if (groupBy !== 'country') setSelectedCluster(null);
       return;
     }
@@ -752,6 +760,17 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
         </div>
       )}
 
+      {/* Node detail panel — rendered outside the graph canvas so it isn't
+           clipped by overflow:hidden or affected by ReactFlow pane dragging.
+           position:fixed anchors to the viewport. */}
+      {selectedCluster && (
+        <ClusterPanel
+          cluster={selectedCluster}
+          fileId={fileId}
+          onClose={handleClusterPanelClose}
+        />
+      )}
+
       {/* Graph canvas */}
       {groupBy === 'country' ? (
         /* ── Country map view ── */
@@ -761,14 +780,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               <span className="spinner-border spinner-border-sm" />
               Loading…
             </div>
-          )}
-
-          {selectedCluster && (
-            <ClusterPanel
-              cluster={selectedCluster}
-              fileId={fileId}
-              onClose={() => setSelectedCluster(null)}
-            />
           )}
 
           {data && data.groupType === groupBy && (
@@ -789,14 +800,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               <span className="spinner-border spinner-border-sm" />
               Computing layout…
             </div>
-          )}
-
-          {selectedCluster && (
-            <ClusterPanel
-              cluster={selectedCluster}
-              fileId={fileId}
-              onClose={() => setSelectedCluster(null)}
-            />
           )}
 
           {!loading && !layoutLoading && rfNodes.length === 0 ? (
