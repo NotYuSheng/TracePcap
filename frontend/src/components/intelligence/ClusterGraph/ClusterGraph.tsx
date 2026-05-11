@@ -427,7 +427,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
         fontSize: 13,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 480,
+        maxHeight: 'calc(100vh - 40px)',
       }}
     >
       <div className="d-flex justify-content-between align-items-start p-3 pb-2">
