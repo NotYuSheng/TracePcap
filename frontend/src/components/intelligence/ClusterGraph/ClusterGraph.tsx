@@ -670,7 +670,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   }, [selectedCluster]);
 
   return (
-    <div className="intel-cluster-graph-wrapper">
+    <div className="intel-cluster-graph-wrapper" style={{ position: 'relative' }}>
       {/* Controls bar */}
       <div className="d-flex align-items-center gap-3 mb-3">
         <label className="form-label mb-0 text-muted small">Group by</label>
@@ -751,6 +751,17 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
         </div>
       )}
 
+      {/* Node detail panel — rendered outside the graph canvas so it isn't
+           clipped by overflow:hidden or affected by ReactFlow pane dragging.
+           position:absolute anchors to .intel-cluster-graph-wrapper. */}
+      {selectedCluster && (
+        <ClusterPanel
+          cluster={selectedCluster}
+          fileId={fileId}
+          onClose={() => setSelectedCluster(null)}
+        />
+      )}
+
       {/* Graph canvas */}
       {groupBy === 'country' ? (
         /* ── Country map view ── */
@@ -760,14 +771,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               <span className="spinner-border spinner-border-sm" />
               Loading…
             </div>
-          )}
-
-          {selectedCluster && (
-            <ClusterPanel
-              cluster={selectedCluster}
-              fileId={fileId}
-              onClose={() => setSelectedCluster(null)}
-            />
           )}
 
           {data && data.groupType === groupBy && (
@@ -788,14 +791,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               <span className="spinner-border spinner-border-sm" />
               Computing layout…
             </div>
-          )}
-
-          {selectedCluster && (
-            <ClusterPanel
-              cluster={selectedCluster}
-              fileId={fileId}
-              onClose={() => setSelectedCluster(null)}
-            />
           )}
 
           {!loading && !layoutLoading && rfNodes.length === 0 ? (
