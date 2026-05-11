@@ -173,16 +173,21 @@ public class NetworkIntelligenceService {
           List<String> topRiskTypes = topKeys(acc.riskTypeCounts, 3);
           Map<String, Long> ipPeerCounts = new HashMap<>();
           acc.ipPeers.forEach((ip, peers) -> ipPeerCounts.put(ip, (long) peers.size()));
-          // Attach lat/lon for geo-based groupings so the frontend can position markers
+          // Attach lat/lon for city clusters so the frontend can position markers.
+          // Country clusters do not need backend coordinates — the frontend resolves
+          // their pin positions from its bundled country-centroids.json.
           Double lat = null;
           Double lon = null;
+          String geoSource = null;
           if ("city".equals(groupBy) || "country".equals(groupBy)) {
-            // Use the first IP in the cluster that has geo coordinates
             for (String ip : acc.ips) {
               IpGeoInfoEntity geo = geoByIp.get(ip);
-              if (geo != null && geo.getLat() != null && geo.getLon() != null) {
-                lat = geo.getLat();
-                lon = geo.getLon();
+              if (geo != null && geo.getGeoSource() != null) {
+                geoSource = geo.getGeoSource();
+                if ("city".equals(groupBy) && geo.getLat() != null && geo.getLon() != null) {
+                  lat = geo.getLat();
+                  lon = geo.getLon();
+                }
                 break;
               }
             }
@@ -205,6 +210,7 @@ public class NetworkIntelligenceService {
               .ipPeers(ipPeerCounts)
               .lat(lat)
               .lon(lon)
+              .geoSource(geoSource)
               .build();
         })
         .collect(Collectors.toList());
@@ -304,6 +310,7 @@ public class NetworkIntelligenceService {
               .country(geo != null ? geo.getCountryCode() : null)
               .org(geo != null ? geo.getOrg() : null)
               .role(role)
+              .geoSource(geo != null ? geo.getGeoSource() : null)
               .build();
         })
         .collect(Collectors.toList());
@@ -460,7 +467,6 @@ public class NetworkIntelligenceService {
         .map(Map.Entry::getKey)
         .collect(Collectors.toList());
   }
-
   // ── Accumulators (private inner classes) ─────────────────────────────────
 
   private static class ClusterAcc {

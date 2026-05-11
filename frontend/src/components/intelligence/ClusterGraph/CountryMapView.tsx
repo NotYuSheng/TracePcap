@@ -224,11 +224,14 @@ export function CountryMapView({
 
           {/* Country labels on world view */}
           {!isDrilled && data.clusters
-            .filter(c => c.id.startsWith('country:') && c.lat != null && c.lon != null)
+            .filter(c => c.id.startsWith('country:'))
             .map(cluster => {
+              const cc = cluster.id.slice('country:'.length);
+              const centroid = CENTROID_MAP[cc];
+              if (!centroid) return null;
               const labelText = cluster.label.replace(/ \([A-Z]{2}\)$/, '');
               return (
-                <Marker key={`lbl-${cluster.id}`} coordinates={[cluster.lon!, cluster.lat!]}>
+                <Marker key={`lbl-${cluster.id}`} coordinates={[centroid[1], centroid[0]]}>
                   <text
                     textAnchor="middle"
                     style={{

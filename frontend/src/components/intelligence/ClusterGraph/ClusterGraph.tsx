@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   ReactFlow,
@@ -27,6 +28,85 @@ import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } fr
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
 import { CountryMapView } from './CountryMapView';
+
+// ── Geo source badge ──────────────────────────────────────────────────────────
+
+const GEO_SOURCE_INFO: Record<string, { label: string; title: string; description: string; bg: string }> = {
+  ipinfo: {
+    label: 'ipinfo.io',
+    title: 'Geo source: ipinfo.io',
+    description: 'Location was resolved by calling the ipinfo.io API. This is an online feature — an internet connection is required. Results are cached locally so repeat lookups do not require another API call.',
+    bg: '#198754',
+  },
+  mmdb: {
+    label: 'Offline DB',
+    title: 'Geo source: Offline database',
+    description: 'Location was resolved using the bundled DB-IP Lite database. This happens when the app is offline or ipinfo.io could not be reached. Accuracy may be lower, especially for cloud provider IPs.',
+    bg: '#6c757d',
+  },
+};
+
+const GEO_SOURCE_FALLBACK = GEO_SOURCE_INFO.mmdb;
+
+function GeoSourceBadge({ source }: { source?: string | null }) {
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const info = (source ? GEO_SOURCE_INFO[source] : undefined) ?? GEO_SOURCE_FALLBACK;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (popoverPos) { setPopoverPos(null); return; }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const popW = 260;
+    const popH = 120; // rough estimate
+    const left = Math.min(rect.right - popW, window.innerWidth - popW - 8);
+    const top = rect.bottom + 6 + popH > window.innerHeight
+      ? rect.top - popH - 6
+      : rect.bottom + 6;
+    setPopoverPos({ top, left: Math.max(8, left) });
+  };
+
+  return (
+    <>
+      <span
+        className="ms-2 badge"
+        style={{ backgroundColor: info.bg, color: '#fff', fontSize: '0.7em', cursor: 'pointer', verticalAlign: 'middle' }}
+        onClick={handleClick}
+      >
+        {info.label}
+      </span>
+      {popoverPos && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: popoverPos.top,
+            left: popoverPos.left,
+            zIndex: 9999,
+            background: '#fff',
+            border: '1px solid #dee2e6',
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            padding: '8px 10px',
+            width: 260,
+            fontSize: 11,
+            color: '#212529',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <strong style={{ fontSize: 12 }}>{info.title}</strong>
+          <p style={{ margin: '4px 0 0' }}>{info.description}</p>
+          <button
+            style={{ marginTop: 6, fontSize: 10, padding: '1px 6px', cursor: 'pointer' }}
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => setPopoverPos(null)}
+          >
+            Close
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
@@ -438,7 +518,12 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
       }}
     >
       <div className="d-flex justify-content-between align-items-start p-3 pb-2">
-        <strong style={{ fontSize: 13 }}>{cluster.label}</strong>
+        <strong style={{ fontSize: 13 }}>
+          {cluster.label}
+          {(cluster.groupType === 'country' || cluster.groupType === 'city') && (
+            <GeoSourceBadge source={cluster.geoSource} />
+          )}
+        </strong>
         <button className="btn-close btn-sm" onClick={onClose} />
       </div>
 

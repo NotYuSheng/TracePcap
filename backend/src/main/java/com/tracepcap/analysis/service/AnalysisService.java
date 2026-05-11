@@ -944,6 +944,7 @@ public class AnalysisService {
         .countryCode(result.countryCode())
         .asn(result.asn())
         .org(result.org())
+        .geoSource(result.geoSource())
         .build();
   }
 

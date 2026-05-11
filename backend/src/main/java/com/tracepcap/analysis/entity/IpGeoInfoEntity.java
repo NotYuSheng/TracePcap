@@ -51,6 +51,11 @@ public class IpGeoInfoEntity {
   @Column
   private Double lon;
 
+  /** Source of this geo result: "ipinfo" (live API) or "mmdb" (offline DB-IP database). */
+  @Column(name = "geo_source", length = 10, nullable = false)
+  @Builder.Default
+  private String geoSource = "mmdb";
+
   @UpdateTimestamp
   @Column(name = "looked_up_at", nullable = false)
   private LocalDateTime lookedUpAt;

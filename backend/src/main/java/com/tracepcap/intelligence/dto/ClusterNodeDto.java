@@ -27,4 +27,6 @@ public class ClusterNodeDto {
   private Double lat;
   /** Approximate longitude of this cluster's location (city/country centroid). Null if not geo-based. */
   private Double lon;
+  /** Source of geo data for this cluster: "ipinfo" or "mmdb". Null if not a geo-based grouping. */
+  private String geoSource;
 }
