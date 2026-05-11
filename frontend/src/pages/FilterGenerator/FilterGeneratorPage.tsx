@@ -104,15 +104,15 @@ export const FilterGeneratorPage = () => {
       const status = (err as { response?: { status?: number } })?.response?.status;
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
       const errorMsg = err instanceof Error ? err.message : String(err);
-      const isTimeout = (err as { code?: string })?.code === 'ECONNABORTED' || errorMsg.toLowerCase().includes('timeout');
-      if (isTimeout || data.errorCode === 'LLM_TIMEOUT') {
+      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
+      if (data.errorCode === 'LLM_UNREACHABLE' || status === 502 || status === 503) {
+        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
+      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
         const totalSeconds = Math.round(llmTimeoutMs / 1000);
         const timeoutLabel = totalSeconds < 60
           ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
           : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
         setError(`Filter generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or simplify your query.`);
-      } else if (status === 502 || status === 503 || data.errorCode === 'LLM_UNREACHABLE') {
-        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
       } else {
         setError(`Error: ${errorMsg || 'Failed to generate filter'}`);
       }

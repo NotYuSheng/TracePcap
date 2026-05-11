@@ -19,7 +19,7 @@ export const filterService = {
     const response = await apiClient.post<FilterGenerationResponse>(
       API_ENDPOINTS.GENERATE_FILTER(fileId),
       request,
-      { ...(timeoutMs !== undefined && { timeout: timeoutMs }) }
+      { ...(timeoutMs !== undefined && { timeout: timeoutMs + 10000 }) }
     );
     return response.data;
   },

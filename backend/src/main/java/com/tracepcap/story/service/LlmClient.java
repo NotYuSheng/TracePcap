@@ -9,7 +9,6 @@ import com.tracepcap.config.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -18,11 +17,21 @@ import org.springframework.web.client.RestTemplate;
 /** Client for communicating with OpenAI-compatible LLM APIs */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class LlmClient {
 
   private final LlmConfig llmConfig;
   private final RestTemplate llmRestTemplate;
+  private final RestTemplate llmHealthCheckRestTemplate;
+
+  public LlmClient(
+      LlmConfig llmConfig,
+      RestTemplate llmRestTemplate,
+      RestTemplate llmHealthCheckRestTemplate) {
+    this.llmConfig = llmConfig;
+    this.llmRestTemplate = llmRestTemplate;
+    this.llmHealthCheckRestTemplate = llmHealthCheckRestTemplate;
+  }
+
   private static final Pattern PATTERN_PROMPT_TOKENS = Pattern.compile("\\((\\d+) in the messages");
   private static final Pattern PATTERN_CONTEXT_LENGTH = Pattern.compile("maximum context length is (\\d+)");
   private static final Pattern PATTERN_CONTEXT_LENGTH_ALT = Pattern.compile("context length is (\\d+)");
@@ -138,6 +147,26 @@ public class LlmClient {
     return null;
   }
 
+  /**
+   * Pre-flight reachability check using a short 2s timeout. Throws LLM_UNREACHABLE immediately
+   * if the LLM server cannot be reached, so the user gets a fast failure rather than waiting for
+   * the full generation timeout.
+   */
+  private void checkReachable() {
+    try {
+      String url = llmConfig.getApi().getBaseUrl() + "/models";
+      HttpHeaders headers = new HttpHeaders();
+      headers.setBearerAuth(llmConfig.getApi().getApiKey());
+      HttpEntity<Void> entity = new HttpEntity<>(headers);
+      llmHealthCheckRestTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+      log.debug("LLM health check passed");
+    } catch (Exception e) {
+      log.warn("LLM pre-flight health check failed: {}", e.getMessage());
+      throw new LlmException(
+          "LLM server is not reachable: " + e.getMessage(), e, LlmException.ErrorCode.LLM_UNREACHABLE);
+    }
+  }
+
   /** Get the effective max tokens (adjusted based on model capabilities) */
   public Integer getEffectiveMaxTokens() {
     return effectiveMaxTokens != null ? effectiveMaxTokens : llmConfig.getApi().getMaxTokens();
@@ -171,6 +200,11 @@ public class LlmClient {
         throw new ContextLengthExceededException(estimatedPromptTokens, modelContextLength, userPrompt);
       }
     }
+
+    // Pre-flight: fail fast with LLM_UNREACHABLE if the server isn't responding (2s timeout).
+    // This runs before the main generation call so users get an instant error instead of waiting
+    // for the full generation timeout.
+    checkReachable();
 
     try {
       log.info("Sending request to LLM API: {}", llmConfig.getApi().getBaseUrl());
@@ -246,10 +280,11 @@ public class LlmClient {
       } else {
         log.error("Error calling LLM API", e);
       }
-      // Distinguish connection failures from read/generation timeouts
+      // Distinguish read/generation timeouts from connection failures
       Throwable cause = e.getCause() != null ? e.getCause() : e;
+      String causeMsg = cause.getMessage() != null ? cause.getMessage() : "";
       boolean isReadTimeout = cause instanceof java.net.SocketTimeoutException
-          && cause.getMessage() != null && cause.getMessage().contains("Read timed out");
+          && causeMsg.contains("Read timed out");
       LlmException.ErrorCode code = isReadTimeout
           ? LlmException.ErrorCode.LLM_TIMEOUT
           : LlmException.ErrorCode.LLM_UNREACHABLE;
