@@ -9,6 +9,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   useReactFlow,
+  applyNodeChanges,
   type Node,
   type Edge,
   type NodeProps,
@@ -16,6 +17,7 @@ import {
   type NodeTypes,
   type EdgeTypes,
   type NodeMouseHandler,
+  type OnNodesChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './ClusterGraph.css';
@@ -577,6 +579,8 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   const [colorMode, setColorMode] = useState<ColorMode>('traffic');
   const [layoutVersion, setLayoutVersion] = useState(0);
   const layoutGen = useRef(0);
+  // Tracks positions that the user has manually dragged, keyed by node id.
+  const draggedPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
 
   const clusterById = new Map((data?.clusters ?? []).map(c => [c.id, c]));
 
@@ -586,10 +590,25 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
     setSelectedCluster(prev => prev?.id === node.id ? null : (cluster ?? null));
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Let ReactFlow own node position/selection changes (enables dragging).
+  const handleNodesChange: OnNodesChange = useCallback((changes) => {
+    setRfNodes(prev => {
+      const next = applyNodeChanges(changes, prev);
+      // Record positions for nodes that were dragged so layout re-runs don't reset them.
+      for (const change of changes) {
+        if (change.type === 'position' && change.dragging === false && change.position) {
+          draggedPositions.current.set(change.id, change.position);
+        }
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!data || data.clusters.length === 0 || groupBy === 'country') {
       setRfNodes([]);
       setRfEdges([]);
+      draggedPositions.current.clear();
       if (groupBy !== 'country') setSelectedCluster(null);
       return;
     }
@@ -631,6 +650,8 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
     }));
 
     const gen = ++layoutGen.current;
+    // Clear dragged positions when data or groupBy changes so ELK re-lays everything out.
+    draggedPositions.current.clear();
     runLayout(rawNodes, rawEdges, groupBy)
       .then(({ nodes, edges }) => {
         if (gen !== layoutGen.current) return;
@@ -642,7 +663,15 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
       .finally(() => {
         if (gen === layoutGen.current) setLayoutLoading(false);
       });
-  }, [data, groupBy, colorMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, groupBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update colorMode on node data without re-running layout (preserves drag positions).
+  useEffect(() => {
+    setRfNodes(prev => prev.map(n => n.id.startsWith('__lane__') ? n : ({
+      ...n,
+      data: { ...n.data, colorMode },
+    })));
+  }, [colorMode]);
 
   // Update selected state on nodes without re-running layout
   useEffect(() => {
@@ -792,6 +821,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               edges={rfEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
+              onNodesChange={handleNodesChange}
               onNodeClick={handleNodeClick}
               fitView
               fitViewOptions={{ padding: 0.15 }}
