@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ReactFlow,
   Background,
@@ -23,7 +24,6 @@ import { formatBytes } from '@/utils/formatters';
 import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } from '@/features/intelligence/services/intelligenceService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
-import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
 import { CountryMapView } from './CountryMapView';
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -383,10 +383,10 @@ interface ClusterPanelProps {
   cluster: ClusterNodeData;
   fileId: string;
   onClose: () => void;
-  onTrace: (conversationId: string) => void;
 }
 
-function ClusterPanel({ cluster, fileId, onClose, onTrace }: ClusterPanelProps) {
+function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
+  const navigate = useNavigate();
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [convosLoading, setConvosLoading] = useState(false);
   type IpMetric = 'bytes' | 'conversations' | 'risks' | 'peers';
@@ -540,11 +540,11 @@ function ClusterPanel({ cluster, fileId, onClose, onTrace }: ClusterPanelProps) 
               <button
                 className="btn btn-outline-primary btn-sm flex-shrink-0"
                 style={{ fontSize: 10, padding: '2px 8px' }}
-                onClick={() => onTrace(c.id)}
-                title="Trace this conversation"
+                onClick={() => navigate(`/analysis/${fileId}/conversations?highlight=${c.id}`)}
+                title="View this conversation"
               >
-                <i className="bi bi-play-circle me-1" />
-                Trace
+                <i className="bi bi-arrow-right-circle me-1" />
+                View
               </button>
             </div>
           );
@@ -574,7 +574,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<ClusterNodeData | null>(null);
   const [layoutLoading, setLayoutLoading] = useState(false);
-  const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>('traffic');
   const [layoutVersion, setLayoutVersion] = useState(0);
   const layoutGen = useRef(0);
@@ -751,7 +750,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               cluster={selectedCluster}
               fileId={fileId}
               onClose={() => setSelectedCluster(null)}
-              onTrace={id => setTracerConversationId(id)}
             />
           )}
 
@@ -780,7 +778,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               cluster={selectedCluster}
               fileId={fileId}
               onClose={() => setSelectedCluster(null)}
-              onTrace={id => setTracerConversationId(id)}
             />
           )}
 
@@ -812,14 +809,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
         </div>
       )}
 
-      {/* Conversation Tracer modal */}
-      {tracerConversationId && (
-        <ConversationTracerModal
-          conversationId={tracerConversationId}
-          fileId={fileId}
-          onClose={() => setTracerConversationId(null)}
-        />
-      )}
     </div>
   );
 };
