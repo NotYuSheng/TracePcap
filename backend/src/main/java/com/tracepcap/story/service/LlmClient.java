@@ -246,7 +246,14 @@ public class LlmClient {
       } else {
         log.error("Error calling LLM API", e);
       }
-      throw new LlmException("Failed to reach the LLM service: " + e.getMessage(), e);
+      // Distinguish connection failures from read/generation timeouts
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      boolean isReadTimeout = cause instanceof java.net.SocketTimeoutException
+          && cause.getMessage() != null && cause.getMessage().contains("Read timed out");
+      LlmException.ErrorCode code = isReadTimeout
+          ? LlmException.ErrorCode.LLM_TIMEOUT
+          : LlmException.ErrorCode.LLM_UNREACHABLE;
+      throw new LlmException("Failed to reach the LLM service: " + e.getMessage(), e, code);
     }
   }
 

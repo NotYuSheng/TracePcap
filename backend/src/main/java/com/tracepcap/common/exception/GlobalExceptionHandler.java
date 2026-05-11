@@ -117,6 +117,7 @@ public class GlobalExceptionHandler {
             .error("Bad Gateway")
             .message(ex.getMessage())
             .path(request.getRequestURI())
+            .errorCode(ex.getErrorCode().name())
             .build();
 
     return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);

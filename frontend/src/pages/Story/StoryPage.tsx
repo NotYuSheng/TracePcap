@@ -139,12 +139,15 @@ export const StoryPage = () => {
           contextLength: (data.contextLength as number) ?? 0,
         });
         setEditablePrompt((data.promptText as string) ?? '');
-      } else if (isTimeout) {
-        const minutes = Math.round(llmTimeoutMs / 60000);
+      } else if (isTimeout || data.errorCode === 'LLM_TIMEOUT') {
+        const totalSeconds = Math.round(llmTimeoutMs / 1000);
+        const timeoutLabel = totalSeconds < 60
+          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
+          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
         setError(
-          `Story generation timed out after ${minutes} minute${minutes !== 1 ? 's' : ''}. The LLM is taking too long to respond. Try again or reduce the capture size.`
+          `Story generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or reduce the capture size.`
         );
-      } else if (status === 502) {
+      } else if (status === 502 || data.errorCode === 'LLM_UNREACHABLE') {
         setError(
           'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
         );
@@ -219,7 +222,8 @@ export const StoryPage = () => {
     const seconds = elapsedSeconds % 60;
     const elapsed =
       minutes > 0 ? `${minutes}m ${seconds.toString().padStart(2, '0')}s` : `${seconds}s`;
-    const timeoutMinutes = Math.round(llmTimeoutMs / 60000);
+    const timeoutSec = Math.round(llmTimeoutMs / 1000);
+    const timeoutLabel = timeoutSec < 60 ? `${timeoutSec}s` : `${Math.round(timeoutSec / 60)} min`;
     return (
       <div className="text-center py-5">
         <LoadingSpinner
@@ -230,7 +234,7 @@ export const StoryPage = () => {
           AI is analyzing the network traffic and creating a comprehensive narrative...
         </p>
         <p className="text-muted small mt-1">
-          Elapsed: <strong>{elapsed}</strong> &nbsp;|&nbsp; Timeout: {timeoutMinutes} min
+          Elapsed: <strong>{elapsed}</strong> &nbsp;|&nbsp; Timeout: {timeoutLabel}
         </p>
       </div>
     );
@@ -342,6 +346,18 @@ export const StoryPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Regeneration error banner */}
+      {error && (
+        <div className="row mb-3">
+          <div className="col-12">
+            <div className="alert alert-danger py-2 mb-0" role="alert">
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              {error}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* How stories are generated */}
       <div className="row mb-4">

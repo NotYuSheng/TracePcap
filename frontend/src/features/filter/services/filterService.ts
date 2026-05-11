@@ -11,14 +11,15 @@ export const filterService = {
   /**
    * Generate a pcap filter from natural language query
    */
-  generateFilter: async (fileId: string, query: string): Promise<FilterGenerationResponse> => {
+  generateFilter: async (fileId: string, query: string, timeoutMs?: number): Promise<FilterGenerationResponse> => {
     const request: FilterGenerationRequest = {
       fileId,
       naturalLanguageQuery: query,
     };
     const response = await apiClient.post<FilterGenerationResponse>(
       API_ENDPOINTS.GENERATE_FILTER(fileId),
-      request
+      request,
+      { ...(timeoutMs !== undefined && { timeout: timeoutMs }) }
     );
     return response.data;
   },

@@ -35,6 +35,10 @@ public class ConversationTracerController {
       description = "Generates a plain-English explanation for each packet in the conversation using the configured LLM. Results are cached per conversation.")
   public ResponseEntity<TracerExplainResponse> explainSteps(@PathVariable UUID conversationId) {
     log.info("POST /api/tracer/{}/explain", conversationId);
-    return ResponseEntity.ok(tracerService.explainSteps(conversationId));
+    TracerExplainResponse response = tracerService.explainSteps(conversationId);
+    if (response.getError() != null) {
+      return ResponseEntity.status(503).body(response);
+    }
+    return ResponseEntity.ok(response);
   }
 }
