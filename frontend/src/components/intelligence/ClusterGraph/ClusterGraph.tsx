@@ -597,7 +597,6 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
     if (!data || data.clusters.length === 0 || groupBy === 'country') {
       setRfNodes([]);
       setRfEdges([]);
-      draggedPositions.current.clear();
       if (groupBy !== 'country') setSelectedCluster(null);
       return;
     }
