@@ -415,11 +415,11 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 10,
-        right: 10,
+        position: 'fixed',
+        top: 20,
+        right: 20,
         width: 300,
-        zIndex: 10,
+        zIndex: 1050,
         background: 'var(--tp-surface, #fff)',
         border: '1px solid var(--tp-border, #dee2e6)',
         borderRadius: 8,
@@ -670,7 +670,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
   }, [selectedCluster]);
 
   return (
-    <div className="intel-cluster-graph-wrapper" style={{ position: 'relative' }}>
+    <div className="intel-cluster-graph-wrapper">
       {/* Controls bar */}
       <div className="d-flex align-items-center gap-3 mb-3">
         <label className="form-label mb-0 text-muted small">Group by</label>
