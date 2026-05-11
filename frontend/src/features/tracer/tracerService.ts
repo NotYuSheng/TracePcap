@@ -31,6 +31,7 @@ export interface StepExplanation {
 export interface TracerExplainResponse {
   conversationId: string;
   explanations: StepExplanation[];
+  error?: string;
 }
 
 export const tracerService = {

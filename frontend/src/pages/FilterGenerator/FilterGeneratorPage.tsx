@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { AnalysisData, Packet } from '@/types';
+import { apiClient } from '@/services/api/client';
 import { filterService } from '@/features/filter/services/filterService';
 import { Pagination } from '@components/common/Pagination';
 
@@ -25,6 +26,13 @@ export const FilterGeneratorPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedPacket, setSelectedPacket] = useState<Packet | null>(null);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
+
+  useEffect(() => {
+    apiClient.get<{ llmTimeoutMs?: number }>('/system/limits')
+      .then(res => { if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs); })
+      .catch(() => { /* keep default */ });
+  }, []);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,12 +80,12 @@ export const FilterGeneratorPage = () => {
     try {
       setGenerating(true);
       setError(null);
-      const result = await filterService.generateFilter(fileId, query);
+      const result = await filterService.generateFilter(fileId, query, llmTimeoutMs);
 
       // Validate the generated filter
       const validation = validateFilter(result.filter);
       if (!validation.valid) {
-        setError(`❌ Invalid Filter Generated: ${validation.message}`);
+        setError(`Invalid Filter Generated: ${validation.message}`);
         setGeneratedFilter('');
         setEditableFilter('');
         return;
@@ -93,22 +101,20 @@ export const FilterGeneratorPage = () => {
       setTotalMatches(0);
       setExecutionTime(null);
     } catch (err) {
-      // Provide helpful error message for common issues
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
       const errorMsg = err instanceof Error ? err.message : String(err);
-      if (
-        errorMsg.includes('500') ||
-        errorMsg.includes('LLM') ||
-        errorMsg.includes('Failed to generate')
-      ) {
-        setError(
-          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
-        );
-      } else if (errorMsg.includes('timeout') || errorMsg.includes('ECONNREFUSED')) {
-        setError(
-          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
-        );
+      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
+      if (data.errorCode === 'LLM_UNREACHABLE' || status === 502 || status === 503) {
+        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
+      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
+        const totalSeconds = Math.round(llmTimeoutMs / 1000);
+        const timeoutLabel = totalSeconds < 60
+          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
+          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
+        setError(`Filter generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or simplify your query.`);
       } else {
-        setError(`❌ Error: ${errorMsg || 'Failed to generate filter'}`);
+        setError(`Error: ${errorMsg || 'Failed to generate filter'}`);
       }
     } finally {
       setGenerating(false);
@@ -140,16 +146,16 @@ export const FilterGeneratorPage = () => {
         errorMsg.includes('parse filter')
       ) {
         setError(
-          `❌ Invalid BPF Syntax: The filter "${editableFilter}" is not valid BPF syntax. Common valid filters: "tcp port 80", "udp port 53", "host 192.168.1.1", "icmp". Check the BPF Cheat Sheet for help.`
+          `Invalid BPF Syntax: The filter "${editableFilter}" is not valid BPF syntax. Common valid filters: "tcp port 80", "udp port 53", "host 192.168.1.1", "icmp". Check the BPF Cheat Sheet for help.`
         );
       } else if (errorMsg.includes('500')) {
         setError(
-          '🔴 Server Error: The backend encountered an error while executing the filter. This might be due to invalid syntax or a server issue.'
+          'Server Error: The backend encountered an error while executing the filter. This might be due to invalid syntax or a server issue.'
         );
       } else if (errorMsg.includes('404')) {
-        setError('❌ File Not Found: The PCAP file could not be found. It may have been deleted.');
+        setError('File Not Found: The PCAP file could not be found. It may have been deleted.');
       } else {
-        setError(`❌ Execution Failed: ${errorMsg || 'Unknown error occurred'}`);
+        setError(`Execution Failed: ${errorMsg || 'Unknown error occurred'}`);
       }
     } finally {
       setExecuting(false);

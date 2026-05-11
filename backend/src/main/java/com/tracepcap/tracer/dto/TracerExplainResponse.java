@@ -9,4 +9,6 @@ import lombok.Data;
 public class TracerExplainResponse {
   private String conversationId;
   private List<StepExplanation> explanations;
+  /** Non-null when the LLM was unreachable or returned an error. */
+  private String error;
 }

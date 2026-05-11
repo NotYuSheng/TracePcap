@@ -104,10 +104,13 @@ public class ConversationTracerService {
       llmResponse = llmClient.generateCompletion(systemPrompt, userPrompt);
     } catch (LlmException e) {
       log.warn("LLM call failed for tracer {}: {}", conversationId, e.getMessage());
-      // Return empty explanations rather than failing the whole request
+      String errorMsg = e.getErrorCode() == com.tracepcap.common.exception.LlmException.ErrorCode.LLM_TIMEOUT
+          ? "AI explanation unavailable — the language model took too long to respond."
+          : "AI explanation unavailable — could not reach the language model. Check your LLM configuration.";
       return TracerExplainResponse.builder()
           .conversationId(conversationId.toString())
           .explanations(Collections.emptyList())
+          .error(errorMsg)
           .build();
     }
 
@@ -154,9 +157,34 @@ public class ConversationTracerService {
       if (p.getInfo() != null && !p.getInfo().isBlank()) {
         sb.append("  Info: ").append(p.getInfo()).append("\n");
       }
+      String ascii = extractAsciiPayload(p.getPayload());
+      if (!ascii.isEmpty()) {
+        sb.append("  Payload (ASCII): ").append(ascii).append("\n");
+      }
       sb.append("\n");
     }
     return sb.toString();
+  }
+
+  /**
+   * Converts up to the first 64 bytes of a hex payload string to a printable ASCII excerpt.
+   * Non-printable bytes are replaced with '.'. Returns empty string if payload is null/blank.
+   */
+  private String extractAsciiPayload(String hexPayload) {
+    if (hexPayload == null || hexPayload.isBlank()) return "";
+    // Strip any whitespace
+    String hex = hexPayload.replaceAll("\\s", "");
+    int byteLen = Math.min(hex.length() / 2, 64);
+    if (byteLen == 0) return "";
+    StringBuilder ascii = new StringBuilder(byteLen);
+    for (int i = 0; i < byteLen; i++) {
+      int b = Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+      ascii.append((b >= 0x20 && b < 0x7f) ? (char) b : '.');
+    }
+    // Only return if there's meaningful printable content (at least 4 consecutive printable chars)
+    String result = ascii.toString();
+    if (!result.matches(".*[\\x20-\\x7e]{4,}.*")) return "";
+    return result;
   }
 
   private List<StepExplanation> parseExplanations(String llmResponse, int packetCount) {

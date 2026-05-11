@@ -1,6 +1,41 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { tracerService, type TracerStep, type TracerStepsResponse } from '@/features/tracer/tracerService';
 import { conversationService } from '@/features/conversation/services/conversationService';
+
+function AiExplanationInfoPopover() {
+  const popover = (
+    <Popover id="info-ai-explanation" style={{ maxWidth: '320px' }}>
+      <Popover.Header>AI Explanation — How it works</Popover.Header>
+      <Popover.Body className="small">
+        <p className="mb-2">
+          For each packet the LLM receives: direction, protocol, size, tshark's dissector info
+          string, and up to 64 bytes of payload decoded as ASCII (where readable).
+        </p>
+        <p className="mb-2">
+          <strong>Works well for:</strong> TCP handshakes, HTTP requests, DNS queries, TLS
+          handshake phases — where the info field or payload is descriptive.
+        </p>
+        <p className="mb-0">
+          <strong>Limited for:</strong> encrypted traffic (TLS data, RDP) where only size and
+          direction are available — explanations will be generic.
+        </p>
+      </Popover.Body>
+    </Popover>
+  );
+  return (
+    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+      <button
+        type="button"
+        className="btn btn-link p-0 text-muted"
+        style={{ lineHeight: 1, flexShrink: 0 }}
+        aria-label="About AI Explanation"
+      >
+        <i className="bi bi-info-circle" style={{ fontSize: '0.85rem' }}></i>
+      </button>
+    </OverlayTrigger>
+  );
+}
 
 interface ConversationTracerModalProps {
   conversationId: string;
@@ -46,6 +81,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
   const [isPlaying, setIsPlaying] = useState(false);
   const [explanations, setExplanations] = useState<Map<number, string>>(new Map());
   const [explainLoading, setExplainLoading] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
 
   const [dotT, setDotT] = useState(0);
 
@@ -96,13 +132,21 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
   useEffect(() => {
     if (!tracer || tracer.steps.length === 0) return;
     setExplainLoading(true);
+    setExplainError(null);
     tracerService.explain(conversationId)
       .then(data => {
+        if (data.error) {
+          setExplainError(data.error);
+          return;
+        }
         const map = new Map<number, string>();
         data.explanations.forEach(e => map.set(e.stepIndex, e.explanation));
         setExplanations(map);
       })
-      .catch(console.error)
+      .catch((err) => {
+        const backendError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        setExplainError(backendError || 'AI explanation unavailable — could not reach the language model. Check your LLM configuration.');
+      })
       .finally(() => setExplainLoading(false));
   }, [tracer, conversationId]);
 
@@ -324,27 +368,33 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                 )}
 
                 {/* LLM explanation */}
-                <div
-                  style={{
-                    minHeight: 44,
-                    background: 'var(--tp-bg-subtle)',
-                    borderRadius: 6,
-                    padding: '6px 12px',
-                    fontSize: 12,
-                    color: 'var(--tp-text)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                >
-                  <i className="bi bi-stars" style={{ color: '#6c757d', flexShrink: 0 }} />
-                  {explainLoading && !explanations.has(currentStep) ? (
-                    <span className="text-muted">Generating AI explanation…</span>
-                  ) : explanations.has(currentStep) ? (
-                    <span>{explanations.get(currentStep)}</span>
-                  ) : (
-                    <span className="text-muted">No explanation available for this packet.</span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AiExplanationInfoPopover />
+                  <div
+                    style={{
+                      flex: 1,
+                      minHeight: 44,
+                      background: 'var(--tp-bg-subtle)',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      color: 'var(--tp-text)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <i className="bi bi-stars" style={{ color: '#6c757d', flexShrink: 0 }} />
+                    {explainLoading ? (
+                      <span className="text-muted">Generating AI explanation…</span>
+                    ) : explainError ? (
+                      <span style={{ color: 'var(--bs-danger)' }}>{explainError}</span>
+                    ) : explanations.has(currentStep) ? (
+                      <span>{explanations.get(currentStep)}</span>
+                    ) : (
+                      <span className="text-muted">No explanation available for this packet.</span>
+                    )}
+                  </div>
                 </div>
               </div>
 

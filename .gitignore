@@ -1,3 +1,6 @@
+# IDE / Editor settings
+.vscode/settings.json
+
 # Environment files with secrets
 .env
 .env.local
