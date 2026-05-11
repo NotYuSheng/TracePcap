@@ -2,6 +2,42 @@ import { useState } from 'react';
 import { formatBytes } from '@/utils/formatters';
 import type { HostSummary, SortBy } from '@/features/intelligence/services/intelligenceService';
 
+const GEO_SOURCE_INFO = {
+  ipinfo: {
+    label: 'Live',
+    tooltip: 'Location data from ipinfo.io (live lookup). Generally accurate but may be imprecise for cloud/CDN IPs whose servers are distributed globally.',
+    color: '#198754',
+  },
+  mmdb: {
+    label: 'MMDB',
+    tooltip: 'Location data from the bundled DB-IP Lite offline database. Approximate only — cloud provider IPs (AWS, Azure, Google, Cloudflare) may show incorrect cities or countries. No internet connection was available at lookup time.',
+    color: '#6c757d',
+  },
+};
+
+function GeoSourceBadge({ source }: { source: string | null }) {
+  if (!source) return null;
+  const info = GEO_SOURCE_INFO[source as keyof typeof GEO_SOURCE_INFO] ?? GEO_SOURCE_INFO.mmdb;
+  return (
+    <span
+      title={info.tooltip}
+      style={{
+        fontSize: 9,
+        fontWeight: 600,
+        color: '#fff',
+        background: info.color,
+        borderRadius: 3,
+        padding: '1px 4px',
+        cursor: 'help',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      {info.label} ⓘ
+    </span>
+  );
+}
+
 interface TopHostsTableProps {
   hosts: HostSummary[];
   loading: boolean;
@@ -99,9 +135,17 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
                   )}
                 </td>
                 <td style={{ fontSize: 10 }}>
-                  {host.country && <span className="me-1">{host.country}</span>}
-                  {host.org && <span className="text-muted">{host.org}</span>}
-                  {!host.country && !host.org && <span className="text-muted">—</span>}
+                  {(host.country || host.org) ? (
+                    <div className="d-flex align-items-center gap-1">
+                      <span>
+                        {host.country && <span className="me-1">{host.country}</span>}
+                        {host.org && <span className="text-muted">{host.org}</span>}
+                      </span>
+                      <GeoSourceBadge source={host.geoSource} />
+                    </div>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
                 </td>
               </tr>
             ))}

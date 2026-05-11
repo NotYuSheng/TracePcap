@@ -16,4 +16,5 @@ public class HostSummaryDto {
   private String country;
   private String org;
   private String role;
+  private String geoSource;
 }

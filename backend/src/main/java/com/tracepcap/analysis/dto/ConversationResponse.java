@@ -24,6 +24,7 @@ public class ConversationResponse {
     private String countryCode;
     private String asn;
     private String org;
+    private String geoSource;
   }
 
   private UUID conversationId;

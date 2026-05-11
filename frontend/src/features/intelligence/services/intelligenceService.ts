@@ -22,6 +22,7 @@ export interface ClusterNode {
   ipPeers: Record<string, number>;
   lat: number | null;
   lon: number | null;
+  geoSource: string | null;
 }
 
 export interface ClusterEdge {
@@ -50,6 +51,7 @@ export interface HostSummary {
   country: string | null;
   org: string | null;
   role: string;
+  geoSource: string | null;
 }
 
 export interface TopHostsResponse {
