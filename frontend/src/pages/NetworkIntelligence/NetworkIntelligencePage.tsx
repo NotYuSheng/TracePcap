@@ -8,6 +8,7 @@ import {
   type IntelClusterFilters,
 } from '@/features/intelligence/services/intelligenceService';
 import { conversationService } from '@/features/conversation/services/conversationService';
+import { ipOrgRuleService } from '@/features/intelligence/services/ipOrgRuleService';
 import { SummaryStatsBar } from '@components/intelligence/SummaryStatsBar/SummaryStatsBar';
 import { ClusterGraph } from '@components/intelligence/ClusterGraph/ClusterGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
@@ -43,6 +44,7 @@ export const NetworkIntelligencePage = () => {
   const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
   const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
+  const [activeNetLabels, setActiveNetLabels] = useState<string[]>([]);
 
   // ── Present-value state (loaded from API) ─────────────────────────────────
   const [presentRiskTypes, setPresentRiskTypes] = useState<string[]>([]);
@@ -50,6 +52,7 @@ export const NetworkIntelligencePage = () => {
   const [presentCustomSigs, setPresentCustomSigs] = useState<string[]>([]);
   const [presentCountries, setPresentCountries] = useState<string[]>([]);
   const [presentDeviceTypes, setPresentDeviceTypes] = useState<Set<string>>(new Set());
+  const [presentNetLabels, setPresentNetLabels] = useState<string[]>([]);
 
   useEffect(() => {
     if (!fileId) return;
@@ -63,6 +66,10 @@ export const NetworkIntelligencePage = () => {
     conversationService.getHostClassifications(fileId).then(hosts => {
       const types = new Set(hosts.map(h => h.deviceType).filter(Boolean) as string[]);
       setPresentDeviceTypes(types);
+    }).catch(() => {});
+    ipOrgRuleService.list().then(rules => {
+      const labels = [...new Set(rules.map(r => r.label))].sort();
+      setPresentNetLabels(labels);
     }).catch(() => {});
   }, [fileId]);
 
@@ -106,6 +113,7 @@ export const NetworkIntelligencePage = () => {
   const toggleCustomSig = toggleSet(setActiveCustomSigs);
   const toggleFileType = toggleSet(setActiveFileTypes);
   const toggleCountry = toggleSet(setActiveCountries);
+  const toggleNetLabel = toggleSet(setActiveNetLabels);
 
   const clearAllFilters = () => {
     setActiveLegendProtocols([]);
@@ -119,6 +127,7 @@ export const NetworkIntelligencePage = () => {
     setActiveCustomSigs([]);
     setActiveFileTypes([]);
     setActiveCountries([]);
+    setActiveNetLabels([]);
     setHasRisksOnly(false);
   };
 
@@ -134,7 +143,8 @@ export const NetworkIntelligencePage = () => {
     activeCountries.length +
     (ipFilter ? 1 : 0) +
     (portFilter ? 1 : 0) +
-    (hasRisksOnly ? 1 : 0);
+    (hasRisksOnly ? 1 : 0) +
+    activeNetLabels.length;
 
   // ── Build IntelClusterFilters from active filter state ────────────────────
   const intelFilters = useMemo((): IntelClusterFilters => {
@@ -161,12 +171,13 @@ export const NetworkIntelligencePage = () => {
       customSignatures: activeCustomSigs.length ? activeCustomSigs : undefined,
       deviceTypes: deviceTypes.length ? deviceTypes : undefined,
       countries: activeCountries.length ? activeCountries : undefined,
+      networkLabels: activeNetLabels.length ? activeNetLabels : undefined,
     };
   }, [
     ipFilter, portFilter, hasRisksOnly,
     activeLegendProtocols, activeNodeFilters,
     activeAppFilters, activeL7Protocols, activeCategories,
-    activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries,
+    activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNetLabels,
   ]);
 
   useEffect(() => {
@@ -274,6 +285,10 @@ export const NetworkIntelligencePage = () => {
           activeFilterCount={activeFilterCount}
           onClearAllFilters={clearAllFilters}
           defaultCollapsed={true}
+          activeNetLabels={activeNetLabels}
+          onNetLabelClick={toggleNetLabel}
+          onNetLabelClear={() => setActiveNetLabels([])}
+          presentNetLabels={presentNetLabels}
         />
       </div>
 

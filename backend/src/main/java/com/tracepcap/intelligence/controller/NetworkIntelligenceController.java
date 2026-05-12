@@ -42,7 +42,8 @@ public class NetworkIntelligenceController {
       @Parameter(description = "Comma-separated nDPI risk types") @RequestParam(required = false) String riskTypes,
       @Parameter(description = "Comma-separated custom signature rule names") @RequestParam(required = false) String customSignatures,
       @Parameter(description = "Comma-separated device types") @RequestParam(required = false) String deviceTypes,
-      @Parameter(description = "Comma-separated ISO 3166-1 alpha-2 country codes") @RequestParam(required = false) String countries) {
+      @Parameter(description = "Comma-separated ISO 3166-1 alpha-2 country codes") @RequestParam(required = false) String countries,
+      @Parameter(description = "Comma-separated network label names (e.g. 'Office,DMZ')") @RequestParam(required = false) String networkLabels) {
 
     log.info("GET /api/network/intelligence/{}/clusters?groupBy={}", fileId, groupBy);
 
@@ -61,7 +62,7 @@ public class NetworkIntelligenceController {
         .countries(splitComma(countries))
         .build();
 
-    ClusterGraphResponse response = intelligenceService.computeClusters(fileId, groupBy, filterParams);
+    ClusterGraphResponse response = intelligenceService.computeClusters(fileId, groupBy, filterParams, splitComma(networkLabels));
     return ResponseEntity.ok(response);
   }
 

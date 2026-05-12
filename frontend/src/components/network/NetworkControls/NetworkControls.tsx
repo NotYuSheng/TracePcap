@@ -85,6 +85,10 @@ interface NetworkControlsProps {
   onHasRisksOnlyChange: (val: boolean) => void;
   activeFilterCount: number;
   onClearAllFilters: () => void;
+  activeNetLabels?: string[];
+  onNetLabelClick?: (label: string) => void;
+  onNetLabelClear?: () => void;
+  presentNetLabels?: string[];
   /** Whether the panel starts collapsed. Defaults to false (expanded). */
   defaultCollapsed?: boolean;
 }
@@ -155,6 +159,10 @@ export function NetworkControls({
   onHasRisksOnlyChange,
   activeFilterCount,
   onClearAllFilters,
+  activeNetLabels = [],
+  onNetLabelClick,
+  onNetLabelClear,
+  presentNetLabels = [],
   defaultCollapsed = false,
 }: NetworkControlsProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
@@ -703,6 +711,47 @@ export function NetworkControls({
                             onClick={() => onFileTypeClick(ft)}
                           >
                             {ft}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Network Labels */}
+                {presentNetLabels.length > 0 && onNetLabelClick && (
+                  <div className="col-12">
+                    <PillSectionHeader
+                      label="Network Labels"
+                      info={
+                        <InfoPopover
+                          id="nc-info-netlabels"
+                          title="Network Labels"
+                          body="Filter by your defined network segments (e.g. Office, DMZ). Only conversations where at least one endpoint falls within a labelled CIDR range are shown."
+                        />
+                      }
+                      onSelectAll={() =>
+                        presentNetLabels.forEach(l => {
+                          if (!activeNetLabels.includes(l)) onNetLabelClick(l);
+                        })
+                      }
+                      onDeselectAll={onNetLabelClear ?? (() => {})}
+                    />
+                    <div className="d-flex flex-wrap gap-1 mt-1">
+                      {presentNetLabels.map(label => {
+                        const isActive = activeNetLabels.includes(label);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            className={filterPillClass(isActive)}
+                            style={
+                              isActive ? { backgroundColor: '#198754', color: '#fff' } : undefined
+                            }
+                            onClick={() => onNetLabelClick(label)}
+                          >
+                            <i className="bi bi-tag me-1" />
+                            {label}
                           </button>
                         );
                       })}

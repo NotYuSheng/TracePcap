@@ -17,6 +17,7 @@ export interface IntelClusterFilters {
   customSignatures?: string[];
   deviceTypes?: string[];
   countries?: string[];
+  networkLabels?: string[];
 }
 
 export interface ClusterNode {
@@ -89,6 +90,7 @@ export const intelligenceService = {
       if (filters.customSignatures?.length) params.set('customSignatures', filters.customSignatures.join(','));
       if (filters.deviceTypes?.length) params.set('deviceTypes', filters.deviceTypes.join(','));
       if (filters.countries?.length) params.set('countries', filters.countries.join(','));
+      if (filters.networkLabels?.length) params.set('networkLabels', filters.networkLabels.join(','));
     }
     const res = await apiClient.get<ClusterGraphResponse>(
       `/network/intelligence/${fileId}/clusters?${params.toString()}`
