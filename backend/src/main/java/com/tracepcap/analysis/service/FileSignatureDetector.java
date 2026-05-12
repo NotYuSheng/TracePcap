@@ -94,7 +94,7 @@ public final class FileSignatureDetector {
     try {
       MimeType mt = TIKA_MIME_REPO.forName(mime);
       String ext = mt.getExtension(); // e.g. ".pdf", ".docx"
-      if (ext != null && !ext.isEmpty()) {
+      if (ext != null && ext.length() > 1) {
         return ext.substring(1).toUpperCase(); // strip leading dot
       }
     } catch (MimeTypeException ignored) {
@@ -102,6 +102,6 @@ public final class FileSignatureDetector {
     // Fallback: derive from subtype string
     String subtype = mime.contains("/") ? mime.substring(mime.indexOf('/') + 1) : mime;
     subtype = subtype.replaceAll("^(x-|vnd\\.)", "").toUpperCase();
-    return subtype.length() <= 12 ? subtype : null;
+    return (!subtype.isEmpty() && subtype.length() <= 12) ? subtype : null;
   }
 }
