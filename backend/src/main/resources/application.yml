@@ -170,3 +170,53 @@ tracepcap:
   intelligence:
     max-clusters: ${INTELLIGENCE_MAX_CLUSTERS:60}   # Max cluster nodes returned per groupBy request
     max-edges: ${INTELLIGENCE_MAX_EDGES:200}         # Max edges returned per groupBy request
+  device-classification:
+    mobile-apps:
+      - Instagram
+      - TikTok
+      - Snapchat
+      - WhatsApp
+      - WeChat
+      - Line
+      - Viber
+      - Telegram
+      - Signal
+      - iMessage
+      - FaceTime
+      - AirDrop
+      - Siri
+    desktop-apps:
+      - Zoom
+      - Teams
+      - Slack
+      - Discord
+      - Skype
+      - WebEx
+      - GoToMeeting
+      - BitTorrent
+      - Steam
+      - Battle.net
+      - League of Legends
+      - Valorant
+      - Remote Desktop
+      - SSH
+      - SMB
+      - NFS
+      - VNC
+      - TeamViewer
+    server-apps:
+      - PostgreSQL
+      - MySQL
+      - MongoDB
+      - Redis
+      - Elasticsearch
+      - Kafka
+      - RabbitMQ
+      - Memcached
+      - LDAP
+      - Kerberos
+      - SNMP
+      - Syslog
+    iot-categories:
+      - IoT-Scada
+      - Cloud
