@@ -59,15 +59,18 @@ public class NetworkIntelligenceService {
           .collect(Collectors.toList());
       if (!netLabelRules.isEmpty()) {
         final List<IpOrgRuleEntity> rules = netLabelRules;
+        Map<String, Boolean> matchCache = new HashMap<>();
         conversations = conversations.stream()
-            .filter(c ->
-                ipOrgRuleService.matchIp(c.getSrcIp(), rules) != null ||
-                ipOrgRuleService.matchIp(c.getDstIp(), rules) != null)
+            .filter(c -> {
+              boolean srcMatch = matchCache.computeIfAbsent(c.getSrcIp(), ip -> ipOrgRuleService.matchIp(ip, rules) != null);
+              boolean dstMatch = matchCache.computeIfAbsent(c.getDstIp(), ip -> ipOrgRuleService.matchIp(ip, rules) != null);
+              return srcMatch || dstMatch;
+            })
             .collect(Collectors.toList());
         // Track which IPs are actually inside a label CIDR
         for (ConversationEntity c : conversations) {
-          if (ipOrgRuleService.matchIp(c.getSrcIp(), rules) != null) labelledIps.add(c.getSrcIp());
-          if (ipOrgRuleService.matchIp(c.getDstIp(), rules) != null) labelledIps.add(c.getDstIp());
+          if (Boolean.TRUE.equals(matchCache.get(c.getSrcIp()))) labelledIps.add(c.getSrcIp());
+          if (Boolean.TRUE.equals(matchCache.get(c.getDstIp()))) labelledIps.add(c.getDstIp());
         }
       }
     }
