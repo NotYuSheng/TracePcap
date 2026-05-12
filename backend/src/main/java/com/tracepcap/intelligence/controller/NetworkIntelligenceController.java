@@ -45,6 +45,7 @@ public class NetworkIntelligenceController {
       @Parameter(description = "Comma-separated detected file types") @RequestParam(required = false) String fileTypes,
       @Parameter(description = "Comma-separated nDPI risk types") @RequestParam(required = false) String riskTypes,
       @Parameter(description = "Comma-separated custom signature rule names") @RequestParam(required = false) String customSignatures,
+      @Parameter(description = "Filter by payload content (ASCII or hex)") @RequestParam(required = false) String payloadContains,
       @Parameter(description = "Comma-separated device types") @RequestParam(required = false) String deviceTypes,
       @Parameter(description = "Comma-separated ISO 3166-1 alpha-2 country codes") @RequestParam(required = false) String countries,
       @Parameter(description = "Comma-separated network label names (e.g. 'Office,DMZ')") @RequestParam(required = false) String networkLabels) {
@@ -62,6 +63,7 @@ public class NetworkIntelligenceController {
         .fileTypes(splitComma(fileTypes))
         .riskTypes(splitComma(riskTypes))
         .customSignatures(splitComma(customSignatures))
+        .payloadContains(payloadContains)
         .deviceTypes(splitComma(deviceTypes))
         .countries(splitComma(countries))
         .build();
