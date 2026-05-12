@@ -51,19 +51,24 @@ public class TsharkEnrichmentService {
   private static Map<String, String> loadIanaProtocolNumbers() {
     Map<String, String> map = new HashMap<>();
     try (InputStream is =
-            TsharkEnrichmentService.class.getResourceAsStream("/iana/protocol-numbers.csv");
-        BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
-      br.readLine(); // skip header
-      String line;
-      while ((line = br.readLine()) != null) {
-        String[] cols = line.split(",", 3);
-        if (cols.length < 2 || cols[1].isBlank()) continue;
-        String keyword = cols[1].trim();
-        keyword = KEYWORD_OVERRIDES.getOrDefault(keyword, keyword.toUpperCase());
-        map.put(cols[0].trim(), keyword);
+        TsharkEnrichmentService.class.getResourceAsStream("/iana/protocol-numbers.csv")) {
+      if (is == null) {
+        log.warn("IANA protocol numbers CSV not found on classpath");
+        return Collections.emptyMap();
+      }
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+        br.readLine(); // skip header
+        String line;
+        while ((line = br.readLine()) != null) {
+          String[] cols = line.split(",", 3);
+          if (cols.length < 2 || cols[1].isBlank()) continue;
+          String keyword = cols[1].trim();
+          keyword = KEYWORD_OVERRIDES.getOrDefault(keyword, keyword.toUpperCase());
+          map.put(cols[0].trim(), keyword);
+        }
       }
     } catch (Exception e) {
-      log.warn("Could not load IANA protocol numbers: {}", e.getMessage());
+      log.warn("Could not load IANA protocol numbers", e);
     }
     return Collections.unmodifiableMap(map);
   }
