@@ -848,8 +848,8 @@ export function NetworkControls({
                     <strong>Specific server role</strong> — the node's dominant inbound port identifies it as a known server type (DNS, web, SSH, FTP, mail, DHCP, NTP, database, router). Each type has a fixed colour.
                   </li>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: '#8b5cf6', color: '#fff' }}>Mobile</span>
-                    <span className="badge me-2" style={{ backgroundColor: '#0ea5e9', color: '#fff' }}>IoT</span>
+                    <span className="badge me-2" style={{ backgroundColor: deviceTypeColor('MOBILE'), color: '#fff' }}>Mobile</span>
+                    <span className="badge me-2" style={{ backgroundColor: deviceTypeColor('IOT'), color: '#fff' }}>IoT</span>
                     <strong>Device classification</strong> — inferred from MAC OUI vendor lookup, TTL fingerprinting, and observed nDPI application profiles. Overrides generic node type when a non-unknown device type is detected.
                   </li>
                   <li>
