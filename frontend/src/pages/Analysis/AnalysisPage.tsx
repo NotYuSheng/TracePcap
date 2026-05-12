@@ -274,7 +274,7 @@ export const AnalysisPage = () => {
       {/* Navigation Tabs */}
       <ul
         className="nav nav-tabs"
-        style={{ flexWrap: 'nowrap', overflowX: 'auto', display: 'flex', borderBottom: 'none', paddingTop: '1px' }}
+        style={{ display: 'flex', flexWrap: 'wrap', borderBottom: 'none', paddingTop: '1px' }}
       >
         <li className="nav-item">
           <button

@@ -39,8 +39,9 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
         maxWidth: '380px',
         boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
         borderRadius: '8px',
-        backgroundColor: '#fff',
-        border: '1px solid #dee2e6',
+        backgroundColor: 'var(--tp-surface)',
+        border: '1px solid var(--tp-border)',
+        color: 'var(--tp-text)',
       }}
     >
       {/* Header */}
@@ -89,7 +90,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
               <div>
                 <span className="badge bg-secondary">{typeLabel}</span>
                 {typeNote && (
-                  <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                  <div className="mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                     {typeNote}
                   </div>
                 )}
@@ -108,7 +109,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
               {deviceTypeLabel(info.deviceType)}
             </span>
             {signals.length > 0 && (
-              <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+              <ul className="mb-1 ps-3 mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                 {signals.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
@@ -118,7 +119,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
               <div
                 style={{
                   flex: 1,
-                  background: '#e9ecef',
+                  background: 'var(--tp-bg-subtle)',
                   borderRadius: '4px',
                   height: '4px',
                   overflow: 'hidden',
@@ -133,7 +134,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
                   }}
                 />
               </div>
-              <span style={{ fontSize: '0.72rem', color: '#6c757d', whiteSpace: 'nowrap' }}>
+              <span className="text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
                 {info.confidence}% — {level}
               </span>
             </div>
@@ -150,7 +151,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
               <span className={`badge ${info.role === 'client' ? 'bg-primary' : 'bg-success'}`}>
                 {info.role.charAt(0).toUpperCase() + info.role.slice(1)}
               </span>
-              <div className="mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+              <div className="mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                 {info.role === 'client'
                   ? 'Initiated this conversation'
                   : 'Received this conversation'}
