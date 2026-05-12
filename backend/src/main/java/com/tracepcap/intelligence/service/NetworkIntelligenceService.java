@@ -1,5 +1,6 @@
 package com.tracepcap.intelligence.service;
 
+import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
@@ -38,9 +39,38 @@ public class NetworkIntelligenceService {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  public ClusterGraphResponse computeClusters(UUID fileId, String groupBy) {
+  public ClusterGraphResponse computeClusters(UUID fileId, String groupBy, ConversationFilterParams filterParams, List<String> networkLabels) {
     log.info("Computing {} clusters for file {}", groupBy, fileId);
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    List<ConversationEntity> conversations = (filterParams != null && hasActiveFilters(filterParams))
+        ? conversationRepository.findAll(ConversationRepository.buildSpec(fileId, filterParams))
+        : conversationRepository.findByFileId(fileId);
+
+    // Network label filter: keep only IPs that fall within any CIDR belonging to the
+    // selected labels. A conversation is kept if BOTH endpoints are labelled IPs, or if
+    // one endpoint is a labelled IP (to show what the segment talks to). The cluster-node
+    // post-filter below then removes any cluster whose IPs are all outside the label CIDRs,
+    // so only nodes containing at least one labelled IP remain in the graph.
+    Set<String> labelledIps = new HashSet<>();
+    List<IpOrgRuleEntity> netLabelRules = List.of();
+    if (networkLabels != null && !networkLabels.isEmpty()) {
+      List<IpOrgRuleEntity> allRules = ipOrgRuleService.loadRules();
+      netLabelRules = allRules.stream()
+          .filter(r -> networkLabels.contains(r.getLabel()))
+          .collect(Collectors.toList());
+      if (!netLabelRules.isEmpty()) {
+        final List<IpOrgRuleEntity> rules = netLabelRules;
+        conversations = conversations.stream()
+            .filter(c ->
+                ipOrgRuleService.matchIp(c.getSrcIp(), rules) != null ||
+                ipOrgRuleService.matchIp(c.getDstIp(), rules) != null)
+            .collect(Collectors.toList());
+        // Track which IPs are actually inside a label CIDR
+        for (ConversationEntity c : conversations) {
+          if (ipOrgRuleService.matchIp(c.getSrcIp(), rules) != null) labelledIps.add(c.getSrcIp());
+          if (ipOrgRuleService.matchIp(c.getDstIp(), rules) != null) labelledIps.add(c.getDstIp());
+        }
+      }
+    }
 
     Set<String> allIps = new HashSet<>();
     for (ConversationEntity c : conversations) {
@@ -215,6 +245,14 @@ public class NetworkIntelligenceService {
         })
         .collect(Collectors.toList());
 
+    // If a network label filter is active, remove cluster nodes that contain no labelled IPs
+    if (!labelledIps.isEmpty()) {
+      clusterDtos = clusterDtos.stream()
+          .filter(dto -> dto.getSampleIps().stream().anyMatch(labelledIps::contains)
+              || dto.getIpBytes().keySet().stream().anyMatch(labelledIps::contains))
+          .collect(Collectors.toList());
+    }
+
     // Prune to top maxClusters by traffic to keep rendering manageable
     int totalClusters = clusterDtos.size();
     if (clusterDtos.size() > maxClusters) {
@@ -316,6 +354,24 @@ public class NetworkIntelligenceService {
         .collect(Collectors.toList());
 
     return TopHostsResponse.builder().hosts(hosts).build();
+  }
+
+  // ── Filter helpers ────────────────────────────────────────────────────────
+
+  private boolean hasActiveFilters(ConversationFilterParams p) {
+    return (p.getIp() != null && !p.getIp().isBlank())
+        || p.getPort() != null
+        || (p.getProtocols() != null && !p.getProtocols().isEmpty())
+        || (p.getL7Protocols() != null && !p.getL7Protocols().isEmpty())
+        || (p.getApps() != null && !p.getApps().isEmpty())
+        || (p.getCategories() != null && !p.getCategories().isEmpty())
+        || Boolean.TRUE.equals(p.getHasRisks())
+        || (p.getFileTypes() != null && !p.getFileTypes().isEmpty())
+        || (p.getRiskTypes() != null && !p.getRiskTypes().isEmpty())
+        || (p.getCustomSignatures() != null && !p.getCustomSignatures().isEmpty())
+        || (p.getPayloadContains() != null && !p.getPayloadContains().isBlank())
+        || (p.getDeviceTypes() != null && !p.getDeviceTypes().isEmpty())
+        || (p.getCountries() != null && !p.getCountries().isEmpty());
   }
 
   // ── Clustering logic ──────────────────────────────────────────────────────
