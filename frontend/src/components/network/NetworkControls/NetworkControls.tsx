@@ -319,7 +319,7 @@ export function NetworkControls({
                       <InfoPopover
                         id="nc-info-nodetypes"
                         title="Node Types"
-                        body="Filter by the role of each node in the network graph — e.g. Client, Server, Gateway. Roles are inferred from port usage and traffic direction."
+                        body="Filter by the inferred role of each node. Determined from graph data: a node's dominant inbound port identifies it as a specific server type (e.g. DNS, HTTP), a high distinct peer count marks it as a router, and nodes that only initiate connections are classified as clients."
                       />
                     }
                     onSelectAll={() =>
@@ -419,16 +419,16 @@ export function NetworkControls({
                   </div>
                 )}
 
-                {/* L7 Protocols */}
+                {/* Dissected Protocols */}
                 {presentL7Protocols.length > 0 && (
                   <div className="col-12">
                     <PillSectionHeader
-                      label="L7 Protocol"
+                      label="Dissected Protocol"
                       info={
                         <InfoPopover
                           id="nc-info-l7protocol"
-                          title="L7 Protocol"
-                          body="Layer 7 application-layer protocol identified by Wireshark's deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
+                          title="Dissected Protocol"
+                          body="The deepest protocol Wireshark's tshark could decode in each flow, determined by its built-in deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
                         />
                       }
                       onSelectAll={() =>

@@ -2,8 +2,10 @@ package com.tracepcap.analysis.service;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,21 +41,37 @@ public class TsharkEnrichmentService {
 
   private static final String TSHARK_BINARY = "tshark";
 
-  /** ip.proto number → transport protocol name. */
-  private static final Map<String, String> IP_PROTO =
-      Map.ofEntries(
-          Map.entry("1", "ICMP"),
-          Map.entry("2", "IGMP"),
-          Map.entry("6", "TCP"),
-          Map.entry("17", "UDP"),
-          Map.entry("47", "GRE"),
-          Map.entry("50", "ESP"),
-          Map.entry("51", "AH"),
-          Map.entry("58", "ICMPv6"),
-          Map.entry("89", "OSPF"),
-          Map.entry("103", "PIM"),
-          Map.entry("112", "VRRP"),
-          Map.entry("132", "SCTP"));
+  /** Normalise IANA keyword names to match what tshark/nDPI emit. */
+  private static final Map<String, String> KEYWORD_OVERRIDES =
+      Map.of("IPv6-ICMP", "ICMPv6", "OSPFIGP", "OSPF");
+
+  /** ip.proto number → transport protocol name, loaded from IANA registry CSV. */
+  private static final Map<String, String> IP_PROTO = loadIanaProtocolNumbers();
+
+  private static Map<String, String> loadIanaProtocolNumbers() {
+    Map<String, String> map = new HashMap<>();
+    try (InputStream is =
+        TsharkEnrichmentService.class.getResourceAsStream("/iana/protocol-numbers.csv")) {
+      if (is == null) {
+        log.warn("IANA protocol numbers CSV not found on classpath");
+        return Collections.emptyMap();
+      }
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+        br.readLine(); // skip header
+        String line;
+        while ((line = br.readLine()) != null) {
+          String[] cols = line.split(",", 3);
+          if (cols.length < 2 || cols[1].isBlank()) continue;
+          String keyword = cols[1].trim();
+          keyword = KEYWORD_OVERRIDES.getOrDefault(keyword, keyword.toUpperCase());
+          map.put(cols[0].trim(), keyword);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Could not load IANA protocol numbers", e);
+    }
+    return Collections.unmodifiableMap(map);
+  }
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -221,8 +239,7 @@ public class TsharkEnrichmentService {
 
     // Transport protocol from ip.proto / ipv6.nxt number
     String protoNum = !f[8].isEmpty() ? f[8] : f[9];
-    String proto =
-        IP_PROTO.getOrDefault(protoNum, protoNum.isEmpty() ? "UNKNOWN" : protoNum.toUpperCase());
+    String proto = resolveProtoNumber(protoNum);
 
     String frameProtocols = f[10].trim();
     if (!frameProtocols.isEmpty()) {
@@ -292,6 +309,11 @@ public class TsharkEnrichmentService {
    */
   private static final Set<String> NON_APP_PROTOCOLS =
       Set.of("DATA", "FRAME", "ETH", "ETHERNET", "SLL", "RAW");
+
+  /** Maps an ip.proto number string to a protocol name, or falls back to the raw number. */
+  static String resolveProtoNumber(String protoNum) {
+    return IP_PROTO.getOrDefault(protoNum, protoNum.isEmpty() ? "UNKNOWN" : protoNum.toUpperCase());
+  }
 
   /**
    * Returns the upperscased deepest protocol from a {@code frame.protocols} stack (e.g. {@code
