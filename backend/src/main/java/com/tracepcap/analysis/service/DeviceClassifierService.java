@@ -1,12 +1,14 @@
 package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.tracepcap.config.DeviceClassificationProperties;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DeviceClassifierService {
 
   // -------------------------------------------------------------------------
@@ -47,6 +50,8 @@ public class DeviceClassifierService {
   // -------------------------------------------------------------------------
   // OUI vendor lookup — loaded at startup from /usr/share/wireshark/manuf
   // -------------------------------------------------------------------------
+
+  private final DeviceClassificationProperties classificationProps;
 
   @Value("${app.wireshark.manuf-path:/usr/share/wireshark/manuf}")
   private String manufFile;
@@ -122,68 +127,6 @@ public class DeviceClassifierService {
     ouiVendor = Collections.unmodifiableMap(mutable);
     log.info("Loaded {} OUI entries from {}", loaded, manufFile);
   }
-
-  // -------------------------------------------------------------------------
-  // App profile signals
-  // -------------------------------------------------------------------------
-
-  /** nDPI apps strongly associated with mobile devices */
-  private static final Set<String> MOBILE_APPS =
-      Set.of(
-          "Instagram",
-          "TikTok",
-          "Snapchat",
-          "WhatsApp",
-          "WeChat",
-          "Line",
-          "Viber",
-          "Telegram",
-          "Signal",
-          "iMessage",
-          "FaceTime",
-          "AirDrop",
-          "Siri");
-
-  /** nDPI apps/categories suggesting a laptop/desktop */
-  private static final Set<String> DESKTOP_APPS =
-      Set.of(
-          "Zoom",
-          "Teams",
-          "Slack",
-          "Discord",
-          "Skype",
-          "WebEx",
-          "GoToMeeting",
-          "BitTorrent",
-          "Steam",
-          "Battle.net",
-          "League of Legends",
-          "Valorant",
-          "Remote Desktop",
-          "SSH",
-          "SMB",
-          "NFS",
-          "VNC",
-          "TeamViewer");
-
-  /** nDPI apps associated with server or infrastructure roles */
-  private static final Set<String> SERVER_APPS =
-      Set.of(
-          "PostgreSQL",
-          "MySQL",
-          "MongoDB",
-          "Redis",
-          "Elasticsearch",
-          "Kafka",
-          "RabbitMQ",
-          "Memcached",
-          "LDAP",
-          "Kerberos",
-          "SNMP",
-          "Syslog");
-
-  /** nDPI categories strongly associated with IoT / embedded devices */
-  private static final Set<String> IOT_CATEGORIES = Set.of("IoT-Scada", "Cloud");
 
   // -------------------------------------------------------------------------
   // Classification
@@ -359,13 +302,17 @@ public class DeviceClassifierService {
     }
 
     // --- Signal 3: nDPI app profile ---
+    Set<String> mobileApps = classificationProps.getMobileApps();
+    Set<String> desktopApps = classificationProps.getDesktopApps();
+    Set<String> serverApps = classificationProps.getServerApps();
+    Set<String> iotCategories = classificationProps.getIotCategories();
     for (String app : p.apps) {
-      if (MOBILE_APPS.contains(app)) scores.merge(MOBILE, 20, Integer::sum);
-      if (DESKTOP_APPS.contains(app)) scores.merge(LAPTOP_DESKTOP, 20, Integer::sum);
-      if (SERVER_APPS.contains(app)) scores.merge(SERVER, 20, Integer::sum);
+      if (mobileApps.contains(app)) scores.merge(MOBILE, 20, Integer::sum);
+      if (desktopApps.contains(app)) scores.merge(LAPTOP_DESKTOP, 20, Integer::sum);
+      if (serverApps.contains(app)) scores.merge(SERVER, 20, Integer::sum);
     }
     for (String cat : p.categories) {
-      if (IOT_CATEGORIES.contains(cat)) scores.merge(IOT, 15, Integer::sum);
+      if (iotCategories.contains(cat)) scores.merge(IOT, 15, Integer::sum);
       if ("Web".equals(cat) || "Media".equals(cat)) scores.merge(LAPTOP_DESKTOP, 5, Integer::sum);
     }
 
