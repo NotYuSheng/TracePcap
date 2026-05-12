@@ -4,6 +4,21 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 export type GroupBy = 'asn' | 'country' | 'city' | 'subnet24' | 'subnet16' | 'deviceType' | 'customOrg';
 export type SortBy = 'bytes' | 'packets' | 'conversations' | 'risks';
 
+export interface IntelClusterFilters {
+  ip?: string;
+  port?: string;
+  protocols?: string[];
+  l7Protocols?: string[];
+  apps?: string[];
+  categories?: string[];
+  hasRisks?: boolean;
+  fileTypes?: string[];
+  riskTypes?: string[];
+  customSignatures?: string[];
+  deviceTypes?: string[];
+  countries?: string[];
+}
+
 export interface ClusterNode {
   id: string;
   label: string;
@@ -59,9 +74,24 @@ export interface TopHostsResponse {
 }
 
 export const intelligenceService = {
-  async getClusters(fileId: string, groupBy: GroupBy): Promise<ClusterGraphResponse> {
+  async getClusters(fileId: string, groupBy: GroupBy, filters?: IntelClusterFilters): Promise<ClusterGraphResponse> {
+    const params = new URLSearchParams({ groupBy });
+    if (filters) {
+      if (filters.ip) params.set('ip', filters.ip);
+      if (filters.port) params.set('port', filters.port);
+      if (filters.protocols?.length) params.set('protocols', filters.protocols.join(','));
+      if (filters.l7Protocols?.length) params.set('l7Protocols', filters.l7Protocols.join(','));
+      if (filters.apps?.length) params.set('apps', filters.apps.join(','));
+      if (filters.categories?.length) params.set('categories', filters.categories.join(','));
+      if (filters.hasRisks) params.set('hasRisks', 'true');
+      if (filters.fileTypes?.length) params.set('fileTypes', filters.fileTypes.join(','));
+      if (filters.riskTypes?.length) params.set('riskTypes', filters.riskTypes.join(','));
+      if (filters.customSignatures?.length) params.set('customSignatures', filters.customSignatures.join(','));
+      if (filters.deviceTypes?.length) params.set('deviceTypes', filters.deviceTypes.join(','));
+      if (filters.countries?.length) params.set('countries', filters.countries.join(','));
+    }
     const res = await apiClient.get<ClusterGraphResponse>(
-      API_ENDPOINTS.NETWORK_INTELLIGENCE_CLUSTERS(fileId, groupBy)
+      `/network/intelligence/${fileId}/clusters?${params.toString()}`
     );
     return res.data;
   },

@@ -1,5 +1,6 @@
 package com.tracepcap.intelligence.service;
 
+import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
@@ -38,9 +39,11 @@ public class NetworkIntelligenceService {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  public ClusterGraphResponse computeClusters(UUID fileId, String groupBy) {
+  public ClusterGraphResponse computeClusters(UUID fileId, String groupBy, ConversationFilterParams filterParams) {
     log.info("Computing {} clusters for file {}", groupBy, fileId);
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    List<ConversationEntity> conversations = (filterParams != null && hasActiveFilters(filterParams))
+        ? conversationRepository.findAll(ConversationRepository.buildSpec(fileId, filterParams))
+        : conversationRepository.findByFileId(fileId);
 
     Set<String> allIps = new HashSet<>();
     for (ConversationEntity c : conversations) {
@@ -316,6 +319,23 @@ public class NetworkIntelligenceService {
         .collect(Collectors.toList());
 
     return TopHostsResponse.builder().hosts(hosts).build();
+  }
+
+  // ── Filter helpers ────────────────────────────────────────────────────────
+
+  private boolean hasActiveFilters(ConversationFilterParams p) {
+    return (p.getIp() != null && !p.getIp().isBlank())
+        || p.getPort() != null
+        || (p.getProtocols() != null && !p.getProtocols().isEmpty())
+        || (p.getL7Protocols() != null && !p.getL7Protocols().isEmpty())
+        || (p.getApps() != null && !p.getApps().isEmpty())
+        || (p.getCategories() != null && !p.getCategories().isEmpty())
+        || Boolean.TRUE.equals(p.getHasRisks())
+        || (p.getFileTypes() != null && !p.getFileTypes().isEmpty())
+        || (p.getRiskTypes() != null && !p.getRiskTypes().isEmpty())
+        || (p.getCustomSignatures() != null && !p.getCustomSignatures().isEmpty())
+        || (p.getDeviceTypes() != null && !p.getDeviceTypes().isEmpty())
+        || (p.getCountries() != null && !p.getCountries().isEmpty());
   }
 
   // ── Clustering logic ──────────────────────────────────────────────────────
