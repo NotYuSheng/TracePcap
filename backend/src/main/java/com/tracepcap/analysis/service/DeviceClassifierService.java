@@ -302,13 +302,17 @@ public class DeviceClassifierService {
     }
 
     // --- Signal 3: nDPI app profile ---
+    Set<String> mobileApps = classificationProps.getMobileApps();
+    Set<String> desktopApps = classificationProps.getDesktopApps();
+    Set<String> serverApps = classificationProps.getServerApps();
+    Set<String> iotCategories = classificationProps.getIotCategories();
     for (String app : p.apps) {
-      if (classificationProps.getMobileApps().contains(app)) scores.merge(MOBILE, 20, Integer::sum);
-      if (classificationProps.getDesktopApps().contains(app)) scores.merge(LAPTOP_DESKTOP, 20, Integer::sum);
-      if (classificationProps.getServerApps().contains(app)) scores.merge(SERVER, 20, Integer::sum);
+      if (mobileApps.contains(app)) scores.merge(MOBILE, 20, Integer::sum);
+      if (desktopApps.contains(app)) scores.merge(LAPTOP_DESKTOP, 20, Integer::sum);
+      if (serverApps.contains(app)) scores.merge(SERVER, 20, Integer::sum);
     }
     for (String cat : p.categories) {
-      if (classificationProps.getIotCategories().contains(cat)) scores.merge(IOT, 15, Integer::sum);
+      if (iotCategories.contains(cat)) scores.merge(IOT, 15, Integer::sum);
       if ("Web".equals(cat) || "Media".equals(cat)) scores.merge(LAPTOP_DESKTOP, 5, Integer::sum);
     }
 
