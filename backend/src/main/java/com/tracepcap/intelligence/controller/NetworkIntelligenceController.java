@@ -7,15 +7,19 @@ import com.tracepcap.intelligence.service.NetworkIntelligenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
+@Validated
 @RestController
 @RequestMapping("/api/network/intelligence")
 @RequiredArgsConstructor
@@ -32,7 +36,7 @@ public class NetworkIntelligenceController {
       @PathVariable UUID fileId,
       @RequestParam(defaultValue = "asn") String groupBy,
       @Parameter(description = "Filter by IP address or hostname") @RequestParam(required = false) String ip,
-      @Parameter(description = "Filter by port number (src or dst)") @RequestParam(required = false) Integer port,
+      @Parameter(description = "Filter by port number (src or dst)") @RequestParam(required = false) @Min(0) @Max(65535) Integer port,
       @Parameter(description = "Comma-separated L4 protocols") @RequestParam(required = false) String protocols,
       @Parameter(description = "Comma-separated L7 protocols") @RequestParam(required = false) String l7Protocols,
       @Parameter(description = "Comma-separated application names") @RequestParam(required = false) String apps,

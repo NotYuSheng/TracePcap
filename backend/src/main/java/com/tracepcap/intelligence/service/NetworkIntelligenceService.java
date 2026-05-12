@@ -369,6 +369,7 @@ public class NetworkIntelligenceService {
         || (p.getFileTypes() != null && !p.getFileTypes().isEmpty())
         || (p.getRiskTypes() != null && !p.getRiskTypes().isEmpty())
         || (p.getCustomSignatures() != null && !p.getCustomSignatures().isEmpty())
+        || (p.getPayloadContains() != null && !p.getPayloadContains().isBlank())
         || (p.getDeviceTypes() != null && !p.getDeviceTypes().isEmpty())
         || (p.getCountries() != null && !p.getCountries().isEmpty());
   }

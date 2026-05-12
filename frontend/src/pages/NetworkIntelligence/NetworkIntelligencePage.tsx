@@ -56,21 +56,20 @@ export const NetworkIntelligencePage = () => {
 
   useEffect(() => {
     if (!fileId) return;
-    conversationService.getRiskTypes(fileId).then(setPresentRiskTypes).catch(() => {});
-    conversationService.getFileTypes(fileId).then(setPresentFileTypes).catch(() => {});
-    conversationService.getCustomSignatures(fileId).then(setPresentCustomSigs).catch(() => {});
+    let active = true;
+    conversationService.getRiskTypes(fileId).then(v => { if (active) setPresentRiskTypes(v); }).catch(() => {});
+    conversationService.getFileTypes(fileId).then(v => { if (active) setPresentFileTypes(v); }).catch(() => {});
+    conversationService.getCustomSignatures(fileId).then(v => { if (active) setPresentCustomSigs(v); }).catch(() => {});
     conversationService.getCountries(fileId).then(codes => {
-      // Countries come back as "CC|CountryName" strings — extract just the code
-      setPresentCountries(codes.map(c => c.split('|')[0]).filter(Boolean).sort());
+      if (active) setPresentCountries(codes.map(c => c.split('|')[0]).filter(Boolean).sort());
     }).catch(() => {});
     conversationService.getHostClassifications(fileId).then(hosts => {
-      const types = new Set(hosts.map(h => h.deviceType).filter(Boolean) as string[]);
-      setPresentDeviceTypes(types);
+      if (active) setPresentDeviceTypes(new Set(hosts.map(h => h.deviceType).filter(Boolean) as string[]));
     }).catch(() => {});
     ipOrgRuleService.list().then(rules => {
-      const labels = [...new Set(rules.map(r => r.label))].sort();
-      setPresentNetLabels(labels);
+      if (active) setPresentNetLabels([...new Set(rules.map(r => r.label))].sort());
     }).catch(() => {});
+    return () => { active = false; };
   }, [fileId]);
 
   // ── Derive present-values from AnalysisData ───────────────────────────────
@@ -148,11 +147,6 @@ export const NetworkIntelligencePage = () => {
 
   // ── Build IntelClusterFilters from active filter state ────────────────────
   const intelFilters = useMemo((): IntelClusterFilters => {
-    // Map activeLegendProtocols (edge legend keys like TCP/UDP/ICMP) → protocols param
-    const protocols = activeLegendProtocols.filter(k =>
-      ['TCP', 'UDP', 'ICMP', 'ARP'].includes(k),
-    );
-
     // Map activeNodeFilters (dt:MOBILE etc.) → deviceTypes param
     const deviceTypes = activeNodeFilters
       .filter(k => k.startsWith('dt:'))
@@ -161,7 +155,7 @@ export const NetworkIntelligencePage = () => {
     return {
       ip: ipFilter || undefined,
       port: portFilter || undefined,
-      protocols: protocols.length ? protocols : undefined,
+      protocols: activeLegendProtocols.length ? activeLegendProtocols : undefined,
       l7Protocols: activeL7Protocols.length ? activeL7Protocols : undefined,
       apps: activeAppFilters.length ? activeAppFilters : undefined,
       categories: activeCategories.length ? activeCategories : undefined,
@@ -202,12 +196,14 @@ export const NetworkIntelligencePage = () => {
   // Fetch clusters when groupBy or filters change
   useEffect(() => {
     if (!fileId) return;
+    let active = true;
     setClusterLoading(true);
     setClusterError(null);
     setClusterData(null);
     intelligenceService
       .getClusters(fileId, groupBy, intelFilters)
       .then(result => {
+        if (!active) return;
         setClusterData(result);
         // On first load, auto-switch to subnet24 if all clusters are internal
         if (!autoSelected) {
@@ -219,8 +215,14 @@ export const NetworkIntelligencePage = () => {
           }
         }
       })
-      .catch(e => setClusterError(e instanceof Error ? e.message : 'Failed to load cluster data'))
-      .finally(() => setClusterLoading(false));
+      .catch(e => {
+        if (!active) return;
+        setClusterError(e instanceof Error ? e.message : 'Failed to load cluster data');
+      })
+      .finally(() => {
+        if (active) setClusterLoading(false);
+      });
+    return () => { active = false; };
   }, [fileId, groupBy, intelFiltersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

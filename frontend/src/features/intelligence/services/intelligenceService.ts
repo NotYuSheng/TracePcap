@@ -76,7 +76,9 @@ export interface TopHostsResponse {
 
 export const intelligenceService = {
   async getClusters(fileId: string, groupBy: GroupBy, filters?: IntelClusterFilters): Promise<ClusterGraphResponse> {
-    const params = new URLSearchParams({ groupBy });
+    // Start from the canonical endpoint (includes ?groupBy=X) and append extra filter params
+    const base = API_ENDPOINTS.NETWORK_INTELLIGENCE_CLUSTERS(fileId, groupBy);
+    const params = new URLSearchParams();
     if (filters) {
       if (filters.ip) params.set('ip', filters.ip);
       if (filters.port) params.set('port', filters.port);
@@ -92,9 +94,8 @@ export const intelligenceService = {
       if (filters.countries?.length) params.set('countries', filters.countries.join(','));
       if (filters.networkLabels?.length) params.set('networkLabels', filters.networkLabels.join(','));
     }
-    const res = await apiClient.get<ClusterGraphResponse>(
-      `/network/intelligence/${fileId}/clusters?${params.toString()}`
-    );
+    const qs = params.toString();
+    const res = await apiClient.get<ClusterGraphResponse>(qs ? `${base}&${qs}` : base);
     return res.data;
   },
 
