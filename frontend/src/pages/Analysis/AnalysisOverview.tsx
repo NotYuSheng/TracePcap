@@ -49,15 +49,15 @@ const ndpiPopover = (
 
 const l7Popover = (
   <Popover id="l7-info" style={{ maxWidth: '320px' }}>
-    <Popover.Header>About L7 protocols</Popover.Header>
+    <Popover.Header>About dissected protocols</Popover.Header>
     <Popover.Body>
       <p className="mb-2">
-        Layer 7 protocols are identified by{' '}
+        Determined by{' '}
         <a href="https://www.wireshark.org/" target="_blank" rel="noopener noreferrer">
           Wireshark
-        </a>{' '}
-        (tshark) deterministic dissectors — e.g. TLS, HTTP, DNS, QUIC. These reflect the
-        application-layer protocol in use, independent of the service generating the traffic.
+        </a>
+        's tshark, which inspects each flow's payload using built-in deterministic dissectors and
+        reports the deepest protocol it can decode — e.g. TLS, HTTP, DNS, QUIC.
       </p>
       <p className="mb-0">
         Click any badge to filter the Conversations tab to flows using that protocol.
@@ -192,7 +192,7 @@ export const AnalysisOverview = () => {
         <div className="mt-4">
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-layers me-2"></i>
-            L7 Protocols Detected
+            Dissected Protocols
             <OverlayTrigger trigger="click" placement="right" overlay={l7Popover} rootClose>
               <button
                 type="button"

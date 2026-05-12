@@ -18,8 +18,8 @@ export type ColumnKey =
 export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'source', label: 'Source', defaultVisible: true },
   { key: 'destination', label: 'Destination', defaultVisible: true },
-  { key: 'protocol', label: 'L4 Protocol', defaultVisible: false },
-  { key: 'tsharkProtocol', label: 'L7 Protocol', defaultVisible: true },
+  { key: 'protocol', label: 'Protocol', defaultVisible: false },
+  { key: 'tsharkProtocol', label: 'Dissected Protocol', defaultVisible: true },
   { key: 'appName', label: 'Application', defaultVisible: true },
   { key: 'category', label: 'Category', defaultVisible: true },
   { key: 'risks', label: 'Risks', defaultVisible: true },

@@ -286,7 +286,7 @@ export const ConversationDetail = ({
                 </dd>
                 <GeoInfoRows geo={conversation.srcGeo} label="Src" ip={source.ip} />
                 <GeoInfoRows geo={conversation.dstGeo} label="Dst" ip={destination.ip} />
-                <dt className="col-sm-4">L4 Protocol:</dt>
+                <dt className="col-sm-4">Protocol:</dt>
                 <dd className="col-sm-8">
                   {(() => {
                     const bg = getProtocolColor(conversation.protocol.name);
@@ -302,7 +302,7 @@ export const ConversationDetail = ({
                 </dd>
                 {conversation.tsharkProtocol && (
                   <>
-                    <dt className="col-sm-4">L7 Protocol:</dt>
+                    <dt className="col-sm-4">Dissected Protocol:</dt>
                     <dd className="col-sm-8">
                       {(() => {
                         const bg = getL7ProtocolColor(conversation.tsharkProtocol!);
