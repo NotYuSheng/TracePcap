@@ -25,6 +25,9 @@ public class SessionResponse {
   /** Parsed HTTP request/response pairs. Only populated when {@code detectedProtocol} is "HTTP". */
   private List<HttpExchange> httpExchanges;
 
+  /** Decoded STUN messages. Only populated when {@code detectedProtocol} is "STUN". */
+  private List<StunMessage> stunMessages;
+
   /** True when the session exceeded the 1 MB size limit and was truncated. */
   private boolean truncated;
 
@@ -61,6 +64,27 @@ public class SessionResponse {
   public static class HttpExchange {
     private HttpMessage request;
     private HttpMessage response;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class StunMessage {
+    /** "CLIENT" or "SERVER" — which side sent this STUN message. */
+    private String direction;
+
+    /** E.g. "Binding Request", "Binding Success Response", "Allocate Request". */
+    private String messageType;
+
+    /** STUN message class: "Request", "Indication", "Success Response", "Error Response". */
+    private String messageClass;
+
+    /** Hex transaction ID (12 bytes = 24 hex chars). */
+    private String transactionId;
+
+    /** Decoded STUN attributes (attribute type name → decoded value). */
+    private Map<String, String> attributes;
   }
 
   @Data

@@ -117,10 +117,16 @@ public class SessionReconstructionService {
       httpExchanges = parseHttpExchanges(rawChunks);
     }
 
+    List<SessionResponse.StunMessage> stunMessages = null;
+    if ("STUN".equals(detectedProtocol)) {
+      stunMessages = parseStunMessages(rawChunks);
+    }
+
     return SessionResponse.builder()
         .detectedProtocol(detectedProtocol)
         .chunks(chunks)
         .httpExchanges(httpExchanges)
+        .stunMessages(stunMessages)
         .truncated(truncated)
         .totalClientBytes(clientBytes)
         .totalServerBytes(serverBytes)
@@ -338,12 +344,14 @@ public class SessionReconstructionService {
       if (upper.contains("IMAP")) return "IMAP";
       if (upper.contains("POP")) return "POP3";
       if (upper.contains("DNS")) return "DNS";
+      if (upper.contains("STUN")) return "STUN";
     }
     String app = conv.getAppName();
     if (app != null) {
       String upper = app.toUpperCase();
       if (upper.contains("HTTP")) return "HTTP";
       if (upper.contains("TLS") || upper.contains("SSL")) return "TLS";
+      if (upper.contains("STUN")) return "STUN";
     }
 
     // Sniff first client bytes
@@ -371,6 +379,8 @@ public class SessionReconstructionService {
         }
         // TLS ClientHello starts with 0x16 0x03
         if (chunk.data[0] == 0x16 && chunk.data[1] == 0x03) return "TLS";
+        // STUN magic cookie 0x2112A442 at bytes 4-7
+        if (chunk.data.length >= 20 && isStunPacket(chunk.data, 0)) return "STUN";
         break;
       }
     }
@@ -386,6 +396,7 @@ public class SessionReconstructionService {
         case 143, 993 -> "IMAP";
         case 21 -> "FTP";
         case 53 -> "DNS";
+        case 3478, 5349 -> "STUN";
         default -> "RAW";
       };
     }
@@ -410,6 +421,240 @@ public class SessionReconstructionService {
               .build());
     }
     return result;
+  }
+
+  // -------------------------------------------------------------------------
+  // STUN parsing (RFC 5389 / 8489)
+  // -------------------------------------------------------------------------
+
+  private static final int STUN_MAGIC_COOKIE = 0x2112A442;
+
+  /**
+   * Returns true if the bytes at {@code offset} look like the start of a STUN message: the STUN
+   * magic cookie must appear at bytes 4–7.
+   */
+  private boolean isStunPacket(byte[] data, int offset) {
+    if (offset + 20 > data.length) return false;
+    int cookie =
+        ((data[offset + 4] & 0xFF) << 24)
+            | ((data[offset + 5] & 0xFF) << 16)
+            | ((data[offset + 6] & 0xFF) << 8)
+            | (data[offset + 7] & 0xFF);
+    return cookie == STUN_MAGIC_COOKIE;
+  }
+
+  private List<SessionResponse.StunMessage> parseStunMessages(List<RawChunk> rawChunks) {
+    List<SessionResponse.StunMessage> result = new ArrayList<>();
+    for (RawChunk chunk : rawChunks) {
+      // For UDP each chunk is typically one STUN datagram; for TCP there is a 4-byte framing
+      // header per RFC 4571 (2-byte length + the message). We attempt both.
+      parseStunFromBytes(chunk.data, chunk.direction, result);
+    }
+    return result;
+  }
+
+  private void parseStunFromBytes(byte[] data, String direction, List<SessionResponse.StunMessage> out) {
+    int pos = 0;
+    while (pos + 20 <= data.length) {
+      // Try with TCP framing (2-byte big-endian length prefix)
+      int tcpFrameLen = ((data[pos] & 0xFF) << 8) | (data[pos + 1] & 0xFF);
+      if (pos + 2 + tcpFrameLen <= data.length && isStunPacket(data, pos + 2)) {
+        SessionResponse.StunMessage msg = decodeStunMessage(data, pos + 2, direction);
+        if (msg != null) {
+          out.add(msg);
+          pos += 2 + tcpFrameLen;
+          continue;
+        }
+      }
+      // Try without framing (bare UDP datagram)
+      if (isStunPacket(data, pos)) {
+        int msgLen = ((data[pos + 2] & 0xFF) << 8) | (data[pos + 3] & 0xFF);
+        SessionResponse.StunMessage msg = decodeStunMessage(data, pos, direction);
+        if (msg != null) {
+          out.add(msg);
+          pos += 20 + msgLen;
+          continue;
+        }
+      }
+      break; // not a recognisable STUN message — stop scanning this chunk
+    }
+  }
+
+  private SessionResponse.StunMessage decodeStunMessage(byte[] data, int offset, String direction) {
+    if (offset + 20 > data.length) return null;
+
+    int typeField = ((data[offset] & 0xFF) << 8) | (data[offset + 1] & 0xFF);
+    int msgLen = ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+
+    // Transaction ID: bytes 8–19
+    StringBuilder txId = new StringBuilder();
+    for (int i = 8; i < 20; i++) {
+      txId.append(String.format("%02x", data[offset + i] & 0xFF));
+    }
+
+    String messageClass = decodeStunClass(typeField);
+    String messageType = decodeStunMethod(typeField, messageClass);
+
+    Map<String, String> attributes = new LinkedHashMap<>();
+
+    // Decode attributes
+    int attrOffset = offset + 20;
+    int attrEnd = Math.min(attrOffset + msgLen, data.length);
+    while (attrOffset + 4 <= attrEnd) {
+      int attrType = ((data[attrOffset] & 0xFF) << 8) | (data[attrOffset + 1] & 0xFF);
+      int attrLen = ((data[attrOffset + 2] & 0xFF) << 8) | (data[attrOffset + 3] & 0xFF);
+      int valueOffset = attrOffset + 4;
+      int valueEnd = Math.min(valueOffset + attrLen, attrEnd);
+
+      String attrName = stunAttributeName(attrType);
+      String attrValue = decodeStunAttribute(attrType, data, valueOffset, valueEnd - valueOffset);
+      attributes.put(attrName, attrValue);
+
+      // Attributes are padded to 4-byte boundaries
+      attrOffset += 4 + ((attrLen + 3) & ~3);
+    }
+
+    return SessionResponse.StunMessage.builder()
+        .direction(direction)
+        .messageType(messageType)
+        .messageClass(messageClass)
+        .transactionId(txId.toString())
+        .attributes(attributes)
+        .build();
+  }
+
+  /** Decodes the 2-bit STUN message class from the 14-bit type field. */
+  private String decodeStunClass(int typeField) {
+    // Bits C1 and C0 are at positions 8 and 4 of the 14-bit field (RFC 5389 §6)
+    int c1 = (typeField >> 8) & 0x01;
+    int c0 = (typeField >> 4) & 0x01;
+    int cls = (c1 << 1) | c0;
+    return switch (cls) {
+      case 0b00 -> "Request";
+      case 0b01 -> "Indication";
+      case 0b10 -> "Success Response";
+      case 0b11 -> "Error Response";
+      default -> "Unknown";
+    };
+  }
+
+  /** Decodes the STUN method from the type field and returns a human-readable message type. */
+  private String decodeStunMethod(int typeField, String messageClass) {
+    // Extract method bits: bits 13-10, 8-5, 3-0 (masking out the class bits)
+    int method = (typeField & 0x3E00) >> 2 | (typeField & 0x00E0) >> 1 | (typeField & 0x000F);
+    String methodName =
+        switch (method) {
+          case 0x001 -> "Binding";
+          case 0x003 -> "Allocate";
+          case 0x004 -> "Refresh";
+          case 0x006 -> "Send";
+          case 0x007 -> "Data";
+          case 0x008 -> "CreatePermission";
+          case 0x009 -> "ChannelBind";
+          default -> String.format("Unknown(0x%03x)", method);
+        };
+    return methodName + " " + messageClass;
+  }
+
+  private String stunAttributeName(int attrType) {
+    return switch (attrType) {
+      case 0x0001 -> "MAPPED-ADDRESS";
+      case 0x0006 -> "USERNAME";
+      case 0x0008 -> "MESSAGE-INTEGRITY";
+      case 0x0009 -> "ERROR-CODE";
+      case 0x000A -> "UNKNOWN-ATTRIBUTES";
+      case 0x0014 -> "REALM";
+      case 0x0015 -> "NONCE";
+      case 0x0020 -> "XOR-MAPPED-ADDRESS";
+      case 0x0024 -> "PRIORITY";
+      case 0x0025 -> "USE-CANDIDATE";
+      case 0x0026 -> "ICE-CONTROLLED";  // or ICE-CONTROLLING depending on value
+      case 0x0027 -> "ICE-CONTROLLING";
+      case 0x002B -> "RESPONSE-ORIGIN";
+      case 0x002C -> "OTHER-ADDRESS";
+      case 0x8022 -> "SOFTWARE";
+      case 0x8023 -> "ALTERNATE-SERVER";
+      case 0x8025 -> "TRANSACTION-TRANSMIT-COUNTER";
+      case 0x8028 -> "FINGERPRINT";
+      case 0x8029 -> "ICE-CONTROLLED";
+      case 0x802A -> "ICE-CONTROLLING";
+      case 0xC057 -> "NETWORK-COST";
+      default -> String.format("0x%04X", attrType);
+    };
+  }
+
+  private String decodeStunAttribute(int attrType, byte[] data, int offset, int length) {
+    if (length <= 0 || offset + length > data.length) return "(empty)";
+    try {
+      return switch (attrType) {
+        case 0x0001 -> decodeMappedAddress(data, offset, false);
+        case 0x0020 -> decodeMappedAddress(data, offset, true);
+        case 0x0006, 0x0014, 0x0015, 0x8022 ->
+            new String(data, offset, length, StandardCharsets.UTF_8);
+        case 0x0009 -> decodeErrorCode(data, offset, length);
+        case 0x0008, 0x8028 -> bytesToHex(data, offset, Math.min(length, 20));
+        case 0x0024 -> {
+          if (length >= 4) {
+            long priority =
+                ((data[offset] & 0xFFL) << 24)
+                    | ((data[offset + 1] & 0xFFL) << 16)
+                    | ((data[offset + 2] & 0xFFL) << 8)
+                    | (data[offset + 3] & 0xFFL);
+            yield String.valueOf(priority);
+          }
+          yield bytesToHex(data, offset, length);
+        }
+        default -> bytesToHex(data, offset, Math.min(length, 16));
+      };
+    } catch (Exception e) {
+      return "(parse error)";
+    }
+  }
+
+  /** Decodes MAPPED-ADDRESS or XOR-MAPPED-ADDRESS attribute. */
+  private String decodeMappedAddress(byte[] data, int offset, boolean xor) {
+    if (offset + 4 > data.length) return "(truncated)";
+    int family = data[offset + 1] & 0xFF;
+    int port = ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+    if (xor) {
+      port ^= (STUN_MAGIC_COOKIE >> 16) & 0xFFFF;
+    }
+    if (family == 0x01) {
+      // IPv4
+      if (offset + 8 > data.length) return "(truncated)";
+      int[] ip = new int[4];
+      for (int i = 0; i < 4; i++) {
+        ip[i] = data[offset + 4 + i] & 0xFF;
+        if (xor) ip[i] ^= (STUN_MAGIC_COOKIE >> (24 - i * 8)) & 0xFF;
+      }
+      return String.format("%d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], port);
+    } else if (family == 0x02) {
+      // IPv6 — just show hex for brevity
+      if (offset + 20 > data.length) return "(truncated)";
+      return "[IPv6]:" + port;
+    }
+    return "(unknown family)";
+  }
+
+  private String decodeErrorCode(byte[] data, int offset, int length) {
+    if (length < 4) return "(truncated)";
+    int cls = (data[offset + 2] & 0x07);
+    int num = data[offset + 3] & 0xFF;
+    int code = cls * 100 + num;
+    String reason =
+        length > 4
+            ? new String(data, offset + 4, length - 4, StandardCharsets.UTF_8).trim()
+            : "";
+    return reason.isEmpty() ? String.valueOf(code) : code + " " + reason;
+  }
+
+  private String bytesToHex(byte[] data, int offset, int length) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < length && offset + i < data.length; i++) {
+      if (i > 0) sb.append(':');
+      sb.append(String.format("%02x", data[offset + i] & 0xFF));
+    }
+    return sb.toString();
   }
 
   // -------------------------------------------------------------------------

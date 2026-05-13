@@ -363,6 +363,12 @@
   color: var(--tp-text);
 }
 
+[data-theme='dark'] .btn-outline-secondary.active {
+  background-color: var(--tp-border);
+  border-color: var(--tp-border);
+  color: var(--tp-text);
+}
+
 [data-theme='dark'] .btn-close {
   filter: invert(1) grayscale(100%) brightness(200%);
 }
