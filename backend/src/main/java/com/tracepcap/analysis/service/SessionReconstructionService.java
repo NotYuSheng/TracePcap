@@ -986,8 +986,9 @@ public class SessionReconstructionService {
       return iis.readAllBytes();
     } catch (Exception e) {
       // Fall back to raw deflate (no zlib wrapper).
-      try (InflaterInputStream iis =
-          new InflaterInputStream(new ByteArrayInputStream(data), new Inflater(true))) {
+      try (Inflater inflater = new Inflater(true);
+          InflaterInputStream iis =
+              new InflaterInputStream(new ByteArrayInputStream(data), inflater)) {
         return iis.readAllBytes();
       } catch (Exception e2) {
         return null;
