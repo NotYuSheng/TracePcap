@@ -153,6 +153,8 @@ export interface HttpMessage {
   body: string | null;
   bodyBinary: boolean;
   bodyDecompressed: boolean;
+  bodyEncoding: string | null;
+  bodyCompressedLength: number;
   bodyTruncated: boolean;
   bodyLength: number;
 }
