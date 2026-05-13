@@ -1,46 +1,33 @@
 import type { DeviceType } from '@/types';
 
+interface DeviceTypeConfig {
+  label: string;
+  color: string;
+}
+
+const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
+  ROUTER:         { label: 'Router',           color: '#f97316' }, // orange
+  MOBILE:         { label: 'Mobile',           color: '#8b5cf6' }, // violet
+  LAPTOP_DESKTOP: { label: 'Laptop / Desktop', color: '#3b82f6' }, // blue
+  SERVER:         { label: 'Server',           color: '#10b981' }, // emerald
+  IOT:            { label: 'IoT Device',       color: '#ec4899' }, // pink
+  UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
+};
+
+const DEFAULT_COLOR = '#6b7280';
+
 /**
  * Returns a human-readable label for the device type.
  */
 export function deviceTypeLabel(deviceType: DeviceType): string {
-  switch (deviceType) {
-    case 'ROUTER':
-      return 'Router';
-    case 'MOBILE':
-      return 'Mobile';
-    case 'LAPTOP_DESKTOP':
-      return 'Laptop / Desktop';
-    case 'SERVER':
-      return 'Server';
-    case 'IOT':
-      return 'IoT Device';
-    case 'UNKNOWN':
-      return 'Unknown';
-    default:
-      return deviceType; // custom YAML override values pass through as-is
-  }
+  return DEVICE_TYPE_CONFIG[deviceType]?.label ?? deviceType; // custom YAML override values pass through as-is
 }
 
 /**
  * Returns a hex colour for the device type (used in NetworkDiagram nodes).
  */
 export function deviceTypeColor(deviceType: DeviceType): string {
-  switch (deviceType) {
-    case 'ROUTER':
-      return '#f97316'; // orange
-    case 'MOBILE':
-      return '#8b5cf6'; // violet
-    case 'LAPTOP_DESKTOP':
-      return '#3b82f6'; // blue
-    case 'SERVER':
-      return '#10b981'; // emerald
-    case 'IOT':
-      return '#ec4899'; // pink
-    case 'UNKNOWN':
-    default:
-      return '#6b7280'; // gray
-  }
+  return DEVICE_TYPE_CONFIG[deviceType]?.color ?? DEFAULT_COLOR;
 }
 
 /**
