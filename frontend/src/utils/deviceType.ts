@@ -5,7 +5,7 @@ interface DeviceTypeConfig {
   color: string;
 }
 
-const DEVICE_TYPE_CONFIG: Record<string, DeviceTypeConfig> = {
+const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
   ROUTER:         { label: 'Router',           color: '#f97316' }, // orange
   MOBILE:         { label: 'Mobile',           color: '#8b5cf6' }, // violet
   LAPTOP_DESKTOP: { label: 'Laptop / Desktop', color: '#3b82f6' }, // blue
@@ -14,7 +14,7 @@ const DEVICE_TYPE_CONFIG: Record<string, DeviceTypeConfig> = {
   UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
 };
 
-const DEFAULT_CONFIG: DeviceTypeConfig = { label: '', color: '#6b7280' };
+const DEFAULT_COLOR = '#6b7280';
 
 /**
  * Returns a human-readable label for the device type.
@@ -27,7 +27,7 @@ export function deviceTypeLabel(deviceType: DeviceType): string {
  * Returns a hex colour for the device type (used in NetworkDiagram nodes).
  */
 export function deviceTypeColor(deviceType: DeviceType): string {
-  return (DEVICE_TYPE_CONFIG[deviceType] ?? DEFAULT_CONFIG).color;
+  return DEVICE_TYPE_CONFIG[deviceType]?.color ?? DEFAULT_COLOR;
 }
 
 /**
