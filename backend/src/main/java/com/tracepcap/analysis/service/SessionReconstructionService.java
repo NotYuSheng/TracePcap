@@ -495,6 +495,9 @@ public class SessionReconstructionService {
     String messageClass = decodeStunClass(typeField);
     String messageType = decodeStunMethod(typeField, messageClass);
 
+    // Transaction ID as raw bytes (bytes 8–19) — needed for IPv6 XOR-MAPPED-ADDRESS decoding
+    byte[] txIdBytes = Arrays.copyOfRange(data, offset + 8, offset + 20);
+
     Map<String, String> attributes = new LinkedHashMap<>();
 
     // Decode attributes
@@ -507,7 +510,7 @@ public class SessionReconstructionService {
       int valueEnd = Math.min(valueOffset + attrLen, attrEnd);
 
       String attrName = stunAttributeName(attrType);
-      String attrValue = decodeStunAttribute(attrType, data, valueOffset, valueEnd - valueOffset);
+      String attrValue = decodeStunAttribute(attrType, data, valueOffset, valueEnd - valueOffset, txIdBytes);
       attributes.put(attrName, attrValue);
 
       // Attributes are padded to 4-byte boundaries
@@ -583,12 +586,12 @@ public class SessionReconstructionService {
     };
   }
 
-  private String decodeStunAttribute(int attrType, byte[] data, int offset, int length) {
+  private String decodeStunAttribute(int attrType, byte[] data, int offset, int length, byte[] txId) {
     if (length <= 0 || offset + length > data.length) return "(empty)";
     try {
       return switch (attrType) {
-        case 0x0001 -> decodeMappedAddress(data, offset, false);
-        case 0x0020 -> decodeMappedAddress(data, offset, true);
+        case 0x0001 -> decodeMappedAddress(data, offset, false, null);
+        case 0x0020 -> decodeMappedAddress(data, offset, true, txId);
         case 0x0006, 0x0014, 0x0015, 0x8022 ->
             new String(data, offset, length, StandardCharsets.UTF_8);
         case 0x0009 -> decodeErrorCode(data, offset, length);
@@ -611,8 +614,8 @@ public class SessionReconstructionService {
     }
   }
 
-  /** Decodes MAPPED-ADDRESS or XOR-MAPPED-ADDRESS attribute. */
-  private String decodeMappedAddress(byte[] data, int offset, boolean xor) {
+  /** Decodes MAPPED-ADDRESS or XOR-MAPPED-ADDRESS attribute (IPv4 and IPv6). */
+  private String decodeMappedAddress(byte[] data, int offset, boolean xor, byte[] txId) {
     if (offset + 4 > data.length) return "(truncated)";
     int family = data[offset + 1] & 0xFF;
     int port = ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
@@ -622,16 +625,30 @@ public class SessionReconstructionService {
     if (family == 0x01) {
       // IPv4
       if (offset + 8 > data.length) return "(truncated)";
-      int[] ip = new int[4];
-      for (int i = 0; i < 4; i++) {
-        ip[i] = data[offset + 4 + i] & 0xFF;
-        if (xor) ip[i] ^= (STUN_MAGIC_COOKIE >> (24 - i * 8)) & 0xFF;
+      byte[] ipBytes = Arrays.copyOfRange(data, offset + 4, offset + 8);
+      if (xor) {
+        int ipInt = java.nio.ByteBuffer.wrap(ipBytes).getInt() ^ STUN_MAGIC_COOKIE;
+        java.nio.ByteBuffer.wrap(ipBytes).putInt(ipInt);
       }
-      return String.format("%d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], port);
+      try {
+        return java.net.InetAddress.getByAddress(ipBytes).getHostAddress() + ":" + port;
+      } catch (java.net.UnknownHostException e) {
+        return "(invalid IPv4):" + port;
+      }
     } else if (family == 0x02) {
-      // IPv6 — just show hex for brevity
+      // IPv6 — XOR key is magic cookie (4 bytes) + transaction ID (12 bytes)
       if (offset + 20 > data.length) return "(truncated)";
-      return "[IPv6]:" + port;
+      byte[] ipBytes = Arrays.copyOfRange(data, offset + 4, offset + 20);
+      if (xor && txId != null && txId.length == 12) {
+        byte[] xorKey = new byte[16];
+        java.nio.ByteBuffer.wrap(xorKey).putInt(STUN_MAGIC_COOKIE).put(txId);
+        for (int i = 0; i < 16; i++) ipBytes[i] ^= xorKey[i];
+      }
+      try {
+        return "[" + java.net.InetAddress.getByAddress(ipBytes).getHostAddress() + "]:" + port;
+      } catch (java.net.UnknownHostException e) {
+        return "(invalid IPv6):" + port;
+      }
     }
     return "(unknown family)";
   }
