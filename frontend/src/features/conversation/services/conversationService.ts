@@ -162,10 +162,19 @@ export interface HttpExchange {
   response: HttpMessage | null;
 }
 
+export interface StunMessage {
+  direction: 'CLIENT' | 'SERVER';
+  messageType: string;
+  messageClass: string;
+  transactionId: string;
+  attributes: Record<string, string>;
+}
+
 export interface SessionData {
   detectedProtocol: string | null;
   chunks: SessionChunk[];
   httpExchanges: HttpExchange[] | null;
+  stunMessages: StunMessage[] | null;
   truncated: boolean;
   totalClientBytes: number;
   totalServerBytes: number;
