@@ -9,6 +9,8 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -895,13 +897,23 @@ public class SessionReconstructionService {
 
     long actualBodyLength = bodyBytes.length;
 
-    // Handle gzip/deflate
+    // Handle content-encoding (gzip / deflate)
     boolean decompressed = false;
-    String contentEncoding = headers.getOrDefault("content-encoding", "");
-    if (contentEncoding.toLowerCase().contains("gzip") && bodyBytes.length > 0) {
-      byte[] decompressed_ = tryDecompress(bodyBytes);
-      if (decompressed_ != null) {
-        bodyBytes = decompressed_;
+    String bodyEncoding = null;
+    long bodyCompressedLength = 0;
+    String contentEncoding = headers.getOrDefault("content-encoding", "").toLowerCase();
+    if (bodyBytes.length > 0 && !contentEncoding.isEmpty()) {
+      byte[] result = null;
+      if (contentEncoding.contains("gzip")) {
+        result = tryDecompressGzip(bodyBytes);
+        if (result != null) bodyEncoding = "gzip";
+      } else if (contentEncoding.contains("deflate")) {
+        result = tryDecompressDeflate(bodyBytes);
+        if (result != null) bodyEncoding = "deflate";
+      }
+      if (result != null) {
+        bodyCompressedLength = bodyBytes.length;
+        bodyBytes = result;
         actualBodyLength = bodyBytes.length;
         decompressed = true;
       }
@@ -922,6 +934,8 @@ public class SessionReconstructionService {
         .body(bodyText)
         .bodyBinary(binary)
         .bodyDecompressed(decompressed)
+        .bodyEncoding(bodyEncoding)
+        .bodyCompressedLength(bodyCompressedLength)
         .bodyTruncated(bodyTruncated)
         .bodyLength(actualBodyLength)
         .build();
@@ -958,11 +972,26 @@ public class SessionReconstructionService {
     }
   }
 
-  private byte[] tryDecompress(byte[] data) {
+  private byte[] tryDecompressGzip(byte[] data) {
     try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(data))) {
       return gzip.readAllBytes();
     } catch (Exception e) {
       return null;
+    }
+  }
+
+  private byte[] tryDecompressDeflate(byte[] data) {
+    // Try zlib-wrapped deflate first (RFC 7230 recommends this format).
+    try (InflaterInputStream iis = new InflaterInputStream(new ByteArrayInputStream(data))) {
+      return iis.readAllBytes();
+    } catch (Exception e) {
+      // Fall back to raw deflate (no zlib wrapper).
+      try (InflaterInputStream iis =
+          new InflaterInputStream(new ByteArrayInputStream(data), new Inflater(true))) {
+        return iis.readAllBytes();
+      } catch (Exception e2) {
+        return null;
+      }
     }
   }
 

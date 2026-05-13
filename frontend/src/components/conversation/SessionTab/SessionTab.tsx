@@ -135,7 +135,9 @@ function HttpMessageBlock({
         <code style={{ fontSize: '0.8rem', color: '#fff', flex: 1 }}>{message.firstLine}</code>
         {message.bodyDecompressed && (
           <span className="badge bg-light text-dark" style={{ fontSize: '0.65rem' }}>
-            gzip decoded
+            {message.bodyEncoding ?? 'compressed'} decoded
+            {message.bodyCompressedLength > 0 &&
+              ` (${formatBytes(message.bodyCompressedLength)} → ${formatBytes(message.bodyLength)})`}
           </span>
         )}
       </div>

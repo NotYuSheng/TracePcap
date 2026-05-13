@@ -107,8 +107,17 @@ public class SessionResponse {
     /** True when the body contained non-printable bytes (body field will be null). */
     private boolean bodyBinary;
 
-    /** True when the body was gzip-encoded and successfully decompressed. */
+    /** True when the body was content-encoded and successfully decompressed. */
     private boolean bodyDecompressed;
+
+    /**
+     * The original Content-Encoding value (e.g. "gzip", "deflate", "br") when decompression was
+     * applied, otherwise null.
+     */
+    private String bodyEncoding;
+
+    /** Compressed byte length before decompression; 0 when not decompressed. */
+    private long bodyCompressedLength;
 
     /** True when the body was trimmed to the display limit. */
     private boolean bodyTruncated;
