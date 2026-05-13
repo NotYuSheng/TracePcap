@@ -1,3 +1,5 @@
+import type { NodeType } from './types';
+
 /**
  * Single source of truth for protocol edge colors and display labels used in
  * NetworkGraph (edge strokes) and NetworkControls (legend).
@@ -42,7 +44,7 @@ export const PROTOCOL_LABELS: Record<string, string> = {
  * Single source of truth for all per-node-type display properties.
  * Adding a new NodeType requires only one change here.
  */
-export const NODE_TYPE_CONFIG: Record<string, {
+export const NODE_TYPE_CONFIG: Record<NodeType, {
   label: string;
   icon: string;
   badgeClass: string;

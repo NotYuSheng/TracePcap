@@ -18,31 +18,34 @@ function determineRole(port: number): 'client' | 'server' {
 }
 
 /**
- * Maps nDPI appName values to node types.
+ * Maps nDPI appName values (uppercased) to node types.
  * Used as the primary classifier — more accurate than port-based guessing,
  * especially for encrypted flows (TLS/QUIC) and non-standard ports.
+ *
+ * Stored as an ordered array of [appName, NodeType] pairs so that priority
+ * is explicit and not dependent on object key iteration order.
+ * More-specific entries (e.g. FTP_CONTROL) should come before broader ones.
  */
-// Keys are uppercased — lookups normalise appName to uppercase for case-insensitive matching.
-const NDPI_APP_MAP: Partial<Record<string, NodeType>> = {
-  DNS: 'dns-server',
-  HTTP: 'web-server',
-  TLS: 'web-server',
-  QUIC: 'web-server',
-  SSH: 'ssh-server',
-  FTP_CONTROL: 'ftp-server',
-  FTP_DATA: 'ftp-server',
-  SMTP: 'mail-server',
-  SMTPTLS: 'mail-server',
-  IMAP: 'mail-server',
-  POP: 'mail-server',
-  DHCP: 'dhcp-server',
-  NTP: 'ntp-server',
-  MYSQL: 'database-server',
-  POSTGRESQL: 'database-server',
-  REDIS: 'database-server',
-  MONGODB: 'database-server',
-  ELASTICSEARCH: 'database-server',
-};
+const NDPI_APP_ENTRIES: [string, NodeType][] = [
+  ['DNS',           'dns-server'],
+  ['HTTP',          'web-server'],
+  ['TLS',           'web-server'],
+  ['QUIC',          'web-server'],
+  ['SSH',           'ssh-server'],
+  ['FTP_CONTROL',   'ftp-server'],
+  ['FTP_DATA',      'ftp-server'],
+  ['SMTP',          'mail-server'],
+  ['SMTPTLS',       'mail-server'],
+  ['IMAP',          'mail-server'],
+  ['POP',           'mail-server'],
+  ['DHCP',          'dhcp-server'],
+  ['NTP',           'ntp-server'],
+  ['MYSQL',         'database-server'],
+  ['POSTGRESQL',    'database-server'],
+  ['REDIS',         'database-server'],
+  ['MONGODB',       'database-server'],
+  ['ELASTICSEARCH', 'database-server'],
+];
 
 /**
  * Maps well-known port/protocol combinations to node types.
@@ -111,16 +114,18 @@ function classifyNodeType(
   if (node.data.isL2) return;
 
   // --- Primary: nDPI appName ---
-  // Pick the first matching nDPI app (deterministic order from NDPI_APP_MAP keys).
+  // Iterate NDPI_APP_ENTRIES in declared priority order (explicit, not key-order dependent).
   let matchedNdpiApp: string | null = null;
-  for (const app of Object.keys(NDPI_APP_MAP)) {
+  let matchedNodeType: NodeType | null = null;
+  for (const [app, type] of NDPI_APP_ENTRIES) {
     if (ndpiApps.has(app)) {
       matchedNdpiApp = app;
+      matchedNodeType = type;
       break;
     }
   }
-  if (matchedNdpiApp) {
-    node.data.nodeType = NDPI_APP_MAP[matchedNdpiApp]!;
+  if (matchedNdpiApp && matchedNodeType) {
+    node.data.nodeType = matchedNodeType;
     node.data.nodeTypeEvidence = {
       dominantPort: null,
       connectionCount: 0,
