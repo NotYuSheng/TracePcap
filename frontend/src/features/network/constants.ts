@@ -39,24 +39,34 @@ export const PROTOCOL_LABELS: Record<string, string> = {
 };
 
 /**
- * Display label overrides for node type legend entries.
- * Keys not listed here are title-cased automatically.
+ * Single source of truth for all per-node-type display properties.
+ * Adding a new NodeType requires only one change here.
  */
-export const NODE_TYPE_LABELS: Record<string, string> = {
-  'dns-server': 'DNS Server',
-  'web-server': 'Web Server',
-  'ssh-server': 'SSH Server',
-  'ftp-server': 'FTP Server',
-  'mail-server': 'Mail Server',
-  'dhcp-server': 'DHCP Server',
-  'ntp-server': 'NTP Server',
-  'database-server': 'Database Server',
-  router: 'Router / Gateway',
-  client: 'Client',
-  'l2-device': 'L2 Device',
-  anomaly: 'Anomaly',
-  unknown: 'Unknown',
+export const NODE_TYPE_CONFIG: Record<string, {
+  label: string;
+  icon: string;
+  badgeClass: string;
+  color: string;
+}> = {
+  'dns-server':      { label: 'DNS Server',       icon: 'bi-globe2',          badgeClass: 'bg-warning text-dark', color: '#f39c12' },
+  'web-server':      { label: 'Web Server',        icon: 'bi-server',          badgeClass: 'bg-success',           color: '#2ecc71' },
+  'ssh-server':      { label: 'SSH Server',        icon: 'bi-terminal',        badgeClass: 'bg-info text-dark',    color: '#1abc9c' },
+  'ftp-server':      { label: 'FTP Server',        icon: 'bi-folder-symlink',  badgeClass: 'bg-secondary',         color: '#16a085' },
+  'mail-server':     { label: 'Mail Server',       icon: 'bi-envelope',        badgeClass: 'bg-danger',            color: '#e91e63' },
+  'dhcp-server':     { label: 'DHCP Server',       icon: 'bi-diagram-3',       badgeClass: 'bg-secondary',         color: '#8e44ad' },
+  'ntp-server':      { label: 'NTP Server',        icon: 'bi-clock',           badgeClass: 'bg-dark',              color: '#6c3483' },
+  'database-server': { label: 'Database Server',   icon: 'bi-database',        badgeClass: 'bg-danger',            color: '#e67e22' },
+  router:            { label: 'Router / Gateway',  icon: 'bi-router',          badgeClass: 'bg-warning text-dark', color: '#d4ac0d' },
+  client:            { label: 'Client',            icon: 'bi-laptop',          badgeClass: 'bg-primary',           color: '#3498db' },
+  'l2-device':       { label: 'L2 Device',         icon: 'bi-ethernet',        badgeClass: 'bg-teal text-white',   color: '#1abc9c' },
+  anomaly:           { label: 'Anomaly',           icon: 'bi-exclamation-triangle', badgeClass: 'bg-danger',       color: '#e74c3c' },
+  unknown:           { label: 'Unknown',           icon: 'bi-question-circle', badgeClass: 'bg-light text-dark',   color: '#95a5a6' },
 };
+
+/** @deprecated Use NODE_TYPE_CONFIG[type].label instead. */
+export const NODE_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(NODE_TYPE_CONFIG).map(([k, v]) => [k, v.label])
+);
 
 /**
  * Converts a raw activeNodeFilters key (e.g. "nt:router", "dt:IOT") to a
@@ -136,22 +146,7 @@ export function buildActiveFilterLabels(filters: {
   return labels;
 }
 
-/**
- * Single source of truth for node type colors used in
- * NetworkGraph (node fill) and NetworkControls (legend).
- */
-export const NODE_TYPE_COLORS: Record<string, string> = {
-  'dns-server': '#f39c12',
-  'web-server': '#2ecc71',
-  'ssh-server': '#1abc9c',
-  'ftp-server': '#16a085',
-  'mail-server': '#e91e63',
-  'dhcp-server': '#8e44ad',
-  'ntp-server': '#6c3483',
-  'database-server': '#e67e22',
-  router: '#d4ac0d',
-  client: '#3498db',
-  'l2-device': '#1abc9c',
-  anomaly: '#e74c3c',
-  unknown: '#95a5a6',
-};
+/** @deprecated Use NODE_TYPE_CONFIG[type].color instead. */
+export const NODE_TYPE_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(NODE_TYPE_CONFIG).map(([k, v]) => [k, v.color])
+);

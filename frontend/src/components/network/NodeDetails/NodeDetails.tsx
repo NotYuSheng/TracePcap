@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { GraphNode, GraphEdge, NodeType } from '@/features/network/types';
+import type { GraphNode, GraphEdge } from '@/features/network/types';
+import { NODE_TYPE_CONFIG } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import './NodeDetails.css';
@@ -37,20 +38,6 @@ function getRoleBadgeClass(role: string): string {
   }
 }
 
-const NODE_TYPE_DISPLAY: Record<NodeType, { label: string; icon: string; badgeClass: string }> = {
-  'dns-server': { label: 'DNS Server', icon: 'bi-globe2', badgeClass: 'bg-warning text-dark' },
-  'web-server': { label: 'Web Server', icon: 'bi-server', badgeClass: 'bg-success' },
-  'ssh-server': { label: 'SSH Server', icon: 'bi-terminal', badgeClass: 'bg-info text-dark' },
-  'ftp-server': { label: 'FTP Server', icon: 'bi-folder-symlink', badgeClass: 'bg-secondary' },
-  'mail-server': { label: 'Mail Server', icon: 'bi-envelope', badgeClass: 'bg-danger' },
-  'dhcp-server': { label: 'DHCP Server', icon: 'bi-diagram-3', badgeClass: 'bg-secondary' },
-  'ntp-server': { label: 'NTP Server', icon: 'bi-clock', badgeClass: 'bg-dark' },
-  'database-server': { label: 'Database Server', icon: 'bi-database', badgeClass: 'bg-danger' },
-  router: { label: 'Router / Gateway', icon: 'bi-router', badgeClass: 'bg-warning text-dark' },
-  client: { label: 'Client', icon: 'bi-laptop', badgeClass: 'bg-primary' },
-  'l2-device': { label: 'L2 Device', icon: 'bi-ethernet', badgeClass: 'bg-teal text-white' },
-  unknown: { label: 'Unknown', icon: 'bi-question-circle', badgeClass: 'bg-light text-dark' },
-};
 
 export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) {
   const navigate = useNavigate();
@@ -91,7 +78,7 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
 
   const peers = Array.from(peerMap.entries()).sort((a, b) => b[1].bytes - a[1].bytes);
 
-  const typeInfo = NODE_TYPE_DISPLAY[node.data.nodeType] ?? NODE_TYPE_DISPLAY['unknown'];
+  const typeInfo = NODE_TYPE_CONFIG[node.data.nodeType] ?? NODE_TYPE_CONFIG['unknown'];
   return (
     <div
       className="modal fade show d-block"

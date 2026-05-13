@@ -23,6 +23,9 @@ export interface NodeClassificationInfo {
 }
 
 function typeEvidence(nodeType: NodeType, ev: NodeTypeEvidence): string {
+  if (ev.ndpiApps && ev.ndpiApps.length > 0) {
+    return `nDPI: ${ev.ndpiApps.join(', ')}`;
+  }
   switch (nodeType) {
     case 'router':
       return `${ev.distinctPeers} distinct peers`;
@@ -74,8 +77,9 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
         maxWidth: '380px',
         boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
         borderRadius: '8px',
-        backgroundColor: '#fff',
-        border: '1px solid #dee2e6',
+        backgroundColor: 'var(--tp-surface)',
+        border: '1px solid var(--tp-border)',
+        color: 'var(--tp-text)',
       }}
     >
       {/* Header */}
@@ -130,7 +134,7 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
                 {deviceTypeLabel(info.deviceType)}
               </span>
               {deviceSignals.length > 0 && (
-                <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: 'var(--tp-text-muted)' }}>
                   {deviceSignals.map((s, i) => (
                     <li key={i}>{s}</li>
                   ))}
@@ -140,7 +144,7 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
                 <div
                   style={{
                     flex: 1,
-                    background: '#e9ecef',
+                    background: 'var(--tp-bg-subtle)',
                     borderRadius: '4px',
                     height: '4px',
                     overflow: 'hidden',
@@ -155,7 +159,7 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
                     }}
                   />
                 </div>
-                <span style={{ fontSize: '0.72rem', color: '#6c757d', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--tp-text-muted)', whiteSpace: 'nowrap' }}>
                   {confidence}% — {confidenceLevel(confidence)}
                 </span>
               </div>
@@ -179,8 +183,8 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
         </div>
 
         {/* Legend */}
-        <table className="table table-sm table-bordered mb-0 mt-2" style={{ fontSize: '0.72rem' }}>
-          <thead className="table-light">
+        <table className="table table-sm table-bordered mb-0 mt-2" style={{ fontSize: '0.72rem', color: 'var(--tp-text)', borderColor: 'var(--tp-border)' }}>
+          <thead style={{ backgroundColor: 'var(--tp-bg-subtle)', color: 'var(--tp-text)' }}>
             <tr>
               <th></th>
               <th>Source</th>
@@ -191,7 +195,7 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
             <tr>
               <td>Type</td>
               <td>Network topology</td>
-              <td>Ports listened on, peer count</td>
+              <td>nDPI app name, ports listened on, peer count</td>
             </tr>
             <tr>
               <td>Device</td>
