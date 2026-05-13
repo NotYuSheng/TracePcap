@@ -13,12 +13,15 @@ export type NodeType =
   | 'router'
   | 'client'
   | 'l2-device'
+  | 'anomaly'
   | 'unknown';
 
 export interface NodeTypeEvidence {
   dominantPort: string | null;
   connectionCount: number;
   distinctPeers: number;
+  /** nDPI appName values that drove the classification (primary signal). */
+  ndpiApps?: string[];
 }
 
 export interface GraphNode {
