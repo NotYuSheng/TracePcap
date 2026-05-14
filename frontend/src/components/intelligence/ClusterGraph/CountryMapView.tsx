@@ -9,7 +9,7 @@ import {
 import type { ClusterGraphResponse, ClusterNode } from '@/features/intelligence/services/intelligenceService';
 import { intelligenceService } from '@/features/intelligence/services/intelligenceService';
 import { formatBytes } from '@/utils/formatters';
-import worldTopojson from '@/assets/geo/world-50m.json';
+import worldTopojson from 'virtual:world-map';
 import centroids from '@/assets/geo/country-centroids.json';
 
 const CENTROID_MAP = centroids as unknown as Record<string, [number, number]>;
