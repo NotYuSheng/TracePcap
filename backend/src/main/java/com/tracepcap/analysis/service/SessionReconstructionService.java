@@ -438,10 +438,15 @@ public class SessionReconstructionService {
       return detectRtpMedia(rawChunks);
     }
 
-    // For other protocols, scan the first chunk of each direction for container magic bytes
+    // For other protocols, scan the first chunk of each direction for container magic bytes.
+    // Container signatures appear at the stream start, so scanning every chunk would be wasteful
+    // for large sessions.
+    Set<String> seenDirections = new java.util.HashSet<>();
     for (RawChunk chunk : rawChunks) {
+      if (!seenDirections.add(chunk.direction)) continue; // already scanned this direction
       SessionResponse.MediaInfo info = detectContainerMagic(chunk.data);
       if (info != null) return info;
+      if (seenDirections.size() == 2) break; // both directions scanned
     }
     return null;
   }
@@ -476,7 +481,6 @@ public class SessionReconstructionService {
 
         // Advance past fixed header + CSRC list (no extension parsing needed)
         pos += 12 + csrcCount * 4;
-        break; // one RTP packet per chunk for UDP
       }
     }
 
