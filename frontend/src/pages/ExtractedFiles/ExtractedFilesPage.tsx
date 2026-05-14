@@ -4,6 +4,7 @@ import type { AnalysisData } from '@/types';
 import {
   getExtractedFiles,
   getDownloadUrl,
+  getPreviewUrl,
   type ExtractedFile,
 } from '@features/extractedFiles/services/extractedFilesService';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
@@ -78,6 +79,24 @@ function mimeIcon(mimeType: string | null): string {
   return 'bi-file-earmark';
 }
 
+/**
+ * Returns the preview mode for a MIME type if the browser can play it natively, or null otherwise.
+ * Only audio/video/image types that are universally supported without plugins are included.
+ */
+function nativePreviewMode(mimeType: string | null): 'audio' | 'video' | 'image' | null {
+  if (!mimeType) return null;
+  // Images — always natively renderable
+  if (mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/gif'
+      || mimeType === 'image/webp' || mimeType === 'image/svg+xml') return 'image';
+  // Audio — widely supported
+  if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3' || mimeType === 'audio/wav'
+      || mimeType === 'audio/ogg' || mimeType === 'audio/flac' || mimeType === 'audio/aac'
+      || mimeType === 'audio/webm' || mimeType === 'audio/mp4') return 'audio';
+  // Video — widely supported
+  if (mimeType === 'video/mp4' || mimeType === 'video/webm' || mimeType === 'video/ogg') return 'video';
+  return null;
+}
+
 function methodBadge(method: string | null) {
   if (method === 'tshark_http') return <span className="badge bg-primary">HTTP</span>;
   if (method === 'magic_bytes') return <span className="badge bg-secondary">Raw stream</span>;
@@ -129,6 +148,7 @@ export const ExtractedFilesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDownload, setPendingDownload] = useState<ExtractedFile | null>(null);
+  const [previewFile, setPreviewFile] = useState<ExtractedFile | null>(null);
   const [sortBy, setSortBy] = useState<SortField | ''>('');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [mimeTypeFilter, setMimeTypeFilter] = useState<string[]>([]);
@@ -357,13 +377,25 @@ export const ExtractedFilesPage = () => {
                       </td>
                       <td>{methodBadge(file.extractionMethod)}</td>
                       <td>
-                        <button
-                          className="btn btn-outline-primary btn-sm text-nowrap"
-                          onClick={() => handleDownloadRequest(file)}
-                        >
-                          <i className="bi bi-download me-1"></i>
-                          Download
-                        </button>
+                        <div className="d-flex gap-1">
+                          {nativePreviewMode(file.mimeType) && (
+                            <button
+                              className="btn btn-outline-secondary btn-sm text-nowrap"
+                              onClick={() => setPreviewFile(file)}
+                              title="Preview in browser"
+                            >
+                              <i className="bi bi-play-circle me-1"></i>
+                              Preview
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-outline-primary btn-sm text-nowrap"
+                            onClick={() => handleDownloadRequest(file)}
+                          >
+                            <i className="bi bi-download me-1"></i>
+                            Download
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -373,6 +405,63 @@ export const ExtractedFilesPage = () => {
           )}
         </div>
       </div>
+
+      {/* Inline media preview modal */}
+      <Modal show={previewFile !== null} onHide={() => setPreviewFile(null)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-play-circle me-2"></i>
+            Preview — {previewFile?.filename ?? '(unnamed)'}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center">
+          {previewFile && (() => {
+            const mode = nativePreviewMode(previewFile.mimeType);
+            const url = getPreviewUrl(fileId, previewFile.id);
+            if (mode === 'audio') {
+              return (
+                <audio controls src={url} style={{ width: '100%' }}>
+                  Your browser does not support audio playback.
+                </audio>
+              );
+            }
+            if (mode === 'video') {
+              return (
+                <video controls src={url} style={{ maxWidth: '100%', maxHeight: '60vh' }}>
+                  Your browser does not support video playback.
+                </video>
+              );
+            }
+            if (mode === 'image') {
+              return (
+                <img
+                  src={url}
+                  alt={previewFile.filename ?? 'preview'}
+                  style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }}
+                />
+              );
+            }
+            return null;
+          })()}
+          <div className="alert alert-warning mt-3 mb-0 text-start" style={{ fontSize: '0.8rem' }}>
+            <i className="bi bi-exclamation-triangle-fill me-1"></i>
+            Content rendered from a packet capture. Do not interact with active content on a
+            production system.
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-secondary" onClick={() => setPreviewFile(null)}>
+            Close
+          </button>
+          <button
+            className="btn btn-outline-primary"
+            onClick={() => { setPreviewFile(null); handleDownloadRequest(previewFile!); }}
+          >
+            <i className="bi bi-download me-1"></i>
+            Download
+          </button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Safety disclaimer modal */}
       <Modal show={pendingDownload !== null} onHide={() => setPendingDownload(null)}>

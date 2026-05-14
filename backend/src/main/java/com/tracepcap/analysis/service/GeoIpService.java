@@ -348,9 +348,11 @@ public class GeoIpService {
     }
   }
 
-  /** Returns true if the IP is RFC1918, loopback, link-local, or IPv6 ULA/loopback. */
+  /** Returns true if the IP is RFC1918, loopback, link-local, IPv6 ULA/loopback, or a MAC address. */
   static boolean isPrivate(String ip) {
     if (ip == null || ip.isBlank()) return true;
+    // MAC addresses (e.g. "00:11:22:33:44:55") — used as fallback IPs for non-IP packets
+    if (ip.matches("([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")) return true;
     String t = ip.trim();
     if (t.equals("::1") || t.startsWith("fc") || t.startsWith("fd") || t.startsWith("fe80"))
       return true;
