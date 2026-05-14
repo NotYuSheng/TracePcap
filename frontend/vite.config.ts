@@ -7,7 +7,7 @@ type MapResolution = (typeof VALID_RESOLUTIONS)[number];
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = loadEnv(mode, process.cwd());
   const rawResolution = env.VITE_MAP_RESOLUTION ?? '50m';
   const resolution: MapResolution = (VALID_RESOLUTIONS as readonly string[]).includes(rawResolution)
     ? (rawResolution as MapResolution)

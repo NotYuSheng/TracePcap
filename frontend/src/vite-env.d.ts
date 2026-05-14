@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 declare module 'virtual:world-map' {
-  const topology: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const topology: any;
   export default topology;
 }
