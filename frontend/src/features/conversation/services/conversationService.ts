@@ -172,11 +172,22 @@ export interface StunMessage {
   attributes: Record<string, string>;
 }
 
+export interface MediaInfo {
+  mediaType: 'VIDEO' | 'AUDIO' | 'IMAGE' | 'MEDIA';
+  containerFormat: string;
+  codec: string | null;
+  width: number | null;
+  height: number | null;
+  sampleRate: number | null;
+  streamCount: number | null;
+}
+
 export interface SessionData {
   detectedProtocol: string | null;
   chunks: SessionChunk[];
   httpExchanges: HttpExchange[] | null;
   stunMessages: StunMessage[] | null;
+  mediaInfo: MediaInfo | null;
   truncated: boolean;
   totalClientBytes: number;
   totalServerBytes: number;

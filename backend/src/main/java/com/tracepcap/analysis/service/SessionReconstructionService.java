@@ -124,11 +124,14 @@ public class SessionReconstructionService {
       stunMessages = parseStunMessages(rawChunks);
     }
 
+    SessionResponse.MediaInfo mediaInfo = detectMedia(conv, rawChunks, detectedProtocol);
+
     return SessionResponse.builder()
         .detectedProtocol(detectedProtocol)
         .chunks(chunks)
         .httpExchanges(httpExchanges)
         .stunMessages(stunMessages)
+        .mediaInfo(mediaInfo)
         .truncated(truncated)
         .totalClientBytes(clientBytes)
         .totalServerBytes(serverBytes)
@@ -347,6 +350,8 @@ public class SessionReconstructionService {
       if (upper.contains("POP")) return "POP3";
       if (upper.contains("DNS")) return "DNS";
       if (upper.contains("STUN")) return "STUN";
+      if (upper.contains("RTSP")) return "RTSP";
+      if (upper.contains("RTP") && !upper.contains("RTSP")) return "RTP";
     }
     String app = conv.getAppName();
     if (app != null) {
@@ -354,6 +359,8 @@ public class SessionReconstructionService {
       if (upper.contains("HTTP")) return "HTTP";
       if (upper.contains("TLS") || upper.contains("SSL")) return "TLS";
       if (upper.contains("STUN")) return "STUN";
+      if (upper.contains("RTSP")) return "RTSP";
+      if (upper.contains("RTP")) return "RTP";
     }
 
     // Sniff first client bytes
@@ -383,6 +390,15 @@ public class SessionReconstructionService {
         if (chunk.data[0] == 0x16 && chunk.data[1] == 0x03) return "TLS";
         // STUN magic cookie 0x2112A442 at bytes 4-7
         if (chunk.data.length >= 20 && isStunPacket(chunk.data, 0)) return "STUN";
+        // RTP: V=2 (top 2 bits of byte 0 = 10), valid payload type (byte 1 & 0x7F in 0-127)
+        if (chunk.data.length >= 12 && ((chunk.data[0] & 0xC0) == 0x80)) return "RTP";
+        // RTSP: either a plain RTSP/1.0 response, or an OPTIONS request with "rtsp://" in the URL
+        if (prefix.startsWith("RTSP")
+            || (prefix.startsWith("OPTI") && chunk.data.length > 8
+                && new String(Arrays.copyOf(chunk.data, Math.min(20, chunk.data.length)),
+                    StandardCharsets.US_ASCII).contains("rtsp"))) {
+          return "RTSP";
+        }
         break;
       }
     }
@@ -399,10 +415,311 @@ public class SessionReconstructionService {
         case 21 -> "FTP";
         case 53 -> "DNS";
         case 3478, 5349 -> "STUN";
+        case 554, 8554 -> "RTSP";
         default -> "RAW";
       };
     }
     return "RAW";
+  }
+
+  // -------------------------------------------------------------------------
+  // Media detection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Scans the raw payload for known media container/codec magic bytes and RTP packet structure.
+   * Returns a {@link SessionResponse.MediaInfo} when a media signature is found, or {@code null}.
+   */
+  private SessionResponse.MediaInfo detectMedia(
+      ConversationEntity conv, List<RawChunk> rawChunks, String detectedProtocol) {
+
+    // RTP: protocol already identified — build metadata from RTP header fields
+    if ("RTP".equals(detectedProtocol)) {
+      return detectRtpMedia(rawChunks);
+    }
+
+    // For other protocols, scan the first chunk of each direction for container magic bytes.
+    // Container signatures appear at the stream start, so scanning every chunk would be wasteful
+    // for large sessions.
+    Set<String> seenDirections = new java.util.HashSet<>();
+    for (RawChunk chunk : rawChunks) {
+      if (!seenDirections.add(chunk.direction)) continue; // already scanned this direction
+      SessionResponse.MediaInfo info = detectContainerMagic(chunk.data);
+      if (info != null) return info;
+      if (seenDirections.size() == 2) break; // both directions scanned
+    }
+    return null;
+  }
+
+  /**
+   * Parses RTP headers (RFC 3550) from UDP chunks to extract payload type, codec, and distinct
+   * SSRCs.
+   */
+  private SessionResponse.MediaInfo detectRtpMedia(List<RawChunk> rawChunks) {
+    Set<Long> ssrcs = new LinkedHashSet<>();
+    Integer payloadType = null;
+
+    for (RawChunk chunk : rawChunks) {
+      byte[] d = chunk.data;
+      int pos = 0;
+      // Each UDP chunk may contain one or more back-to-back RTP packets (unusual but possible
+      // when reconstructed from a TCP-framed stream). For UDP captures each chunk = one packet.
+      while (pos + 12 <= d.length) {
+        int version = (d[pos] & 0xC0) >> 6;
+        if (version != 2) break; // not an RTP packet
+
+        int csrcCount = d[pos] & 0x0F;
+        int pt = d[pos + 1] & 0x7F;
+        long ssrc =
+            ((d[pos + 8] & 0xFFL) << 24)
+                | ((d[pos + 9] & 0xFFL) << 16)
+                | ((d[pos + 10] & 0xFFL) << 8)
+                | (d[pos + 11] & 0xFFL);
+
+        ssrcs.add(ssrc);
+        if (payloadType == null) payloadType = pt;
+
+        // Advance past fixed header + CSRC list (no extension parsing needed)
+        pos += 12 + csrcCount * 4;
+      }
+    }
+
+    String codec = payloadType != null ? rtpPayloadTypeCodec(payloadType) : null;
+    String mediaType = rtpPayloadTypeMediaType(payloadType);
+
+    return SessionResponse.MediaInfo.builder()
+        .mediaType(mediaType)
+        .containerFormat("RTP")
+        .codec(codec)
+        .streamCount(ssrcs.isEmpty() ? null : ssrcs.size())
+        .build();
+  }
+
+  /** Returns the codec name for well-known static RTP payload types (RFC 3551). */
+  private String rtpPayloadTypeCodec(int pt) {
+    return switch (pt) {
+      case 0 -> "PCMU (G.711 μ-law)";
+      case 3 -> "GSM";
+      case 4 -> "G.723";
+      case 8 -> "PCMA (G.711 A-law)";
+      case 9 -> "G.722";
+      case 14 -> "MP3 (MPA)";
+      case 18 -> "G.729";
+      case 26 -> "JPEG";
+      case 31 -> "H.261";
+      case 32 -> "MPV (MPEG-1/2 Video)";
+      case 33 -> "MP2T (MPEG-2 TS)";
+      case 34 -> "H.263";
+      default -> pt >= 96 ? "dynamic(PT=" + pt + ")" : null;
+    };
+  }
+
+  /** Returns "AUDIO", "VIDEO", or "MEDIA" for a given RTP payload type. */
+  private String rtpPayloadTypeMediaType(Integer pt) {
+    if (pt == null) return "MEDIA";
+    return switch (pt) {
+      case 0, 3, 4, 8, 9, 14, 18 -> "AUDIO";
+      case 26, 31, 32, 33, 34 -> "VIDEO";
+      default -> "MEDIA"; // dynamic PTs could be either
+    };
+  }
+
+  /**
+   * Checks the first bytes of {@code data} for known container/image magic signatures.
+   *
+   * <ul>
+   *   <li>MP4/ftyp: bytes 4-7 = "ftyp"
+   *   <li>WebM/EBML: 0x1A 0x45 0xDF 0xA3
+   *   <li>Ogg: "OggS"
+   *   <li>JPEG: 0xFF 0xD8
+   *   <li>PNG: 0x89 "PNG"
+   *   <li>WebP: "RIFF" … "WEBP" at offset 8
+   *   <li>MPEG-TS: 0x47 sync byte (188-byte packets)
+   *   <li>FLAC: "fLaC"
+   *   <li>ID3 (MP3): "ID3" or 0xFF 0xFB/0xF3/0xF2
+   * </ul>
+   */
+  private SessionResponse.MediaInfo detectContainerMagic(byte[] data) {
+    if (data.length < 4) return null;
+
+    // MP4 — ISO Base Media: bytes 4-7 are "ftyp"
+    if (data.length >= 8 && data[4] == 'f' && data[5] == 't' && data[6] == 'y' && data[7] == 'p') {
+      String brand = data.length >= 12
+          ? new String(Arrays.copyOfRange(data, 8, 12), StandardCharsets.US_ASCII).trim()
+          : "";
+      String codec = mp4BrandCodec(brand);
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("VIDEO")
+          .containerFormat("MP4")
+          .codec(codec)
+          .build();
+    }
+
+    // WebM / Matroska EBML header
+    if ((data[0] & 0xFF) == 0x1A && (data[1] & 0xFF) == 0x45
+        && (data[2] & 0xFF) == 0xDF && (data[3] & 0xFF) == 0xA3) {
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("VIDEO")
+          .containerFormat("WebM")
+          .codec("VP8/VP9/AV1")
+          .build();
+    }
+
+    // Ogg container
+    if (data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S') {
+      String codec = detectOggCodec(data);
+      String mediaType = "opus".equals(codec) || "vorbis".equals(codec) ? "AUDIO" : "MEDIA";
+      return SessionResponse.MediaInfo.builder()
+          .mediaType(mediaType)
+          .containerFormat("Ogg")
+          .codec(codec)
+          .build();
+    }
+
+    // JPEG
+    if ((data[0] & 0xFF) == 0xFF && (data[1] & 0xFF) == 0xD8) {
+      Integer[] dims = parseJpegDimensions(data);
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("IMAGE")
+          .containerFormat("JPEG")
+          .width(dims[0])
+          .height(dims[1])
+          .build();
+    }
+
+    // PNG
+    if ((data[0] & 0xFF) == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G') {
+      Integer[] dims = parsePngDimensions(data);
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("IMAGE")
+          .containerFormat("PNG")
+          .width(dims[0])
+          .height(dims[1])
+          .build();
+    }
+
+    // WebP: RIFF????WEBP
+    if (data.length >= 12 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F'
+        && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P') {
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("IMAGE")
+          .containerFormat("WebP")
+          .build();
+    }
+
+    // MPEG-TS: starts with 0x47 sync byte
+    if ((data[0] & 0xFF) == 0x47 && data.length >= 188
+        && (data[188] & 0xFF) == 0x47) {
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("VIDEO")
+          .containerFormat("MPEG-TS")
+          .build();
+    }
+
+    // FLAC
+    if (data[0] == 'f' && data[1] == 'L' && data[2] == 'a' && data[3] == 'C') {
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("AUDIO")
+          .containerFormat("FLAC")
+          .build();
+    }
+
+    // MP3: ID3 tag header or sync word
+    if (data[0] == 'I' && data[1] == 'D' && data[2] == '3') {
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("AUDIO")
+          .containerFormat("MP3")
+          .codec("MP3")
+          .build();
+    }
+    if ((data[0] & 0xFF) == 0xFF && ((data[1] & 0xE0) == 0xE0)
+        && ((data[1] & 0x06) != 0x00)) { // MPEG sync + layer bits != 00
+      return SessionResponse.MediaInfo.builder()
+          .mediaType("AUDIO")
+          .containerFormat("MP3")
+          .codec("MP3")
+          .build();
+    }
+
+    return null;
+  }
+
+  /** Maps the ftyp major brand to a codec hint. */
+  private String mp4BrandCodec(String brand) {
+    return switch (brand.toLowerCase(java.util.Locale.ROOT)) {
+      case "avc1", "iso2", "isom", "mp41", "mp42" -> "H.264";
+      case "hevc", "hvc1", "hev1" -> "H.265/HEVC";
+      case "av01" -> "AV1";
+      case "qt  " -> "QuickTime";
+      case "M4V ", "m4v " -> "H.264 (iTunes)";
+      case "M4A ", "m4a " -> "AAC (Audio)";
+      default -> brand.isBlank() ? null : brand;
+    };
+  }
+
+  /**
+   * Looks past the first Ogg page to find the codec identification packet. Returns "opus",
+   * "vorbis", "theora", or null.
+   */
+  private String detectOggCodec(byte[] data) {
+    if (data.length < 28) return null;
+    // The codec identification packet starts immediately after the 28-byte Ogg page header
+    // (for single-segment pages). Scan the first 256 bytes for known signatures.
+    int searchEnd = Math.min(data.length, 256);
+    for (int i = 0; i < searchEnd - 8; i++) {
+      // OpusHead
+      if (data[i] == 'O' && data[i+1] == 'p' && data[i+2] == 'u' && data[i+3] == 's'
+          && data[i+4] == 'H' && data[i+5] == 'e' && data[i+6] == 'a' && data[i+7] == 'd') {
+        return "opus";
+      }
+      // \x01vorbis
+      if (data[i] == 0x01 && data[i+1] == 'v' && data[i+2] == 'o' && data[i+3] == 'r'
+          && data[i+4] == 'b' && data[i+5] == 'i' && data[i+6] == 's') {
+        return "vorbis";
+      }
+      // \x80theora
+      if ((data[i] & 0xFF) == 0x80 && data[i+1] == 't' && data[i+2] == 'h' && data[i+3] == 'e'
+          && data[i+4] == 'o' && data[i+5] == 'r' && data[i+6] == 'a') {
+        return "theora";
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Parses JPEG SOF (Start Of Frame) markers to extract image dimensions. Returns [width, height]
+   * or [null, null] if not found.
+   */
+  private Integer[] parseJpegDimensions(byte[] data) {
+    int i = 2; // skip SOI marker
+    while (i + 4 < data.length) {
+      if ((data[i] & 0xFF) != 0xFF) break;
+      int marker = data[i + 1] & 0xFF;
+      int segLen = ((data[i + 2] & 0xFF) << 8) | (data[i + 3] & 0xFF);
+      // SOF markers: 0xC0-0xC3, 0xC5-0xC7, 0xC9-0xCB, 0xCD-0xCF
+      if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7)
+          || (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF)) {
+        if (i + 9 < data.length) {
+          int height = ((data[i + 5] & 0xFF) << 8) | (data[i + 6] & 0xFF);
+          int width  = ((data[i + 7] & 0xFF) << 8) | (data[i + 8] & 0xFF);
+          return new Integer[]{width > 0 ? width : null, height > 0 ? height : null};
+        }
+      }
+      i += 2 + segLen;
+    }
+    return new Integer[]{null, null};
+  }
+
+  /**
+   * Reads PNG IHDR chunk (offset 16-24) for image dimensions. Returns [width, height] or
+   * [null, null] if the header is truncated.
+   */
+  private Integer[] parsePngDimensions(byte[] data) {
+    // PNG signature (8) + IHDR length (4) + "IHDR" (4) + width (4) + height (4) = 24 bytes
+    if (data.length < 24) return new Integer[]{null, null};
+    int width  = java.nio.ByteBuffer.wrap(data, 16, 4).getInt();
+    int height = java.nio.ByteBuffer.wrap(data, 20, 4).getInt();
+    return new Integer[]{width > 0 ? width : null, height > 0 ? height : null};
   }
 
   // -------------------------------------------------------------------------
@@ -985,13 +1302,16 @@ public class SessionReconstructionService {
     try (InflaterInputStream iis = new InflaterInputStream(new ByteArrayInputStream(data))) {
       return iis.readAllBytes();
     } catch (Exception e) {
-      // Fall back to raw deflate (no zlib wrapper).
-      try (Inflater inflater = new Inflater(true);
-          InflaterInputStream iis =
-              new InflaterInputStream(new ByteArrayInputStream(data), inflater)) {
+      // Fall back to raw deflate (no zlib wrapper). Inflater does not implement AutoCloseable
+      // so we close it explicitly.
+      Inflater inflater = new Inflater(true);
+      try (InflaterInputStream iis =
+          new InflaterInputStream(new ByteArrayInputStream(data), inflater)) {
         return iis.readAllBytes();
       } catch (Exception e2) {
         return null;
+      } finally {
+        inflater.end();
       }
     }
   }

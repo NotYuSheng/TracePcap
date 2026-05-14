@@ -5,6 +5,7 @@ import type {
   SessionChunk,
   HttpExchange,
   StunMessage,
+  MediaInfo,
 } from '@/features/conversation/services/conversationService';
 import { formatBytes } from '@/utils/formatters';
 
@@ -339,6 +340,39 @@ function StunMessagesView({ messages }: { messages: StunMessage[] }) {
   );
 }
 
+// ─── Media info panel ─────────────────────────────────────────────────────────
+
+function MediaInfoPanel({ info }: { info: MediaInfo }) {
+  const rows: Array<[string, string]> = [];
+  if (info.containerFormat) rows.push(['Container', info.containerFormat]);
+  if (info.codec) rows.push(['Codec', info.codec]);
+  if (info.width != null && info.height != null) rows.push(['Dimensions', `${info.width} × ${info.height}`]);
+  if (info.sampleRate != null) rows.push(['Sample rate', `${info.sampleRate.toLocaleString()} Hz`]);
+  if (info.streamCount != null) rows.push(['SSRC streams', String(info.streamCount)]);
+
+  return (
+    <div className="card mb-3" style={{ fontSize: '0.85rem' }}>
+      <div className="card-body p-3">
+        <div className="fw-semibold mb-2">
+          {info.mediaType} stream detected — {info.containerFormat}
+        </div>
+        {rows.length > 0 && (
+          <table className="table table-sm table-borderless mb-0" style={{ fontSize: '0.8rem' }}>
+            <tbody>
+              {rows.map(([k, v]) => (
+                <tr key={k}>
+                  <td className="text-muted pe-3" style={{ whiteSpace: 'nowrap', width: '1%' }}>{k}</td>
+                  <td>{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SessionTab({ conversationId }: SessionTabProps) {
@@ -419,6 +453,7 @@ export function SessionTab({ conversationId }: SessionTabProps) {
 
   const hasHttp = session.httpExchanges && session.httpExchanges.length > 0;
   const hasStun = session.stunMessages && session.stunMessages.length > 0;
+  const hasMedia = session.mediaInfo != null;
   const isTls = session.detectedProtocol === 'TLS';
 
   return (
@@ -428,6 +463,11 @@ export function SessionTab({ conversationId }: SessionTabProps) {
         <div className="d-flex align-items-center gap-2">
           {session.detectedProtocol && (
             <span className="badge bg-info text-dark">{session.detectedProtocol}</span>
+          )}
+          {hasMedia && (
+            <span className="badge bg-primary">
+              {session.mediaInfo!.containerFormat}
+            </span>
           )}
           <small className="text-muted">
             ↑ {formatBytes(session.totalClientBytes)} client &nbsp;·&nbsp; ↓{' '}
@@ -488,6 +528,9 @@ export function SessionTab({ conversationId }: SessionTabProps) {
           Session exceeded 1 MB — only the first 1 MB of data is shown.
         </div>
       )}
+
+      {/* Media metadata panel */}
+      {hasMedia && <MediaInfoPanel info={session.mediaInfo!} />}
 
       {/* Parsed HTTP view */}
       {hasHttp && activeView === 'parsed' && (

@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +72,9 @@ public class GeoIpService {
   private volatile Boolean onlineCache = null;
   private volatile long onlineCheckedAt = 0;
   private static final long ONLINE_CHECK_TTL_MS = 60_000; // re-check every 60s
+
+  private static final Pattern MAC_PATTERN =
+      Pattern.compile("([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}");
 
   public record GeoResult(
       String country, String countryCode, String asn, String org,
@@ -348,9 +352,11 @@ public class GeoIpService {
     }
   }
 
-  /** Returns true if the IP is RFC1918, loopback, link-local, or IPv6 ULA/loopback. */
+  /** Returns true if the IP is RFC1918, loopback, link-local, IPv6 ULA/loopback, or a MAC address. */
   static boolean isPrivate(String ip) {
     if (ip == null || ip.isBlank()) return true;
+    // MAC addresses (e.g. "00:11:22:33:44:55") — used as fallback IPs for non-IP packets
+    if (MAC_PATTERN.matcher(ip).matches()) return true;
     String t = ip.trim();
     if (t.equals("::1") || t.startsWith("fc") || t.startsWith("fd") || t.startsWith("fe80"))
       return true;

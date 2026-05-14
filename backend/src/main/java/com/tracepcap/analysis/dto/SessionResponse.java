@@ -28,6 +28,12 @@ public class SessionResponse {
   /** Decoded STUN messages. Only populated when {@code detectedProtocol} is "STUN". */
   private List<StunMessage> stunMessages;
 
+  /**
+   * Media metadata detected in the payload (RTP, MP4, WebM, etc.). Null when no known media
+   * signature was found.
+   */
+  private MediaInfo mediaInfo;
+
   /** True when the session exceeded the 1 MB size limit and was truncated. */
   private boolean truncated;
 
@@ -85,6 +91,40 @@ public class SessionResponse {
 
     /** Decoded STUN attributes (attribute type name → decoded value). */
     private Map<String, String> attributes;
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class MediaInfo {
+    /**
+     * High-level media category: "VIDEO", "AUDIO", "IMAGE", or "MEDIA" (when ambiguous).
+     */
+    private String mediaType;
+
+    /**
+     * Container/protocol format, e.g. "RTP", "MP4", "WebM", "Ogg", "JPEG", "PNG", "WebP", "AAC".
+     */
+    private String containerFormat;
+
+    /**
+     * Codec hint when determinable from the container header, e.g. "H.264", "VP8", "Opus",
+     * "AAC". Null when not determinable without full demuxing.
+     */
+    private String codec;
+
+    /** Image width in pixels (images only). Null when not applicable or not parseable. */
+    private Integer width;
+
+    /** Image height in pixels (images only). Null when not applicable or not parseable. */
+    private Integer height;
+
+    /** Audio sample rate in Hz (audio streams only). Null when not applicable. */
+    private Integer sampleRate;
+
+    /** Number of detected independent streams (e.g. RTP SSRCs). */
+    private Integer streamCount;
   }
 
   @Data
