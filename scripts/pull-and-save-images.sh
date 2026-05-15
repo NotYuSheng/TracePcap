@@ -55,8 +55,8 @@ echo "=== [1/3] Pulling third-party images ==="
 # --- Docker Hub ---
 DOCKERHUB_IMAGES=(
   "postgres:15-alpine"
-  "minio/minio:RELEASE.2024-11-07T00-52-20Z"
-  "minio/mc:RELEASE.2024-11-21T17-21-54Z"
+  "minio/minio:RELEASE.2025-04-22T22-12-26Z"
+  "minio/mc:RELEASE.2025-04-16T07-55-52Z"
 )
 
 for img in "${DOCKERHUB_IMAGES[@]}"; do

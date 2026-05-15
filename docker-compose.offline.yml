@@ -35,7 +35,7 @@ services:
 
   # MinIO Object Storage
   minio:
-    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: lanturn-minio
     command: server /data --console-address ":9001"
     environment:
@@ -57,7 +57,7 @@ services:
 
   # MinIO Client (mc) - Create bucket on startup
   minio-init:
-    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    image: minio/mc:RELEASE.2025-04-16T07-55-52Z
     container_name: lanturn-minio-init
     depends_on:
       - minio
