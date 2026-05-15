@@ -47,16 +47,18 @@ fi
 mkdir -p "$IMAGES_DIR"
 
 # ---------------------------------------------------------------------------
-# 1. Pull third-party images
+# 1. Pull third-party images — versions read from docker-compose.offline.yml
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== [1/3] Pulling third-party images ==="
 
-# --- Docker Hub ---
-DOCKERHUB_IMAGES=(
-  "postgres:15-alpine"
-  "minio/minio:RELEASE.2025-04-22T22-12-26Z"
-  "minio/mc:RELEASE.2025-08-13T08-35-41Z"
+# Parse third-party image tags directly from the offline compose file so that
+# the script and the compose file never get out of sync.
+OFFLINE_COMPOSE="$ROOT_DIR/docker-compose.offline.yml"
+mapfile -t DOCKERHUB_IMAGES < <(
+  grep '^\s*image:' "$OFFLINE_COMPOSE" \
+  | awk '{print $2}' \
+  | grep -v '^lanturn-'  # exclude locally-built images
 )
 
 for img in "${DOCKERHUB_IMAGES[@]}"; do
