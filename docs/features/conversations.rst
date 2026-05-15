@@ -201,19 +201,63 @@ columns include:
 Filtering
 ---------
 
-The filter bar supports simultaneous filtering on:
+The filter panel supports simultaneous filtering. Each filter section has a
+clickable ⓘ icon that explains exactly what is being matched. Filters combine
+with AND logic — a conversation must satisfy all active filters to be shown.
 
-- IP address (src, dst, or either)
-- Port (src, dst, or either)
-- Protocol (TCP, UDP, ICMP, …)
-- Application name (nDPI)
-- Risk level
-- Custom signature rule name
-- Device type
-- Country
-- Payload pattern (substring search across reconstructed payloads)
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
 
-Multiple filters combine with AND logic.
+   * - Filter
+     - What it matches
+   * - **IP / Hostname**
+     - Substring match (case-insensitive) against ``srcIp``, ``dstIp``, or the
+       SNI hostname extracted by nDPI. Accepts partial IPs or hostnames.
+   * - **Port**
+     - Exact integer match against ``srcPort`` **or** ``dstPort``. Digits only.
+   * - **Payload contains**
+     - Searches the stored 64-byte payload hex of every packet in the
+       conversation. Accepts: plain ASCII string (e.g. ``GET /admin``), hex
+       with ``0x`` prefix (e.g. ``0x474554``), or space-separated hex bytes
+       (e.g. ``47 45 54``).
+   * - **Security risks only**
+     - Toggle: shows only conversations that have at least one nDPI risk flag
+       (the ``flowRisks`` array is non-empty).
+   * - **Protocol** (pills)
+     - The ``_ws.col.Protocol`` label — the protocol carried in the IP header,
+       determined from the Wireshark display column with no heuristics
+       (e.g. TCP, UDP, ICMP, OSPF, GRE). Multiple selections are OR-matched.
+   * - **Dissected Protocol** (pills)
+     - The ``tsharkProtocol`` — deepest protocol Wireshark's dissectors decoded
+       from the ``frame.protocols`` stack (e.g. TLS, HTTP, DNS, QUIC).
+       Multiple selections are OR-matched.
+   * - **Application** (pills)
+     - The nDPI ``appName`` — application or service identified by deep packet
+       inspection (e.g. YouTube, WhatsApp). Detection accuracy may vary; treat
+       as indicative. Only present when nDPI analysis was enabled.
+   * - **Category** (pills)
+     - The nDPI traffic category (e.g. Web, Media, VPN, Social Network).
+       Multiple selections are OR-matched.
+   * - **File Types** (pills)
+     - Shows only conversations containing at least one packet where a file
+       magic-byte signature was detected in the stored 64-byte payload
+       (e.g. PDF, ZIP, PNG).
+   * - **Risk Type** (pills)
+     - Individual nDPI risk flag names (e.g. ``clear_text_credentials``,
+       ``tls_self_signed_certificate``). Multiple selections are OR-matched.
+   * - **Custom Rules** (pills)
+     - Custom detection rule names from ``signatures.yml`` that fired in this
+       PCAP. Only rules that matched at least one conversation are shown.
+       Severity quick-select buttons (critical/high/medium/low) select all
+       rules of that severity level at once.
+   * - **Country** (pills)
+     - Country of external IP addresses (src or dst) from ipinfo.io (online)
+       or DB-IP Lite (offline). Multiple selections are OR-matched.
+   * - **Device Type** (pills)
+     - Predicted device class (Router, Mobile, etc.) for either the source or
+       destination IP. Based on the multi-signal classifier; custom signature
+       overrides apply at 100% confidence.
 
 Sorting
 -------
@@ -225,6 +269,174 @@ Pagination
 ----------
 
 Results are paginated. The page size is configurable from 10 to 100 rows.
+
+Conversation Detail Panel
+--------------------------
+
+Clicking a row opens the **Conversation Detail Panel**, which shows all
+fields for a single conversation in one place. The fields displayed depend on
+what data was available during analysis:
+
+**Identity and endpoints**
+
+- Source IP : Port and Destination IP : Port
+- Destination hostname (SNI from TLS ClientHello, if available)
+- **Device type badges** — shown next to each IP if the device classifier ran.
+  Clicking the badge opens the **Device Classification Popup** (see below).
+- **Country / ASN** — for external IPs; includes a clickable geo-source badge:
+
+  - **ipinfo.io** (green badge) — looked up via the ipinfo.io API. Provides
+    country, region, city, ASN, and organisation. Results are cached locally
+    so the API is not called again for known IPs.
+  - **Offline DB** (grey badge) — resolved from the bundled DB-IP Lite MMDB.
+    Used when the app is offline or ipinfo.io is unreachable. Accuracy may be
+    lower, especially for cloud-provider IP ranges. ASN is not available from
+    this source.
+
+**Protocol fields**
+
+- **Protocol** — ``_ws.col.Protocol`` label (Wireshark display column).
+- **Dissected Protocol** — ``tsharkProtocol`` from the deepest
+  ``frame.protocols`` stack layer (see `Protocol vs Application`_).
+- **Application** — nDPI ``appName`` (may be absent if nDPI was not enabled).
+
+**Security fields**
+
+- **Security Flags** — nDPI risk flags (e.g. ``tls_self_signed_certificate``,
+  ``clear_text_credentials``). These are stored as normalized
+  ``lowercase_underscore`` strings from nDPI's ``[Risk: ...]`` output.
+- **Custom Rules** — names of fired custom signature rules, color-coded by
+  severity (critical=red, high=orange, medium=amber, low=purple).
+
+**TLS metadata** (when nDPI analysis was enabled and a TLS handshake was
+observed)
+
+- **JA3 Client** — MD5 hash of the TLS ClientHello parameters.
+- **JA3S Server** — MD5 hash of the TLS ServerHello parameters.
+- **TLS Issuer** — Issuer DN from the server certificate.
+- **TLS Subject** — Subject DN from the server certificate.
+- **Cert Valid From / Cert Valid To** — certificate validity dates from
+  ``NotBefore`` / ``NotAfter`` fields. The "Valid To" date is highlighted in
+  red and an **Expired** badge is shown if ``NotAfter < now`` at the time
+  the page is viewed.
+
+**HTTP metadata**
+
+- **User-Agents** — distinct ``http.user_agent`` values extracted during the
+  tshark enrichment pass, shown as a list.
+
+**Statistics**
+
+- Packet count, total bytes, start time.
+
+**Packet table**
+
+The lower section shows the individual stored packets for the conversation.
+Each row has:
+
+- Packet index (1-based within this conversation)
+- Direction arrow (→ blue = client-to-server, ← green = server-to-client;
+  direction is relative to the conversation's ``srcIp``)
+- Timestamp from the PCAP frame
+- Source IP:Port / Destination IP:Port
+- Frame length (``frame.len``) in bytes — includes all headers
+- **File Type** — if a magic-byte signature was detected in the first 64 bytes
+  of the stored payload hex, the detected file type is shown as a badge
+  (e.g. ``PDF``, ``ZIP``, ``PNG``). An **ASCII** badge appears if > 30% of
+  the first 256 payload bytes are printable ASCII characters.
+- Info — the ``_ws.col.Info`` tshark display column for the packet
+
+Click a packet row to expand the **Hex Viewer**, which renders the stored
+64-byte payload as both hex and ASCII side-by-side.
+
+**Extracted files link**
+
+If File Extraction was enabled at upload time and files were extracted from
+this conversation's stream, a button shows the count and links to the
+Extracted Files tab filtered to this conversation.
+
+Device Classification Popup (Conversation Detail)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The device type badge next to each IP in the Conversation Detail Panel opens
+a simplified classification popup scoped to this specific conversation:
+
+- **Type** — whether this IP acted as ``Client`` (initiated) or ``Server``
+  (received) in this conversation. For server-role IPs, the label uses a
+  port-to-service mapping on the destination port (e.g. port 443 → ``HTTPS``).
+  The note below explains: "Based on destination port N in this conversation".
+- **Device** — same device type badge, signal bullets, and confidence progress
+  bar as the Network Visualization popup (see :doc:`network-visualization`).
+- **Role** — ``Client`` or ``Server`` badge with a one-line note.
+
+This popup is distinct from the Network Visualization Classification popup in
+that it is conversation-scoped rather than global (it does not show initiated/
+received counts across all conversations).
+
+Conversation Tracer
+-------------------
+
+The **Conversation Tracer** is opened from the conversation list via the tracer
+icon. It provides a step-by-step replay of every packet in the conversation,
+with an LLM-generated plain-English explanation for each packet.
+
+Star-Graph Visualization
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A star-graph SVG shows the traced host (center node, labelled "Host") and up
+to 12 of its peer IPs arranged in a ring. The active traced peer is highlighted
+with a solid blue edge; other peers appear as dashed lines.
+
+An animated dot travels along the active edge on each step advance:
+
+- **Blue dot** (→) — packet travelling client-to-server.
+- **Green dot** (←) — packet travelling server-to-client.
+
+Direction is determined relative to the conversation's stored ``srcIp``:
+packets where ``packet.srcIp == conversation.srcIp`` are labelled ``CLIENT``
+(outbound), others are ``SERVER`` (inbound).
+
+Below the graph, a step summary line shows: direction arrow, protocol,
+size in bytes, and a truncated version of the ``_ws.col.Info`` string for
+the current packet.
+
+LLM Packet Explanations
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+For each packet, the LLM receives:
+
+- Direction (``CLIENT->SERVER`` or ``SERVER->CLIENT``)
+- Protocol (``_ws.col.Protocol`` label)
+- Packet size in bytes
+- Info string (``_ws.col.Info``) where present
+- Up to 64 bytes of payload rendered as ASCII, with non-printable bytes
+  replaced by ``.``. Only included if the payload contains at least 4
+  consecutive printable ASCII characters. Encrypted payloads produce no
+  readable ASCII and are excluded.
+
+The LLM is asked to produce a 1-2 sentence plain-English explanation of what
+is happening at that network step, in the context of the full conversation
+(protocol, application name, endpoint IPs/ports).
+
+The system caches LLM explanations per conversation (up to 500 entries in an
+LRU cache), so switching steps or reopening the tracer does not make repeated
+LLM calls.
+
+**Works well for:** TCP handshakes, HTTP requests/responses, DNS queries, TLS
+handshake phases — where the Info field or payload bytes are descriptive.
+
+**Limited for:** encrypted traffic (TLS application data, RDP) where only
+size and direction are available — explanations will be generic.
+
+Packet List
+~~~~~~~~~~~
+
+The scrollable packet list below the controls shows all packets with: step
+index, direction, protocol, size, timestamp (time component only), and
+truncated Info string. Clicking any row jumps directly to that step.
+
+Navigation controls: Previous / Next buttons, current step / total counter,
+and a Play/Pause button that auto-advances at 1.5-second intervals.
 
 Session Reconstruction
 -----------------------

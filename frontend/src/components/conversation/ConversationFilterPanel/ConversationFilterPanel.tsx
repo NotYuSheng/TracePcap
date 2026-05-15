@@ -634,7 +634,7 @@ export function ConversationFilterPanel({
                       <InfoPopover
                         id="info-country"
                         title="Country filter"
-                        body="Filter by the country of external IP addresses (source or destination). Based on ip-api.com geolocation data."
+                        body="Filter by the country of external IP addresses (source or destination). Based on ipinfo.io (online) or DB-IP Lite (offline) geolocation data."
                       />
                     }
                     onSelectAll={() =>

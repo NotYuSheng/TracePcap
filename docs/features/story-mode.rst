@@ -82,7 +82,21 @@ Aggregates Panel
 
 Pre-computed statistics over the full conversation dataset are displayed in
 the **Aggregates** panel — top talkers, protocol breakdown, risk counts, etc.
-These are computed independently of the LLM.
+These are computed independently of the LLM and reflect **all conversations**
+in the PCAP, not just the evidence sample sent to the LLM.
+
+The ⓘ icon in the Aggregates panel header reveals important caveats:
+
+- **Beacon detection** uses the coefficient of variation (CV) of inter-arrival
+  times across flows to the same destination. A low CV (< 0.1) suggests highly
+  regular, automated traffic. Short captures may produce false positives;
+  legitimate software (NTP, telemetry agents) can appear beacon-like.
+- **TLS health** is based on certificate issuer metadata (issuer DN, subject DN,
+  NotBefore, NotAfter) extracted at analysis time. Certificates are **not**
+  re-validated at display time — an expired certificate shown here reflects the
+  certificate's own stated expiry date, not a live OCSP/CRL check.
+- **ASN / geo data** is enriched via ipinfo.io at analysis time and may not
+  reflect recent IP address reassignments.
 
 Interactive LLM Q&A Chat
 ~~~~~~~~~~~~~~~~~~~~~~~~~
