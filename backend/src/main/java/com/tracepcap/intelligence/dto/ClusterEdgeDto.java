@@ -1,4 +1,4 @@
-package com.tracepcap.intelligence.dto;
+package com.lanturn.intelligence.dto;
 
 import lombok.Builder;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package com.tracepcap.config;
+package com.lanturn.config;
 
 import jakarta.validation.constraints.NotNull;
 import java.util.LinkedHashSet;
@@ -10,7 +10,7 @@ import org.springframework.validation.annotation.Validated;
 
 /** Configuration properties for device classification app/category signal lists. */
 @Configuration
-@ConfigurationProperties(prefix = "tracepcap.device-classification")
+@ConfigurationProperties(prefix = "lanturn.device-classification")
 @Validated
 @Data
 public class DeviceClassificationProperties {

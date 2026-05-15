@@ -1,8 +1,8 @@
-package com.tracepcap.tracer.controller;
+package com.lanturn.tracer.controller;
 
-import com.tracepcap.tracer.dto.TracerExplainResponse;
-import com.tracepcap.tracer.dto.TracerStepsResponse;
-import com.tracepcap.tracer.service.ConversationTracerService;
+import com.lanturn.tracer.dto.TracerExplainResponse;
+import com.lanturn.tracer.dto.TracerStepsResponse;
+import com.lanturn.tracer.service.ConversationTracerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;

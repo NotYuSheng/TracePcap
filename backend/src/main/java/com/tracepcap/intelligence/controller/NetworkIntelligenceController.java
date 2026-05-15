@@ -1,9 +1,9 @@
-package com.tracepcap.intelligence.controller;
+package com.lanturn.intelligence.controller;
 
-import com.tracepcap.analysis.dto.ConversationFilterParams;
-import com.tracepcap.intelligence.dto.ClusterGraphResponse;
-import com.tracepcap.intelligence.dto.TopHostsResponse;
-import com.tracepcap.intelligence.service.NetworkIntelligenceService;
+import com.lanturn.analysis.dto.ConversationFilterParams;
+import com.lanturn.intelligence.dto.ClusterGraphResponse;
+import com.lanturn.intelligence.dto.TopHostsResponse;
+import com.lanturn.intelligence.service.NetworkIntelligenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

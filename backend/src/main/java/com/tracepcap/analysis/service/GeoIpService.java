@@ -83,7 +83,7 @@ public class GeoIpService {
   @PostConstruct
   void init() {
     if (!geoEnabled) {
-      log.info("GeoIP enrichment disabled via tracepcap.geo.enabled=false");
+      log.info("GeoIP enrichment disabled via lanturn.geo.enabled=false");
       return;
     }
     this.dbReader = tryOpenMmdb();
@@ -326,7 +326,7 @@ public class GeoIpService {
     if (mmdbPathOverride != null && !mmdbPathOverride.isBlank()) {
       File f = new File(mmdbPathOverride);
       if (f.exists()) return openFile(f);
-      log.warn("tracepcap.geo.mmdb-path={} not found", mmdbPathOverride);
+      log.warn("lanturn.geo.mmdb-path={} not found", mmdbPathOverride);
     }
     File dockerFile = new File("/app/geoip/dbip-city-lite.mmdb");
     if (dockerFile.exists()) return openFile(dockerFile);

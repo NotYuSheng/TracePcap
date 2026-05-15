@@ -1,7 +1,7 @@
-package com.tracepcap.intelligence.controller;
+package com.lanturn.intelligence.controller;
 
-import com.tracepcap.intelligence.dto.IpOrgRuleDto;
-import com.tracepcap.intelligence.service.IpOrgRuleService;
+import com.lanturn.intelligence.dto.IpOrgRuleDto;
+import com.lanturn.intelligence.service.IpOrgRuleService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

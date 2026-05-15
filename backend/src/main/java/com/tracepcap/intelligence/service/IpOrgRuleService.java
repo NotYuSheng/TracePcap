@@ -1,8 +1,8 @@
-package com.tracepcap.intelligence.service;
+package com.lanturn.intelligence.service;
 
-import com.tracepcap.intelligence.dto.IpOrgRuleDto;
-import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
-import com.tracepcap.intelligence.repository.IpOrgRuleRepository;
+import com.lanturn.intelligence.dto.IpOrgRuleDto;
+import com.lanturn.intelligence.entity.IpOrgRuleEntity;
+import com.lanturn.intelligence.repository.IpOrgRuleRepository;
 import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.util.List;

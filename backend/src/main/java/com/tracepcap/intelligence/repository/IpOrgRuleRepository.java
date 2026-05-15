@@ -1,6 +1,6 @@
-package com.tracepcap.intelligence.repository;
+package com.lanturn.intelligence.repository;
 
-import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
+import com.lanturn.intelligence.entity.IpOrgRuleEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

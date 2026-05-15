@@ -21,10 +21,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: tracepcap-backend
+          - name: lanturn-backend
             context: ./backend
             dockerfile: ./backend/Dockerfile
-          - name: tracepcap-nginx
+          - name: lanturn-nginx
             context: .
             dockerfile: ./nginx/Dockerfile
 

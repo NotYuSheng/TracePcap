@@ -1,4 +1,4 @@
-package com.tracepcap.tracer.dto;
+package com.lanturn.tracer.dto;
 
 import java.util.List;
 import lombok.Builder;

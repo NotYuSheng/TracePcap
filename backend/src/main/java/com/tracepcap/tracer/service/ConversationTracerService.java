@@ -1,12 +1,12 @@
-package com.tracepcap.tracer.service;
+package com.lanturn.tracer.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.PacketEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
-import com.tracepcap.common.exception.LlmException;
-import com.tracepcap.story.service.LlmClient;
-import com.tracepcap.tracer.dto.*;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.PacketEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.PacketRepository;
+import com.lanturn.common.exception.LlmException;
+import com.lanturn.story.service.LlmClient;
+import com.lanturn.tracer.dto.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -104,7 +104,7 @@ public class ConversationTracerService {
       llmResponse = llmClient.generateCompletion(systemPrompt, userPrompt);
     } catch (LlmException e) {
       log.warn("LLM call failed for tracer {}: {}", conversationId, e.getMessage());
-      String errorMsg = e.getErrorCode() == com.tracepcap.common.exception.LlmException.ErrorCode.LLM_TIMEOUT
+      String errorMsg = e.getErrorCode() == com.lanturn.common.exception.LlmException.ErrorCode.LLM_TIMEOUT
           ? "AI explanation unavailable — the language model took too long to respond."
           : "AI explanation unavailable — could not reach the language model. Check your LLM configuration.";
       return TracerExplainResponse.builder()

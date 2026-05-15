@@ -1,4 +1,4 @@
-package com.tracepcap.intelligence.dto;
+package com.lanturn.intelligence.dto;
 
 import java.util.List;
 import java.util.Map;

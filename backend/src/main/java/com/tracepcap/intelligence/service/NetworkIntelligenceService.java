@@ -1,15 +1,15 @@
-package com.tracepcap.intelligence.service;
+package com.lanturn.intelligence.service;
 
-import com.tracepcap.analysis.dto.ConversationFilterParams;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.analysis.service.GeoIpService;
-import com.tracepcap.intelligence.dto.*;
-import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
+import com.lanturn.analysis.dto.ConversationFilterParams;
+import com.lanturn.analysis.entity.ConversationEntity;
+import com.lanturn.analysis.entity.HostClassificationEntity;
+import com.lanturn.analysis.entity.IpGeoInfoEntity;
+import com.lanturn.analysis.repository.ConversationRepository;
+import com.lanturn.analysis.repository.HostClassificationRepository;
+import com.lanturn.analysis.repository.IpGeoInfoRepository;
+import com.lanturn.analysis.service.GeoIpService;
+import com.lanturn.intelligence.dto.*;
+import com.lanturn.intelligence.entity.IpOrgRuleEntity;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +31,10 @@ public class NetworkIntelligenceService {
   private static final int SAMPLE_IPS_LIMIT = 20;
   private static final int DOMINANT_PROTOCOLS_LIMIT = 3;
 
-  @Value("${tracepcap.intelligence.max-clusters:60}")
+  @Value("${lanturn.intelligence.max-clusters:60}")
   private int maxClusters;
 
-  @Value("${tracepcap.intelligence.max-edges:200}")
+  @Value("${lanturn.intelligence.max-edges:200}")
   private int maxEdges;
 
   // ── Public API ────────────────────────────────────────────────────────────

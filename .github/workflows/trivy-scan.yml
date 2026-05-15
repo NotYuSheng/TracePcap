@@ -20,8 +20,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: tracepcap-backend
-          - name: tracepcap-nginx
+          - name: lanturn-backend
+          - name: lanturn-nginx
 
     steps:
       - name: Resolve image reference
