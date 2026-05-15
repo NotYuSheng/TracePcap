@@ -1,0 +1,52 @@
+TracePcap Documentation
+=======================
+
+**TracePcap** is an intelligent, self-hosted PCAP analysis platform with AI-powered insights and interactive network visualization. It runs entirely offline — no data leaves your infrastructure.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Getting Started
+
+   getting-started/prerequisites
+   getting-started/installation
+   getting-started/offline-deployment
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Features
+
+   features/pcap-upload
+   features/network-visualization
+   features/ndpi-analysis
+   features/conversations
+   features/session-reconstruction
+   features/file-extraction
+   features/geolocation
+   features/mac-lookup
+   features/timeline-analysis
+   features/ai-filter-generator
+   features/story-mode
+   features/custom-signatures
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Configuration
+
+   configuration/environment-variables
+   configuration/llm-setup
+   configuration/signature-rules
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Operations
+
+   operations/backup-restore
+   operations/logs-monitoring
+   operations/production-hardening
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Reference
+
+   api-reference
+   sample-files
