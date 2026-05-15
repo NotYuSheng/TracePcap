@@ -29,7 +29,7 @@ const ExtractionInfoCard = () => {
     <div className="card mb-3">
       <div
         className="card-header d-flex align-items-center justify-content-between"
-        style={{ cursor: 'pointer', userSelect: 'none' }}
+        style={{ cursor: 'pointer', userSelect: 'none', borderBottom: collapsed ? 'none' : undefined }}
         onClick={() => setCollapsed(c => !c)}
       >
         <h6 className="mb-0">
