@@ -32,8 +32,9 @@ Before clicking **Upload** you can enable optional analysis modules:
 Duplicate Detection
 -------------------
 
-TracePcap computes an MD5 hash of each uploaded file. If a file with the same
-hash already exists, the upload is rejected and you are linked to the existing
+TracePcap computes a **SHA-256** hash of each uploaded file by streaming it
+through a ``MessageDigest``. If a file with the same hash already exists in
+the database, the upload is rejected and you are linked to the existing
 analysis. This prevents redundant processing and storage.
 
 Processing Progress
@@ -41,8 +42,8 @@ Processing Progress
 
 After upload, you are redirected to a progress view showing each analysis
 stage (packet parsing, nDPI analysis, geolocation, file extraction, …) with
-a percentage indicator. You can navigate away; analysis continues in the
-background.
+a percentage indicator. Analysis runs asynchronously — you can navigate away
+and return later.
 
 Managing Uploads
 ----------------

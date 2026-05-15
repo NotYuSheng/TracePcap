@@ -101,8 +101,10 @@ Exact integer port match against the conversation's source or destination port.
 ``match.ja3``
 ~~~~~~~~~~~~~
 
-Exact match against the JA3S fingerprint hash recorded by nDPI.
-Only populated when nDPI analysis is enabled and a TLS ServerHello is observed.
+Exact match against either the **JA3C** (client) fingerprint or the **JA3S**
+(server) fingerprint recorded by nDPI. The rule fires if either hash matches,
+so a single rule can flag a fingerprint regardless of which side of the TLS
+handshake it appeared on. Only populated when nDPI analysis is enabled.
 
 .. code-block:: yaml
 
@@ -149,8 +151,9 @@ List of byte pattern objects. Each entry has exactly one key:
   The ``0x`` prefix and space separators are optional (``"0xDE 0xAD"`` is
   equivalent to ``"dead"``).
 
-Patterns are searched across the **reassembled payload** of the conversation
-(not just individual packets).
+Patterns are searched across the **raw payload bytes of each individual
+packet** in the conversation (stored as hex strings). A match on any single
+packet in the conversation is sufficient.
 
 ``match_all``
 ~~~~~~~~~~~~~
