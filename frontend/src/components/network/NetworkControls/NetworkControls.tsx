@@ -525,7 +525,12 @@ export function NetworkControls({
                         <InfoPopover
                           id="nc-info-cat"
                           title="Category"
-                          body="Broad traffic category assigned by nDPI (e.g. Web, Media, VPN). Select multiple to show any of them."
+                          body={
+                            <>
+                              Broad traffic category assigned by <strong>nDPI</strong> (e.g. Web,
+                              Media, VPN). Select multiple to show any of them.
+                            </>
+                          }
                         />
                       }
                       onSelectAll={() =>
@@ -568,7 +573,13 @@ export function NetworkControls({
                         <InfoPopover
                           id="nc-info-risk"
                           title="Risk Type"
-                          body="Filter by nDPI risk flags assigned to a conversation. Examples: clear-text credentials, unsafe protocols, known malicious signatures."
+                          body={
+                            <>
+                              Filter by <strong>nDPI</strong> risk flags assigned to a conversation.
+                              Examples: clear-text credentials, unsafe protocols, known malicious
+                              signatures.
+                            </>
+                          }
                         />
                       }
                       onSelectAll={() =>
