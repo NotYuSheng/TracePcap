@@ -34,9 +34,9 @@ Each unique conversation (5-tuple after direction-normalization — see
 two IPs have multiple conversations (e.g. TCP on port 443 and TCP on port 80),
 they produce multiple edges — one per conversation row.
 
-Edge thickness is proportional to the conversation's ``totalBytes`` (sum of
-on-wire frame lengths for all packets in the conversation), scaled relative to
-the maximum ``totalBytes`` across all edges in the current filtered view.
+Edge thickness is fixed: **1.5 px** for edges in a single capture, or **2.5 px**
+for edges that appear in both captures when using the Compare view. Edge width
+does not vary with traffic volume.
 
 Node Attributes and Their Sources
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
