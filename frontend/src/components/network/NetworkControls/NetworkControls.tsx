@@ -529,14 +529,6 @@ export function NetworkControls({
                             <>
                               Broad traffic category assigned by <strong>nDPI</strong> (e.g. Web,
                               Media, VPN). Select multiple to show any of them.
-                              <br />
-                              <a
-                                href="/ndpi-reference.html"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                View protocol reference →
-                              </a>
                             </>
                           }
                         />
@@ -586,14 +578,6 @@ export function NetworkControls({
                               Filter by <strong>nDPI</strong> risk flags assigned to a conversation.
                               Examples: clear-text credentials, unsafe protocols, known malicious
                               signatures.
-                              <br />
-                              <a
-                                href="/ndpi-reference.html"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                View protocol reference →
-                              </a>
                             </>
                           }
                         />
