@@ -56,9 +56,10 @@ echo "=== [1/3] Pulling third-party images ==="
 # the script and the compose file never get out of sync.
 OFFLINE_COMPOSE="$ROOT_DIR/docker-compose.offline.yml"
 mapfile -t DOCKERHUB_IMAGES < <(
-  grep '^\s*image:' "$OFFLINE_COMPOSE" \
-  | awk '{print $2}' \
-  | grep -v '^lanturn-'  # exclude locally-built images
+  grep '^[[:space:]]*image:' "$OFFLINE_COMPOSE" | \
+  sed -E 's/^[[:space:]]*image:[[:space:]]*"?([^" #]+)"?.*/\1/' | \
+  grep -v '^lanturn-' | \
+  sort -u
 )
 
 for img in "${DOCKERHUB_IMAGES[@]}"; do
