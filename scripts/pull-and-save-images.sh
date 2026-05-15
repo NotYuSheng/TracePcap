@@ -103,17 +103,30 @@ save_image "$BACKEND_IMAGE" "tracepcap-backend.tar"
 save_image "$NGINX_IMAGE"   "tracepcap-nginx.tar"
 
 # ---------------------------------------------------------------------------
+# 4. Export nDPI debs for offline patching
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== [4/4] Exporting nDPI debs for offline patching ==="
+bash "$SCRIPT_DIR/export-ndpi-debs.sh"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Done ==="
 echo ""
 echo "Transfer the following to the offline machine:"
-echo "  images/                    (all .tar files)"
+echo "  images/                    (all .tar files, including ndpi-debs.tar.gz)"
 echo "  docker-compose.offline.yml"
 echo "  .env                       (or .env.example — configure before starting)"
 echo "  scripts/load-images.sh"
+echo "  scripts/update-ndpi.sh"
 echo ""
 echo "Then on the offline machine run:"
 echo "  bash scripts/load-images.sh"
 echo "  docker compose -f docker-compose.offline.yml up -d"
+echo ""
+echo "To upgrade nDPI on the offline machine later (without a full image rebuild):"
+echo "  1. On internet machine: bump NDPI_VERSION in backend/Dockerfile, rebuild, run this script"
+echo "  2. Transfer images/ndpi-debs.tar.gz to the offline machine"
+echo "  3. On offline machine:  bash scripts/update-ndpi.sh"
