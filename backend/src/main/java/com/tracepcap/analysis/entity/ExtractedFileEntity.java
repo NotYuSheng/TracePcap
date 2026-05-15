@@ -42,11 +42,15 @@ public class ExtractedFileEntity {
   @Column(name = "sha256", length = 64)
   private String sha256;
 
-  @Column(name = "minio_path", length = 1000, nullable = false)
+  @Column(name = "minio_path", length = 1000)
   private String minioPath;
 
   @Column(name = "extraction_method", length = 50)
   private String extractionMethod;
+
+  /** Non-null when the file was detected but not stored (e.g. "exceeds_size_limit"). */
+  @Column(name = "skipped_reason", length = 100)
+  private String skippedReason;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

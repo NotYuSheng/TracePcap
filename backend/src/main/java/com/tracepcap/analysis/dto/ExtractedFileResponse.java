@@ -20,5 +20,6 @@ public class ExtractedFileResponse {
   private Long fileSize;
   private String sha256;
   private String extractionMethod;
+  private String skippedReason;
   private LocalDateTime createdAt;
 }
