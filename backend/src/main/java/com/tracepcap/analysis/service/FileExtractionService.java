@@ -44,6 +44,16 @@ public class FileExtractionService {
   /** Maximum size of a single extracted file stored in MinIO (50 MB). */
   private static final int MAX_EXTRACTED_FILE_BYTES = 50 * 1024 * 1024;
 
+  /**
+   * Maximum bytes buffered per raw stream during reassembly (200 MB). This is intentionally larger
+   * than {@link #MAX_EXTRACTED_FILE_BYTES} so that magic-byte scanning can still find files near
+   * the end of a large stream, while preventing a single runaway stream from exhausting heap.
+   */
+  private static final int MAX_STREAM_BUFFER_BYTES = 200 * 1024 * 1024;
+
+  /** Skipped-reason value written to DB when a file exceeds the per-file size limit. */
+  private static final String REASON_EXCEEDS_SIZE_LIMIT = "exceeds_size_limit";
+
   /** Maximum number of non-HTTP conversations to scan for embedded files. */
   private static final int MAX_RAW_STREAM_CONVERSATIONS = 50;
 
@@ -700,7 +710,7 @@ public class FileExtractionService {
             String hexLine = line.stripLeading();
             if (!hexLine.isEmpty()) {
               byte[] chunk = hexToBytes(hexLine);
-              if (chunk != null) {
+              if (chunk != null && currentBuf.size() + chunk.length <= MAX_STREAM_BUFFER_BYTES) {
                 currentBuf.write(chunk);
               }
             }
@@ -946,7 +956,7 @@ public class FileExtractionService {
             .filename(filename)
             .fileSize(rawSize)
             .extractionMethod(method)
-            .skippedReason("exceeds_size_limit")
+            .skippedReason(REASON_EXCEEDS_SIZE_LIMIT)
             .build();
 
     extractedFileRepository.save(entity);
