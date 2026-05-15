@@ -60,16 +60,6 @@ export const ConversationList = ({
 
   const col = (key: ColumnKey) => visibleColumns.has(key);
 
-  const hasAppNames = conversations.some(c => c.appName);
-  const hasL7Protocols = conversations.some(c => c.tsharkProtocol);
-  const hasCategories = conversations.some(c => c.category);
-  const hasRisks = conversations.some(c => c.flowRisks && c.flowRisks.length > 0);
-  const hasCustomRules = conversations.some(
-    c => c.customSignatures && c.customSignatures.length > 0
-  );
-  const hasFileTypes = conversations.some(
-    c => c.detectedFileTypes && c.detectedFileTypes.length > 0
-  );
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -107,14 +97,14 @@ export const ConversationList = ({
               {col('source') && <SortableHeader field="srcIp" label="Source" />}
               {col('destination') && <SortableHeader field="dstIp" label="Destination" />}
               {col('protocol') && <th style={{ whiteSpace: 'nowrap' }}>Protocol</th>}
-              {col('tsharkProtocol') && hasL7Protocols && (
+              {col('tsharkProtocol') && (
                 <th style={{ whiteSpace: 'nowrap' }}>Dissected Protocol</th>
               )}
-              {col('appName') && hasAppNames && <th>Application</th>}
-              {col('category') && hasCategories && <th>Category</th>}
-              {col('risks') && hasRisks && <th>Risks</th>}
-              {col('customRules') && hasCustomRules && <th>Custom Rules</th>}
-              {col('fileTypes') && hasFileTypes && (
+              {col('appName') && <th>Application</th>}
+              {col('category') && <th>Category</th>}
+              {col('risks') && <th>Risks</th>}
+              {col('customRules') && <th>Custom Rules</th>}
+              {col('fileTypes') && (
                 <th style={{ whiteSpace: 'nowrap' }}>File Type</th>
               )}
               {col('srcCountry') && <th style={{ whiteSpace: 'nowrap' }}>Src Country</th>}
@@ -170,7 +160,7 @@ export const ConversationList = ({
                       })()}
                     </td>
                   )}
-                  {col('tsharkProtocol') && hasL7Protocols && (
+                  {col('tsharkProtocol') && (
                     <td>
                       {conversation.tsharkProtocol ? (
                         (() => {
@@ -189,7 +179,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {col('appName') && hasAppNames && (
+                  {col('appName') && (
                     <td>
                       {conversation.appName ? (
                         (() => {
@@ -208,7 +198,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {col('category') && hasCategories && (
+                  {col('category') && (
                     <td>
                       {conversation.category ? (
                         (() => {
@@ -227,7 +217,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {col('risks') && hasRisks && (
+                  {col('risks') && (
                     <td>
                       {conversation.flowRisks && conversation.flowRisks.length > 0 ? (
                         <div className="d-inline-flex flex-wrap gap-1">
@@ -250,7 +240,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {col('customRules') && hasCustomRules && (
+                  {col('customRules') && (
                     <td>
                       {conversation.customSignatures && conversation.customSignatures.length > 0 ? (
                         <div className="d-inline-flex flex-wrap gap-1">
@@ -272,7 +262,7 @@ export const ConversationList = ({
                       )}
                     </td>
                   )}
-                  {col('fileTypes') && hasFileTypes && (
+                  {col('fileTypes') && (
                     <td>
                       {conversation.detectedFileTypes &&
                       conversation.detectedFileTypes.length > 0 ? (
