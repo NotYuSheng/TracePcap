@@ -19,25 +19,31 @@ pipe-separated output:
 .. code-block:: text
 
    tshark -r <file> -T fields -E separator=| \
-     -e frame.time_epoch   \  # Unix epoch with sub-second precision
-     -e frame.len          \  # total on-wire frame length in bytes
-     -e ip.src             \  # IPv4 source address (empty for IPv6-only)
-     -e ip.dst             \  # IPv4 destination address
-     -e ipv6.src           \  # IPv6 source (fallback when IPv4 is absent)
-     -e ipv6.dst           \  # IPv6 destination
-     -e tcp.srcport        \  # TCP source port (empty for non-TCP)
-     -e tcp.dstport        \
-     -e udp.srcport        \  # UDP source port (empty for non-UDP)
-     -e udp.dstport        \
-     -e _ws.col.Protocol   \  # Wireshark's "Protocol" display column label
-     -e _ws.col.Info       \  # Wireshark's "Info" display column
-     -e tcp.payload        \  # raw TCP payload bytes (colon-hex, e.g. 48:54:54:50)
-     -e udp.payload        \
-     -e ip.ttl             \  # IP time-to-live field
-     -e eth.src            \  # Ethernet source MAC address
-     -e arp.src.proto_ipv4 \  # ARP sender IP (for ARP frames)
-     -e arp.dst.proto_ipv4 \  # ARP target IP
-     -e eth.dst               # Ethernet destination MAC
+     -e frame.time_epoch \
+     -e frame.len \
+     -e ip.src \
+     -e ip.dst \
+     -e ipv6.src \
+     -e ipv6.dst \
+     -e tcp.srcport \
+     -e tcp.dstport \
+     -e udp.srcport \
+     -e udp.dstport \
+     -e _ws.col.Protocol \
+     -e _ws.col.Info \
+     -e tcp.payload \
+     -e udp.payload \
+     -e ip.ttl \
+     -e eth.src \
+     -e arp.src.proto_ipv4 \
+     -e arp.dst.proto_ipv4 \
+     -e eth.dst
+
+Fields (in order): Unix epoch timestamp, on-wire frame length, IPv4 src/dst,
+IPv6 src/dst (fallback), TCP src/dst port, UDP src/dst port, Wireshark Protocol
+display column, Wireshark Info display column, TCP payload bytes (colon-hex),
+UDP payload bytes, IP TTL, Ethernet source MAC, ARP sender/target IPs,
+Ethernet destination MAC.
 
 For **IPv4** traffic, ``ip.src``/``ip.dst`` are used. For **IPv6**, the service
 falls back to ``ipv6.src``/``ipv6.dst``. For **ARP** frames (no IP layer),
@@ -62,8 +68,8 @@ Packets are merged into a single conversation if they share the same
 **direction-independent 5-tuple**. The key is computed as follows:
 
 1. Compare ``srcIp`` and ``dstIp`` lexicographically.
-2. If ``srcIp < dstIp``: the canonical form is ``srcIp:srcPort–dstIp:dstPort``.
-3. If ``srcIp > dstIp``: swap, so the canonical form is ``dstIp:dstPort–srcIp:srcPort``.
+2. If ``srcIp < dstIp``: the canonical form is ``srcIp:srcPort-dstIp:dstPort``.
+3. If ``srcIp > dstIp``: swap, so the canonical form is ``dstIp:dstPort-srcIp:srcPort``.
 4. If the IPs are equal (same-host loopback traffic): compare ports — the
    smaller port number goes first.
 
@@ -225,9 +231,11 @@ with AND logic — a conversation must satisfy all active filters to be shown.
      - Toggle: shows only conversations that have at least one nDPI risk flag
        (the ``flowRisks`` array is non-empty).
    * - **Protocol** (pills)
-     - The ``_ws.col.Protocol`` label — the protocol carried in the IP header,
-       determined from the Wireshark display column with no heuristics
-       (e.g. TCP, UDP, ICMP, OSPF, GRE). Multiple selections are OR-matched.
+     - The ``_ws.col.Protocol`` label — Wireshark's display column, representing
+       the highest protocol layer its dissectors identified for each packet
+       (e.g. TCP, UDP, TLS, HTTP, DNS). Note: filtering for ``TCP`` here will
+       exclude packets Wireshark dissected further to ``HTTP`` or ``TLS``.
+       Multiple selections are OR-matched.
    * - **Dissected Protocol** (pills)
      - The ``tsharkProtocol`` — deepest protocol Wireshark's dissectors decoded
        from the ``frame.protocols`` stack (e.g. TLS, HTTP, DNS, QUIC).
