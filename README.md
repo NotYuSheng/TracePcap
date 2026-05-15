@@ -362,6 +362,18 @@ The [`sample-files/`](sample-files/) directory contains example PCAP files:
 
 These files can be used to test the application's analysis capabilities.
 
+## Star History
+
+If you find TracePcap useful, consider giving it a star! ⭐
+
+<a href="https://star-history.com/#NotYuSheng/TracePcap&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=NotYuSheng/TracePcap&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=NotYuSheng/TracePcap&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=NotYuSheng/TracePcap&type=Date" />
+  </picture>
+</a>
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
