@@ -13,8 +13,14 @@ Rules are stored inside a Docker named volume (``config_data``) at
 ``/app/config/signatures.yml`` inside the backend container. The file is
 reloaded on every analysis run — **no restart is required** after editing.
 
-Click **Custom Detection Rules** in the navbar to open the built-in YAML
-editor. Changes are saved immediately.
+Click **Custom Detection Rules** in the navbar to open a modal with two tabs:
+
+- **Detection Rules** — the built-in YAML editor for ``signatures.yml``.
+  Changes are saved immediately and take effect on the next analysis run.
+- **Network Labels** — define CIDR-to-label mappings used in the Network
+  Visualization grouping mode (see `Network Labels`_ below).
+
+.. _Network Labels:
 
 .. tip::
 
@@ -198,3 +204,43 @@ covering every match field. The script ``sample-files/gen_demo.py`` generates
 a PCAP that triggers all demo rules at once.
 
 For a deep-dive rule authoring guide, see :doc:`../configuration/signature-rules`.
+
+Network Labels
+--------------
+
+The **Network Labels** tab (in the same **Custom Detection Rules** modal) maps
+individual IP addresses or CIDR ranges to human-readable organisation labels.
+These labels are used as a grouping strategy in the **Network Visualization**
+— enabling you to cluster nodes by network segment rather than by ASN or
+country.
+
+How to Add a Label
+~~~~~~~~~~~~~~~~~~
+
+1. Open **Custom Detection Rules** in the navbar.
+2. Switch to the **Network Labels** tab.
+3. Enter a label name (e.g. ``Corporate LAN``, ``DMZ``, ``Guest Wi-Fi``) and
+   a CIDR range (e.g. ``10.0.1.0/24``) or individual IP (e.g. ``10.0.1.5``).
+4. Click **Add**.
+
+Labels are stored in the database and persist across sessions. Multiple CIDR
+entries can share the same label to group non-contiguous ranges under one name.
+
+Specificity Priority
+~~~~~~~~~~~~~~~~~~~~
+
+When an IP matches multiple CIDR rules, the **most specific** (longest prefix
+length) rule wins. For example, if ``10.0.1.0/24`` is labelled ``Corporate LAN``
+and ``10.0.1.100/32`` is labelled ``Print Server``, the IP ``10.0.1.100`` will
+be assigned ``Print Server``.
+
+Using Labels in the Network Visualization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the Network Visualization, select **Network Labels** from the grouping
+dropdown. Nodes are clustered by label. IPs that fall within any labelled CIDR
+appear grouped; IPs not covered by any rule appear individually.
+
+The graph is filtered to show conversations where **at least one endpoint** is
+a labelled IP — unlabelled-only traffic is suppressed when this grouping mode
+is active.
