@@ -1,0 +1,11 @@
+package com.tracepcap.intelligence.dto;
+
+import java.util.List;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class TopHostsResponse {
+  private List<HostSummaryDto> hosts;
+}

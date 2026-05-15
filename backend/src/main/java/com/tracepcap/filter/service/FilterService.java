@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lanturn.common.TsharkHexUtil;
+import com.lanturn.common.exception.LlmException;
 import com.lanturn.file.entity.FileEntity;
 import com.lanturn.file.service.FileService;
 import com.lanturn.file.service.StorageService;
@@ -186,6 +187,8 @@ public class FilterService {
                         + "Please respond with ONLY valid JSON in the exact format specified.",
                     naturalLanguageQuery);
           }
+        } catch (LlmException e) {
+          throw e;
         } catch (Exception e) {
           log.error("Error processing LLM response on attempt {}", attempt, e);
           lastValidationError = "Error processing LLM response: " + e.getMessage();
@@ -206,6 +209,8 @@ public class FilterService {
                 MAX_GENERATION_RETRIES, lastValidationError));
       }
 
+    } catch (LlmException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Error generating filter", e);
       throw new RuntimeException("Failed to generate filter: " + e.getMessage(), e);

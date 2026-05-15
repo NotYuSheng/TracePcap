@@ -1,1 +1,0 @@
-ALTER TABLE conversations ALTER COLUMN protocol TYPE VARCHAR(100);

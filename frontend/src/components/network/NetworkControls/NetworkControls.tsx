@@ -85,6 +85,10 @@ interface NetworkControlsProps {
   onHasRisksOnlyChange: (val: boolean) => void;
   activeFilterCount: number;
   onClearAllFilters: () => void;
+  activeNetLabels?: string[];
+  onNetLabelClick?: (label: string) => void;
+  onNetLabelClear?: () => void;
+  presentNetLabels?: string[];
   /** Whether the panel starts collapsed. Defaults to false (expanded). */
   defaultCollapsed?: boolean;
 }
@@ -155,6 +159,10 @@ export function NetworkControls({
   onHasRisksOnlyChange,
   activeFilterCount,
   onClearAllFilters,
+  activeNetLabels = [],
+  onNetLabelClick,
+  onNetLabelClear,
+  presentNetLabels = [],
   defaultCollapsed = false,
 }: NetworkControlsProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
@@ -205,36 +213,32 @@ export function NetworkControls({
   return (
     <>
       <div className="nc-filter-panel">
-        <div className="card">
-          {/* Card header — click anywhere to toggle */}
-          <div
-            className="card-header d-flex justify-content-between align-items-center"
-            style={{ cursor: 'pointer' }}
+        {/* Toggle button */}
+        <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
             onClick={() => setIsOpen(o => !o)}
           >
-            <div className="d-flex align-items-center gap-2">
-              <strong>Filters</strong>
-              {activeFilterCount > 0 && (
-                <span className="badge bg-primary">{activeFilterCount}</span>
-              )}
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              <button
-                className="btn btn-link btn-sm p-0 text-muted"
-                onClick={e => {
-                  e.stopPropagation();
-                  setShowColorInfo(true);
-                }}
-                title="How are node colours determined?"
-              >
-                <i className="bi bi-info-circle me-1"></i>Node colours
-              </button>
-              <i className={`bi ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'} text-muted`} />
-            </div>
-          </div>
+            <i className="bi bi-funnel me-1"></i>
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="badge bg-primary ms-2">{activeFilterCount}</span>
+            )}
+            <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
+          </button>
+          <button
+            className="btn btn-link btn-sm p-0 text-muted"
+            onClick={() => setShowColorInfo(true)}
+            title="How are node colours determined?"
+          >
+            <i className="bi bi-info-circle me-1"></i>Node colours
+          </button>
+        </div>
 
-          {/* Collapsible body */}
-          {isOpen && (
+        {/* Collapsible panel */}
+        {isOpen && (
+          <div className="card mt-2">
             <div className="card-body p-3">
               <div className="row g-3">
                 {/* IP / Hostname */}
@@ -311,7 +315,7 @@ export function NetworkControls({
                       <InfoPopover
                         id="nc-info-nodetypes"
                         title="Node Types"
-                        body="Filter by the role of each node in the network graph — e.g. Client, Server, Gateway. Roles are inferred from port usage and traffic direction."
+                        body="Filter by the inferred role of each node. Determined from graph data: a node's dominant inbound port identifies it as a specific server type (e.g. DNS, HTTP), a high distinct peer count marks it as a router, and nodes that only initiate connections are classified as clients."
                       />
                     }
                     onSelectAll={() =>
@@ -411,16 +415,16 @@ export function NetworkControls({
                   </div>
                 )}
 
-                {/* L7 Protocols */}
+                {/* Dissected Protocols */}
                 {presentL7Protocols.length > 0 && (
                   <div className="col-12">
                     <PillSectionHeader
-                      label="L7 Protocol"
+                      label="Dissected Protocol"
                       info={
                         <InfoPopover
                           id="nc-info-l7protocol"
-                          title="L7 Protocol"
-                          body="Layer 7 application-layer protocol identified by Wireshark's deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
+                          title="Dissected Protocol"
+                          body="The deepest protocol Wireshark's tshark could decode in each flow, determined by its built-in deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
                         />
                       }
                       onSelectAll={() =>
@@ -710,6 +714,47 @@ export function NetworkControls({
                   </div>
                 )}
 
+                {/* Network Labels */}
+                {presentNetLabels.length > 0 && onNetLabelClick && (
+                  <div className="col-12">
+                    <PillSectionHeader
+                      label="Network Labels"
+                      info={
+                        <InfoPopover
+                          id="nc-info-netlabels"
+                          title="Network Labels"
+                          body="Filter by your defined network segments (e.g. Office, DMZ). Only conversations where at least one endpoint falls within a labelled CIDR range are shown."
+                        />
+                      }
+                      onSelectAll={() =>
+                        presentNetLabels.forEach(l => {
+                          if (!activeNetLabels.includes(l)) onNetLabelClick(l);
+                        })
+                      }
+                      onDeselectAll={onNetLabelClear ?? (() => {})}
+                    />
+                    <div className="d-flex flex-wrap gap-1 mt-1">
+                      {presentNetLabels.map(label => {
+                        const isActive = activeNetLabels.includes(label);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            className={filterPillClass(isActive)}
+                            style={
+                              isActive ? { backgroundColor: '#198754', color: '#fff' } : undefined
+                            }
+                            onClick={() => onNetLabelClick(label)}
+                          >
+                            <i className="bi bi-tag me-1" />
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Countries */}
                 {presentCountries.length > 0 && (
                   <div className="col-12">
@@ -764,8 +809,8 @@ export function NetworkControls({
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Node colour priority modal */}
@@ -797,41 +842,25 @@ export function NetworkControls({
                 </p>
                 <ol className="ps-3" style={{ lineHeight: '2' }}>
                   <li>
-                    <span
-                      className="badge me-2"
-                      style={{ backgroundColor: NODE_TYPE_COLORS['anomaly'], color: '#fff' }}
-                    >
-                      Anomaly
-                    </span>
-                    <strong>Anomaly detected</strong> — always shown in red regardless of type.
+                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['dns-server'], color: '#fff' }}>DNS</span>
+                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['web-server'], color: '#fff' }}>Web</span>
+                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['router'], color: '#fff' }}>Router</span>
+                    <strong>Specific server role</strong> — the node's dominant inbound port identifies it as a known server type (DNS, web, SSH, FTP, mail, DHCP, NTP, database, router). Each type has a fixed colour.
                   </li>
                   <li>
-                    <span className="badge bg-warning text-dark me-2">Specific server role</span>
-                    <strong>Port-based server classification</strong> — DNS, web, SSH, FTP, mail,
-                    DHCP, NTP, database, and router nodes keep their dedicated colours.
+                    <span className="badge me-2" style={{ backgroundColor: deviceTypeColor('MOBILE'), color: '#fff' }}>Mobile</span>
+                    <span className="badge me-2" style={{ backgroundColor: deviceTypeColor('IOT'), color: '#fff' }}>IoT</span>
+                    <strong>Device classification</strong> — inferred from MAC OUI vendor lookup, TTL fingerprinting, and observed nDPI application profiles. Overrides generic node type when a non-unknown device type is detected.
                   </li>
                   <li>
-                    <span
-                      className="badge me-2"
-                      style={{ backgroundColor: '#8b5cf6', color: '#fff' }}
-                    >
-                      Device type
-                    </span>
-                    <strong>Device classification</strong> — Mobile, Laptop/Desktop, IoT, etc.
+                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}>Client</span>
+                    <strong>Generic node type</strong> — nodes that only initiate outbound connections with no dominant inbound port are classified as clients and shown in blue.
                   </li>
                   <li>
-                    <span
-                      className="badge me-2"
-                      style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}
-                    >
-                      Client
-                    </span>
-                    <strong>Generic node type</strong> — port-based classification colour.
-                  </li>
-                  <li>
-                    <span className="badge bg-secondary me-2">Role fallback</span>
-                    <strong>Traffic role</strong> — green for server, purple for both, grey
-                    otherwise.
+                    <span className="badge me-2" style={{ backgroundColor: '#2ecc71', color: '#fff' }}>Server</span>
+                    <span className="badge me-2" style={{ backgroundColor: '#9b59b6', color: '#fff' }}>Both</span>
+                    <span className="badge bg-secondary me-2">Other</span>
+                    <strong>Traffic role fallback</strong> — if no type can be determined, nodes are coloured by their observed role: green if they only receive connections (server), purple if they both send and receive (both), grey otherwise.
                   </li>
                 </ol>
               </div>

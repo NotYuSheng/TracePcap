@@ -298,12 +298,12 @@ export function ConversationFilterPanel({
               {protocols.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
-                    label="L4 Protocol"
+                    label="Protocol"
                     info={
                       <InfoPopover
                         id="info-protocol"
-                        title="L4 Protocol"
-                        body="Filter by Layer 4 transport protocol (e.g. TCP, UDP, ICMP). Select multiple to show any of them."
+                        title="Protocol"
+                        body="The protocol carried by each IP packet, determined by the Protocol field in the IP header — no heuristics involved (e.g. TCP, UDP, ICMP, OSPF, GRE). Select multiple to show any of them."
                       />
                     }
                     onSelectAll={() =>
@@ -333,16 +333,16 @@ export function ConversationFilterPanel({
                 </div>
               )}
 
-              {/* L7 Protocol pills */}
+              {/* Dissected Protocol pills */}
               {l7Protocols.length > 0 && (
                 <div className="col-12">
                   <PillSectionHeader
-                    label="L7 Protocol"
+                    label="Dissected Protocol"
                     info={
                       <InfoPopover
                         id="info-l7protocol"
-                        title="L7 Protocol"
-                        body="Layer 7 application-layer protocol identified by Wireshark's deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
+                        title="Dissected Protocol"
+                        body="The deepest protocol Wireshark's tshark could decode in each flow, determined by its built-in deterministic dissectors (e.g. TLS, HTTP, DNS, QUIC). Select multiple to show any of them."
                       />
                     }
                     onSelectAll={() => onFiltersChange({ l7Protocols })}
@@ -676,7 +676,7 @@ export function ConversationFilterPanel({
                     <InfoPopover
                       id="info-devicetype"
                       title="Device Type"
-                      body="Filter by the classified device type of hosts in each conversation. Device types are inferred from traffic patterns and port usage. Click on a device type badge in the conversation details to see the confidence score and evidence."
+                      body="Device types are inferred using a multi-signal heuristic: MAC OUI vendor lookup, TTL fingerprinting, observed application profiles from nDPI, and traffic patterns (e.g. port usage, peer count). Custom signatures can override the classification with 100% confidence. Click a device type badge in conversation details to see the confidence score and evidence."
                     />
                   }
                   onSelectAll={() => onFiltersChange({ deviceTypes: presentDeviceTypes })}

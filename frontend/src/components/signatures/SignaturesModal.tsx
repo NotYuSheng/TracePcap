@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
+import { ipOrgRuleService, type IpOrgRule } from '@/features/intelligence/services/ipOrgRuleService';
 
 interface SignaturesModalProps {
   show: boolean;
@@ -8,6 +9,9 @@ interface SignaturesModalProps {
 }
 
 export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
+  const [activeTab, setActiveTab] = useState<'rules' | 'labels'>('rules');
+
+  // ── Detection Rules tab state ─────────────────────────────────────────────
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -15,7 +19,7 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (!show) return;
+    if (!show || activeTab !== 'rules') return;
     setLoading(true);
     setError(null);
     setSaved(false);
@@ -24,16 +28,14 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
       .then(r => setContent(r.data.content))
       .catch(() => setError('Failed to load signatures file.'))
       .finally(() => setLoading(false));
-  }, [show]);
+  }, [show, activeTab]);
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      const res = await apiClient.put<{ status?: string; error?: string }>('/signatures', {
-        content,
-      });
+      const res = await apiClient.put<{ status?: string; error?: string }>('/signatures', { content });
       if (res.data.error) {
         setError(res.data.error);
       } else {
@@ -47,68 +49,236 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
     }
   };
 
+  // ── Network Labels tab state ──────────────────────────────────────────────
+  const [rules, setRules] = useState<IpOrgRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newCidr, setNewCidr] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!show || activeTab !== 'labels') return;
+    setRulesLoading(true);
+    ipOrgRuleService.list()
+      .then(setRules)
+      .catch(() => setAddError('Failed to load network labels.'))
+      .finally(() => setRulesLoading(false));
+  }, [show, activeTab]);
+
+  const handleAdd = async () => {
+    if (!newLabel.trim() || !newCidr.trim()) {
+      setAddError('Both label and CIDR are required.');
+      return;
+    }
+    setAdding(true);
+    setAddError(null);
+    try {
+      const created = await ipOrgRuleService.create(newLabel.trim(), newCidr.trim());
+      setRules(prev => [...prev, created].sort((a, b) => a.label.localeCompare(b.label)));
+      setNewLabel('');
+      setNewCidr('');
+    } catch (e: unknown) {
+      setAddError(e instanceof Error ? e.message : 'Failed to add rule.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    setDeletingId(id);
+    try {
+      await ipOrgRuleService.delete(id);
+      setRules(prev => prev.filter(r => r.id !== id));
+    } catch {
+      setAddError('Failed to delete rule.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleHide = () => {
+    setActiveTab('rules');
+    onHide();
+  };
+
   return (
-    <Modal show={show} onHide={onHide} size="lg">
+    <Modal show={show} onHide={handleHide} size="lg">
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-shield-check me-2"></i>Custom Detection Rules
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted small mb-3">
-          Edit <code>signatures.yml</code> to define custom detection rules. Matched rules appear as
-          risk flags alongside nDPI's built-in detections. Changes take effect on the next file
-          analysis — no restart required.
-        </p>
 
-        {loading ? (
-          <div className="text-center py-4 text-muted">
-            <div className="spinner-border spinner-border-sm me-2" role="status" />
-            Loading…
-          </div>
-        ) : (
-          <textarea
-            className="form-control font-monospace"
-            rows={20}
-            value={content}
-            onChange={e => {
-              setContent(e.target.value);
-              setSaved(false);
-            }}
-            spellCheck={false}
-            style={{ fontSize: '0.82rem', resize: 'vertical' }}
-          />
+      <Modal.Body>
+        {/* Tabs */}
+        <div className="btn-group mb-3" role="group">
+          <button
+            type="button"
+            className={`btn btn-sm ${activeTab === 'rules' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setActiveTab('rules')}
+          >
+            <i className="bi bi-code-square me-1" />
+            Detection Rules
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${activeTab === 'labels' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setActiveTab('labels')}
+          >
+            <i className="bi bi-tag me-1" />
+            Network Labels
+          </button>
+        </div>
+
+        {/* ── Detection Rules tab ─────────────────────────────────────── */}
+        {activeTab === 'rules' && (
+          <>
+            <p className="text-muted small mb-3">
+              Edit <code>signatures.yml</code> to define custom detection rules. Matched rules appear as
+              risk flags alongside nDPI's built-in detections. Changes take effect on the next file
+              analysis — no restart required.
+            </p>
+
+            {loading ? (
+              <div className="text-center py-4 text-muted">
+                <div className="spinner-border spinner-border-sm me-2" role="status" />
+                Loading…
+              </div>
+            ) : (
+              <textarea
+                className="form-control font-monospace"
+                rows={20}
+                value={content}
+                onChange={e => { setContent(e.target.value); setSaved(false); }}
+                spellCheck={false}
+                style={{ fontSize: '0.82rem', resize: 'vertical' }}
+              />
+            )}
+
+            {error && <div className="alert alert-danger mt-2 py-2 small mb-0">{error}</div>}
+            {saved && (
+              <div className="alert alert-success mt-2 py-2 small mb-0">
+                <i className="bi bi-check-circle me-1"></i>Saved — rules will apply on the next analysis.
+              </div>
+            )}
+          </>
         )}
 
-        {error && <div className="alert alert-danger mt-2 py-2 small mb-0">{error}</div>}
-        {saved && (
-          <div className="alert alert-success mt-2 py-2 small mb-0">
-            <i className="bi bi-check-circle me-1"></i>Saved — rules will apply on the next
-            analysis.
-          </div>
+        {/* ── Network Labels tab ──────────────────────────────────────── */}
+        {activeTab === 'labels' && (
+          <>
+            <p className="text-muted small mb-3">
+              Map IP addresses or ranges to organisation names. Accepts individual IPs (e.g.{' '}
+              <code>10.0.1.5</code>) or CIDR ranges (e.g. <code>10.0.1.0/24</code>). These labels
+              are available as the <strong>Network Labels</strong> grouping strategy in the Network
+              Intelligence tab. More specific ranges take priority over broader ones.
+            </p>
+
+            {/* Existing rules */}
+            {rulesLoading ? (
+              <div className="text-center py-4 text-muted">
+                <div className="spinner-border spinner-border-sm me-2" role="status" />
+                Loading…
+              </div>
+            ) : rules.length === 0 ? (
+              <div className="text-muted small text-center py-3 border rounded mb-3" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}>
+                No network labels defined yet. Add one below.
+              </div>
+            ) : (
+              <table className="table table-sm table-hover mb-3">
+                <thead>
+                  <tr>
+                    <th>Label</th>
+                    <th>CIDR Range</th>
+                    <th style={{ width: 48 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rules.map(r => (
+                    <tr key={r.id}>
+                      <td>{r.label}</td>
+                      <td><code>{r.cidr}</code></td>
+                      <td>
+                        <button
+                          className="btn btn-link btn-sm text-danger p-0"
+                          onClick={() => handleDelete(r.id)}
+                          disabled={deletingId === r.id}
+                          title="Delete"
+                        >
+                          {deletingId === r.id
+                            ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} />
+                            : <i className="bi bi-trash" />}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* Add form */}
+            <div className="border rounded p-3" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}>
+              <div className="row g-2 align-items-end">
+                <div className="col">
+                  <label className="form-label small mb-1">Label</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="e.g. Engineering Team"
+                    value={newLabel}
+                    onChange={e => { setNewLabel(e.target.value); setAddError(null); }}
+                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                  />
+                </div>
+                <div className="col">
+                  <label className="form-label small mb-1">CIDR Range</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="e.g. 10.0.1.0/24 or 10.0.1.5"
+                    value={newCidr}
+                    onChange={e => { setNewCidr(e.target.value); setAddError(null); }}
+                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                  />
+                </div>
+                <div className="col-auto">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleAdd}
+                    disabled={adding}
+                  >
+                    {adding
+                      ? <span className="spinner-border spinner-border-sm" />
+                      : <><i className="bi bi-plus-lg me-1" />Add</>}
+                  </button>
+                </div>
+              </div>
+              {addError && <div className="text-danger small mt-2">{addError}</div>}
+            </div>
+          </>
         )}
       </Modal.Body>
+
       <Modal.Footer>
-        <button type="button" className="btn btn-outline-secondary" onClick={onHide}>
+        <button type="button" className="btn btn-outline-secondary" onClick={handleHide}>
           Close
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={handleSave}
-          disabled={loading || saving}
-        >
-          {saving ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-1" role="status" />
-              Saving…
-            </>
-          ) : (
-            <>
-              <i className="bi bi-floppy me-1"></i>Save
-            </>
-          )}
-        </button>
+        {activeTab === 'rules' && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={loading || saving}
+          >
+            {saving ? (
+              <><span className="spinner-border spinner-border-sm me-1" role="status" />Saving…</>
+            ) : (
+              <><i className="bi bi-floppy me-1"></i>Save</>
+            )}
+          </button>
+        )}
       </Modal.Footer>
     </Modal>
   );

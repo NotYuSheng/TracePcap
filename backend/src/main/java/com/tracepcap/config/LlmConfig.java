@@ -42,4 +42,13 @@ public class LlmConfig {
     factory.setReadTimeout(timeoutMs);
     return new RestTemplate(factory);
   }
+
+  /** Short-timeout RestTemplate used only for the pre-flight reachability check. */
+  @Bean
+  public RestTemplate llmHealthCheckRestTemplate() {
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(2_000);
+    factory.setReadTimeout(2_000);
+    return new RestTemplate(factory);
+  }
 }

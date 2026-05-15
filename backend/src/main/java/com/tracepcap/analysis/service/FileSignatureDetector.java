@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+import org.apache.tika.mime.MimeType;
+import org.apache.tika.mime.MimeTypeException;
+import org.apache.tika.mime.MimeTypes;
 
 @Slf4j
 
@@ -17,59 +20,22 @@ public final class FileSignatureDetector {
   private FileSignatureDetector() {}
 
   private static final Tika TIKA = new Tika();
+  private static final MimeTypes TIKA_MIME_REPO = MimeTypes.getDefaultMimeTypes();
 
-  /** Maps Tika MIME types to short human-readable badge labels. */
-  private static final Map<String, String> MIME_LABELS =
+  /**
+   * Overrides for cases where Tika's primary extension does not match the conventional badge label
+   * (e.g. Tika maps image/jpeg to ".jpg" but the badge should read "JPEG").
+   */
+  private static final Map<String, String> MIME_LABEL_OVERRIDES =
       Map.ofEntries(
-          // Archives
-          Map.entry("application/zip", "ZIP"),
-          Map.entry("application/x-7z-compressed", "7-ZIP"),
-          Map.entry("application/x-rar-compressed", "RAR"),
-          Map.entry("application/x-gzip", "GZIP"),
-          Map.entry("application/gzip", "GZIP"),
-          Map.entry("application/x-bzip2", "BZIP2"),
-          Map.entry("application/x-xz", "XZ"),
-          Map.entry("application/x-tar", "TAR"),
-          // Executables
-          Map.entry("application/x-msdownload", "EXE/DLL"),
-          Map.entry("application/x-dosexec", "EXE/DLL"),
-          Map.entry("application/x-elf", "ELF"),
-          Map.entry("application/java-vm", "CLASS"),
-          Map.entry("application/x-sharedlib", "ELF"),
-          // Documents
-          Map.entry("application/pdf", "PDF"),
-          Map.entry("application/msword", "DOC"),
-          Map.entry("application/vnd.ms-excel", "XLS"),
-          Map.entry("application/vnd.ms-powerpoint", "PPT"),
-          Map.entry(
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "DOCX"),
-          Map.entry("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "XLSX"),
-          Map.entry(
-              "application/vnd.openxmlformats-officedocument.presentationml.presentation", "PPTX"),
-          Map.entry("application/vnd.oasis.opendocument.text", "ODT"),
-          Map.entry("application/vnd.oasis.opendocument.spreadsheet", "ODS"),
-          // Images
-          Map.entry("image/png", "PNG"),
           Map.entry("image/jpeg", "JPEG"),
-          Map.entry("image/gif", "GIF"),
-          Map.entry("image/bmp", "BMP"),
-          Map.entry("image/tiff", "TIFF"),
-          Map.entry("image/webp", "WEBP"),
-          Map.entry("image/vnd.adobe.photoshop", "PSD"),
-          // Audio / Video
           Map.entry("audio/mpeg", "MP3"),
           Map.entry("audio/ogg", "OGG"),
-          Map.entry("audio/x-flac", "FLAC"),
-          Map.entry("audio/flac", "FLAC"),
-          Map.entry("audio/wav", "WAV"),
-          Map.entry("video/mp4", "MP4"),
-          Map.entry("video/x-msvideo", "AVI"),
-          Map.entry("video/quicktime", "MOV"),
-          Map.entry("video/x-matroska", "MKV"),
-          // Database
-          Map.entry("application/x-sqlite3", "SQLITE"),
-          // Java
-          Map.entry("application/java-archive", "JAR"));
+          Map.entry("application/x-bzip2", "BZIP2"),
+          Map.entry("application/x-msdownload", "EXE/DLL"),
+          Map.entry("application/x-dosexec", "EXE/DLL"),
+          Map.entry("application/x-sharedlib", "ELF"),
+          Map.entry("application/x-sqlite3", "SQLITE"));
 
   /**
    * If {@code bytes} begins with an HTTP response status line ({@code HTTP/}), returns the bytes
@@ -115,17 +81,27 @@ public final class FileSignatureDetector {
           || mime.equals("application/x-www-form-urlencoded")) {
         return null;
       }
-      String label = MIME_LABELS.get(mime);
-      // Fall back to a tidied version of the subtype if no explicit mapping exists
-      if (label == null) {
-        String subtype = mime.contains("/") ? mime.substring(mime.indexOf('/') + 1) : mime;
-        subtype = subtype.replaceAll("^(x-|vnd\\.)", "").toUpperCase();
-        label = subtype.length() <= 12 ? subtype : null;
-      }
-      return label;
+      return labelFromMime(mime);
     } catch (Exception e) {
       log.warn("File signature detection failed", e);
       return null;
     }
+  }
+
+  static String labelFromMime(String mime) {
+    String override = MIME_LABEL_OVERRIDES.get(mime);
+    if (override != null) return override;
+    try {
+      MimeType mt = TIKA_MIME_REPO.forName(mime);
+      String ext = mt.getExtension(); // e.g. ".pdf", ".docx"
+      if (ext != null && ext.length() > 1) {
+        return ext.substring(1).toUpperCase(); // strip leading dot
+      }
+    } catch (MimeTypeException ignored) {
+    }
+    // Fallback: derive from subtype string
+    String subtype = mime.contains("/") ? mime.substring(mime.indexOf('/') + 1) : mime;
+    subtype = subtype.replaceAll("^(x-|vnd\\.)", "").toUpperCase();
+    return (!subtype.isEmpty() && subtype.length() <= 12) ? subtype : null;
   }
 }

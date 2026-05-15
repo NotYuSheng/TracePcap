@@ -300,6 +300,87 @@ packets += [
           ack=5001 + len(tls_server_hello)),
 ]
 
+# ── Network Labels demo traffic ───────────────────────────────────────────────
+# Multiple internal subnets so the Network Labels grouping strategy has something
+# interesting to show. Suggested labels to add in the UI:
+#   10.1.0.0/24  →  Engineering Team
+#   10.2.0.0/24  →  Finance Team
+#   10.3.0.0/24  →  HR Department
+#   10.4.0.0/24  →  Production Servers
+
+ENG1   = "10.1.0.10";  ENG2  = "10.1.0.20"
+FIN1   = "10.2.0.10";  FIN2  = "10.2.0.11"
+HR1    = "10.3.0.10"
+PROD1  = "10.4.0.1";   PROD2 = "10.4.0.2"
+INET1  = "93.184.216.34"    # example.com
+INET2  = "151.101.1.140"    # fastly CDN
+
+# Engineering ↔ Production
+packets += tcp_flow(ENG1, PROD1, 60001, 8080, b"GET /api/data HTTP/1.1\r\nHost: prod\r\n\r\n")
+packets += tcp_flow(ENG2, PROD1, 60002, 8080, b"GET /api/status HTTP/1.1\r\nHost: prod\r\n\r\n")
+packets += tcp_flow(ENG1, PROD2, 60003, 5432)   # DB connection
+
+# Finance ↔ Production
+packets += tcp_flow(FIN1, PROD1, 60010, 8080, b"GET /api/reports HTTP/1.1\r\nHost: prod\r\n\r\n")
+packets += tcp_flow(FIN2, PROD1, 60011, 8080, b"POST /api/invoice HTTP/1.1\r\nHost: prod\r\n\r\n")
+
+# HR ↔ Finance (internal cross-dept)
+packets += tcp_flow(HR1, FIN1, 60020, 445)    # SMB file share
+
+# Engineering → Internet
+packets += tcp_flow(ENG1, INET1, 60030, 80,  b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+packets += tcp_flow(ENG2, INET2, 60031, 443)
+
+# Finance → Internet (should be flagged as unusual in the cluster view)
+packets += tcp_flow(FIN1, INET1, 60040, 80,  b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+
+# ── Star-graph / Conversation Tracer demo ─────────────────────────────────────
+# HUB_IP talks to 8 different peers so that when you open any of its conversations
+# in the Tracer, the star graph shows the full peer ring around the hub.
+#
+# Upload demo_all_rules.pcap, open the Conversations tab, filter by IP 10.10.0.1,
+# then click Trace on any of those conversations.
+
+HUB_IP = "10.10.0.1"
+
+STAR_PEERS = [
+    ("10.10.0.2",   60100, 80,   b"GET /index.html HTTP/1.1\r\nHost: 10.10.0.2\r\n\r\n"),
+    ("10.10.0.3",   60101, 22,   b"SSH-2.0-OpenSSH_8.9\r\n"),
+    ("10.10.0.4",   60102, 5432, b""),        # postgres
+    ("10.10.0.5",   60103, 6379, b"*1\r\n$4\r\nPING\r\n"),   # redis
+    ("203.0.113.50",60104, 443,  b""),        # external HTTPS
+    ("203.0.113.51",60105, 80,   b"GET / HTTP/1.1\r\nHost: api.example.com\r\n\r\n"),
+    ("203.0.113.52",60106, 8443, b""),        # alt HTTPS
+    ("8.8.4.4",     60107, 53,   b""),        # DNS
+]
+
+for peer_ip, sport, dport, payload in STAR_PEERS:
+    # Full TCP handshake + data so ndpi registers a proper conversation
+    flow = tcp_flow(HUB_IP, peer_ip, sport, dport, payload)
+    # Add a few extra data packets to make the tracer animation more interesting
+    seq_base = 1001 + len(payload)
+    ack_base = 5001
+    extra_data = b"DATA " + peer_ip.encode() + b"\r\n"
+    flow += [
+        eth(src_mac=GW_MAC, dst_mac=CLIENT_MAC)
+        / IP(src=peer_ip, dst=HUB_IP)
+        / TCP(sport=dport, dport=sport, flags="PA", seq=ack_base, ack=seq_base)
+        / Raw(extra_data),
+        eth()
+        / IP(src=HUB_IP, dst=peer_ip)
+        / TCP(sport=sport, dport=dport, flags="A", seq=seq_base, ack=ack_base + len(extra_data)),
+        eth()
+        / IP(src=HUB_IP, dst=peer_ip)
+        / TCP(sport=sport, dport=dport, flags="PA", seq=seq_base, ack=ack_base + len(extra_data))
+        / Raw(b"ACK\r\n"),
+        eth(src_mac=GW_MAC, dst_mac=CLIENT_MAC)
+        / IP(src=peer_ip, dst=HUB_IP)
+        / TCP(sport=dport, dport=sport, flags="A", seq=ack_base + len(extra_data), ack=seq_base + 5),
+    ]
+    packets += flow
+
+print(f"Star-graph demo: {HUB_IP} ↔ {len(STAR_PEERS)} peers added")
+
 # ── write synthetic pcap ──────────────────────────────────────────────────────
 synthetic_path = os.path.join(SCRIPT_DIR, "_synthetic_rules.pcap")
 wrpcap(synthetic_path, packets)

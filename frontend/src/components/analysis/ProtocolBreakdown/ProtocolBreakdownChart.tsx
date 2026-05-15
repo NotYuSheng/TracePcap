@@ -12,11 +12,10 @@ const protocolInfoPopover = (
     <Popover.Header>Protocol distribution</Popover.Header>
     <Popover.Body>
       <p className="mb-0">
-        Shows the breakdown of <strong>transport-layer protocols</strong> (TCP, UDP, ICMP, ARP,
-        etc.) read directly from IP packet headers — no heuristics involved. The counts accurately
-        reflect what is declared in each packet's header. Note that tunnelled traffic (e.g. GRE,
-        VXLAN, IP-in-IP) will appear as its outer transport protocol, not the encapsulated inner
-        protocol.
+        Shows the breakdown of protocols read directly from the IP header's Protocol field — no
+        heuristics involved. The counts accurately reflect what is declared in each packet's header.
+        Note that tunnelled traffic (e.g. GRE, VXLAN, IP-in-IP) will appear as its outer protocol,
+        not the encapsulated inner protocol.
       </p>
     </Popover.Body>
   </Popover>
@@ -57,7 +56,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
   return (
     <div className="protocol-breakdown">
       <h3 className="breakdown-title d-flex align-items-center gap-2">
-        L4 Protocol Distribution
+        Protocol Distribution
         <OverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover} rootClose>
           <button
             type="button"

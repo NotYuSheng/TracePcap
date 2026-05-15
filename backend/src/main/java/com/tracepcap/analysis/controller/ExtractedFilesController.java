@@ -44,6 +44,53 @@ public class ExtractedFilesController {
     return ResponseEntity.ok(response);
   }
 
+  /** MIME types the browser can safely render inline without a plugin. */
+  private static final java.util.Set<String> INLINE_SAFE_MIME_TYPES = java.util.Set.of(
+      "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+      "audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/flac",
+      "audio/aac", "audio/webm", "audio/mp4",
+      "video/mp4", "video/webm", "video/ogg"
+  );
+
+  @GetMapping("/{extractionId}/preview")
+  @Operation(summary = "Preview an extracted file inline (browser-renderable types only)")
+  public ResponseEntity<StreamingResponseBody> preview(
+      @PathVariable UUID fileId, @PathVariable UUID extractionId) {
+
+    ExtractedFileEntity entity =
+        extractedFileRepository
+            .findById(extractionId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Extracted file not found: " + extractionId));
+
+    if (!entity.getFile().getId().equals(fileId)) {
+      throw new ResourceNotFoundException("Extracted file not found: " + extractionId);
+    }
+
+    String mimeType =
+        entity.getMimeType() != null ? entity.getMimeType() : "application/octet-stream";
+
+    if (!INLINE_SAFE_MIME_TYPES.contains(mimeType)) {
+      return ResponseEntity.status(415).build();
+    }
+
+    String filename = entity.getFilename() != null ? entity.getFilename() : "preview";
+
+    StreamingResponseBody body =
+        outputStream -> {
+          try (InputStream in = storageService.downloadFile(entity.getMinioPath())) {
+            in.transferTo(outputStream);
+          }
+        };
+
+    return ResponseEntity.ok()
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.inline().filename(filename).build().toString())
+        .contentType(MediaType.parseMediaType(mimeType))
+        .body(body);
+  }
+
   @GetMapping("/{extractionId}/download")
   @Operation(summary = "Download an extracted file")
   public ResponseEntity<StreamingResponseBody> download(

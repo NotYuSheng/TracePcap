@@ -4,6 +4,8 @@ import type {
   SessionData,
   SessionChunk,
   HttpExchange,
+  StunMessage,
+  MediaInfo,
 } from '@/features/conversation/services/conversationService';
 import { formatBytes } from '@/utils/formatters';
 
@@ -134,7 +136,9 @@ function HttpMessageBlock({
         <code style={{ fontSize: '0.8rem', color: '#fff', flex: 1 }}>{message.firstLine}</code>
         {message.bodyDecompressed && (
           <span className="badge bg-light text-dark" style={{ fontSize: '0.65rem' }}>
-            gzip decoded
+            {message.bodyEncoding ?? 'compressed'} decoded
+            {message.bodyCompressedLength > 0 &&
+              ` (${formatBytes(message.bodyCompressedLength)} → ${formatBytes(message.bodyLength)})`}
           </span>
         )}
       </div>
@@ -241,13 +245,141 @@ function HttpExchangeBlock({ exchange, index }: { exchange: HttpExchange; index:
   );
 }
 
+// ─── STUN message view ────────────────────────────────────────────────────────
+
+function StunMessageBlock({ msg, index }: { msg: StunMessage; index: number }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const isClient = msg.direction === 'CLIENT';
+  const color = isClient ? CLIENT_COLOR : SERVER_COLOR;
+  const attrEntries = Object.entries(msg.attributes ?? {});
+
+  return (
+    <div className="mb-2">
+      <button
+        className="btn btn-link btn-sm p-0 text-muted mb-1"
+        onClick={() => setCollapsed(c => !c)}
+        style={{ fontSize: '0.8rem', textDecoration: 'none' }}
+      >
+        {collapsed ? '▸' : '▾'} #{index + 1}
+        <span
+          className="badge ms-2"
+          style={{ backgroundColor: color, color: '#fff', fontSize: '0.65rem' }}
+        >
+          {msg.direction}
+        </span>
+        <code className="ms-2" style={{ fontSize: '0.78rem' }}>
+          {msg.messageType}
+        </code>
+      </button>
+      {!collapsed && (
+        <div
+          style={{
+            border: `1px solid ${color}`,
+            borderRadius: '6px',
+            overflow: 'hidden',
+            marginLeft: '0.5rem',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: color,
+              color: '#fff',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.8rem',
+              display: 'flex',
+              gap: '1rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span className="fw-semibold">{msg.messageType}</span>
+            <span style={{ opacity: 0.85, fontFamily: 'monospace', fontSize: '0.72rem' }}>
+              tx: {msg.transactionId}
+            </span>
+          </div>
+          {attrEntries.length > 0 && (
+            <table
+              className="table table-sm table-borderless mb-0"
+              style={{ fontSize: '0.75rem' }}
+            >
+              <tbody>
+                {attrEntries.map(([k, v]) => (
+                  <tr key={k}>
+                    <td
+                      className="fw-semibold text-muted pe-2"
+                      style={{ whiteSpace: 'nowrap', width: '1%', paddingLeft: '0.75rem' }}
+                    >
+                      {k}
+                    </td>
+                    <td style={{ wordBreak: 'break-all', paddingRight: '0.75rem' }}>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {attrEntries.length === 0 && (
+            <div style={{ padding: '0.4rem 0.75rem' }}>
+              <small className="text-muted">No attributes</small>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StunMessagesView({ messages }: { messages: StunMessage[] }) {
+  if (messages.length === 0) {
+    return <p className="text-muted text-center py-3">No STUN messages decoded.</p>;
+  }
+  return (
+    <div>
+      {messages.map((msg, i) => (
+        <StunMessageBlock key={i} msg={msg} index={i} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Media info panel ─────────────────────────────────────────────────────────
+
+function MediaInfoPanel({ info }: { info: MediaInfo }) {
+  const rows: Array<[string, string]> = [];
+  if (info.containerFormat) rows.push(['Container', info.containerFormat]);
+  if (info.codec) rows.push(['Codec', info.codec]);
+  if (info.width != null && info.height != null) rows.push(['Dimensions', `${info.width} × ${info.height}`]);
+  if (info.sampleRate != null) rows.push(['Sample rate', `${info.sampleRate.toLocaleString()} Hz`]);
+  if (info.streamCount != null) rows.push(['SSRC streams', String(info.streamCount)]);
+
+  return (
+    <div className="card mb-3" style={{ fontSize: '0.85rem' }}>
+      <div className="card-body p-3">
+        <div className="fw-semibold mb-2">
+          {info.mediaType} stream detected — {info.containerFormat}
+        </div>
+        {rows.length > 0 && (
+          <table className="table table-sm table-borderless mb-0" style={{ fontSize: '0.8rem' }}>
+            <tbody>
+              {rows.map(([k, v]) => (
+                <tr key={k}>
+                  <td className="text-muted pe-3" style={{ whiteSpace: 'nowrap', width: '1%' }}>{k}</td>
+                  <td>{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SessionTab({ conversationId }: SessionTabProps) {
   const [session, setSession] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'parsed' | 'raw'>('parsed');
+  const [activeView, setActiveView] = useState<'parsed' | 'stun' | 'raw'>('parsed');
 
   const handleReconstruct = async () => {
     setLoading(true);
@@ -255,7 +387,13 @@ export function SessionTab({ conversationId }: SessionTabProps) {
     try {
       const data = await conversationService.reconstructSession(conversationId);
       setSession(data);
-      setActiveView(data.httpExchanges && data.httpExchanges.length > 0 ? 'parsed' : 'raw');
+      if (data.httpExchanges && data.httpExchanges.length > 0) {
+        setActiveView('parsed');
+      } else if (data.stunMessages && data.stunMessages.length > 0) {
+        setActiveView('stun');
+      } else {
+        setActiveView('raw');
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Request failed');
     } finally {
@@ -314,6 +452,8 @@ export function SessionTab({ conversationId }: SessionTabProps) {
   // ── Session display ────────────────────────────────────────────────────────
 
   const hasHttp = session.httpExchanges && session.httpExchanges.length > 0;
+  const hasStun = session.stunMessages && session.stunMessages.length > 0;
+  const hasMedia = session.mediaInfo != null;
   const isTls = session.detectedProtocol === 'TLS';
 
   return (
@@ -323,6 +463,11 @@ export function SessionTab({ conversationId }: SessionTabProps) {
         <div className="d-flex align-items-center gap-2">
           {session.detectedProtocol && (
             <span className="badge bg-info text-dark">{session.detectedProtocol}</span>
+          )}
+          {hasMedia && (
+            <span className="badge bg-primary">
+              {session.mediaInfo!.containerFormat}
+            </span>
           )}
           <small className="text-muted">
             ↑ {formatBytes(session.totalClientBytes)} client &nbsp;·&nbsp; ↓{' '}
@@ -335,14 +480,24 @@ export function SessionTab({ conversationId }: SessionTabProps) {
           )}
         </div>
 
-        {hasHttp && (
+        {(hasHttp || hasStun) && (
           <div className="btn-group btn-group-sm">
-            <button
-              className={`btn btn-outline-secondary${activeView === 'parsed' ? ' active' : ''}`}
-              onClick={() => setActiveView('parsed')}
-            >
-              Parsed HTTP
-            </button>
+            {hasHttp && (
+              <button
+                className={`btn btn-outline-secondary${activeView === 'parsed' ? ' active' : ''}`}
+                onClick={() => setActiveView('parsed')}
+              >
+                Parsed HTTP
+              </button>
+            )}
+            {hasStun && (
+              <button
+                className={`btn btn-outline-secondary${activeView === 'stun' ? ' active' : ''}`}
+                onClick={() => setActiveView('stun')}
+              >
+                STUN Messages
+              </button>
+            )}
             <button
               className={`btn btn-outline-secondary${activeView === 'raw' ? ' active' : ''}`}
               onClick={() => setActiveView('raw')}
@@ -374,6 +529,9 @@ export function SessionTab({ conversationId }: SessionTabProps) {
         </div>
       )}
 
+      {/* Media metadata panel */}
+      {hasMedia && <MediaInfoPanel info={session.mediaInfo!} />}
+
       {/* Parsed HTTP view */}
       {hasHttp && activeView === 'parsed' && (
         <div>
@@ -383,8 +541,13 @@ export function SessionTab({ conversationId }: SessionTabProps) {
         </div>
       )}
 
+      {/* Decoded STUN messages */}
+      {hasStun && activeView === 'stun' && (
+        <StunMessagesView messages={session.stunMessages!} />
+      )}
+
       {/* Interleaved raw stream (Wireshark-style) */}
-      {(!hasHttp || activeView === 'raw') && <InterleavedStream chunks={session.chunks} />}
+      {activeView === 'raw' && <InterleavedStream chunks={session.chunks} />}
     </div>
   );
 }

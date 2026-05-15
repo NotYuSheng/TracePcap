@@ -18,8 +18,39 @@ function determineRole(port: number): 'client' | 'server' {
 }
 
 /**
+ * Maps nDPI appName values (uppercased) to node types.
+ * Used as the primary classifier — more accurate than port-based guessing,
+ * especially for encrypted flows (TLS/QUIC) and non-standard ports.
+ *
+ * Stored as an ordered array of [appName, NodeType] pairs so that priority
+ * is explicit and not dependent on object key iteration order.
+ * More-specific entries (e.g. FTP_CONTROL) should come before broader ones.
+ */
+const NDPI_APP_ENTRIES: [string, NodeType][] = [
+  ['DNS',           'dns-server'],
+  ['HTTP',          'web-server'],
+  ['TLS',           'web-server'],
+  ['QUIC',          'web-server'],
+  ['SSH',           'ssh-server'],
+  ['FTP_CONTROL',   'ftp-server'],
+  ['FTP_DATA',      'ftp-server'],
+  ['SMTP',          'mail-server'],
+  ['SMTPTLS',       'mail-server'],
+  ['IMAP',          'mail-server'],
+  ['POP',           'mail-server'],
+  ['DHCP',          'dhcp-server'],
+  ['NTP',           'ntp-server'],
+  ['MYSQL',         'database-server'],
+  ['POSTGRESQL',    'database-server'],
+  ['REDIS',         'database-server'],
+  ['MONGODB',       'database-server'],
+  ['ELASTICSEARCH', 'database-server'],
+];
+
+/**
  * Maps well-known port/protocol combinations to node types.
  * Key format: "<port>/<PROTOCOL>"
+ * Used as a fallback when nDPI appName is unavailable.
  */
 const PORT_SERVICE_MAP: Record<string, NodeType> = {
   '53/UDP': 'dns-server',
@@ -61,17 +92,50 @@ function isMacAddress(id: string): boolean {
 }
 
 /**
- * Classify a node type from its inbound port frequency map and distinct peer count.
+ * Classify a node type from its inbound port frequency map, distinct peer count,
+ * and the set of nDPI appName values observed on inbound edges.
+ *
+ * Classification order (highest priority first):
+ *   1. nDPI appName (NDPI_APP_MAP) — accurate even on non-standard ports / encrypted flows
+ *   2. Well-known port (PORT_SERVICE_MAP) — fallback when appName is unavailable
+ *   3. Router heuristic — many distinct peers
+ *   4. Generic client / unknown
+ *
  * serverPorts: { "53/UDP": 42, "80/TCP": 1 } — counts of connections received on each port.
+ * ndpiApps: set of distinct nDPI appName strings seen on inbound edges.
  */
 function classifyNodeType(
   node: GraphNode,
   serverPorts: Record<string, number>,
-  distinctPeers: number
+  distinctPeers: number,
+  ndpiApps: Set<string>
 ): void {
   // L2-only nodes (identified by MAC address) keep their pre-assigned type
   if (node.data.isL2) return;
-  // Find the port/protocol with the most inbound connections
+
+  // --- Primary: nDPI appName ---
+  // Iterate NDPI_APP_ENTRIES in declared priority order (explicit, not key-order dependent).
+  let matchedNdpiApp: string | null = null;
+  let matchedNodeType: NodeType | null = null;
+  for (const [app, type] of NDPI_APP_ENTRIES) {
+    if (ndpiApps.has(app)) {
+      matchedNdpiApp = app;
+      matchedNodeType = type;
+      break;
+    }
+  }
+  if (matchedNdpiApp && matchedNodeType) {
+    node.data.nodeType = matchedNodeType;
+    node.data.nodeTypeEvidence = {
+      dominantPort: null,
+      connectionCount: 0,
+      distinctPeers,
+      ndpiApps: Array.from(ndpiApps),
+    };
+    return;
+  }
+
+  // --- Fallback: well-known port ---
   let dominantPort: string | null = null;
   let maxCount = 0;
 
@@ -317,6 +381,8 @@ export function buildNetworkGraph(
   const serverPorts: Record<string, Record<string, number>> = {};
   // peerSets[ip] = set of all distinct peer IPs
   const peerSets: Record<string, Set<string>> = {};
+  // ndpiAppSets[ip] = set of distinct nDPI appName values seen on inbound edges (dst = ip)
+  const ndpiAppSets: Record<string, Set<string>> = {};
 
   // Seed all known hosts from the analysis summary so the node count matches
   // the "Unique Hosts" figure on the overview, even for hosts that fall outside
@@ -374,13 +440,25 @@ export function buildNetworkGraph(
     if (!peerSets[dst.ip]) peerSets[dst.ip] = new Set();
     peerSets[dst.ip].add(src.ip);
 
+    // Accumulate nDPI appName on the destination node (the server side of the flow).
+    // Store uppercased to match NDPI_APP_MAP keys.
+    if (conv.appName) {
+      if (!ndpiAppSets[dst.ip]) ndpiAppSets[dst.ip] = new Set();
+      ndpiAppSets[dst.ip].add(conv.appName.toUpperCase());
+    }
+
     // Create edge
     edges.push(createEdge(conv, src.ip, dst.ip));
   });
 
-  // Classify node types based on accumulated port/peer data
+  // Classify node types based on accumulated nDPI app / port / peer data
   Object.keys(nodeMap).forEach(ip => {
-    classifyNodeType(nodeMap[ip], serverPorts[ip] || {}, peerSets[ip]?.size || 0);
+    classifyNodeType(
+      nodeMap[ip],
+      serverPorts[ip] || {},
+      peerSets[ip]?.size || 0,
+      ndpiAppSets[ip] ?? new Set()
+    );
   });
 
   // Apply backend device classifications (deviceType, confidence, manufacturer)

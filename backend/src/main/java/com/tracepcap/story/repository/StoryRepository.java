@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Repository for Story entities */
 @Repository
@@ -18,5 +19,6 @@ public interface StoryRepository extends JpaRepository<StoryEntity, UUID> {
    */
   Optional<StoryEntity> findFirstByFileIdOrderByGeneratedAtDesc(UUID fileId);
 
+  @Transactional
   void deleteByFileId(UUID fileId);
 }

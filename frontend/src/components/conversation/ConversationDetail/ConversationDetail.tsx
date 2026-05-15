@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { Conversation, ConversationGeoInfo, Packet, HostClassification } from '@/types';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
@@ -38,6 +39,79 @@ function isPrivateIp(ip: string): boolean {
   );
 }
 
+const GEO_SOURCE_INFO: Record<string, { label: string; title: string; description: string; bg: string }> = {
+  ipinfo: {
+    label: 'ipinfo.io',
+    title: 'Geo source: ipinfo.io',
+    description: 'Location was resolved by calling the ipinfo.io API. This is an online feature — an internet connection is required. Results are cached locally so repeat lookups do not require another API call.',
+    bg: '#198754',
+  },
+  mmdb: {
+    label: 'Offline DB',
+    title: 'Geo source: Offline database',
+    description: 'Location was resolved using the bundled DB-IP Lite database. This happens when the app is offline or ipinfo.io could not be reached. Accuracy may be lower, especially for cloud provider IPs.',
+    bg: '#6c757d',
+  },
+};
+
+const GEO_SOURCE_FALLBACK = GEO_SOURCE_INFO.mmdb;
+
+function GeoSourceBadge({ source }: { source?: string }) {
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const info = (source ? GEO_SOURCE_INFO[source] : undefined) ?? GEO_SOURCE_FALLBACK;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (popoverPos) { setPopoverPos(null); return; }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const popW = 260;
+    const popH = 120;
+    const left = Math.min(rect.right - popW, window.innerWidth - popW - 8);
+    const top = rect.bottom + 6 + popH > window.innerHeight
+      ? rect.top - popH - 6
+      : rect.bottom + 6;
+    setPopoverPos({ top, left: Math.max(8, left) });
+  };
+
+  return (
+    <>
+      <span
+        className="ms-2 badge"
+        style={{ backgroundColor: info.bg, color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
+        onClick={handleClick}
+      >
+        {info.label}
+      </span>
+      {popoverPos && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: popoverPos.top,
+            left: popoverPos.left,
+            zIndex: 9999,
+            background: 'var(--tp-surface)',
+            border: '1px solid var(--tp-border)',
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            padding: '10px 12px',
+            width: 260,
+            fontSize: 11,
+            color: 'var(--tp-text)',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="fw-semibold mb-1" style={{ fontSize: 12 }}>{info.title}</div>
+          <div className="text-muted">{info.description}</div>
+          <div className="text-end mt-2">
+            <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => setPopoverPos(null)}>Close</button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: string; ip: string }) {
   if (!geo?.countryCode) {
     if (!isPrivateIp(ip)) return null;
@@ -56,6 +130,7 @@ function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: str
       <dd className="col-sm-8">
         {countryFlag(geo.countryCode)} {geo.country} ({geo.countryCode})
         {geo.asn && <small className="text-muted ms-2">{geo.asn}</small>}
+        <GeoSourceBadge source={geo.geoSource} />
         {geo.org && <small className="text-muted d-block">{geo.org}</small>}
       </dd>
     </>
@@ -211,7 +286,7 @@ export const ConversationDetail = ({
                 </dd>
                 <GeoInfoRows geo={conversation.srcGeo} label="Src" ip={source.ip} />
                 <GeoInfoRows geo={conversation.dstGeo} label="Dst" ip={destination.ip} />
-                <dt className="col-sm-4">L4 Protocol:</dt>
+                <dt className="col-sm-4">Protocol:</dt>
                 <dd className="col-sm-8">
                   {(() => {
                     const bg = getProtocolColor(conversation.protocol.name);
@@ -227,7 +302,7 @@ export const ConversationDetail = ({
                 </dd>
                 {conversation.tsharkProtocol && (
                   <>
-                    <dt className="col-sm-4">L7 Protocol:</dt>
+                    <dt className="col-sm-4">Dissected Protocol:</dt>
                     <dd className="col-sm-8">
                       {(() => {
                         const bg = getL7ProtocolColor(conversation.tsharkProtocol!);

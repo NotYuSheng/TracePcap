@@ -355,10 +355,16 @@ export const NetworkDiagramPage = () => {
   return (
     <div className="network-diagram-page">
       {/* Page title */}
-      <h4 className="mb-3">
-        <i className="bi bi-diagram-3 me-2"></i>
-        Network Topology Diagram
-      </h4>
+      <div className="mb-3">
+        <h4 className="mb-1">
+          <i className="bi bi-diagram-3 me-2"></i>
+          Network Topology Diagram
+        </h4>
+        <p className="text-muted small mb-0">
+          Visualise individual hosts and the connections between them. Best for captures with fewer than 50 hosts —
+          for larger captures, use the <strong>Network Intelligence</strong> tab for a cluster-level overview.
+        </p>
+      </div>
 
       {CONVERSATION_LIMIT_ENABLED &&
         (stats.isLimited ? (
