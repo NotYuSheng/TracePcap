@@ -31,9 +31,8 @@ WORKDIR /app
 # The ntop apt repo is required because Ubuntu 22.04's built-in nDPI (4.2-2)
 # lacks H.225/H.245 session tracking and several protocol signatures added in v5.
 #
-# After installing, the ndpi .deb and its runtime dependency debs are copied to
-# /opt/ndpi-debs/ so they can be exported and reinstalled on air-gapped machines
-# without a full image rebuild (see scripts/export-ndpi-debs.sh).
+# To upgrade nDPI: bump NDPI_VERSION above, rebuild the image, and redeploy
+# (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh).
 #
 # BuildKit cache mounts keep downloaded apt packages cached across rebuilds.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -54,11 +53,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         tzdata \
         gosu && \
     apt-get purge -y --auto-remove gnupg && \
-    # Cache the installed ndpi deb and its non-standard runtime deps for offline patching.
-    mkdir -p /opt/ndpi-debs && \
-    apt-get download "ndpi=${NDPI_VERSION}" libnuma1 libmaxminddb0 && \
-    mv ndpi_*.deb libnuma1_*.deb libmaxminddb0_*.deb /opt/ndpi-debs/ && \
-    echo "${NDPI_VERSION}" > /opt/ndpi-debs/VERSION
+    # Write the pinned version to a file for introspection.
+    echo "${NDPI_VERSION}" > /opt/ndpi-version
 
 # Download DB-IP Lite City MMDB (offline GeoIP).
 # Published monthly at https://db-ip.com/db/download/ip-to-city-lite
