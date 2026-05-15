@@ -1,1 +1,0 @@
-ALTER TABLE packets ALTER COLUMN protocol TYPE VARCHAR(100);

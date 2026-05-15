@@ -43,6 +43,7 @@ export interface ConversationGeoInfo {
   countryCode: string;
   asn?: string;
   org?: string;
+  geoSource?: string;
 }
 
 // Conversation Types

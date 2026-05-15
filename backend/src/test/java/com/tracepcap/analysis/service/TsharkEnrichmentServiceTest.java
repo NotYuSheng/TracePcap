@@ -92,6 +92,44 @@ class TsharkEnrichmentServiceTest {
         .isNull();
   }
 
+  // --- resolveProtoNumber ---
+
+  @Test
+  void resolveProtoNumber_commonProtocols_returnExpectedNames() {
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("1")).isEqualTo("ICMP");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("2")).isEqualTo("IGMP");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("6")).isEqualTo("TCP");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("17")).isEqualTo("UDP");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("47")).isEqualTo("GRE");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("50")).isEqualTo("ESP");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("51")).isEqualTo("AH");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("103")).isEqualTo("PIM");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("112")).isEqualTo("VRRP");
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("132")).isEqualTo("SCTP");
+  }
+
+  @Test
+  void resolveProtoNumber_icmpv6Override_appliesNormalization() {
+    // IANA keyword is "IPv6-ICMP"; override maps it to "ICMPv6"
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("58")).isEqualTo("ICMPv6");
+  }
+
+  @Test
+  void resolveProtoNumber_ospfOverride_appliesNormalization() {
+    // IANA keyword is "OSPFIGP"; override maps it to "OSPF"
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("89")).isEqualTo("OSPF");
+  }
+
+  @Test
+  void resolveProtoNumber_unknownNumber_returnsUpperCasedNumber() {
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("200")).isEqualTo("200");
+  }
+
+  @Test
+  void resolveProtoNumber_emptyString_returnsUnknown() {
+    assertThat(TsharkEnrichmentService.resolveProtoNumber("")).isEqualTo("UNKNOWN");
+  }
+
   // --- normalizeL7Protocol ---
 
   @Test

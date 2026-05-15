@@ -22,7 +22,7 @@ export const storyService = {
     const response = await apiClient.post<Story>(
       API_ENDPOINTS.GENERATE_STORY(fileId),
       Object.keys(body).length > 0 ? body : undefined,
-      { ...(timeoutMs !== undefined && { timeout: timeoutMs }) }
+      { ...(timeoutMs !== undefined && { timeout: timeoutMs + 10000 }) }
     );
     return response.data;
   },

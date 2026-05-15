@@ -106,9 +106,9 @@ export const ConversationList = ({
             <tr>
               {col('source') && <SortableHeader field="srcIp" label="Source" />}
               {col('destination') && <SortableHeader field="dstIp" label="Destination" />}
-              {col('protocol') && <th style={{ whiteSpace: 'nowrap' }}>L4 Protocol</th>}
+              {col('protocol') && <th style={{ whiteSpace: 'nowrap' }}>Protocol</th>}
               {col('tsharkProtocol') && hasL7Protocols && (
-                <th style={{ whiteSpace: 'nowrap' }}>L7 Protocol</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Dissected Protocol</th>
               )}
               {col('appName') && hasAppNames && <th>Application</th>}
               {col('category') && hasCategories && <th>Category</th>}

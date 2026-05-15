@@ -85,6 +85,9 @@ services:
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2000}
       LLM_CONTEXT_LENGTH: ${LLM_CONTEXT_LENGTH:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
+      # Network Intelligence cluster limits
+      INTELLIGENCE_MAX_CLUSTERS: ${INTELLIGENCE_MAX_CLUSTERS:-60}
+      INTELLIGENCE_MAX_EDGES: ${INTELLIGENCE_MAX_EDGES:-200}
       # Timezone Configuration
       TZ: Asia/Singapore
     volumes:

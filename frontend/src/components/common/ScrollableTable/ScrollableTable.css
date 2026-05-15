@@ -1,9 +1,9 @@
 /* Top phantom scrollbar — sits above the table, synced via JS */
 .sct-top-scrollbar {
   overflow: scroll hidden;
-  height: 12px;
+  height: 6px;
   scrollbar-width: thin;
-  scrollbar-color: var(--tp-scrollbar, #adb5bd) transparent;
+  scrollbar-color: var(--tp-scrollbar, #adb5bd) var(--tp-border, #dee2e6);
 }
 
 .sct-top-scrollbar::-webkit-scrollbar {
@@ -11,7 +11,7 @@
 }
 
 .sct-top-scrollbar::-webkit-scrollbar-track {
-  background: var(--tp-bg-subtle, #f1f3f5);
+  background: var(--tp-border, #dee2e6);
   border-radius: 3px;
 }
 

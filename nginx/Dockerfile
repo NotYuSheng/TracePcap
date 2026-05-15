@@ -3,8 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY frontend/package*.json ./
+# Copy package files and .npmrc (needed for legacy-peer-deps flag)
+COPY frontend/package*.json frontend/.npmrc* ./
 
 # Install dependencies
 RUN npm ci

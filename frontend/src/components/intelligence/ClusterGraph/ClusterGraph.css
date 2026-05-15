@@ -1,0 +1,200 @@
+.intel-graph-container {
+  position: relative;
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: var(--tp-surface, #fff);
+}
+
+.intel-graph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 70vh;
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 0.375rem;
+  background: var(--tp-bg-subtle, #f8f9fa);
+  color: var(--tp-text-muted, #6c757d);
+}
+
+.intel-graph-layouting {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--tp-surface, #fff) 70%, transparent);
+  font-size: 0.85rem;
+  color: var(--tp-text-muted, #6c757d);
+  pointer-events: none;
+  gap: 8px;
+}
+
+/* ── Cluster node ─────────────────────────────────────────────────────────── */
+.intel-cluster-node {
+  border-radius: 10px;
+  border: 2px dashed #7f8c8d;
+  background: var(--tp-surface, #fff);
+  padding: 8px 10px;
+  width: 160px;
+  position: relative;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+  transition: box-shadow 0.15s;
+}
+
+.intel-cluster-node:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+}
+
+.intel-cluster-node.has-risk {
+  border-color: #e74c3c;
+  border-style: solid;
+}
+
+.intel-cluster-node.selected {
+  border-style: solid;
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+}
+
+.intel-cluster-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--tp-text, #212529);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.intel-cluster-header i {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.intel-cluster-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intel-cluster-stats {
+  color: var(--tp-text-muted, #6c757d);
+  font-size: 10px;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.intel-cluster-protocols {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.intel-cluster-badge {
+  font-size: 9px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.intel-cluster-badge-dark {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.intel-cluster-risk-badge {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  font-size: 10px;
+  color: #e74c3c;
+  line-height: 1;
+}
+
+/* ── Edge label ────────────────────────────────────────────────────────────── */
+.intel-edge-label {
+  position: absolute;
+  font-size: 10px;
+  background: color-mix(in srgb, var(--tp-surface, #fff) 90%, transparent);
+  color: var(--tp-text, #212529);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: all;
+  border: 1px solid var(--tp-border, #dee2e6);
+}
+
+/* ── Handle ────────────────────────────────────────────────────────────────── */
+.intel-handle {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+/* ── Fullscreen ────────────────────────────────────────────────────────────── */
+.card:fullscreen {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  background: var(--tp-surface, #fff);
+}
+
+.card:fullscreen .intel-cluster-card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The ClusterGraph wrapper div fills all remaining card-body space */
+.card:fullscreen .intel-cluster-card-body .intel-cluster-graph-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The graph canvas fills the wrapper below the controls bar */
+.card:fullscreen .intel-cluster-card-body .intel-cluster-graph-wrapper .intel-graph-container {
+  flex: 1;
+  height: auto;
+}
+
+/* ── React Flow overrides ──────────────────────────────────────────────────── */
+.intel-graph-container .react-flow__attribution {
+  display: none;
+}
+
+.intel-graph-container .react-flow__controls {
+  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.intel-graph-container .react-flow__controls-button {
+  border-bottom: 1px solid var(--tp-border, #dee2e6);
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #212529);
+}
+
+.intel-graph-container .react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.intel-graph-container .react-flow__controls-button:hover {
+  background: var(--tp-surface-hover, #f8f9fa);
+}

@@ -125,7 +125,7 @@ async:
 
 # CORS Configuration
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8888}
   allowed-methods: GET,POST,PUT,DELETE,OPTIONS
   allowed-headers: "*"
   allow-credentials: true
@@ -166,3 +166,61 @@ lanturn:
   geo:
     enabled: ${GEO_ENRICHMENT_ENABLED:true}
     timeout-seconds: ${GEO_TIMEOUT_SECONDS:10}
+    mmdb-path: ${GEO_MMDB_PATH:}
+  intelligence:
+    max-clusters: ${INTELLIGENCE_MAX_CLUSTERS:60}   # Max cluster nodes returned per groupBy request
+    max-edges: ${INTELLIGENCE_MAX_EDGES:200}         # Max edges returned per groupBy request
+  device-classification:
+    # nDPI application/category names used to infer host device types.
+    # When a conversation's detected app matches an entry here, it adds weight
+    # to that device type during classification. Edit these lists to tune
+    # classification without recompiling.
+    mobile-apps:
+      - Instagram
+      - TikTok
+      - Snapchat
+      - WhatsApp
+      - WeChat
+      - Line
+      - Viber
+      - Telegram
+      - Signal
+      - iMessage
+      - FaceTime
+      - AirDrop
+      - Siri
+    desktop-apps:
+      - Zoom
+      - Teams
+      - Slack
+      - Discord
+      - Skype
+      - WebEx
+      - GoToMeeting
+      - BitTorrent
+      - Steam
+      - Battle.net
+      - League of Legends
+      - Valorant
+      - Remote Desktop
+      - SSH
+      - SMB
+      - NFS
+      - VNC
+      - TeamViewer
+    server-apps:
+      - PostgreSQL
+      - MySQL
+      - MongoDB
+      - Redis
+      - Elasticsearch
+      - Kafka
+      - RabbitMQ
+      - Memcached
+      - LDAP
+      - Kerberos
+      - SNMP
+      - Syslog
+    iot-categories:
+      - IoT-Scada
+      - Cloud

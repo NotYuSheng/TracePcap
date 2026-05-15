@@ -30,3 +30,7 @@ export async function getExtractionsByConversation(
 export function getDownloadUrl(fileId: string, extractionId: string): string {
   return `/api${API_ENDPOINTS.EXTRACTED_FILE_DOWNLOAD(fileId, extractionId)}`;
 }
+
+export function getPreviewUrl(fileId: string, extractionId: string): string {
+  return `/api/files/${fileId}/extractions/${extractionId}/preview`;
+}

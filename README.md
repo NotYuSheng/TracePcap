@@ -135,12 +135,7 @@ PCAP, PCAPNG, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
 
 ## Documentation
 
-Comprehensive documentation is available in the [`docs/`](docs/) directory:
-
-| Document | Description |
-|----------|-------------|
-| **[API Endpoints](docs/API_ENDPOINTS.md)** | Complete REST API documentation with request/response examples |
-| **[Backend Structure](docs/BACKEND_STRUCTURE.md)** | Backend architecture, package organization, and design patterns |
+API documentation is available via Swagger UI at **http://localhost:80/swagger-ui.html** when the application is running.
 
 ## Common Tasks
 
