@@ -1,9 +1,22 @@
 Offline / Air-Gapped Deployment
 ================================
 
-TracePcap is designed to run fully offline — no external API calls are made
-at runtime. This page covers the workflow for deploying to a machine that has
-no internet access.
+TracePcap is designed to support fully offline operation. This page covers
+the workflow for deploying to a machine that has no internet access.
+
+.. note::
+
+   **Geolocation behaviour:** By default, TracePcap attempts to enrich
+   external IPs using `ipinfo.io <https://ipinfo.io>`_ when internet access
+   is available. On an air-gapped machine it automatically falls back to the
+   bundled **DB-IP Lite MMDB** — no configuration change is needed. All other
+   features (packet parsing, nDPI, session reconstruction, file extraction,
+   custom signatures) are fully offline at all times.
+
+   If you want to force MMDB-only lookups even on an internet-connected
+   machine, set ``tracepcap.geo.mmdb-path`` in ``application.yml`` or set the
+   environment variable to point to the MMDB file and remove internet access
+   from the container.
 
 Overview
 --------

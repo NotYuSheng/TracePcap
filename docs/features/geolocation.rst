@@ -7,8 +7,17 @@ Geolocation
 TracePcap enriches every external (non-RFC-1918) IP address with country and
 ASN (Autonomous System Number) information.
 
-The geolocation database is bundled inside the Docker image — no internet
-connection is required at runtime.
+TracePcap uses a two-source lookup strategy:
+
+1. **ipinfo.io** (online) — queried first when internet is reachable.
+   Returns country, region, city, ASN, and organisation name.
+2. **DB-IP Lite MMDB** (offline fallback) — bundled inside the Docker image.
+   Used automatically when internet is unreachable or ipinfo.io fails.
+   Returns country, region, and city (no ASN data).
+
+The source used for each cached entry is stored and surfaced in the UI so
+users understand the accuracy context. In an air-gapped environment the MMDB
+is used exclusively and no external calls are made.
 
 Data Shown
 ~~~~~~~~~~
