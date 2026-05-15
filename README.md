@@ -135,16 +135,7 @@ PCAP, PCAPNG, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
 
 ## Documentation
 
-Comprehensive documentation is available in the [`docs/`](docs/) directory, built with Sphinx.
-
-**Build the docs locally:**
-```bash
-pip install -r docs/requirements.txt
-make -C docs html
-# Open docs/_build/html/index.html in your browser
-```
-
-Sections include getting started, feature guides, configuration reference, operations, and API reference.
+Full documentation is available at **https://notyusheng.github.io/TracePcap**.
 
 API documentation is also available via Swagger UI at **http://localhost:80/swagger-ui.html** when the application is running.
 

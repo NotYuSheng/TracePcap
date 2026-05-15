@@ -60,7 +60,10 @@ const ExtractionInfoCard = () => {
           </ul>
           <p className="mb-0">
             All extracted files are stored as raw bytes only — no execution or active-content
-            rendering occurs. A safety disclaimer is shown before each download.
+            rendering occurs. A safety disclaimer is shown before each download. Individual files
+            larger than 50 MB are not stored; they appear in this list with a{' '}
+            <span className="badge bg-warning text-dark" style={{ fontSize: '0.85em' }}>Too large</span>{' '}
+            badge so you can see they were detected but skipped.
           </p>
         </div>
       )}
@@ -329,8 +332,10 @@ export const ExtractedFilesPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map(file => (
-                    <tr key={file.id}>
+                  {sorted.map(file => {
+                    const isSkipped = file.skippedReason != null;
+                    return (
+                    <tr key={file.id} className={isSkipped ? 'text-muted' : undefined}>
                       <td>
                         <i className={`bi ${mimeIcon(file.mimeType)} me-2 text-secondary`}></i>
                         <span className="font-monospace" style={{ fontSize: '0.85em' }}>
@@ -377,28 +382,39 @@ export const ExtractedFilesPage = () => {
                       </td>
                       <td>{methodBadge(file.extractionMethod)}</td>
                       <td>
-                        <div className="d-flex gap-1">
-                          {nativePreviewMode(file.mimeType) && (
-                            <button
-                              className="btn btn-outline-secondary btn-sm text-nowrap"
-                              onClick={() => setPreviewFile(file)}
-                              title="Preview in browser"
-                            >
-                              <i className="bi bi-play-circle me-1"></i>
-                              Preview
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-outline-primary btn-sm text-nowrap"
-                            onClick={() => handleDownloadRequest(file)}
+                        {isSkipped ? (
+                          <span
+                            className="badge bg-warning text-dark"
+                            title="File exceeds the 50 MB size limit and was not stored"
                           >
-                            <i className="bi bi-download me-1"></i>
-                            Download
-                          </button>
-                        </div>
+                            <i className="bi bi-slash-circle me-1"></i>
+                            Too large
+                          </span>
+                        ) : (
+                          <div className="d-flex gap-1">
+                            {nativePreviewMode(file.mimeType) && (
+                              <button
+                                className="btn btn-outline-secondary btn-sm text-nowrap"
+                                onClick={() => setPreviewFile(file)}
+                                title="Preview in browser"
+                              >
+                                <i className="bi bi-play-circle me-1"></i>
+                                Preview
+                              </button>
+                            )}
+                            <button
+                              className="btn btn-outline-primary btn-sm text-nowrap"
+                              onClick={() => handleDownloadRequest(file)}
+                            >
+                              <i className="bi bi-download me-1"></i>
+                              Download
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </ScrollableTable>
