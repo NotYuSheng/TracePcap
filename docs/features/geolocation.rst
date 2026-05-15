@@ -49,62 +49,192 @@ Device Classification
 ---------------------
 
 TracePcap classifies each unique IP address into a device type using a
-**multi-signal scoring system**. Four signal types contribute weighted scores;
-the type with the highest total score wins:
+**multi-signal scoring system**. Four signal types contribute weighted scores
+to five possible device type buckets; the type with the highest total score
+wins. If all scores are zero, the result is ``UNKNOWN``.
+
+Host Profile Construction
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before scoring, a profile is built for each IP by iterating over all
+conversations in the PCAP. For each conversation, the IP is encountered either
+as the source (initiator) or as the destination (receiver):
+
+- **Initiator**: ``initiatedCount`` is incremented; the destination port is
+  added to ``dstPorts``; the peer IP is added to the ``peers`` set.
+- **Receiver**: the destination port is added to ``receivedOnPorts``; the peer
+  IP is added to the ``peers`` set.
+- For both roles: the nDPI ``appName`` is added to ``apps``; the nDPI
+  ``category`` is added to ``categories``; ``conversationCount`` is
+  incremented; ``totalBytes`` and ``totalPackets`` accumulate.
+
+Signal 1: MAC OUI Lookup (+40 points)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The first 3 octets of the source MAC address (recorded during tshark parsing
+as ``eth.src``) are resolved against the Wireshark ``manuf`` database to get
+the vendor short name. The vendor name is then matched (case-insensitive
+substring) against a fixed table:
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 75
+   :widths: 30 30 40
 
-   * - Signal
-     - How it works
-   * - **MAC OUI lookup**
-     - The first 3 octets of the MAC address are resolved against the bundled
-       Wireshark ``manuf`` file. Vendor names are matched against a fixed
-       table — e.g. Apple/Samsung/Google → ``MOBILE``; Cisco/Netgear/Ubiquiti
-       → ``ROUTER``; Dell/Lenovo/Intel → ``LAPTOP_DESKTOP``;
-       Raspberry Pi/Espressif → ``IOT``. A match adds **+40 points**.
-   * - **TTL fingerprinting**
-     - The observed IP TTL is normalized to the nearest standard initial value.
-       TTL ~128 (Windows) → ``LAPTOP_DESKTOP`` (+30). TTL ~64 (Linux/Android)
-       → ``SERVER``, ``MOBILE``, ``ROUTER`` (+10 each). TTL ~255
-       (Cisco/network gear) → ``ROUTER`` (+30).
-   * - **nDPI app profile**
-     - Applications seen in conversations are matched against configurable
-       sets of mobile apps, desktop apps, server apps, and IoT categories.
-       Each matching app adds **+20 points** to the relevant type.
-   * - **Traffic patterns**
-     - ≥15 distinct peers → ``ROUTER`` (+35). Never initiates + receives on
-       well-known ports (<1024) → ``SERVER`` (+35). ≤2 apps, ≤5 conversations,
-       <200 packets → ``IOT`` (+20). >70% initiated traffic + >3 distinct apps
-       → ``MOBILE``/``LAPTOP_DESKTOP`` (+10). Only DNS/NTP traffic →
-       ``ROUTER``/``SERVER`` (+20/+15).
+   * - Vendor substring
+     - Device type
+     - Examples
+   * - ``apple``
+     - ``MOBILE``
+     - Apple iPhones, iPads, MacBooks (note: Apple OUIs span many device types)
+   * - ``samsung``
+     - ``MOBILE``
+     - Samsung smartphones
+   * - ``google``
+     - ``MOBILE``
+     - Google Pixel phones, Nest devices
+   * - ``oneplus``, ``xiaomi``
+     - ``MOBILE``
+     - Android phone manufacturers
+   * - ``cisco``
+     - ``ROUTER``
+     - Cisco routers and switches
+   * - ``huawei``, ``tp-link``, ``tplink``, ``netgear``, ``asus``, ``ubiquiti``, ``mikrotik``
+     - ``ROUTER``
+     - Common consumer/enterprise networking gear
+   * - ``dell``, ``intel``, ``lenovo``, ``hewlett packard``, ``hp inc``, ``acer``
+     - ``LAPTOP_DESKTOP``
+     - PC hardware vendors
+   * - ``raspberry pi``, ``espressif``, ``arduino``
+     - ``IOT``
+     - Common IoT hardware platforms
 
-**Confidence** is derived from the score margin between the winning type and
-the runner-up: a margin of ≥60 points → 100%; scaled linearly to 0% at a
-margin of 0.
+Only the first matching vendor substring wins — the table is checked in order.
+If the vendor name does not match any entry, no OUI score is added.
+
+The MAC address is only available if the host is on the same Layer-2 segment
+as the capture point. See :doc:`mac-lookup` for the full scope limitation.
+
+Signal 2: TTL Fingerprinting (up to +30 points)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every IP packet carries a ``Time To Live`` (TTL) field that the sending OS
+initialises to a standard value, then each router hop decrements by 1. By
+examining the **observed** TTL in the PCAP (from the ``ip.ttl`` tshark field)
+we can infer the **initial** TTL and thereby the likely OS family.
+
+TTL normalisation: the observed TTL is rounded up to the nearest standard
+initial value:
+
+- Observed TTL > 128 → initial TTL assumed to be **255** (Cisco IOS, network
+  devices)
+- Observed TTL > 64 → initial TTL assumed to be **128** (Windows)
+- Observed TTL ≤ 64 → initial TTL assumed to be **64** (Linux, macOS, Android,
+  iOS, most Unix-like systems)
+
+Scoring based on the normalised initial TTL:
+
+- ``255`` → ``ROUTER`` **+30**
+- ``128`` → ``LAPTOP_DESKTOP`` **+30**
+- ``64`` → ``SERVER`` **+10**, ``MOBILE`` **+10**, ``ROUTER`` **+10**
+  (three types share the same initial TTL, so all receive a small boost;
+  other signals must disambiguate)
+
+The TTL used is the **first-seen** TTL from the first packet where that IP
+appeared as source. Only one TTL value is stored per IP.
+
+Signal 3: nDPI App Profile (up to +20 points per matching app)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The set of nDPI ``appName`` values observed for an IP (across all its
+conversations) is matched against configurable app lists:
+
+- Each app in the **mobile apps** list → ``MOBILE`` **+20**
+- Each app in the **desktop apps** list → ``LAPTOP_DESKTOP`` **+20**
+- Each app in the **server apps** list → ``SERVER`` **+20**
+- Each nDPI **category** in the IoT categories list → ``IOT`` **+15**
+- nDPI category ``Web`` or ``Media`` → ``LAPTOP_DESKTOP`` **+5**
+
+This signal scales with the number of distinct matching apps — a host that
+generates Telegram, WhatsApp, and Instagram traffic accumulates three
+``MOBILE`` boosts (+60 total from this signal alone).
+
+Signal 4: Traffic Patterns (up to +35 points)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Heuristics applied to the host profile:
+
+**High peer count → ROUTER**
+
+- ≥ 15 distinct peer IPs → ``ROUTER`` **+35**
+- ≥ 8 distinct peer IPs → ``ROUTER`` **+15**
+
+**Receives on well-known ports without initiating → SERVER**
+
+- Never initiated any conversation AND received on at least one port < 1024
+  → ``SERVER`` **+35**
+- Never initiated any conversation (but no port evidence) → ``SERVER`` **+15**
+
+**Low variety and volume → IOT**
+
+- ≤ 2 distinct nDPI apps AND ≤ 5 conversations AND < 200 total packets
+  → ``IOT`` **+20**
+
+**Client-like traffic pattern → MOBILE / LAPTOP_DESKTOP**
+
+- Initiated > 70% of conversations AND observed > 3 distinct nDPI apps
+  → ``MOBILE`` **+10** AND ``LAPTOP_DESKTOP`` **+10**
+
+**Only infrastructure traffic → ROUTER / SERVER**
+
+- All nDPI apps are ``DNS`` or ``NTP`` (and at least one is present)
+  → ``ROUTER`` **+20**, ``SERVER`` **+15**
+
+Confidence Calculation
+~~~~~~~~~~~~~~~~~~~~~~
+
+After all four signals have been scored, confidence is calculated from the
+**margin** between the winning score and the second-highest score:
+
+.. code-block:: text
+
+   confidence = min(100, round( margin × 100 / 60 ))
+
+- Margin ≥ 60 → 100% confidence
+- Margin of 0 (tie) → 0% confidence
+- Intermediate margins scale linearly
+
+A high confidence value means the classification is unambiguous (one device
+type dominates). A low confidence value means multiple device types received
+similar scores and the result should be treated as a best guess.
+
+Custom Signature Override
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A ``device_type`` field in a custom signature rule **overrides** all
-heuristics with confidence 100 — see :doc:`custom-signatures`.
+heuristics with confidence **100** for every IP address involved in a matching
+conversation — see :doc:`custom-signatures`. Standard values (``ROUTER``,
+``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``, ``IOT``, ``UNKNOWN``) and custom
+strings (e.g. ``"PLC"``, ``"CCTV Camera"``) are both accepted.
 
 .. list-table::
    :header-rows: 1
    :widths: 25 75
 
    * - Device Type
-     - Typical signals
+     - Typical winning signals
    * - ``ROUTER``
-     - High peer count, TTL ~255, Cisco/Netgear OUI, DNS/NTP-only traffic
+     - High peer count (≥15), TTL ~255, Cisco/Netgear/Ubiquiti OUI, DNS/NTP-only apps
    * - ``SERVER``
-     - Never initiates, receives on well-known ports (<1024)
+     - Never initiates, receives on well-known ports (<1024), server app profile
    * - ``IOT``
-     - Low app variety, low packet count, Raspberry Pi / Espressif OUI
+     - Low app variety (≤2), low conversation count (≤5), Raspberry Pi/Espressif OUI
    * - ``MOBILE``
-     - Apple/Samsung OUI, mobile nDPI apps (Telegram, WhatsApp, etc.)
+     - Apple/Samsung/Google OUI, mobile app profile (Telegram, WhatsApp, Instagram, etc.)
    * - ``LAPTOP_DESKTOP``
-     - TTL ~128 (Windows), Dell/Lenovo OUI, browser-associated apps
+     - TTL ~128 (Windows), Dell/Lenovo/Intel OUI, browser/desktop app profile
    * - ``UNKNOWN``
-     - Insufficient signals to classify
+     - All signals scored zero — insufficient data to classify
 
 Device types are displayed as icons in the Network Visualization and as a
-filterable column in Conversations.
+filterable column in Conversations. The confidence score is shown in the Node
+Detail Panel.
