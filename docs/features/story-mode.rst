@@ -1,56 +1,101 @@
 Story Mode
 ==========
 
-Story Mode uses an LLM to produce a human-readable **narrative reconstruction**
-of the network activity captured in a PCAP file, along with an interactive
-Q&A chat.
+Story Mode combines **deterministic detectors** with an **LLM narrative
+generator** to produce a rich, structured analysis of the network activity
+captured in a PCAP file.
 
 Requirements
 ------------
 
-A configured LLM server is required (see :doc:`../configuration/llm-setup`).
+A configured LLM server is required for the narrative and Q&A features (see
+:doc:`../configuration/llm-setup`). The deterministic findings panels work
+without an LLM.
 
 What Story Mode Produces
 ------------------------
 
-Narrative Summary
-~~~~~~~~~~~~~~~~~
+Story Mode returns a response containing several components:
 
-The LLM analyses conversation metadata (IPs, ports, protocols, applications,
-risk flags, timestamps, geolocation, custom signature matches) and generates
-a structured narrative that describes:
+Deterministic Findings
+~~~~~~~~~~~~~~~~~~~~~~
 
-- Who was communicating with whom.
-- What applications and protocols were used.
-- When notable events occurred.
-- Any detected anomalies or risk indicators.
-- A timeline of significant events.
+Before the LLM is invoked, a pipeline of **detector algorithms** runs over
+the conversation data and produces typed findings. Each finding has a
+severity (``CRITICAL``, ``HIGH``, ``MEDIUM``, ``LOW``), a title, a summary,
+affected IPs, and numeric metrics. Detectors include:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Detector
+     - What it detects
+   * - **NdpiRisk**
+     - Surfaces nDPI risk flags directly as findings.
+   * - **Beacon**
+     - Identifies periodic/beaconing traffic by computing the coefficient of
+       variation (CV) of inter-flow intervals. Flows with ≥3 repetitions,
+       mean interval ≥1 second, and CV <0.3 are flagged. CV <0.1 →
+       ``CRITICAL``; CV 0.1–0.3 → ``HIGH``. Up to 5 beacons are reported,
+       sorted by lowest CV (most periodic first).
+   * - **TlsAnomaly**
+     - Detects self-signed certificates (issuer DN == subject DN), expired
+       certificates (not-after < now), and certificates from unknown/untrusted
+       CAs. Severity: ``HIGH`` for self-signed/expired; ``MEDIUM`` for unknown
+       CA.
+   * - **Volume**
+     - Flags top talkers that account for >40% of total capture traffic
+       (``MEDIUM``) and any host that sent ≥10 MB outbound (``MEDIUM`` or
+       ``HIGH`` if >100 MB), as potential data exfiltration indicators.
+   * - **FanOut**
+     - Flags hosts that contacted many distinct destination IPs. >50 distinct
+       destinations → ``HIGH``; fewer → ``MEDIUM``. Pattern is consistent
+       with scanning or lateral movement.
+   * - **LongSession**
+     - Flags individual conversations lasting longer than **15 minutes**.
+       >1 hour → ``HIGH``; 15 min–1 hour → ``MEDIUM``.
+   * - **UnknownApp**
+     - Flags captures where ≥5% of conversations could not be identified by
+       nDPI. >30% → ``HIGH``; >10% → ``MEDIUM``; 5–10% → ``LOW``.
+   * - **PortProtocolMismatch**
+     - Flags nDPI-identified applications running on non-standard ports (e.g.
+       DNS on a port other than 53, HTTP on a port other than 80/8080, etc.).
+       Always ``HIGH`` severity.
+
+LLM Narrative
+~~~~~~~~~~~~~
+
+The LLM receives a structured summary of conversation metadata (IPs, ports,
+protocols, applications, risk flags, timestamps, geolocation, custom signature
+matches) and produces a multi-section narrative describing the network
+activity, notable events, and anomalies.
 
 Story Timeline
 ~~~~~~~~~~~~~~
 
-Below the narrative, a visual **timeline** marks the key events extracted from
-the story (e.g. "DNS lookup for evil.com", "TLS session established",
-"File download detected") in chronological order.
+A visual timeline is derived from the narrative output, showing key events
+in chronological order.
+
+Aggregates Panel
+~~~~~~~~~~~~~~~~
+
+Pre-computed statistics over the full conversation dataset are displayed in
+the **Aggregates** panel — top talkers, protocol breakdown, risk counts, etc.
+These are computed independently of the LLM.
 
 Interactive LLM Q&A Chat
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After the narrative is generated, a chat panel allows you to ask follow-up
-questions about the PCAP, for example:
+After the narrative is generated, a **chat panel** allows follow-up questions
+about the PCAP. The LLM answers using the PCAP metadata as context.
 
-- *"Which IP downloaded the most data?"*
-- *"Were there any connections to known threat IPs?"*
-- *"Summarise the DNS activity."*
+Investigation Panel
+~~~~~~~~~~~~~~~~~~~
 
-The LLM answers using the PCAP metadata as context.
-
-Custom Context
-~~~~~~~~~~~~~~
-
-You can provide additional context before generating the story — for example,
-a description of the network environment or the timeframe of an incident.
-This helps the LLM produce a more accurate and relevant narrative.
+The **Investigation** panel shows LLM-directed investigation steps:
+hypotheses the LLM formed, structured queries it ran against the conversation
+data, and the conversation evidence it retrieved to support each hypothesis.
 
 Privacy
 -------

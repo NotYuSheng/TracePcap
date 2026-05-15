@@ -66,7 +66,8 @@ Match Fields
      - ``4444``
    * - ``ja3``
      - string
-     - Exact JA3S fingerprint hash (nDPI 5.x)
+     - Exact match against **either** the JA3C (client) or JA3S (server)
+       fingerprint hash recorded by nDPI
      - ``"82f0d8a75fa483d1cfe4b7085b784d7e"``
    * - ``hostname``
      - string
@@ -92,6 +93,9 @@ In addition to ``match`` fields, rules can search raw packet payloads:
    payload_contains:
      - ascii: "GET /admin"       # plain ASCII text
      - hex: "255044462d"         # hex bytes (%PDF-)
+
+Patterns are searched against the raw payload bytes of each packet in the
+conversation. A match on any single packet is sufficient.
 
 Multiple ``payload_contains`` entries are **OR-matched** by default. Set
 ``match_all: true`` on the rule to require **all** patterns (AND):
