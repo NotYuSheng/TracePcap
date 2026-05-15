@@ -27,23 +27,11 @@ export const FileUploadZone = ({
     [onFileSelect]
   );
 
-  // Validate by extension — MIME-type validation is unreliable on Windows where
-  // .pcap/.pcapng files have no registered MIME type and are sent as
-  // application/octet-stream or with an empty type.
-  const validator = (file: File) => {
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!acceptedFileTypes.includes(ext)) {
-      return {
-        code: 'file-invalid-type',
-        message: `Unsupported file type. Only ${acceptedFileTypes.join(', ')} files are accepted.`,
-      };
-    }
-    return null;
-  };
-
   const { getRootProps, getInputProps, isDragActive, isDragReject, fileRejections } = useDropzone({
     onDrop,
-    validator,
+    accept: {
+      'application/vnd.tcpdump.pcap': acceptedFileTypes,
+    },
     maxSize,
     multiple: true,
     disabled,
