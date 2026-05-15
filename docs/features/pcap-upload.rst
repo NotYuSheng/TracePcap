@@ -21,13 +21,18 @@ The default maximum file size is **512 MB**, configurable via the
 Upload Options
 --------------
 
-Before clicking **Upload** you can enable optional analysis modules:
+Both analysis stages run automatically on every upload by default:
 
-- **nDPI Analysis** — deep packet inspection for application identification,
-  risk detection, TLS metadata, and JA3/JA3S fingerprints
+- **Protocol & application classification** (nDPI) — application
+  identification, risk detection, TLS metadata, JA3/JA3S fingerprints
   (see :doc:`ndpi-analysis`).
-- **File Extraction** — HTTP object extraction and raw stream extraction from
+- **Embedded file extraction** — HTTP object and raw stream extraction from
   TCP/UDP payloads (see :doc:`file-extraction`).
+
+If the deployment has ``VITE_ANALYSIS_OPTIONS=true`` set, an
+**Analysis options** modal appears after file selection, allowing each
+stage to be disabled individually for that upload (useful for reducing
+processing time on large captures).
 
 Duplicate Detection
 -------------------

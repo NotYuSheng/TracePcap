@@ -7,8 +7,13 @@ documents, binaries, archives, and more — directly from PCAP payloads.
 Enabling Extraction
 -------------------
 
-Enable the **File Extraction** toggle in the upload dialog before submitting
-the PCAP file. Like nDPI analysis, it cannot be added retroactively.
+By default file extraction runs automatically on every upload. If the
+deployment has ``VITE_ANALYSIS_OPTIONS=true`` set, an **Analysis options**
+modal appears after file selection where the **Embedded file extraction**
+stage can be unchecked to skip extraction for that upload.
+
+Either way, extraction cannot be added retroactively — re-upload the file
+if you need extracted files for a capture processed without it.
 
 Extraction Methods
 ------------------
