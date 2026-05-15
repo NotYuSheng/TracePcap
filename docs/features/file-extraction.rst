@@ -70,6 +70,29 @@ Go to the **Extracted Files** tab for a PCAP. Each file is listed with:
 - Source conversation (src IP : src port → dst IP : dst port)
 - Extraction method (``tshark_http`` / stream)
 
+MIME Type Filter
+~~~~~~~~~~~~~~~~
+
+A collapsible **Filters** panel above the file list shows pill buttons for
+every MIME type present in the loaded files. Select one or more to narrow the
+list. The file count badge updates to ``X / Y files`` while a filter is
+active. **Select All** and **Clear** shortcuts appear in the pill header.
+
+Media Preview
+~~~~~~~~~~~~~
+
+Files with a browser-natively playable MIME type (images, audio, video) show
+a **Preview** button. Clicking it opens an inline modal with the file rendered
+directly in the browser — no download required. The preview endpoint returns
+``Content-Disposition: inline`` so the browser handles rendering.
+
+Download Safety Disclaimer
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Clicking **Download** on any extracted file shows a safety disclaimer modal
+before the download begins, reminding you that extracted files may be
+malicious.
+
 Bulk Download
 -------------
 

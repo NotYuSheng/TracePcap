@@ -17,6 +17,8 @@ TracePcap Documentation
 
    features/pcap-upload
    features/network-visualization
+   features/network-intelligence
+   features/comparison
    features/ndpi-analysis
    features/conversations
    features/session-reconstruction
@@ -27,6 +29,7 @@ TracePcap Documentation
    features/ai-filter-generator
    features/story-mode
    features/custom-signatures
+   features/report-export
 
 .. toctree::
    :maxdepth: 2

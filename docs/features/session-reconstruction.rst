@@ -49,6 +49,41 @@ Truncation Limits
 - PCAP files larger than **500 MB** are excluded from session reconstruction
   to protect disk I/O.
 
+STUN Decoder
+------------
+
+When a conversation is identified as STUN (by nDPI, tshark metadata, the
+magic cookie ``0x2112A442``, or port heuristics — 3478/5349), a
+**STUN Messages** tab appears in the session toolbar alongside Raw Stream.
+It is selected automatically on load when STUN messages are present.
+
+Decoded fields include:
+
+- Message type and class (e.g. Binding Request, Binding Success Response,
+  Allocate Request).
+- Transaction ID.
+- Attributes: ``XOR-MAPPED-ADDRESS`` (with XOR un-masking applied),
+  ``MAPPED-ADDRESS``, ``USERNAME``, ``SOFTWARE``, ``ERROR-CODE``,
+  ``PRIORITY``, ``FINGERPRINT``, and ICE credentials.
+
+Both bare UDP datagrams and TCP-framed STUN (RFC 4571 two-byte length
+prefix) are supported.
+
+Media Detection Panel
+---------------------
+
+When the stream payload matches a known media signature, a
+**MediaInfo** panel appears above the raw/parsed view showing:
+
+- **Type** — ``AUDIO``, ``VIDEO``, or ``IMAGE``.
+- **Container** — detected container format (e.g. ``RTP``, ``MP4``,
+  ``WebM``, ``Ogg``, ``MPEG-TS``, ``JPEG``, ``PNG``, ``WebP``).
+- **Codec** — codec name where detectable.
+- **Sample rate** — for audio streams where extractable.
+
+Detected signatures include: RTP (audio/video), MP4, WebM, Ogg, JPEG, PNG,
+WebP, AAC, FLAC, MP3, and MPEG-TS.
+
 Limitations
 -----------
 
