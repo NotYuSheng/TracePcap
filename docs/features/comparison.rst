@@ -13,7 +13,7 @@ Starting a Comparison
 2. Click the **Multi-Analysis (N)** button that appears in the header.
 3. A modal appears with two options:
 
-   - **View Together** — navigates to ``/compare?files=id1,id2,…`` and
+   - **View Together** — navigates to ``/compare?files=id1,id2,...`` and
      renders the merged topology immediately. The original files are unchanged.
    - **Merge & Analyze** — permanently merges the selected PCAPs into a new
      single file (named automatically or as you specify), runs the full
@@ -74,4 +74,4 @@ Choosing **Merge & Analyze** calls ``POST /api/files/merge``, which:
    pipeline (tshark parsing, nDPI, geolocation, file extraction).
 
 The merged file appears as a regular entry in the file list and can be
-analysed, compared, or deleted independently of the originals.
+analyzed, compared, or deleted independently of the originals.
