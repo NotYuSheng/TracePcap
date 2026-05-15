@@ -20,7 +20,7 @@ The bin index is computed in O(1):
 
 .. code-block:: text
 
-   binIndex = floor( (conversation.startTime − captureStart) / intervalSeconds )
+   binIndex = floor( (conversation.startTime - captureStart) / intervalSeconds )
 
 A conversation that spans multiple bins (e.g. a long-lived TCP session) is
 counted **only in the bin where it started**, not spread across bins for its
