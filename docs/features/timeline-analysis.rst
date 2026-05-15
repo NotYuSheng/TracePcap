@@ -13,7 +13,7 @@ Traffic is visualised as a stacked bar chart:
 - The **X axis** represents time (divided into configurable buckets).
 - The **Y axis** represents packet count or byte volume (toggle between the
   two using the view control).
-- Each bar is colour-coded by **protocol** so you can see the protocol mix
+- Each bar is color-coded by **protocol** so you can see the protocol mix
   at a glance.
 
 Time Granularity
@@ -29,7 +29,7 @@ You can control how finely the time axis is divided:
 Protocol Breakdown
 ------------------
 
-A legend below the chart lists every protocol colour. Clicking a legend entry
+A legend below the chart lists every protocol color. Clicking a legend entry
 toggles that protocol's visibility, letting you isolate specific traffic types.
 
 Interaction

@@ -3,7 +3,7 @@ Custom Signature Rules
 
 TracePcap supports user-defined YAML detection rules that are matched against
 every conversation after nDPI analysis. Matched rule names appear as
-colour-coded badges in the Conversations tab and Overview, alongside nDPI's
+color-coded badges in the Conversations tab and Overview, alongside nDPI's
 built-in detections.
 
 How It Works

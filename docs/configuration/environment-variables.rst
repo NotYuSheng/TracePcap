@@ -98,6 +98,8 @@ you are connecting to an external database.
      - Database user
    * - ``POSTGRES_PASSWORD``
      - Database password — **change this in production**
+   * - ``SPRING_DATASOURCE_PASSWORD``
+     - Backend database connection password — must match ``POSTGRES_PASSWORD``
 
 MinIO Configuration (internal)
 -------------------------------

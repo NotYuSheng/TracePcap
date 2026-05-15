@@ -62,7 +62,7 @@ Displayed in the UI as a tooltip on the badge.
 
 Required. One of: ``low``, ``medium``, ``high``, ``critical``.
 
-Controls badge colour. See :doc:`../features/custom-signatures` for the colour
+Controls badge color. See :doc:`../features/custom-signatures` for the color
 mapping.
 
 ``match.ip``

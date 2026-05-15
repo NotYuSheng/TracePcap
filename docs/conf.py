@@ -6,7 +6,7 @@ copyright = "2025, TracePcap Contributors"
 author = "TracePcap Contributors"
 release = "1.0"
 
-extensions = []
+extensions = ["sphinx_rtd_theme"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

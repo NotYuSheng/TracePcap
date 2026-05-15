@@ -48,7 +48,7 @@ nDPI data surfaces across multiple views:
 Risk Flags
 ----------
 
-Risk flags are coloured badges displayed alongside conversations:
+Risk flags are colored badges displayed alongside conversations:
 
 - ``critical`` — red
 - ``high`` — orange

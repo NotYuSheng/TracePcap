@@ -32,7 +32,7 @@ display so you see the plaintext content.
 Stream Direction
 ----------------
 
-The viewer colour-codes bytes by direction:
+The viewer color-codes bytes by direction:
 
 - **Blue** — client-to-server bytes.
 - **Green** — server-to-client bytes.
