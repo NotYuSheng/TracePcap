@@ -14,9 +14,9 @@ the workflow for deploying to a machine that has no internet access.
    custom signatures) are fully offline at all times.
 
    If you want to force MMDB-only lookups even on an internet-connected
-   machine, set ``tracepcap.geo.mmdb-path`` in ``application.yml`` or set the
-   environment variable to point to the MMDB file and remove internet access
-   from the container.
+   machine, remove internet access from the container. If the MMDB file is
+   not at the default location, also set the ``GEO_MMDB_PATH`` environment
+   variable (or ``tracepcap.geo.mmdb-path`` in ``application.yml``).
 
 Overview
 --------

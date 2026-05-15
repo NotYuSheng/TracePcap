@@ -27,7 +27,7 @@ Dockerfile* text eol=lf
 *.jpeg      binary
 *.gif       binary
 *.ico       binary
-*.svg       binary
+*.svg       text eol=lf
 *.woff      binary
 *.woff2     binary
 *.ttf       binary
