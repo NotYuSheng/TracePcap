@@ -56,7 +56,10 @@ paired with **structured database queries** to investigate the most suspicious
 activity. Each query specifies filters such as ``srcIp``, ``dstIp``,
 ``dstPort``, ``protocol``, ``appName``, ``category``, ``hasRisks``,
 ``hasTlsAnomaly``, ``riskType``, ``minBytes``, ``maxBytes``, and ``minFlows``.
-Catch-all queries (no filters set) are automatically discarded.
+Catch-all queries (no filters set) are automatically discarded. Note that
+``minBytes`` and ``maxBytes`` are per-conversation byte counts and are silently
+ignored by the backend when ``srcIp`` or ``riskType`` is also present in the
+same query.
 
 Phase 2 — Narrative generation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -142,10 +145,10 @@ affected IPs, and numeric metrics. Detectors include:
        If both conditions fire for the same source IP, only the
        higher-severity finding is kept.
    * - **FanOut**
-     - Flags hosts that contacted many distinct destination IPs. >50 distinct
-       destinations → ``HIGH``; fewer → ``MEDIUM``. Pattern is consistent
-       with scanning or lateral movement. The minimum fan-out count to trigger
-       a finding is determined by the underlying database query.
+     - Flags hosts that contacted many distinct destination IPs. The minimum
+       threshold to trigger a finding is >5 distinct destinations. >50 distinct
+       destinations → ``HIGH``; 6–50 → ``MEDIUM``. Pattern is consistent
+       with scanning or lateral movement.
    * - **LongSession**
      - Flags individual conversations lasting longer than **15 minutes**.
        >1 hour → ``HIGH``; 15 min–1 hour → ``MEDIUM``.
