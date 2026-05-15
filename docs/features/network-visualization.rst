@@ -122,10 +122,60 @@ Filters are applied interactively — the graph updates without reloading.
 Click a node to open the **Node Detail Panel**, which shows:
 
 - IP address and MAC address
-- Vendor (from Wireshark OUI database)
-- Predicted device type and confidence score
-- Country, region, city, and ASN (for external IPs)
-- List of conversations involving this node
+- Hostname (SNI extracted from TLS ClientHello, if available)
+- Classification badge — click it to open the **Classification popup** (see
+  below)
+- Packets sent / received and bytes sent / received / total
+- Protocols used across all conversations
+- Connections table: per-peer breakdown sorted by bytes, with application labels
+
+Classification Popup
+~~~~~~~~~~~~~~~~~~~~
+
+Clicking the classification badge opens a popup with three sections:
+
+**Type** — the node's network topology role, derived from traffic analysis:
+
+- ``Router`` — many distinct peers (flagged by peer-count threshold)
+- ``Server`` — receives inbound connections on well-known ports
+- ``Client`` — initiates connections (default for most endpoints)
+- Evidence text shown below the badge (e.g. "42 distinct peers", or the
+  nDPI applications that triggered the classification)
+
+**Device** — the hardware/OS classification from the multi-signal scorer
+(see :doc:`geolocation` for the full algorithm):
+
+- The device type badge (e.g. ``Mobile``, ``Router``, ``IoT Device``)
+- A bullet list of the signals that contributed:
+
+  - ``MAC OUI matched: <vendor>`` — OUI resolved to a known vendor
+  - ``TTL <N> → <OS family>`` — observed TTL mapped to Linux/Android/iOS,
+    Windows, or Network device (Cisco/BSD)
+  - ``Application traffic profile analysed`` — shown when confidence ≥ 60
+  - ``Network traffic patterns analysed`` — shown when confidence ≥ 25
+
+- A **confidence progress bar** showing the numeric confidence percentage
+  and a qualitative label:
+
+  - **Strong** — ≥ 75%
+  - **Moderate** — ≥ 50%
+  - **Low** — ≥ 25%
+  - **Uncertain** — < 25%
+
+  The confidence is computed from the score margin between the winning device
+  type and the runner-up: ``min(100, round(margin × 100 / 60))``. A margin of
+  60 or more points → 100% (Strong). A tie → 0% (Uncertain).
+
+**Role** — whether this host initiates or receives connections:
+
+- ``Client`` — mostly initiates
+- ``Server`` — mostly receives
+- ``Both`` — significant traffic in both directions
+- Counts of conversations initiated vs. received are shown below the badge
+
+A legend table at the bottom of the popup summarises the signal source for
+each classification dimension (Type: network topology; Device: hardware
+fingerprinting; Role: TCP session direction).
 
 Layout Controls
 ---------------
