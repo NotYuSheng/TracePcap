@@ -78,10 +78,11 @@ docker build \
 
 echo "  Building nginx (frontend)..."
 docker build \
-  --build-arg "VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}" \
+  --build-arg "VITE_API_BASE_URL=/api" \
   --build-arg "VITE_SUPPORTED_FILE_TYPES=${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}" \
   --build-arg "VITE_ANALYSIS_OPTIONS=${VITE_ANALYSIS_OPTIONS:-false}" \
   --build-arg "VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}" \
+  --build-arg "VITE_MAP_RESOLUTION=${VITE_MAP_RESOLUTION:-50m}" \
   -t "$NGINX_IMAGE" \
   -f ./nginx/Dockerfile \
   .
