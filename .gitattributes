@@ -1,6 +1,42 @@
-# Normalize line endings on commit
-* text=auto
+# Normalize all text files to LF in the repository
+* text=auto eol=lf
 
-# Force LF for scripts with shebangs — CRLF breaks them on Linux/macOS
-*.sh text eol=lf
-*.py text eol=lf
+# Explicitly force LF for files that break when checked out with CRLF
+*.sh        text eol=lf
+*.py        text eol=lf
+Dockerfile* text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.conf      text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.rst       text eol=lf
+*.sql       text eol=lf
+*.xml       text eol=lf
+*.java      text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.env       text eol=lf
+.env*       text eol=lf
+
+# Binary files — never touch line endings
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.svg       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.pcap      binary
+*.pcapng    binary
+*.cap       binary
+*.mmdb      binary
+*.tar       binary
+*.gz        binary
+*.zip       binary
+*.jar       binary
