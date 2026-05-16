@@ -67,6 +67,10 @@ public class ExtractedFilesController {
       throw new ResourceNotFoundException("Extracted file not found: " + extractionId);
     }
 
+    if (entity.getMinioPath() == null) {
+      throw new ResourceNotFoundException("Extracted file not available: " + extractionId);
+    }
+
     String mimeType =
         entity.getMimeType() != null ? entity.getMimeType() : "application/octet-stream";
 
@@ -107,6 +111,10 @@ public class ExtractedFilesController {
       throw new ResourceNotFoundException("Extracted file not found: " + extractionId);
     }
 
+    if (entity.getMinioPath() == null) {
+      throw new ResourceNotFoundException("Extracted file not available: " + extractionId);
+    }
+
     String filename = entity.getFilename() != null ? entity.getFilename() : "extracted-file";
     String mimeType =
         entity.getMimeType() != null ? entity.getMimeType() : "application/octet-stream";
@@ -135,6 +143,7 @@ public class ExtractedFilesController {
         .fileSize(e.getFileSize())
         .sha256(e.getSha256())
         .extractionMethod(e.getExtractionMethod())
+        .skippedReason(e.getSkippedReason())
         .createdAt(e.getCreatedAt())
         .build();
   }

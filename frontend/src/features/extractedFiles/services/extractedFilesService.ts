@@ -9,6 +9,7 @@ export interface ExtractedFile {
   fileSize: number | null;
   sha256: string | null;
   extractionMethod: string | null;
+  skippedReason: string | null;
   createdAt: string;
 }
 

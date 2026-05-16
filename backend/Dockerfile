@@ -15,15 +15,26 @@ RUN mvn clean package -DskipTests -B
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-jammy
 
+# nDPI version pin — bump this arg to upgrade nDPI without changing anything else.
+# Current pinned version is sourced from ntop's stable apt repo for Ubuntu 22.04.
+# To find available versions: apt-cache policy ndpi (after adding ntop repo).
+ARG NDPI_VERSION=5.0.0-5922
+
 WORKDIR /app
 
 # Install runtime dependencies:
-#   tshark       — PCAP/pcapng parser
-#   libndpi-bin  — ndpiReader for application-layer identification (from ntop repo
-#                  for latest version with H.225 session tracking / H.245 support)
-#   tzdata       — timezone data
-# ntop's apt repository provides newer nDPI builds than Ubuntu 22.04's 4.2-2.
-# BuildKit cache mount keeps downloaded .deb files cached across rebuilds.
+#   tshark  — PCAP/pcapng parser
+#   ndpi    — ndpiReader for application-layer DPI (pinned via NDPI_VERSION arg)
+#   tzdata  — timezone data
+#   gosu    — privilege-drop helper for entrypoint
+#
+# The ntop apt repo is required because Ubuntu 22.04's built-in nDPI (4.2-2)
+# lacks H.225/H.245 session tracking and several protocol signatures added in v5.
+#
+# To upgrade nDPI: bump NDPI_VERSION above, rebuild the image, and redeploy
+# (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh).
+#
+# BuildKit cache mounts keep downloaded apt packages cached across rebuilds.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     DEBIAN_FRONTEND=noninteractive apt-get update && \
@@ -38,10 +49,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         tshark \
-        ndpi \
+        "ndpi=${NDPI_VERSION}" \
         tzdata \
         gosu && \
-    apt-get purge -y --auto-remove gnupg
+    apt-get purge -y --auto-remove gnupg && \
+    # Write the pinned version to a file for introspection.
+    echo "${NDPI_VERSION}" > /opt/ndpi-version
 
 # Download DB-IP Lite City MMDB (offline GeoIP).
 # Published monthly at https://db-ip.com/db/download/ip-to-city-lite
