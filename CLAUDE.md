@@ -20,6 +20,6 @@ Only build a custom component if SGDS has no equivalent.
 
 This app must function fully offline (no external API calls at runtime). Keep this in mind for any new features:
 
-- **GeoIP**: Currently uses ip-api.com (online-only). Any region/city-level geo enrichment must replace this with an offline database — use **MaxMind GeoLite2-City** (MMDB format) via the `com.maxmind.geoip2` Java library, or **DB-IP Lite** (no registration required). Bundle the `.mmdb` file in the Docker image.
+- **GeoIP**: Uses a hybrid strategy — `ipinfo.io` when internet is reachable, **DB-IP Lite MMDB** (bundled in the Docker image) as automatic offline fallback. Implemented in `GeoIpService.java` via `com.maxmind.geoip2`. Do not add any other external geo APIs.
 - **Maps**: Use static SVG/GeoJSON bundled in the frontend — no tile servers (OpenStreetMap etc.).
 - **LLM**: Already configurable via `LLM_BASE_URL` env var pointing to a local inference server (e.g. LM Studio, Ollama).

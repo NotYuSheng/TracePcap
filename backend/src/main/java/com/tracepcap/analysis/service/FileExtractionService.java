@@ -44,6 +44,16 @@ public class FileExtractionService {
   /** Maximum size of a single extracted file stored in MinIO (50 MB). */
   private static final int MAX_EXTRACTED_FILE_BYTES = 50 * 1024 * 1024;
 
+  /**
+   * Maximum bytes buffered per raw stream during reassembly (200 MB). This is intentionally larger
+   * than {@link #MAX_EXTRACTED_FILE_BYTES} so that magic-byte scanning can still find files near
+   * the end of a large stream, while preventing a single runaway stream from exhausting heap.
+   */
+  private static final int MAX_STREAM_BUFFER_BYTES = 200 * 1024 * 1024;
+
+  /** Skipped-reason value written to DB when a file exceeds the per-file size limit. */
+  private static final String REASON_EXCEEDS_SIZE_LIMIT = "exceeds_size_limit";
+
   /** Maximum number of non-HTTP conversations to scan for embedded files. */
   private static final int MAX_RAW_STREAM_CONVERSATIONS = 50;
 
@@ -520,16 +530,26 @@ public class FileExtractionService {
     List<MagicMatch> segments = findMagicMatches(streamBytes);
     for (MagicMatch seg : segments) {
       int start = seg.start();
-      int end = Math.min(seg.end(), start + MAX_EXTRACTED_FILE_BYTES);
+      int end = seg.end();
       if (end <= start) continue;
+      long segSize = (long) end - start;
+      String ext = seg.ext();
+      String name = "stream-" + conv.getId().toString().substring(0, 8) + "-" + start + "." + ext;
+      if (segSize > MAX_EXTRACTED_FILE_BYTES) {
+        log.warn(
+            "Skipping magic-byte extracted file {} ({} bytes) — exceeds {} MB limit",
+            name,
+            segSize,
+            MAX_EXTRACTED_FILE_BYTES / 1024 / 1024);
+        recordSkippedFile(file, conv.getId(), name, segSize, "magic_bytes");
+        continue;
+      }
       byte[] fileData = Arrays.copyOfRange(streamBytes, start, end);
 
       String sha256 = sha256Hex(fileData);
       if (extractedFileRepository.existsByFileIdAndSha256(file.getId(), sha256)) continue;
 
       String mime = detectMime(fileData);
-      String ext = seg.ext();
-      String name = "stream-" + conv.getId().toString().substring(0, 8) + "-" + start + "." + ext;
       storeExtractedFile(file, conv.getId(), fileData, name, mime, sha256, "magic_bytes");
     }
   }
@@ -690,7 +710,7 @@ public class FileExtractionService {
             String hexLine = line.stripLeading();
             if (!hexLine.isEmpty()) {
               byte[] chunk = hexToBytes(hexLine);
-              if (chunk != null && currentBuf.size() + chunk.length <= MAX_EXTRACTED_FILE_BYTES) {
+              if (chunk != null && currentBuf.size() + chunk.length <= MAX_STREAM_BUFFER_BYTES) {
                 currentBuf.write(chunk);
               }
             }
@@ -867,11 +887,18 @@ public class FileExtractionService {
 
   private void processLocalFile(FileEntity file, UUID conversationId, File localFile, String method)
       throws Exception {
-    byte[] data = Files.readAllBytes(localFile.toPath());
-    if (data.length == 0) return;
-    if (data.length > MAX_EXTRACTED_FILE_BYTES) {
-      data = Arrays.copyOf(data, MAX_EXTRACTED_FILE_BYTES);
+    long rawSize = localFile.length();
+    if (rawSize == 0) return;
+    if (rawSize > MAX_EXTRACTED_FILE_BYTES) {
+      log.warn(
+          "Skipping extracted file {} ({} bytes) — exceeds {} MB limit",
+          localFile.getName(),
+          rawSize,
+          MAX_EXTRACTED_FILE_BYTES / 1024 / 1024);
+      recordSkippedFile(file, conversationId, localFile.getName(), rawSize, method);
+      return;
     }
+    byte[] data = Files.readAllBytes(localFile.toPath());
     String sha256 = sha256Hex(data);
     if (extractedFileRepository.existsByFileIdAndSha256(file.getId(), sha256)) return;
 
@@ -913,6 +940,26 @@ public class FileExtractionService {
 
     extractedFileRepository.save(entity);
     log.info("Stored extracted file: {} ({} bytes, sha256={})", filename, data.length, sha256);
+  }
+
+  private void recordSkippedFile(
+      FileEntity file, UUID conversationId, String filename, long rawSize, String method) {
+    ConversationEntity convRef =
+        conversationId != null
+            ? entityManager.getReference(ConversationEntity.class, conversationId)
+            : null;
+
+    ExtractedFileEntity entity =
+        ExtractedFileEntity.builder()
+            .file(file)
+            .conversation(convRef)
+            .filename(filename)
+            .fileSize(rawSize)
+            .extractionMethod(method)
+            .skippedReason(REASON_EXCEEDS_SIZE_LIMIT)
+            .build();
+
+    extractedFileRepository.save(entity);
   }
 
   // -------------------------------------------------------------------------
