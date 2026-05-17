@@ -589,7 +589,7 @@ public class StoryService {
         - minBytes and maxBytes are PER-CONVERSATION byte counts, NOT aggregate totals. Do NOT set minBytes to an aggregate total from the findings (e.g. total bytes for an IP). Only use minBytes if you want conversations larger than a specific individual flow size.
         - To find unknown/unidentified application traffic, set hasRisks=null and appName=null (leave appName as null — do not set it to "UNKNOWN_APP" or any string).
         - To find traffic from a specific IP, use srcIp only — do not combine srcIp with minBytes.
-        - riskType values must match exactly what appears in the findings, e.g. "susp_entropy", "unidirectional_traffic".
+        - riskType values must match exactly what appears in the findings, e.g. "suspicious_entropy", "unidirectional_traffic". Do not combine riskType with minBytes or maxBytes.
         """;
   }
 
