@@ -315,8 +315,8 @@ export function CountryMapView({
       {!isDrilled && (
         <div style={{
           position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
-          fontSize: 10, color: '#6c757d',
-          background: 'rgba(255,255,255,0.92)', border: '1px solid #dee2e6',
+          fontSize: 10, color: 'var(--tp-text-muted, #6c757d)',
+          background: 'var(--tp-surface, rgba(255,255,255,0.92))', border: '1px solid var(--tp-border, #dee2e6)',
           borderRadius: 4, padding: '2px 8px', zIndex: 5, whiteSpace: 'nowrap',
         }}>
           Click a highlighted country to view city-level breakdown
@@ -326,9 +326,9 @@ export function CountryMapView({
       {/* Legend */}
       <div style={{
         position: 'absolute', bottom: 12, right: 12,
-        background: 'rgba(255,255,255,0.92)', border: '1px solid #dee2e6',
+        background: 'var(--tp-surface, rgba(255,255,255,0.92))', border: '1px solid var(--tp-border, #dee2e6)',
         borderRadius: 6, padding: '6px 10px', fontSize: 10,
-        color: '#6c757d', zIndex: 5,
+        color: 'var(--tp-text-muted, #6c757d)', zIndex: 5,
       }}>
         {colorMode === 'traffic'
           ? <div>Dark blue = more traffic</div>

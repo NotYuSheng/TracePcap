@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import ELK from 'elkjs';
-const ELK_WORKER_URL = '/elk-worker.min.js';
+const ELK_WORKER_URL = `${import.meta.env.BASE_URL}elk-worker.min.js`;
 import Graph from 'graphology';
 import Sigma from 'sigma';
 import FA2Layout from 'graphology-layout-forceatlas2/worker';
