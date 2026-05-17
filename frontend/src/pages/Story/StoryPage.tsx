@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { useOutletContext } from 'react-router-dom';
-import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
-import { apiClient } from '@/services/api/client';
-import { storyService } from '@/features/story/services/storyService';
+import type { TimelineDataPoint } from '@/types';
+import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import {
   AUTO_GRANULARITY_INTERVAL,
@@ -19,11 +18,6 @@ import { InvestigationPanel } from '@components/story/InvestigationPanel';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
-
-interface AnalysisOutletContext {
-  data: AnalysisData;
-  fileId: string;
-}
 
 function NarrativeInfoPopover() {
   const popover = (
@@ -61,127 +55,23 @@ function NarrativeInfoPopover() {
 }
 
 export const StoryPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>();
-  const [story, setStory] = useState<Story | null>(null);
+  const { fileId, storyState } = useOutletContext<AnalysisOutletContext>();
+  const {
+    story, generating, error,
+    contextError, setContextError,
+    editablePrompt, setEditablePrompt,
+    elapsedSeconds, llmTimeoutMs,
+    generateStory: handleGenerateStory,
+    additionalContext, setAdditionalContext,
+    maxFindings, setMaxFindings,
+    maxRiskMatrix, setMaxRiskMatrix,
+    totalFindings,
+    totalRiskMatrix,
+  } = storyState;
+
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
-  const [additionalContext, setAdditionalContext] = useState('');
-  const [maxFindings, setMaxFindings] = useState(20);
-  const [maxRiskMatrix, setMaxRiskMatrix] = useState(15);
-  const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
-  const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
-  const [generating, setGenerating] = useState(false);
-  const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [contextError, setContextError] = useState<{
-    promptText: string;
-    promptTokens: number;
-    contextLength: number;
-  } | null>(null);
-  const [editablePrompt, setEditablePrompt] = useState('');
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<{ llmTimeoutMs?: number }>('/system/limits')
-      .then(res => {
-        if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs);
-      })
-      .catch(() => {
-        /* keep default */
-      });
-  }, []);
-
-  useEffect(() => {
-    if (generating) {
-      setElapsedSeconds(0);
-      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [generating]);
-
-  const handleGenerateStory = useCallback(async (customPrompt?: string) => {
-    try {
-      setGenerating(true);
-      setError(null);
-      setContextError(null);
-      const generatedStory = await storyService.generateStory(
-        fileId,
-        additionalContext,
-        llmTimeoutMs,
-        customPrompt,
-        maxFindings,
-        maxRiskMatrix
-      );
-      setStory(generatedStory);
-      if (generatedStory.findings?.length) setTotalFindings(generatedStory.findings.length);
-      if (generatedStory.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(generatedStory.aggregates.protocolRiskMatrix.length);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
-      const serverMsg: string = (data.message as string) ?? '';
-      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
-      if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
-        setContextError({
-          promptText: (data.promptText as string) ?? '',
-          promptTokens: (data.promptTokens as number) ?? 0,
-          contextLength: (data.contextLength as number) ?? 0,
-        });
-        setEditablePrompt((data.promptText as string) ?? '');
-      } else if (data.errorCode === 'LLM_UNREACHABLE' || status === 502) {
-        setError(
-          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
-        );
-      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
-        const totalSeconds = Math.round(llmTimeoutMs / 1000);
-        const timeoutLabel = totalSeconds < 60
-          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
-          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
-        setError(
-          `Story generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or reduce the capture size.`
-        );
-      } else {
-        setError(serverMsg || msg || 'Failed to generate story');
-      }
-    } finally {
-      setGenerating(false);
-    }
-  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix]);
-
-  useEffect(() => {
-    const fetchExistingStory = async () => {
-      try {
-        setLoadingStory(true);
-        const existing = await storyService.getStoryByFileId(fileId);
-        if (existing) {
-          setStory(existing);
-          if (existing.findings?.length) setTotalFindings(existing.findings.length);
-          if (existing.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(existing.aggregates.protocolRiskMatrix.length);
-        }
-      } catch (err) {
-        console.error('Failed to load existing story:', err);
-      } finally {
-        setLoadingStory(false);
-      }
-    };
-
-    if (fileId) {
-      fetchExistingStory();
-    } else {
-      setLoadingStory(false);
-    }
-  }, [fileId]);
 
 
   useEffect(() => {
@@ -208,14 +98,6 @@ export const StoryPage = () => {
       fetchTimeline();
     }
   }, [fileId, granularity]);
-
-  if (loadingStory) {
-    return (
-      <div className="text-center py-5">
-        <LoadingSpinner size="large" message="Loading story..." />
-      </div>
-    );
-  }
 
   if (generating && !story) {
     const minutes = Math.floor(elapsedSeconds / 60);

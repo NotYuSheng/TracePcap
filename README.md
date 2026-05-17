@@ -202,6 +202,8 @@ For environments without internet access, use the offline deployment workflow:
 
 **On an internet-connected machine:**
 
+> **Windows users**: These scripts require a Bash shell. Use **Git Bash** (comes with [Git for Windows](https://git-scm.com/)) or **WSL**. Do not run them in CMD or PowerShell.
+
 ```bash
 # Pull all third-party images, build local images, and save everything as .tar files
 bash scripts/pull-and-save-images.sh

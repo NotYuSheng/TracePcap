@@ -812,6 +812,8 @@ public class StoryService {
 
     if (start >= 0 && end > start) {
       String json = content.substring(start, end + 1);
+      // Strip // line comments that some LLMs emit (invalid JSON but common)
+      json = json.replaceAll("//[^\n\r]*", "");
       log.debug("Extracted JSON from LLM response, length: {}", json.length());
       return json;
     }

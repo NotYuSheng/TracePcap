@@ -81,14 +81,14 @@ function GeoSourceBadge({ source }: { source?: string | null }) {
             top: popoverPos.top,
             left: popoverPos.left,
             zIndex: 9999,
-            background: '#fff',
-            border: '1px solid #dee2e6',
+            background: 'var(--tp-surface, #fff)',
+            border: '1px solid var(--tp-border, #dee2e6)',
             borderRadius: 6,
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             padding: '8px 10px',
             width: 260,
             fontSize: 11,
-            color: '#212529',
+            color: 'var(--tp-text, #212529)',
           }}
           onClick={e => e.stopPropagation()}
         >
