@@ -7,6 +7,7 @@ import {
   type GroupBy,
   type ClusterGraphResponse,
   type IntelClusterFilters,
+  type ClusterNode,
 } from '@/features/intelligence/services/intelligenceService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ipOrgRuleService } from '@/features/intelligence/services/ipOrgRuleService';
@@ -32,6 +33,7 @@ export const NetworkIntelligencePage = () => {
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedCluster, setSelectedCluster] = useState<ClusterNode | null>(null);
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [ipFilter, setIpFilter] = useState('');
@@ -182,11 +184,12 @@ export const NetworkIntelligencePage = () => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showFilterModal) { setShowFilterModal(false); return; }
+      if (selectedCluster) { setSelectedCluster(null); return; }
       setIsFullscreen(false);
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isFullscreen, showFilterModal]);
+  }, [isFullscreen, showFilterModal, selectedCluster]);
 
   const [autoSelected, setAutoSelected] = useState(false);
 
@@ -271,6 +274,8 @@ export const NetworkIntelligencePage = () => {
             fileId={fileId}
             onFilterClick={() => setShowFilterModal(true)}
             activeFilterCount={activeFilterCount}
+            selectedCluster={selectedCluster}
+            onSelectedClusterChange={setSelectedCluster}
           />
         </div>
       </div>
