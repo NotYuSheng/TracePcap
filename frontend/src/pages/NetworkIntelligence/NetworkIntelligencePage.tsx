@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Modal } from '@govtechsg/sgds-react';
 import type { AnalysisData } from '@/types';
 import {
   intelligenceService,
@@ -30,6 +31,7 @@ export const NetworkIntelligencePage = () => {
 
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [ipFilter, setIpFilter] = useState('');
@@ -174,19 +176,17 @@ export const NetworkIntelligencePage = () => {
     activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNetLabels,
   ]);
 
+  // CSS fullscreen — lets us intercept Escape to close modals before exiting fullscreen
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      graphCardRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  };
+    if (!isFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showFilterModal) { setShowFilterModal(false); return; }
+      setIsFullscreen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isFullscreen, showFilterModal]);
 
   const [autoSelected, setAutoSelected] = useState(false);
 
@@ -238,64 +238,8 @@ export const NetworkIntelligencePage = () => {
       {/* Summary stats */}
       <SummaryStatsBar data={data} />
 
-      {/* Filters */}
-      <div className="mb-3">
-        <NetworkControls
-          activeLegendProtocols={activeLegendProtocols}
-          onLegendProtocolClick={toggleLegendProtocol}
-          onLegendProtocolClear={() => setActiveLegendProtocols([])}
-          presentEdgeLegendKeys={presentEdgeLegendKeys}
-          activeNodeFilters={activeNodeFilters}
-          onNodeFilterClick={toggleNodeFilter}
-          onNodeFilterClear={() => setActiveNodeFilters([])}
-          presentNodeTypes={presentNodeTypes}
-          presentDeviceTypes={presentDeviceTypes}
-          ipFilter={ipFilter}
-          onIpFilterChange={setIpFilter}
-          portFilter={portFilter}
-          onPortFilterChange={setPortFilter}
-          activeAppFilters={activeAppFilters}
-          onAppFilterClick={toggleAppFilter}
-          onAppFilterClear={() => setActiveAppFilters([])}
-          presentAppNames={presentAppNames}
-          activeL7Protocols={activeL7Protocols}
-          onL7ProtocolClick={toggleL7Protocol}
-          onL7ProtocolClear={() => setActiveL7Protocols([])}
-          presentL7Protocols={presentL7Protocols}
-          activeCategories={activeCategories}
-          onCategoryClick={toggleCategory}
-          onCategoryClear={() => setActiveCategories([])}
-          presentCategories={presentCategories}
-          activeRiskTypes={activeRiskTypes}
-          onRiskTypeClick={toggleRiskType}
-          onRiskTypeClear={() => setActiveRiskTypes([])}
-          presentRiskTypes={presentRiskTypes}
-          activeCustomSigs={activeCustomSigs}
-          onCustomSigClick={toggleCustomSig}
-          onCustomSigClear={() => setActiveCustomSigs([])}
-          presentCustomSigs={presentCustomSigs}
-          activeFileTypes={activeFileTypes}
-          onFileTypeClick={toggleFileType}
-          onFileTypeClear={() => setActiveFileTypes([])}
-          presentFileTypes={presentFileTypes}
-          activeCountries={activeCountries}
-          onCountryClick={toggleCountry}
-          onCountryClear={() => setActiveCountries([])}
-          presentCountries={presentCountries}
-          hasRisksOnly={hasRisksOnly}
-          onHasRisksOnlyChange={setHasRisksOnly}
-          activeFilterCount={activeFilterCount}
-          onClearAllFilters={clearAllFilters}
-          defaultCollapsed={true}
-          activeNetLabels={activeNetLabels}
-          onNetLabelClick={toggleNetLabel}
-          onNetLabelClear={() => setActiveNetLabels([])}
-          presentNetLabels={presentNetLabels}
-        />
-      </div>
-
       {/* Cluster graph */}
-      <div className="card mb-4" ref={graphCardRef}>
+      <div className={`card mb-4${isFullscreen ? ' nd-css-fullscreen' : ''}`} ref={graphCardRef}>
         <div className="card-header d-flex justify-content-between align-items-center">
           <div>
             <h6 className="mb-0">
@@ -304,13 +248,27 @@ export const NetworkIntelligencePage = () => {
             </h6>
             <small className="text-muted">Click a cluster node to see its member IPs and statistics.</small>
           </div>
-          <button
-            className="btn btn-link btn-sm p-0 text-muted"
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <button
+              className="btn btn-outline-secondary btn-sm position-relative"
+              onClick={() => setShowFilterModal(true)}
+              title="Filters"
+            >
+              <i className="bi bi-funnel" />
+              {activeFilterCount > 0 && (
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary" style={{ fontSize: '0.6rem' }}>
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <button
+              className="btn btn-link btn-sm p-0 text-muted"
+              onClick={() => setIsFullscreen(f => !f)}
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
+            </button>
+          </div>
         </div>
         <div className="card-body intel-cluster-card-body">
           {clusterError && (
@@ -328,6 +286,72 @@ export const NetworkIntelligencePage = () => {
           />
         </div>
       </div>
+
+      {/* Filter modal */}
+      <Modal
+        show={showFilterModal}
+        onHide={() => setShowFilterModal(false)}
+        container={graphCardRef.current ?? undefined}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Filters</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <NetworkControls
+            activeLegendProtocols={activeLegendProtocols}
+            onLegendProtocolClick={toggleLegendProtocol}
+            onLegendProtocolClear={() => setActiveLegendProtocols([])}
+            presentEdgeLegendKeys={presentEdgeLegendKeys}
+            activeNodeFilters={activeNodeFilters}
+            onNodeFilterClick={toggleNodeFilter}
+            onNodeFilterClear={() => setActiveNodeFilters([])}
+            presentNodeTypes={presentNodeTypes}
+            presentDeviceTypes={presentDeviceTypes}
+            ipFilter={ipFilter}
+            onIpFilterChange={setIpFilter}
+            portFilter={portFilter}
+            onPortFilterChange={setPortFilter}
+            activeAppFilters={activeAppFilters}
+            onAppFilterClick={toggleAppFilter}
+            onAppFilterClear={() => setActiveAppFilters([])}
+            presentAppNames={presentAppNames}
+            activeL7Protocols={activeL7Protocols}
+            onL7ProtocolClick={toggleL7Protocol}
+            onL7ProtocolClear={() => setActiveL7Protocols([])}
+            presentL7Protocols={presentL7Protocols}
+            activeCategories={activeCategories}
+            onCategoryClick={toggleCategory}
+            onCategoryClear={() => setActiveCategories([])}
+            presentCategories={presentCategories}
+            activeRiskTypes={activeRiskTypes}
+            onRiskTypeClick={toggleRiskType}
+            onRiskTypeClear={() => setActiveRiskTypes([])}
+            presentRiskTypes={presentRiskTypes}
+            activeCustomSigs={activeCustomSigs}
+            onCustomSigClick={toggleCustomSig}
+            onCustomSigClear={() => setActiveCustomSigs([])}
+            presentCustomSigs={presentCustomSigs}
+            activeFileTypes={activeFileTypes}
+            onFileTypeClick={toggleFileType}
+            onFileTypeClear={() => setActiveFileTypes([])}
+            presentFileTypes={presentFileTypes}
+            activeCountries={activeCountries}
+            onCountryClick={toggleCountry}
+            onCountryClear={() => setActiveCountries([])}
+            presentCountries={presentCountries}
+            hasRisksOnly={hasRisksOnly}
+            onHasRisksOnlyChange={setHasRisksOnly}
+            activeFilterCount={activeFilterCount}
+            onClearAllFilters={clearAllFilters}
+            defaultCollapsed={false}
+            activeNetLabels={activeNetLabels}
+            onNetLabelClick={toggleNetLabel}
+            onNetLabelClear={() => setActiveNetLabels([])}
+            presentNetLabels={presentNetLabels}
+          />
+        </Modal.Body>
+      </Modal>
 
     </div>
   );
