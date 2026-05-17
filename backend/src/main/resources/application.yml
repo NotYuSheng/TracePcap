@@ -63,7 +63,6 @@ minio:
   bucket: ${MINIO_BUCKET:tracepcap-files}
   max-file-size: ${MAX_UPLOAD_SIZE_BYTES:536870912}
   presigned-url-expiry: 300  # 5 minutes in seconds
-  retention-hours: 12  # Files are deleted after 12 hours
 
 # Server Configuration
 server:
@@ -156,7 +155,7 @@ tracepcap:
     auto-adjust-interval: true
   cleanup:
     cron: "0 0 * * * ?"  # Run every hour at the top of the hour
-    enabled: true
+    enabled: ${FILE_RETENTION_ENABLED:true}
     retention-hours: ${FILE_RETENTION_HOURS:12}  # Files deleted after this many hours
   overview:
     apps-limited: ${OVERVIEW_APPS_LIMITED:true}   # true = cap detected apps list; false = show all

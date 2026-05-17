@@ -18,7 +18,6 @@ public class MinioConfig {
   private String bucket;
   private Long maxFileSize;
   private Integer presignedUrlExpiry;
-  private Integer retentionHours;
 
   @Bean
   public MinioClient minioClient() {
