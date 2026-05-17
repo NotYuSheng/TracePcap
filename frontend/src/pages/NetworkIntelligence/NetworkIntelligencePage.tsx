@@ -248,27 +248,13 @@ export const NetworkIntelligencePage = () => {
             </h6>
             <small className="text-muted">Click a cluster node to see its member IPs and statistics.</small>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <button
-              className="btn btn-outline-secondary btn-sm position-relative"
-              onClick={() => setShowFilterModal(true)}
-              title="Filters"
-            >
-              <i className="bi bi-funnel" />
-              {activeFilterCount > 0 && (
-                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary" style={{ fontSize: '0.6rem' }}>
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            <button
-              className="btn btn-link btn-sm p-0 text-muted"
-              onClick={() => setIsFullscreen(f => !f)}
-              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            >
-              <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-            </button>
-          </div>
+          <button
+            className="btn btn-link btn-sm p-0 text-muted"
+            onClick={() => setIsFullscreen(f => !f)}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
+          </button>
         </div>
         <div className="card-body intel-cluster-card-body">
           {clusterError && (
@@ -283,6 +269,8 @@ export const NetworkIntelligencePage = () => {
             groupBy={groupBy}
             onGroupByChange={setGroupBy}
             fileId={fileId}
+            onFilterClick={() => setShowFilterModal(true)}
+            activeFilterCount={activeFilterCount}
           />
         </div>
       </div>

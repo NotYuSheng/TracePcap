@@ -198,3 +198,49 @@
 .intel-graph-container .react-flow__controls-button:hover {
   background: var(--tp-surface-hover, #f8f9fa);
 }
+
+/* ── Bottom-right filter overlay ─────────────────────────────── */
+.intel-filter-overlay {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10;
+}
+
+.intel-filter-overlay .ng-ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(22, 30, 46, 0.8);
+  color: #adbac7;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.12s, background 0.12s;
+  backdrop-filter: blur(6px);
+  position: relative;
+}
+
+.intel-filter-overlay .ng-ctrl-btn:hover {
+  color: #c9d1d9;
+  background: rgba(30, 40, 60, 0.9);
+}
+
+.intel-filter-overlay .ng-filter-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #58a6ff;
+  color: #0d1117;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

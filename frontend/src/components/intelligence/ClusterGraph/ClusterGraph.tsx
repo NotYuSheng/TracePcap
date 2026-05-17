@@ -656,6 +656,8 @@ interface ClusterGraphProps {
   groupBy: GroupBy;
   onGroupByChange: (g: GroupBy) => void;
   fileId: string;
+  onFilterClick?: () => void;
+  activeFilterCount?: number;
 }
 
 const COLOR_MODE_OPTIONS: { value: ColorMode; label: string }[] = [
@@ -663,7 +665,7 @@ const COLOR_MODE_OPTIONS: { value: ColorMode; label: string }[] = [
   { value: 'traffic', label: 'Traffic volume' },
 ];
 
-export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }: ClusterGraphProps) => {
+export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, onFilterClick, activeFilterCount = 0 }: ClusterGraphProps) => {
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<ClusterNodeData | null>(null);
@@ -876,6 +878,15 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               fileId={fileId}
             />
           )}
+
+          {onFilterClick && (
+            <div className="intel-filter-overlay">
+              <button className="ng-ctrl-btn position-relative" onClick={onFilterClick} title="Filters">
+                <i className="bi bi-funnel" />
+                {activeFilterCount > 0 && <span className="ng-filter-badge">{activeFilterCount}</span>}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         /* ── ReactFlow graph view (all other groupBy strategies) ── */
@@ -912,6 +923,15 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               <Controls showInteractive={false} />
               <AutoFitView version={layoutVersion} />
             </ReactFlow>
+          )}
+
+          {onFilterClick && (
+            <div className="intel-filter-overlay">
+              <button className="ng-ctrl-btn position-relative" onClick={onFilterClick} title="Filters">
+                <i className="bi bi-funnel" />
+                {activeFilterCount > 0 && <span className="ng-filter-badge">{activeFilterCount}</span>}
+              </button>
+            </div>
           )}
         </div>
       )}
