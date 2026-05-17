@@ -63,7 +63,6 @@ minio:
   bucket: ${MINIO_BUCKET:tracepcap-files}
   max-file-size: ${MAX_UPLOAD_SIZE_BYTES:536870912}
   presigned-url-expiry: 300  # 5 minutes in seconds
-  retention-hours: 12  # Files are deleted after 12 hours
 
 # Server Configuration
 server:
