@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'viz-vendor': ['recharts', 'd3', '@xyflow/react', 'elkjs'],
+            'viz-vendor': ['recharts', 'd3', '@xyflow/react'],
             'sgds-vendor': ['@govtechsg/sgds-react', '@govtechsg/sgds'],
           },
         },

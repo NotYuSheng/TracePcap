@@ -41,6 +41,7 @@ export const NetworkDiagramPage = () => {
   // Draft value for the custom node count input — only applied on Enter/blur
   const [customInput, setCustomInput] = useState('');
   const [showSignificanceModal, setShowSignificanceModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } =
     useNetworkData(fileId, data, nodeLimit);
 
@@ -78,19 +79,23 @@ export const NetworkDiagramPage = () => {
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
+  const toggleFullscreen = () => setIsFullscreen(f => !f);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      graphCardRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  };
+  // When in CSS fullscreen, handle Escape ourselves:
+  // — filter modal open → close modal
+  // — node details open → close node details
+  // — otherwise → exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showFilterModal) { setShowFilterModal(false); return; }
+      if (selectedNode) { setSelectedNode(null); return; }
+      setIsFullscreen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isFullscreen, showFilterModal, selectedNode]);
 
   // ─── "Present" sets: only show options that exist in the data ───────────────
 
@@ -486,61 +491,10 @@ export const NetworkDiagramPage = () => {
           );
         })()}
 
-      {/* Row 2: Legend & Filters */}
-      <div className="mb-3">
-        <NetworkControls
-          activeLegendProtocols={activeLegendProtocols}
-          onLegendProtocolClick={toggleLegendProtocol}
-          onLegendProtocolClear={() => setActiveLegendProtocols([])}
-          activeNodeFilters={activeNodeFilters}
-          onNodeFilterClick={toggleNodeFilter}
-          onNodeFilterClear={() => setActiveNodeFilters([])}
-          presentNodeTypes={presentNodeTypes}
-          presentEdgeLegendKeys={presentEdgeLegendKeys}
-          presentDeviceTypes={presentDeviceTypes}
-          ipFilter={ipFilter}
-          onIpFilterChange={setIpFilter}
-          portFilter={portFilter}
-          onPortFilterChange={setPortFilter}
-          activeAppFilters={activeAppFilters}
-          onAppFilterClick={toggleAppFilter}
-          onAppFilterClear={() => setActiveAppFilters([])}
-          presentAppNames={presentAppNames}
-          activeL7Protocols={activeL7Protocols}
-          onL7ProtocolClick={toggleL7Protocol}
-          onL7ProtocolClear={() => setActiveL7Protocols([])}
-          presentL7Protocols={presentL7Protocols}
-          activeCategories={activeCategories}
-          onCategoryClick={toggleCategory}
-          onCategoryClear={() => setActiveCategories([])}
-          presentCategories={presentCategories}
-          activeRiskTypes={activeRiskTypes}
-          onRiskTypeClick={toggleRiskType}
-          onRiskTypeClear={() => setActiveRiskTypes([])}
-          presentRiskTypes={presentRiskTypes}
-          activeCustomSigs={activeCustomSigs}
-          onCustomSigClick={toggleCustomSig}
-          onCustomSigClear={() => setActiveCustomSigs([])}
-          presentCustomSigs={presentCustomSigs}
-          activeFileTypes={activeFileTypes}
-          onFileTypeClick={toggleFileType}
-          onFileTypeClear={() => setActiveFileTypes([])}
-          presentFileTypes={presentFileTypes}
-          activeCountries={activeCountries}
-          onCountryClick={toggleCountry}
-          onCountryClear={() => setActiveCountries([])}
-          presentCountries={presentCountries}
-          hasRisksOnly={hasRisksOnly}
-          onHasRisksOnlyChange={setHasRisksOnly}
-          activeFilterCount={activeFilterCount}
-          onClearAllFilters={clearAllFilters}
-        />
-      </div>
-
-      {/* Row 3: Graph full width */}
+      {/* Row 2: Graph full width */}
       <div className="row">
         <div className="col-12">
-          <div className="card" ref={graphCardRef}>
+          <div className={`card${isFullscreen ? ' nd-css-fullscreen' : ''}`} ref={graphCardRef}>
             <div className="card-header d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
               <button
@@ -561,6 +515,8 @@ export const NetworkDiagramPage = () => {
                 onNodeClick={node => setSelectedNode(node)}
                 layoutType={layoutType}
                 onLayoutChange={setLayoutType}
+                onFilterClick={() => setShowFilterModal(true)}
+                activeFilterCount={activeFilterCount}
               />
             </div>
           </div>
@@ -575,6 +531,71 @@ export const NetworkDiagramPage = () => {
           onClose={() => setSelectedNode(null)}
         />
       )}
+
+      <Modal
+        show={showFilterModal}
+        onHide={() => setShowFilterModal(false)}
+        size="lg"
+        container={graphCardRef.current ?? undefined}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Filters</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <NetworkControls
+            activeLegendProtocols={activeLegendProtocols}
+            onLegendProtocolClick={toggleLegendProtocol}
+            onLegendProtocolClear={() => setActiveLegendProtocols([])}
+            activeNodeFilters={activeNodeFilters}
+            onNodeFilterClick={toggleNodeFilter}
+            onNodeFilterClear={() => setActiveNodeFilters([])}
+            presentNodeTypes={presentNodeTypes}
+            presentEdgeLegendKeys={presentEdgeLegendKeys}
+            presentDeviceTypes={presentDeviceTypes}
+            ipFilter={ipFilter}
+            onIpFilterChange={setIpFilter}
+            portFilter={portFilter}
+            onPortFilterChange={setPortFilter}
+            activeAppFilters={activeAppFilters}
+            onAppFilterClick={toggleAppFilter}
+            onAppFilterClear={() => setActiveAppFilters([])}
+            presentAppNames={presentAppNames}
+            activeL7Protocols={activeL7Protocols}
+            onL7ProtocolClick={toggleL7Protocol}
+            onL7ProtocolClear={() => setActiveL7Protocols([])}
+            presentL7Protocols={presentL7Protocols}
+            activeCategories={activeCategories}
+            onCategoryClick={toggleCategory}
+            onCategoryClear={() => setActiveCategories([])}
+            presentCategories={presentCategories}
+            activeRiskTypes={activeRiskTypes}
+            onRiskTypeClick={toggleRiskType}
+            onRiskTypeClear={() => setActiveRiskTypes([])}
+            presentRiskTypes={presentRiskTypes}
+            activeCustomSigs={activeCustomSigs}
+            onCustomSigClick={toggleCustomSig}
+            onCustomSigClear={() => setActiveCustomSigs([])}
+            presentCustomSigs={presentCustomSigs}
+            activeFileTypes={activeFileTypes}
+            onFileTypeClick={toggleFileType}
+            onFileTypeClear={() => setActiveFileTypes([])}
+            presentFileTypes={presentFileTypes}
+            activeCountries={activeCountries}
+            onCountryClick={toggleCountry}
+            onCountryClear={() => setActiveCountries([])}
+            presentCountries={presentCountries}
+            hasRisksOnly={hasRisksOnly}
+            onHasRisksOnlyChange={setHasRisksOnly}
+            activeFilterCount={activeFilterCount}
+            onClearAllFilters={clearAllFilters}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-secondary" onClick={() => setShowFilterModal(false)}>
+            Close
+          </button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal show={showSignificanceModal} onHide={() => setShowSignificanceModal(false)} centered>
         <Modal.Header closeButton>

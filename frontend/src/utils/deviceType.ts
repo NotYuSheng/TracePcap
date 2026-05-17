@@ -66,6 +66,21 @@ export function buildDeviceSignals(info: {
   return signals;
 }
 
+const DEVICE_TYPE_ICONS: Partial<Record<DeviceType, string>> = {
+  ROUTER:         'bi-router',
+  MOBILE:         'bi-phone',
+  LAPTOP_DESKTOP: 'bi-laptop',
+  SERVER:         'bi-server',
+  IOT:            'bi-cpu',
+};
+
+/**
+ * Returns the Bootstrap Icon class name for the device type.
+ */
+export function deviceTypeIcon(deviceType: DeviceType): string {
+  return DEVICE_TYPE_ICONS[deviceType] ?? 'bi-question-circle';
+}
+
 /** All canonical device type values shown in filter UIs. */
 export const DEVICE_TYPES: DeviceType[] = [
   'ROUTER',
