@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -181,7 +181,7 @@ export const AnalysisPage = () => {
       .catch(err => console.error('Failed to load existing story:', err));
   }, [fileId]);
 
-  const storyState: StoryGenerationState = {
+  const storyState: StoryGenerationState = useMemo(() => ({
     story, setStory,
     generating: storyGenerating,
     generateStory,
@@ -195,7 +195,8 @@ export const AnalysisPage = () => {
     maxRiskMatrix, setMaxRiskMatrix,
     totalFindings, setTotalFindings,
     totalRiskMatrix, setTotalRiskMatrix,
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [story, storyGenerating, generateStory, storyError, storyContextError, storyEditablePrompt, storyElapsedSeconds, llmTimeoutMs, additionalContext, maxFindings, maxRiskMatrix, totalFindings, totalRiskMatrix]);
 
   // ── Network diagram filter state (lifted here so it survives tab switches) ──
   const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);

@@ -151,12 +151,12 @@ export function CountryMapView({
             <i className="bi bi-arrow-left" />
             World
           </button>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tp-text, #212529)' }}>
             <i className="bi bi-geo-alt me-1" />
             {clusterById.get(drilledCountryId!)?.label ?? drilledCC}
           </span>
           {cityLoading && <span className="spinner-border spinner-border-sm text-primary" style={{ width: 14, height: 14, borderWidth: 2 }} />}
-          {noCityData && <span style={{ fontSize: 11, color: '#6c757d' }}>No city-level data available</span>}
+          {noCityData && <span style={{ fontSize: 11, color: 'var(--tp-text-muted, #6c757d)' }}>No city-level data available</span>}
         </div>
       )}
 

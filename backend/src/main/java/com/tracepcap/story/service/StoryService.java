@@ -812,8 +812,12 @@ public class StoryService {
 
     if (start >= 0 && end > start) {
       String json = content.substring(start, end + 1);
-      // Strip // line comments that some LLMs emit (invalid JSON but common)
-      json = json.replaceAll("//[^\n\r]*", "");
+      // Strip // line comments that some LLMs emit (invalid JSON but common).
+      // Only match // that is NOT preceded by a colon+optional-space+quote sequence,
+      // i.e. not inside a string value like "url": "https://...".
+      // Pattern: // preceded by whitespace, comma, or bracket (safe comment positions).
+      json = json.replaceAll("(?m)^(\\s*)//[^\n\r]*", "$1")
+                 .replaceAll(",\\s*//[^\n\r]*", ",");
       log.debug("Extracted JSON from LLM response, length: {}", json.length());
       return json;
     }

@@ -251,7 +251,7 @@ function buildGraph(
 // Hierarchical layout — ELK layered algorithm (Sugiyama-style)
 // ---------------------------------------------------------------------------
 
-const NODE_SIZE = 56;
+const NODE_SIZE = 36; // bounding box for ELK spacing; actual rendered node diameter is 24–36px
 
 async function applyHierarchicalLayout(graph: Graph, elk: InstanceType<typeof ELK>): Promise<void> {
   const nodes: { id: string }[] = [];
@@ -684,7 +684,8 @@ export const NetworkGraph = memo(function NetworkGraph({
 
 function blendColor(hex: string, bg: string, alpha: number): string {
   const parse = (h: string) => {
-    const c = h.replace('#', '');
+    let c = h.replace('#', '');
+    if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2]; // expand shorthand
     return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
   };
   const [r1, g1, b1] = parse(hex);
