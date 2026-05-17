@@ -61,7 +61,6 @@ export const NODE_TYPE_CONFIG: Record<NodeType, {
   router:            { label: 'Router / Gateway',  icon: 'bi-router',          badgeClass: 'bg-warning text-dark', color: '#d4ac0d' },
   client:            { label: 'Client',            icon: 'bi-laptop',          badgeClass: 'bg-primary',           color: '#3498db' },
   'l2-device':       { label: 'L2 Device',         icon: 'bi-ethernet',        badgeClass: 'bg-teal text-white',   color: '#1abc9c' },
-  anomaly:           { label: 'Anomaly',           icon: 'bi-exclamation-triangle', badgeClass: 'bg-danger',       color: '#e74c3c' },
   unknown:           { label: 'Unknown',           icon: 'bi-question-circle', badgeClass: 'bg-light text-dark',   color: '#95a5a6' },
 };
 

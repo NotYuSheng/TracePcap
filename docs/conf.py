@@ -2,9 +2,11 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 project = "TracePcap"
-copyright = "2025, TracePcap Contributors"
+copyright = "2025–2026, TracePcap Contributors"
 author = "TracePcap Contributors"
-release = "1.0"
+release = "1.0.1"
+version = "1.0.1"
+today = "2026-05-17"
 
 extensions = ["sphinx_rtd_theme"]
 

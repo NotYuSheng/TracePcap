@@ -9,6 +9,8 @@
 # Usage:
 #   bash scripts/load-images.sh
 #
+# Windows: run this in Git Bash or WSL — not CMD or PowerShell.
+#
 # After loading, start the stack with:
 #   docker compose -f docker-compose.offline.yml up -d
 

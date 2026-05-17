@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { NODE_TYPE_CONFIG } from '@/features/network/constants';
+import { NODE_TYPE_CONFIG, getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import './NodeDetails.css';
@@ -203,7 +203,11 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
               <h6 className="border-bottom pb-1 mb-2">Protocols</h6>
               <div className="d-flex flex-wrap gap-1">
                 {node.data.protocols.map(p => (
-                  <span key={p} className="badge bg-secondary">
+                  <span
+                    key={p}
+                    className="badge"
+                    style={{ backgroundColor: getProtocolColor(p), color: '#fff' }}
+                  >
                     {p}
                   </span>
                 ))}

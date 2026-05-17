@@ -62,11 +62,15 @@ sources:
        Wireshark ``manuf`` database. Shown in the Node Detail Panel. Not
        available if the MAC address is absent, locally-administered
        (randomised), or belongs to a virtual adapter.
-   * - **Device type icon**
-     - The predicted device type from the multi-signal classifier (OUI, TTL,
-       nDPI apps, traffic patterns). See :doc:`geolocation` for the full
-       scoring algorithm. A ``device_type`` override in a custom signature rule
-       sets the icon to 100% confidence.
+   * - **Node colour and icon**
+     - Node colour and icon are derived from two classification signals.
+       **Specific service nodes** (DNS server, web server, SSH server, etc.)
+       always use their service colour. **Generic nodes** (``client`` /
+       ``unknown``) use the hardware device classification colour instead
+       (IoT = pink, Mobile = violet, Laptop/Desktop = blue, Server = emerald,
+       Router = orange). The legend in the graph reflects exactly which colours
+       are present in the current view. See the *Classification* section below
+       for how each signal is derived.
    * - **Country flag**
      - Shown on external (non-RFC-1918) IP nodes only. Sourced from ipinfo.io
        (online) or the bundled DB-IP Lite MMDB (offline fallback). RFC-1918,
@@ -83,10 +87,20 @@ sources:
 Technology
 ----------
 
-The graph is built with **React Flow** and laid out using the **ELK** (Eclipse
-Layout Kernel) automatic layout engine. No external tile servers or map
-services are used — the topology is a pure data-driven graph rendered in the
-browser.
+The graph is rendered with **Sigma.js** (WebGL) using **graphology** as the
+underlying graph model. No external tile servers or map services are used — the
+topology is a pure data-driven graph rendered in the browser.
+
+Two layout algorithms are available:
+
+- **Force-directed** (default) — ForceAtlas2 run in a Web Worker, followed by
+  a de-overlapping pass. Surfaces natural clusters and hub-and-spoke structure.
+- **Hierarchical** — ELK (Eclipse Layout Kernel) ``layered`` algorithm, which
+  implements the **Sugiyama method**: nodes are ranked into horizontal layers by
+  longest-path analysis, edge crossings between layers are minimised, and
+  disconnected components are placed side-by-side. This layout makes
+  client → server traffic flow and parent/child relationships immediately
+  visible.
 
 Grouping Modes
 --------------
@@ -134,13 +148,30 @@ Classification Popup
 
 Clicking the classification badge opens a popup with three sections:
 
-**Type** — the node's network topology role, derived from traffic analysis:
+**Type** — the node's network topology role, derived from traffic analysis.
+Classification priority (highest first):
 
-- ``Router`` — many distinct peers (flagged by peer-count threshold)
-- ``Server`` — receives inbound connections on well-known ports
-- ``Client`` — initiates connections (default for most endpoints)
-- Evidence text shown below the badge (e.g. "42 distinct peers", or the
-  nDPI applications that triggered the classification)
+1. **nDPI application name** — the most reliable signal, works even on
+   non-standard ports and encrypted flows. Recognised apps:
+   DNS, HTTP, TLS/QUIC, SSH, FTP, SMTP/IMAP/POP, DHCP, NTP, and common
+   databases (MySQL, PostgreSQL, Redis, MongoDB, Elasticsearch).
+2. **Well-known port / protocol** — fallback when nDPI app is unavailable
+   (e.g. port 443/TCP → web server, port 22/TCP → SSH server).
+3. **Router heuristic** — a node with 10 or more distinct peers that is
+   not acting as a server is classified as a Router / Gateway.
+4. **Role fallback** — nodes that match none of the above are classified
+   as ``Client`` (default for most endpoints) or ``Unknown``.
+
+Node colour in the graph reflects which tier matched:
+
+- **Specific service types** (dns-server, web-server, ssh-server, etc.)
+  always use their service colour regardless of device classification.
+- **Generic types** (``client``, ``unknown``) show the **device type colour**
+  instead — so an IoT client appears pink and a mobile client appears violet,
+  making hardware diversity visible without requiring a separate filter.
+
+Evidence text is shown below the badge (e.g. "42 distinct peers" for a
+router, or the nDPI applications that triggered the classification).
 
 **Device** — the hardware/OS classification from the multi-signal scorer
 (see :doc:`geolocation` for the full algorithm):
@@ -180,9 +211,10 @@ fingerprinting; Role: TCP session direction).
 Layout Controls
 ---------------
 
-- **Auto layout** — re-run ELK layout.
-- **Fullscreen toggle** — expand the graph to fill the viewport.
-- **Zoom controls** — zoom in/out and fit-to-screen buttons.
+- **Force-directed** — switch to ForceAtlas2 layout (default).
+- **Hierarchical** — switch to ELK Sugiyama layered layout (top-down).
+- **Fit view** — reset the camera to fit all nodes in the viewport.
+- **Filters** — open the filter panel (also accessible in fullscreen mode).
 
 Export
 ------

@@ -361,7 +361,7 @@ export function selectSignificantNodes(
 /**
  * Transform conversations into graph nodes and edges
  * @param conversations - Array of conversations to visualize
- * @param analysisSummary - Optional analysis summary for anomaly detection
+ * @param analysisSummary - Optional analysis summary used to seed unique hosts and override packet totals
  * @param maxConversations - Maximum number of conversations to render (default: 500)
  * @param hostClassifications - Optional per-IP device classifications from the backend
  * @param maxNodes - Maximum number of nodes to render (default: 50, 0 = no limit)

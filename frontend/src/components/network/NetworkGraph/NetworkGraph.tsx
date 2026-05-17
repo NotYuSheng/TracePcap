@@ -1,30 +1,14 @@
-import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  Panel,
-  Handle,
-  Position,
-  BaseEdge,
-  EdgeLabelRenderer,
-  applyNodeChanges,
-  applyEdgeChanges,
-  type Node,
-  type Edge,
-  type NodeChange,
-  type EdgeChange,
-  type NodeTypes,
-  type EdgeTypes,
-  type NodeProps,
-  type EdgeProps,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import ELK from 'elkjs';
+const ELK_WORKER_URL = `${import.meta.env.BASE_URL}elk-worker.min.js`;
+import Graph from 'graphology';
+import Sigma from 'sigma';
+import FA2Layout from 'graphology-layout-forceatlas2/worker';
+import { inferSettings } from 'graphology-layout-forceatlas2';
+import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { ClusterNode, type ClusterFlowNodeData } from './ClusterNode';
-import { getProtocolColor, NODE_TYPE_COLORS } from '@/features/network/constants';
-import { deviceTypeColor } from '@/utils/deviceType';
+import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
+import { deviceTypeColor, deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
 import './NetworkGraph.css';
 
@@ -36,108 +20,142 @@ interface NetworkGraphProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
   onNodeClick?: (node: GraphNode) => void;
-  /** Called when the user clicks the expand button on a cluster node. */
   onClusterClick?: (clusterId: string) => void;
   layoutType?: 'forceDirected2d' | 'hierarchicalTd';
   onLayoutChange?: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
-  /** Called once after ELK layout completes and ReactFlow has painted. */
   onLayoutComplete?: () => void;
-  /**
-   * In compare mode, the label of the "primary" (File A) source.
-   * Nodes/edges exclusive to the secondary source (File B) are rendered with
-   * a dashed style to visually distinguish them.
-   */
   primarySource?: string;
-  /** Hidden nodes (not rendered due to significance cap). */
   hiddenNodesList?: GraphNode[];
-  /** Edges connecting a visible node to a hidden node. */
   crossEdges?: GraphEdge[];
-}
-
-interface FlowNodeData extends Record<string, unknown> {
-  label: string;
-  color: string;
-  icon: string;
-  /** Which file(s) this node appears in — set only in compare mode. */
-  sources?: string[];
-  /** Label of the primary (File A) source — used to determine dashed styling. */
-  primarySource?: string;
-}
-
-interface FlowEdgeData extends Record<string, unknown> {
-  label: string;
-  offset: number; // perpendicular pixel offset for parallel edges
-  /** Which file(s) this edge appears in — set only in compare mode. */
-  sources?: string[];
-  /** Label of the primary (File A) source — used to determine dashed styling. */
-  primarySource?: string;
+  onFilterClick?: () => void;
+  activeFilterCount?: number;
 }
 
 // ---------------------------------------------------------------------------
-// Constants
+// Node visual helpers
 // ---------------------------------------------------------------------------
 
-const NODE_WIDTH = 56;
-const NODE_HEIGHT = 56;
-const CLUSTER_WIDTH = 140;
-const CLUSTER_HEIGHT = 90;
-
-const elk = new ELK();
+const DARK_BG = '#0f1117';
+const DARK_SURFACE = '#1e2130';
+const LIGHT_BG = '#f6f8fa';
 
 // ---------------------------------------------------------------------------
-// Node helpers
+// Bootstrap Icons — unicode codepoints for each node type
+// Pre-rendered to data URLs so Sigma's WebGL renderer can display them.
 // ---------------------------------------------------------------------------
 
-const SPECIFIC_NODE_TYPES = new Set([
-  'dns-server',
-  'web-server',
-  'ssh-server',
-  'ftp-server',
-  'mail-server',
-  'dhcp-server',
-  'ntp-server',
-  'database-server',
-  'router',
-]);
+// Icons for specific service nodeTypes
+const NODE_TYPE_ICONS: Record<string, string> = {
+  'dns-server':      '\uf3ef', // bi-globe2
+  'web-server':      '\uf52c', // bi-server
+  'ssh-server':      '\uf5c3', // bi-terminal
+  'ftp-server':      '\uf3d5', // bi-folder-symlink
+  'mail-server':     '\uf32f', // bi-envelope
+  'dhcp-server':     '\uf1d6', // bi-broadcast
+  'ntp-server':      '\uf293', // bi-clock
+  'database-server': '\uf8c4', // bi-database
+  router:            '\uf6ec', // bi-router
+  'l2-device':       '\uf6d5', // bi-ethernet
+  cluster:           '\uf2ee', // bi-diagram-3
+};
 
-function getNodeColor(nodeData: { role: string; nodeType?: string; deviceType?: string }): string {
-  if (nodeData.nodeType && SPECIFIC_NODE_TYPES.has(nodeData.nodeType))
-    return NODE_TYPE_COLORS[nodeData.nodeType];
-  if (nodeData.deviceType && nodeData.deviceType !== 'UNKNOWN')
-    return deviceTypeColor(nodeData.deviceType);
-  if (nodeData.nodeType && NODE_TYPE_COLORS[nodeData.nodeType])
-    return NODE_TYPE_COLORS[nodeData.nodeType];
-  switch (nodeData.role) {
-    case 'server':
-      return '#2ecc71';
-    case 'both':
-      return '#9b59b6';
-    default:
-      return '#95a5a6';
+// Icons for device types — used on generic (client/unknown) nodes
+const DEVICE_TYPE_ICONS: Record<string, string> = {
+  ROUTER:         '\uf6ec', // bi-router
+  MOBILE:         '\uf4b9', // bi-phone
+  LAPTOP_DESKTOP: '\uf456', // bi-laptop
+  SERVER:         '\uf52c', // bi-server
+  IOT:            '\uf46b', // bi-cpu
+};
+
+const FALLBACK_ICON = '\uf505'; // bi-question-circle
+
+function getNodeIcon(nodeType: string, deviceType: string): string {
+  if (!GENERIC_NODE_TYPES.has(nodeType)) {
+    return NODE_TYPE_ICONS[nodeType] ?? FALLBACK_ICON;
+  }
+  return DEVICE_TYPE_ICONS[deviceType] ?? FALLBACK_ICON;
+}
+
+/**
+ * Sidecar maps: label → nodeType and label → deviceType.
+ * Sigma strips custom graph attributes before calling defaultDrawNodeLabel —
+ * only standard NodeDisplayData fields survive (x, y, size, color, label…).
+ * We key by label (the node's IP / hostname) which is unique per graph.
+ * Stored as refs so they are instance-local and never shared across remounts.
+ */
+
+/**
+ * Draws the full node appearance on the 2D canvas layer.
+ *
+ * Strategy: node `color` in NodeDisplayData IS the accent color (so Sigma's
+ * WebGL circle draws the accent color underneath). This function overdraws:
+ *   1. White filled circle (covers the WebGL accent circle)
+ *   2. Accent-colored border ring
+ *   3. Accent-colored Bootstrap Icon centered inside
+ *   4. Text label below
+ */
+function drawNodeLabel(
+  ctx: CanvasRenderingContext2D,
+  data: { x: number; y: number; size: number; label: string | null; color: string },
+  labelColor: string,
+  nodeFill: string,
+  ntMap: Map<string, string>,
+  dtMap: Map<string, string>,
+): void {
+  const { x, y, size, label, color: accentColor } = data;
+  const nodeType = ntMap.get(label ?? '') ?? 'unknown';
+  const deviceType = dtMap.get(label ?? '') ?? '';
+
+  // Fill — covers the WebGL accent circle underneath
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.fillStyle = nodeFill;
+  ctx.fill();
+
+  // Accent border ring
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = Math.max(1, size * 0.07);
+  ctx.stroke();
+
+  // Bootstrap Icon — reflects the same logic as getNodeColor/getNodeIcon
+  const cp = getNodeIcon(nodeType, deviceType);
+  ctx.font = `${size * 0.9}px "bootstrap-icons"`;
+  ctx.fillStyle = accentColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(cp, x, y);
+
+  // Text label below
+  if (label) {
+    ctx.font = `500 11px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x, y + size + 3);
   }
 }
 
-const NODE_ICONS: Record<string, string> = {
-  router: 'bi-router',
-  'web-server': 'bi-globe',
-  'dns-server': 'bi-search',
-  'ssh-server': 'bi-terminal',
-  'ftp-server': 'bi-hdd-network',
-  'mail-server': 'bi-envelope',
-  'dhcp-server': 'bi-broadcast',
-  'ntp-server': 'bi-clock',
-  'database-server': 'bi-database',
-  client: 'bi-laptop',
-};
+// Generic nodeTypes that carry no specific service information.
+// For these, deviceType provides a more meaningful colour signal.
+const GENERIC_NODE_TYPES = new Set(['client', 'unknown']);
 
-function getNodeIcon(nodeData: { nodeType?: string }): string {
-  return NODE_ICONS[nodeData.nodeType ?? ''] ?? 'bi-pc-display';
+function getNodeColor(node: GraphNode): string {
+  const { nodeType, deviceType } = node.data;
+  // Specific service nodeTypes always take priority (DNS server, web server, etc.)
+  if (!GENERIC_NODE_TYPES.has(nodeType) && NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]) {
+    return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG].color;
+  }
+  // For generic types (client / unknown), prefer the hardware device classification
+  if (deviceType && deviceType !== 'UNKNOWN') return deviceTypeColor(deviceType);
+  // Fall back to the nodeType color (client=blue, unknown=grey)
+  return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]?.color ?? '#95a5a6';
 }
 
 // ---------------------------------------------------------------------------
-// Deduplicate same-protocol edges between the same node pair
-// Handles backend inconsistencies where the same app protocol arrives with
-// different casing (e.g. "telegram" vs "Telegram") across conversations.
+// Deduplicate & normalise edges (ported from old NetworkGraph)
 // ---------------------------------------------------------------------------
 
 function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
@@ -149,24 +167,18 @@ function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
     g.push(e);
     groups.set(key, g);
   }
-
   const result: GraphEdge[] = [];
   for (const group of groups.values()) {
-    if (group.length === 1) {
-      result.push(group[0]);
-      continue;
-    }
-    const dominant = group.reduce((best, e) =>
-      e.data.packetCount > best.data.packetCount ? e : best
-    );
+    if (group.length === 1) { result.push(group[0]); continue; }
+    const dominant = group.reduce((b, e) => e.data.packetCount > b.data.packetCount ? e : b);
     const totalPackets = group.reduce((s, e) => s + e.data.packetCount, 0);
     const totalBytes = group.reduce((s, e) => s + e.data.totalBytes, 0);
     const raw = dominant.data.appName ?? dominant.data.protocol;
-    const displayName = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const display = raw.charAt(0).toUpperCase() + raw.slice(1);
     result.push({
       ...dominant,
       id: group.map(e => e.id).join('|'),
-      label: `${displayName} (${totalPackets})`,
+      label: `${display} (${totalPackets})`,
       data: { ...dominant.data, packetCount: totalPackets, totalBytes },
     });
   }
@@ -174,262 +186,103 @@ function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
 }
 
 // ---------------------------------------------------------------------------
-// Parallel edge handling — perpendicular pixel offset
-// All edges between the same node pair are fanned out as parallel straight
-// lines. Each keeps its own protocol colour, label, and direction arrow.
+// Build a graphology graph from GraphNode[] / GraphEdge[]
 // ---------------------------------------------------------------------------
 
-function assignEdgeOffsets(edges: GraphEdge[]): Map<string, number> {
-  // Group by unordered pair so A→B and B→A are fanned together
-  const groups = new Map<string, GraphEdge[]>();
-  for (const e of edges) {
-    const key = [e.source, e.target].sort().join('\0');
-    const g = groups.get(key) ?? [];
-    g.push(e);
-    groups.set(key, g);
-  }
-
-  const offsetMap = new Map<string, number>();
-  for (const group of groups.values()) {
-    if (group.length === 1) {
-      offsetMap.set(group[0].id, 0);
-    } else {
-      const step = 20; // px between parallel lines
-      const mid = (group.length - 1) / 2;
-      group.forEach((e, i) => {
-        offsetMap.set(e.id, (i - mid) * step);
-      });
-    }
-  }
-  return offsetMap;
-}
-
-// ---------------------------------------------------------------------------
-// ELK layout
-// ---------------------------------------------------------------------------
-
-const ELK_OPTIONS: Record<string, Record<string, string>> = {
-  hierarchicalTd: {
-    'elk.algorithm': 'layered',
-    'elk.direction': 'DOWN',
-    'elk.separateConnectedComponents': 'true',
-    'elk.spacing.componentComponent': '80',
-    'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-    'elk.spacing.nodeNode': '40',
-    'elk.edgeRouting': 'SPLINES',
-  },
-  forceDirected2d: {
-    'elk.algorithm': 'org.eclipse.elk.force',
-    'elk.separateConnectedComponents': 'true',
-    'elk.spacing.nodeNode': '80',
-    'elk.force.iterations': '500',
-    'elk.force.repulsion': '5.0',
-  },
-};
-
-async function computeLayout(
+function buildGraph(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  layoutType: 'forceDirected2d' | 'hierarchicalTd',
   primarySource?: string,
-  onClusterClick?: (clusterId: string) => void
-): Promise<{ nodes: Node[]; edges: Edge[] }> {
-  // Drop edges whose source or target doesn't exist in the node list.
-  // This guards against stale edges after clustering or filtering — ELK will
-  // error on edges that reference unknown node IDs.
+): Graph {
+  const graph = new Graph({ multi: true, type: 'directed' });
+
   const nodeIdSet = new Set(nodes.map(n => n.id));
-  const validEdges = edges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
-  const dedupedEdges = deduplicateEdges(validEdges);
-  const offsetMap = assignEdgeOffsets(dedupedEdges);
+  const validEdges = deduplicateEdges(
+    edges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target))
+  );
 
-  const graph = await elk.layout({
-    id: 'root',
-    layoutOptions: ELK_OPTIONS[layoutType],
-    children: nodes.map(n => ({
-      id: n.id,
-      width: n.data.isCluster ? CLUSTER_WIDTH : NODE_WIDTH,
-      height: n.data.isCluster ? CLUSTER_HEIGHT : NODE_HEIGHT,
-    })),
-    edges: dedupedEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
-  });
+  for (const n of nodes) {
+    const color = getNodeColor(n);
+    const size = n.data.isCluster ? 18 : 12;
 
-  const posMap = new Map((graph.children ?? []).map(n => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]));
+    const isSecondaryOnly =
+      n.data.sources?.length === 1 &&
+      primarySource !== undefined &&
+      n.data.sources[0] !== primarySource;
 
-  const rfNodes: Node[] = nodes.map(n => {
-    if (n.data.isCluster) {
-      const clusterData: ClusterFlowNodeData = {
-        label: n.label,
-        clusterId: n.data.clusterId!,
-        memberCount: n.data.memberCount ?? 0,
-        statsText: n.data.hostname ?? '',
-        hasAnomaly: false,
-        roleBreakdown: n.data.roleBreakdown ?? { client: 0, server: 0, both: 0, unknown: 0 },
-        onExpand: onClusterClick ?? (() => {}),
-        sources: n.data.sources,
-        primarySource,
-      };
-      return {
-        id: n.id,
-        type: 'clusterNode',
-        position: posMap.get(n.id) ?? { x: 0, y: 0 },
-        data: clusterData,
-        width: CLUSTER_WIDTH,
-        height: CLUSTER_HEIGHT,
-      };
-    }
-    return {
-      id: n.id,
-      type: 'networkNode',
-      position: posMap.get(n.id) ?? { x: 0, y: 0 },
-      data: {
-        label: n.label,
-        color: getNodeColor(n.data),
-        icon: getNodeIcon(n.data),
-        sources: n.data.sources,
-        primarySource,
-      },
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-    };
-  });
+    const nodeType = n.data.isCluster ? 'cluster' : (n.data.nodeType ?? 'unknown');
+    graph.addNode(n.id, {
+      x: Math.random() * 1000,
+      y: Math.random() * 1000,
+      size,
+      color,
+      label: n.label,
+      nodeType,
+      deviceType: n.data.deviceType ?? '',
+      isCluster: !!n.data.isCluster,
+      clusterId: n.data.clusterId,
+      memberCount: n.data.memberCount ?? 0,
+      isSecondaryOnly,
+      hidden: false,
+    });
+  }
 
-  const rfEdges: Edge[] = dedupedEdges.map(e => {
+  for (const e of validEdges) {
     const color = getProtocolColor(e.data.protocol);
-    const sources = e.data.sources;
-    const isShared = sources && sources.length >= 2;
-    return {
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      type: 'networkEdge',
-      data: { label: e.label, offset: offsetMap.get(e.id) ?? 0, sources, primarySource },
-      style: {
-        stroke: color,
-        strokeWidth: isShared ? 2.5 : 1.5,
-      },
-    };
+    const isSecondaryOnly =
+      e.data.sources?.length === 1 &&
+      primarySource !== undefined &&
+      e.data.sources[0] !== primarySource;
+
+    graph.addEdgeWithKey(e.id, e.source, e.target, {
+      color,
+      size: 1.2,
+      label: e.label,
+      type: 'arrow',
+      isSecondaryOnly,
+      packetCount: e.data.packetCount,
+    });
+  }
+
+  return graph;
+}
+
+// ---------------------------------------------------------------------------
+// Hierarchical layout — ELK layered algorithm (Sugiyama-style)
+// ---------------------------------------------------------------------------
+
+const NODE_SIZE = 36; // bounding box for ELK spacing; actual rendered node diameter is 24–36px
+
+async function applyHierarchicalLayout(graph: Graph, elk: InstanceType<typeof ELK>): Promise<void> {
+  const nodes: { id: string }[] = [];
+  graph.forEachNode(n => nodes.push({ id: n }));
+
+  const edges: { id: string; sources: string[]; targets: string[] }[] = [];
+  graph.forEachEdge((key, _attrs, src, tgt) => {
+    edges.push({ id: key, sources: [src], targets: [tgt] });
   });
 
-  return { nodes: rfNodes, edges: rfEdges };
+  const elkGraph = await elk.layout({
+    id: 'root',
+    layoutOptions: {
+      'elk.algorithm': 'layered',
+      'elk.direction': 'DOWN',
+      'elk.separateConnectedComponents': 'true',
+      'elk.spacing.componentComponent': '80',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+      'elk.spacing.nodeNode': '40',
+    },
+    children: nodes.map(n => ({ id: n.id, width: NODE_SIZE, height: NODE_SIZE })),
+    edges,
+  });
+
+  for (const child of elkGraph.children ?? []) {
+    if (child.x !== undefined && child.y !== undefined) {
+      graph.setNodeAttribute(child.id, 'x', child.x);
+      graph.setNodeAttribute(child.id, 'y', child.y);
+    }
+  }
 }
-
-// ---------------------------------------------------------------------------
-// Custom node — Packet Tracer style: icon above, label below
-// ---------------------------------------------------------------------------
-
-function NetworkNode({ data }: NodeProps) {
-  const { label, color, icon, sources, primarySource } = data as FlowNodeData;
-  const isSecondaryOnly =
-    sources?.length === 1 && primarySource !== undefined && sources[0] !== primarySource;
-  const isShared = sources !== undefined && sources.length >= 2;
-  return (
-    <div
-      className="network-flow-node"
-      style={{
-        borderColor: color,
-        borderStyle: isSecondaryOnly ? 'dashed' : 'solid',
-        opacity: isSecondaryOnly ? 0.8 : 1,
-      }}
-    >
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="network-flow-handle"
-        style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
-      />
-      <Handle
-        type="source"
-        position={Position.Top}
-        className="network-flow-handle"
-        style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
-      />
-      <div className="network-flow-icon" style={{ color }}>
-        <i className={`bi ${icon}`} />
-      </div>
-      <span className="network-flow-label">{label}</span>
-      {isShared && (
-        <i
-          className="bi bi-layers-fill"
-          style={{
-            position: 'absolute',
-            bottom: 2,
-            right: 2,
-            fontSize: '0.6rem',
-            color,
-            opacity: 0.85,
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Custom edge — straight line with perpendicular offset per parallel edge
-// ---------------------------------------------------------------------------
-
-function NetworkEdge({ id, sourceX, sourceY, targetX, targetY, data, style }: EdgeProps) {
-  const { label, offset, sources, primarySource } = (data ?? {
-    label: '',
-    offset: 0,
-  }) as FlowEdgeData;
-  const isSecondaryOnly =
-    sources?.length === 1 && primarySource !== undefined && sources[0] !== primarySource;
-  const edgeStyle = isSecondaryOnly ? { ...style, strokeDasharray: '6 3' } : style;
-
-  // Use a canonical direction for the perpendicular so that A→B and B→A
-  // both receive the same perpendicular unit vector.
-  const canonicalX = sourceX < targetX || (sourceX === targetX && sourceY <= targetY);
-  const cdx = canonicalX ? targetX - sourceX : sourceX - targetX;
-  const cdy = canonicalX ? targetY - sourceY : sourceY - targetY;
-  const len = Math.sqrt(cdx * cdx + cdy * cdy) || 1;
-  const px = (-cdy / len) * offset;
-  const py = (cdx / len) * offset;
-
-  const sx = sourceX + px;
-  const sy = sourceY + py;
-  const tx = targetX + px;
-  const ty = targetY + py;
-
-  const labelX = sx + (tx - sx) * 0.3;
-  const labelY = sy + (ty - sy) * 0.3;
-
-  // Arrow at midpoint, pointing toward target
-  const arrowX = (sx + tx) / 2;
-  const arrowY = (sy + ty) / 2;
-  const angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI);
-  const arrowColor = (style?.stroke as string) ?? '#999';
-
-  const edgePath = `M ${sx},${sy} L ${tx},${ty}`;
-
-  return (
-    <>
-      <BaseEdge id={id} path={edgePath} style={edgeStyle} />
-      <polygon
-        points="-6,-3.5 6,0 -6,3.5"
-        transform={`translate(${arrowX},${arrowY}) rotate(${angle})`}
-        fill={arrowColor}
-      />
-      {label && (
-        <EdgeLabelRenderer>
-          <div
-            className="network-flow-edge-label nodrag nopan"
-            style={{ transform: `translate(-50%,-50%) translate(${labelX}px,${labelY}px)` }}
-          >
-            {label}
-          </div>
-        </EdgeLabelRenderer>
-      )}
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stable type maps
-// ---------------------------------------------------------------------------
-
-const nodeTypes: NodeTypes = { networkNode: NetworkNode, clusterNode: ClusterNode };
-const edgeTypes: EdgeTypes = { networkEdge: NetworkEdge };
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -446,6 +299,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   primarySource,
   hiddenNodesList = [],
   crossEdges = [],
+  onFilterClick,
+  activeFilterCount = 0,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -459,157 +314,258 @@ export const NetworkGraph = memo(function NetworkGraph({
     return () => mq.removeEventListener('change', handler);
   }, [themeMode]);
   const darkMode = themeMode === 'dark' || (themeMode === 'system' && sysDark);
-  const [rfNodes, setRfNodes] = useState<Node[]>([]);
-  const [rfEdges, setRfEdges] = useState<Edge[]>([]);
-  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const onNodesChange = useCallback(
-    (changes: NodeChange[]) => setRfNodes(nds => applyNodeChanges(changes, nds)),
-    []
-  );
-  const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => setRfEdges(eds => applyEdgeChanges(changes, eds)),
-    []
-  );
-  const [layouting, setLayouting] = useState(false);
-
-  const visibleNodes = useMemo(() => {
-    if (layoutType !== 'hierarchicalTd') return nodes;
-    const connected = new Set(edges.flatMap(e => [e.source, e.target]));
-    return nodes.filter(n => connected.has(n.id));
-  }, [nodes, edges, layoutType]);
-
-  useEffect(() => {
-    let active = true;
-
-    if (visibleNodes.length === 0) {
-      setRfNodes([]);
-      setRfEdges([]);
-      return;
-    }
-
-    setLayouting(true);
-    computeLayout(visibleNodes, edges, layoutType, primarySource, onClusterClick)
-      .then(({ nodes: n, edges: e }) => {
-        if (!active) return;
-        setRfNodes(n);
-        setRfEdges(e);
-        setLayouting(false);
-      })
-      .catch(err => {
-        if (!active) return;
-        console.error('ELK layout error:', err);
-        setLayouting(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [visibleNodes, edges, layoutType, primarySource, onClusterClick]);
-
-  // Signal the caller once the layout has been computed and painted.
-  // Works for both the normal case (rfNodes set after ELK) and the empty-data
-  // case (visibleNodes.length === 0, layouting never becomes true).
-  const onLayoutCompleteRef = useRef(onLayoutComplete);
-  useEffect(() => {
-    onLayoutCompleteRef.current = onLayoutComplete;
-  });
-
-  useEffect(() => {
-    const idle = !layouting && (rfNodes.length > 0 || visibleNodes.length === 0);
-    if (!idle) return;
-    const id = requestAnimationFrame(() => onLayoutCompleteRef.current?.());
-    return () => cancelAnimationFrame(id);
-  }, [layouting, rfNodes.length, visibleNodes.length]);
-
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      // Cluster nodes handle their own expand click via the button in ClusterNode
-      if (!onNodeClick) return;
-      const original = nodes.find(n => n.id === node.id);
-      if (original && !original.data.isCluster) onNodeClick(original);
-    },
-    [nodes, onNodeClick]
-  );
-
-  const handleNodeMouseEnter = useCallback((event: React.MouseEvent, node: Node) => {
-    setHoveredNodeId(node.id);
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (rect) {
-      setTooltipPos({ x: event.clientX - rect.left + 12, y: event.clientY - rect.top + 12 });
-    }
-  }, []);
-
-  const handleNodeMouseLeave = useCallback(() => {
-    setHoveredNodeId(null);
-    setTooltipPos(null);
-  }, []);
-
-  // When a node is hovered, dim all nodes/edges not connected to it.
-  const { dimmedNodeIds, dimmedEdgeIds } = useMemo(() => {
-    if (!hoveredNodeId)
-      return { dimmedNodeIds: new Set<string>(), dimmedEdgeIds: new Set<string>() };
-    const connectedEdgeIds = new Set<string>();
-    const neighborIds = new Set<string>([hoveredNodeId]);
-    rfEdges.forEach(e => {
-      if (e.source === hoveredNodeId || e.target === hoveredNodeId) {
-        connectedEdgeIds.add(e.id);
-        neighborIds.add(e.source);
-        neighborIds.add(e.target);
-      }
+  const sigmaRef = useRef<Sigma | null>(null);
+  const fa2Ref = useRef<InstanceType<typeof FA2Layout> | null>(null);
+  const graphRef = useRef<Graph | null>(null);
+  const nodeTypeByLabel = useRef<Map<string, string>>(new Map());
+  const deviceTypeByLabel = useRef<Map<string, string>>(new Map());
+  const elkRef = useRef<InstanceType<typeof ELK> | null>(null);
+  if (!elkRef.current) {
+    elkRef.current = new ELK({
+      workerFactory: () => new Worker(ELK_WORKER_URL, { type: 'classic' }),
     });
-    const dimNodes = new Set(rfNodes.map(n => n.id).filter(id => !neighborIds.has(id)));
-    const dimEdges = new Set(rfEdges.map(e => e.id).filter(id => !connectedEdgeIds.has(id)));
-    return { dimmedNodeIds: dimNodes, dimmedEdgeIds: dimEdges };
-  }, [hoveredNodeId, rfNodes, rfEdges]);
+  }
 
-  // Build a lookup map for hidden nodes by ID
+  const [layouting, setLayouting] = useState(false);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  const onLayoutCompleteRef = useRef(onLayoutComplete);
+  useEffect(() => { onLayoutCompleteRef.current = onLayoutComplete; });
+
+  const nodesRef = useRef(nodes);
+  useEffect(() => { nodesRef.current = nodes; });
+
+  // Hidden neighbor lookup
   const hiddenNodeMap = useMemo(
     () => new Map(hiddenNodesList.map(n => [n.id, n])),
     [hiddenNodesList]
   );
 
-  // When hovering, find hidden neighbors via cross-edges
   const hiddenNeighbors = useMemo<GraphNode[]>(() => {
-    if (!hoveredNodeId || crossEdges.length === 0) return [];
+    if (!hoveredNode || crossEdges.length === 0) return [];
     const neighborIds = new Set<string>();
     for (const e of crossEdges) {
-      if (e.source === hoveredNodeId) neighborIds.add(e.target);
-      else if (e.target === hoveredNodeId) neighborIds.add(e.source);
+      if (e.source === hoveredNode) neighborIds.add(e.target);
+      else if (e.target === hoveredNode) neighborIds.add(e.source);
     }
-    console.debug(
-      '[HiddenTooltip] hoveredNode:',
-      hoveredNodeId,
-      'crossEdges:',
-      crossEdges.length,
-      'hiddenNodes:',
-      hiddenNodesList.length,
-      'neighborIds:',
-      [...neighborIds]
-    );
     return [...neighborIds]
       .map(id => hiddenNodeMap.get(id))
       .filter((n): n is GraphNode => n !== undefined);
-  }, [hoveredNodeId, crossEdges, hiddenNodeMap, hiddenNodesList.length]);
+  }, [hoveredNode, crossEdges, hiddenNodeMap]);
 
-  // Apply/remove "dimmed" className without recomputing layout.
-  const displayNodes = useMemo(
-    () =>
-      hoveredNodeId
-        ? rfNodes.map(n => ({ ...n, className: dimmedNodeIds.has(n.id) ? 'nf-dimmed' : '' }))
-        : rfNodes,
-    [hoveredNodeId, rfNodes, dimmedNodeIds]
-  );
+  // ---------------------------------------------------------------------------
+  // Build & render Sigma instance
+  // ---------------------------------------------------------------------------
 
-  const displayEdges = useMemo(
-    () =>
-      hoveredNodeId
-        ? rfEdges.map(e => ({ ...e, className: dimmedEdgeIds.has(e.id) ? 'nf-dimmed' : '' }))
-        : rfEdges,
-    [hoveredNodeId, rfEdges, dimmedEdgeIds]
-  );
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (nodes.length === 0) return;
+
+    // Tear down previous instance
+    fa2Ref.current?.kill();
+    fa2Ref.current = null;
+    sigmaRef.current?.kill();
+    sigmaRef.current = null;
+
+    const graph = buildGraph(nodes, edges, primarySource);
+    graphRef.current = graph;
+
+    const bgColor = darkMode ? DARK_BG : LIGHT_BG;
+    const nodeFill = darkMode ? DARK_SURFACE : '#ffffff';
+    const labelColor = darkMode ? '#c9d1d9' : '#212529';
+
+    const sigma = new Sigma(graph, containerRef.current, {
+      renderLabels: true,
+      renderEdgeLabels: false,
+      defaultEdgeType: 'arrow',
+      labelDensity: 1,
+      labelGridCellSize: 60,
+      labelRenderedSizeThreshold: -Infinity, // always call drawNodeLabel at every zoom level
+      minEdgeThickness: 0.5,
+      zIndex: true,
+      defaultDrawNodeLabel: (ctx, data) => {
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current);
+      },
+      defaultDrawNodeHover: (ctx, data) => {
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current);
+      },
+      nodeReducer: (node, data) => {
+        const res = { ...data };
+        const hovNode = sigmaRef.current?.['hoveredNode'] as string | undefined;
+        const isHovered = !!hovNode && node === hovNode;
+        const neighbors = hovNode && graph.hasNode(hovNode)
+          ? new Set(graph.neighbors(hovNode))
+          : new Set<string>();
+
+        const dimColor = darkMode ? '#3a3f4b' : '#c8cdd6';
+
+        // Hover dimming
+        if (hovNode && !isHovered && !neighbors.has(node)) {
+          res['color'] = dimColor;
+          res['label'] = '';
+        }
+
+        // Compare-mode secondary
+        if (data['isSecondaryOnly']) {
+          res['color'] = blendColor(data['color'] as string, bgColor, 0.4);
+        }
+
+        return res;
+      },
+      edgeReducer: (edge, data) => {
+        const res = { ...data };
+        const hovNode = sigmaRef.current?.['hoveredNode'];
+        if (hovNode) {
+          const [src, tgt] = graph.extremities(edge);
+          if (src !== hovNode && tgt !== hovNode) {
+            res['hidden'] = true;
+          }
+        }
+        if (data['isSecondaryOnly']) {
+          res['color'] = blendColor(data['color'] as string, bgColor, 0.5);
+        }
+        return res;
+      },
+    });
+
+    sigmaRef.current = sigma;
+
+    // Before each render, rebuild the label→nodeType/deviceType sidecar maps.
+    // Keyed by label (IP/hostname) which is unique per node in this graph.
+    sigma.on('beforeRender', () => {
+      nodeTypeByLabel.current.clear();
+      deviceTypeByLabel.current.clear();
+      graph.forEachNode((_node, attrs) => {
+        const label = attrs['label'] as string ?? '';
+        if (!label) return;
+        nodeTypeByLabel.current.set(label, attrs['nodeType'] as string ?? 'unknown');
+        deviceTypeByLabel.current.set(label, attrs['deviceType'] as string ?? '');
+      });
+    });
+
+    // After each render, clear the separate hoverNodes WebGL layer that Sigma
+    // uses to draw a solid-colored circle over the hovered node. This removes
+    // the built-in hover highlight while keeping our canvas overdraw intact.
+    sigma.on('afterRender', () => {
+      const gl = (sigma as unknown as { webGLContexts: { hoverNodes: WebGLRenderingContext } }).webGLContexts?.hoverNodes;
+      if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
+    });
+
+
+    // Override background color via the canvas element behind WebGL
+    const canvas = containerRef.current.querySelector('canvas');
+    if (canvas) (canvas as HTMLCanvasElement).style.background = bgColor;
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    sigma.on('enterNode', ({ node }) => {
+      setHoveredNode(node);
+      sigma.refresh();
+    });
+
+    sigma.on('leaveNode', () => {
+      setHoveredNode(null);
+      sigma.refresh();
+    });
+
+    sigma.on('clickNode', ({ node, event }) => {
+      const original = nodesRef.current.find(n => n.id === node);
+      if (!original) return;
+
+      if (original.data.isCluster) {
+        const clusterId = graph.getNodeAttribute(node, 'clusterId') as string;
+        onClusterClick?.(clusterId);
+        return;
+      }
+
+      // Show tooltip pos from mouse event (guard against TouchEvent)
+      const orig = event.original;
+      if (containerRef.current && orig instanceof MouseEvent) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setTooltipPos({ x: orig.clientX - rect.left + 12, y: orig.clientY - rect.top + 12 });
+      }
+
+      onNodeClick?.(original);
+    });
+
+    // Double-click to zoom into node
+    sigma.on('doubleClickNode', ({ node }) => {
+      const cam = sigma.getCamera();
+      const { x, y } = sigma.getNodeDisplayData(node) ?? { x: 0.5, y: 0.5 };
+      cam.animate({ x, y, ratio: cam.ratio / 2 }, { duration: 300 });
+    });
+
+    // ── Layout ────────────────────────────────────────────────────────────────
+
+    if (layoutType === 'hierarchicalTd') {
+      setLayouting(true);
+      applyHierarchicalLayout(graph, elkRef.current!).then(() => {
+        sigma.refresh();
+        sigma.getCamera().animate({ ratio: 1 }, { duration: 400 });
+        setLayouting(false);
+        requestAnimationFrame(() => onLayoutCompleteRef.current?.());
+      }).catch(err => {
+        console.error('[NetworkGraph] ELK hierarchical layout failed:', err);
+        setLayouting(false);
+      });
+    } else {
+      // ForceAtlas2 in a web worker
+      setLayouting(true);
+      const fa2Settings = inferSettings(graph);
+      const fa2 = new FA2Layout(graph, {
+        settings: {
+          ...fa2Settings,
+          gravity: 1,
+          scalingRatio: 2,
+          slowDown: 10,
+          barnesHutOptimize: graph.order > 200,
+        },
+      });
+      fa2Ref.current = fa2;
+      fa2.start();
+
+      // Run for a fixed time then stop and de-overlap
+      const runMs = Math.min(3000, 800 + graph.order * 4);
+      const timer = setTimeout(() => {
+        fa2.stop();
+        fa2.kill();
+        fa2Ref.current = null;
+        noverlap.assign(graph, { maxIterations: 50, settings: { margin: 4 } });
+        sigma.refresh();
+        setLayouting(false);
+        requestAnimationFrame(() => onLayoutCompleteRef.current?.());
+      }, runMs);
+
+      return () => {
+        clearTimeout(timer);
+        fa2?.stop();
+        fa2?.kill();
+      };
+    }
+
+    return () => {
+      fa2Ref.current?.kill();
+      fa2Ref.current = null;
+      sigmaRef.current?.kill();
+      sigmaRef.current = null;
+      elkRef.current?.terminateWorker();
+      elkRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges, layoutType, primarySource, darkMode]);
+
+  // Re-render sigma when hover changes (reducer reads this)
+  useEffect(() => {
+    sigmaRef.current?.refresh();
+  }, [hoveredNode]);
+
+  // Fit view
+  const handleFitView = useCallback(() => {
+    sigmaRef.current?.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
+  }, []);
 
   if (nodes.length === 0) {
     return (
@@ -622,15 +578,63 @@ export const NetworkGraph = memo(function NetworkGraph({
   }
 
   return (
-    <div className="network-graph-container" ref={containerRef}>
+    <div className="network-graph-wrapper" style={{ background: darkMode ? DARK_BG : LIGHT_BG }}>
+      {/* Sigma canvas mount point */}
+      <div className="network-graph-canvas" ref={containerRef} />
+
+      {/* ── Bottom-right controls ────────────────────────────────────────── */}
+      <div className="ng-overlay-controls">
+        <button className="ng-ctrl-btn" title="Fit view" onClick={handleFitView}>
+          <i className="bi bi-fullscreen" />
+        </button>
+        {onLayoutChange && (
+          <>
+            <button
+              className={`ng-ctrl-btn${layoutType === 'forceDirected2d' ? ' active' : ''}`}
+              title="Force Directed layout"
+              onClick={() => onLayoutChange('forceDirected2d')}
+            >
+              <i className="bi bi-diagram-2" />
+            </button>
+            <button
+              className={`ng-ctrl-btn${layoutType === 'hierarchicalTd' ? ' active' : ''}`}
+              title="Hierarchical layout"
+              onClick={() => onLayoutChange('hierarchicalTd')}
+            >
+              <i className="bi bi-diagram-3" />
+            </button>
+          </>
+        )}
+        {onFilterClick && (
+          <button
+            className={`ng-ctrl-btn${activeFilterCount > 0 ? ' active' : ''}`}
+            title="Filters"
+            onClick={onFilterClick}
+          >
+            <i className="bi bi-funnel" />
+            {activeFilterCount > 0 && (
+              <span className="ng-filter-badge">{activeFilterCount}</span>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* ── Layout spinner ───────────────────────────────────────────────── */}
+      {layouting && (
+        <div className="ng-layouting">
+          <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
+          Computing layout…
+        </div>
+      )}
+
+      {/* ── Hidden neighbor tooltip ──────────────────────────────────────── */}
       {tooltipPos && hiddenNeighbors.length > 0 && (
         <div className="nf-hidden-tooltip" style={{ left: tooltipPos.x, top: tooltipPos.y }}>
           <div className="nf-hidden-tooltip-title">Hidden neighbors ({hiddenNeighbors.length})</div>
           <ul className="nf-hidden-tooltip-list">
             {hiddenNeighbors.slice(0, 10).map(n => (
               <li key={n.id}>
-                {n.data.ip}
-                {n.data.hostname ? ` (${n.data.hostname})` : ''}
+                {n.data.ip}{n.data.hostname ? ` (${n.data.hostname})` : ''}
               </li>
             ))}
             {hiddenNeighbors.length > 10 && (
@@ -639,52 +643,55 @@ export const NetworkGraph = memo(function NetworkGraph({
           </ul>
         </div>
       )}
-      {layouting && (
-        <div className="network-graph-layouting">
-          <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
-          Computing layout…
-        </div>
-      )}
-      <ReactFlow
-        nodes={displayNodes}
-        edges={displayEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        onNodeClick={handleNodeClick}
-        onNodeMouseEnter={handleNodeMouseEnter}
-        onNodeMouseLeave={handleNodeMouseLeave}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
-        nodesConnectable={false}
-        nodesDraggable
-        elementsSelectable
-        minZoom={0.1}
-      >
-        <Background gap={20} color={darkMode ? '#1e2130' : '#f0f0f0'} />
-        <Controls showInteractive={false} />
-        {onLayoutChange && (
-          <Panel position="bottom-right">
-            <div className="react-flow__controls network-layout-controls">
-              <button
-                className={`react-flow__controls-button${layoutType === 'forceDirected2d' ? ' active' : ''}`}
-                onClick={() => onLayoutChange('forceDirected2d')}
-                title="Force Directed layout"
-              >
-                <i className="bi bi-diagram-2" />
-              </button>
-              <button
-                className={`react-flow__controls-button${layoutType === 'hierarchicalTd' ? ' active' : ''}`}
-                onClick={() => onLayoutChange('hierarchicalTd')}
-                title="Hierarchical layout"
-              >
-                <i className="bi bi-diagram-3" />
-              </button>
+
+      {/* ── Node-type legend — data-driven, matches getNodeColor/getNodeIcon ── */}
+      <div className="ng-legend">
+        {/* Specific service nodeTypes present in this graph */}
+        {Object.entries(NODE_TYPE_CONFIG)
+          .filter(([type]) => !GENERIC_NODE_TYPES.has(type) && type !== 'cluster' &&
+            nodes.some(n => !n.data.isCluster && (n.data.nodeType ?? 'unknown') === type))
+          .map(([type, cfg]) => (
+            <div key={type} className="ng-legend-item">
+              <i className={`bi ${cfg.icon} ng-legend-icon`} style={{ color: cfg.color }} />
+              <span className="ng-legend-label">{cfg.label}</span>
             </div>
-          </Panel>
+          ))}
+        {/* Device types present among generic (client/unknown) nodes */}
+        {DEVICE_TYPES
+          .filter(dt => dt !== 'UNKNOWN' &&
+            nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && n.data.deviceType === dt))
+          .map(dt => (
+            <div key={dt} className="ng-legend-item">
+              <i className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`} style={{ color: deviceTypeColor(dt) }} />
+              <span className="ng-legend-label">{deviceTypeLabel(dt)}</span>
+            </div>
+          ))}
+        {/* Fallback: show Unknown only if generic nodes exist with no specific deviceType */}
+        {nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && (!n.data.deviceType || n.data.deviceType === 'UNKNOWN')) && (
+          <div className="ng-legend-item">
+            <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} />
+            <span className="ng-legend-label">Unknown</span>
+          </div>
         )}
-      </ReactFlow>
+      </div>
     </div>
   );
 });
+
+// ---------------------------------------------------------------------------
+// Utility: blend two hex colours
+// ---------------------------------------------------------------------------
+
+function blendColor(hex: string, bg: string, alpha: number): string {
+  const parse = (h: string) => {
+    let c = h.replace('#', '');
+    if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2]; // expand shorthand
+    return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = parse(hex);
+  const [r2, g2, b2] = parse(bg);
+  const r = Math.round(r1 * alpha + r2 * (1 - alpha));
+  const g = Math.round(g1 * alpha + g2 * (1 - alpha));
+  const b = Math.round(b1 * alpha + b2 * (1 - alpha));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}

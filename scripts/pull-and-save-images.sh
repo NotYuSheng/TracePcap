@@ -11,6 +11,8 @@
 # Usage:
 #   bash scripts/pull-and-save-images.sh
 #
+# Windows: run this in Git Bash or WSL — not CMD or PowerShell.
+#
 # Build args for nginx are read from .env (if present) — copy .env.example first
 # if you haven't already configured it.
 

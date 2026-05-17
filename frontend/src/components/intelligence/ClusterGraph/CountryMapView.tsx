@@ -156,7 +156,7 @@ export function CountryMapView({
             {clusterById.get(drilledCountryId!)?.label ?? drilledCC}
           </span>
           {cityLoading && <span className="spinner-border spinner-border-sm text-primary" style={{ width: 14, height: 14, borderWidth: 2 }} />}
-          {noCityData && <span className="text-muted" style={{ fontSize: 11 }}>No city-level data available</span>}
+          {noCityData && <span style={{ fontSize: 11, color: 'var(--tp-text-muted, #6c757d)' }}>No city-level data available</span>}
         </div>
       )}
 
@@ -316,7 +316,7 @@ export function CountryMapView({
         <div style={{
           position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
           fontSize: 10, color: 'var(--tp-text-muted, #6c757d)',
-          background: 'var(--tp-surface, #fff)', border: '1px solid var(--tp-border, #dee2e6)',
+          background: 'var(--tp-surface, rgba(255,255,255,0.92))', border: '1px solid var(--tp-border, #dee2e6)',
           borderRadius: 4, padding: '2px 8px', zIndex: 5, whiteSpace: 'nowrap',
         }}>
           Click a highlighted country to view city-level breakdown
@@ -326,7 +326,7 @@ export function CountryMapView({
       {/* Legend */}
       <div style={{
         position: 'absolute', bottom: 12, right: 12,
-        background: 'var(--tp-surface, #fff)', border: '1px solid var(--tp-border, #dee2e6)',
+        background: 'var(--tp-surface, rgba(255,255,255,0.92))', border: '1px solid var(--tp-border, #dee2e6)',
         borderRadius: 6, padding: '6px 10px', fontSize: 10,
         color: 'var(--tp-text-muted, #6c757d)', zIndex: 5,
       }}>

@@ -81,14 +81,14 @@ function GeoSourceBadge({ source }: { source?: string | null }) {
             top: popoverPos.top,
             left: popoverPos.left,
             zIndex: 9999,
-            background: '#fff',
-            border: '1px solid #dee2e6',
+            background: 'var(--tp-surface, #fff)',
+            border: '1px solid var(--tp-border, #dee2e6)',
             borderRadius: 6,
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             padding: '8px 10px',
             width: 260,
             fontSize: 11,
-            color: '#212529',
+            color: 'var(--tp-text, #212529)',
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -474,11 +474,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
   type IpMetric = 'bytes' | 'conversations' | 'risks' | 'peers';
   const [ipMetric, setIpMetric] = useState<IpMetric>('bytes');
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  // Escape is handled by the parent page (so it can respect fullscreen priority).
 
   useEffect(() => {
     if (!cluster.sampleIps.length) return;
@@ -656,6 +652,10 @@ interface ClusterGraphProps {
   groupBy: GroupBy;
   onGroupByChange: (g: GroupBy) => void;
   fileId: string;
+  onFilterClick?: () => void;
+  activeFilterCount?: number;
+  selectedCluster: ClusterNodeData | null;
+  onSelectedClusterChange: (cluster: ClusterNodeData | null) => void;
 }
 
 const COLOR_MODE_OPTIONS: { value: ColorMode; label: string }[] = [
@@ -663,24 +663,23 @@ const COLOR_MODE_OPTIONS: { value: ColorMode; label: string }[] = [
   { value: 'traffic', label: 'Traffic volume' },
 ];
 
-export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }: ClusterGraphProps) => {
+export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, onFilterClick, activeFilterCount = 0, selectedCluster, onSelectedClusterChange }: ClusterGraphProps) => {
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const [rfEdges, setRfEdges] = useState<Edge[]>([]);
-  const [selectedCluster, setSelectedCluster] = useState<ClusterNodeData | null>(null);
   const [layoutLoading, setLayoutLoading] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>('traffic');
   const [layoutVersion, setLayoutVersion] = useState(0);
   const layoutGen = useRef(0);
 
-  const handleClusterPanelClose = useCallback(() => setSelectedCluster(null), []);
+  const handleClusterPanelClose = useCallback(() => onSelectedClusterChange(null), [onSelectedClusterChange]);
 
   const clusterById = new Map((data?.clusters ?? []).map(c => [c.id, c]));
 
   const handleNodeClick: NodeMouseHandler = useCallback((_event, node) => {
     if (node.id.startsWith('__lane__')) return;
     const cluster = clusterById.get(node.id);
-    setSelectedCluster(prev => prev?.id === node.id ? null : (cluster ?? null));
-  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+    onSelectedClusterChange(selectedCluster?.id === node.id ? null : (cluster ?? null));
+  }, [data, selectedCluster, onSelectedClusterChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Let ReactFlow own node position/selection changes (enables dragging).
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
@@ -691,7 +690,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
     if (!data || data.clusters.length === 0 || groupBy === 'country') {
       setRfNodes([]);
       setRfEdges([]);
-      if (groupBy !== 'country') setSelectedCluster(null);
+      if (groupBy !== 'country') onSelectedClusterChange(null);
       return;
     }
 
@@ -872,9 +871,18 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               data={data}
               colorMode={colorMode}
               selectedClusterId={selectedCluster?.id ?? null}
-              onSelectCluster={c => setSelectedCluster(c)}
+              onSelectCluster={c => onSelectedClusterChange(c)}
               fileId={fileId}
             />
+          )}
+
+          {onFilterClick && (
+            <div className="intel-filter-overlay">
+              <button className="ng-ctrl-btn position-relative" onClick={onFilterClick} title="Filters">
+                <i className="bi bi-funnel" />
+                {activeFilterCount > 0 && <span className="ng-filter-badge">{activeFilterCount}</span>}
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -912,6 +920,15 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId }
               <Controls showInteractive={false} />
               <AutoFitView version={layoutVersion} />
             </ReactFlow>
+          )}
+
+          {onFilterClick && (
+            <div className="intel-filter-overlay">
+              <button className="ng-ctrl-btn position-relative" onClick={onFilterClick} title="Filters">
+                <i className="bi bi-funnel" />
+                {activeFilterCount > 0 && <span className="ng-filter-badge">{activeFilterCount}</span>}
+              </button>
+            </div>
           )}
         </div>
       )}

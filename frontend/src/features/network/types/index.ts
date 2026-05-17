@@ -13,7 +13,6 @@ export type NodeType =
   | 'router'
   | 'client'
   | 'l2-device'
-  | 'anomaly'
   | 'unknown';
 
 export interface NodeTypeEvidence {
