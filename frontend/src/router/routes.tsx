@@ -11,6 +11,8 @@ import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { ComparePage } from '@pages/Compare/ComparePage';
 import { NetworkIntelligencePage } from '@pages/NetworkIntelligence';
 import { NotFoundPage } from '@pages/NotFound';
+import { MonitorPage } from '@pages/Monitor/MonitorPage';
+import { NetworkDetailPage } from '@pages/Monitor/NetworkDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -58,6 +60,14 @@ export const router = createBrowserRouter([
       {
         path: 'compare',
         element: <ComparePage />,
+      },
+      {
+        path: 'monitor',
+        element: <MonitorPage />,
+      },
+      {
+        path: 'monitor/:networkId',
+        element: <NetworkDetailPage />,
       },
       {
         path: '*',

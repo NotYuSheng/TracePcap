@@ -2,9 +2,11 @@ package com.lanturn.cleanup;
 
 import com.lanturn.config.CleanupProperties;
 import com.lanturn.file.entity.FileEntity;
+import com.lanturn.file.entity.FileEntity.FileSource;
 import com.lanturn.file.repository.FileRepository;
 import com.lanturn.file.service.FileService;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
-    prefix = "lanturn.cleanup",
+    prefix = "tracepcap.cleanup",
     name = "enabled",
     havingValue = "true",
     matchIfMissing = true)
@@ -31,7 +33,7 @@ public class FileCleanupService {
    * Scheduled task to clean up expired files Runs according to the cron expression configured in
    * application.yml
    */
-  @Scheduled(cron = "${lanturn.cleanup.cron}")
+  @Scheduled(cron = "${tracepcap.cleanup.cron}")
   public void cleanupExpiredFiles() {
     if (!cleanupProperties.isEnabled()) {
       log.debug("File cleanup is disabled");
@@ -41,14 +43,23 @@ public class FileCleanupService {
     log.info("Starting scheduled file cleanup task");
 
     try {
-      // Calculate expiry timestamp (current time - retention hours)
-      LocalDateTime expiryTimestamp =
+      List<FileEntity> expiredFiles = new ArrayList<>();
+
+      // Analysis files — always apply retention
+      LocalDateTime analysisExpiry =
           LocalDateTime.now().minusHours(cleanupProperties.getRetentionHours());
+      log.info("Checking analysis files uploaded before: {}", analysisExpiry);
+      expiredFiles.addAll(
+          fileRepository.findBySourceAndUploadedAtBefore(FileSource.ANALYSIS, analysisExpiry));
 
-      log.info("Looking for files uploaded before: {}", expiryTimestamp);
-
-      // Find all files older than retention period
-      List<FileEntity> expiredFiles = fileRepository.findByUploadedAtBefore(expiryTimestamp);
+      // Monitor files — only apply if monitorRetentionHours > 0
+      if (cleanupProperties.getMonitorRetentionHours() > 0) {
+        LocalDateTime monitorExpiry =
+            LocalDateTime.now().minusHours(cleanupProperties.getMonitorRetentionHours());
+        log.info("Checking monitor files uploaded before: {}", monitorExpiry);
+        expiredFiles.addAll(
+            fileRepository.findBySourceAndUploadedAtBefore(FileSource.MONITOR, monitorExpiry));
+      }
 
       if (expiredFiles.isEmpty()) {
         log.info("No expired files found");
