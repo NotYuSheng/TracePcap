@@ -314,11 +314,11 @@ export const FileList = () => {
               ))}
             </div>
           )}
-          <Card.Footer className="text-muted small">
-            <AlertCircle size={14} className="me-1" />
-            Files are automatically deleted after 12 hours
-          </Card.Footer>
         </Card.Body>
+        <Card.Footer className="text-muted small">
+          <AlertCircle size={14} className="me-1" />
+          Files are automatically deleted after 12 hours
+        </Card.Footer>
       </Card>
 
       {/* Delete confirmation modal */}
