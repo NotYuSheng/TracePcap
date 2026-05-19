@@ -34,6 +34,11 @@ public class FileEntity {
   private String fileHash;
 
   @Builder.Default
+  @Column(name = "source", nullable = false, length = 20)
+  @Enumerated(EnumType.STRING)
+  private FileSource source = FileSource.ANALYSIS;
+
+  @Builder.Default
   @Column(name = "enable_ndpi", nullable = false)
   private boolean enableNdpi = true;
 
@@ -70,6 +75,12 @@ public class FileEntity {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
+
+  /** Upload source — controls listing visibility and retention policy */
+  public enum FileSource {
+    ANALYSIS,
+    MONITOR
+  }
 
   /** File processing status */
   public enum FileStatus {

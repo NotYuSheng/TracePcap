@@ -96,10 +96,14 @@ export const StoryInfoCard = ({
   const [collapsed, setCollapsed] = useState(true);
 
   return (
-    <div className="card">
+    <div className="card" style={{ overflow: 'hidden' }}>
       <div
         className="card-header d-flex align-items-center justify-content-between"
-        style={{ cursor: 'pointer', userSelect: 'none' }}
+        style={{
+          cursor: 'pointer',
+          userSelect: 'none',
+          borderBottom: collapsed ? 'none' : undefined,
+        }}
         onClick={() => setCollapsed(c => !c)}
       >
         <h6 className="mb-0">

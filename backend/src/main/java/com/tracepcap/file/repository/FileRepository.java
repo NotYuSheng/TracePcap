@@ -17,11 +17,17 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
   /** Find all files with pagination and sorting */
   Page<FileEntity> findAll(Pageable pageable);
 
+  /** Find files by source with pagination */
+  Page<FileEntity> findBySource(FileEntity.FileSource source, Pageable pageable);
+
   /** Find files by status */
   Page<FileEntity> findByStatus(FileEntity.FileStatus status, Pageable pageable);
 
   /** Find files uploaded before the specified timestamp (for cleanup) */
   List<FileEntity> findByUploadedAtBefore(LocalDateTime timestamp);
+
+  /** Find files by source uploaded before the specified timestamp (for source-specific cleanup) */
+  List<FileEntity> findBySourceAndUploadedAtBefore(FileEntity.FileSource source, LocalDateTime timestamp);
 
   /** Find the most recently uploaded file with the given SHA-256 hash */
   Optional<FileEntity> findFirstByFileHashOrderByUploadedAtDesc(String fileHash);

@@ -198,6 +198,17 @@
   font-style: italic;
 }
 
+/* ── Monitor modal diagram — fill fixed-height parent exactly ── */
+.monitor-diagram-graph {
+  position: relative;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.monitor-diagram-graph .network-graph-wrapper {
+  height: 100%;
+}
+
 /* ── CSS fullscreen card support ───────────────────────────── */
 .nd-css-fullscreen {
   position: fixed !important;

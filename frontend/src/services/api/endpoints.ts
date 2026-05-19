@@ -60,3 +60,17 @@ export const API_ENDPOINTS = {
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
   COMPARE_REPORT_DOWNLOAD: '/files/compare/report',
 } as const;
+
+export const MONITOR_ENDPOINTS = {
+  NETWORKS: '/monitor/networks',
+  NETWORK: (id: string) => `/monitor/networks/${id}`,
+  SNAPSHOTS: (networkId: string) => `/monitor/networks/${networkId}/snapshots`,
+  SNAPSHOT: (networkId: string, snapshotId: string) =>
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
+  SNAPSHOT_BASELINE: (networkId: string, snapshotId: string) =>
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}/baseline`,
+  CHANGES: (networkId: string) => `/monitor/networks/${networkId}/changes`,
+  CHANGE: (networkId: string, eventId: string) => `/monitor/networks/${networkId}/changes/${eventId}`,
+  BASELINE_DEFINITIONS: (networkId: string) =>
+    `/monitor/networks/${networkId}/baseline/definitions`,
+};

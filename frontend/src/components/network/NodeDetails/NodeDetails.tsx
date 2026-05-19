@@ -4,6 +4,7 @@ import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { NODE_TYPE_CONFIG, getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
+import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
 import './NodeDetails.css';
 
 interface NodeDetailsProps {
@@ -11,6 +12,8 @@ interface NodeDetailsProps {
   edges: GraphEdge[];
   fileId: string;
   onClose: () => void;
+  changeHighlight?: NodeHighlight;
+  zIndex?: number;
 }
 
 function formatBytes(bytes: number): string {
@@ -39,17 +42,20 @@ function getRoleBadgeClass(role: string): string {
 }
 
 
-export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) {
+export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIndex }: NodeDetailsProps) {
   const navigate = useNavigate();
   const [classificationPopupOpen, setClassificationPopupOpen] = useState(false);
 
-  // ESC closes the modal
+  // ESC closes the modal — stop propagation so parent modals don't also close
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        onClose();
+      }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [onClose]);
 
   // Lock background scroll
@@ -82,7 +88,7 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
   return (
     <div
       className="modal fade show d-block"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: zIndex ?? 1055 }}
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -110,6 +116,24 @@ export function NodeDetails({ node, edges, fileId, onClose }: NodeDetailsProps) 
           </div>
 
           <div className="modal-body">
+            {/* Change event highlight banner */}
+            {changeHighlight && (
+              <div
+                className="d-flex align-items-center gap-2 rounded p-2 mb-3 small"
+                style={{ background: changeHighlight.color + '22', border: `1px solid ${changeHighlight.color}55` }}
+              >
+                <span
+                  style={{ width: 10, height: 10, borderRadius: '50%', background: changeHighlight.color, flexShrink: 0, display: 'inline-block' }}
+                />
+                <span style={{ color: changeHighlight.color, fontWeight: 600 }}>
+                  {changeHighlight.label}
+                </span>
+                {changeHighlight.description && (
+                  <span className="text-muted">— {changeHighlight.description}</span>
+                )}
+              </div>
+            )}
+
             {/* Identity */}
             <div className="row mb-3">
               <div className="col-sm-6">

@@ -3,6 +3,7 @@ package com.tracepcap.file.controller;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.dto.MergeFilesRequest;
+import com.tracepcap.file.entity.FileEntity.FileSource;
 import com.tracepcap.file.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,14 +40,16 @@ public class FileController {
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "enableNdpi", defaultValue = "true") boolean enableNdpi,
       @RequestParam(value = "enableFileExtraction", defaultValue = "true")
-          boolean enableFileExtraction) {
+          boolean enableFileExtraction,
+      @RequestParam(value = "source", defaultValue = "ANALYSIS") FileSource source) {
     log.info(
-        "Received file upload request: {} (ndpi={}, extraction={})",
+        "Received file upload request: {} (ndpi={}, extraction={}, source={})",
         file.getOriginalFilename(),
         enableNdpi,
-        enableFileExtraction);
+        enableFileExtraction,
+        source);
 
-    FileUploadResponse response = fileService.uploadFile(file, enableNdpi, enableFileExtraction);
+    FileUploadResponse response = fileService.uploadFile(file, enableNdpi, enableFileExtraction, source);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -56,7 +59,8 @@ public class FileController {
   public ResponseEntity<Page<FileMetadataDto>> getAllFiles(
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
-      @RequestParam(defaultValue = "uploadedAt,desc") String sort) {
+      @RequestParam(defaultValue = "uploadedAt,desc") String sort,
+      @RequestParam(required = false) FileSource source) {
 
     // Parse sort parameter
     String[] sortParams = sort.split(",");
@@ -66,7 +70,7 @@ public class FileController {
             : Sort.Direction.DESC;
     Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
 
-    Page<FileMetadataDto> files = fileService.getAllFiles(pageable);
+    Page<FileMetadataDto> files = fileService.getAllFiles(pageable, source);
 
     return ResponseEntity.ok(files);
   }

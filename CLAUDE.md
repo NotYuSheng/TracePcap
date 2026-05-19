@@ -15,6 +15,7 @@ Only build a custom component if SGDS has no equivalent.
 - **DB**: PostgreSQL with Flyway migrations
 - **Storage**: MinIO
 - **Build**: Docker Compose — run `docker compose build` to build, `docker compose up -d` to start
+- **After every change**: run `docker compose up -d --build` to rebuild and restart all services
 
 ## Offline Requirement
 

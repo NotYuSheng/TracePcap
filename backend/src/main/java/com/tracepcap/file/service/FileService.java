@@ -3,6 +3,7 @@ package com.tracepcap.file.service;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.entity.FileEntity;
+import com.tracepcap.file.entity.FileEntity.FileSource;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +21,7 @@ public interface FileService {
    * @return upload response with file metadata
    */
   FileUploadResponse uploadFile(
-      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction);
+      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction, FileSource source);
 
   /**
    * Get file metadata by ID
@@ -36,7 +37,7 @@ public interface FileService {
    * @param pageable pagination information
    * @return page of file metadata
    */
-  Page<FileMetadataDto> getAllFiles(Pageable pageable);
+  Page<FileMetadataDto> getAllFiles(Pageable pageable, FileSource source);
 
   /**
    * Download a file

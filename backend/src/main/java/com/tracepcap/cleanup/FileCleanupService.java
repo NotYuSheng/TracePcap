@@ -2,9 +2,11 @@ package com.tracepcap.cleanup;
 
 import com.tracepcap.config.CleanupProperties;
 import com.tracepcap.file.entity.FileEntity;
+import com.tracepcap.file.entity.FileEntity.FileSource;
 import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.file.service.FileService;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,14 +43,23 @@ public class FileCleanupService {
     log.info("Starting scheduled file cleanup task");
 
     try {
-      // Calculate expiry timestamp (current time - retention hours)
-      LocalDateTime expiryTimestamp =
+      List<FileEntity> expiredFiles = new ArrayList<>();
+
+      // Analysis files — always apply retention
+      LocalDateTime analysisExpiry =
           LocalDateTime.now().minusHours(cleanupProperties.getRetentionHours());
+      log.info("Checking analysis files uploaded before: {}", analysisExpiry);
+      expiredFiles.addAll(
+          fileRepository.findBySourceAndUploadedAtBefore(FileSource.ANALYSIS, analysisExpiry));
 
-      log.info("Looking for files uploaded before: {}", expiryTimestamp);
-
-      // Find all files older than retention period
-      List<FileEntity> expiredFiles = fileRepository.findByUploadedAtBefore(expiryTimestamp);
+      // Monitor files — only apply if monitorRetentionHours > 0
+      if (cleanupProperties.getMonitorRetentionHours() > 0) {
+        LocalDateTime monitorExpiry =
+            LocalDateTime.now().minusHours(cleanupProperties.getMonitorRetentionHours());
+        log.info("Checking monitor files uploaded before: {}", monitorExpiry);
+        expiredFiles.addAll(
+            fileRepository.findBySourceAndUploadedAtBefore(FileSource.MONITOR, monitorExpiry));
+      }
 
       if (expiredFiles.isEmpty()) {
         log.info("No expired files found");

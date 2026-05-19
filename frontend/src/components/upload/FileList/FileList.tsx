@@ -101,7 +101,7 @@ export const FileList = () => {
   const fetchFiles = async () => {
     try {
       const res = await apiClient.get(API_ENDPOINTS.FILES_LIST, {
-        params: { sort: 'uploadedAt,desc', size: 50 },
+        params: { sort: 'uploadedAt,desc', size: 50, source: 'ANALYSIS' },
       });
       setFiles(res.data.content ?? []);
     } catch (err) {

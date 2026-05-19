@@ -2,9 +2,12 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { UploadResponse, UploadProgress } from '../types/upload.types';
 
+export type FileSource = 'ANALYSIS' | 'MONITOR';
+
 export interface AnalysisOptions {
   enableNdpi: boolean;
   enableFileExtraction: boolean;
+  source?: FileSource;
 }
 
 export const uploadService = {
@@ -20,6 +23,7 @@ export const uploadService = {
     formData.append('file', file);
     formData.append('enableNdpi', String(options.enableNdpi));
     formData.append('enableFileExtraction', String(options.enableFileExtraction));
+    formData.append('source', options.source ?? 'ANALYSIS');
 
     const response = await apiClient.post<UploadResponse>(API_ENDPOINTS.UPLOAD_PCAP, formData, {
       onUploadProgress: progressEvent => {
