@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert, Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { tracerService, type TracerStep, type TracerStepsResponse } from '@/features/tracer/tracerService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 
@@ -25,14 +26,15 @@ function AiExplanationInfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted"
+        variant="link"
+        className="p-0 text-muted"
         style={{ lineHeight: 1, flexShrink: 0 }}
         aria-label="About AI Explanation"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.85rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -255,9 +257,9 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
               <div className="fw-semibold" style={{ fontSize: 14 }}>Conversation Tracer</div>
               <div style={{ fontSize: 11, color: 'var(--tp-text-muted)', fontFamily: 'monospace' }}>{title}</div>
               {tracer?.protocol && (
-                <span className="badge bg-secondary ms-0 mt-1" style={{ fontSize: 10 }}>
+                <Badge bg="secondary" className="ms-0 mt-1" style={{ fontSize: 10 }}>
                   {tracer.protocol}{tracer.appName ? ` / ${tracer.appName}` : ''}
-                </span>
+                </Badge>
               )}
             </div>
             <button className="btn-close" onClick={onClose} />
@@ -265,12 +267,12 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
 
           {loading && (
             <div className="d-flex align-items-center justify-content-center p-5">
-              <span className="spinner-border text-primary me-2" />
+              <Spinner animation="border" className="text-primary me-2" />
               <span>Loading packets…</span>
             </div>
           )}
 
-          {error && <div className="alert alert-danger m-3">{error}</div>}
+          {error && <Alert variant="danger" className="m-3">{error}</Alert>}
 
           {!loading && !error && tracer && (
             <>
@@ -400,19 +402,20 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
 
               {/* Navigation */}
               <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <button className="btn btn-sm btn-outline-secondary" onClick={prev} disabled={currentStep === 0}>‹ Prev</button>
+                <Button size="sm" variant="outline-secondary" onClick={prev} disabled={currentStep === 0}>‹ Prev</Button>
                 <span style={{ fontSize: 12, color: 'var(--tp-text-muted)', minWidth: 90, textAlign: 'center' }}>
                   Step {currentStep + 1} / {tracer.steps.length}
                 </span>
-                <button className="btn btn-sm btn-outline-secondary" onClick={next} disabled={currentStep >= tracer.steps.length - 1}>Next ›</button>
-                <button
-                  className={`btn btn-sm ${isPlaying ? 'btn-warning' : 'btn-outline-primary'}`}
+                <Button size="sm" variant="outline-secondary" onClick={next} disabled={currentStep >= tracer.steps.length - 1}>Next ›</Button>
+                <Button
+                  size="sm"
+                  variant={isPlaying ? 'warning' : 'outline-primary'}
                   onClick={togglePlay}
                   disabled={currentStep >= tracer.steps.length - 1}
                   title={isPlaying ? 'Pause' : 'Auto-play'}
                 >
                   <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'}`} />
-                </button>
+                </Button>
               </div>
 
               {/* Packet list */}

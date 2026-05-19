@@ -1,3 +1,4 @@
+import { Button } from '@govtechsg/sgds-react';
 import './UploadProgress.css';
 
 interface UploadProgressProps {
@@ -76,16 +77,16 @@ export const UploadProgress = ({
       {/* Action */}
       <div className="usc-action">
         {isDone && isDuplicate && onOpenExisting && (
-          <button className="btn btn-sm btn-outline-warning me-1" onClick={onOpenExisting}>
+          <Button size="sm" variant="outline-warning" className="me-1" onClick={onOpenExisting}>
             <i className="bi bi-folder2-open me-1"></i>
             Open existing
-          </button>
+          </Button>
         )}
         {isDone && onAnalyze && (
-          <button className="btn btn-sm btn-primary" onClick={onAnalyze}>
+          <Button size="sm" variant="primary" onClick={onAnalyze}>
             <i className="bi bi-graph-up me-1"></i>
             Analyze
-          </button>
+          </Button>
         )}
         {isDone && !onAnalyze && (
           <i className="bi bi-check-circle-fill text-success usc-icon-lg"></i>

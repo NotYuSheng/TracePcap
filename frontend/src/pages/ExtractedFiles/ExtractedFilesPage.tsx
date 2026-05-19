@@ -11,7 +11,7 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Modal } from '@govtechsg/sgds-react';
+import { Alert, Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
 import { formatBytes } from '@/utils/formatters';
 import '@components/conversation/ConversationFilterPanel/ConversationFilterPanel.css';
 
@@ -26,9 +26,9 @@ type SortDir = 'asc' | 'desc';
 const ExtractionInfoCard = () => {
   const [collapsed, setCollapsed] = useState(true);
   return (
-    <div className="card mb-3" style={{ overflow: 'hidden' }}>
-      <div
-        className="card-header d-flex align-items-center justify-content-between"
+    <Card className="mb-3" style={{ overflow: 'hidden' }}>
+      <Card.Header
+        className="d-flex align-items-center justify-content-between"
         style={{
           cursor: 'pointer',
           userSelect: 'none',
@@ -41,9 +41,9 @@ const ExtractionInfoCard = () => {
           What's listed here &amp; how files are extracted
         </h6>
         <i className={`bi bi-chevron-${collapsed ? 'down' : 'up'} text-muted`}></i>
-      </div>
+      </Card.Header>
       {!collapsed && (
-        <div className="card-body small text-muted">
+        <Card.Body className="small text-muted">
           <p className="mb-2">Files are extracted using two methods:</p>
           <ul className="mb-3">
             <li>
@@ -66,12 +66,12 @@ const ExtractionInfoCard = () => {
             All extracted files are stored as raw bytes only — no execution or active-content
             rendering occurs. A safety disclaimer is shown before each download. Individual files
             larger than 50 MB are not stored; they appear in this list with a{' '}
-            <span className="badge bg-warning text-dark" style={{ fontSize: '0.85em' }}>Too large</span>{' '}
+            <Badge bg="warning" text="dark" style={{ fontSize: '0.85em' }}>Too large</Badge>{' '}
             badge so you can see they were detected but skipped.
           </p>
-        </div>
+        </Card.Body>
       )}
-    </div>
+    </Card>
   );
 };
 
@@ -105,9 +105,9 @@ function nativePreviewMode(mimeType: string | null): 'audio' | 'video' | 'image'
 }
 
 function methodBadge(method: string | null) {
-  if (method === 'tshark_http') return <span className="badge bg-primary">HTTP</span>;
-  if (method === 'magic_bytes') return <span className="badge bg-secondary">Raw stream</span>;
-  return <span className="badge bg-light text-dark">{method ?? '—'}</span>;
+  if (method === 'tshark_http') return <Badge bg="primary">HTTP</Badge>;
+  if (method === 'magic_bytes') return <Badge bg="secondary">Raw stream</Badge>;
+  return <Badge bg="light" text="dark">{method ?? '—'}</Badge>;
 }
 
 function sortFiles(files: ExtractedFile[], by: SortField | '', dir: SortDir): ExtractedFile[] {
@@ -136,14 +136,16 @@ const CopyHash = ({ hash }: { hash: string }) => {
       <span className="font-monospace text-muted" style={{ fontSize: '0.75em' }} title={hash}>
         {hash.substring(0, 8)}…{hash.substring(hash.length - 8)}
       </span>
-      <button
-        className="btn btn-link btn-sm p-0 text-muted"
+      <Button
+        variant="link"
+        size="sm"
+        className="p-0 text-muted"
         style={{ fontSize: '0.75em', lineHeight: 1 }}
         onClick={copy}
         title={copied ? 'Copied!' : 'Copy full hash'}
       >
         <i className={`bi ${copied ? 'bi-check text-success' : 'bi-clipboard'}`}></i>
-      </button>
+      </Button>
     </span>
   );
 };
@@ -236,12 +238,12 @@ export const ExtractedFilesPage = () => {
             Files detected and extracted from HTTP transfers and raw packet streams.
           </small>
         </div>
-        <span className="badge bg-secondary fs-6">
+        <Badge bg="secondary" className="fs-6">
           {mimeTypeFilter.length > 0
             ? `${sorted.length} / ${files.length}`
             : files.length}{' '}
           file{files.length !== 1 ? 's' : ''}
-        </span>
+        </Badge>
       </div>
 
       <ExtractionInfoCard />
@@ -250,22 +252,23 @@ export const ExtractedFilesPage = () => {
       {allMimeTypes.length > 0 && (
         <div className="conversation-filter-panel mb-3">
           <div className="d-flex align-items-center gap-2">
-            <button
+            <Button
               type="button"
-              className="btn btn-outline-secondary btn-sm"
+              variant="outline-secondary"
+              size="sm"
               onClick={() => setFilterOpen(o => !o)}
             >
               <i className="bi bi-funnel me-1"></i>
               Filters
               {mimeTypeFilter.length > 0 && (
-                <span className="badge bg-primary ms-2">{mimeTypeFilter.length}</span>
+                <Badge bg="primary" className="ms-2">{mimeTypeFilter.length}</Badge>
               )}
               <i className={`bi ms-2 ${filterOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
-            </button>
+            </Button>
           </div>
           {filterOpen && (
-            <div className="card mt-2 filter-panel-body">
-              <div className="card-body p-3">
+            <Card className="mt-2 filter-panel-body">
+              <Card.Body className="p-3">
                 <PillSectionHeader
                   label="MIME Type"
                   onSelectAll={() => setMimeTypeFilter(allMimeTypes)}
@@ -293,27 +296,28 @@ export const ExtractedFilesPage = () => {
                 </div>
                 {mimeTypeFilter.length > 0 && (
                   <div className="mt-3 pt-2 border-top">
-                    <button
+                    <Button
                       type="button"
-                      className="btn btn-sm btn-outline-secondary"
+                      size="sm"
+                      variant="outline-secondary"
                       onClick={() => setMimeTypeFilter([])}
                     >
                       <i className="bi bi-x-circle me-1"></i>Clear filters
-                    </button>
+                    </Button>
                   </div>
                 )}
-              </div>
-            </div>
+              </Card.Body>
+            </Card>
           )}
         </div>
       )}
 
-      <div className="card">
-        <div className="card-header d-flex justify-content-between align-items-center">
+      <Card>
+        <Card.Header className="d-flex justify-content-between align-items-center">
           <h6 className="mb-0">Files</h6>
           <small className="text-muted">Click a column header to sort</small>
-        </div>
-        <div className="card-body p-0" style={{ position: 'relative' }}>
+        </Card.Header>
+        <Card.Body className="p-0" style={{ position: 'relative' }}>
           {sorted.length === 0 ? (
             <div className="text-center py-5 text-muted">
               <i className="bi bi-inbox fs-1 d-block mb-2"></i>
@@ -363,8 +367,10 @@ export const ExtractedFilesPage = () => {
                       </td>
                       <td>
                         {file.conversationId ? (
-                          <button
-                            className="btn btn-link btn-sm p-0"
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="p-0"
                             style={{ fontSize: '0.8em' }}
                             onClick={() =>
                               navigate(
@@ -373,7 +379,7 @@ export const ExtractedFilesPage = () => {
                             }
                           >
                             View conversation
-                          </button>
+                          </Button>
                         ) : (
                           <span
                             className="text-muted"
@@ -387,32 +393,37 @@ export const ExtractedFilesPage = () => {
                       <td>{methodBadge(file.extractionMethod)}</td>
                       <td>
                         {isSkipped ? (
-                          <span
-                            className="badge bg-warning text-dark"
+                          <Badge
+                            bg="warning"
+                            text="dark"
                             title="File exceeds the 50 MB size limit and was not stored"
                           >
                             <i className="bi bi-slash-circle me-1"></i>
                             Too large
-                          </span>
+                          </Badge>
                         ) : (
                           <div className="d-flex gap-1">
                             {nativePreviewMode(file.mimeType) && (
-                              <button
-                                className="btn btn-outline-secondary btn-sm text-nowrap"
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                className="text-nowrap"
                                 onClick={() => setPreviewFile(file)}
                                 title="Preview in browser"
                               >
                                 <i className="bi bi-play-circle me-1"></i>
                                 Preview
-                              </button>
+                              </Button>
                             )}
-                            <button
-                              className="btn btn-outline-primary btn-sm text-nowrap"
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="text-nowrap"
                               onClick={() => handleDownloadRequest(file)}
                             >
                               <i className="bi bi-download me-1"></i>
                               Download
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </td>
@@ -423,8 +434,8 @@ export const ExtractedFilesPage = () => {
               </table>
             </ScrollableTable>
           )}
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
 
       {/* Inline media preview modal */}
       <Modal show={previewFile !== null} onHide={() => setPreviewFile(null)} size="lg">
@@ -463,23 +474,23 @@ export const ExtractedFilesPage = () => {
             }
             return null;
           })()}
-          <div className="alert alert-warning mt-3 mb-0 text-start" style={{ fontSize: '0.8rem' }}>
+          <Alert variant="warning" className="mt-3 mb-0 text-start" style={{ fontSize: '0.8rem' }}>
             <i className="bi bi-exclamation-triangle-fill me-1"></i>
             Content rendered from a packet capture. Do not interact with active content on a
             production system.
-          </div>
+          </Alert>
         </Modal.Body>
         <Modal.Footer>
-          <button className="btn btn-secondary" onClick={() => setPreviewFile(null)}>
+          <Button variant="secondary" onClick={() => setPreviewFile(null)}>
             Close
-          </button>
-          <button
-            className="btn btn-outline-primary"
+          </Button>
+          <Button
+            variant="outline-primary"
             onClick={() => { setPreviewFile(null); handleDownloadRequest(previewFile!); }}
           >
             <i className="bi bi-download me-1"></i>
             Download
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
 
@@ -493,26 +504,26 @@ export const ExtractedFilesPage = () => {
         </Modal.Header>
         <Modal.Body>
           <p>You are about to download a file that was extracted from a packet capture:</p>
-          <div className="alert alert-secondary font-monospace" style={{ fontSize: '0.85em' }}>
+          <Alert variant="secondary" className="font-monospace" style={{ fontSize: '0.85em' }}>
             {pendingDownload?.filename ?? '(unnamed)'}{' '}
             {pendingDownload?.fileSize != null && (
               <span className="text-muted">({formatBytes(pendingDownload.fileSize)})</span>
             )}
-          </div>
-          <div className="alert alert-warning mb-0">
+          </Alert>
+          <Alert variant="warning" className="mb-0">
             <strong>Safety disclaimer:</strong> This file was transferred over the network and may
             contain malware, scripts, or other active content. Do <strong>not</strong> open or
             execute it on a production system. Use an isolated, sandboxed environment for analysis.
-          </div>
+          </Alert>
         </Modal.Body>
         <Modal.Footer>
-          <button className="btn btn-secondary" onClick={() => setPendingDownload(null)}>
+          <Button variant="secondary" onClick={() => setPendingDownload(null)}>
             Cancel
-          </button>
-          <button className="btn btn-primary" onClick={confirmDownload}>
+          </Button>
+          <Button variant="primary" onClick={confirmDownload}>
             <i className="bi bi-download me-1"></i>
             Download anyway
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

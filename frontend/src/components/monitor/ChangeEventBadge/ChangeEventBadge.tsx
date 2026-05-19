@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
 
@@ -120,8 +122,9 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
         )}
         {showNotes && (
           <div className="mt-2">
-            <textarea
-              className="form-control form-control-sm"
+            <Form.Control
+              as="textarea"
+              size="sm"
               rows={2}
               placeholder="Add notes…"
               value={draftNotes}
@@ -129,23 +132,23 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
               autoFocus
             />
             <div className="d-flex gap-1 mt-1">
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
+              <Button
+                size="sm"
+                variant="primary"
                 onClick={handleSaveNotes}
                 disabled={saving}
               >
-                {saving ? <span className="spinner-border spinner-border-sm me-1" /> : null}
+                {saving ? <Spinner animation="border" size="sm" className="me-1" /> : null}
                 Save
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-secondary"
                 onClick={() => { setShowNotes(false); setDraftNotes(localNotes); }}
                 disabled={saving}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -153,23 +156,25 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
 
       <div className="d-flex align-items-center gap-2 flex-shrink-0">
         <small className="text-muted text-nowrap">{formattedTime}</small>
-        <button
-          type="button"
-          className="btn btn-sm btn-link p-0 text-muted"
+        <Button
+          size="sm"
+          variant="link"
+          className="p-0 text-muted"
           title={showNotes ? 'Hide notes' : (localNotes ? 'Edit notes' : 'Add notes')}
           onClick={() => { setShowNotes(v => !v); setDraftNotes(localNotes); }}
         >
           <i className={`bi bi-chat-left-text${localNotes ? '-fill' : ''}`}></i>
-        </button>
-        <button
-          type="button"
-          className={`btn btn-sm btn-link p-0 ${localReviewed ? 'text-success' : 'text-muted'}`}
+        </Button>
+        <Button
+          size="sm"
+          variant="link"
+          className={`p-0 ${localReviewed ? 'text-success' : 'text-muted'}`}
           title={localReviewed ? 'Mark as unreviewed' : 'Mark as reviewed'}
           onClick={handleReviewToggle}
           disabled={saving}
         >
           <i className={`bi bi-check-circle${localReviewed ? '-fill' : ''}`}></i>
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
-import { Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
 import { ScrollableTable } from '@/components/common/ScrollableTable';
@@ -84,9 +85,9 @@ export const SnapshotTimeline = ({
         <h6 className="mb-0 text-muted fw-normal">
           {snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}
         </h6>
-        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onAddSnapshot}>
+        <Button size="sm" variant="outline-secondary" onClick={onAddSnapshot}>
           <i className="bi bi-plus-lg me-1"></i>Add PCAP
-        </button>
+        </Button>
       </div>
 
       {snapshots.length === 0 ? (
@@ -118,14 +119,15 @@ export const SnapshotTimeline = ({
                         <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-link btn-sm p-0 text-start text-break"
+                        <Button
+                          size="sm"
+                          variant="link"
+                          className="p-0 text-start text-break"
                           onClick={() => onSelectSnapshot(snap.id)}
                           title="View network diagram"
                         >
                           {snap.fileName}
-                        </button>
+                        </Button>
                       </td>
                       <td>
                         <small className="text-muted">{formatDuration(snap.startTime, snap.endTime)}</small>
@@ -135,39 +137,44 @@ export const SnapshotTimeline = ({
                       </td>
                       <td>
                         {snap.changeCount === 0 ? (
-                          <span className="badge bg-light text-muted border">No changes</span>
+                          <Badge bg="light" text="muted" className="border">No changes</Badge>
                         ) : snap.criticalCount > 0 ? (
-                          <button
+                          <Badge
+                            as="button"
                             type="button"
-                            className="badge bg-danger border-0"
+                            bg="danger"
+                            className="border-0"
                             style={{ cursor: 'pointer' }}
                             onClick={() => setChangesSnap(snap)}
                           >
                             {snap.criticalCount} critical
                             {snap.changeCount > snap.criticalCount &&
                               `, ${snap.changeCount - snap.criticalCount} more`}
-                          </button>
+                          </Badge>
                         ) : (
-                          <button
+                          <Badge
+                            as="button"
                             type="button"
-                            className="badge bg-warning text-dark border-0"
+                            bg="warning"
+                            text="dark"
+                            className="border-0"
                             style={{ cursor: 'pointer' }}
                             onClick={() => setChangesSnap(snap)}
                           >
                             {snap.changeCount} change{snap.changeCount !== 1 ? 's' : ''}
-                          </button>
+                          </Badge>
                         )}
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
                           onClick={() => setConfirmRemove(snap.id)}
                           disabled={removing !== null}
                           title="Remove snapshot"
                         >
                           <i className="bi bi-trash"></i>
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -176,7 +183,7 @@ export const SnapshotTimeline = ({
             </table>
           </ScrollableTable>
 
-          <div className="card-footer border-top pt-2 mt-2">
+          <Card.Footer className="border-top pt-2 mt-2">
             <Pagination
               currentPage={page}
               totalPages={totalPages}
@@ -186,7 +193,7 @@ export const SnapshotTimeline = ({
               showPageSizeSelector
               onPageSizeChange={size => { setPageSize(size); setPage(1); }}
             />
-          </div>
+          </Card.Footer>
         </>
       )}
 
@@ -228,23 +235,21 @@ export const SnapshotTimeline = ({
           </p>
         </Modal.Body>
         <Modal.Footer>
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
+          <Button
+            variant="outline-secondary"
             onClick={() => setConfirmRemove(null)}
             disabled={removing !== null}
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline-danger"
+          </Button>
+          <Button
+            variant="outline-danger"
             onClick={() => confirmRemove && handleRemove(confirmRemove)}
             disabled={removing !== null}
           >
-            {removing ? <span className="spinner-border spinner-border-sm me-1" /> : null}
+            {removing ? <Spinner animation="border" size="sm" className="me-1" /> : null}
             Remove
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

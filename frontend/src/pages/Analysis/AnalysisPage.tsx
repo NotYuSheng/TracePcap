@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { Button, Card } from '@govtechsg/sgds-react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -367,12 +369,12 @@ export const AnalysisPage = () => {
             justifyContent: 'center',
           }}
         >
-          <div className="card shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
-            <div className="spinner-border text-primary mb-3" role="status" />
+          <Card className="shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
+            <Spinner animation="border" className="text-primary mb-3" />
             <h6 className="mb-1">Generating Report</h6>
             <p className="text-muted small mb-0">{reportStep}</p>
             <p className="text-muted small mt-1">This may take up to 60 seconds.</p>
-          </div>
+          </Card>
         </div>
       )}
       <div className="analysis-header mb-4 d-flex justify-content-between align-items-start">
@@ -381,14 +383,15 @@ export const AnalysisPage = () => {
           <p className="text-muted">File ID: {fileId}</p>
         </div>
         <div className="d-flex flex-column align-items-end gap-1">
-          <button
-            className="btn btn-outline-primary btn-sm"
+          <Button
+            variant="outline-primary"
+            size="sm"
             onClick={handleDownloadReport}
             disabled={reportLoading}
           >
             {reportLoading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                <Spinner animation="border" size="sm" className="me-2" />
                 Generating report…
               </>
             ) : (
@@ -397,7 +400,7 @@ export const AnalysisPage = () => {
                 Download Report
               </>
             )}
-          </button>
+          </Button>
           {reportError && <small className="text-danger">{reportError}</small>}
         </div>
       </div>
@@ -432,7 +435,7 @@ export const AnalysisPage = () => {
             onClick={() => handleTabChange('story')}
           >
             <i className="bi bi-journal-text me-2"></i>Story
-            {storyGenerating && <span className="spinner-border spinner-border-sm ms-2" style={{ width: 10, height: 10, borderWidth: 2 }} role="status" />}
+            {storyGenerating && <Spinner animation="border" size="sm" className="ms-2" style={{ width: 10, height: 10, borderWidth: 2 }} />}
           </button>
         </li>
         <li className="nav-item">
@@ -474,11 +477,11 @@ export const AnalysisPage = () => {
       </ul>
 
       {/* Tab Content */}
-      <div className="card">
-        <div className="card-body">
+      <Card>
+        <Card.Body>
           <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState } satisfies AnalysisOutletContext} />
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
     </div>
   );
 };

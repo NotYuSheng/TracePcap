@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { Badge } from '@govtechsg/sgds-react';
 import { deviceTypeLabel, deviceTypeColor, confidenceLevel, buildDeviceSignals } from '@/utils/deviceType';
 import { portToServiceLabel } from '@/utils/portUtils';
 import { useClickOutside } from '@/utils/useClickOutside';
@@ -88,7 +89,7 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
                 Type
               </span>
               <div>
-                <span className="badge bg-secondary">{typeLabel}</span>
+                <Badge bg="secondary">{typeLabel}</Badge>
                 {typeNote && (
                   <div className="mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                     {typeNote}
@@ -105,9 +106,9 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
             Device
           </span>
           <div style={{ flex: 1 }}>
-            <span className="badge" style={{ backgroundColor: badgeBg, color: '#fff' }}>
+            <Badge style={{ backgroundColor: badgeBg, color: '#fff' }}>
               {deviceTypeLabel(info.deviceType)}
-            </span>
+            </Badge>
             {signals.length > 0 && (
               <ul className="mb-1 ps-3 mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                 {signals.map((s, i) => (
@@ -148,9 +149,9 @@ export function DeviceClassificationPopup({ info, onClose }: DeviceClassificatio
               Role
             </span>
             <div>
-              <span className={`badge ${info.role === 'client' ? 'bg-primary' : 'bg-success'}`}>
+              <Badge bg={info.role === 'client' ? 'primary' : 'success'}>
                 {info.role.charAt(0).toUpperCase() + info.role.slice(1)}
-              </span>
+              </Badge>
               <div className="mt-1 text-muted" style={{ fontSize: '0.75rem' }}>
                 {info.role === 'client'
                   ? 'Initiated this conversation'

@@ -1,4 +1,4 @@
-import { Modal } from '@govtechsg/sgds-react';
+import { Button, Modal } from '@govtechsg/sgds-react';
 import { useNavigate } from 'react-router-dom';
 import type { AbsentEntity } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
@@ -46,20 +46,21 @@ export const LastSeenModal = ({ show, onHide, entity }: LastSeenModalProps) => {
       </Modal.Body>
       <Modal.Footer>
         {entity.lastSeenFileId && (
-          <button
+          <Button
             type="button"
-            className="btn btn-sm btn-outline-primary"
+            size="sm"
+            variant="outline-primary"
             onClick={() => {
               onHide();
               navigate(`/analysis/${entity.lastSeenFileId}`);
             }}
           >
             <i className="bi bi-box-arrow-up-right me-1"></i>Open in Analysis
-          </button>
+          </Button>
         )}
-        <button type="button" className="btn btn-sm btn-secondary" onClick={onHide}>
+        <Button type="button" size="sm" variant="secondary" onClick={onHide}>
           Close
-        </button>
+        </Button>
       </Modal.Footer>
     </Modal>
   );

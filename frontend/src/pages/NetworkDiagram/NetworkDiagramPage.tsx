@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Modal } from '@govtechsg/sgds-react';
+import { Alert, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import type { GraphNode } from '@/features/network/types';
 import {
   useNetworkData,
@@ -373,28 +373,28 @@ export const NetworkDiagramPage = () => {
 
       {CONVERSATION_LIMIT_ENABLED &&
         (stats.isLimited ? (
-          <div className="alert alert-warning mb-3">
+          <Alert variant="warning" className="mb-3">
             <i className="bi bi-exclamation-triangle me-2"></i>
             <strong>Performance limit active:</strong> Showing top{' '}
             {stats.displayedConversations?.toLocaleString()} of{' '}
             {stats.totalConversations?.toLocaleString()} conversations by packet count. Set{' '}
             <code>VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false</code> to render all.
-          </div>
+          </Alert>
         ) : (
-          <div className="alert alert-info mb-3">
+          <Alert variant="info" className="mb-3">
             <i className="bi bi-info-circle me-2"></i>
             <strong>Performance limit enabled</strong> — all{' '}
             {stats.totalConversations?.toLocaleString()} conversations are within the 500-connection
             limit and fully rendered.
-          </div>
+          </Alert>
         ))}
 
       {/* Row 1: Network Statistics */}
-      <div className="card mb-3">
-        <div className="card-header">
+      <Card className="mb-3">
+        <Card.Header>
           <strong>Diagram Overview</strong>
-        </div>
-        <div className="card-body py-2 px-3">
+        </Card.Header>
+        <Card.Body className="py-2 px-3">
           <div className="d-flex align-items-center gap-3 flex-wrap">
             {[
               { label: 'Nodes', value: stats.totalNodes.toLocaleString() },
@@ -413,8 +413,8 @@ export const NetworkDiagramPage = () => {
               {filteredNodes.length} nodes · {filteredEdges.length} connections shown
             </div>
           </div>
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
 
       {stats.totalNodes > MAX_DIAGRAM_NODES &&
         (() => {
@@ -426,16 +426,17 @@ export const NetworkDiagramPage = () => {
             setCustomInput('');
           };
           return (
-            <div className="alert alert-info mb-3">
+            <Alert variant="info" className="mb-3">
               <div className="d-flex align-items-start gap-2 flex-wrap">
-                <button
-                  className="btn btn-link p-0 border-0 mt-1 flex-shrink-0"
+                <Button
+                  variant="link"
+                  className="p-0 border-0 mt-1 flex-shrink-0"
                   style={{ lineHeight: 1 }}
                   title="How is significance determined?"
                   onClick={() => setShowSignificanceModal(true)}
                 >
                   <i className="bi bi-info-circle"></i>
-                </button>
+                </Button>
                 <div className="flex-grow-1">
                   <div>
                     {hiddenNodes > 0 ? (
@@ -454,27 +455,29 @@ export const NetworkDiagramPage = () => {
                   <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
                     <span className="text-muted small fw-semibold me-1">Show:</span>
                     {presets.map(p => (
-                      <button
+                      <Button
                         key={p}
-                        className={`btn btn-sm ${nodeLimit === p ? 'btn-info' : 'btn-outline-secondary'}`}
+                        size="sm"
+                        variant={nodeLimit === p ? 'info' : 'outline-secondary'}
                         style={{ minWidth: 52 }}
                         onClick={() => setNodeLimit(p)}
                       >
                         Top {p}
-                      </button>
+                      </Button>
                     ))}
-                    <button
-                      className={`btn btn-sm ${nodeLimit >= totalNodes ? 'btn-info' : 'btn-outline-secondary'}`}
+                    <Button
+                      size="sm"
+                      variant={nodeLimit >= totalNodes ? 'info' : 'outline-secondary'}
                       style={{ minWidth: 52 }}
                       onClick={() => setNodeLimit(totalNodes)}
                     >
                       All {totalNodes}
-                    </button>
+                    </Button>
                     <span className="text-muted small ms-2 me-1">or</span>
                     <div className="input-group input-group-sm" style={{ width: 120 }}>
-                      <input
+                      <Form.Control
                         type="number"
-                        className="form-control form-control-sm"
+                        size="sm"
                         placeholder="Custom…"
                         min={1}
                         max={totalNodes}
@@ -487,25 +490,27 @@ export const NetworkDiagramPage = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </Alert>
           );
         })()}
 
       {/* Row 2: Graph full width */}
       <div className="row">
         <div className="col-12">
-          <div className={`card${isFullscreen ? ' nd-css-fullscreen' : ''}`} ref={graphCardRef}>
-            <div className="card-header d-flex justify-content-between align-items-center">
+          <Card className={isFullscreen ? 'nd-css-fullscreen' : ''} ref={graphCardRef}>
+            <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
-              <button
-                className="btn btn-link btn-sm p-0 text-muted"
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted"
                 onClick={toggleFullscreen}
                 title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               >
                 <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-              </button>
-            </div>
-            <div className="card-body p-0 network-diagram-graph-body">
+              </Button>
+            </Card.Header>
+            <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
                 nodes={filteredNodes}
@@ -518,8 +523,8 @@ export const NetworkDiagramPage = () => {
                 onFilterClick={() => setShowFilterModal(true)}
                 activeFilterCount={activeFilterCount}
               />
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
 
@@ -591,9 +596,9 @@ export const NetworkDiagramPage = () => {
           />
         </Modal.Body>
         <Modal.Footer>
-          <button className="btn btn-secondary" onClick={() => setShowFilterModal(false)}>
+          <Button variant="secondary" onClick={() => setShowFilterModal(false)}>
             Close
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
 
@@ -645,9 +650,9 @@ export const NetworkDiagramPage = () => {
           </table>
         </Modal.Body>
         <Modal.Footer>
-          <button className="btn btn-secondary" onClick={() => setShowSignificanceModal(false)}>
+          <Button variant="secondary" onClick={() => setShowSignificanceModal(false)}>
             Close
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

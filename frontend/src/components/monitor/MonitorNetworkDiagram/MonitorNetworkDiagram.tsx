@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useMemo, useState, useEffect } from 'react';
-import { Modal } from '@govtechsg/sgds-react';
+import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
@@ -178,17 +179,17 @@ export const MonitorNetworkDiagram = ({
         {/* Snapshot selector + comparison info */}
         <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
           <div className="d-flex align-items-center gap-2">
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
+            <Button
+              size="sm"
+              variant="outline-secondary"
               disabled={selectedIndex <= 0}
               onClick={() => sorted[selectedIndex - 1] && setSelectedId(sorted[selectedIndex - 1].id)}
               title="Previous snapshot"
             >
               <i className="bi bi-chevron-left" />
-            </button>
-            <select
-              className="form-select form-select-sm"
+            </Button>
+            <Form.Select
+              size="sm"
               style={{ width: 'auto', minWidth: 220 }}
               value={selectedSnap?.id ?? ''}
               onChange={e => setSelectedId(e.target.value)}
@@ -198,16 +199,16 @@ export const MonitorNetworkDiagram = ({
                   {i + 1}. {formatSnapLabel(snap)} — {snap.fileName}
                 </option>
               ))}
-            </select>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
+            </Form.Select>
+            <Button
+              size="sm"
+              variant="outline-secondary"
               disabled={selectedIndex >= sorted.length - 1}
               onClick={() => sorted[selectedIndex + 1] && setSelectedId(sorted[selectedIndex + 1].id)}
               title="Next snapshot"
             >
               <i className="bi bi-chevron-right" />
-            </button>
+            </Button>
           </div>
 
           {prevSnap ? (
@@ -238,7 +239,7 @@ export const MonitorNetworkDiagram = ({
         <div className="monitor-diagram-graph" style={{ height: 480 }}>
           {loading ? (
             <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-              <span className="spinner-border spinner-border-sm me-2" />
+              <Spinner animation="border" size="sm" className="me-2" />
               Loading graph…
             </div>
           ) : (

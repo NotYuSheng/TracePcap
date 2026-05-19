@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, type CSSProperties } from 'react';
+import { Badge } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import { LastSeenModal } from '../LastSeenModal/LastSeenModal';
@@ -53,21 +55,22 @@ function IpBadgeGroup({
   return (
     <div className="d-flex flex-wrap gap-2">
       {items.map(ip => (
-        <span key={ip} className="badge" style={hashBadgeStyle(ip)}>
+        <Badge key={ip} style={hashBadgeStyle(ip)}>
           {ip}
-        </span>
+        </Badge>
       ))}
       {absentItems.map(entity => (
-        <button
+        <Badge
           key={entity.key}
+          as="button"
           type="button"
-          className="badge text-decoration-line-through"
+          className="text-decoration-line-through"
           style={{ cursor: 'pointer', opacity: 0.5, ...hashBadgeStyle(entity.key) }}
           onClick={() => onAbsentClick(entity)}
           title={`Last seen in ${entity.lastSeenFileName}`}
         >
           {entity.key}
-        </button>
+        </Badge>
       ))}
     </div>
   );
@@ -131,7 +134,7 @@ export const IpDriftPanel = ({ snapshots }: IpDriftPanelProps) => {
   }, [snapshots.map(s => s.id).join(',')]);
 
   if (loading) {
-    return <div className="text-muted small text-center py-3"><span className="spinner-border spinner-border-sm me-2" />Loading…</div>;
+    return <div className="text-muted small text-center py-3"><Spinner animation="border" size="sm" className="me-2" />Loading…</div>;
   }
 
   const hasData =

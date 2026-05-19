@@ -1,4 +1,4 @@
-import { Card } from '@govtechsg/sgds-react';
+import { Button, Card } from '@govtechsg/sgds-react';
 import type { Network } from '@/features/monitor/types/monitor.types';
 
 interface NetworkCardProps {
@@ -13,9 +13,11 @@ export const NetworkCard = ({ network, onClick, onDelete }: NetworkCardProps) =>
       <Card.Body>
         <div className="d-flex justify-content-between align-items-start mb-2">
           <h5 className="mb-0 text-break">{network.name}</h5>
-          <button
+          <Button
             type="button"
-            className="btn btn-sm btn-outline-danger ms-2 flex-shrink-0"
+            size="sm"
+            variant="outline-danger"
+            className="ms-2 flex-shrink-0"
             onClick={e => {
               e.stopPropagation();
               onDelete();
@@ -24,7 +26,7 @@ export const NetworkCard = ({ network, onClick, onDelete }: NetworkCardProps) =>
             aria-label="Delete network"
           >
             <i className="bi bi-trash"></i>
-          </button>
+          </Button>
         </div>
 
         {network.description && (

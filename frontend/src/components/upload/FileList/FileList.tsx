@@ -1,7 +1,8 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { isAxiosError } from 'axios';
-import { Card, Modal } from '@govtechsg/sgds-react';
+import { Alert, Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { AlertCircle } from 'lucide-react';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
@@ -161,15 +162,16 @@ export const FileList = () => {
               All Uploads
             </h5>
             <div ref={infoRef} style={{ position: 'relative' }}>
-              <button
+              <Button
                 type="button"
-                className="btn btn-link p-0 text-muted"
+                variant="link"
+                className="p-0 text-muted"
                 style={{ lineHeight: 1 }}
                 onClick={() => setShowInfo(v => !v)}
                 aria-label="About file actions"
               >
                 <i className="bi bi-info-circle" style={{ fontSize: '0.85rem' }}></i>
-              </button>
+              </Button>
               {showInfo && (
                 <div
                   className="card shadow"
@@ -182,7 +184,7 @@ export const FileList = () => {
                     fontSize: '0.82rem',
                   }}
                 >
-                  <div className="card-body py-2 px-3">
+                  <Card.Body className="py-2 px-3">
                     <p className="mb-1">
                       <i className="bi bi-graph-up me-1 text-primary"></i>
                       Click <strong>Analyze</strong> on any file to open its individual analysis.
@@ -192,7 +194,7 @@ export const FileList = () => {
                       Select <strong>two or more</strong> files using the checkboxes, then click{' '}
                       <strong>Multi-Analysis</strong> for cross-PCAP topology analysis.
                     </p>
-                  </div>
+                  </Card.Body>
                 </div>
               )}
             </div>
@@ -200,9 +202,10 @@ export const FileList = () => {
           {files.length > 0 && (
             <div className="d-flex gap-2">
               {selectedForCompare.size >= 2 && (
-                <button
+                <Button
                   type="button"
-                  className="btn btn-outline-primary btn-sm"
+                  variant="outline-primary"
+                  size="sm"
                   onClick={() => {
                     setMergedFileName(buildAutoMergeName(selectedForCompare));
                     setShowMultiSelectModal(true);
@@ -210,27 +213,24 @@ export const FileList = () => {
                 >
                   <i className="bi bi-diagram-3 me-1"></i>
                   Multi-Analysis ({selectedForCompare.size})
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 type="button"
-                className="btn btn-outline-danger btn-sm"
+                variant="outline-danger"
+                size="sm"
                 onClick={() => setConfirmDeleteAll(true)}
               >
                 <i className="bi bi-trash me-1"></i>
                 Delete all
-              </button>
+              </Button>
             </div>
           )}
         </Card.Header>
         <Card.Body className="p-0">
           {loading ? (
             <div className="text-center text-muted py-4">
-              <div
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              />
+              <Spinner animation="border" size="sm" className="me-2" />
               Loading files…
             </div>
           ) : files.length === 0 ? (
@@ -253,9 +253,9 @@ export const FileList = () => {
                 >
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2">
-                      <input
+                      <Form.Check.Input
                         type="checkbox"
-                        className="form-check-input mt-0 flex-shrink-0"
+                        className="mt-0 flex-shrink-0"
                         checked={selectedForCompare.has(file.fileId)}
                         disabled={file.status.toLowerCase() !== 'completed'}
                         title={
@@ -276,12 +276,13 @@ export const FileList = () => {
                           {formatFileSize(file.fileSize)} •{' '}
                           {formatDate(parseDateTime(file.uploadedAt))}
                           {file.status.toLowerCase() !== 'completed' && (
-                            <span
-                              className="ms-2 badge bg-secondary"
+                            <Badge
+                              bg="secondary"
+                              className="ms-2"
                               style={{ fontSize: '0.7rem' }}
                             >
                               {file.status.toLowerCase()}
-                            </span>
+                            </Badge>
                           )}
                         </small>
                       </div>
@@ -291,29 +292,32 @@ export const FileList = () => {
                     className="d-flex gap-2 align-items-center"
                     onClick={e => e.stopPropagation()}
                   >
-                    <button
-                      className="btn btn-outline-primary btn-sm"
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
                       onClick={() => navigate(`/analysis/${file.fileId}`)}
                     >
                       <i className="bi bi-graph-up me-1"></i>
                       Analyze
-                    </button>
-                    <button
-                      className="btn btn-link btn-sm p-0 text-danger"
+                    </Button>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-danger"
                       onClick={() => setPendingDeleteFile(file)}
                       title="Delete this file"
                     >
                       <i className="bi bi-trash"></i>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-          <div className="card-footer text-muted small">
+          <Card.Footer className="text-muted small">
             <AlertCircle size={14} className="me-1" />
             Files are automatically deleted after 12 hours
-          </div>
+          </Card.Footer>
         </Card.Body>
       </Card>
 
@@ -328,23 +332,23 @@ export const FileList = () => {
           </p>
         </Modal.Body>
         <Modal.Footer>
-          <button
+          <Button
             type="button"
-            className="btn btn-outline-secondary"
+            variant="outline-secondary"
             onClick={() => setPendingDeleteFile(null)}
           >
             Cancel
-          </button>
-          <button type="button" className="btn btn-outline-danger" onClick={handleConfirmDelete}>
+          </Button>
+          <Button type="button" variant="outline-danger" onClick={handleConfirmDelete}>
             Delete
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
 
       {/* Merge in-progress overlay */}
       <Modal show={merging} onHide={() => {}} centered backdrop="static" keyboard={false}>
         <Modal.Body className="text-center py-4">
-          <div className="spinner-border text-primary mb-3" role="status" aria-hidden="true" />
+          <Spinner animation="border" className="text-primary mb-3" />
           <p className="mb-0 fw-semibold">Merging files…</p>
           <small className="text-muted">This may take a moment.</small>
         </Modal.Body>
@@ -364,16 +368,17 @@ export const FileList = () => {
         </Modal.Header>
         <Modal.Body>
           {mergeError && (
-            <div className="alert alert-danger py-2 mb-3" role="alert">
+            <Alert variant="danger" className="py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
               {mergeError}
-            </div>
+            </Alert>
           )}
           <p className="mb-3">How would you like to process the selected files?</p>
           <div className="d-flex flex-column gap-3">
-            <button
+            <Button
               type="button"
-              className="btn btn-outline-primary text-start p-3 multiselect-action-btn"
+              variant="outline-primary"
+              className="text-start p-3 multiselect-action-btn"
               onClick={() => handleMultiSelectAction('analyze')}
             >
               <div className="fw-semibold mb-1">
@@ -384,7 +389,7 @@ export const FileList = () => {
                 View a joint topology diagram overlaying all selected files. The original files
                 remain separate.
               </small>
-            </button>
+            </Button>
             <div className="border rounded p-3" style={{ borderColor: '#6c757d' }}>
               <div className="fw-semibold mb-1">
                 <i className="bi bi-layers me-2"></i>
@@ -394,9 +399,8 @@ export const FileList = () => {
                 Combine all selected files into a single new PCAP file for unified analysis.
               </small>
               <div className="input-group input-group-sm mb-2" onClick={e => e.stopPropagation()}>
-                <input
+                <Form.Control
                   type="text"
-                  className="form-control"
                   value={mergedFileName}
                   onChange={e => setMergedFileName(e.target.value)}
                   placeholder="merged file name"
@@ -404,28 +408,30 @@ export const FileList = () => {
                 />
                 <span className="input-group-text">.pcap</span>
               </div>
-              <button
+              <Button
                 type="button"
-                className="btn btn-secondary btn-sm w-100"
+                variant="secondary"
+                size="sm"
+                className="w-100"
                 onClick={() => handleMultiSelectAction('merge')}
                 disabled={!mergedFileName.trim()}
               >
                 Merge &amp; Analyze
-              </button>
+              </Button>
             </div>
           </div>
         </Modal.Body>
         <Modal.Footer>
-          <button
+          <Button
             type="button"
-            className="btn btn-outline-secondary"
+            variant="outline-secondary"
             onClick={() => {
               setShowMultiSelectModal(false);
               setMergeError(null);
             }}
           >
             Cancel
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
 
@@ -440,16 +446,16 @@ export const FileList = () => {
           </p>
         </Modal.Body>
         <Modal.Footer>
-          <button
+          <Button
             type="button"
-            className="btn btn-outline-secondary"
+            variant="outline-secondary"
             onClick={() => setConfirmDeleteAll(false)}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="btn btn-danger"
+            variant="danger"
             onClick={async () => {
               const results = await Promise.allSettled(
                 files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.fileId)))
@@ -464,7 +470,7 @@ export const FileList = () => {
             }}
           >
             Delete all
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
     </>

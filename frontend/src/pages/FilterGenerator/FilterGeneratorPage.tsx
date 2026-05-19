@@ -1,5 +1,7 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Alert, Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import type { AnalysisData, Packet } from '@/types';
 import { apiClient } from '@/services/api/client';
 import { filterService } from '@/features/filter/services/filterService';
@@ -198,19 +200,19 @@ export const FilterGeneratorPage = () => {
       {/* Natural Language Input */}
       <div className="row mb-4">
         <div className="col-12">
-          <div className="card">
-            <div className="card-body">
+          <Card>
+            <Card.Body>
               <h5 className="card-title mb-3">
                 <i className="bi bi-chat-dots me-2"></i>
                 Ask in Natural Language
               </h5>
               <div className="mb-3">
-                <label htmlFor="query" className="form-label">
+                <Form.Label htmlFor="query">
                   Describe what you want to filter
-                </label>
-                <textarea
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
                   id="query"
-                  className="form-control"
                   rows={3}
                   placeholder="Examples:&#10;- Show me all HTTP traffic&#10;- Find DNS queries&#10;- Traffic from 192.168.1.1&#10;- SSH connections"
                   value={query}
@@ -220,14 +222,14 @@ export const FilterGeneratorPage = () => {
                 />
                 <small className="text-muted">Press Ctrl+Enter to generate filter</small>
               </div>
-              <button
-                className="btn btn-primary"
+              <Button
+                variant="primary"
                 onClick={handleGenerateFilter}
                 disabled={generating || !query.trim()}
               >
                 {generating ? (
                   <>
-                    <span className="spinner-border spinner-border-sm me-2" />
+                    <Spinner animation="border" size="sm" className="me-2" />
                     Generating...
                   </>
                 ) : (
@@ -236,9 +238,9 @@ export const FilterGeneratorPage = () => {
                     Generate Filter
                   </>
                 )}
-              </button>
-            </div>
-          </div>
+              </Button>
+            </Card.Body>
+          </Card>
         </div>
       </div>
 
@@ -246,37 +248,38 @@ export const FilterGeneratorPage = () => {
       {generatedFilter && (
         <div className="row mb-4">
           <div className="col-12">
-            <div className="card">
-              <div className="card-body">
+            <Card>
+              <Card.Body>
                 <h5 className="card-title mb-3">
                   <i className="bi bi-funnel me-2"></i>
                   Generated Filter
                   {confidence !== null && (
-                    <span
-                      className={`badge ms-2 ${confidence > 0.8 ? 'bg-success' : confidence > 0.6 ? 'bg-warning' : 'bg-secondary'}`}
+                    <Badge
+                      bg={confidence > 0.8 ? 'success' : confidence > 0.6 ? 'warning' : 'secondary'}
+                      className="ms-2"
                     >
                       {(confidence * 100).toFixed(0)}% confidence
-                    </span>
+                    </Badge>
                   )}
                 </h5>
 
                 {/* Explanation */}
                 {explanation && (
-                  <div className="alert alert-info mb-3">
+                  <Alert variant="info" className="mb-3">
                     <i className="bi bi-info-circle me-2"></i>
                     {explanation}
-                  </div>
+                  </Alert>
                 )}
 
                 {/* Editable Filter */}
                 <div className="mb-3">
-                  <label htmlFor="filter" className="form-label">
+                  <Form.Label htmlFor="filter">
                     Filter Expression (editable)
-                  </label>
-                  <input
+                  </Form.Label>
+                  <Form.Control
                     type="text"
                     id="filter"
-                    className="form-control font-monospace"
+                    className="font-monospace"
                     value={editableFilter}
                     onChange={e => setEditableFilter(e.target.value)}
                     disabled={executing}
@@ -286,7 +289,7 @@ export const FilterGeneratorPage = () => {
                 {/* Suggestions */}
                 {suggestions.length > 0 && (
                   <div className="mb-3">
-                    <label className="form-label">Suggestions:</label>
+                    <Form.Label>Suggestions:</Form.Label>
                     <ul className="list-unstyled mb-0">
                       {suggestions.map((suggestion, index) => (
                         <li key={index} className="text-muted small">
@@ -300,14 +303,14 @@ export const FilterGeneratorPage = () => {
 
                 {/* Action Buttons */}
                 <div className="d-flex gap-2">
-                  <button
-                    className="btn btn-success"
+                  <Button
+                    variant="success"
                     onClick={() => handleExecuteFilter(1)}
                     disabled={executing || !editableFilter.trim()}
                   >
                     {executing ? (
                       <>
-                        <span className="spinner-border spinner-border-sm me-2" />
+                        <Spinner animation="border" size="sm" className="me-2" />
                         Executing...
                       </>
                     ) : (
@@ -316,14 +319,14 @@ export const FilterGeneratorPage = () => {
                         Execute Filter
                       </>
                     )}
-                  </button>
-                  <button className="btn btn-outline-info" onClick={() => setShowCheatSheet(true)}>
+                  </Button>
+                  <Button variant="outline-info" onClick={() => setShowCheatSheet(true)}>
                     <i className="bi bi-file-earmark-text me-2"></i>
                     BPF Cheat Sheet
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </Card.Body>
+            </Card>
           </div>
         </div>
       )}
@@ -332,16 +335,10 @@ export const FilterGeneratorPage = () => {
       {error && (
         <div className="row mb-4">
           <div className="col-12">
-            <div className="alert alert-danger alert-dismissible fade show" role="alert">
+            <Alert variant="danger" dismissible onClose={() => setError(null)}>
               <i className="bi bi-exclamation-triangle me-2"></i>
               {error}
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => setError(null)}
-                aria-label="Close"
-              ></button>
-            </div>
+            </Alert>
           </div>
         </div>
       )}
@@ -350,7 +347,7 @@ export const FilterGeneratorPage = () => {
       {!error && executionTime !== null && packets.length === 0 && (
         <div className="row mb-4">
           <div className="col-12">
-            <div className="alert alert-info" role="alert">
+            <Alert variant="info">
               <h5 className="alert-heading">
                 <i className="bi bi-info-circle me-2"></i>
                 No Matching Packets Found
@@ -377,7 +374,7 @@ export const FilterGeneratorPage = () => {
                   <small className="text-muted">Execution time: {executionTime}ms</small>
                 </div>
               )}
-            </div>
+            </Alert>
           </div>
         </div>
       )}
@@ -386,17 +383,17 @@ export const FilterGeneratorPage = () => {
       {packets.length > 0 && (
         <div className="row mb-4">
           <div className="col-12">
-            <div className="card">
-              <div className="card-body">
+            <Card>
+              <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <h5 className="card-title mb-0">
                     <i className="bi bi-list-check me-2"></i>
                     Matching Packets
                   </h5>
                   <div>
-                    <span className="badge bg-primary me-2">{totalMatches} matches</span>
+                    <Badge bg="primary" className="me-2">{totalMatches} matches</Badge>
                     {executionTime !== null && (
-                      <span className="badge bg-secondary">{executionTime}ms</span>
+                      <Badge bg="secondary">{executionTime}ms</Badge>
                     )}
                   </div>
                 </div>
@@ -431,23 +428,24 @@ export const FilterGeneratorPage = () => {
                             {packet.destination.ip}:{packet.destination.port}
                           </td>
                           <td>
-                            <span className="badge bg-info">{packet.protocol.name}</span>
+                            <Badge bg="info">{packet.protocol.name}</Badge>
                           </td>
                           <td>{formatBytes(packet.size)}</td>
                           <td>
                             {packet.flags?.map((flag, idx) => (
-                              <span key={idx} className="badge bg-secondary me-1">
+                              <Badge key={idx} bg="secondary" className="me-1">
                                 {flag}
-                              </span>
+                              </Badge>
                             ))}
                           </td>
                           <td>
-                            <button
-                              className="btn btn-sm btn-outline-primary"
+                            <Button
+                              size="sm"
+                              variant="outline-primary"
                               onClick={() => setSelectedPacket(packet)}
                             >
                               Details
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -467,163 +465,135 @@ export const FilterGeneratorPage = () => {
                     />
                   </div>
                 )}
-              </div>
-            </div>
+              </Card.Body>
+            </Card>
           </div>
         </div>
       )}
 
       {/* Packet Details Modal */}
-      {selectedPacket && (
-        <div
-          className="modal show d-block"
-          tabIndex={-1}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-        >
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Packet Details</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setSelectedPacket(null)}
-                ></button>
+      <Modal show={!!selectedPacket} onHide={() => setSelectedPacket(null)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Packet Details</Modal.Title>
+        </Modal.Header>
+        {selectedPacket && (
+          <Modal.Body>
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <strong>Timestamp:</strong>
+                <p className="font-monospace">{formatTimestamp(selectedPacket.timestamp)}</p>
               </div>
-              <div className="modal-body">
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Timestamp:</strong>
-                    <p className="font-monospace">{formatTimestamp(selectedPacket.timestamp)}</p>
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Protocol:</strong>
-                    <p>
-                      {selectedPacket.protocol.name} ({selectedPacket.protocol.layer})
-                    </p>
-                  </div>
-                </div>
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Source:</strong>
-                    <p className="font-monospace">
-                      {selectedPacket.source.ip}:{selectedPacket.source.port}
-                      {selectedPacket.source.hostname && (
-                        <>
-                          <br />
-                          <small className="text-muted">{selectedPacket.source.hostname}</small>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Destination:</strong>
-                    <p className="font-monospace">
-                      {selectedPacket.destination.ip}:{selectedPacket.destination.port}
-                      {selectedPacket.destination.hostname && (
-                        <>
-                          <br />
-                          <small className="text-muted">
-                            {selectedPacket.destination.hostname}
-                          </small>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Size:</strong>
-                    <p>{formatBytes(selectedPacket.size)}</p>
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Flags:</strong>
-                    <p>
-                      {selectedPacket.flags?.map((flag, idx) => (
-                        <span key={idx} className="badge bg-secondary me-1">
-                          {flag}
-                        </span>
-                      )) || 'None'}
-                    </p>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-12">
-                    <strong>Payload:</strong>
-                    <pre
-                      className="tp-payload-pre p-3 rounded mt-2 font-monospace small"
-                      style={{ maxHeight: '300px', overflow: 'auto' }}
-                    >
-                      {selectedPacket.payload || 'No payload data'}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setSelectedPacket(null)}
-                >
-                  Close
-                </button>
+              <div className="col-md-6">
+                <strong>Protocol:</strong>
+                <p>
+                  {selectedPacket.protocol.name} ({selectedPacket.protocol.layer})
+                </p>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <strong>Source:</strong>
+                <p className="font-monospace">
+                  {selectedPacket.source.ip}:{selectedPacket.source.port}
+                  {selectedPacket.source.hostname && (
+                    <>
+                      <br />
+                      <small className="text-muted">{selectedPacket.source.hostname}</small>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="col-md-6">
+                <strong>Destination:</strong>
+                <p className="font-monospace">
+                  {selectedPacket.destination.ip}:{selectedPacket.destination.port}
+                  {selectedPacket.destination.hostname && (
+                    <>
+                      <br />
+                      <small className="text-muted">
+                        {selectedPacket.destination.hostname}
+                      </small>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="row mb-3">
+              <div className="col-md-6">
+                <strong>Size:</strong>
+                <p>{formatBytes(selectedPacket.size)}</p>
+              </div>
+              <div className="col-md-6">
+                <strong>Flags:</strong>
+                <p>
+                  {selectedPacket.flags?.map((flag, idx) => (
+                    <Badge key={idx} bg="secondary" className="me-1">
+                      {flag}
+                    </Badge>
+                  )) || 'None'}
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <div className="col-12">
+                <strong>Payload:</strong>
+                <pre
+                  className="tp-payload-pre p-3 rounded mt-2 font-monospace small"
+                  style={{ maxHeight: '300px', overflow: 'auto' }}
+                >
+                  {selectedPacket.payload || 'No payload data'}
+                </pre>
+              </div>
+            </div>
+          </Modal.Body>
+        )}
+        <Modal.Footer>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setSelectedPacket(null)}
+          >
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Cheat Sheet Modal */}
-      {showCheatSheet && (
-        <div
-          className="modal show d-block"
-          tabIndex={-1}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-        >
-          <div className="modal-dialog modal-xl">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  <i className="bi bi-file-earmark-text me-2"></i>
-                  BPF Filter Cheat Sheet
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowCheatSheet(false)}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="text-center">
-                  <img
-                    src="/assets/Wireshark-Cheat-Sheet.jpg"
-                    alt="Wireshark BPF Filter Cheat Sheet"
-                    className="img-fluid"
-                    style={{ maxHeight: '80vh', objectFit: 'contain' }}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <a
-                  href="/assets/Wireshark-Cheat-Sheet.jpg"
-                  download="Wireshark-Cheat-Sheet.jpg"
-                  className="btn btn-outline-primary"
-                >
-                  <i className="bi bi-download me-2"></i>
-                  Download
-                </a>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowCheatSheet(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+      <Modal show={showCheatSheet} onHide={() => setShowCheatSheet(false)} size="xl" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-file-earmark-text me-2"></i>
+            BPF Filter Cheat Sheet
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <img
+              src="/assets/Wireshark-Cheat-Sheet.jpg"
+              alt="Wireshark BPF Filter Cheat Sheet"
+              className="img-fluid"
+              style={{ maxHeight: '80vh', objectFit: 'contain' }}
+            />
           </div>
-        </div>
-      )}
+        </Modal.Body>
+        <Modal.Footer>
+          <a
+            href="/assets/Wireshark-Cheat-Sheet.jpg"
+            download="Wireshark-Cheat-Sheet.jpg"
+            className="btn btn-outline-primary"
+          >
+            <i className="bi bi-download me-2"></i>
+            Download
+          </a>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setShowCheatSheet(false)}
+          >
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

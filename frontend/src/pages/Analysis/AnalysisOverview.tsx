@@ -11,7 +11,7 @@ import {
   getSeverityColor,
   RISK_BADGE,
 } from '@/utils/appColors';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
 
@@ -151,14 +151,15 @@ export const AnalysisOverview = () => {
               </span>
             )}
             <OverlayTrigger trigger="click" placement="right" overlay={ndpiPopover} rootClose>
-              <button
+              <Button
                 type="button"
-                className="btn btn-link p-0 text-muted"
+                variant="link"
+                className="p-0 text-muted"
                 style={{ lineHeight: 1 }}
                 aria-label="About application detection accuracy"
               >
                 <i className="bi bi-info-circle fs-6"></i>
-              </button>
+              </Button>
             </OverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
@@ -194,14 +195,15 @@ export const AnalysisOverview = () => {
             <i className="bi bi-layers me-2"></i>
             Dissected Protocols
             <OverlayTrigger trigger="click" placement="right" overlay={l7Popover} rootClose>
-              <button
+              <Button
                 type="button"
-                className="btn btn-link p-0 text-muted"
+                variant="link"
+                className="p-0 text-muted"
                 style={{ lineHeight: 1 }}
                 aria-label="About L7 protocol detection"
               >
                 <i className="bi bi-info-circle fs-6"></i>
-              </button>
+              </Button>
             </OverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
@@ -233,14 +235,15 @@ export const AnalysisOverview = () => {
             <i className="bi bi-shield-exclamation me-2 text-warning"></i>
             Risk Alerts
             <OverlayTrigger trigger="click" placement="right" overlay={riskPopover} rootClose>
-              <button
+              <Button
                 type="button"
-                className="btn btn-link p-0 text-muted"
+                variant="link"
+                className="p-0 text-muted"
                 style={{ lineHeight: 1 }}
                 aria-label="About nDPI risk flags"
               >
                 <i className="bi bi-info-circle fs-6"></i>
-              </button>
+              </Button>
             </OverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
@@ -278,14 +281,15 @@ export const AnalysisOverview = () => {
               overlay={customRulesPopover}
               rootClose
             >
-              <button
+              <Button
                 type="button"
-                className="btn btn-link p-0 text-muted"
+                variant="link"
+                className="p-0 text-muted"
                 style={{ lineHeight: 1 }}
                 aria-label="About custom security alerts"
               >
                 <i className="bi bi-info-circle fs-6"></i>
-              </button>
+              </Button>
             </OverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">

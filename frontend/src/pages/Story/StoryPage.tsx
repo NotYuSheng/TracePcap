@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { useOutletContext } from 'react-router-dom';
 import type { TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
@@ -42,14 +42,15 @@ function NarrativeInfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-2"
+        variant="link"
+        className="p-0 text-muted ms-2"
         style={{ lineHeight: 1 }}
         aria-label="About Narrative"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -126,44 +127,46 @@ export const StoryPage = () => {
     const remaining = contextError.contextLength - contextError.promptTokens;
     return (
       <div className="py-4">
-        <div className="alert alert-danger mb-3" role="alert">
-          <h5 className="alert-heading">
+        <Alert variant="danger" className="mb-3">
+          <Alert.Heading>
             <i className="bi bi-exclamation-triangle-fill me-2"></i>
             Prompt Too Large for Model
-          </h5>
+          </Alert.Heading>
           <p className="mb-0">
             The prompt used <strong>{contextError.promptTokens.toLocaleString()}</strong> tokens
             but the model's context window is{' '}
             <strong>{contextError.contextLength.toLocaleString()}</strong> tokens, leaving only{' '}
             <strong>{remaining.toLocaleString()}</strong> for the response.
           </p>
-        </div>
+        </Alert>
         <p className="text-muted small mb-2">
           Edit the prompt below to reduce its size (e.g. remove findings or aggregates sections),
           then retry:
         </p>
-        <textarea
-          className="form-control form-control-sm font-monospace mb-3"
+        <Form.Control
+          as="textarea"
+          size="sm"
+          className="font-monospace mb-3"
           rows={20}
           value={editablePrompt}
           onChange={e => setEditablePrompt(e.target.value)}
         />
         <div className="d-flex gap-2">
-          <button
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={() => handleGenerateStory(editablePrompt)}
             disabled={generating}
           >
             <i className="bi bi-arrow-repeat me-2"></i>
             Retry with edited prompt
-          </button>
-          <button
-            className="btn btn-outline-secondary"
+          </Button>
+          <Button
+            variant="outline-secondary"
             onClick={() => { setContextError(null); setEditablePrompt(''); }}
             disabled={generating}
           >
             Start over
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -200,10 +203,10 @@ export const StoryPage = () => {
           <p className="text-muted mb-4">
             Generate an AI-powered narrative analysis of this network capture
           </p>
-          <button className="btn btn-primary" onClick={() => handleGenerateStory()}>
+          <Button variant="primary" onClick={() => handleGenerateStory()}>
             <i className="bi bi-magic me-2"></i>
             Generate Story
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -216,15 +219,16 @@ export const StoryPage = () => {
         <div className="col-12">
           <div className="d-flex align-items-center justify-content-between">
             <h4 className="mb-0">Network Traffic Story</h4>
-            <button
-              className="btn btn-outline-primary btn-sm"
+            <Button
+              variant="outline-primary"
+              size="sm"
               onClick={() => handleGenerateStory()}
               disabled={generating}
               title={generating ? 'Generating...' : 'Regenerate'}
             >
               <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`}></i>
               {generating ? 'Generating...' : 'Regenerate'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -233,10 +237,10 @@ export const StoryPage = () => {
       {error && (
         <div className="row mb-3">
           <div className="col-12">
-            <div className="alert alert-danger py-2 mb-0" role="alert">
+            <Alert variant="danger" className="py-2 mb-0">
               <i className="bi bi-exclamation-triangle-fill me-2"></i>
               {error}
-            </div>
+            </Alert>
           </div>
         </div>
       )}
@@ -268,15 +272,15 @@ export const StoryPage = () => {
       {!loadingTimeline && timelineData.length > 0 && (
         <div className="row mb-4">
           <div className="col-12">
-            <div className="card">
-              <div className="card-body">
+            <Card>
+              <Card.Body>
                 <TrafficTimeline
                   data={timelineData}
                   granularity={granularity}
                   onGranularityChange={setGranularity}
                 />
-              </div>
-            </div>
+              </Card.Body>
+            </Card>
           </div>
         </div>
       )}
@@ -321,16 +325,16 @@ export const StoryPage = () => {
 
         {/* Story Event Timeline Section */}
         <div className="col-lg-4">
-          <div className="card sticky-top" style={{ top: '20px', zIndex: 10 }}>
-            <div className="card-body">
+          <Card className="sticky-top" style={{ top: '20px', zIndex: 10 }}>
+            <Card.Body>
               <h5 className="mb-3">Key Events</h5>
               {story.timeline && story.timeline.length > 0 ? (
                 <StoryTimeline events={story.timeline} />
               ) : (
                 <p className="text-muted small">No key events identified in this capture.</p>
               )}
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
     </div>

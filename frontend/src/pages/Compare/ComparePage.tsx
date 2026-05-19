@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { Alert, Badge, Button, Card, Form } from '@govtechsg/sgds-react';
 import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import type { GraphNode } from '@/features/network/types';
@@ -362,18 +364,18 @@ export const ComparePage = () => {
             justifyContent: 'center',
           }}
         >
-          <div className="card shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
-            <div className="spinner-border text-primary mb-3" role="status" />
+          <Card className="shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
+            <Spinner animation="border" className="text-primary mb-3" />
             <h6 className="mb-1">Generating Report</h6>
             <p className="text-muted small mb-0">{reportStep}</p>
             <p className="text-muted small mt-1">This may take up to 60 seconds.</p>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Back link + header */}
       <div className="d-flex align-items-center gap-3 mb-3">
-        <Link to="/" className="btn btn-link btn-sm p-0 text-muted text-decoration-none">
+        <Link to="/" className="text-muted text-decoration-none small">
           <i className="bi bi-arrow-left me-1" />
           Back
         </Link>
@@ -382,14 +384,15 @@ export const ComparePage = () => {
           Compare Topology
         </h4>
         <div className="d-flex flex-column align-items-end gap-1">
-          <button
-            className="btn btn-outline-primary btn-sm"
+          <Button
+            variant="outline-primary"
+            size="sm"
             onClick={handleDownloadReport}
             disabled={reportLoading}
           >
             {reportLoading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                <Spinner animation="border" size="sm" className="me-2" />
                 Generating report…
               </>
             ) : (
@@ -398,7 +401,7 @@ export const ComparePage = () => {
                 Download Report
               </>
             )}
-          </button>
+          </Button>
           {reportError && <small className="text-danger">{reportError}</small>}
         </div>
       </div>
@@ -407,8 +410,7 @@ export const ComparePage = () => {
       <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
         {labels.map((label, i) => (
           <span key={label}>
-            <span
-              className="badge"
+            <Badge
               style={{
                 fontSize: '0.8rem',
                 backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length],
@@ -416,31 +418,30 @@ export const ComparePage = () => {
             >
               <i className="bi bi-file-earmark-binary me-1" />
               {label}
-            </span>
+            </Badge>
             {i < labels.length - 1 && <span className="text-muted small ms-2">vs</span>}
           </span>
         ))}
       </div>
 
       {/* Per-file stats — one column per file, wraps naturally */}
-      <div className="card mb-3">
-        <div className="card-header">
+      <Card className="mb-3">
+        <Card.Header>
           <strong>Comparison Overview</strong>
-        </div>
-        <div className="card-body py-2 px-3">
+        </Card.Header>
+        <Card.Body className="py-2 px-3">
           <div className="d-flex flex-wrap gap-3">
             {perFileStats.map(({ label, stats }, i) => (
               <div key={label} style={{ minWidth: 200 }}>
                 <div className="mb-2">
-                  <span
-                    className="badge"
+                  <Badge
                     style={{
                       fontSize: '0.7rem',
                       backgroundColor: SOURCE_COLORS[i % SOURCE_COLORS.length],
                     }}
                   >
                     {label}
-                  </span>
+                  </Badge>
                 </div>
                 <div className="d-flex gap-2 flex-wrap">
                   {[
@@ -469,8 +470,8 @@ export const ComparePage = () => {
           <div className="mt-2 text-muted small">
             {filteredNodes.length} nodes · {filteredEdges.length} connections shown
           </div>
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
 
       {totalNodes > MAX_DIAGRAM_NODES &&
         (() => {
@@ -481,7 +482,7 @@ export const ComparePage = () => {
             setCustomInput('');
           };
           return (
-            <div className="alert alert-info mb-3">
+            <Alert variant="info" className="mb-3">
               <div className="d-flex align-items-start gap-2 flex-wrap">
                 <div className="flex-grow-1">
                   <div>
@@ -501,27 +502,29 @@ export const ComparePage = () => {
                   <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
                     <span className="text-muted small fw-semibold me-1">Show:</span>
                     {presets.map(p => (
-                      <button
+                      <Button
                         key={p}
-                        className={`btn btn-sm ${nodeLimit === p ? 'btn-info' : 'btn-outline-secondary'}`}
+                        size="sm"
+                        variant={nodeLimit === p ? 'info' : 'outline-secondary'}
                         style={{ minWidth: 52 }}
                         onClick={() => setNodeLimit(p)}
                       >
                         Top {p}
-                      </button>
+                      </Button>
                     ))}
-                    <button
-                      className={`btn btn-sm ${nodeLimit >= totalNodes ? 'btn-info' : 'btn-outline-secondary'}`}
+                    <Button
+                      size="sm"
+                      variant={nodeLimit >= totalNodes ? 'info' : 'outline-secondary'}
                       style={{ minWidth: 52 }}
                       onClick={() => setNodeLimit(totalNodes)}
                     >
                       All {totalNodes}
-                    </button>
+                    </Button>
                     <span className="text-muted small ms-2 me-1">or</span>
                     <div className="input-group input-group-sm" style={{ width: 120 }}>
-                      <input
+                      <Form.Control
                         type="number"
-                        className="form-control form-control-sm"
+                        size="sm"
                         placeholder="Custom…"
                         min={1}
                         max={totalNodes}
@@ -534,7 +537,7 @@ export const ComparePage = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </Alert>
           );
         })()}
 
@@ -597,9 +600,9 @@ export const ComparePage = () => {
           const color = SOURCE_COLORS[i % SOURCE_COLORS.length];
           const hidden = hiddenSources.has(label);
           return (
-            <button
+            <Button
               key={label}
-              className="btn btn-sm"
+              size="sm"
               style={{
                 backgroundColor: hidden ? 'transparent' : color,
                 borderColor: color,
@@ -610,7 +613,7 @@ export const ComparePage = () => {
             >
               <i className={`bi ${hidden ? 'bi-eye-slash' : 'bi-eye'} me-1`} />
               {label}
-            </button>
+            </Button>
           );
         })}
         <span className="small text-muted ms-3">
@@ -622,18 +625,20 @@ export const ComparePage = () => {
       {/* Graph */}
       <div className="row">
         <div className="col-12">
-          <div className="card" ref={graphCardRef}>
-            <div className="card-header d-flex justify-content-between align-items-center">
+          <Card ref={graphCardRef}>
+            <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
-              <button
-                className="btn btn-link btn-sm p-0 text-muted"
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted"
                 onClick={toggleFullscreen}
                 title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               >
                 <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-              </button>
-            </div>
-            <div className="card-body p-0 network-diagram-graph-body">
+              </Button>
+            </Card.Header>
+            <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
                 nodes={filteredNodes}
@@ -643,8 +648,8 @@ export const ComparePage = () => {
                 onLayoutChange={setLayoutType}
                 primarySource={primaryLabel}
               />
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
 

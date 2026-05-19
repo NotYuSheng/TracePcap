@@ -1,3 +1,4 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useEffect } from 'react';
 import {
   ComposableMap,
@@ -6,6 +7,7 @@ import {
   Marker,
   ZoomableGroup,
 } from 'react-simple-maps';
+import { Button } from '@govtechsg/sgds-react';
 import type { ClusterGraphResponse, ClusterNode } from '@/features/intelligence/services/intelligenceService';
 import { intelligenceService } from '@/features/intelligence/services/intelligenceService';
 import { formatBytes } from '@/utils/formatters';
@@ -143,31 +145,33 @@ export function CountryMapView({
       {/* Breadcrumb */}
       {isDrilled && (
         <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            className="btn btn-sm btn-light border d-flex align-items-center gap-1"
+          <Button
+            size="sm"
+            variant="light"
+            className="border d-flex align-items-center gap-1"
             style={{ fontSize: 12 }}
             onClick={exitDrillDown}
           >
             <i className="bi bi-arrow-left" />
             World
-          </button>
+          </Button>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tp-text, #212529)' }}>
             <i className="bi bi-geo-alt me-1" />
             {clusterById.get(drilledCountryId!)?.label ?? drilledCC}
           </span>
-          {cityLoading && <span className="spinner-border spinner-border-sm text-primary" style={{ width: 14, height: 14, borderWidth: 2 }} />}
+          {cityLoading && <Spinner animation="border" size="sm" className="text-primary" style={{ width: 14, height: 14, borderWidth: 2 }} />}
           {noCityData && <span style={{ fontSize: 11, color: 'var(--tp-text-muted, #6c757d)' }}>No city-level data available</span>}
         </div>
       )}
 
       {/* Zoom controls */}
       <div style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <button className="btn btn-sm btn-light border" style={{ width: 28, height: 28, padding: 0, lineHeight: 1 }}
-          onClick={() => setZoom(z => Math.min(z * 1.5, 1200))} title="Zoom in">+</button>
-        <button className="btn btn-sm btn-light border" style={{ width: 28, height: 28, padding: 0, lineHeight: 1 }}
-          onClick={() => setZoom(z => Math.max(z / 1.5, 1))} title="Zoom out">−</button>
-        <button className="btn btn-sm btn-light border" style={{ width: 28, height: 28, padding: 0, fontSize: 10 }}
-          onClick={exitDrillDown} title="Reset view">⌂</button>
+        <Button size="sm" variant="light" className="border" style={{ width: 28, height: 28, padding: 0, lineHeight: 1 }}
+          onClick={() => setZoom(z => Math.min(z * 1.5, 1200))} title="Zoom in">+</Button>
+        <Button size="sm" variant="light" className="border" style={{ width: 28, height: 28, padding: 0, lineHeight: 1 }}
+          onClick={() => setZoom(z => Math.max(z / 1.5, 1))} title="Zoom out">−</Button>
+        <Button size="sm" variant="light" className="border" style={{ width: 28, height: 28, padding: 0, fontSize: 10 }}
+          onClick={exitDrillDown} title="Reset view">⌂</Button>
       </div>
 
       <ComposableMap

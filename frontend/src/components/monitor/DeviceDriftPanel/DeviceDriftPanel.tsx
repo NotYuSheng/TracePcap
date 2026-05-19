@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, type CSSProperties } from 'react';
-import { Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Modal } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
@@ -153,7 +154,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   }
 
   if (loading) {
-    return <div className="text-muted small text-center py-3"><span className="spinner-border spinner-border-sm me-2" />Loading…</div>;
+    return <div className="text-muted small text-center py-3"><Spinner animation="border" size="sm" className="me-2" />Loading…</div>;
   }
 
   const total = active.length + absent.length;
@@ -168,28 +169,29 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
     <>
       <div className="d-flex flex-wrap gap-2">
         {active.map(mac => (
-          <button
+          <Badge
             key={mac}
+            as="button"
             type="button"
-            className="badge"
             style={{ cursor: 'pointer', ...hashBadgeStyle(mac) }}
             onClick={() => openModal(mac)}
             title="View device history"
           >
             {mac}
-          </button>
+          </Badge>
         ))}
         {absent.map(mac => (
-          <button
+          <Badge
             key={mac}
+            as="button"
             type="button"
-            className="badge text-decoration-line-through"
+            className="text-decoration-line-through"
             style={{ cursor: 'pointer', opacity: 0.5, ...hashBadgeStyle(mac) }}
             onClick={() => openModal(mac)}
             title="View device history"
           >
             {mac}
-          </button>
+          </Badge>
         ))}
       </div>
       {absent.length > 0 && (
@@ -205,9 +207,9 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
             <i className="bi bi-device-hdd me-2"></i>
             {selectedMac}
             {' '}
-            <span className={`badge ms-2 ${isActive ? 'bg-success' : 'bg-secondary'}`}>
+            <Badge bg={isActive ? 'success' : 'secondary'} className="ms-2">
               {isActive ? 'Active' : 'Gone'}
-            </span>
+            </Badge>
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -268,7 +270,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
               <h6 className="text-muted fw-semibold mb-2">Snapshot History</h6>
               {modalLoading ? (
                 <div className="text-muted small text-center py-2">
-                  <span className="spinner-border spinner-border-sm me-2" />Loading protocols & apps…
+                  <Spinner animation="border" size="sm" className="me-2" />Loading protocols & apps…
                 </div>
               ) : (() => {
                 const totalPages = Math.ceil(selectedHistory.length / HISTORY_PAGE_SIZE);
@@ -301,7 +303,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                               <td>
                                 <code>{host.ip ?? '—'}</code>
                                 {globalIdx > 0 && host.ip !== selectedHistory[globalIdx - 1].host.ip && (
-                                  <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.65rem' }}>changed</span>
+                                  <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
                                 )}
                               </td>
                               <td><small className="text-muted">{host.deviceType ?? '—'}</small></td>
@@ -311,10 +313,10 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                                 ) : (
                                   <div className="d-flex flex-wrap gap-1">
                                     {protocols.map(p => (
-                                      <span key={p} className="badge" style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(p) }}>{p}</span>
+                                      <Badge key={p} style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(p) }}>{p}</Badge>
                                     ))}
                                     {apps.map(a => (
-                                      <span key={a} className="badge" style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(a) }}>{a}</span>
+                                      <Badge key={a} style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(a) }}>{a}</Badge>
                                     ))}
                                   </div>
                                 )}
@@ -330,22 +332,22 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                           {historyPage * HISTORY_PAGE_SIZE + 1}–{Math.min((historyPage + 1) * HISTORY_PAGE_SIZE, selectedHistory.length)} of {selectedHistory.length}
                         </small>
                         <div className="d-flex gap-1">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-secondary"
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
                             disabled={historyPage === 0}
                             onClick={() => setHistoryPage(p => p - 1)}
                           >
                             <i className="bi bi-chevron-left" />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-secondary"
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
                             disabled={historyPage >= totalPages - 1}
                             onClick={() => setHistoryPage(p => p + 1)}
                           >
                             <i className="bi bi-chevron-right" />
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}

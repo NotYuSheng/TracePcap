@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Modal } from '@govtechsg/sgds-react';
+import { Alert, Button, Card, Modal } from '@govtechsg/sgds-react';
 import type { AnalysisData } from '@/types';
 import {
   intelligenceService,
@@ -242,8 +242,8 @@ export const NetworkIntelligencePage = () => {
       <SummaryStatsBar data={data} />
 
       {/* Cluster graph */}
-      <div className={`card mb-4${isFullscreen ? ' nd-css-fullscreen' : ''}`} ref={graphCardRef}>
-        <div className="card-header d-flex justify-content-between align-items-center">
+      <Card className={`mb-4${isFullscreen ? ' nd-css-fullscreen' : ''}`} ref={graphCardRef}>
+        <Card.Header className="d-flex justify-content-between align-items-center">
           <div>
             <h6 className="mb-0">
               <i className="bi bi-diagram-3 me-2" />
@@ -251,20 +251,22 @@ export const NetworkIntelligencePage = () => {
             </h6>
             <small className="text-muted">Click a cluster node to see its member IPs and statistics.</small>
           </div>
-          <button
-            className="btn btn-link btn-sm p-0 text-muted"
+          <Button
+            variant="link"
+            size="sm"
+            className="p-0 text-muted"
             onClick={() => setIsFullscreen(f => !f)}
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           >
             <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-          </button>
-        </div>
-        <div className="card-body intel-cluster-card-body">
+          </Button>
+        </Card.Header>
+        <Card.Body className="intel-cluster-card-body">
           {clusterError && (
-            <div className="alert alert-warning py-2" role="alert">
+            <Alert variant="warning" className="py-2">
               <i className="bi bi-exclamation-triangle me-2" />
               {clusterError}
-            </div>
+            </Alert>
           )}
           <ClusterGraph
             data={clusterData}
@@ -277,8 +279,8 @@ export const NetworkIntelligencePage = () => {
             selectedCluster={selectedCluster}
             onSelectedClusterChange={setSelectedCluster}
           />
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
 
       {/* Filter modal */}
       <Modal
