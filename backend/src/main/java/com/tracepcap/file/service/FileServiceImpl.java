@@ -6,6 +6,7 @@ import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.entity.FileEntity;
+import com.tracepcap.file.entity.FileEntity.FileSource;
 import com.tracepcap.file.event.FileUploadedEvent;
 import com.tracepcap.file.mapper.FileMapper;
 import com.tracepcap.file.repository.FileRepository;
@@ -51,7 +52,7 @@ public class FileServiceImpl implements FileService {
   @Override
   @Transactional
   public FileUploadResponse uploadFile(
-      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction) {
+      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction, FileSource source) {
     log.info("Starting file upload: {}", file.getOriginalFilename());
 
     // Validate file
@@ -87,6 +88,7 @@ public class FileServiceImpl implements FileService {
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
               .fileHash(fileHash)
+              .source(source != null ? source : FileSource.ANALYSIS)
               .enableNdpi(enableNdpi)
               .enableFileExtraction(enableFileExtraction)
               .build();
@@ -124,7 +126,10 @@ public class FileServiceImpl implements FileService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<FileMetadataDto> getAllFiles(Pageable pageable) {
+  public Page<FileMetadataDto> getAllFiles(Pageable pageable, FileSource source) {
+    if (source != null) {
+      return fileRepository.findBySource(source, pageable).map(fileMapper::toMetadataDto);
+    }
     return fileRepository.findAll(pageable).map(fileMapper::toMetadataDto);
   }
 

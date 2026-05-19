@@ -26,10 +26,14 @@ type SortDir = 'asc' | 'desc';
 const ExtractionInfoCard = () => {
   const [collapsed, setCollapsed] = useState(true);
   return (
-    <div className="card mb-3">
+    <div className="card mb-3" style={{ overflow: 'hidden' }}>
       <div
         className="card-header d-flex align-items-center justify-content-between"
-        style={{ cursor: 'pointer', userSelect: 'none', borderBottom: collapsed ? 'none' : undefined }}
+        style={{
+          cursor: 'pointer',
+          userSelect: 'none',
+          borderBottom: collapsed ? 'none' : undefined,
+        }}
         onClick={() => setCollapsed(c => !c)}
       >
         <h6 className="mb-0">

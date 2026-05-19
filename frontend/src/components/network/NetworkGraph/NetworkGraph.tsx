@@ -16,6 +16,12 @@ import './NetworkGraph.css';
 // Types
 // ---------------------------------------------------------------------------
 
+export interface NodeHighlight {
+  color: string;
+  label: string;
+  description?: string;
+}
+
 interface NetworkGraphProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -29,6 +35,8 @@ interface NetworkGraphProps {
   crossEdges?: GraphEdge[];
   onFilterClick?: () => void;
   activeFilterCount?: number;
+  /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
+  highlightedNodes?: Map<string, NodeHighlight>;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,10 +110,23 @@ function drawNodeLabel(
   nodeFill: string,
   ntMap: Map<string, string>,
   dtMap: Map<string, string>,
+  hlMap?: Map<string, NodeHighlight>,
 ): void {
   const { x, y, size, label, color: accentColor } = data;
   const nodeType = ntMap.get(label ?? '') ?? 'unknown';
   const deviceType = dtMap.get(label ?? '') ?? '';
+  const highlight = label ? hlMap?.get(label) : undefined;
+
+  // Outer glow ring for highlighted (changed) nodes
+  if (highlight) {
+    ctx.beginPath();
+    ctx.arc(x, y, size + size * 0.45, 0, Math.PI * 2);
+    ctx.strokeStyle = highlight.color;
+    ctx.lineWidth = size * 0.22;
+    ctx.globalAlpha = 0.55;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 
   // Fill — covers the WebGL accent circle underneath
   ctx.beginPath();
@@ -116,8 +137,8 @@ function drawNodeLabel(
   // Accent border ring
   ctx.beginPath();
   ctx.arc(x, y, size, 0, Math.PI * 2);
-  ctx.strokeStyle = accentColor;
-  ctx.lineWidth = Math.max(1, size * 0.07);
+  ctx.strokeStyle = highlight ? highlight.color : accentColor;
+  ctx.lineWidth = highlight ? Math.max(2, size * 0.12) : Math.max(1, size * 0.07);
   ctx.stroke();
 
   // Bootstrap Icon — reflects the same logic as getNodeColor/getNodeIcon
@@ -301,6 +322,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   crossEdges = [],
   onFilterClick,
   activeFilterCount = 0,
+  highlightedNodes,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -316,6 +338,20 @@ export const NetworkGraph = memo(function NetworkGraph({
   const darkMode = themeMode === 'dark' || (themeMode === 'system' && sysDark);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerReady, setContainerReady] = useState(false);
+
+  // Watch for the container getting actual width (e.g. modal finishes opening)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (el.offsetWidth > 0) { setContainerReady(true); return; }
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth > 0) { setContainerReady(true); ro.disconnect(); }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const sigmaRef = useRef<Sigma | null>(null);
   const fa2Ref = useRef<InstanceType<typeof FA2Layout> | null>(null);
   const graphRef = useRef<Graph | null>(null);
@@ -337,6 +373,12 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   const nodesRef = useRef(nodes);
   useEffect(() => { nodesRef.current = nodes; });
+
+  const highlightedNodesRef = useRef(highlightedNodes);
+  useEffect(() => {
+    highlightedNodesRef.current = highlightedNodes;
+    sigmaRef.current?.refresh();
+  }, [highlightedNodes]);
 
   // Hidden neighbor lookup
   const hiddenNodeMap = useMemo(
@@ -363,6 +405,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   useEffect(() => {
     if (!containerRef.current) return;
     if (nodes.length === 0) return;
+    if (!containerReady) return;
 
     // Tear down previous instance
     fa2Ref.current?.kill();
@@ -378,6 +421,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     const labelColor = darkMode ? '#c9d1d9' : '#212529';
 
     const sigma = new Sigma(graph, containerRef.current, {
+      allowInvalidContainer: true,
       renderLabels: true,
       renderEdgeLabels: false,
       defaultEdgeType: 'arrow',
@@ -387,10 +431,10 @@ export const NetworkGraph = memo(function NetworkGraph({
       minEdgeThickness: 0.5,
       zIndex: true,
       defaultDrawNodeLabel: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, highlightedNodesRef.current);
       },
       defaultDrawNodeHover: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, highlightedNodesRef.current);
       },
       nodeReducer: (node, data) => {
         const res = { ...data };
@@ -555,7 +599,7 @@ export const NetworkGraph = memo(function NetworkGraph({
       elkRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, layoutType, primarySource, darkMode]);
+  }, [nodes, edges, layoutType, primarySource, darkMode, containerReady]);
 
   // Re-render sigma when hover changes (reducer reads this)
   useEffect(() => {

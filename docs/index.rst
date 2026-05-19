@@ -30,6 +30,7 @@ TracePcap Documentation
    features/story-mode
    features/custom-signatures
    features/report-export
+   features/streaming-upload
 
 .. toctree::
    :maxdepth: 2

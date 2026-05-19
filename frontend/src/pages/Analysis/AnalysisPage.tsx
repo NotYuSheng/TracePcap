@@ -405,7 +405,7 @@ export const AnalysisPage = () => {
       {/* Navigation Tabs */}
       <ul
         className="nav nav-tabs"
-        style={{ display: 'flex', flexWrap: 'wrap', borderBottom: 'none', paddingTop: '1px' }}
+        style={{ display: 'flex', flexWrap: 'nowrap', overflowX: 'auto', borderBottom: 'none', paddingTop: '1px' }}
       >
         <li className="nav-item">
           <button
@@ -459,7 +459,7 @@ export const AnalysisPage = () => {
             className={`nav-link ${activeTab === 'network-diagram' ? 'active' : ''}`}
             onClick={() => handleTabChange('network-diagram')}
           >
-            <i className="bi bi-diagram-3 me-2"></i>Network Diagram
+            <i className="bi bi-diagram-3 me-2"></i>Network Visualization
           </button>
         </li>
         <li className="nav-item">
