@@ -279,7 +279,7 @@ export const NetworkDetailPage = () => {
 
       {/* Traffic Overview Chart */}
       {snapshots.length >= 2 && (
-        <Card className="mb-4" style={{ overflow: 'hidden' }}>
+        <Card className="mb-4">
           <div className="card-header">
             <h6 className="mb-0">
               <i className="bi bi-bar-chart-line me-2"></i>Traffic Overview
