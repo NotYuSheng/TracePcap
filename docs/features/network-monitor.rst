@@ -223,7 +223,7 @@ Supported definition types:
      - A VPN risk string that is intentional (e.g. a corporate VPN)
 
 To add a baseline entry, click **Add Baseline** in the Baseline Definitions
-panel and fill in the type, entity key, and an optional description.
+panel and fill in the type, entity key, optional value, and notes.
 
 Network Diagram Overlay
 -----------------------
@@ -336,7 +336,7 @@ Baseline Definitions
      - List all baseline definitions for a network.
    * - ``POST``
      - ``/api/monitor/networks/{networkId}/baseline/definitions``
-     - Create a definition. Body: ``{ "type": "DEVICE|IP_MAC_BINDING|GATEWAY|PROTOCOL|APP|VPN_FINGERPRINT", "entityKey": "string", "description": "string" }``.
+     - Create a definition. Body: ``{ "entryType": "DEVICE|IP_MAC_BINDING|GATEWAY|PROTOCOL|APP|VPN_FINGERPRINT", "entityKey": "string", "entityValue": "string", "notes": "string" }``.
    * - ``DELETE``
      - ``/api/monitor/networks/{networkId}/baseline/definitions/{definitionId}``
      - Delete a baseline definition.
