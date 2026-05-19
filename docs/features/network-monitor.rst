@@ -319,7 +319,7 @@ Change Events
      - List change events. Optional query params: ``changeType``, ``severity``.
    * - ``PATCH``
      - ``/api/monitor/networks/{networkId}/changes/{eventId}``
-     - Update ``reviewed`` (boolean) and/or ``notes`` (string) on an event.
+     - Update an event. Body: ``{ "reviewed": boolean, "notes": "string" }`` (both fields optional).
 
 Baseline Definitions
 ~~~~~~~~~~~~~~~~~~~~
@@ -336,7 +336,7 @@ Baseline Definitions
      - List all baseline definitions for a network.
    * - ``POST``
      - ``/api/monitor/networks/{networkId}/baseline/definitions``
-     - Create a definition. Body: ``{ "entryType": "DEVICE|IP_MAC_BINDING|GATEWAY|PROTOCOL|APP|VPN_FINGERPRINT", "entityKey": "string", "entityValue": "string", "notes": "string" }``.
+     - Create a definition. Body: ``{ "entryType": "DEVICE|IP_MAC_BINDING|GATEWAY|PROTOCOL|APP|VPN_FINGERPRINT", "entityKey": "string", "entityValue": "string?", "notes": "string?" }`` (``entityValue`` and ``notes`` are optional).
    * - ``DELETE``
      - ``/api/monitor/networks/{networkId}/baseline/definitions/{definitionId}``
      - Delete a baseline definition.
