@@ -111,6 +111,27 @@ export const AnalysisPage = () => {
   const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
   const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
   const storyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tabsRef = useRef<HTMLUListElement | null>(null);
+  const tabsRoRef = useRef<ResizeObserver | null>(null);
+  const [tabsScrolledRight, setTabsScrolledRight] = useState(false);
+  const [tabsOverflows, setTabsOverflows] = useState(false);
+  const [tabsAtEnd, setTabsAtEnd] = useState(false);
+
+  const tabsRefCallback = useCallback((el: HTMLUListElement | null) => {
+    tabsRef.current = el;
+    tabsRoRef.current?.disconnect();
+    if (!el) return;
+    const check = () => {
+      setTabsOverflows(el.scrollWidth > el.clientWidth);
+      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+    };
+    check();
+    setTimeout(check, 50);
+    setTimeout(check, 300);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    tabsRoRef.current = ro;
+  }, []);
 
   useEffect(() => {
     apiClient
@@ -406,10 +427,26 @@ export const AnalysisPage = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <ul
-        className="nav nav-tabs"
-        style={{ borderBottom: 'none', paddingTop: '1px' }}
-      >
+      <div className="nav-tabs-scroll-wrapper">
+        <button
+          className="nav-tabs-scroll-btn"
+          style={{ visibility: tabsScrolledRight ? 'visible' : 'hidden' }}
+          onClick={() => { tabsRef.current?.scrollBy({ left: -150, behavior: 'smooth' }); }}
+          aria-label="Scroll tabs left"
+        >
+          <i className="bi bi-chevron-left"></i>
+        </button>
+        <ul
+          ref={tabsRefCallback}
+          className="nav nav-tabs"
+          style={{ borderBottom: 'none', paddingTop: '1px' }}
+          onScroll={e => {
+            const el = e.currentTarget as HTMLUListElement;
+            const s = el.scrollLeft;
+            if ((tabsScrolledRight) !== (s > 0)) setTabsScrolledRight(s > 0);
+            setTabsAtEnd(s + el.clientWidth >= el.scrollWidth - 1);
+          }}
+        >
         <li className="nav-item">
           <button
             style={{ whiteSpace: 'nowrap' }}
@@ -474,7 +511,17 @@ export const AnalysisPage = () => {
             <i className="bi bi-globe-europe-africa me-2"></i>Network Intelligence
           </button>
         </li>
-      </ul>
+        </ul>
+        <button
+          className="nav-tabs-scroll-btn"
+          style={{ visibility: tabsOverflows && !tabsAtEnd ? 'visible' : 'hidden' }}
+          onClick={() => { tabsRef.current?.scrollBy({ left: 150, behavior: 'smooth' }); }}
+          aria-label="Scroll tabs right"
+          tabIndex={tabsOverflows && !tabsAtEnd ? 0 : -1}
+        >
+          <i className="bi bi-chevron-right"></i>
+        </button>
+      </div>
 
       {/* Tab Content */}
       <Card>
