@@ -139,30 +139,29 @@ export const SnapshotTimeline = ({
                         {snap.changeCount === 0 ? (
                           <Badge bg="light" text="muted" className="border">No changes</Badge>
                         ) : snap.criticalCount > 0 ? (
-                          <Badge
-                            as="button"
+                          <Button
                             type="button"
-                            bg="danger"
-                            className="border-0"
-                            style={{ cursor: 'pointer' }}
+                            variant="danger"
+                            size="sm"
+                            className="border-0 py-0 px-1"
+                            style={{ fontSize: '0.75em' }}
                             onClick={() => setChangesSnap(snap)}
                           >
                             {snap.criticalCount} critical
                             {snap.changeCount > snap.criticalCount &&
                               `, ${snap.changeCount - snap.criticalCount} more`}
-                          </Badge>
+                          </Button>
                         ) : (
-                          <Badge
-                            as="button"
+                          <Button
                             type="button"
-                            bg="warning"
-                            text="dark"
-                            className="border-0"
-                            style={{ cursor: 'pointer' }}
+                            variant="warning"
+                            size="sm"
+                            className="border-0 py-0 px-1"
+                            style={{ fontSize: '0.75em' }}
                             onClick={() => setChangesSnap(snap)}
                           >
                             {snap.changeCount} change{snap.changeCount !== 1 ? 's' : ''}
-                          </Badge>
+                          </Button>
                         )}
                       </td>
                       <td>
