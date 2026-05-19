@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
@@ -111,6 +111,20 @@ export const AnalysisPage = () => {
   const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
   const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
   const storyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tabsRef = useRef<HTMLUListElement>(null);
+  const [tabsScrollLeft, setTabsScrollLeft] = useState(0);
+  const [tabsOverflows, setTabsOverflows] = useState(false);
+
+  const tabsRefCallback = useCallback((el: HTMLUListElement | null) => {
+    (tabsRef as React.MutableRefObject<HTMLUListElement | null>).current = el;
+    if (!el) return;
+    const check = () => setTabsOverflows(el.scrollWidth > el.clientWidth);
+    check();
+    setTimeout(check, 50);
+    setTimeout(check, 300);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+  }, []);
 
   useEffect(() => {
     apiClient
@@ -406,10 +420,21 @@ export const AnalysisPage = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <ul
-        className="nav nav-tabs"
-        style={{ borderBottom: 'none', paddingTop: '1px' }}
-      >
+      <div className="nav-tabs-scroll-wrapper">
+        <button
+          className="nav-tabs-scroll-btn"
+          style={{ visibility: tabsOverflows && tabsScrollLeft > 0 ? 'visible' : 'hidden' }}
+          onClick={() => { tabsRef.current?.scrollBy({ left: -150, behavior: 'smooth' }); }}
+          aria-label="Scroll tabs left"
+        >
+          <i className="bi bi-chevron-left"></i>
+        </button>
+        <ul
+          ref={tabsRefCallback}
+          className="nav nav-tabs"
+          style={{ borderBottom: 'none', paddingTop: '1px' }}
+          onScroll={e => setTabsScrollLeft((e.currentTarget as HTMLUListElement).scrollLeft)}
+        >
         <li className="nav-item">
           <button
             style={{ whiteSpace: 'nowrap' }}
@@ -474,7 +499,17 @@ export const AnalysisPage = () => {
             <i className="bi bi-globe-europe-africa me-2"></i>Network Intelligence
           </button>
         </li>
-      </ul>
+        </ul>
+        <button
+          className="nav-tabs-scroll-btn"
+          style={{ visibility: tabsOverflows ? 'visible' : 'hidden' }}
+          onClick={() => { tabsRef.current?.scrollBy({ left: 150, behavior: 'smooth' }); }}
+          aria-label="Scroll tabs right"
+          tabIndex={tabsOverflows ? 0 : -1}
+        >
+          <i className="bi bi-chevron-right"></i>
+        </button>
+      </div>
 
       {/* Tab Content */}
       <Card>
