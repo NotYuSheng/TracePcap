@@ -11,6 +11,7 @@ import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +34,18 @@ public class SnapshotService {
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
     networkService.findOrThrow(networkId);
-    return snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(networkId).stream()
-        .map(this::toDto)
+    List<NetworkSnapshotEntity> snapshots =
+        snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(networkId);
+    if (snapshots.isEmpty()) return List.of();
+
+    // Bulk-fetch counts to avoid N+1 queries
+    List<UUID> ids = snapshots.stream().map(NetworkSnapshotEntity::getId).collect(Collectors.toList());
+    Map<UUID, Long> changeCounts = changeEventRepository.countByToSnapshotIds(ids);
+    Map<UUID, Long> criticalCounts = changeEventRepository.countCriticalByToSnapshotIds(ids);
+
+    return snapshots.stream()
+        .map(s -> toDto(s, changeCounts.getOrDefault(s.getId(), 0L),
+                           criticalCounts.getOrDefault(s.getId(), 0L)))
         .collect(Collectors.toList());
   }
 
@@ -71,12 +82,14 @@ public class SnapshotService {
     // Refresh after reorder
     snapshot = snapshotRepository.findById(snapshot.getId()).orElseThrow();
 
-    // Run change detection vs. the immediately preceding snapshot
+    // Run change detection for the new snapshot and any successor whose predecessor changed
     if (!isFirst) {
       List<NetworkSnapshotEntity> ordered =
           snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(networkId);
       int newOrder = snapshot.getSnapshotOrder();
       NetworkSnapshotEntity prev = newOrder > 0 ? ordered.get(newOrder - 1) : null;
+
+      // Detect: prev → new
       if (prev != null) {
         try {
           changeDetectionService.detectChanges(prev, snapshot);
@@ -86,9 +99,25 @@ public class SnapshotService {
               snapshot.getId(), prev.getId(), e.getMessage(), e);
         }
       }
+
+      // If the new snapshot was inserted mid-timeline, the successor's events now reflect
+      // the wrong predecessor. Delete its stale events and re-detect: new → successor.
+      if (newOrder + 1 < ordered.size()) {
+        NetworkSnapshotEntity successor = ordered.get(newOrder + 1);
+        changeEventRepository.deleteByToSnapshotId(successor.getId());
+        try {
+          changeDetectionService.detectChanges(snapshot, successor);
+        } catch (Exception e) {
+          log.error(
+              "Change detection failed for successor snapshot {} vs {}: {}",
+              snapshot.getId(), successor.getId(), e.getMessage(), e);
+        }
+      }
     }
 
-    return toDto(snapshot);
+    long changeCount = changeEventRepository.countByToSnapshotId(snapshot.getId());
+    long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshot.getId());
+    return toDto(snapshot, changeCount, criticalCount);
   }
 
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
@@ -143,9 +172,7 @@ public class SnapshotService {
     }
   }
 
-  NetworkSnapshotDto toDto(NetworkSnapshotEntity s) {
-    long changeCount = changeEventRepository.countByToSnapshotId(s.getId());
-    long criticalCount = changeEventRepository.countCriticalByToSnapshotId(s.getId());
+  NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount) {
     return NetworkSnapshotDto.builder()
         .id(s.getId())
         .networkId(s.getNetwork().getId())

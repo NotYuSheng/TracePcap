@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +40,10 @@ public class ChangeDetectionService {
 
   private static final Set<String> PRIVATE_PREFIXES =
       Set.of("10.", "127.", "169.254.", "192.168.", "::1", "fc", "fd", "fe80");
+
+  // 172.16.0.0/12 covers 172.16.x.x – 172.31.x.x (second octet 16–31)
+  private static final int PRIVATE_172_MIN = 16;
+  private static final int PRIVATE_172_MAX = 31;
 
   private final HostClassificationRepository hostClassificationRepository;
   private final ConversationRepository conversationRepository;
@@ -121,15 +124,13 @@ public class ChangeDetectionService {
     Map<String, String> toIpToMac = invertMap(toMacToIp);
 
     List<NetworkChangeEventEntity> events = new ArrayList<>();
-    Set<String> emittedMacs = new HashSet<>();
 
-    // MAC → IP change (same MAC, different IP; e.g. DHCP reassignment)
+    // MAC → IP change (same MAC, different IP; e.g. DHCP reassignment) — WARNING
     for (Map.Entry<String, String> entry : toMacToIp.entrySet()) {
       String mac = entry.getKey();
       String toIp = entry.getValue();
       String fromIp = fromMacToIp.get(mac);
       if (fromIp != null && !fromIp.equals(toIp)) {
-        emittedMacs.add(mac);
         events.add(
             buildEvent(
                 toSnapshot.getNetwork().getId(),
@@ -144,12 +145,14 @@ public class ChangeDetectionService {
       }
     }
 
-    // IP → MAC change (same IP, different MAC; stronger signal — possible ARP spoofing)
+    // IP → MAC change (same IP, different MAC; possible ARP spoofing) — CRITICAL
+    // Reported independently: a device may simultaneously change its own IP (DHCP drift)
+    // AND claim another IP via ARP — both events are meaningful.
     for (Map.Entry<String, String> entry : toIpToMac.entrySet()) {
       String ip = entry.getKey();
       String toMac = entry.getValue();
       String fromMac = fromIpToMac.get(ip);
-      if (fromMac != null && !fromMac.equals(toMac) && !emittedMacs.contains(toMac)) {
+      if (fromMac != null && !fromMac.equals(toMac)) {
         events.add(
             buildEvent(
                 toSnapshot.getNetwork().getId(),
@@ -457,6 +460,16 @@ public class ChangeDetectionService {
     if (ip == null) return true;
     for (String prefix : PRIVATE_PREFIXES) {
       if (ip.startsWith(prefix)) return true;
+    }
+    // 172.16.0.0/12: second octet must be 16–31
+    if (ip.startsWith("172.")) {
+      String[] parts = ip.split("\\.", 3);
+      if (parts.length >= 2) {
+        try {
+          int second = Integer.parseInt(parts[1]);
+          if (second >= PRIVATE_172_MIN && second <= PRIVATE_172_MAX) return true;
+        } catch (NumberFormatException ignored) { }
+      }
     }
     return false;
   }
