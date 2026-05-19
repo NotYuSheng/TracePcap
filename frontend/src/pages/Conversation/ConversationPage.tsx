@@ -363,7 +363,7 @@ export const ConversationPage = () => {
 
       <div className="row">
         <div className="col-12">
-          <Card>
+          <Card style={{ overflow: 'hidden' }}>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <h6 className="mb-0">Conversations</h6>
               <small className="text-muted">Click a row to view details</small>
@@ -442,6 +442,7 @@ export const ConversationPage = () => {
             <span className="text-muted small text-nowrap">
               {selectedIndex + 1} / {conversations.length}
             </span>
+          </div>
           <Button
             type="button"
             size="sm"
