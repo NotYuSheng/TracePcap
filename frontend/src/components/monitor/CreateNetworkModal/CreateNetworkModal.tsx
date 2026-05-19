@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
-import { Modal } from '@govtechsg/sgds-react';
+import { Alert, Button, Form, Modal } from '@govtechsg/sgds-react';
 
 interface CreateNetworkModalProps {
   show: boolean;
@@ -45,15 +46,14 @@ export const CreateNetworkModal = ({ show, onHide, onCreate }: CreateNetworkModa
       </Modal.Header>
       <form onSubmit={handleSubmit}>
         <Modal.Body>
-          {error && <div className="alert alert-danger py-2">{error}</div>}
-          <div className="mb-3">
-            <label className="form-label fw-semibold" htmlFor="network-name">
+          {error && <Alert variant="danger" className="py-2">{error}</Alert>}
+          <Form.Group className="mb-3">
+            <Form.Label className="fw-semibold" htmlFor="network-name">
               Name <span className="text-danger">*</span>
-            </label>
-            <input
+            </Form.Label>
+            <Form.Control
               id="network-name"
               type="text"
-              className="form-control"
               placeholder="e.g. Office LAN, OT Segment A"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -61,35 +61,35 @@ export const CreateNetworkModal = ({ show, onHide, onCreate }: CreateNetworkModa
               required
               autoFocus
             />
-          </div>
-          <div className="mb-3">
-            <label className="form-label fw-semibold" htmlFor="network-desc">
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label className="fw-semibold" htmlFor="network-desc">
               Description
-            </label>
-            <textarea
+            </Form.Label>
+            <Form.Control
               id="network-desc"
-              className="form-control"
+              as="textarea"
               rows={3}
               placeholder="Optional description of this network segment"
               value={description}
               onChange={e => setDescription(e.target.value)}
             />
-          </div>
+          </Form.Group>
         </Modal.Body>
         <Modal.Footer>
-          <button type="button" className="btn btn-secondary" onClick={handleHide} disabled={saving}>
+          <Button variant="secondary" onClick={handleHide} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={saving || !name.trim()}>
+          </Button>
+          <Button type="submit" variant="primary" disabled={saving || !name.trim()}>
             {saving ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" />
+                <Spinner animation="border" size="sm" className="me-2" />
                 Creating…
               </>
             ) : (
               'Create Network'
             )}
-          </button>
+          </Button>
         </Modal.Footer>
       </form>
     </Modal>

@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Alert, Badge, Button, Form } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -94,13 +96,14 @@ function GeoSourceBadge({ source }: { source?: string | null }) {
         >
           <strong style={{ fontSize: 12 }}>{info.title}</strong>
           <p style={{ margin: '4px 0 0' }}>{info.description}</p>
-          <button
+          <Button
+            size="sm"
+            variant="outline-secondary"
             style={{ marginTop: 6, fontSize: 10, padding: '1px 6px', cursor: 'pointer' }}
-            className="btn btn-sm btn-outline-secondary"
             onClick={() => setPopoverPos(null)}
           >
             Close
-          </button>
+          </Button>
         </div>,
         document.body
       )}
@@ -550,7 +553,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
         {cluster.dominantProtocols.length > 0 && (
           <div className="d-flex flex-wrap gap-1 mb-1">
             {cluster.dominantProtocols.map(p => (
-              <span key={p} className="badge bg-primary-subtle text-primary-emphasis" style={{ fontSize: 10 }}>{p}</span>
+              <Badge key={p} className="bg-primary-subtle text-primary-emphasis" style={{ fontSize: 10 }}>{p}</Badge>
             ))}
           </div>
         )}
@@ -559,8 +562,8 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
           <div className="mt-1">
             <div className="d-flex align-items-center justify-content-between mb-1">
               <small className="text-muted">Top hosts by</small>
-              <select
-                className="form-select form-select-sm"
+              <Form.Select
+                size="sm"
                 style={{ width: 120, fontSize: 10, padding: '1px 4px' }}
                 value={ipMetric}
                 onChange={e => setIpMetric(e.target.value as IpMetric)}
@@ -569,7 +572,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
                 <option value="conversations">Conversations</option>
                 <option value="risks">Risk flags</option>
                 <option value="peers">Unique peers</option>
-              </select>
+              </Form.Select>
             </div>
             {[...cluster.sampleIps]
               .sort((a, b) => {
@@ -605,7 +608,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
       <div style={{ borderTop: '1px solid var(--tp-border, #dee2e6)', flex: 1, overflowY: 'auto' }}>
         <div className="px-3 py-2 d-flex align-items-center gap-2">
           <small className="fw-semibold text-muted" style={{ fontSize: 10, letterSpacing: '0.04em' }}>TOP CONVERSATIONS</small>
-          {convosLoading && <span className="spinner-border spinner-border-sm text-secondary" style={{ width: 12, height: 12, borderWidth: 2 }} />}
+          {convosLoading && <Spinner animation="border" size="sm" className="text-secondary" style={{ width: 12, height: 12, borderWidth: 2 }} />}
         </div>
         {convos.length === 0 && !convosLoading && (
           <p className="text-muted small px-3">No conversations found.</p>
@@ -627,15 +630,17 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
                   {c.protocol.name}{c.appName ? ` / ${c.appName}` : ''} · {formatBytes(c.totalBytes)}
                 </div>
               </div>
-              <button
-                className="btn btn-outline-primary btn-sm flex-shrink-0"
+              <Button
+                variant="outline-primary"
+                size="sm"
+                className="flex-shrink-0"
                 style={{ fontSize: 10, padding: '2px 8px' }}
                 onClick={() => navigate(`/analysis/${fileId}/conversations?highlight=${c.id}`)}
                 title="View this conversation"
               >
                 <i className="bi bi-arrow-right-circle me-1" />
                 View
-              </button>
+              </Button>
             </div>
           );
         })}
@@ -766,9 +771,9 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
     <div className="intel-cluster-graph-wrapper">
       {/* Controls bar */}
       <div className="d-flex align-items-center gap-3 mb-3">
-        <label className="form-label mb-0 text-muted small">Group by</label>
-        <select
-          className="form-select form-select-sm"
+        <Form.Label className="mb-0 text-muted small">Group by</Form.Label>
+        <Form.Select
+          size="sm"
           style={{ width: 200 }}
           value={groupBy}
           onChange={e => onGroupByChange(e.target.value as GroupBy)}
@@ -777,11 +782,11 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
           {GROUP_BY_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
-        </select>
+        </Form.Select>
 
-        <label className="form-label mb-0 text-muted small ms-2">Color by</label>
-        <select
-          className="form-select form-select-sm"
+        <Form.Label className="mb-0 text-muted small ms-2">Color by</Form.Label>
+        <Form.Select
+          size="sm"
           style={{ width: 160 }}
           value={colorMode}
           onChange={e => setColorMode(e.target.value as ColorMode)}
@@ -789,7 +794,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
           {COLOR_MODE_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
-        </select>
+        </Form.Select>
 
         {data && !loading && (
           <div className="d-flex align-items-center gap-2">
@@ -798,32 +803,32 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
               {data.edges.length} connection{data.edges.length !== 1 ? 's' : ''}
             </small>
             {data.hiddenClusters > 0 && (
-              <span
-                className="badge bg-secondary"
+              <Badge
+                bg="secondary"
                 style={{ fontSize: 10 }}
                 title="Showing top clusters by traffic volume"
               >
                 +{data.hiddenClusters} smaller hidden
-              </span>
+              </Badge>
             )}
           </div>
         )}
 
         {(loading || layoutLoading) && (
-          <span className="spinner-border spinner-border-sm text-primary" role="status" />
+          <Spinner animation="border" size="sm" className="text-primary" role="status" />
         )}
       </div>
 
       {/* Hint for Network Labels grouping */}
       {groupBy === 'customOrg' && (
-        <div className="alert alert-info py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
+        <Alert variant="info" className="py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
           <i className="bi bi-tag-fill flex-shrink-0" />
           <span>
             Network Labels are defined in{' '}
             <strong>Custom Detection Rules</strong> — open it from the navigation bar and go to the{' '}
             <strong>Network Labels</strong> tab to add or edit IP ranges.
           </span>
-        </div>
+        </Alert>
       )}
 
       {/* Hint when geo-based grouping yields only internal traffic */}
@@ -831,17 +836,17 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
         (groupBy === 'asn' || groupBy === 'country' || groupBy === 'city') &&
         data.clusters.length <= 2 &&
         data.clusters.every(c => c.label.startsWith('Internal')) && (
-        <div className="alert alert-info py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
+        <Alert variant="info" className="py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
           <i className="bi bi-info-circle-fill" />
           <span>
             All hosts are on an internal/private network — {groupBy === 'asn' ? 'ASN' : groupBy === 'country' ? 'Country' : 'City'} grouping
             has no external data to show. Try{' '}
             <strong>Subnet /24</strong> or <strong>Device Type</strong> for a meaningful view.
           </span>
-          <button className="btn btn-sm btn-info ms-auto" onClick={() => onGroupByChange('subnet24')}>
+          <Button size="sm" variant="info" className="ms-auto" onClick={() => onGroupByChange('subnet24')}>
             Switch to Subnet /24
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {/* Node detail panel — rendered outside the graph canvas so it isn't
@@ -861,7 +866,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
         <div className="intel-graph-container">
           {loading && (
             <div className="intel-graph-layouting">
-              <span className="spinner-border spinner-border-sm" />
+              <Spinner animation="border" size="sm" />
               Loading…
             </div>
           )}
@@ -890,7 +895,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
         <div className="intel-graph-container">
           {(loading || layoutLoading) && (
             <div className="intel-graph-layouting">
-              <span className="spinner-border spinner-border-sm" />
+              <Spinner animation="border" size="sm" />
               Computing layout…
             </div>
           )}

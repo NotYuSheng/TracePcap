@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { Badge } from '@govtechsg/sgds-react';
 import type { NodeType, NodeTypeEvidence } from '@/features/network/types';
 import type { DeviceType } from '@/types';
 import { deviceTypeLabel, deviceTypeColor, confidenceLevel, buildDeviceSignals } from '@/utils/deviceType';
@@ -114,7 +115,7 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
             Type
           </span>
           <div>
-            <span className={`badge ${info.typeBadgeClass}`}>{info.typeLabel}</span>
+            <Badge className={info.typeBadgeClass}>{info.typeLabel}</Badge>
             {evText && (
               <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
                 {evText}
@@ -130,9 +131,9 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
               Device
             </span>
             <div style={{ flex: 1 }}>
-              <span className="badge" style={{ backgroundColor: deviceBg, color: '#fff' }}>
+              <Badge style={{ backgroundColor: deviceBg, color: '#fff' }}>
                 {deviceTypeLabel(info.deviceType)}
-              </span>
+              </Badge>
               {deviceSignals.length > 0 && (
                 <ul className="mb-1 ps-3 mt-1" style={{ fontSize: '0.75rem', color: 'var(--tp-text-muted)' }}>
                   {deviceSignals.map((s, i) => (
@@ -173,9 +174,9 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
             Role
           </span>
           <div>
-            <span className="badge bg-secondary">
+            <Badge bg="secondary">
               {info.role.charAt(0).toUpperCase() + info.role.slice(1)}
-            </span>
+            </Badge>
             <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
               {info.initiated} initiated · {info.received} received
             </div>

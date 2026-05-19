@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
+import { Alert, Badge, Button, Form } from '@govtechsg/sgds-react';
 import type {
   BaselineDefinition,
   BaselineEntryType,
@@ -137,9 +139,9 @@ export const BaselineDefinitionPanel = ({
               {definitions.map(def => (
                 <tr key={def.id}>
                   <td>
-                    <span className="badge bg-light text-dark border">
+                    <Badge bg="light" text="dark" className="border">
                       {ENTRY_TYPE_LABELS[def.entryType] ?? def.entryType}
-                    </span>
+                    </Badge>
                   </td>
                   <td>
                     <code>{def.entityKey}</code>
@@ -153,18 +155,18 @@ export const BaselineDefinitionPanel = ({
                     <small className="text-muted">{def.notes ?? '—'}</small>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-danger"
+                    <Button
+                      size="sm"
+                      variant="outline-danger"
                       onClick={() => handleDelete(def.id)}
                       disabled={deletingId === def.id}
                     >
                       {deletingId === def.id ? (
-                        <span className="spinner-border spinner-border-sm" />
+                        <Spinner animation="border" size="sm" />
                       ) : (
                         <i className="bi bi-trash"></i>
                       )}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -175,12 +177,12 @@ export const BaselineDefinitionPanel = ({
 
       {showForm ? (
         <form onSubmit={handleAdd} className="border rounded p-3 bg-light">
-          {error && <div className="alert alert-danger py-2 small">{error}</div>}
+          {error && <Alert variant="danger" className="py-2 small">{error}</Alert>}
           <div className="row g-2">
             <div className="col-sm-3">
-              <label className="form-label small fw-semibold">Type</label>
-              <select
-                className="form-select form-select-sm"
+              <Form.Label className="small fw-semibold">Type</Form.Label>
+              <Form.Select
+                size="sm"
                 value={entryType}
                 onChange={e => {
                   setEntryType(e.target.value as BaselineEntryType);
@@ -191,15 +193,15 @@ export const BaselineDefinitionPanel = ({
                 {ENTRY_TYPES.map(t => (
                   <option key={t} value={t}>{ENTRY_TYPE_LABELS[t]}</option>
                 ))}
-              </select>
+              </Form.Select>
             </div>
             <div className={FIELD_CONFIG[entryType].valueLabel ? 'col-sm-3' : 'col-sm-5'}>
-              <label className="form-label small fw-semibold">
+              <Form.Label className="small fw-semibold">
                 {FIELD_CONFIG[entryType].keyLabel} <span className="text-danger">*</span>
-              </label>
-              <input
+              </Form.Label>
+              <Form.Control
+                size="sm"
                 type="text"
-                className="form-control form-control-sm"
                 placeholder={FIELD_CONFIG[entryType].keyPlaceholder}
                 value={entityKey}
                 onChange={e => setEntityKey(e.target.value)}
@@ -208,12 +210,12 @@ export const BaselineDefinitionPanel = ({
             </div>
             {FIELD_CONFIG[entryType].valueLabel && (
               <div className="col-sm-3">
-                <label className="form-label small fw-semibold">
+                <Form.Label className="small fw-semibold">
                   {FIELD_CONFIG[entryType].valueLabel}
-                </label>
-                <input
+                </Form.Label>
+                <Form.Control
+                  size="sm"
                   type="text"
-                  className="form-control form-control-sm"
                   placeholder={FIELD_CONFIG[entryType].valuePlaceholder}
                   value={entityValue}
                   onChange={e => setEntityValue(e.target.value)}
@@ -221,10 +223,10 @@ export const BaselineDefinitionPanel = ({
               </div>
             )}
             <div className={FIELD_CONFIG[entryType].valueLabel ? 'col-sm-3' : 'col-sm-4'}>
-              <label className="form-label small fw-semibold">Notes</label>
-              <input
+              <Form.Label className="small fw-semibold">Notes</Form.Label>
+              <Form.Control
+                size="sm"
                 type="text"
-                className="form-control form-control-sm"
                 placeholder="Optional"
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
@@ -232,28 +234,28 @@ export const BaselineDefinitionPanel = ({
             </div>
           </div>
           <div className="d-flex gap-2 mt-3">
-            <button type="submit" className="btn btn-sm btn-primary" disabled={saving || !entityKey.trim()}>
-              {saving ? <span className="spinner-border spinner-border-sm me-1" /> : null}
+            <Button size="sm" type="submit" variant="primary" disabled={saving || !entityKey.trim()}>
+              {saving ? <Spinner animation="border" size="sm" className="me-1" /> : null}
               Add Entry
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm btn-secondary"
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => setShowForm(false)}
               disabled={saving}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-primary"
+        <Button
+          size="sm"
+          variant="outline-primary"
           onClick={() => setShowForm(true)}
         >
           <i className="bi bi-plus-lg me-1"></i>Add Entry
-        </button>
+        </Button>
       )}
     </div>
   );

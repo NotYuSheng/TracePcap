@@ -15,7 +15,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './NetworkControls.css';
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: ReactNode }) {
@@ -27,14 +27,15 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-1"
+        variant="link"
+        className="p-0 text-muted ms-1"
         style={{ lineHeight: 1 }}
         aria-label={`About ${title}`}
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -215,31 +216,33 @@ export function NetworkControls({
       <div className="nc-filter-panel">
         {/* Toggle button */}
         <div className="d-flex align-items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
+          <Button
+            size="sm"
+            variant="outline-secondary"
             onClick={() => setIsOpen(o => !o)}
           >
             <i className="bi bi-funnel me-1"></i>
             Filters
             {activeFilterCount > 0 && (
-              <span className="badge bg-primary ms-2">{activeFilterCount}</span>
+              <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
             )}
             <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
-          </button>
-          <button
-            className="btn btn-link btn-sm p-0 text-muted"
+          </Button>
+          <Button
+            size="sm"
+            variant="link"
+            className="p-0 text-muted"
             onClick={() => setShowColorInfo(true)}
             title="How are node colours determined?"
           >
             <i className="bi bi-info-circle me-1"></i>Node colours
-          </button>
+          </Button>
         </div>
 
         {/* Collapsible panel */}
         {isOpen && (
           <div className="card mt-2">
-            <div className="card-body p-3">
+            <Card.Body className="p-3">
               <div className="row g-3">
                 {/* IP / Hostname */}
                 <div className="col-md-3">
@@ -248,21 +251,19 @@ export function NetworkControls({
                     <span className="input-group-text">
                       <i className="bi bi-search" />
                     </span>
-                    <input
+                    <Form.Control
                       type="text"
-                      className="form-control"
                       placeholder="e.g. 192.168.1.1"
                       value={ipInput}
                       onChange={e => handleIpChange(e.target.value)}
                     />
                     {ipInput && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary"
+                      <Button
+                        variant="outline-secondary"
                         onClick={() => handleIpChange('')}
                       >
                         ×
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -271,40 +272,34 @@ export function NetworkControls({
                 <div className="col-md-2">
                   <label className="filter-section-label d-block mb-2">Port</label>
                   <div className="input-group input-group-sm">
-                    <input
+                    <Form.Control
                       type="text"
                       inputMode="numeric"
-                      className="form-control"
                       placeholder="e.g. 443"
                       value={portInput}
                       onChange={e => handlePortChange(e.target.value)}
                     />
                     {portInput && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary"
+                      <Button
+                        variant="outline-secondary"
                         onClick={() => handlePortChange('')}
                       >
                         ×
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
 
                 {/* Has risks */}
                 <div className="col-md-2 d-flex align-items-end">
-                  <div className="form-check mb-0">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="ncHasRisks"
-                      checked={hasRisksOnly}
-                      onChange={e => onHasRisksOnlyChange(e.target.checked)}
-                    />
-                    <label className="form-check-label small" htmlFor="ncHasRisks">
-                      Security risks only
-                    </label>
-                  </div>
+                  <Form.Check
+                    className="mb-0"
+                    type="checkbox"
+                    id="ncHasRisks"
+                    label="Security risks only"
+                    checked={hasRisksOnly}
+                    onChange={e => onHasRisksOnlyChange(e.target.checked)}
+                  />
                 </div>
 
                 {/* Node Types */}
@@ -782,17 +777,17 @@ export function NetworkControls({
 
               {activeFilterCount > 0 && (
                 <div className="mt-3 pt-2 border-top">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
+                  <Button
+                    size="sm"
+                    variant="outline-secondary"
                     onClick={onClearAllFilters}
                   >
                     <i className="bi bi-x-circle me-1" />
                     Clear filters
-                  </button>
+                  </Button>
                 </div>
               )}
-            </div>
+            </Card.Body>
           </div>
         )}
       </div>
@@ -826,24 +821,24 @@ export function NetworkControls({
                 </p>
                 <ol className="ps-3" style={{ lineHeight: '2' }}>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['dns-server'], color: '#fff' }}>DNS</span>
-                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['web-server'], color: '#fff' }}>Web</span>
-                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['router'], color: '#fff' }}>Router</span>
+                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['dns-server'], color: '#fff' }}>DNS</Badge>
+                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['web-server'], color: '#fff' }}>Web</Badge>
+                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['router'], color: '#fff' }}>Router</Badge>
                     <strong>Specific server role</strong> — the node's dominant inbound port identifies it as a known server type (DNS, web, SSH, FTP, mail, DHCP, NTP, database, router). Each type has a fixed colour.
                   </li>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: deviceTypeColor('MOBILE'), color: '#fff' }}>Mobile</span>
-                    <span className="badge me-2" style={{ backgroundColor: deviceTypeColor('IOT'), color: '#fff' }}>IoT</span>
+                    <Badge className="me-2" style={{ backgroundColor: deviceTypeColor('MOBILE'), color: '#fff' }}>Mobile</Badge>
+                    <Badge className="me-2" style={{ backgroundColor: deviceTypeColor('IOT'), color: '#fff' }}>IoT</Badge>
                     <strong>Device classification</strong> — inferred from MAC OUI vendor lookup, TTL fingerprinting, and observed nDPI application profiles. Overrides generic node type when a non-unknown device type is detected.
                   </li>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}>Client</span>
+                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}>Client</Badge>
                     <strong>Generic node type</strong> — nodes that only initiate outbound connections with no dominant inbound port are classified as clients and shown in blue.
                   </li>
                   <li>
-                    <span className="badge me-2" style={{ backgroundColor: '#2ecc71', color: '#fff' }}>Server</span>
-                    <span className="badge me-2" style={{ backgroundColor: '#9b59b6', color: '#fff' }}>Both</span>
-                    <span className="badge bg-secondary me-2">Other</span>
+                    <Badge className="me-2" style={{ backgroundColor: '#2ecc71', color: '#fff' }}>Server</Badge>
+                    <Badge className="me-2" style={{ backgroundColor: '#9b59b6', color: '#fff' }}>Both</Badge>
+                    <Badge bg="secondary" className="me-2">Other</Badge>
                     <strong>Traffic role fallback</strong> — if no type can be determined, nodes are coloured by their observed role: green if they only receive connections (server), purple if they both send and receive (both), grey otherwise.
                   </li>
                 </ol>

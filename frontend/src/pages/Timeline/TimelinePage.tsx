@@ -7,6 +7,7 @@ import {
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
+import { Alert, Card } from '@govtechsg/sgds-react';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 
@@ -57,7 +58,7 @@ export const TimelinePage = () => {
   }
 
   if (timelineData.length === 0) {
-    return <div className="alert alert-warning">No timeline data available for this capture.</div>;
+    return <Alert variant="warning">No timeline data available for this capture.</Alert>;
   }
 
   // Calculate summary statistics
@@ -78,50 +79,50 @@ export const TimelinePage = () => {
 
       <div className="row mb-4">
         <div className="col-md-3">
-          <div className="card">
-            <div className="card-body text-center">
+          <Card>
+            <Card.Body className="text-center">
               <h6 className="text-muted mb-1">Total Packets</h6>
               <h3 className="mb-0">{totalPackets.toLocaleString()}</h3>
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
         <div className="col-md-3">
-          <div className="card">
-            <div className="card-body text-center">
+          <Card>
+            <Card.Body className="text-center">
               <h6 className="text-muted mb-1">Total Bytes</h6>
               <h3 className="mb-0">{(totalBytes / 1024 / 1024).toFixed(2)} MB</h3>
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
         <div className="col-md-3">
-          <div className="card">
-            <div className="card-body text-center">
+          <Card>
+            <Card.Body className="text-center">
               <h6 className="text-muted mb-1">Avg Packets/Min</h6>
               <h3 className="mb-0">{avgPackets.toLocaleString()}</h3>
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
         <div className="col-md-3">
-          <div className="card">
-            <div className="card-body text-center">
+          <Card>
+            <Card.Body className="text-center">
               <h6 className="text-muted mb-1">Peak Packets/Min</h6>
               <h3 className="mb-0">{maxPackets.toLocaleString()}</h3>
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
 
       <div className="row">
         <div className="col-12">
-          <div className="card">
-            <div className="card-body">
+          <Card>
+            <Card.Body>
               <TrafficTimeline
                 data={timelineData}
                 granularity={granularity}
                 onGranularityChange={setGranularity}
               />
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
     </div>

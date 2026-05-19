@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Badge } from '@govtechsg/sgds-react';
 import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { NODE_TYPE_CONFIG, getProtocolColor } from '@/features/network/constants';
@@ -272,9 +273,9 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         </td>
                         <td>
                           {Array.from(info.apps).map(app => (
-                            <span key={app} className="badge bg-light text-dark me-1 border">
+                            <Badge key={app} bg="light" text="dark" className="me-1 border">
                               {app}
-                            </span>
+                            </Badge>
                           ))}
                         </td>
                         <td className="text-end small">{formatNumber(info.packets)}</td>

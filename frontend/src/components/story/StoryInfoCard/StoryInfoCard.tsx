@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button, Card, Form } from '@govtechsg/sgds-react';
 
 interface StoryInfoCardProps {
   additionalContext?: string;
@@ -40,37 +41,40 @@ function CapControl({
     <div className="d-flex align-items-center gap-2 flex-wrap">
       <span className="text-muted small fw-semibold" style={{ minWidth: 140 }}>{label}:</span>
       {presets.map(p => (
-        <button
+        <Button
           key={p}
           type="button"
-          className={`btn btn-sm ${value === p ? 'btn-info' : 'btn-outline-secondary'}`}
+          size="sm"
+          variant={value === p ? 'info' : 'outline-secondary'}
           style={{ minWidth: 44 }}
           onClick={() => onChange(p)}
         >
           {p}
-        </button>
+        </Button>
       ))}
-      <button
+      <Button
         type="button"
-        className={`btn btn-sm ${total !== undefined && value >= total ? 'btn-info' : 'btn-outline-secondary'}`}
+        size="sm"
+        variant={total !== undefined && value >= total ? 'info' : 'outline-secondary'}
         style={{ minWidth: 44 }}
         onClick={() => onChange(total ?? 999999)}
       >
         {total !== undefined ? `All ${total}` : 'All'}
-      </button>
+      </Button>
       {value !== defaultValue && !presets.includes(value) && (total === undefined || value < total) && (
-        <button
+        <Button
           type="button"
-          className="btn btn-sm btn-info"
+          size="sm"
+          variant="info"
           style={{ minWidth: 44 }}
         >
           {value}
-        </button>
+        </Button>
       )}
       <div className="input-group input-group-sm" style={{ width: 110 }}>
-        <input
+        <Form.Control
           type="number"
-          className="form-control form-control-sm"
+          size="sm"
           placeholder="Custom…"
           min={1}
           value={customInput}
@@ -96,9 +100,9 @@ export const StoryInfoCard = ({
   const [collapsed, setCollapsed] = useState(true);
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
-      <div
-        className="card-header d-flex align-items-center justify-content-between"
+    <Card style={{ overflow: 'hidden' }}>
+      <Card.Header
+        className="d-flex align-items-center justify-content-between"
         style={{
           cursor: 'pointer',
           userSelect: 'none',
@@ -111,9 +115,9 @@ export const StoryInfoCard = ({
           How Stories Are Generated &amp; Limitations
         </h6>
         <i className={`bi bi-chevron-${collapsed ? 'down' : 'up'} text-muted`}></i>
-      </div>
+      </Card.Header>
       {!collapsed && (
-        <div className="card-body">
+        <Card.Body>
           <p className="text-muted small mb-2">
             The following data is sent to the configured LLM to generate the narrative:
           </p>
@@ -141,12 +145,12 @@ export const StoryInfoCard = ({
 
           {(onMaxFindingsChange || onMaxRiskMatrixChange) && (
             <div className="mt-3 pt-3 border-top">
-              <label className="form-label small fw-semibold mb-2">
+              <Form.Label className="small fw-semibold mb-2">
                 Prompt limits{' '}
                 <span className="text-muted fw-normal">
                   (reduce if generation fails due to context length)
                 </span>
-              </label>
+              </Form.Label>
               <div className="d-flex flex-column gap-2">
                 {onMaxFindingsChange && (
                   <CapControl
@@ -174,11 +178,12 @@ export const StoryInfoCard = ({
 
           {onAdditionalContextChange !== undefined && (
             <div className="mt-3 pt-3 border-top">
-              <label className="form-label small fw-semibold mb-1">
+              <Form.Label className="small fw-semibold mb-1">
                 Additional context <span className="text-muted fw-normal">(optional)</span>
-              </label>
-              <textarea
-                className="form-control form-control-sm"
+              </Form.Label>
+              <Form.Control
+                as="textarea"
+                size="sm"
                 rows={3}
                 placeholder={
                   'Help the LLM produce a more relevant story by providing context it cannot see, e.g.:\n' +
@@ -192,8 +197,8 @@ export const StoryInfoCard = ({
               />
             </div>
           )}
-        </div>
+        </Card.Body>
       )}
-    </div>
+    </Card>
   );
 };

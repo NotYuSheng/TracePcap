@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useRef, useState } from 'react';
-import { Modal } from '@govtechsg/sgds-react';
+import { Alert, Button, Modal } from '@govtechsg/sgds-react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
@@ -148,10 +149,10 @@ export const AddSnapshotModal = ({
                 </>
               )}
             </div>
-            {uploadError && <div className="alert alert-danger py-2">{uploadError}</div>}
-            <button
-              type="button"
-              className="btn btn-primary w-100"
+            {uploadError && <Alert variant="danger" className="py-2">{uploadError}</Alert>}
+            <Button
+              variant="primary"
+              className="w-100"
               disabled={uploadFiles.length === 0}
               onClick={handleUploadAndAdd}
             >
@@ -159,7 +160,7 @@ export const AddSnapshotModal = ({
               {uploadFiles.length > 1
                 ? `Upload ${uploadFiles.length} files & add to network`
                 : 'Upload & add to network'}
-            </button>
+            </Button>
           </>
         ) : (
           <div className="text-center py-4">
@@ -169,7 +170,7 @@ export const AddSnapshotModal = ({
               </div>
             ) : (
               <>
-                <div className="spinner-border text-primary mb-3" role="status" />
+                <Spinner animation="border" className="text-primary mb-3" role="status" />
                 <div className="fw-semibold">
                   {totalFiles > 1 && `File ${uploadCurrent} of ${totalFiles} — `}
                   {phaseLabel[uploadPhase]}

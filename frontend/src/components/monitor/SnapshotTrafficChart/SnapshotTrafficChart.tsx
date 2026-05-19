@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState, useMemo } from 'react';
+import { Button, ButtonGroup, Card, Form } from '@govtechsg/sgds-react';
 import {
   BarChart,
   Bar,
@@ -83,8 +85,8 @@ function CustomTooltip({ active, payload, label, viewMode }: TooltipProps) {
   const total = payload.reduce((s, e) => s + (e.value ?? 0), 0);
   const snapLabel = payload[0]?.payload?.snapLabel;
   return (
-    <div className="card shadow-sm" style={{ minWidth: 200 }}>
-      <div className="card-body p-2 small">
+    <Card className="shadow-sm" style={{ minWidth: 200 }}>
+      <Card.Body className="p-2 small">
         {snapLabel && <p className="mb-0 text-muted" style={{ fontSize: '0.7rem' }}>{snapLabel}</p>}
         <p className="mb-1 fw-semibold">{label}</p>
         <div className="mb-1">
@@ -101,8 +103,8 @@ function CustomTooltip({ active, payload, label, viewMode }: TooltipProps) {
             ))}
           </ul>
         )}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }
 
@@ -201,8 +203,8 @@ export const SnapshotTrafficChart = ({ snapshots }: Props) => {
         <div className="d-flex align-items-center gap-2 flex-wrap">
           <div className="d-flex align-items-center gap-1">
             <label className="text-muted small mb-0">Granularity:</label>
-            <select
-              className="form-select form-select-sm"
+            <Form.Select
+              size="sm"
               style={{ width: 'auto' }}
               value={granularity === 'auto' ? 'auto' : String(granularity)}
               onChange={e => {
@@ -214,30 +216,28 @@ export const SnapshotTrafficChart = ({ snapshots }: Props) => {
               {GRANULARITY_OPTIONS.map(({ label, seconds }) => (
                 <option key={seconds} value={String(seconds)}>{label}</option>
               ))}
-            </select>
+            </Form.Select>
           </div>
-          <div className="btn-group btn-group-sm">
-            <button
-              type="button"
-              className={`btn ${viewMode === 'packets' ? 'btn-primary' : 'btn-outline-primary'}`}
+          <ButtonGroup size="sm">
+            <Button
+              variant={viewMode === 'packets' ? 'primary' : 'outline-primary'}
               onClick={() => setViewMode('packets')}
             >
               Packets
-            </button>
-            <button
-              type="button"
-              className={`btn ${viewMode === 'bytes' ? 'btn-primary' : 'btn-outline-primary'}`}
+            </Button>
+            <Button
+              variant={viewMode === 'bytes' ? 'primary' : 'outline-primary'}
               onClick={() => setViewMode('bytes')}
             >
               Bytes
-            </button>
-          </div>
+            </Button>
+          </ButtonGroup>
         </div>
       </div>
 
       {loading ? (
         <div className="d-flex align-items-center justify-content-center py-5 text-muted">
-          <span className="spinner-border spinner-border-sm me-2" />
+          <Spinner animation="border" size="sm" className="me-2" />
           Loading traffic data…
         </div>
       ) : (

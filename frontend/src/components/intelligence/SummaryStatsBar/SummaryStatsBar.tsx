@@ -1,3 +1,4 @@
+import { Card } from '@govtechsg/sgds-react';
 import type { AnalysisData } from '@/types';
 import { formatBytes } from '@/utils/formatters';
 
@@ -42,18 +43,18 @@ export const SummaryStatsBar = ({ data }: SummaryStatsBarProps) => {
     <div className="row g-3 mb-4">
       {stats.map(s => (
         <div key={s.label} className="col-6 col-md-3">
-          <div
-            className="card h-100"
+          <Card
+            className="h-100"
             style={{ borderLeft: `4px solid ${s.color}` }}
           >
-            <div className="card-body py-3">
+            <Card.Body className="py-3">
               <div className="d-flex align-items-center gap-2 mb-1">
                 <i className={`bi ${s.icon}`} style={{ color: s.color, fontSize: '1.1rem' }} />
                 <small className="text-muted">{s.label}</small>
               </div>
               <div className="fw-bold fs-5">{s.value}</div>
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       ))}
     </div>

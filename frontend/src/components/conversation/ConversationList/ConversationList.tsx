@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Badge } from '@govtechsg/sgds-react';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import type { Conversation, ConversationGeoInfo, HostClassification } from '@/types';
 import type { SortField, SortDir } from '@/features/conversation/types';
@@ -268,13 +269,14 @@ export const ConversationList = ({
                       conversation.detectedFileTypes.length > 0 ? (
                         <div className="d-inline-flex flex-wrap gap-1">
                           {conversation.detectedFileTypes.map(ft => (
-                            <span
+                            <Badge
                               key={ft}
-                              className="badge bg-info text-dark"
+                              bg="info"
+                              text="dark"
                               style={{ whiteSpace: 'nowrap' }}
                             >
                               {ft}
-                            </span>
+                            </Badge>
                           ))}
                         </div>
                       ) : (

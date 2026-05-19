@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
+import { Badge, Button } from '@govtechsg/sgds-react';
 import { formatBytes } from '@/utils/formatters';
 import type { HostSummary, SortBy } from '@/features/intelligence/services/intelligenceService';
 
@@ -64,17 +66,18 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
         <h6 className="mb-0">Top Hosts</h6>
         <div className="d-flex gap-1">
           {SORT_OPTIONS.map(o => (
-            <button
+            <Button
               key={o.value}
-              className={`btn btn-sm ${sortBy === o.value ? 'btn-primary' : 'btn-outline-secondary'}`}
+              size="sm"
+              variant={sortBy === o.value ? 'primary' : 'outline-secondary'}
               onClick={() => { onSortByChange(o.value); setPage(0); }}
               disabled={loading}
             >
               {o.label}
-            </button>
+            </Button>
           ))}
         </div>
-        {loading && <span className="spinner-border spinner-border-sm text-primary" role="status" />}
+        {loading && <Spinner animation="border" size="sm" className="text-primary" role="status" />}
       </div>
 
       <div style={{ overflowX: 'auto' }}>
@@ -109,14 +112,13 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
                 <td>{host.conversationCount.toLocaleString()}</td>
                 <td>
                   {host.riskCount > 0 ? (
-                    <span className="badge bg-danger">{host.riskCount}</span>
+                    <Badge bg="danger">{host.riskCount}</Badge>
                   ) : (
                     <span className="text-muted">—</span>
                   )}
                 </td>
                 <td>
-                  <span
-                    className="badge"
+                  <Badge
                     style={{
                       background: host.role === 'server' ? '#107c10'
                         : host.role === 'client' ? '#0072c6'
@@ -125,7 +127,7 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
                     }}
                   >
                     {host.role}
-                  </span>
+                  </Badge>
                 </td>
                 <td>
                   {host.deviceType ? (
@@ -160,21 +162,23 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
 
       {totalPages > 1 && (
         <div className="d-flex align-items-center gap-2 mt-2">
-          <button
-            className="btn btn-sm btn-outline-secondary"
+          <Button
+            size="sm"
+            variant="outline-secondary"
             onClick={() => setPage(p => p - 1)}
             disabled={page === 0}
           >
             ‹ Prev
-          </button>
+          </Button>
           <small className="text-muted">Page {page + 1} / {totalPages}</small>
-          <button
-            className="btn btn-sm btn-outline-secondary"
+          <Button
+            size="sm"
+            variant="outline-secondary"
             onClick={() => setPage(p => p + 1)}
             disabled={page >= totalPages - 1}
           >
             Next ›
-          </button>
+          </Button>
         </div>
       )}
     </div>

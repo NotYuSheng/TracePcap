@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { Conversation, ConversationGeoInfo, Packet, HostClassification } from '@/types';
@@ -75,13 +76,13 @@ function GeoSourceBadge({ source }: { source?: string }) {
 
   return (
     <>
-      <span
-        className="ms-2 badge"
+      <Badge
+        className="ms-2"
         style={{ backgroundColor: info.bg, color: '#fff', fontSize: '0.7em', cursor: 'pointer' }}
         onClick={handleClick}
       >
         {info.label}
-      </span>
+      </Badge>
       {popoverPos && createPortal(
         <div
           style={{
@@ -103,7 +104,7 @@ function GeoSourceBadge({ source }: { source?: string }) {
           <div className="fw-semibold mb-1" style={{ fontSize: 12 }}>{info.title}</div>
           <div className="text-muted">{info.description}</div>
           <div className="text-end mt-2">
-            <button className="btn btn-sm btn-outline-secondary" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => setPopoverPos(null)}>Close</button>
+            <Button size="sm" variant="outline-secondary" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => setPopoverPos(null)}>Close</Button>
           </div>
         </div>,
         document.body
@@ -226,20 +227,21 @@ export const ConversationDetail = ({
   return (
     <div className="conversation-detail">
       <div className="card mb-4">
-        <div className="card-header d-flex align-items-center justify-content-between">
+        <Card.Header className="d-flex align-items-center justify-content-between">
           <h5 className="mb-0">Conversation Details</h5>
           {extractedCount != null && extractedCount > 0 && fileId && (
-            <button
-              className="btn btn-sm btn-outline-warning"
+            <Button
+              size="sm"
+              variant="outline-warning"
               onClick={() => navigate(`/analysis/${fileId}/extracted-files`)}
               title="Files extracted from this conversation's stream"
             >
               <i className="bi bi-file-earmark-arrow-down me-1"></i>
               {extractedCount} extracted file{extractedCount !== 1 ? 's' : ''}
-            </button>
+            </Button>
           )}
-        </div>
-        <div className="card-body">
+        </Card.Header>
+        <Card.Body>
           <div className="row">
             <div className="col-md-6">
               <dl className="row mb-0">
@@ -247,8 +249,8 @@ export const ConversationDetail = ({
                 <dd className="col-sm-8">
                   {formatIpPort(source.ip, source.port)}
                   {srcClass && (
-                    <span
-                      className="ms-2 badge"
+                    <Badge
+                      className="ms-2"
                       style={{
                         backgroundColor: deviceTypeColor(srcClass.deviceType),
                         color: '#fff',
@@ -259,15 +261,15 @@ export const ConversationDetail = ({
                       onClick={e => openDevicePopup(srcClass, source.ip, 'client', e)}
                     >
                       {deviceTypeLabel(srcClass.deviceType)}
-                    </span>
+                    </Badge>
                   )}
                 </dd>
                 <dt className="col-sm-4">Destination:</dt>
                 <dd className="col-sm-8">
                   {formatIpPort(destination.ip, destination.port)}
                   {dstClass && (
-                    <span
-                      className="ms-2 badge"
+                    <Badge
+                      className="ms-2"
                       style={{
                         backgroundColor: deviceTypeColor(dstClass.deviceType),
                         color: '#fff',
@@ -278,7 +280,7 @@ export const ConversationDetail = ({
                       onClick={e => openDevicePopup(dstClass, destination.ip, 'server', e)}
                     >
                       {deviceTypeLabel(dstClass.deviceType)}
-                    </span>
+                    </Badge>
                   )}
                   {conversation.hostname && (
                     <small className="text-info d-block">{conversation.hostname}</small>
@@ -291,12 +293,9 @@ export const ConversationDetail = ({
                   {(() => {
                     const bg = getProtocolColor(conversation.protocol.name);
                     return (
-                      <span
-                        className="badge"
-                        style={{ backgroundColor: bg, color: getTextColor(bg) }}
-                      >
+                      <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
                         {conversation.protocol.name}
-                      </span>
+                      </Badge>
                     );
                   })()}
                 </dd>
@@ -307,12 +306,9 @@ export const ConversationDetail = ({
                       {(() => {
                         const bg = getL7ProtocolColor(conversation.tsharkProtocol!);
                         return (
-                          <span
-                            className="badge"
-                            style={{ backgroundColor: bg, color: getTextColor(bg) }}
-                          >
+                          <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
                             {conversation.tsharkProtocol}
-                          </span>
+                          </Badge>
                         );
                       })()}
                     </dd>
@@ -325,12 +321,9 @@ export const ConversationDetail = ({
                       {(() => {
                         const bg = getAppColor(conversation.appName!);
                         return (
-                          <span
-                            className="badge"
-                            style={{ backgroundColor: bg, color: getTextColor(bg) }}
-                          >
+                          <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
                             {conversation.appName}
-                          </span>
+                          </Badge>
                         );
                       })()}
                     </dd>
@@ -342,9 +335,8 @@ export const ConversationDetail = ({
                     <dd className="col-sm-8">
                       <div className="d-flex flex-wrap gap-1">
                         {conversation.flowRisks.map(risk => (
-                          <span
+                          <Badge
                             key={risk}
-                            className="badge"
                             style={{
                               backgroundColor: RISK_BADGE.bg,
                               color: RISK_BADGE.text,
@@ -352,7 +344,7 @@ export const ConversationDetail = ({
                             }}
                           >
                             {risk}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     </dd>
@@ -366,13 +358,12 @@ export const ConversationDetail = ({
                         {conversation.customSignatures.map(rule => {
                           const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                           return (
-                            <span
+                            <Badge
                               key={rule}
-                              className="badge"
                               style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}
                             >
                               {rule.replace(/_/g, ' ')}
-                            </span>
+                            </Badge>
                           );
                         })}
                       </div>
@@ -446,7 +437,7 @@ export const ConversationDetail = ({
                       >
                         {formatTimestamp(conversation.tlsNotAfter)}
                         {conversation.tlsNotAfter < Date.now() && (
-                          <span className="ms-1 badge bg-danger">Expired</span>
+                          <Badge bg="danger" className="ms-1">Expired</Badge>
                         )}
                       </small>
                     </dd>
@@ -467,11 +458,11 @@ export const ConversationDetail = ({
               </dl>
             </div>
           </div>
-        </div>
+        </Card.Body>
       </div>
 
       <div className="card">
-        <div className="card-header">
+        <Card.Header>
           <ul className="nav nav-tabs card-header-tabs">
             <li className="nav-item">
               <button
@@ -479,9 +470,9 @@ export const ConversationDetail = ({
                 onClick={() => setActiveTab('packets')}
               >
                 Packets
-                <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }}>
+                <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.65rem' }}>
                   {conversation.packets?.length || 0}
-                </span>
+                </Badge>
               </button>
             </li>
             <li className="nav-item">
@@ -493,10 +484,10 @@ export const ConversationDetail = ({
               </button>
             </li>
           </ul>
-        </div>
+        </Card.Header>
 
         {activeTab === 'packets' && (
-          <div className="card-body p-0">
+          <Card.Body className="p-0">
             <div className="px-3 py-2 border-bottom d-flex justify-content-end">
               <small className="text-muted">Click a row to view hex payload</small>
             </div>
@@ -575,13 +566,14 @@ export const ConversationDetail = ({
                           <td style={{ whiteSpace: 'nowrap' }}>{packet.size} B</td>
                           <td>
                             {packet.detectedFileType ? (
-                              <span
-                                className="badge bg-info text-dark"
+                              <Badge
+                                bg="info"
+                                text="dark"
                                 style={{ fontSize: '0.65rem' }}
                                 title={`Magic bytes match: ${packet.detectedFileType}`}
                               >
                                 {packet.detectedFileType}
-                              </span>
+                              </Badge>
                             ) : (
                               <span className="text-muted">—</span>
                             )}
@@ -591,12 +583,14 @@ export const ConversationDetail = ({
                               {packet.info ?? packet.protocol.name}
                             </small>
                             {asciiPacketIds.has(packet.id) && (
-                              <span
-                                className="badge bg-warning text-dark ms-1"
+                              <Badge
+                                bg="warning"
+                                text="dark"
+                                className="ms-1"
                                 style={{ fontSize: '0.65rem' }}
                               >
                                 ASCII
-                              </span>
+                              </Badge>
                             )}
                           </td>
                         </tr>
@@ -626,13 +620,13 @@ export const ConversationDetail = ({
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card.Body>
         )}
 
         {activeTab === 'session' && (
-          <div className="card-body">
+          <Card.Body>
             <SessionTab conversationId={conversation.id} protocol={conversation.protocol.name} />
-          </div>
+          </Card.Body>
         )}
       </div>
 

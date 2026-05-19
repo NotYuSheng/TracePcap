@@ -1,4 +1,4 @@
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { StoryTimelineEvent } from '@/types';
 import { formatTimestamp } from '@/utils/formatters';
 
@@ -33,14 +33,15 @@ function InfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-2"
+        variant="link"
+        className="p-0 text-muted ms-2"
         style={{ lineHeight: 1 }}
         aria-label="About Event Timeline"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -125,9 +126,9 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
       </div>
 
       {events.length === 0 && (
-        <div className="alert alert-secondary">
+        <Alert variant="secondary">
           <p className="mb-0">No timeline events to display</p>
-        </div>
+        </Alert>
       )}
     </div>
   );

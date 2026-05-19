@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Button, ButtonGroup, Card, Form } from '@govtechsg/sgds-react';
 import {
   BarChart,
   Bar,
@@ -76,8 +77,8 @@ function CustomTooltip({ active, payload, label, viewMode }: CustomTooltipProps)
   if (!active || !payload || payload.length === 0 || typeof label !== 'number') return null;
   const total = payload.reduce((s, e) => s + (e.value ?? 0), 0);
   return (
-    <div className="card shadow-sm" style={{ minWidth: '220px' }}>
-      <div className="card-body p-2">
+    <Card className="shadow-sm" style={{ minWidth: '220px' }}>
+      <Card.Body className="p-2">
         <p className="mb-2 fw-semibold small">{formatTimestamp(label)}</p>
         <div className="mb-1 small">
           <strong>Total {viewMode === 'packets' ? 'Packets' : 'Bytes'}:</strong>{' '}
@@ -93,8 +94,8 @@ function CustomTooltip({ active, payload, label, viewMode }: CustomTooltipProps)
             ))}
           </ul>
         )}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }
 
@@ -169,9 +170,9 @@ export const TrafficTimeline = ({
             <label htmlFor="granularity-select" className="text-muted small mb-0">
               Granularity:
             </label>
-            <select
+            <Form.Select
               id="granularity-select"
-              className="form-select form-select-sm"
+              size="sm"
               style={{ width: 'auto' }}
               value={granularity === 'auto' ? 'auto' : String(granularity)}
               onChange={e => {
@@ -185,24 +186,24 @@ export const TrafficTimeline = ({
                   {label}
                 </option>
               ))}
-            </select>
+            </Form.Select>
           </div>
-          <div className="btn-group btn-group-sm" role="group" aria-label="View mode">
-            <button
+          <ButtonGroup size="sm" aria-label="View mode">
+            <Button
               type="button"
-              className={`btn ${viewMode === 'packets' ? 'btn-primary' : 'btn-outline-primary'}`}
+              variant={viewMode === 'packets' ? 'primary' : 'outline-primary'}
               onClick={() => setViewMode('packets')}
             >
               Packets
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className={`btn ${viewMode === 'bytes' ? 'btn-primary' : 'btn-outline-primary'}`}
+              variant={viewMode === 'bytes' ? 'primary' : 'outline-primary'}
               onClick={() => setViewMode('bytes')}
             >
               Bytes
-            </button>
-          </div>
+            </Button>
+          </ButtonGroup>
         </div>
       </div>
 
