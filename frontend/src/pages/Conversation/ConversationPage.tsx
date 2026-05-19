@@ -442,6 +442,7 @@ export const ConversationPage = () => {
             <span className="text-muted small text-nowrap">
               {selectedIndex + 1} / {conversations.length}
             </span>
+          </div>
           <Button
             type="button"
             size="sm"
