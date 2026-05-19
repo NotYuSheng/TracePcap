@@ -1,6 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, type CSSProperties } from 'react';
-import { Badge } from '@govtechsg/sgds-react';
+import { Badge, Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import { LastSeenModal } from '../LastSeenModal/LastSeenModal';
@@ -60,17 +60,18 @@ function IpBadgeGroup({
         </Badge>
       ))}
       {absentItems.map(entity => (
-        <Badge
+        <Button
           key={entity.key}
-          as="button"
           type="button"
-          className="text-decoration-line-through"
-          style={{ cursor: 'pointer', opacity: 0.5, ...hashBadgeStyle(entity.key) }}
+          variant="secondary"
+          size="sm"
+          className="text-decoration-line-through border-0 py-0 px-1"
+          style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(entity.key) }}
           onClick={() => onAbsentClick(entity)}
           title={`Last seen in ${entity.lastSeenFileName}`}
         >
           {entity.key}
-        </Badge>
+        </Button>
       ))}
     </div>
   );

@@ -169,29 +169,32 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
     <>
       <div className="d-flex flex-wrap gap-2">
         {active.map(mac => (
-          <Badge
+          <Button
             key={mac}
-            as="button"
             type="button"
-            style={{ cursor: 'pointer', ...hashBadgeStyle(mac) }}
+            variant="secondary"
+            size="sm"
+            className="border-0 py-0 px-1"
+            style={{ fontSize: '0.75em', ...hashBadgeStyle(mac) }}
             onClick={() => openModal(mac)}
             title="View device history"
           >
             {mac}
-          </Badge>
+          </Button>
         ))}
         {absent.map(mac => (
-          <Badge
+          <Button
             key={mac}
-            as="button"
             type="button"
-            className="text-decoration-line-through"
-            style={{ cursor: 'pointer', opacity: 0.5, ...hashBadgeStyle(mac) }}
+            variant="secondary"
+            size="sm"
+            className="text-decoration-line-through border-0 py-0 px-1"
+            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(mac) }}
             onClick={() => openModal(mac)}
             title="View device history"
           >
             {mac}
-          </Badge>
+          </Button>
         ))}
       </div>
       {absent.length > 0 && (
