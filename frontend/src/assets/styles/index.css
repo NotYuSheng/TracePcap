@@ -102,6 +102,53 @@ body {
   color: var(--tp-text-muted);
 }
 
+/* Analysis page nav-tabs: single scrollable row with fade + scroll buttons */
+.nav-tabs-scroll-wrapper {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.nav.nav-tabs {
+  flex: 1 1 0;
+  width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav.nav-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-tabs-scroll-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  align-self: stretch;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--tp-border);
+  color: var(--tp-text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.nav-tabs-scroll-btn:first-child {
+  margin-right: 2px;
+}
+
+.nav-tabs-scroll-btn:last-child {
+  margin-left: 2px;
+}
+
+.nav-tabs-scroll-btn:hover {
+  color: var(--tp-text);
+}
+
 /* Upload progress scroll row */
 .upload-progress-scroll {
   display: flex;
