@@ -405,7 +405,7 @@ export const AnalysisPage = () => {
       {/* Navigation Tabs */}
       <ul
         className="nav nav-tabs"
-        style={{ display: 'flex', flexWrap: 'nowrap', overflowX: 'auto', borderBottom: 'none', paddingTop: '1px' }}
+        style={{ borderBottom: 'none', paddingTop: '1px' }}
       >
         <li className="nav-item">
           <button

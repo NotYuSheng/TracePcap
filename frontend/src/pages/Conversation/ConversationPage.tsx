@@ -420,7 +420,7 @@ export const ConversationPage = () => {
             if (e.target === e.currentTarget) closeModal();
           }}
         >
-          <div className="modal-dialog modal-xl modal-dialog-scrollable">
+          <div className="modal-dialog modal-xl modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
                 <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
