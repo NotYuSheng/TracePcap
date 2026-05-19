@@ -1,6 +1,7 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert, Badge, Button, Card, Container, Form, OverlayTrigger, Popover, Row, Col } from '@govtechsg/sgds-react';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import type {
   Network,
@@ -27,9 +28,9 @@ const SEVERITY_FILTERS: SeverityFilter[] = ['ALL', 'CRITICAL', 'WARNING', 'INFO'
 const MonitorInfoCard = () => {
   const [collapsed, setCollapsed] = useState(true);
   return (
-    <div className="card mb-4" style={{ overflow: 'hidden' }}>
-      <div
-        className="card-header d-flex align-items-center justify-content-between"
+    <Card className="mb-4" style={{ overflow: 'hidden' }}>
+      <Card.Header
+        className="d-flex align-items-center justify-content-between"
         style={{
           cursor: 'pointer',
           userSelect: 'none',
@@ -42,9 +43,9 @@ const MonitorInfoCard = () => {
           How network monitoring works
         </h6>
         <i className={`bi bi-chevron-${collapsed ? 'down' : 'up'} text-muted`}></i>
-      </div>
+      </Card.Header>
       {!collapsed && (
-        <div className="card-body small text-muted">
+        <Card.Body className="small text-muted">
           <p className="mb-2">
             Each PCAP you add becomes a <strong>snapshot</strong> ordered by its capture time.
             After adding a second snapshot, the system automatically compares consecutive snapshots
@@ -73,18 +74,18 @@ const MonitorInfoCard = () => {
           </ul>
           <p className="mb-2">
             <strong>Severity guide:</strong>{' '}
-            <span className="badge bg-danger me-1">CRITICAL</span> security-relevant (potential ARP spoof, gateway hijack) ·{' '}
-            <span className="badge bg-warning text-dark me-1">WARNING</span> notable change requiring review ·{' '}
-            <span className="badge bg-info text-dark">INFO</span> informational drift
+            <Badge bg="danger" className="me-1">CRITICAL</Badge> security-relevant (potential ARP spoof, gateway hijack) ·{' '}
+            <Badge bg="warning" text="dark" className="me-1">WARNING</Badge> notable change requiring review ·{' '}
+            <Badge bg="info" text="dark">INFO</Badge> informational drift
           </p>
           <p className="mb-0">
             Click any filename in the <strong>Capture Timeline</strong> to open the network diagram for
             that snapshot. Changed nodes are highlighted by severity colour — click a highlighted node
             to see exactly what changed.
           </p>
-        </div>
+        </Card.Body>
       )}
-    </div>
+    </Card>
   );
 };
 
@@ -194,7 +195,7 @@ export const NetworkDetailPage = () => {
   if (loading) {
     return (
       <Container className="py-5 text-center">
-        <div className="spinner-border text-primary" role="status" />
+        <Spinner animation="border" className="text-primary" />
       </Container>
     );
   }
@@ -202,10 +203,10 @@ export const NetworkDetailPage = () => {
   if (error || !network) {
     return (
       <Container className="py-4">
-        <div className="alert alert-danger">{error ?? 'Network not found.'}</div>
-        <button type="button" className="btn btn-secondary" onClick={() => navigate('/monitor')}>
+        <Alert variant="danger">{error ?? 'Network not found.'}</Alert>
+        <Button type="button" variant="secondary" onClick={() => navigate('/monitor')}>
           Back to Monitor
-        </button>
+        </Button>
       </Container>
     );
   }
@@ -214,13 +215,15 @@ export const NetworkDetailPage = () => {
     <Container className="py-4">
       {/* Header */}
       <div className="mb-4">
-        <button
+        <Button
           type="button"
-          className="btn btn-sm btn-outline-secondary mb-2"
+          size="sm"
+          variant="outline-secondary"
+          className="mb-2"
           onClick={() => navigate('/monitor')}
         >
           <i className="bi bi-arrow-left me-1"></i>All Networks
-        </button>
+        </Button>
         <div className="d-flex align-items-start justify-content-between flex-wrap gap-2 mt-3">
           <div>
             <h3 className="mb-1">{network.name}</h3>
@@ -233,16 +236,17 @@ export const NetworkDetailPage = () => {
                 Updated {lastUpdated.toLocaleTimeString()}
               </small>
             )}
-            <button
+            <Button
               type="button"
-              className="btn btn-sm btn-outline-secondary"
+              size="sm"
+              variant="outline-secondary"
               onClick={() => loadAll(false)}
               title="Refresh now"
             >
               <i className="bi bi-arrow-clockwise"></i>
-            </button>
-            <select
-              className="form-select form-select-sm"
+            </Button>
+            <Form.Select
+              size="sm"
               style={{ width: 'auto' }}
               value={pollInterval}
               onChange={e => setPollInterval(Number(e.target.value))}
@@ -253,7 +257,7 @@ export const NetworkDetailPage = () => {
               <option value={60}>Every 1m</option>
               <option value={300}>Every 5m</option>
               <option value={0}>Manual only</option>
-            </select>
+            </Form.Select>
           </div>
         </div>
       </div>
@@ -280,11 +284,11 @@ export const NetworkDetailPage = () => {
       {/* Traffic Overview Chart */}
       {snapshots.length >= 2 && (
         <Card className="mb-4">
-          <div className="card-header">
+          <Card.Header>
             <h6 className="mb-0">
               <i className="bi bi-bar-chart-line me-2"></i>Traffic Overview
             </h6>
-          </div>
+          </Card.Header>
           <Card.Body>
             <SnapshotTrafficChart snapshots={snapshots} />
           </Card.Body>
@@ -293,11 +297,11 @@ export const NetworkDetailPage = () => {
 
       {/* Change Events */}
       <Card className="mb-4" style={{ overflow: 'hidden' }}>
-        <div className="card-header d-flex justify-content-between align-items-center">
+        <Card.Header className="d-flex justify-content-between align-items-center">
           <h6 className="mb-0">
             <i className="bi bi-activity me-2"></i>Change Events
             {filteredEvents.length > 0 && (
-              <span className="badge bg-secondary ms-2">{filteredEvents.length}</span>
+              <Badge bg="secondary" className="ms-2">{filteredEvents.length}</Badge>
             )}
             <OverlayTrigger
               trigger="click"
@@ -310,17 +314,17 @@ export const NetworkDetailPage = () => {
                     <p className="mb-2 text-muted">Changes are compared against the immediately preceding snapshot by capture time. The first snapshot is the baseline and produces no events.</p>
                     <ul className="mb-0 ps-3">
                       <li className="mb-2">
-                        <span className="badge bg-danger me-1">CRITICAL</span>
+                        <Badge bg="danger" className="me-1">CRITICAL</Badge>
                         <code>IP_MAC_DRIFT</code> — IP claimed by a different MAC (potential ARP spoofing)<br />
                         <code>GATEWAY_CHANGE</code> — default gateway IP changed
                       </li>
                       <li className="mb-2">
-                        <span className="badge bg-warning text-dark me-1">WARNING</span>
+                        <Badge bg="warning" text="dark" className="me-1">WARNING</Badge>
                         <code>MAC_ADDED</code> — new device appeared<br />
                         <code>IP_MAC_DRIFT</code> — known MAC moved to a new IP (DHCP drift)
                       </li>
                       <li>
-                        <span className="badge bg-info text-dark me-1">INFO</span>
+                        <Badge bg="info" text="dark" className="me-1">INFO</Badge>
                         <code>PROTOCOL_ADDED</code> / <code>APP_ADDED</code> — new layer-7 protocol or app<br />
                         <code>ASN_CHANGE</code> — top external peer shifted ISP / ASN<br />
                         <code>VPN_DRIFT</code> — VPN usage appeared or disappeared
@@ -330,41 +334,44 @@ export const NetworkDetailPage = () => {
                 </Popover>
               }
             >
-              <button
+              <Button
                 type="button"
-                className="btn btn-sm btn-link text-muted p-0 ms-2"
+                size="sm"
+                variant="link"
+                className="text-muted p-0 ms-2"
                 style={{ fontSize: '0.85rem', verticalAlign: 'middle' }}
                 title="What's detected"
               >
                 <i className="bi bi-info-circle"></i>
-              </button>
+              </Button>
             </OverlayTrigger>
           </h6>
           <div className="d-flex align-items-center gap-2 flex-wrap">
             {/* Severity pills */}
             <div className="d-flex gap-1">
               {SEVERITY_FILTERS.map(f => (
-                <button
+                <Button
                   key={f}
                   type="button"
-                  className={`btn btn-sm ${
+                  size="sm"
+                  variant={
                     severityFilter === f
-                      ? f === 'CRITICAL' ? 'btn-danger'
-                        : f === 'WARNING' ? 'btn-warning'
-                        : f === 'INFO' ? 'btn-info'
-                        : 'btn-primary'
-                      : 'btn-outline-secondary'
-                  }`}
+                      ? f === 'CRITICAL' ? 'danger'
+                        : f === 'WARNING' ? 'warning'
+                        : f === 'INFO' ? 'info'
+                        : 'primary'
+                      : 'outline-secondary'
+                  }
                   onClick={() => { setSeverityFilter(f); setEventPage(1); }}
                 >
                   {f}
-                </button>
+                </Button>
               ))}
             </div>
             {/* Change type select */}
             {CHANGE_TYPES.length > 2 && (
-              <select
-                className="form-select form-select-sm"
+              <Form.Select
+                size="sm"
                 style={{ width: 'auto' }}
                 value={changeTypeFilter}
                 onChange={e => { setChangeTypeFilter(e.target.value); setEventPage(1); }}
@@ -372,23 +379,24 @@ export const NetworkDetailPage = () => {
                 {CHANGE_TYPES.map(t => (
                   <option key={t} value={t}>{t === 'ALL' ? 'All types' : t}</option>
                 ))}
-              </select>
+              </Form.Select>
             )}
             {/* Reviewed filter */}
             <div className="d-flex gap-1">
               {(['ALL', 'UNREVIEWED', 'REVIEWED'] as const).map(r => (
-                <button
+                <Button
                   key={r}
                   type="button"
-                  className={`btn btn-sm ${reviewedFilter === r ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                  size="sm"
+                  variant={reviewedFilter === r ? 'secondary' : 'outline-secondary'}
                   onClick={() => { setReviewedFilter(r); setEventPage(1); }}
                 >
                   {r === 'ALL' ? 'All' : r === 'UNREVIEWED' ? 'Unreviewed' : 'Reviewed'}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
-        </div>
+        </Card.Header>
 
 
         <Card.Body className="p-0">
@@ -487,14 +495,16 @@ export const NetworkDetailPage = () => {
                 </Popover>
               }
             >
-              <button
+              <Button
                 type="button"
-                className="btn btn-sm btn-link text-muted p-0 ms-2"
+                size="sm"
+                variant="link"
+                className="text-muted p-0 ms-2"
                 style={{ fontSize: '0.85rem' }}
                 title="About baseline definitions"
               >
                 <i className="bi bi-info-circle"></i>
-              </button>
+              </Button>
             </OverlayTrigger>
           </div>
           <BaselineDefinitionPanel

@@ -1,3 +1,4 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import ELK from 'elkjs';
 const ELK_WORKER_URL = `${import.meta.env.BASE_URL}elk-worker.min.js`;
@@ -666,7 +667,7 @@ export const NetworkGraph = memo(function NetworkGraph({
       {/* ── Layout spinner ───────────────────────────────────────────────── */}
       {layouting && (
         <div className="ng-layouting">
-          <div className="spinner-border spinner-border-sm text-secondary me-2" role="status" />
+          <Spinner animation="border" size="sm" className="text-secondary me-2" />
           Computing layout…
         </div>
       )}

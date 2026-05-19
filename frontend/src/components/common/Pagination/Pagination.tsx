@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pagination as SgdsPagination } from '@govtechsg/sgds-react';
+import { Form, Pagination as SgdsPagination } from '@govtechsg/sgds-react';
 import './Pagination.css';
 
 interface PaginationProps {
@@ -50,12 +50,11 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {showPageSizeSelector && onPageSizeChange && (
           <div className="page-size-selector">
-            <label htmlFor="pageSize" className="form-label">
+            <Form.Label htmlFor="pageSize">
               Items per page:
-            </label>
-            <select
+            </Form.Label>
+            <Form.Select
               id="pageSize"
-              className="form-select"
               value={pageSize}
               onChange={handlePageSizeChange}
             >
@@ -64,7 +63,7 @@ export const Pagination: React.FC<PaginationProps> = ({
                   {size}
                 </option>
               ))}
-            </select>
+            </Form.Select>
           </div>
         )}
       </div>

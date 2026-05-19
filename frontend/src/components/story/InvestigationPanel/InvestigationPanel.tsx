@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { InvestigationStep } from '@/types';
 
 interface InvestigationPanelProps {
@@ -29,14 +29,15 @@ function InfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-2"
+        variant="link"
+        className="p-0 text-muted ms-2"
         style={{ lineHeight: 1 }}
         aria-label="About Investigation"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -60,13 +61,14 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
 
   return (
     <div className="border rounded mb-2">
-      <button
-        className="btn btn-link w-100 text-start text-decoration-none p-3 d-flex align-items-center justify-content-between"
+      <Button
+        variant="link"
+        className="w-100 text-start text-decoration-none p-3 d-flex align-items-center justify-content-between"
         onClick={() => setExpanded(e => !e)}
         type="button"
       >
         <div className="d-flex align-items-center gap-2 flex-wrap">
-          <span className="badge bg-secondary font-monospace">{step.query.id}</span>
+          <Badge bg="secondary" className="font-monospace">{step.query.id}</Badge>
           <span className="fw-semibold small">{step.query.label}</span>
           {step.hypothesis && (
             <span
@@ -82,7 +84,7 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
           </span>
           <i className={`bi bi-chevron-${expanded ? 'up' : 'down'}`}></i>
         </div>
-      </button>
+      </Button>
 
       {expanded && (
         <div className="px-3 pb-3">
@@ -126,13 +128,14 @@ function QueryResultTable({ step }: { step: InvestigationStep }) {
                         <td>
                           {conv.flowRisks && conv.flowRisks.length > 0 ? (
                             conv.flowRisks.map(r => (
-                              <span
+                              <Badge
                                 key={r}
-                                className="badge bg-danger me-1"
+                                bg="danger"
+                                className="me-1"
                                 style={{ fontSize: '0.65rem' }}
                               >
                                 {r}
-                              </span>
+                              </Badge>
                             ))
                           ) : (
                             <span className="text-muted">-</span>
@@ -162,24 +165,24 @@ export const InvestigationPanel = ({ steps }: InvestigationPanelProps) => {
   const withEvidenceCount = steps.filter(s => s.conversationCount > 0).length;
 
   return (
-    <div className="card">
-      <div className="card-header d-flex align-items-center justify-content-between">
+    <Card>
+      <Card.Header className="d-flex align-items-center justify-content-between">
         <h6 className="mb-0 d-flex align-items-center">
           <i className="bi bi-search me-2"></i>
           LLM Investigation
           <InfoPopover />
         </h6>
         <div className="d-flex gap-2">
-          <span className="badge bg-primary">
+          <Badge bg="primary">
             {steps.length} quer{steps.length !== 1 ? 'ies' : 'y'}
-          </span>
-          <span className="badge bg-secondary">
+          </Badge>
+          <Badge bg="secondary">
             {hypothesisCount} hypothesis{hypothesisCount !== 1 ? 'es' : ''}
-          </span>
-          <span className="badge bg-success">{withEvidenceCount} with evidence</span>
+          </Badge>
+          <Badge bg="success">{withEvidenceCount} with evidence</Badge>
         </div>
-      </div>
-      <div className="card-body">
+      </Card.Header>
+      <Card.Body>
         <p className="text-muted small mb-3">
           The LLM analysed the findings and timeline, then issued {steps.length} targeted quer
           {steps.length !== 1 ? 'ies' : 'y'} to retrieve real conversation evidence before writing
@@ -188,7 +191,7 @@ export const InvestigationPanel = ({ steps }: InvestigationPanelProps) => {
         {steps.map(step => (
           <QueryResultTable key={step.query.id} step={step} />
         ))}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 };

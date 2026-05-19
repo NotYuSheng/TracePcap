@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Row, Col } from '@govtechsg/sgds-react';
+import { Button, Row, Col } from '@govtechsg/sgds-react';
 import { FileList } from '@components/upload/FileList';
 
 export const HomePage = () => {
@@ -12,10 +12,10 @@ export const HomePage = () => {
           <div className="text-center mb-4">
             <h2 className="mb-2">Lanturn</h2>
             <p className="text-muted mb-3">PCAP File Analysis &amp; Network Traffic Storytelling</p>
-            <button className="btn btn-primary" onClick={() => navigate('/upload')}>
+            <Button variant="primary" onClick={() => navigate('/upload')}>
               <i className="bi bi-upload me-2"></i>
               Upload PCAP
-            </button>
+            </Button>
           </div>
 
           <FileList />

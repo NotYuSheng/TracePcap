@@ -1,6 +1,7 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Modal } from '@govtechsg/sgds-react';
+import { Alert, Button, Container, Form, Modal, Row, Col } from '@govtechsg/sgds-react';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import type { Network } from '@/features/monitor/types/monitor.types';
 import { NetworkCard } from '@/components/monitor/NetworkCard/NetworkCard';
@@ -68,16 +69,17 @@ export const MonitorPage = () => {
               Updated {lastUpdated.toLocaleTimeString()}
             </small>
           )}
-          <button
+          <Button
             type="button"
-            className="btn btn-sm btn-outline-secondary"
+            size="sm"
+            variant="outline-secondary"
             onClick={() => loadNetworks(false)}
             title="Refresh now"
           >
             <i className="bi bi-arrow-clockwise"></i>
-          </button>
-          <select
-            className="form-select form-select-sm"
+          </Button>
+          <Form.Select
+            size="sm"
             style={{ width: 'auto' }}
             value={pollInterval}
             onChange={e => setPollInterval(Number(e.target.value))}
@@ -88,40 +90,39 @@ export const MonitorPage = () => {
             <option value={60}>Every 1m</option>
             <option value={300}>Every 5m</option>
             <option value={0}>Manual only</option>
-          </select>
-          <button
+          </Form.Select>
+          <Button
             type="button"
-            className="btn btn-primary"
+            variant="primary"
             onClick={() => setShowCreate(true)}
           >
             <i className="bi bi-plus-lg me-1"></i>Create Network
-          </button>
+          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="alert alert-danger alert-dismissible">
+        <Alert variant="danger" dismissible onClose={() => setError(null)}>
           {error}
-          <button type="button" className="btn-close" onClick={() => setError(null)} />
-        </div>
+        </Alert>
       )}
 
       {loading ? (
         <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status" />
+          <Spinner animation="border" className="text-primary" />
         </div>
       ) : networks.length === 0 ? (
         <div className="text-center py-5 text-muted">
           <i className="bi bi-diagram-3 display-4 d-block mb-3"></i>
           <h5>No networks yet</h5>
           <p>Create a network group to start monitoring changes across PCAPs.</p>
-          <button
+          <Button
             type="button"
-            className="btn btn-primary"
+            variant="primary"
             onClick={() => setShowCreate(true)}
           >
             <i className="bi bi-plus-lg me-1"></i>Create your first network
-          </button>
+          </Button>
         </div>
       ) : (
         <Row>
@@ -155,23 +156,23 @@ export const MonitorPage = () => {
           </p>
         </Modal.Body>
         <Modal.Footer>
-          <button
+          <Button
             type="button"
-            className="btn btn-outline-secondary"
+            variant="outline-secondary"
             onClick={() => setConfirmDeleteId(null)}
             disabled={deleting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="btn btn-outline-danger"
+            variant="outline-danger"
             onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}
             disabled={deleting}
           >
-            {deleting ? <span className="spinner-border spinner-border-sm me-1" /> : null}
+            {deleting ? <Spinner animation="border" size="sm" className="me-1" /> : null}
             Delete
-          </button>
+          </Button>
         </Modal.Footer>
       </Modal>
     </Container>

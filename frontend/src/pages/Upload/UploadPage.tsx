@@ -1,6 +1,7 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Modal } from '@govtechsg/sgds-react';
+import { Button, Row, Col, Modal } from '@govtechsg/sgds-react';
 import { FileUploadZone } from '@components/upload/FileUploadZone';
 import { FileList } from '@components/upload/FileList';
 import { UploadProgress } from '@components/upload/UploadProgress';
@@ -147,13 +148,13 @@ export const UploadPage = () => {
               )}
             </Modal.Body>
             <Modal.Footer>
-              <button className="btn btn-outline-secondary btn-sm" onClick={handleCancelPending}>
+              <Button variant="outline-secondary" size="sm" onClick={handleCancelPending}>
                 Cancel
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={handleConfirmUpload}>
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleConfirmUpload}>
                 <i className="bi bi-upload me-1" />
                 Start upload
-              </button>
+              </Button>
             </Modal.Footer>
           </Modal>
 
@@ -171,11 +172,7 @@ export const UploadPage = () => {
               <Modal.Title>
                 {isUploading ? (
                   <>
-                    <span
-                      className="spinner-border spinner-border-sm me-2"
-                      role="status"
-                      aria-hidden="true"
-                    />
+                    <Spinner animation="border" size="sm" className="me-2" />
                     Uploading…
                   </>
                 ) : (

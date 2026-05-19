@@ -1,6 +1,7 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
+import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
 import { useStore } from '@/store';
@@ -85,7 +86,7 @@ export const MainLayout = () => {
       <Outlet />
     ) : (
       <div className="d-flex flex-column align-items-center justify-content-center gap-3 py-5 text-muted">
-        <div className="spinner-border text-primary" role="status" aria-hidden="true" />
+        <Spinner animation="border" className="text-primary" />
         <div className="text-center">
           <p className="mb-1 fw-semibold">Backend is starting up…</p>
           <small>This may take up to a minute on first launch.</small>
@@ -122,22 +123,24 @@ export const MainLayout = () => {
               </Nav>
 
               <div className="d-flex align-items-center gap-2 ms-auto">
-                <button
+                <Button
                   type="button"
-                  className="btn btn-sm btn-outline-secondary"
+                  size="sm"
+                  variant="outline-secondary"
                   onClick={cycleTheme}
                   aria-label={THEME_LABELS[themeMode]}
                   title={THEME_LABELS[themeMode]}
                 >
                   <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="btn btn-sm btn-outline-secondary"
+                  size="sm"
+                  variant="outline-secondary"
                   onClick={() => setShowSignatures(true)}
                 >
                   <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
-                </button>
+                </Button>
               </div>
             </Navbar.Collapse>
           </Container>

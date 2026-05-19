@@ -1,4 +1,4 @@
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { Highlight } from '@/types';
 import { formatTimestamp } from '@/utils/formatters';
 
@@ -32,14 +32,15 @@ function InfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-2"
+        variant="link"
+        className="p-0 text-muted ms-2"
         style={{ lineHeight: 1 }}
         aria-label="About Key Highlights"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -49,14 +50,14 @@ interface AnomalyHighlightProps {
 }
 
 export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
-  const getHighlightClass = (type: string) => {
-    const classes: Record<string, string> = {
-      anomaly: 'alert-danger',
-      warning: 'alert-warning',
-      insight: 'alert-info',
-      info: 'alert-primary',
+  const getHighlightVariant = (type: string) => {
+    const variants: Record<string, string> = {
+      anomaly: 'danger',
+      warning: 'warning',
+      insight: 'info',
+      info: 'primary',
     };
-    return classes[type] || 'alert-secondary';
+    return variants[type] || 'secondary';
   };
 
   const getHighlightIcon = (type: string) => {
@@ -88,10 +89,10 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
       </h5>
 
       {sortedHighlights.map(highlight => (
-        <div
+        <Alert
           key={highlight.id}
-          className={`alert ${getHighlightClass(highlight.type)} d-flex`}
-          role="alert"
+          variant={getHighlightVariant(highlight.type)}
+          className="d-flex"
         >
           <div className="flex-shrink-0 me-3">
             <i className={`bi ${getHighlightIcon(highlight.type)} fs-4`}></i>
@@ -106,13 +107,13 @@ export const AnomalyHighlight = ({ highlights }: AnomalyHighlightProps) => {
               </small>
             )}
           </div>
-        </div>
+        </Alert>
       ))}
 
       {highlights.length === 0 && (
-        <div className="alert alert-secondary">
+        <Alert variant="secondary">
           <p className="mb-0">No highlights to display</p>
-        </div>
+        </Alert>
       )}
     </div>
   );

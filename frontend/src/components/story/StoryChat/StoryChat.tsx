@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useRef, useEffect } from 'react';
+import { Alert, Button, Card, Form } from '@govtechsg/sgds-react';
 import { storyService } from '@/features/story/services/storyService';
 
 interface Message {
@@ -62,14 +64,14 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
   };
 
   return (
-    <div className="card mb-4">
-      <div className="card-header">
+    <Card className="mb-4">
+      <Card.Header>
         <h6 className="mb-0">
           <i className="bi bi-chat-dots me-2"></i>
           Ask the LLM
         </h6>
-      </div>
-      <div className="card-body p-0">
+      </Card.Header>
+      <Card.Body className="p-0">
         {messages.length > 0 && (
           <div
             ref={messagesContainerRef}
@@ -108,10 +110,7 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
                   <i className="bi bi-cpu text-white" style={{ fontSize: '0.7rem' }}></i>
                 </div>
                 <div className="px-3 py-2 rounded-3 small bg-light border text-muted">
-                  <span
-                    className="spinner-border spinner-border-sm me-2"
-                    style={{ width: '0.7rem', height: '0.7rem' }}
-                  ></span>
+                  <Spinner animation="border" size="sm" className="me-2" style={{ width: '0.7rem', height: '0.7rem' }} />
                   Thinking...
                 </div>
               </div>
@@ -119,14 +118,16 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
           </div>
         )}
 
-        {error && <div className="mx-3 mt-3 alert alert-danger small py-2 mb-0">{error}</div>}
+        {error && <Alert variant="danger" className="mx-3 mt-3 small py-2 mb-0">{error}</Alert>}
 
         {currentSuggestions.length > 0 && !loading && (
           <div className="px-3 pb-2 pt-3 d-flex flex-wrap gap-2">
             {currentSuggestions.map((q, i) => (
-              <button
+              <Button
                 key={i}
-                className="btn btn-outline-secondary btn-sm text-start"
+                variant="outline-secondary"
+                size="sm"
+                className="text-start"
                 style={{ fontSize: '0.78rem', maxWidth: '100%' }}
                 onClick={() => {
                   setInput(q);
@@ -136,15 +137,16 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
               >
                 <i className="bi bi-lightbulb me-1 text-warning"></i>
                 {q}
-              </button>
+              </Button>
             ))}
           </div>
         )}
 
         <div className="p-3 d-flex gap-2 align-items-end">
-          <textarea
+          <Form.Control
             ref={inputRef}
-            className="form-control form-control-sm"
+            as="textarea"
+            size="sm"
             rows={2}
             placeholder="Ask a question about this story… (Enter to send, Shift+Enter for new line)"
             value={input}
@@ -153,20 +155,22 @@ export const StoryChat = ({ storyId, suggestedQuestions }: StoryChatProps) => {
             disabled={loading}
             style={{ resize: 'none' }}
           />
-          <button
-            className="btn btn-primary btn-sm flex-shrink-0"
+          <Button
+            variant="primary"
+            size="sm"
+            className="flex-shrink-0"
             onClick={handleSubmit}
             disabled={loading || !input.trim()}
             style={{ height: '58px', width: '42px' }}
           >
             {loading ? (
-              <span className="spinner-border spinner-border-sm"></span>
+              <Spinner animation="border" size="sm" />
             ) : (
               <i className="bi bi-send-fill"></i>
             )}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 };

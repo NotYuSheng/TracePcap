@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Card } from '@govtechsg/sgds-react';
+import { Alert, Card } from '@govtechsg/sgds-react';
 import { CloudUpload } from 'lucide-react';
 import { formatBytes } from '@/utils/formatters';
 import './FileUploadZone.css';
@@ -73,7 +73,7 @@ export const FileUploadZone = ({
         {fileRejections.length > 0 && (
           <div className="mt-3">
             {fileRejections.map(({ file, errors }) => (
-              <div key={file.name} className="alert alert-danger text-start">
+              <Alert key={file.name} variant="danger" className="text-start">
                 <strong>{file.name}</strong>
                 <ul className="mb-0 mt-2">
                   {errors.map(e => (
@@ -86,7 +86,7 @@ export const FileUploadZone = ({
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Alert>
             ))}
           </div>
         )}
