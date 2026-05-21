@@ -287,8 +287,22 @@ public class SubnetService {
         || ip.matches("172\\.(1[6-9]|2\\d|3[01])\\..*");
   }
 
+  private static final java.util.regex.Pattern CIDR_PATTERN =
+      java.util.regex.Pattern.compile(
+          "^(\\d{1,3}\\.){3}\\d{1,3}/([0-9]|[1-2]\\d|3[0-2])$");
+
   private static String normaliseCidr(String cidr) {
-    if (cidr == null) return cidr;
-    return cidr.trim();
+    if (cidr == null || cidr.isBlank()) throw new IllegalArgumentException("CIDR must not be blank");
+    cidr = cidr.trim();
+    if (!CIDR_PATTERN.matcher(cidr).matches()) {
+      throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
+    }
+    // Verify each octet is 0–255
+    String[] parts = cidr.split("[./]");
+    for (int i = 0; i < 4; i++) {
+      int octet = Integer.parseInt(parts[i]);
+      if (octet < 0 || octet > 255) throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
+    }
+    return cidr;
   }
 }
