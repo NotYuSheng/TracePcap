@@ -5,6 +5,7 @@ export interface Network {
   snapshotCount: number;
   criticalChanges: number;
   warningChanges: number;
+  hasInsights: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +22,9 @@ export interface NetworkSnapshot {
   totalBytes: number | null;
   changeCount: number;
   criticalCount: number;
+  context: string | null;
+  notes: string | null;
+  hasInsights: boolean;
   addedAt: string;
 }
 

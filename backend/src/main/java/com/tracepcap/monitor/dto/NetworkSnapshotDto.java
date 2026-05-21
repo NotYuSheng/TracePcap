@@ -19,5 +19,8 @@ public class NetworkSnapshotDto {
   private Long totalBytes;
   private long changeCount;
   private long criticalCount;
+  private String context;
+  private String notes;
+  private boolean hasInsights;
   private LocalDateTime addedAt;
 }

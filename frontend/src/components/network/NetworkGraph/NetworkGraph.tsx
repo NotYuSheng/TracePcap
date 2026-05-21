@@ -4,8 +4,7 @@ import ELK from 'elkjs';
 const ELK_WORKER_URL = `${import.meta.env.BASE_URL}elk-worker.min.js`;
 import Graph from 'graphology';
 import Sigma from 'sigma';
-import FA2Layout from 'graphology-layout-forceatlas2/worker';
-import { inferSettings } from 'graphology-layout-forceatlas2';
+import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
@@ -28,8 +27,8 @@ interface NetworkGraphProps {
   edges: GraphEdge[];
   onNodeClick?: (node: GraphNode) => void;
   onClusterClick?: (clusterId: string) => void;
-  layoutType?: 'forceDirected2d' | 'hierarchicalTd';
-  onLayoutChange?: (layout: 'forceDirected2d' | 'hierarchicalTd') => void;
+  layoutType?: 'circular' | 'hierarchicalTd';
+  onLayoutChange?: (layout: 'circular' | 'hierarchicalTd') => void;
   onLayoutComplete?: () => void;
   primarySource?: string;
   hiddenNodesList?: GraphNode[];
@@ -315,7 +314,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   edges,
   onNodeClick,
   onClusterClick,
-  layoutType = 'forceDirected2d',
+  layoutType = 'circular',
   onLayoutChange,
   onLayoutComplete,
   primarySource,
@@ -354,7 +353,6 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, []);
 
   const sigmaRef = useRef<Sigma | null>(null);
-  const fa2Ref = useRef<InstanceType<typeof FA2Layout> | null>(null);
   const graphRef = useRef<Graph | null>(null);
   const nodeTypeByLabel = useRef<Map<string, string>>(new Map());
   const deviceTypeByLabel = useRef<Map<string, string>>(new Map());
@@ -409,8 +407,6 @@ export const NetworkGraph = memo(function NetworkGraph({
     if (!containerReady) return;
 
     // Tear down previous instance
-    fa2Ref.current?.kill();
-    fa2Ref.current = null;
     sigmaRef.current?.kill();
     sigmaRef.current = null;
 
@@ -557,43 +553,15 @@ export const NetworkGraph = memo(function NetworkGraph({
         setLayouting(false);
       });
     } else {
-      // ForceAtlas2 in a web worker
-      setLayouting(true);
-      const fa2Settings = inferSettings(graph);
-      const fa2 = new FA2Layout(graph, {
-        settings: {
-          ...fa2Settings,
-          gravity: 1,
-          scalingRatio: 2,
-          slowDown: 10,
-          barnesHutOptimize: graph.order > 200,
-        },
-      });
-      fa2Ref.current = fa2;
-      fa2.start();
-
-      // Run for a fixed time then stop and de-overlap
-      const runMs = Math.min(3000, 800 + graph.order * 4);
-      const timer = setTimeout(() => {
-        fa2.stop();
-        fa2.kill();
-        fa2Ref.current = null;
-        noverlap.assign(graph, { maxIterations: 50, settings: { margin: 4 } });
-        sigma.refresh();
-        setLayouting(false);
-        requestAnimationFrame(() => onLayoutCompleteRef.current?.());
-      }, runMs);
-
-      return () => {
-        clearTimeout(timer);
-        fa2?.stop();
-        fa2?.kill();
-      };
+      // Circular layout — synchronous, applied before first render so there
+      // is no visible jump from random positions to laid-out positions.
+      circular.assign(graph, { scale: 1 });
+      noverlap.assign(graph, { maxIterations: 50, settings: { margin: 6 } });
+      sigma.refresh();
+      requestAnimationFrame(() => onLayoutCompleteRef.current?.());
     }
 
     return () => {
-      fa2Ref.current?.kill();
-      fa2Ref.current = null;
       sigmaRef.current?.kill();
       sigmaRef.current = null;
       elkRef.current?.terminateWorker();
@@ -635,9 +603,9 @@ export const NetworkGraph = memo(function NetworkGraph({
         {onLayoutChange && (
           <>
             <button
-              className={`ng-ctrl-btn${layoutType === 'forceDirected2d' ? ' active' : ''}`}
-              title="Force Directed layout"
-              onClick={() => onLayoutChange('forceDirected2d')}
+              className={`ng-ctrl-btn${layoutType === 'circular' ? ' active' : ''}`}
+              title="Circular layout"
+              onClick={() => onLayoutChange('circular')}
             >
               <i className="bi bi-diagram-2" />
             </button>

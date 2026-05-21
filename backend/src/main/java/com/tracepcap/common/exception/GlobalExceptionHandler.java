@@ -123,6 +123,23 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
   }
 
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+      IllegalArgumentException ex, HttpServletRequest request) {
+    log.warn("Bad request: {}", ex.getMessage());
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error("Bad Request")
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+  }
+
   @ExceptionHandler(MaxUploadSizeExceededException.class)
   public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(
       MaxUploadSizeExceededException ex, HttpServletRequest request) {

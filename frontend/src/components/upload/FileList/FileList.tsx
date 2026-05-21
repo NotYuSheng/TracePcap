@@ -17,6 +17,7 @@ interface FileMetadata {
   fileSize: number;
   uploadedAt: string | number[];
   status: string;
+  source?: string;
 }
 
 export const FileList = () => {
@@ -102,7 +103,7 @@ export const FileList = () => {
   const fetchFiles = async () => {
     try {
       const res = await apiClient.get(API_ENDPOINTS.FILES_LIST, {
-        params: { sort: 'uploadedAt,desc', size: 50, source: 'ANALYSIS' },
+        params: { sort: 'uploadedAt,desc', size: 100 },
       });
       setFiles(res.data.content ?? []);
     } catch (err) {
@@ -271,7 +272,14 @@ export const FileList = () => {
                         style={{ fontSize: '1.2rem' }}
                       ></i>
                       <div>
-                        <div className="fw-medium">{file.fileName}</div>
+                        <div className="fw-medium d-flex align-items-center gap-2">
+                          {file.fileName}
+                          {file.source === 'MONITOR' && (
+                            <Badge bg="info" text="dark" style={{ fontSize: '0.65rem' }}>
+                              Monitor
+                            </Badge>
+                          )}
+                        </div>
                         <small className="text-muted">
                           {formatFileSize(file.fileSize)} •{' '}
                           {formatDate(parseDateTime(file.uploadedAt))}

@@ -119,8 +119,8 @@ export const ComparePage = () => {
     setHasRisksOnly(false);
   };
 
-  const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>(
-    'forceDirected2d'
+  const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>(
+    'circular'
   );
 
   const graphCardRef = useRef<HTMLDivElement>(null);

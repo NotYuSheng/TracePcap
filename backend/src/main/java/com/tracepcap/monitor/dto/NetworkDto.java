@@ -14,6 +14,7 @@ public class NetworkDto {
   private int snapshotCount;
   private long criticalChanges;
   private long warningChanges;
+  private boolean hasInsights;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }
