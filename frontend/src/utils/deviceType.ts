@@ -30,6 +30,18 @@ export function deviceTypeColor(deviceType: DeviceType): string {
   return DEVICE_TYPE_CONFIG[deviceType]?.color ?? DEFAULT_COLOR;
 }
 
+const DEVICE_TYPE_ICON_MAP: Partial<Record<DeviceType, string>> = {
+  ROUTER:         'bi-router',
+  MOBILE:         'bi-phone',
+  LAPTOP_DESKTOP: 'bi-laptop',
+  SERVER:         'bi-server',
+  IOT:            'bi-cpu',
+};
+
+export function deviceTypeIcon(deviceType: DeviceType): string {
+  return DEVICE_TYPE_ICON_MAP[deviceType] ?? 'bi-question-circle';
+}
+
 /**
  * Maps a confidence percentage (0–100) to a human-readable label.
  * Used in classification popups to describe how reliable the device detection is.

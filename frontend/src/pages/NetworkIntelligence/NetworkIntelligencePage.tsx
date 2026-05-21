@@ -274,10 +274,6 @@ export const NetworkIntelligencePage = () => {
             groupBy={groupBy}
             onGroupByChange={setGroupBy}
             fileId={fileId}
-            onFilterClick={() => setShowFilterModal(true)}
-            activeFilterCount={activeFilterCount}
-            selectedCluster={selectedCluster}
-            onSelectedClusterChange={setSelectedCluster}
           />
         </Card.Body>
       </Card>
