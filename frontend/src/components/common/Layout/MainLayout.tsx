@@ -1,6 +1,7 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
-import { Link, Outlet } from 'react-router-dom';
-import { Container, Row, Col } from '@govtechsg/sgds-react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
 import { useStore } from '@/store';
@@ -73,6 +74,8 @@ export const MainLayout = () => {
   const themeMode = useStore(s => s.themeMode);
   const cycleTheme = useStore(s => s.cycleTheme);
   const isDark = useResolvedDark(themeMode);
+  const location = useLocation();
+  const isMonitorActive = location.pathname.startsWith('/monitor');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -83,7 +86,7 @@ export const MainLayout = () => {
       <Outlet />
     ) : (
       <div className="d-flex flex-column align-items-center justify-content-center gap-3 py-5 text-muted">
-        <div className="spinner-border text-primary" role="status" aria-hidden="true" />
+        <Spinner animation="border" className="text-primary" />
         <div className="text-center">
           <p className="mb-1 fw-semibold">Backend is starting up…</p>
           <small>This may take up to a minute on first launch.</small>
@@ -91,40 +94,57 @@ export const MainLayout = () => {
       </div>
     );
 
+  const isAnalyseActive = !isMonitorActive;
+
   return (
     <div className="main-layout">
       <header className="main-header">
-        <Container>
-          <div className="d-flex align-items-center justify-content-between py-3">
-            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Navbar expand="lg" hasBorderBottom style={{ paddingTop: '1rem', paddingBottom: '1rem' }}>
+          <Container>
+            <Navbar.Brand as={Link} to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
               <div className="d-flex align-items-center gap-3">
-                <Activity size={32} className="text-primary" />
+                <Activity size={28} className="text-primary" />
                 <div>
                   <h4 className="mb-0">Lanturn</h4>
                   <small className="text-muted">Network Analysis</small>
                 </div>
               </div>
-            </Link>
-            <div className="d-flex align-items-center gap-2">
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
-                onClick={cycleTheme}
-                aria-label={THEME_LABELS[themeMode]}
-                title={THEME_LABELS[themeMode]}
-              >
-                <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
-                onClick={() => setShowSignatures(true)}
-              >
-                <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
-              </button>
-            </div>
-          </div>
-        </Container>
+            </Navbar.Brand>
+
+            <Navbar.Toggle />
+            <Navbar.Collapse className="align-items-center">
+              <Nav className="me-auto">
+                <Nav.Link as={Link} to="/" active={isAnalyseActive}>
+                  <i className="bi bi-search me-1"></i>Analyse
+                </Nav.Link>
+                <Nav.Link as={Link} to="/monitor" active={isMonitorActive}>
+                  <i className="bi bi-activity me-1"></i>Monitor
+                </Nav.Link>
+              </Nav>
+
+              <div className="d-flex align-items-center gap-2 ms-auto">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline-secondary"
+                  onClick={cycleTheme}
+                  aria-label={THEME_LABELS[themeMode]}
+                  title={THEME_LABELS[themeMode]}
+                >
+                  <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline-secondary"
+                  onClick={() => setShowSignatures(true)}
+                >
+                  <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
+                </Button>
+              </div>
+            </Navbar.Collapse>
+          </Container>
+        </Navbar>
       </header>
       <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
       <main className="main-content">{mainContent}</main>

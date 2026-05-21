@@ -1,0 +1,272 @@
+@startuml ERD
+
+footer Schema v6 | db/migration/V1-V6
+
+skinparam linetype ortho
+hide circle
+hide methods
+hide stereotypes
+
+skinparam shadowing false
+skinparam backgroundColor White
+
+skinparam class {
+  BackgroundColor White
+  BorderColor #444444
+  HeaderBackgroundColor #E8EEF4
+  FontColor #111111
+  AttributeFontColor #333333
+  BorderThickness 1
+}
+
+skinparam arrow {
+  Color #555555
+  FontColor #555555
+  FontSize 10
+}
+
+' ==========================
+' CORE — FILE INGESTION
+' ==========================
+
+entity "files" as files {
+  * id : uuid
+  --
+  file_name : varchar(255)
+  file_size : bigint
+  file_hash : varchar(64)
+  minio_path : varchar(512)
+  source : varchar(20)
+  status : varchar(50)
+  packet_count : integer
+  total_bytes : bigint
+  duration : bigint
+  start_time : timestamp
+  end_time : timestamp
+  enable_ndpi : boolean
+  enable_file_extraction : boolean
+  uploaded_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "analysis_results" as analysis_results {
+  * id : uuid
+  --
+  file_id : uuid
+  packet_count : bigint
+  total_bytes : bigint
+  start_time : timestamp
+  end_time : timestamp
+  duration_ms : bigint
+  protocol_stats : jsonb
+  status : varchar(50)
+  error_message : text
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+' ==========================
+' TRAFFIC DATA
+' ==========================
+
+entity "conversations" as conversations {
+  * id : uuid
+  --
+  file_id : uuid
+  src_ip : varchar(45)
+  src_port : integer
+  dst_ip : varchar(45)
+  dst_port : integer
+  protocol : varchar(100)
+  packet_count : bigint
+  total_bytes : bigint
+  start_time : timestamp
+  end_time : timestamp
+  app_name : varchar(50)
+  category : varchar(50)
+  hostname : varchar(255)
+  tshark_protocol : varchar(50)
+  ja3_client : varchar(32)
+  ja3_server : varchar(32)
+  tls_issuer : text
+  tls_subject : text
+  tls_not_before : timestamp
+  tls_not_after : timestamp
+  flow_risks : text[]
+  custom_signatures : text[]
+  http_user_agents : text[]
+  created_at : timestamp
+}
+
+entity "packets" as packets {
+  * id : uuid
+  --
+  file_id : uuid
+  conversation_id : uuid
+  packet_number : bigint
+  timestamp : timestamp
+  src_ip : varchar(45)
+  src_port : integer
+  dst_ip : varchar(45)
+  dst_port : integer
+  protocol : varchar(100)
+  packet_size : integer
+  payload : text
+  detected_file_type : varchar(32)
+  info : text
+  created_at : timestamp
+}
+
+entity "extracted_files" as extracted_files {
+  * id : uuid
+  --
+  file_id : uuid
+  conversation_id : uuid
+  filename : varchar(500)
+  mime_type : varchar(200)
+  file_size : bigint
+  sha256 : varchar(64)
+  minio_path : varchar(1000)
+  skipped_reason : varchar(100)
+  extraction_method : varchar(50)
+  created_at : timestamp
+}
+
+' ==========================
+' ENRICHMENT
+' ==========================
+
+entity "host_classifications" as host_classifications {
+  * id : uuid
+  --
+  file_id : uuid
+  ip : varchar(45)
+  mac : varchar(17)
+  manufacturer : varchar(100)
+  ttl : integer
+  device_type : varchar(50)
+  confidence : integer
+}
+
+entity "ip_geo_cache" as ip_geo_cache {
+  * ip : varchar(45)
+  --
+  country : varchar(100)
+  country_code : varchar(2)
+  asn : varchar(20)
+  org : varchar(255)
+  region : varchar(100)
+  city : varchar(100)
+  lat : double precision
+  lon : double precision
+  geo_source : varchar(10)
+  looked_up_at : timestamp
+}
+
+entity "ip_org_rules" as ip_org_rules {
+  * id : bigserial
+  --
+  label : varchar(255)
+  cidr : varchar(50)
+  prefix_length : integer
+  created_at : timestamp
+}
+
+' ==========================
+' AI / STORY
+' ==========================
+
+entity "stories" as stories {
+  * id : uuid
+  --
+  file_id : uuid
+  generated_at : timestamp
+  content : text
+  model_used : varchar(100)
+  tokens_used : integer
+  status : varchar(50)
+  error_message : text
+  created_at : timestamp
+}
+
+' ==========================
+' NETWORK MONITOR
+' ==========================
+
+entity "networks" as networks {
+  * id : uuid
+  --
+  name : varchar(255)
+  description : text
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "network_snapshots" as network_snapshots {
+  * id : uuid
+  --
+  network_id : uuid
+  file_id : uuid
+  snapshot_order : integer
+  is_baseline : boolean
+  added_at : timestamp
+}
+
+entity "baseline_definitions" as baseline_definitions {
+  * id : uuid
+  --
+  network_id : uuid
+  entry_type : varchar(50)
+  entity_key : varchar(255)
+  entity_value : varchar(255)
+  notes : text
+  created_at : timestamp
+}
+
+entity "network_change_events" as network_change_events {
+  * id : uuid
+  --
+  network_id : uuid
+  from_snapshot_id : uuid
+  to_snapshot_id : uuid
+  change_type : varchar(50)
+  entity_type : varchar(50)
+  entity_key : varchar(255)
+  old_value : jsonb
+  new_value : jsonb
+  severity : varchar(20)
+  reviewed : boolean
+  notes : text
+  detected_at : timestamp
+}
+
+' ==========================
+' RELATIONSHIPS
+' ==========================
+
+' Core — file to analysis
+files               ||--o{ analysis_results      : "file_id"
+files               ||--o{ conversations          : "file_id"
+files               ||--o{ packets                : "file_id"
+files               ||--o{ extracted_files        : "file_id"
+files               ||--o{ host_classifications   : "file_id"
+files               ||--o{ stories                : "file_id"
+
+' Traffic data
+conversations       ||--o{ packets                : "conversation_id"
+conversations       ||--o{ extracted_files        : "conversation_id"
+
+' Monitor — networks to snapshots
+networks            ||--o{ network_snapshots       : "network_id"
+networks            ||--o{ baseline_definitions    : "network_id"
+networks            ||--o{ network_change_events   : "network_id"
+
+' Monitor — snapshots link to files
+files               ||--o{ network_snapshots       : "file_id"
+
+' Monitor — change events reference snapshots
+network_snapshots   ||--o{ network_change_events   : "to_snapshot_id"
+network_snapshots   |o--o{ network_change_events   : "from_snapshot_id"
+
+@enduml

@@ -1,4 +1,4 @@
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { Finding, FindingSeverity } from '@/types';
 
 function FindingsInfoPopover() {
@@ -26,30 +26,35 @@ function FindingsInfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="left" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-1"
+        variant="link"
+        className="p-0 text-muted ms-1"
         style={{ lineHeight: 1 }}
         aria-label="About Deterministic Findings"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
 
 const SEVERITY_ORDER: FindingSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 
-function severityBadgeClass(severity: FindingSeverity): string {
+function severityBadgeBg(severity: FindingSeverity): string {
   switch (severity) {
-    case 'CRITICAL':
-      return 'badge bg-danger';
+    case 'CRITICAL': return 'danger';
+    case 'HIGH': return 'warning';
+    case 'MEDIUM': return 'info';
+    case 'LOW': return 'secondary';
+  }
+}
+
+function severityBadgeText(severity: FindingSeverity): 'dark' | undefined {
+  switch (severity) {
     case 'HIGH':
-      return 'badge bg-warning text-dark';
-    case 'MEDIUM':
-      return 'badge bg-info text-dark';
-    case 'LOW':
-      return 'badge bg-secondary';
+    case 'MEDIUM': return 'dark';
+    default: return undefined;
   }
 }
 
@@ -76,15 +81,16 @@ function FindingCard({ finding }: FindingCardProps) {
     : [];
 
   return (
-    <div className="card mb-2">
-      <div className="card-body py-2 px-3">
+    <Card className="mb-2">
+      <Card.Body className="py-2 px-3">
         <div className="d-flex align-items-start gap-2 mb-1">
-          <span
-            className={severityBadgeClass(finding.severity)}
+          <Badge
+            bg={severityBadgeBg(finding.severity)}
+            text={severityBadgeText(finding.severity)}
             style={{ whiteSpace: 'nowrap', fontSize: '0.7rem' }}
           >
             {finding.severity}
-          </span>
+          </Badge>
           <h6 className="mb-0 small fw-semibold" style={{ lineHeight: '1.4' }}>
             {finding.title}
           </h6>
@@ -108,18 +114,20 @@ function FindingCard({ finding }: FindingCardProps) {
         {finding.affectedIps && finding.affectedIps.length > 0 && (
           <div className="d-flex flex-wrap gap-1">
             {finding.affectedIps.map(ip => (
-              <span
+              <Badge
                 key={ip}
-                className="badge bg-light text-dark border"
+                bg="light"
+                text="dark"
+                className="border"
                 style={{ fontSize: '0.7rem', fontFamily: 'monospace' }}
               >
                 {ip}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }
 
@@ -141,8 +149,8 @@ export function FindingsPanel({ findings }: Props) {
   const highCount = grouped.HIGH.length;
 
   return (
-    <div className="card">
-      <div className="card-header d-flex align-items-center justify-content-between">
+    <Card>
+      <Card.Header className="d-flex align-items-center justify-content-between">
         <div className="d-flex align-items-center gap-2">
           <h6 className="mb-0">
             <i className="bi bi-shield-exclamation me-2"></i>
@@ -154,11 +162,11 @@ export function FindingsPanel({ findings }: Props) {
           <span className="text-muted small">
             {total} finding{total !== 1 ? 's' : ''}
           </span>
-          {criticalCount > 0 && <span className="badge bg-danger">{criticalCount} CRITICAL</span>}
-          {highCount > 0 && <span className="badge bg-warning text-dark">{highCount} HIGH</span>}
+          {criticalCount > 0 && <Badge bg="danger">{criticalCount} CRITICAL</Badge>}
+          {highCount > 0 && <Badge bg="warning" text="dark">{highCount} HIGH</Badge>}
         </div>
-      </div>
-      <div className="card-body">
+      </Card.Header>
+      <Card.Body>
         {SEVERITY_ORDER.map(sev => {
           const group = grouped[sev];
           if (group.length === 0) return null;
@@ -173,7 +181,7 @@ export function FindingsPanel({ findings }: Props) {
             </div>
           );
         })}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }

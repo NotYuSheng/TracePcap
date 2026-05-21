@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { Spinner } from '@components/common/Spinner/Spinner';
+import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { Button, Card } from '@govtechsg/sgds-react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { AnalysisLoadingView } from './AnalysisLoadingView';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { storyService } from '@/features/story/services/storyService';
+import type { Story } from '@/types';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
 import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { buildActiveFilterLabels } from '@/features/network/constants';
@@ -47,11 +51,37 @@ export interface NetworkDiagramFilterState {
   setActiveCountries: Dispatch<SetStateAction<string[]>>;
 }
 
+export interface StoryGenerationState {
+  story: Story | null;
+  setStory: Dispatch<SetStateAction<Story | null>>;
+  generating: boolean;
+  generateStory: (customPrompt?: string) => Promise<void>;
+  error: string | null;
+  setError: Dispatch<SetStateAction<string | null>>;
+  contextError: { promptText: string; promptTokens: number; contextLength: number } | null;
+  setContextError: Dispatch<SetStateAction<{ promptText: string; promptTokens: number; contextLength: number } | null>>;
+  editablePrompt: string;
+  setEditablePrompt: Dispatch<SetStateAction<string>>;
+  elapsedSeconds: number;
+  llmTimeoutMs: number;
+  additionalContext: string;
+  setAdditionalContext: Dispatch<SetStateAction<string>>;
+  maxFindings: number;
+  setMaxFindings: Dispatch<SetStateAction<number>>;
+  maxRiskMatrix: number;
+  setMaxRiskMatrix: Dispatch<SetStateAction<number>>;
+  totalFindings: number | undefined;
+  setTotalFindings: Dispatch<SetStateAction<number | undefined>>;
+  totalRiskMatrix: number | undefined;
+  setTotalRiskMatrix: Dispatch<SetStateAction<number | undefined>>;
+}
+
 export interface AnalysisOutletContext {
   data: AnalysisData;
   fileId: string;
   networkGraphStateRef: React.MutableRefObject<NetworkGraphState>;
   networkDiagramFilters: NetworkDiagramFilterState;
+  storyState: StoryGenerationState;
 }
 
 // Re-export so NetworkDiagramPage can import from one place
@@ -66,6 +96,130 @@ export const AnalysisPage = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportStep, setReportStep] = useState<string | null>(null);
+
+  // ── Story generation state (lifted here so it survives tab switches) ──────
+  const [story, setStory] = useState<Story | null>(null);
+  const [storyGenerating, setStoryGenerating] = useState(false);
+  const [storyError, setStoryError] = useState<string | null>(null);
+  const [storyContextError, setStoryContextError] = useState<{ promptText: string; promptTokens: number; contextLength: number } | null>(null);
+  const [storyEditablePrompt, setStoryEditablePrompt] = useState('');
+  const [storyElapsedSeconds, setStoryElapsedSeconds] = useState(0);
+  const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
+  const [additionalContext, setAdditionalContext] = useState('');
+  const [maxFindings, setMaxFindings] = useState(20);
+  const [maxRiskMatrix, setMaxRiskMatrix] = useState(15);
+  const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
+  const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
+  const storyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tabsRef = useRef<HTMLUListElement | null>(null);
+  const tabsRoRef = useRef<ResizeObserver | null>(null);
+  const [tabsScrolledRight, setTabsScrolledRight] = useState(false);
+  const [tabsOverflows, setTabsOverflows] = useState(false);
+  const [tabsAtEnd, setTabsAtEnd] = useState(false);
+
+  const tabsRefCallback = useCallback((el: HTMLUListElement | null) => {
+    tabsRef.current = el;
+    tabsRoRef.current?.disconnect();
+    if (!el) return;
+    const check = () => {
+      setTabsOverflows(el.scrollWidth > el.clientWidth);
+      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+    };
+    check();
+    setTimeout(check, 50);
+    setTimeout(check, 300);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    tabsRoRef.current = ro;
+  }, []);
+
+  useEffect(() => {
+    apiClient
+      .get<{ llmTimeoutMs?: number }>('/system/limits')
+      .then(res => { if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (storyGenerating) {
+      setStoryElapsedSeconds(0);
+      storyTimerRef.current = setInterval(() => setStoryElapsedSeconds(s => s + 1), 1000);
+    } else {
+      if (storyTimerRef.current) { clearInterval(storyTimerRef.current); storyTimerRef.current = null; }
+    }
+    return () => { if (storyTimerRef.current) clearInterval(storyTimerRef.current); };
+  }, [storyGenerating]);
+
+  const generateStory = useCallback(async (customPrompt?: string) => {
+    try {
+      setStoryGenerating(true);
+      setStoryError(null);
+      setStoryContextError(null);
+      const generated = await storyService.generateStory(
+        fileId!, additionalContext, llmTimeoutMs, customPrompt, maxFindings, maxRiskMatrix
+      );
+      setStory(generated);
+      if (generated.findings?.length) setTotalFindings(generated.findings.length);
+      if (generated.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(generated.aggregates.protocolRiskMatrix.length);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
+      const serverMsg: string = (data.message as string) ?? '';
+      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
+      if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
+        setStoryContextError({
+          promptText: (data.promptText as string) ?? '',
+          promptTokens: (data.promptTokens as number) ?? 0,
+          contextLength: (data.contextLength as number) ?? 0,
+        });
+        setStoryEditablePrompt((data.promptText as string) ?? '');
+      } else if (data.errorCode === 'LLM_UNREACHABLE' || status === 502) {
+        setStoryError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
+      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
+        const totalSeconds = Math.round(llmTimeoutMs / 1000);
+        const timeoutLabel = totalSeconds < 60
+          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
+          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
+        setStoryError(`Story generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or reduce the capture size.`);
+      } else {
+        setStoryError(serverMsg || msg || 'Failed to generate story');
+      }
+    } finally {
+      setStoryGenerating(false);
+    }
+  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix]);
+
+  // Load existing story once on mount
+  useEffect(() => {
+    if (!fileId) return;
+    storyService.getStoryByFileId(fileId)
+      .then(existing => {
+        if (existing) {
+          setStory(existing);
+          if (existing.findings?.length) setTotalFindings(existing.findings.length);
+          if (existing.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(existing.aggregates.protocolRiskMatrix.length);
+        }
+      })
+      .catch(err => console.error('Failed to load existing story:', err));
+  }, [fileId]);
+
+  const storyState: StoryGenerationState = useMemo(() => ({
+    story, setStory,
+    generating: storyGenerating,
+    generateStory,
+    error: storyError, setError: setStoryError,
+    contextError: storyContextError, setContextError: setStoryContextError,
+    editablePrompt: storyEditablePrompt, setEditablePrompt: setStoryEditablePrompt,
+    elapsedSeconds: storyElapsedSeconds,
+    llmTimeoutMs,
+    additionalContext, setAdditionalContext,
+    maxFindings, setMaxFindings,
+    maxRiskMatrix, setMaxRiskMatrix,
+    totalFindings, setTotalFindings,
+    totalRiskMatrix, setTotalRiskMatrix,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [story, storyGenerating, generateStory, storyError, storyContextError, storyEditablePrompt, storyElapsedSeconds, llmTimeoutMs, additionalContext, maxFindings, maxRiskMatrix, totalFindings, totalRiskMatrix]);
 
   // ── Network diagram filter state (lifted here so it survives tab switches) ──
   const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
@@ -200,7 +354,7 @@ export const AnalysisPage = () => {
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lanturn-report-${fileId}.pdf`;
+      a.download = `tracepcap-report-${fileId}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -236,12 +390,12 @@ export const AnalysisPage = () => {
             justifyContent: 'center',
           }}
         >
-          <div className="card shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
-            <div className="spinner-border text-primary mb-3" role="status" />
+          <Card className="shadow-lg p-4 text-center" style={{ minWidth: 320 }}>
+            <Spinner animation="border" className="text-primary mb-3" />
             <h6 className="mb-1">Generating Report</h6>
             <p className="text-muted small mb-0">{reportStep}</p>
             <p className="text-muted small mt-1">This may take up to 60 seconds.</p>
-          </div>
+          </Card>
         </div>
       )}
       <div className="analysis-header mb-4 d-flex justify-content-between align-items-start">
@@ -250,14 +404,15 @@ export const AnalysisPage = () => {
           <p className="text-muted">File ID: {fileId}</p>
         </div>
         <div className="d-flex flex-column align-items-end gap-1">
-          <button
-            className="btn btn-outline-primary btn-sm"
+          <Button
+            variant="outline-primary"
+            size="sm"
             onClick={handleDownloadReport}
             disabled={reportLoading}
           >
             {reportLoading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                <Spinner animation="border" size="sm" className="me-2" />
                 Generating report…
               </>
             ) : (
@@ -266,16 +421,32 @@ export const AnalysisPage = () => {
                 Download Report
               </>
             )}
-          </button>
+          </Button>
           {reportError && <small className="text-danger">{reportError}</small>}
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <ul
-        className="nav nav-tabs"
-        style={{ display: 'flex', flexWrap: 'wrap', borderBottom: 'none', paddingTop: '1px' }}
-      >
+      <div className="nav-tabs-scroll-wrapper">
+        <button
+          className="nav-tabs-scroll-btn"
+          style={{ visibility: tabsScrolledRight ? 'visible' : 'hidden' }}
+          onClick={() => { tabsRef.current?.scrollBy({ left: -150, behavior: 'smooth' }); }}
+          aria-label="Scroll tabs left"
+        >
+          <i className="bi bi-chevron-left"></i>
+        </button>
+        <ul
+          ref={tabsRefCallback}
+          className="nav nav-tabs"
+          style={{ paddingTop: '1px', paddingBottom: '1px' }}
+          onScroll={e => {
+            const el = e.currentTarget as HTMLUListElement;
+            const s = el.scrollLeft;
+            if ((tabsScrolledRight) !== (s > 0)) setTabsScrolledRight(s > 0);
+            setTabsAtEnd(s + el.clientWidth >= el.scrollWidth - 1);
+          }}
+        >
         <li className="nav-item">
           <button
             style={{ whiteSpace: 'nowrap' }}
@@ -301,6 +472,7 @@ export const AnalysisPage = () => {
             onClick={() => handleTabChange('story')}
           >
             <i className="bi bi-journal-text me-2"></i>Story
+            {storyGenerating && <Spinner animation="border" size="sm" className="ms-2" style={{ width: 10, height: 10, borderWidth: 2 }} />}
           </button>
         </li>
         <li className="nav-item">
@@ -327,7 +499,7 @@ export const AnalysisPage = () => {
             className={`nav-link ${activeTab === 'network-diagram' ? 'active' : ''}`}
             onClick={() => handleTabChange('network-diagram')}
           >
-            <i className="bi bi-diagram-3 me-2"></i>Network Diagram
+            <i className="bi bi-diagram-3 me-2"></i>Network Visualization
           </button>
         </li>
         <li className="nav-item">
@@ -339,14 +511,24 @@ export const AnalysisPage = () => {
             <i className="bi bi-globe-europe-africa me-2"></i>Network Intelligence
           </button>
         </li>
-      </ul>
+        </ul>
+        <button
+          className="nav-tabs-scroll-btn"
+          style={{ visibility: tabsOverflows && !tabsAtEnd ? 'visible' : 'hidden' }}
+          onClick={() => { tabsRef.current?.scrollBy({ left: 150, behavior: 'smooth' }); }}
+          aria-label="Scroll tabs right"
+          tabIndex={tabsOverflows && !tabsAtEnd ? 0 : -1}
+        >
+          <i className="bi bi-chevron-right"></i>
+        </button>
+      </div>
 
       {/* Tab Content */}
-      <div className="card">
-        <div className="card-body">
-          <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters } satisfies AnalysisOutletContext} />
-        </div>
-      </div>
+      <Card>
+        <Card.Body>
+          <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState } satisfies AnalysisOutletContext} />
+        </Card.Body>
+      </Card>
     </div>
   );
 };

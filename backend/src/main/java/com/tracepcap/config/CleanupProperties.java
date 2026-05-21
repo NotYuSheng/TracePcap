@@ -16,6 +16,9 @@ public class CleanupProperties {
   /** Whether cleanup is enabled */
   private boolean enabled = true;
 
-  /** Number of hours after which files are deleted */
+  /** Number of hours after which analysis files are deleted */
   private int retentionHours = 12;
+
+  /** Number of hours after which monitor snapshot files are deleted (0 = never expire) */
+  private int monitorRetentionHours = 0;
 }

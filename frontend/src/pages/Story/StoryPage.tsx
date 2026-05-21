@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { useState, useEffect } from 'react';
+import { Alert, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { useOutletContext } from 'react-router-dom';
-import type { AnalysisData, Story, TimelineDataPoint } from '@/types';
-import { apiClient } from '@/services/api/client';
-import { storyService } from '@/features/story/services/storyService';
+import type { TimelineDataPoint } from '@/types';
+import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
 import {
   AUTO_GRANULARITY_INTERVAL,
@@ -19,11 +18,6 @@ import { InvestigationPanel } from '@components/story/InvestigationPanel';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
-
-interface AnalysisOutletContext {
-  data: AnalysisData;
-  fileId: string;
-}
 
 function NarrativeInfoPopover() {
   const popover = (
@@ -48,140 +42,37 @@ function NarrativeInfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-2"
+        variant="link"
+        className="p-0 text-muted ms-2"
         style={{ lineHeight: 1 }}
         aria-label="About Narrative"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
 
 export const StoryPage = () => {
-  const { fileId } = useOutletContext<AnalysisOutletContext>();
-  const [story, setStory] = useState<Story | null>(null);
+  const { fileId, storyState } = useOutletContext<AnalysisOutletContext>();
+  const {
+    story, generating, error,
+    contextError, setContextError,
+    editablePrompt, setEditablePrompt,
+    elapsedSeconds, llmTimeoutMs,
+    generateStory: handleGenerateStory,
+    additionalContext, setAdditionalContext,
+    maxFindings, setMaxFindings,
+    maxRiskMatrix, setMaxRiskMatrix,
+    totalFindings,
+    totalRiskMatrix,
+  } = storyState;
+
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
-  const [additionalContext, setAdditionalContext] = useState('');
-  const [maxFindings, setMaxFindings] = useState(20);
-  const [maxRiskMatrix, setMaxRiskMatrix] = useState(15);
-  const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
-  const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
-  const [generating, setGenerating] = useState(false);
-  const [loadingStory, setLoadingStory] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [contextError, setContextError] = useState<{
-    promptText: string;
-    promptTokens: number;
-    contextLength: number;
-  } | null>(null);
-  const [editablePrompt, setEditablePrompt] = useState('');
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<{ llmTimeoutMs?: number }>('/system/limits')
-      .then(res => {
-        if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs);
-      })
-      .catch(() => {
-        /* keep default */
-      });
-  }, []);
-
-  useEffect(() => {
-    if (generating) {
-      setElapsedSeconds(0);
-      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [generating]);
-
-  const handleGenerateStory = useCallback(async (customPrompt?: string) => {
-    try {
-      setGenerating(true);
-      setError(null);
-      setContextError(null);
-      const generatedStory = await storyService.generateStory(
-        fileId,
-        additionalContext,
-        llmTimeoutMs,
-        customPrompt,
-        maxFindings,
-        maxRiskMatrix
-      );
-      setStory(generatedStory);
-      if (generatedStory.findings?.length) setTotalFindings(generatedStory.findings.length);
-      if (generatedStory.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(generatedStory.aggregates.protocolRiskMatrix.length);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
-      const serverMsg: string = (data.message as string) ?? '';
-      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
-      if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
-        setContextError({
-          promptText: (data.promptText as string) ?? '',
-          promptTokens: (data.promptTokens as number) ?? 0,
-          contextLength: (data.contextLength as number) ?? 0,
-        });
-        setEditablePrompt((data.promptText as string) ?? '');
-      } else if (data.errorCode === 'LLM_UNREACHABLE' || status === 502) {
-        setError(
-          'The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.'
-        );
-      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
-        const totalSeconds = Math.round(llmTimeoutMs / 1000);
-        const timeoutLabel = totalSeconds < 60
-          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
-          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
-        setError(
-          `Story generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or reduce the capture size.`
-        );
-      } else {
-        setError(serverMsg || msg || 'Failed to generate story');
-      }
-    } finally {
-      setGenerating(false);
-    }
-  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix]);
-
-  useEffect(() => {
-    const fetchExistingStory = async () => {
-      try {
-        setLoadingStory(true);
-        const existing = await storyService.getStoryByFileId(fileId);
-        if (existing) {
-          setStory(existing);
-          if (existing.findings?.length) setTotalFindings(existing.findings.length);
-          if (existing.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(existing.aggregates.protocolRiskMatrix.length);
-        }
-      } catch (err) {
-        console.error('Failed to load existing story:', err);
-      } finally {
-        setLoadingStory(false);
-      }
-    };
-
-    if (fileId) {
-      fetchExistingStory();
-    } else {
-      setLoadingStory(false);
-    }
-  }, [fileId]);
 
 
   useEffect(() => {
@@ -208,14 +99,6 @@ export const StoryPage = () => {
       fetchTimeline();
     }
   }, [fileId, granularity]);
-
-  if (loadingStory) {
-    return (
-      <div className="text-center py-5">
-        <LoadingSpinner size="large" message="Loading story..." />
-      </div>
-    );
-  }
 
   if (generating && !story) {
     const minutes = Math.floor(elapsedSeconds / 60);
@@ -244,44 +127,46 @@ export const StoryPage = () => {
     const remaining = contextError.contextLength - contextError.promptTokens;
     return (
       <div className="py-4">
-        <div className="alert alert-danger mb-3" role="alert">
-          <h5 className="alert-heading">
+        <Alert variant="danger" className="mb-3">
+          <Alert.Heading>
             <i className="bi bi-exclamation-triangle-fill me-2"></i>
             Prompt Too Large for Model
-          </h5>
+          </Alert.Heading>
           <p className="mb-0">
             The prompt used <strong>{contextError.promptTokens.toLocaleString()}</strong> tokens
             but the model's context window is{' '}
             <strong>{contextError.contextLength.toLocaleString()}</strong> tokens, leaving only{' '}
             <strong>{remaining.toLocaleString()}</strong> for the response.
           </p>
-        </div>
+        </Alert>
         <p className="text-muted small mb-2">
           Edit the prompt below to reduce its size (e.g. remove findings or aggregates sections),
           then retry:
         </p>
-        <textarea
-          className="form-control form-control-sm font-monospace mb-3"
+        <Form.Control
+          as="textarea"
+          size="sm"
+          className="font-monospace mb-3"
           rows={20}
           value={editablePrompt}
           onChange={e => setEditablePrompt(e.target.value)}
         />
         <div className="d-flex gap-2">
-          <button
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={() => handleGenerateStory(editablePrompt)}
             disabled={generating}
           >
             <i className="bi bi-arrow-repeat me-2"></i>
             Retry with edited prompt
-          </button>
-          <button
-            className="btn btn-outline-secondary"
+          </Button>
+          <Button
+            variant="outline-secondary"
             onClick={() => { setContextError(null); setEditablePrompt(''); }}
             disabled={generating}
           >
             Start over
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -318,10 +203,10 @@ export const StoryPage = () => {
           <p className="text-muted mb-4">
             Generate an AI-powered narrative analysis of this network capture
           </p>
-          <button className="btn btn-primary" onClick={() => handleGenerateStory()}>
+          <Button variant="primary" onClick={() => handleGenerateStory()}>
             <i className="bi bi-magic me-2"></i>
             Generate Story
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -334,15 +219,16 @@ export const StoryPage = () => {
         <div className="col-12">
           <div className="d-flex align-items-center justify-content-between">
             <h4 className="mb-0">Network Traffic Story</h4>
-            <button
-              className="btn btn-outline-primary btn-sm"
+            <Button
+              variant="outline-primary"
+              size="sm"
               onClick={() => handleGenerateStory()}
               disabled={generating}
               title={generating ? 'Generating...' : 'Regenerate'}
             >
               <i className={`bi bi-arrow-clockwise${generating ? ' spin' : ''} me-1`}></i>
               {generating ? 'Generating...' : 'Regenerate'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -351,10 +237,10 @@ export const StoryPage = () => {
       {error && (
         <div className="row mb-3">
           <div className="col-12">
-            <div className="alert alert-danger py-2 mb-0" role="alert">
+            <Alert variant="danger" className="py-2 mb-0">
               <i className="bi bi-exclamation-triangle-fill me-2"></i>
               {error}
-            </div>
+            </Alert>
           </div>
         </div>
       )}
@@ -386,15 +272,15 @@ export const StoryPage = () => {
       {!loadingTimeline && timelineData.length > 0 && (
         <div className="row mb-4">
           <div className="col-12">
-            <div className="card">
-              <div className="card-body">
+            <Card>
+              <Card.Body>
                 <TrafficTimeline
                   data={timelineData}
                   granularity={granularity}
                   onGranularityChange={setGranularity}
                 />
-              </div>
-            </div>
+              </Card.Body>
+            </Card>
           </div>
         </div>
       )}
@@ -439,16 +325,16 @@ export const StoryPage = () => {
 
         {/* Story Event Timeline Section */}
         <div className="col-lg-4">
-          <div className="card sticky-top" style={{ top: '20px', zIndex: 10 }}>
-            <div className="card-body">
+          <Card className="sticky-top" style={{ top: '20px', zIndex: 10 }}>
+            <Card.Body>
               <h5 className="mb-3">Key Events</h5>
               {story.timeline && story.timeline.length > 0 ? (
                 <StoryTimeline events={story.timeline} />
               ) : (
                 <p className="text-muted small">No key events identified in this capture.</p>
               )}
-            </div>
-          </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
     </div>

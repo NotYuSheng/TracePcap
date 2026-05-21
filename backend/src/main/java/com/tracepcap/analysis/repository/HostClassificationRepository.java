@@ -12,6 +12,10 @@ public interface HostClassificationRepository
 
   List<HostClassificationEntity> findByFileId(UUID fileId);
 
+  java.util.Optional<HostClassificationEntity> findByFileIdAndIp(UUID fileId, String ip);
+
+  java.util.Optional<HostClassificationEntity> findByFileIdAndMacIgnoreCase(UUID fileId, String mac);
+
   long countByFileId(UUID fileId);
 
   void deleteByFileId(UUID fileId);

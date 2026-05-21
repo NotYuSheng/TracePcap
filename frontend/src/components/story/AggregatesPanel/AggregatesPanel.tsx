@@ -1,4 +1,4 @@
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { StoryAggregates, AsnEntry, ProtocolRiskEntry, BeaconCandidate } from '@/types';
 
 function InfoPopover() {
@@ -31,14 +31,15 @@ function InfoPopover() {
   );
   return (
     <OverlayTrigger trigger="click" placement="left" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-1"
+        variant="link"
+        className="p-0 text-muted ms-1"
         style={{ lineHeight: 1 }}
         aria-label="About Traffic Intelligence"
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -129,9 +130,9 @@ function TopAsnsTable({ entries }: { entries: AsnEntry[] }) {
           <tr key={i}>
             <td>
               {e.country && (
-                <span className="badge bg-secondary me-1 fw-normal" style={{ fontSize: '0.7em' }}>
+                <Badge bg="secondary" className="me-1 fw-normal" style={{ fontSize: '0.7em' }}>
                   {e.country}
-                </span>
+                </Badge>
               )}
               {e.org ?? 'Unknown'}
               {e.asn && (
@@ -199,10 +200,10 @@ function TlsBadges({ aggregates }: { aggregates: StoryAggregates }) {
   const anomalies = tls.selfSigned + tls.expired + tls.unknownCa;
   if (anomalies === 0) {
     return (
-      <span className="badge bg-success">
+      <Badge bg="success">
         <i className="bi bi-shield-check me-1" />
         All {tls.total} TLS flows OK
-      </span>
+      </Badge>
     );
   }
 
@@ -210,11 +211,11 @@ function TlsBadges({ aggregates }: { aggregates: StoryAggregates }) {
     <div className="d-flex flex-wrap gap-2 align-items-center">
       <span className="text-muted small">{tls.total} TLS flows —</span>
       {tls.selfSigned > 0 && (
-        <span className="badge bg-warning text-dark">{tls.selfSigned} self-signed</span>
+        <Badge bg="warning" text="dark">{tls.selfSigned} self-signed</Badge>
       )}
-      {tls.expired > 0 && <span className="badge bg-danger">{tls.expired} expired</span>}
+      {tls.expired > 0 && <Badge bg="danger">{tls.expired} expired</Badge>}
       {tls.unknownCa > 0 && (
-        <span className="badge bg-secondary">{tls.unknownCa} unknown issuer</span>
+        <Badge bg="secondary">{tls.unknownCa} unknown issuer</Badge>
       )}
     </div>
   );
@@ -228,17 +229,18 @@ function BeaconList({ candidates }: { candidates: BeaconCandidate[] }) {
     <div className="d-flex flex-column gap-2">
       {candidates.map((b, i) => (
         <div key={i} className="d-flex align-items-start gap-2 small">
-          <span
-            className="badge bg-danger mt-1"
+          <Badge
+            bg="danger"
+            className="mt-1"
             style={{ minWidth: '1.5rem', textAlign: 'center' }}
           >
             {i + 1}
-          </span>
+          </Badge>
           <div>
             <span className="fw-medium font-monospace">
               {b.srcIp} → {b.dstIp ?? '?'}:{b.dstPort ?? '*'}
             </span>
-            {b.appName && <span className="badge bg-light text-dark ms-1 border">{b.appName}</span>}
+            {b.appName && <Badge bg="light" text="dark" className="ms-1 border">{b.appName}</Badge>}
             <div className="text-muted">
               {b.protocol} &middot; {b.flowCount} flows &middot; avg&nbsp;
               <span className="fw-medium">{fmtInterval(b.avgIntervalMs)}</span>
@@ -263,18 +265,18 @@ export const AggregatesPanel = ({ aggregates }: Props) => {
     0;
 
   return (
-    <div className="card mb-4">
-      <div className="card-header d-flex align-items-center gap-2">
+    <Card className="mb-4">
+      <Card.Header className="d-flex align-items-center gap-2">
         <i className="bi bi-bar-chart-line text-primary" />
         <h6 className="mb-0 d-flex align-items-center">
           Traffic Intelligence — Full Dataset
           <InfoPopover />
         </h6>
         {(hasBeacons || hasTlsAnomalies) && (
-          <span className="badge bg-danger ms-auto">Findings</span>
+          <Badge bg="danger" className="ms-auto">Findings</Badge>
         )}
-      </div>
-      <div className="card-body">
+      </Card.Header>
+      <Card.Body>
         {/* Coverage banner */}
         <CoverageBanner aggregates={aggregates} />
 
@@ -310,15 +312,15 @@ export const AggregatesPanel = ({ aggregates }: Props) => {
             <h6 className="text-muted text-uppercase small fw-semibold mb-2 d-flex align-items-center gap-2">
               Beacon Candidates
               {hasBeacons && (
-                <span className="badge bg-danger fw-normal">
+                <Badge bg="danger" className="fw-normal">
                   {aggregates.beaconCandidates.length}
-                </span>
+                </Badge>
               )}
             </h6>
             <BeaconList candidates={aggregates.beaconCandidates} />
           </div>
         </div>
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 };

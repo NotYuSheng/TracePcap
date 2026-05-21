@@ -1,5 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
-import { Modal } from '@govtechsg/sgds-react';
+import { Alert, Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import { ipOrgRuleService, type IpOrgRule } from '@/features/intelligence/services/ipOrgRuleService';
 
@@ -113,24 +114,22 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
 
       <Modal.Body>
         {/* Tabs */}
-        <div className="btn-group mb-3" role="group">
-          <button
-            type="button"
-            className={`btn btn-sm ${activeTab === 'rules' ? 'btn-primary' : 'btn-outline-primary'}`}
+        <ButtonGroup size="sm" className="mb-3">
+          <Button
+            variant={activeTab === 'rules' ? 'primary' : 'outline-primary'}
             onClick={() => setActiveTab('rules')}
           >
             <i className="bi bi-code-square me-1" />
             Detection Rules
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${activeTab === 'labels' ? 'btn-primary' : 'btn-outline-primary'}`}
+          </Button>
+          <Button
+            variant={activeTab === 'labels' ? 'primary' : 'outline-primary'}
             onClick={() => setActiveTab('labels')}
           >
             <i className="bi bi-tag me-1" />
             Network Labels
-          </button>
-        </div>
+          </Button>
+        </ButtonGroup>
 
         {/* ── Detection Rules tab ─────────────────────────────────────── */}
         {activeTab === 'rules' && (
@@ -143,12 +142,13 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
 
             {loading ? (
               <div className="text-center py-4 text-muted">
-                <div className="spinner-border spinner-border-sm me-2" role="status" />
+                <Spinner animation="border" size="sm" className="me-2" role="status" />
                 Loading…
               </div>
             ) : (
-              <textarea
-                className="form-control font-monospace"
+              <Form.Control
+                as="textarea"
+                className="font-monospace"
                 rows={20}
                 value={content}
                 onChange={e => { setContent(e.target.value); setSaved(false); }}
@@ -157,11 +157,11 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
               />
             )}
 
-            {error && <div className="alert alert-danger mt-2 py-2 small mb-0">{error}</div>}
+            {error && <Alert variant="danger" className="mt-2 py-2 small mb-0">{error}</Alert>}
             {saved && (
-              <div className="alert alert-success mt-2 py-2 small mb-0">
+              <Alert variant="success" className="mt-2 py-2 small mb-0">
                 <i className="bi bi-check-circle me-1"></i>Saved — rules will apply on the next analysis.
-              </div>
+              </Alert>
             )}
           </>
         )}
@@ -179,7 +179,7 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
             {/* Existing rules */}
             {rulesLoading ? (
               <div className="text-center py-4 text-muted">
-                <div className="spinner-border spinner-border-sm me-2" role="status" />
+                <Spinner animation="border" size="sm" className="me-2" role="status" />
                 Loading…
               </div>
             ) : rules.length === 0 ? (
@@ -201,16 +201,18 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                       <td>{r.label}</td>
                       <td><code>{r.cidr}</code></td>
                       <td>
-                        <button
-                          className="btn btn-link btn-sm text-danger p-0"
+                        <Button
+                          size="sm"
+                          variant="link"
+                          className="text-danger p-0"
                           onClick={() => handleDelete(r.id)}
                           disabled={deletingId === r.id}
                           title="Delete"
                         >
                           {deletingId === r.id
-                            ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} />
+                            ? <Spinner animation="border" size="sm" style={{ width: 12, height: 12 }} />
                             : <i className="bi bi-trash" />}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -222,10 +224,10 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
             <div className="border rounded p-3" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}>
               <div className="row g-2 align-items-end">
                 <div className="col">
-                  <label className="form-label small mb-1">Label</label>
-                  <input
+                  <Form.Label className="small mb-1">Label</Form.Label>
+                  <Form.Control
+                    size="sm"
                     type="text"
-                    className="form-control form-control-sm"
                     placeholder="e.g. Engineering Team"
                     value={newLabel}
                     onChange={e => { setNewLabel(e.target.value); setAddError(null); }}
@@ -233,10 +235,10 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                   />
                 </div>
                 <div className="col">
-                  <label className="form-label small mb-1">CIDR Range</label>
-                  <input
+                  <Form.Label className="small mb-1">CIDR Range</Form.Label>
+                  <Form.Control
+                    size="sm"
                     type="text"
-                    className="form-control form-control-sm"
                     placeholder="e.g. 10.0.1.0/24 or 10.0.1.5"
                     value={newCidr}
                     onChange={e => { setNewCidr(e.target.value); setAddError(null); }}
@@ -244,15 +246,16 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                   />
                 </div>
                 <div className="col-auto">
-                  <button
-                    className="btn btn-primary btn-sm"
+                  <Button
+                    size="sm"
+                    variant="primary"
                     onClick={handleAdd}
                     disabled={adding}
                   >
                     {adding
-                      ? <span className="spinner-border spinner-border-sm" />
+                      ? <Spinner animation="border" size="sm" />
                       : <><i className="bi bi-plus-lg me-1" />Add</>}
-                  </button>
+                  </Button>
                 </div>
               </div>
               {addError && <div className="text-danger small mt-2">{addError}</div>}
@@ -262,22 +265,21 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
       </Modal.Body>
 
       <Modal.Footer>
-        <button type="button" className="btn btn-outline-secondary" onClick={handleHide}>
+        <Button variant="outline-secondary" onClick={handleHide}>
           Close
-        </button>
+        </Button>
         {activeTab === 'rules' && (
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={handleSave}
             disabled={loading || saving}
           >
             {saving ? (
-              <><span className="spinner-border spinner-border-sm me-1" role="status" />Saving…</>
+              <><Spinner animation="border" size="sm" className="me-1" role="status" />Saving…</>
             ) : (
               <><i className="bi bi-floppy me-1"></i>Save</>
             )}
-          </button>
+          </Button>
         )}
       </Modal.Footer>
     </Modal>

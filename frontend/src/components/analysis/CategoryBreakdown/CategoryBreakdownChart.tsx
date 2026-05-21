@@ -2,7 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import type { CategoryStat } from '@/types';
 import { getCategoryColor } from '@/utils/appColors';
 import { formatBytes } from '@/utils/formatters';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 
 const categoryInfoPopover = (
   <Popover id="category-info" style={{ maxWidth: '310px' }}>
@@ -49,14 +49,15 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
       <h3 className="breakdown-title d-flex align-items-center gap-2">
         Category Distribution
         <OverlayTrigger trigger="click" placement="right" overlay={categoryInfoPopover} rootClose>
-          <button
+          <Button
             type="button"
-            className="btn btn-link p-0 text-muted"
+            variant="link"
+            className="p-0 text-muted"
             style={{ lineHeight: 1 }}
             aria-label="About category detection accuracy"
           >
             <i className="bi bi-info-circle fs-6"></i>
-          </button>
+          </Button>
         </OverlayTrigger>
       </h3>
 

@@ -1,6 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { ProtocolStats } from '@/types';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './ProtocolBreakdownChart.css';
 
 interface ProtocolBreakdownChartProps {
@@ -58,14 +58,15 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
       <h3 className="breakdown-title d-flex align-items-center gap-2">
         Protocol Distribution
         <OverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover} rootClose>
-          <button
+          <Button
             type="button"
-            className="btn btn-link p-0 text-muted"
+            variant="link"
+            className="p-0 text-muted"
             style={{ lineHeight: 1 }}
             aria-label="About protocol detection accuracy"
           >
             <i className="bi bi-info-circle fs-6"></i>
-          </button>
+          </Button>
         </OverlayTrigger>
       </h3>
 

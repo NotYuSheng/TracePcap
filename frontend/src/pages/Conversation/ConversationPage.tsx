@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Button, Card, Modal } from '@govtechsg/sgds-react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation, HostClassification } from '@/types';
 import type { SortField } from '@/features/conversation/types';
@@ -320,6 +321,7 @@ export const ConversationPage = () => {
                 href={exportUrl}
                 download={exportFilename}
                 className="btn btn-sm btn-outline-secondary"
+                role="button"
                 title="Export current filtered results as CSV"
               >
                 <i className="bi bi-download me-1"></i>
@@ -329,6 +331,7 @@ export const ConversationPage = () => {
                 href={pcapExportUrl}
                 download={pcapExportFilename}
                 className="btn btn-sm btn-outline-secondary"
+                role="button"
                 title="Export current filtered results as PCAP"
               >
                 <i className="bi bi-download me-1"></i>
@@ -360,12 +363,12 @@ export const ConversationPage = () => {
 
       <div className="row">
         <div className="col-12">
-          <div className="card">
-            <div className="card-header d-flex justify-content-between align-items-center">
+          <Card style={{ overflow: 'hidden' }}>
+            <Card.Header className="d-flex justify-content-between align-items-center">
               <h6 className="mb-0">Conversations</h6>
               <small className="text-muted">Click a row to view details</small>
-            </div>
-            <div className="card-body p-0" style={{ position: 'relative' }}>
+            </Card.Header>
+            <Card.Body className="p-0" style={{ position: 'relative' }}>
               {loading && conversations.length === 0 && (
                 <LoadingSpinner size="medium" message="Loading conversations..." />
               )}
@@ -393,9 +396,9 @@ export const ConversationPage = () => {
                   />
                 </div>
               )}
-            </div>
+            </Card.Body>
             {totalPages > 1 && (
-              <div className="card-footer">
+              <Card.Footer>
                 <Pagination
                   currentPage={filters.page}
                   totalPages={totalPages}
@@ -405,99 +408,91 @@ export const ConversationPage = () => {
                   showPageSizeSelector
                   onPageSizeChange={pageSize => setFilters({ pageSize, page: 1 })}
                 />
-              </div>
+              </Card.Footer>
             )}
-          </div>
+          </Card>
         </div>
       </div>
 
       {/* Conversation detail modal */}
-      {selectedConversation && (
-        <div
-          className="modal fade show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={e => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="modal-dialog modal-xl modal-dialog-scrollable">
-            <div className="modal-content">
-              <div className="modal-header">
-                <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={handlePrev}
-                    disabled={selectedIndex <= 0}
-                    title="Previous conversation"
-                  >
-                    ‹ Prev
-                  </button>
-                  <h5 className="modal-title text-truncate mb-0 font-monospace small">
-                    {modalTitle}
-                  </h5>
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={handleNext}
-                    disabled={selectedIndex >= conversations.length - 1}
-                    title="Next conversation"
-                  >
-                    Next ›
-                  </button>
-                  <span className="text-muted small text-nowrap">
-                    {selectedIndex + 1} / {conversations.length}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-info ms-2"
-                  onClick={() => setTracerConversationId(selectedConversation.id)}
-                  title="Step through packets with AI explanations"
-                >
-                  <i className="bi bi-play-circle me-1"></i>Trace
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary ms-2"
-                  onClick={() => exportConversationCsv(selectedConversation)}
-                  title="Export this conversation as CSV"
-                >
-                  <i className="bi bi-download me-1"></i>CSV
-                </button>
-                <a
-                  href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
-                  download={makeExportFilename(
-                    exportBase,
-                    'pcap',
-                    `${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}`
-                  )}
-                  className="btn btn-sm btn-outline-secondary ms-2"
-                  title="Export this conversation as PCAP"
-                >
-                  <i className="bi bi-download me-1"></i>PCAP
-                </a>
-                <button
-                  type="button"
-                  className="btn-close ms-2"
-                  onClick={closeModal}
-                  title="Close (Esc)"
-                />
-              </div>
-              <div className="modal-body">
-                {detailLoading ? (
-                  <LoadingSpinner size="medium" message="Loading conversation..." />
-                ) : (
-                  <ConversationDetail
-                    conversation={selectedConversation}
-                    signatureSeverities={signatureSeverities}
-                    hostClassMap={hostClassMap}
-                    fileId={fileId}
-                  />
-                )}
-              </div>
-            </div>
+      <Modal show={!!selectedConversation} onHide={closeModal} size="xl" centered scrollable>
+        <Modal.Header closeButton>
+          <div className="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              onClick={handlePrev}
+              disabled={selectedIndex <= 0}
+              title="Previous conversation"
+            >
+              ‹ Prev
+            </Button>
+            <Modal.Title className="text-truncate mb-0 font-monospace small" as="h5">
+              {modalTitle}
+            </Modal.Title>
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              onClick={handleNext}
+              disabled={selectedIndex >= conversations.length - 1}
+              title="Next conversation"
+            >
+              Next ›
+            </Button>
+            <span className="text-muted small text-nowrap">
+              {selectedIndex + 1} / {conversations.length}
+            </span>
           </div>
-        </div>
-      )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-info"
+            className="ms-2"
+            onClick={() => selectedConversation && setTracerConversationId(selectedConversation.id)}
+            title="Step through packets with AI explanations"
+          >
+            <i className="bi bi-play-circle me-1"></i>Trace
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-secondary"
+            className="ms-2"
+            onClick={() => selectedConversation && exportConversationCsv(selectedConversation)}
+            title="Export this conversation as CSV"
+          >
+            <i className="bi bi-download me-1"></i>CSV
+          </Button>
+          {selectedConversation && (
+            <a
+              href={conversationService.getConversationPcapExportUrl(selectedConversation.id)}
+              download={makeExportFilename(
+                exportBase,
+                'pcap',
+                `${selectedConversation.endpoints[0].ip.replace(/[^a-zA-Z0-9.]/g, '_')}-${selectedConversation.endpoints[1].ip.replace(/[^a-zA-Z0-9.]/g, '_')}`
+              )}
+              className="btn btn-sm btn-outline-secondary ms-2"
+              title="Export this conversation as PCAP"
+            >
+              <i className="bi bi-download me-1"></i>PCAP
+            </a>
+          )}
+        </Modal.Header>
+        <Modal.Body>
+          {detailLoading ? (
+            <LoadingSpinner size="medium" message="Loading conversation..." />
+          ) : (
+            selectedConversation && (
+              <ConversationDetail
+                conversation={selectedConversation}
+                signatureSeverities={signatureSeverities}
+                hostClassMap={hostClassMap}
+                fileId={fileId}
+              />
+            )
+          )}
+        </Modal.Body>
+      </Modal>
 
       {/* Conversation Tracer modal */}
       {tracerConversationId && (

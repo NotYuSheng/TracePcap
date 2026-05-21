@@ -1,4 +1,5 @@
 import type { NarrativeSection } from '@/types';
+import { Card } from '@govtechsg/sgds-react';
 
 interface NarrativeViewProps {
   sections: NarrativeSection[];
@@ -28,14 +29,14 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
   return (
     <div className="narrative-view">
       {sections.map((section, index) => (
-        <div key={index} className={`card mb-3 overflow-hidden ${getSectionClass(section.type)}`}>
-          <div className="card-header bg-white rounded-top">
+        <Card key={index} className={`mb-3 overflow-hidden ${getSectionClass(section.type)}`}>
+          <Card.Header className="bg-white rounded-top">
             <h5 className="mb-0 d-flex align-items-center">
               <i className={`bi ${getSectionIcon(section.type)} me-2`}></i>
               {section.title}
             </h5>
-          </div>
-          <div className="card-body">
+          </Card.Header>
+          <Card.Body>
             <div className="narrative-content" style={{ whiteSpace: 'pre-line' }}>
               {section.content}
             </div>
@@ -58,8 +59,8 @@ export const NarrativeView = ({ sections }: NarrativeViewProps) => {
                 </small>
               </div>
             )}
-          </div>
-        </div>
+          </Card.Body>
+        </Card>
       ))}
     </div>
   );

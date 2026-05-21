@@ -1,4 +1,6 @@
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
+import { Alert, Badge, Button, ButtonGroup, Card } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type {
   SessionData,
@@ -135,24 +137,26 @@ function HttpMessageBlock({
         </span>
         <code style={{ fontSize: '0.8rem', color: '#fff', flex: 1 }}>{message.firstLine}</code>
         {message.bodyDecompressed && (
-          <span className="badge bg-light text-dark" style={{ fontSize: '0.65rem' }}>
+          <Badge bg="light" text="dark" style={{ fontSize: '0.65rem' }}>
             {message.bodyEncoding ?? 'compressed'} decoded
             {message.bodyCompressedLength > 0 &&
               ` (${formatBytes(message.bodyCompressedLength)} → ${formatBytes(message.bodyLength)})`}
-          </span>
+          </Badge>
         )}
       </div>
 
       <div style={{ padding: '0.5rem 0.75rem' }}>
         {headerEntries.length > 0 && (
           <div className="mb-2">
-            <button
-              className="btn btn-link btn-sm p-0 text-muted"
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 text-muted"
               onClick={() => setShowHeaders(h => !h)}
               style={{ fontSize: '0.75rem', textDecoration: 'none' }}
             >
               {showHeaders ? '▾' : '▸'} Headers ({headerEntries.length})
-            </button>
+            </Button>
             {showHeaders && (
               <table
                 className="table table-sm table-borderless mb-0 mt-1"
@@ -178,14 +182,16 @@ function HttpMessageBlock({
 
         {message.bodyLength > 0 && (
           <div>
-            <button
-              className="btn btn-link btn-sm p-0 text-muted"
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 text-muted"
               onClick={() => setShowBody(b => !b)}
               style={{ fontSize: '0.75rem', textDecoration: 'none' }}
             >
               {showBody ? '▾' : '▸'} Body ({formatBytes(message.bodyLength)}
               {message.bodyTruncated ? ', truncated' : ''})
-            </button>
+            </Button>
             {showBody && (
               <pre
                 className="tp-stream-pane"
@@ -219,8 +225,10 @@ function HttpExchangeBlock({ exchange, index }: { exchange: HttpExchange; index:
 
   return (
     <div className="mb-3">
-      <button
-        className="btn btn-link btn-sm p-0 text-muted mb-2"
+      <Button
+        variant="link"
+        size="sm"
+        className="p-0 text-muted mb-2"
         onClick={() => setCollapsed(c => !c)}
         style={{ fontSize: '0.8rem', textDecoration: 'none' }}
       >
@@ -230,7 +238,7 @@ function HttpExchangeBlock({ exchange, index }: { exchange: HttpExchange; index:
             {exchange.request.firstLine.split(' ').slice(0, 2).join(' ')}
           </code>
         )}
-      </button>
+      </Button>
       {!collapsed && (
         <div style={{ paddingLeft: '0.5rem' }}>
           {exchange.request && (
@@ -255,8 +263,10 @@ function StunMessageBlock({ msg, index }: { msg: StunMessage; index: number }) {
 
   return (
     <div className="mb-2">
-      <button
-        className="btn btn-link btn-sm p-0 text-muted mb-1"
+      <Button
+        variant="link"
+        size="sm"
+        className="p-0 text-muted mb-1"
         onClick={() => setCollapsed(c => !c)}
         style={{ fontSize: '0.8rem', textDecoration: 'none' }}
       >
@@ -270,7 +280,7 @@ function StunMessageBlock({ msg, index }: { msg: StunMessage; index: number }) {
         <code className="ms-2" style={{ fontSize: '0.78rem' }}>
           {msg.messageType}
         </code>
-      </button>
+      </Button>
       {!collapsed && (
         <div
           style={{
@@ -351,8 +361,8 @@ function MediaInfoPanel({ info }: { info: MediaInfo }) {
   if (info.streamCount != null) rows.push(['SSRC streams', String(info.streamCount)]);
 
   return (
-    <div className="card mb-3" style={{ fontSize: '0.85rem' }}>
-      <div className="card-body p-3">
+    <Card className="mb-3" style={{ fontSize: '0.85rem' }}>
+      <Card.Body className="p-3">
         <div className="fw-semibold mb-2">
           {info.mediaType} stream detected — {info.containerFormat}
         </div>
@@ -368,8 +378,8 @@ function MediaInfoPanel({ info }: { info: MediaInfo }) {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }
 
@@ -409,9 +419,9 @@ export function SessionTab({ conversationId }: SessionTabProps) {
         <p className="text-muted mb-3">
           Reconstruct the full application-layer byte stream for this conversation.
         </p>
-        <button className="btn btn-primary" onClick={handleReconstruct}>
+        <Button variant="primary" onClick={handleReconstruct}>
           Reconstruct Session
-        </button>
+        </Button>
       </div>
     );
   }
@@ -419,7 +429,7 @@ export function SessionTab({ conversationId }: SessionTabProps) {
   if (loading) {
     return (
       <div className="text-center py-5">
-        <div className="spinner-border text-primary" role="status" />
+        <Spinner animation="border" className="text-primary" role="status" />
         <p className="text-muted mt-3">Reconstructing session…</p>
       </div>
     );
@@ -429,9 +439,9 @@ export function SessionTab({ conversationId }: SessionTabProps) {
     return (
       <div className="text-center py-4">
         <p className="text-danger mb-3">{error}</p>
-        <button className="btn btn-outline-primary btn-sm" onClick={handleReconstruct}>
+        <Button size="sm" variant="outline-primary" onClick={handleReconstruct}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -441,10 +451,10 @@ export function SessionTab({ conversationId }: SessionTabProps) {
   if (session.errorMessage) {
     return (
       <div className="py-4">
-        <div className="alert alert-warning mb-3">{session.errorMessage}</div>
-        <button className="btn btn-outline-primary btn-sm" onClick={handleReconstruct}>
+        <Alert variant="warning" className="mb-3">{session.errorMessage}</Alert>
+        <Button size="sm" variant="outline-primary" onClick={handleReconstruct}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -462,71 +472,73 @@ export function SessionTab({ conversationId }: SessionTabProps) {
       <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
         <div className="d-flex align-items-center gap-2">
           {session.detectedProtocol && (
-            <span className="badge bg-info text-dark">{session.detectedProtocol}</span>
+            <Badge bg="info" text="dark">{session.detectedProtocol}</Badge>
           )}
           {hasMedia && (
-            <span className="badge bg-primary">
+            <Badge bg="primary">
               {session.mediaInfo!.containerFormat}
-            </span>
+            </Badge>
           )}
           <small className="text-muted">
             ↑ {formatBytes(session.totalClientBytes)} client &nbsp;·&nbsp; ↓{' '}
             {formatBytes(session.totalServerBytes)} server
           </small>
           {session.truncated && (
-            <span className="badge bg-warning text-dark" title="Session truncated at 1 MB">
+            <Badge bg="warning" text="dark" title="Session truncated at 1 MB">
               Truncated
-            </span>
+            </Badge>
           )}
         </div>
 
         {(hasHttp || hasStun) && (
-          <div className="btn-group btn-group-sm">
+          <ButtonGroup size="sm">
             {hasHttp && (
-              <button
-                className={`btn btn-outline-secondary${activeView === 'parsed' ? ' active' : ''}`}
+              <Button
+                variant={activeView === 'parsed' ? 'secondary' : 'outline-secondary'}
                 onClick={() => setActiveView('parsed')}
               >
                 Parsed HTTP
-              </button>
+              </Button>
             )}
             {hasStun && (
-              <button
-                className={`btn btn-outline-secondary${activeView === 'stun' ? ' active' : ''}`}
+              <Button
+                variant={activeView === 'stun' ? 'secondary' : 'outline-secondary'}
                 onClick={() => setActiveView('stun')}
               >
                 STUN Messages
-              </button>
+              </Button>
             )}
-            <button
-              className={`btn btn-outline-secondary${activeView === 'raw' ? ' active' : ''}`}
+            <Button
+              variant={activeView === 'raw' ? 'secondary' : 'outline-secondary'}
               onClick={() => setActiveView('raw')}
             >
               Raw Stream
-            </button>
-          </div>
+            </Button>
+          </ButtonGroup>
         )}
 
-        <button
-          className="btn btn-outline-secondary btn-sm ms-auto"
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          className="ms-auto"
           onClick={handleReconstruct}
           title="Re-run reconstruction"
         >
           ↺ Refresh
-        </button>
+        </Button>
       </div>
 
       {isTls && (
-        <div className="alert alert-secondary py-2 mb-3" style={{ fontSize: '0.85rem' }}>
+        <Alert variant="secondary" className="py-2 mb-3" style={{ fontSize: '0.85rem' }}>
           This session uses TLS encryption — payload content cannot be decoded without the private
           key.
-        </div>
+        </Alert>
       )}
 
       {session.truncated && (
-        <div className="alert alert-warning py-2 mb-3" style={{ fontSize: '0.85rem' }}>
+        <Alert variant="warning" className="py-2 mb-3" style={{ fontSize: '0.85rem' }}>
           Session exceeded 1 MB — only the first 1 MB of data is shown.
-        </div>
+        </Alert>
       )}
 
       {/* Media metadata panel */}

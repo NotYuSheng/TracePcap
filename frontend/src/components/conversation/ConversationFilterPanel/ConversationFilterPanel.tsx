@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
@@ -57,14 +57,15 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
   );
   return (
     <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
-      <button
+      <Button
         type="button"
-        className="btn btn-link p-0 text-muted ms-1"
+        variant="link"
+        className="p-0 text-muted ms-1"
         style={{ lineHeight: 1 }}
         aria-label={`About ${title}`}
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
-      </button>
+      </Button>
     </OverlayTrigger>
   );
 }
@@ -147,24 +148,24 @@ export function ConversationFilterPanel({
     <div className="conversation-filter-panel mb-3">
       {/* Toggle button */}
       <div className="d-flex align-items-center gap-2">
-        <button
-          type="button"
-          className="btn btn-outline-secondary btn-sm"
+        <Button
+          size="sm"
+          variant="outline-secondary"
           onClick={() => setIsOpen(o => !o)}
         >
           <i className="bi bi-funnel me-1"></i>
           Filters
           {activeFilterCount > 0 && (
-            <span className="badge bg-primary ms-2">{activeFilterCount}</span>
+            <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
           )}
           <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
-        </button>
+        </Button>
       </div>
 
       {/* Collapsible panel */}
       {isOpen && (
         <div className="card mt-2 filter-panel-body">
-          <div className="card-body p-3">
+          <Card.Body className="p-3">
             <div className="row g-3">
               {/* IP / Hostname */}
               <div className="col-md-4">
@@ -180,21 +181,19 @@ export function ConversationFilterPanel({
                   <span className="input-group-text">
                     <i className="bi bi-search"></i>
                   </span>
-                  <input
+                  <Form.Control
                     type="text"
-                    className="form-control"
                     placeholder="e.g. 192.168.1.1"
                     value={ipInput}
                     onChange={e => handleIpChange(e.target.value)}
                   />
                   {ipInput && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
+                    <Button
+                      variant="outline-secondary"
                       onClick={() => handleIpChange('')}
                     >
                       ×
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -210,22 +209,20 @@ export function ConversationFilterPanel({
                   />
                 </label>
                 <div className="input-group input-group-sm">
-                  <input
+                  <Form.Control
                     type="text"
                     inputMode="numeric"
-                    className="form-control"
                     placeholder="e.g. 443"
                     value={portInput}
                     onChange={e => handlePortChange(e.target.value)}
                   />
                   {portInput && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
+                    <Button
+                      variant="outline-secondary"
                       onClick={() => handlePortChange('')}
                     >
                       ×
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -251,37 +248,33 @@ export function ConversationFilterPanel({
                   <span className="input-group-text">
                     <i className="bi bi-search"></i>
                   </span>
-                  <input
+                  <Form.Control
                     type="text"
-                    className="form-control"
                     placeholder="e.g. GET /admin or 0x474554"
                     value={payloadInput}
                     onChange={e => handlePayloadChange(e.target.value)}
                   />
                   {payloadInput && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
+                    <Button
+                      variant="outline-secondary"
                       onClick={() => handlePayloadChange('')}
                     >
                       ×
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
 
               {/* Security risks toggle */}
               <div className="col-md-2 d-flex align-items-end">
-                <div className="form-check mb-0">
-                  <input
-                    type="checkbox"
-                    className="form-check-input"
+                <Form.Check className="mb-0">
+                  <Form.Check.Input
                     id="hasRisksCheck"
                     checked={filters.hasRisks}
                     onChange={e => onFiltersChange({ hasRisks: e.target.checked })}
                   />
-                  <label
-                    className="form-check-label small d-inline-flex align-items-center"
+                  <Form.Check.Label
+                    className="small d-inline-flex align-items-center"
                     htmlFor="hasRisksCheck"
                   >
                     Security risks only
@@ -290,8 +283,8 @@ export function ConversationFilterPanel({
                       title="Security risks"
                       body="Shows only conversations flagged with at least one nDPI risk indicator, such as unsafe protocols, clear-text credentials, or suspicious traffic patterns."
                     />
-                  </label>
-                </div>
+                  </Form.Check.Label>
+                </Form.Check>
               </div>
 
               {/* Protocol pills */}
@@ -712,18 +705,15 @@ export function ConversationFilterPanel({
                   </label>
                   <div className="d-flex flex-wrap gap-2">
                     {COLUMN_DEFS.map(({ key, label }) => (
-                      <div key={key} className="form-check form-check-inline mb-0">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id={`col-${key}`}
-                          checked={visibleColumns.has(key)}
-                          onChange={() => onToggleColumn(key)}
-                        />
-                        <label className="form-check-label small" htmlFor={`col-${key}`}>
-                          {label}
-                        </label>
-                      </div>
+                      <Form.Check
+                        key={key}
+                        inline
+                        className="mb-0"
+                        id={`col-${key}`}
+                        label={label}
+                        checked={visibleColumns.has(key)}
+                        onChange={() => onToggleColumn(key)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -732,16 +722,16 @@ export function ConversationFilterPanel({
 
             {activeFilterCount > 0 && (
               <div className="mt-3 pt-2 border-top">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
+                <Button
+                  size="sm"
+                  variant="outline-secondary"
                   onClick={onClearAll}
                 >
                   <i className="bi bi-x-circle me-1"></i>Clear filters
-                </button>
+                </Button>
               </div>
             )}
-          </div>
+          </Card.Body>
         </div>
       )}
     </div>
