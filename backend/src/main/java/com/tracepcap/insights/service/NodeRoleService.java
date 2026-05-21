@@ -2,7 +2,6 @@ package com.tracepcap.insights.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
@@ -123,10 +122,7 @@ public class NodeRoleService {
 
     if ("IP".equalsIgnoreCase(entityType)) {
       // Look up host classification for this IP in the given file
-      List<HostClassificationEntity> hosts = hostClassificationRepository.findByFileId(fileId);
-      hosts.stream()
-          .filter(h -> entityKey.equals(h.getIp()))
-          .findFirst()
+      hostClassificationRepository.findByFileIdAndIp(fileId, entityKey)
           .ifPresent(h -> {
             sb.append("Device type: ").append(h.getDeviceType())
               .append(" (confidence: ").append(h.getConfidence()).append("%)\n");
@@ -170,10 +166,7 @@ public class NodeRoleService {
 
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       // MAC-based lookup
-      List<HostClassificationEntity> hosts = hostClassificationRepository.findByFileId(fileId);
-      hosts.stream()
-          .filter(h -> entityKey.equalsIgnoreCase(h.getMac()))
-          .findFirst()
+      hostClassificationRepository.findByFileIdAndMacIgnoreCase(fileId, entityKey)
           .ifPresent(h -> {
             sb.append("IP: ").append(h.getIp()).append("\n");
             sb.append("Device type: ").append(h.getDeviceType())

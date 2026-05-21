@@ -1,5 +1,6 @@
 package com.tracepcap.insights.service;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.common.exception.ResourceNotFoundException;
@@ -79,9 +80,9 @@ public class NetworkInsightService {
     Set<String> entityKeys = changeEvents.stream()
         .map(NetworkChangeEventEntity::getEntityKey)
         .collect(Collectors.toSet());
-    // Load all confirmed/suggested roles (not just change-event entities) for richer context
+    // Load roles for entities that appear in change events
     Map<String, NodeRoleEntity> rolesByKey = nodeRoleRepository
-        .findAll()
+        .findByEntityTypeInAndEntityKeyIn(List.of("IP", "DEVICE", "APP", "PROTOCOL"), new ArrayList<>(entityKeys))
         .stream()
         .collect(Collectors.toMap(NodeRoleEntity::getEntityKey, r -> r, (a, b) -> a));
 
@@ -323,15 +324,16 @@ public class NetworkInsightService {
 
   // ── JSON extraction (mirrors StoryService) ────────────────────────────────
 
+  private static final ObjectMapper LENIENT_MAPPER =
+      new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
+
   private String extractJson(String content) {
     if (content == null || content.isBlank()) throw new RuntimeException("Empty LLM response");
     content = content.replaceAll("```json\\s*", "").replaceAll("```\\s*", "");
     int start = content.indexOf('{');
     int end = content.lastIndexOf('}');
     if (start >= 0 && end > start) {
-      String json = content.substring(start, end + 1);
-      json = json.replaceAll("(?m)^(\\s*)//[^\n\r]*", "$1").replaceAll(",\\s*//[^\n\r]*", ",");
-      return json;
+      return content.substring(start, end + 1);
     }
     return content;
   }
@@ -352,7 +354,7 @@ public class NetworkInsightService {
 
     if ("COMPLETED".equals(e.getStatus()) && e.getContent() != null) {
       try {
-        Map<String, Object> data = objectMapper.readValue(e.getContent(), new TypeReference<>() {});
+        Map<String, Object> data = LENIENT_MAPPER.readValue(e.getContent(), new TypeReference<>() {});
         builder.summary((String) data.get("summary"));
         builder.narrativeSections(parseNarrativeSections(data.get("narrativeSections")));
         builder.anomalies(parseAnomalies(data.get("anomalies")));

@@ -40,7 +40,10 @@ public class NetworkAnnotationService {
 
     NetworkSnapshotEntity snapshot = null;
     if (req.getSnapshotId() != null) {
-      snapshot = snapshotRepository.findById(req.getSnapshotId()).orElse(null);
+      snapshot = snapshotRepository.findById(req.getSnapshotId())
+          .filter(s -> s.getNetwork().getId().equals(networkId))
+          .orElseThrow(() -> new ResourceNotFoundException(
+              "Snapshot not found in network: " + req.getSnapshotId()));
     }
 
     NetworkAnnotationEntity entity = NetworkAnnotationEntity.builder()

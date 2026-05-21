@@ -2,7 +2,7 @@ package com.tracepcap.insights.controller;
 
 import com.tracepcap.insights.dto.CreateAnnotationRequest;
 import com.tracepcap.insights.dto.NetworkAnnotationDto;
-import java.util.Map;
+import com.tracepcap.insights.dto.UpdateAnnotationRequest;
 import com.tracepcap.insights.service.NetworkAnnotationService;
 import java.util.List;
 import java.util.UUID;
@@ -37,10 +37,9 @@ public class NetworkAnnotationController {
   public ResponseEntity<NetworkAnnotationDto> update(
       @PathVariable UUID networkId,
       @PathVariable UUID annotationId,
-      @RequestBody Map<String, String> body) {
-    String text = body.get("body");
-    if (text == null || text.isBlank()) return ResponseEntity.badRequest().build();
-    return ResponseEntity.ok(service.updateAnnotation(networkId, annotationId, text));
+      @RequestBody UpdateAnnotationRequest req) {
+    if (req.getBody() == null || req.getBody().isBlank()) return ResponseEntity.badRequest().build();
+    return ResponseEntity.ok(service.updateAnnotation(networkId, annotationId, req.getBody()));
   }
 
   @DeleteMapping("/{annotationId}")
