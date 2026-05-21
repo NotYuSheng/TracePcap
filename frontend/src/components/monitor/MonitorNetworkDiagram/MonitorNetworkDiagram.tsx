@@ -116,7 +116,7 @@ export const MonitorNetworkDiagram = ({
   );
 
   const [selectedId, setSelectedId] = useState<string>(initialSnapshotId);
-  const [layoutType, setLayoutType] = useState<'forceDirected2d' | 'hierarchicalTd'>('forceDirected2d');
+  const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>('circular');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
   // Sync to the clicked snapshot each time the modal opens

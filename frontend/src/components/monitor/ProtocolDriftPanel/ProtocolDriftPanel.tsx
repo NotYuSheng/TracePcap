@@ -1,12 +1,13 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, type CSSProperties } from 'react';
-import { Badge, Button } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type {
   NetworkSnapshot,
   AbsentEntity,
 } from '@/features/monitor/types/monitor.types';
-import { LastSeenModal } from '../LastSeenModal/LastSeenModal';
+import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import type { EntityType } from '@/features/notes/services/entityNotesService';
 
 function stringHue(s: string): number {
   let h = 0;
@@ -45,18 +46,29 @@ function BadgeGroup({
   items,
   absentItems,
   onAbsentClick,
+  onActiveClick,
 }: {
   items: string[];
   absentItems: AbsentEntity[];
   onAbsentClick: (e: AbsentEntity) => void;
+  onActiveClick: (name: string) => void;
 }) {
   if (items.length === 0 && absentItems.length === 0) return null;
   return (
     <div className="d-flex flex-wrap gap-2">
       {items.map(name => (
-        <Badge key={name} style={hashBadgeStyle(name)}>
+        <Button
+          key={name}
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="border-0 py-0 px-1"
+          style={{ fontSize: '0.75em', ...hashBadgeStyle(name) }}
+          onClick={() => onActiveClick(name)}
+          title="Click for details & notes"
+        >
           {name}
-        </Badge>
+        </Button>
       ))}
       {absentItems.map(entity => (
         <Button
@@ -76,13 +88,19 @@ function BadgeGroup({
   );
 }
 
+type SelectedEntity = { key: string; entityType: EntityType; fileId: string; isActive: boolean; lastSeenTime?: string | null } | null;
+
 export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
-  const [selectedAbsent, setSelectedAbsent] = useState<AbsentEntity | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<SelectedEntity>(null);
   const [apps, setApps] = useState<EntityGroup>({ active: [], absent: [] });
   const [protocols, setProtocols] = useState<EntityGroup>({ active: [], absent: [] });
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
 
   const sorted = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
+  const latestSnap = sorted[sorted.length - 1];
+  const latestFileId = latestSnap?.fileId ?? '';
+  const latestStartTime = latestSnap?.startTime as unknown as string | null ?? null;
 
   useEffect(() => {
     if (sorted.length === 0) return;
@@ -156,15 +174,31 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
 
   const hasAbsent = apps.absent.length > 0 || protocols.absent.length > 0;
 
+  const q = search.trim().toLowerCase();
+  const filterItems = (items: string[]) => q ? items.filter(i => i.toLowerCase().includes(q)) : items;
+  const filterAbsent = (ents: AbsentEntity[]) => q ? ents.filter(e => e.key.toLowerCase().includes(q)) : ents;
+
   return (
     <>
+      {hasData && (
+        <div className="mb-3">
+          <input
+            type="search"
+            className="form-control form-control-sm"
+            placeholder="Search applications & protocols…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      )}
       {(apps.active.length > 0 || apps.absent.length > 0) && (
         <div className="mb-3">
           <small className="text-muted fw-semibold d-block mb-2">Applications</small>
           <BadgeGroup
-            items={apps.active}
-            absentItems={apps.absent}
-            onAbsentClick={setSelectedAbsent}
+            items={filterItems(apps.active)}
+            absentItems={filterAbsent(apps.absent)}
+            onAbsentClick={e => setSelectedEntity({ key: e.key, entityType: 'APPLICATION', fileId: e.lastSeenFileId ?? latestFileId, isActive: false, lastSeenTime: e.lastSeenStartTime })}
+            onActiveClick={name => setSelectedEntity({ key: name, entityType: 'APPLICATION', fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
           />
         </div>
       )}
@@ -172,9 +206,10 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
         <div className="mb-3">
           <small className="text-muted fw-semibold d-block mb-2">Protocols</small>
           <BadgeGroup
-            items={protocols.active}
-            absentItems={protocols.absent}
-            onAbsentClick={setSelectedAbsent}
+            items={filterItems(protocols.active)}
+            absentItems={filterAbsent(protocols.absent)}
+            onAbsentClick={e => setSelectedEntity({ key: e.key, entityType: 'PROTOCOL', fileId: e.lastSeenFileId ?? latestFileId, isActive: false, lastSeenTime: e.lastSeenStartTime })}
+            onActiveClick={name => setSelectedEntity({ key: name, entityType: 'PROTOCOL', fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
           />
         </div>
       )}
@@ -184,11 +219,17 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
           Greyed-out items are no longer seen. Click for details.
         </small>
       )}
-      <LastSeenModal
-        show={selectedAbsent !== null}
-        onHide={() => setSelectedAbsent(null)}
-        entity={selectedAbsent}
-      />
+      {selectedEntity && (
+        <EntityDetailModal
+          entityType={selectedEntity.entityType}
+          entityKey={selectedEntity.key}
+          displayName={selectedEntity.key}
+          fileId={selectedEntity.fileId}
+          isActive={selectedEntity.isActive}
+          lastSeenTime={selectedEntity.lastSeenTime}
+          onClose={() => setSelectedEntity(null)}
+        />
+      )}
     </>
   );
 };

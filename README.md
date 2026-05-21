@@ -1,7 +1,7 @@
 <h1 align="center">TracePcap</h1>
 
 <p align="center">
-  <strong>Intelligent PCAP file analysis with AI-powered insights and interactive network visualization</strong>
+  <strong>Black-box network analysis from PCAP captures — no prior knowledge of the network required</strong>
 </p>
 
 <p align="center">
@@ -22,7 +22,14 @@
 
 ---
 
-A comprehensive network packet analysis tool that runs entirely self-hosted. Upload PCAP files to visualize network traffic patterns, analyze packet flows, generate intelligent filters, and gain insights through AI-powered analysis. Perfect for network troubleshooting, security analysis, protocol debugging, or educational purposes.
+TracePcap is a self-hosted PCAP analysis workbench designed for situations where you work from the **traffic itself** — with no prior knowledge of the network. Upload one or more PCAP captures and the tool characterises devices, maps topology, reconstructs sessions, tracks changes over time, and generates AI-powered narratives — all derived purely from observed traffic.
+
+This makes it well-suited for:
+
+- **Network audits and third-party assessments** — handed a PCAP with no documentation; build the picture from scratch
+- **Incident response** — incomplete network records; reconstruct what happened from packet evidence
+- **Penetration test reconnaissance** — map an unknown or scarcely-documented network from captured traffic
+- **Research and education** — explore any capture without needing context about the environment
 
 <div align="center">
 
@@ -35,16 +42,19 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 | Feature | Description |
 |---------|-------------|
 | **PCAP Upload & Management** | Upload and manage PCAP/PCAPNG/CAP files (max 512MB) with MinIO object storage; duplicate detection and configurable upload limits |
-| **Network Visualization** | Interactive network topology using React Flow + ELK layout with a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, layout controls, and clickable node detail panel |
+| **Network Visualization** | Interactive network topology using React Flow + ELK layout with a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, layout controls, and clickable node detail panels |
 | **nDPI Security Detection** | Deep packet inspection via nDPI v5: application identification, traffic categories, risk/alert flags, JA3/JA3S TLS fingerprints, SNI extraction, and TLS certificate metadata per conversation |
 | **Conversation Tracking** | Paginated conversation list with advanced filtering (IP, port, protocol, app, risk, custom rules, device type, country, payload pattern), multi-column sorting, column picker, and bulk PCAP export |
 | **Session Reconstruction** | TCP/UDP application-layer payload decoding with a hex+ASCII viewer for inspecting raw packet payloads |
-| **File Extraction** | HTTP object extraction and raw TCP/UDP stream extraction via Aho-Corasick; automatic MIME type detection; bulk download |
-| **Geolocation & Device Classification** | Country/ASN enrichment for external IPs; automatic device-type prediction (Router, Server, IoT, Mobile, Laptop/Desktop) across all views |
+| **File Extraction** | HTTP object extraction and raw TCP/UDP stream extraction; automatic MIME type detection; bulk download |
+| **Geolocation & Device Classification** | Country/ASN enrichment for external IPs; automatic device-type inference (Router, Server, IoT, Mobile, Laptop/Desktop) from traffic behaviour and manufacturer data |
 | **MAC Manufacturer Lookup** | Wireshark OUI database integration for vendor identification from MAC addresses |
-| **Timeline Analysis** | Chronological traffic visualization with configurable time granularity (auto or manual) and protocol breakdown |
+| **Timeline Analysis** | Chronological traffic visualization with configurable time granularity and protocol breakdown |
 | **AI Filter Generator** | LLM-powered Wireshark/tcpdump filter generation from natural language queries with confidence scores and packet-level results |
 | **Story Mode** | AI-generated narrative reconstruction of network activities with an interactive LLM Q&A chat, custom context input, and story timeline |
+| **Network Monitor** | Load multiple PCAPs as ordered snapshots to track device, IP, protocol, and topology changes over time — useful for repeated audits or ongoing capture sessions |
+| **Subnet Detection & Labelling** | Infer subnet structure from traffic patterns or define CIDRs manually; group observed IPs by subnet across all snapshots |
+| **Node Role Annotation** | Annotate any IP or device with a role label (e.g. "SCADA Controller", "Historian"); AI-suggested from traffic signals, human-confirmable |
 | **Custom Signature Rules** | YAML-based detection rules matched against IP, CIDR, port, JA3, hostname, app, and protocol fields; live-reloaded without restart |
 | **Export Options** | PDF report (with live topology capture), per-conversation PCAP, bulk PCAP export, and CSV export |
 | **Real-time Processing** | Asynchronous analysis with detailed progress tracking |
@@ -58,7 +68,7 @@ A comprehensive network packet analysis tool that runs entirely self-hosted. Upl
 |----------|---------|---------|
 | Docker | Latest | Container runtime |
 | Docker Compose | Latest | Multi-container orchestration |
-| LLM Server | Any OpenAI-compatible API | AI filter generation (e.g., LM Studio, Ollama, OpenAI) |
+| LLM Server | Any OpenAI-compatible API | AI features (e.g., LM Studio, Ollama, OpenAI) |
 
 **Minimum Hardware:**
 - RAM: 4GB (8GB+ recommended)
@@ -98,33 +108,72 @@ docker compose up -d
 
 Open **http://localhost:80** in your browser.
 
-> **Note**: The application includes PostgreSQL for metadata storage and MinIO for PCAP file storage. First startup may take a few minutes while containers initialize.
+> **Note**: First startup may take a minute while PostgreSQL and MinIO initialise. AI features require a running LLM server pointed to by `LLM_API_BASE_URL`; all other features work without it.
 
 ## Usage
 
-### Basic Workflow
+### Single-file Analysis
 
-1. **Upload** — Drag-and-drop a PCAP/PCAPNG file; optionally enable nDPI analysis and file extraction before uploading
-2. **Analyze** — File is processed asynchronously with a detailed progress view
+1. **Upload** — Drag-and-drop a PCAP/PCAPNG file; optionally enable nDPI analysis and file extraction
+2. **Analyze** — File is processed asynchronously; a progress view shows each analysis stage
 3. **Overview** — Review detected applications, protocols, risk alerts, and custom signature matches
 4. **Visualize** — Explore the interactive network topology with filters, layout controls, and node detail panels
 5. **Conversations** — Review flows with advanced filtering, session reconstruction, and payload inspection
 6. **Story Mode** — Read the AI-generated narrative and ask follow-up questions via LLM chat
 7. **Extracted Files** — Browse and download files recovered from HTTP responses and raw streams
-8. **Generate Filters** — Use AI to create Wireshark/tcpdump filters from natural language (e.g., "show all TLS traffic to external IPs")
+8. **Generate Filters** — Use AI to create Wireshark/tcpdump filters from natural language
 9. **Export** — Download a PDF report, per-conversation or bulk PCAP, or CSV
+
+### Multi-file Network Monitor
+
+The Network Monitor lets you build a picture of an unknown network from multiple captures taken at different points in time — and track how it changes between them.
+
+1. **Create a Network** — Give the network a name (e.g. "Client Site — Building A")
+2. **Add Snapshots** — Upload PCAPs in capture order; each becomes a snapshot ordered by capture time
+3. **Review the Diagram** — Click any snapshot filename to open the network diagram; changed nodes are highlighted by severity
+4. **Track Drift** — Device, IP, protocol, and VPN changes are detected automatically between consecutive snapshots
+5. **Define Subnets** — Use "Detect Subnets" to infer CIDR blocks from traffic, or add them manually; IPs are then grouped by subnet in the IP Addresses panel
+6. **Annotate Nodes** — Click any IP or device to assign a role label; use "Suggest with AI" to auto-generate one from traffic signals
+7. **Correlate Events** — Log real-world events (maintenance windows, incidents) to correlate with observed network changes
+8. **Generate Insights** — Use the AI insights panel to get a narrative explanation of all changes across snapshots
 
 ### Supported File Formats
 
 PCAP, PCAPNG, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
+
+## How Network Monitor Works
+
+The Monitor is designed for black-box analysis — it assumes you know nothing about the network upfront and builds understanding from the traffic itself:
+
+- **No prior knowledge needed** — subnet structure, device roles, and topology are all inferred from observed traffic
+- **Snapshots, not agents** — there is no persistent sensor; you feed in PCAPs and the tool compares them
+- **Bottom-up inventory** — devices and IPs are discovered from ARP, MAC addresses, and IP conversations; not imported from a CMDB
+- **Inference over assumption** — device types, manufacturers, and roles are estimated from traffic patterns and can be confirmed or corrected by the analyst
+- **Change detection without a baseline** — the first snapshot becomes the implicit baseline; every subsequent snapshot is compared against the one before it
+
+This is intentionally different from a blue team SIEM or EDR: there is no always-on agent, no rule engine with predefined baselines, and no assumption that you have network documentation. The tool is most useful when you are the one trying to *produce* that documentation.
+
+### Change Detection
+
+Changes are compared between consecutive snapshots (ordered by capture time):
+
+| Severity | Event Type | Description |
+|----------|-----------|-------------|
+| CRITICAL | `IP_MAC_DRIFT` | An IP is now claimed by a different MAC — possible ARP spoofing or device swap |
+| CRITICAL | `GATEWAY_CHANGE` | Default gateway IP changed between snapshots |
+| WARNING | `MAC_ADDED` | A new MAC address appeared — new device on the network |
+| WARNING | `IP_MAC_DRIFT` | A known MAC moved to a new IP — possible DHCP drift |
+| INFO | `PROTOCOL_ADDED` | A new layer-7 protocol appeared |
+| INFO | `APP_ADDED` | A new application name appeared |
+| INFO | `ASN_CHANGE` | The top external peer shifted ISP/ASN |
+| INFO | `VPN_DRIFT` | VPN usage appeared or disappeared |
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | **Backend** | Spring Boot 3.2.1, Java 21, Maven, Lombok, MapStruct |
-| **Architecture** | Layered architecture (Controller → Service → Repository → Database) |
-| **Frontend** | React 19, Vite, TypeScript, Lucide Icons, SGDS React |
+| **Frontend** | React 19, Vite, TypeScript, SGDS React |
 | **Visualization** | React Flow + ELK (network topology), Recharts, D3.js |
 | **Reverse Proxy** | Nginx |
 | **Packet Parsing** | tshark / Wireshark, nDPI v5 (deep packet inspection) |
@@ -156,10 +205,7 @@ docker compose logs -f minio
 ### Restart Services
 
 ```bash
-# Restart all
 docker compose restart
-
-# Restart backend only
 docker compose restart tracepcap-backend
 ```
 
@@ -184,9 +230,7 @@ docker exec -it tracepcap-postgres psql -U tracepcap_user tracepcap
 
 ### Access MinIO Console
 
-Navigate to **http://localhost:9001** and login with:
-- Username: `minioadmin`
-- Password: `minioadmin`
+Navigate to **http://localhost:9001** and login with `minioadmin` / `minioadmin`.
 
 ### Access Swagger API Documentation
 
@@ -194,103 +238,64 @@ Navigate to **http://localhost:80/swagger-ui.html** to explore the API interacti
 
 ## Deployment
 
-TracePcap is designed for self-hosted deployment:
+TracePcap is designed for self-hosted deployment.
 
 ### Offline / Air-gapped Deployment
 
-For environments without internet access, use the offline deployment workflow:
+For environments without internet access:
 
 **On an internet-connected machine:**
 
-> **Windows users**: These scripts require a Bash shell. Use **Git Bash** (comes with [Git for Windows](https://git-scm.com/)) or **WSL**. Do not run them in CMD or PowerShell.
+> **Windows users**: These scripts require a Bash shell. Use **Git Bash** or **WSL** — not CMD or PowerShell.
 
 ```bash
 # Pull all third-party images, build local images, and save everything as .tar files
 bash scripts/pull-and-save-images.sh
 ```
 
-This creates a `images/` directory containing `.tar` files for all services.
-
-**Transfer to the offline machine:**
-
-```
-images/                      # all .tar files
-docker-compose.offline.yml
-scripts/load-images.sh
-.env                         # copy from .env.example and configure
-```
+**Transfer to the offline machine:** the generated `images/` directory, `docker-compose.offline.yml`, `scripts/load-images.sh`, and your configured `.env`.
 
 **On the offline machine:**
 
 ```bash
-# Load all images into Docker
 bash scripts/load-images.sh
-
-# Start the stack
 docker compose -f docker-compose.offline.yml up -d
 ```
 
-> **Note**: The offline compose file defaults `LLM_API_BASE_URL` to `http://localhost:1234/v1` (LM Studio). Configure a locally-hosted LLM in `.env` before starting if you want AI features.
+> The offline compose file defaults `LLM_API_BASE_URL` to `http://localhost:1234/v1` (LM Studio). Configure a locally-hosted LLM before starting if you want AI features.
 
 ---
 
-- **Development**: Use built-in configuration with exposed ports
-- **Production**:
-  - Change default MinIO credentials in `docker-compose.yml`
-  - Update PostgreSQL password
-  - Configure reverse proxy with SSL/TLS
-  - Adjust `MAX_UPLOAD_SIZE_BYTES` based on your needs
-  - Set appropriate LLM configuration for your infrastructure
+**Production hardening:**
+- Change default MinIO credentials in `docker-compose.yml`
+- Update PostgreSQL password
+- Configure reverse proxy with SSL/TLS
+- Adjust `MAX_UPLOAD_SIZE_BYTES` based on your needs
+- Add an authentication layer for multi-user deployments
 
 ## Security
 
-- **Local Processing**: PCAP analysis runs entirely on your server
-- **Data Privacy**: Network captures never leave your infrastructure (except LLM filter generation)
-- **Object Storage**: MinIO provides S3-compatible secure file storage
-- **Database**: PostgreSQL not exposed outside Docker network by default
-- **No Authentication**: Add authentication layer for multi-user deployments
-- **LLM Privacy**: Use local LLM servers (LM Studio, Ollama) to keep filter queries private
-
-## Performance
-
-- **Async Processing**: File analysis runs asynchronously to prevent blocking
-- **Object Storage**: MinIO provides scalable storage for large PCAP files
-- **Database Indexing**: Optimized queries with proper indexing for fast lookups
-- **Connection Pooling**: Efficient database connection management
-- **File Size Limits**: Configurable upload limits to prevent resource exhaustion
-
-## Architecture Highlights
-
-- **Layered Architecture**: Clean separation of concerns (API → Service → Repository → Database)
-- **DTO Pattern**: MapStruct for efficient object mapping between layers
-- **Database Migrations**: Flyway for version-controlled schema management
-- **Health Checks**: Built-in health checks for all services
-- **API-First Design**: OpenAPI specification with Swagger UI
+- **Local Processing**: All PCAP analysis runs on your server — packet data never leaves your infrastructure
+- **Offline-capable**: GeoIP uses a bundled DB-IP MMDB as fallback; LLM queries use a configurable local endpoint
+- **No Authentication by default**: Add an authentication layer before exposing to multiple users
+- **Object Storage**: MinIO provides S3-compatible secure file storage; not exposed outside the Docker network
 
 ## Custom Signature Rules
 
-TracePcap supports user-defined detection rules that are matched against every conversation after nDPI analysis. Matched rule names appear as color-coded badges in the Conversations tab and Overview, alongside nDPI's built-in detections.
-
-### How it works
-
-Rules live inside a Docker named volume (`config_data`) at `/app/config/signatures.yml` inside the backend container. The file is reloaded on every analysis run — no restart required after editing.
-
-Click **Custom Detection Rules** in the navbar to open the built-in YAML editor. Changes are saved immediately — no restart required.
-
-> **`signatures.sample.yml`** in the repo root is a reference template with demo rules covering every match field. Paste it into the browser editor to get started.
+TracePcap supports user-defined detection rules matched against every conversation after nDPI analysis. Matched rule names appear as colour-coded badges in the Conversations tab and Overview.
 
 ### Rule format
 
 ```yaml
 signatures:
-  - name: rule_name_shown_in_ui   # shown as a badge (use underscores, no spaces)
+  - name: rule_name_shown_in_ui   # shown as a badge
     description: Human-readable description
     severity: low                  # low | medium | high | critical
     match:
       ip: "203.0.113.42"           # exact match against srcIp OR dstIp
 ```
 
-A rule fires when **all** specified match fields are satisfied. All fields are optional — mix and match as needed.
+Rules fire when **all** specified match fields are satisfied. All fields are optional.
 
 ### Match fields
 
@@ -300,73 +305,25 @@ A rule fires when **all** specified match fields are satisfied. All fields are o
 | `cidr` | string | CIDR range match against srcIp or dstIp | `"10.0.0.0/8"` |
 | `srcPort` | number | Exact source port | `67` |
 | `dstPort` | number | Exact destination port | `4444` |
-| `ja3` | string | Exact JA3S fingerprint hash (nDPI 5.x) | `"82f0d8a75fa483d1cfe4b7085b784d7e"` |
-| `hostname` | string | Exact or wildcard SNI hostname — `*.evil.com` matches any subdomain at any depth | `"*.evil.com"` |
-| `app` | string | Case-insensitive nDPI application name | `"Telegram"`, `"TOR"`, `"SIP"`, `"RTP"` |
-| `protocol` | string | Case-insensitive transport protocol | `"TCP"`, `"UDP"`, `"ICMP"` |
+| `ja3` | string | Exact JA3S fingerprint hash | `"82f0d8a75fa483d1cfe4b7085b784d7e"` |
+| `hostname` | string | Exact or wildcard SNI hostname — `*.evil.com` matches any subdomain | `"*.evil.com"` |
+| `app` | string | Case-insensitive nDPI application name | `"Telegram"`, `"TOR"` |
+| `protocol` | string | Case-insensitive transport protocol | `"TCP"`, `"UDP"` |
 
-### Severity colors
+Click **Custom Detection Rules** in the navbar to open the built-in YAML editor. Changes take effect on the next analysis run — no restart required.
 
-| Severity | Color |
-|----------|-------|
-| `critical` | Red |
-| `high` | Orange |
-| `medium` | Yellow |
-| `low` | Purple |
-
-### Examples
-
-```yaml
-signatures:
-
-  # Flag a known C2 IP
-  - name: known_c2_ip
-    description: Known command-and-control server
-    severity: high
-    match:
-      ip: "203.0.113.42"
-
-  # Flag all traffic to a suspicious subnet
-  - name: flagged_subnet
-    severity: medium
-    match:
-      cidr: "198.51.100.0/24"
-
-  # Detect DNS over TCP (possible zone transfer or tunnelling)
-  - name: dns_over_tcp
-    severity: medium
-    match:
-      app: "DNS"
-      protocol: TCP
-
-  # Wildcard hostname match
-  - name: blocked_domain
-    severity: high
-    match:
-      hostname: "*.malware.example.com"
-
-  # JA3S fingerprint from a threat-intel feed
-  - name: suspicious_tls_fingerprint
-    severity: critical
-    match:
-      ja3: "a0e9f5d64349fb13191bc781f81f42e1"
-```
-
-A full set of 12 demo rules covering every match field type is available in [`signatures.sample.yml`](signatures.sample.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP file that triggers all 12 rules at once.
+A full set of demo rules covering every match field is in [`signatures.sample.yml`](signatures.sample.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP that triggers all 12 rules.
 
 ## Sample Files
 
-The [`sample-files/`](sample-files/) directory contains example PCAP files:
+The [`sample-files/`](sample-files/) directory contains example PCAPs:
 
-- `atm_capture1.cap` - ATM network traffic sample
-- `free5gc.pcap` - 5G core network traffic sample
-- `demo_all_rules.pcap` - Triggers all 12 custom signature demo rules (generated by `gen_demo.py`)
-
-These files can be used to test the application's analysis capabilities.
+- `atm_capture1.cap` — ATM network traffic sample
+- `free5gc.pcap` — 5G core network traffic sample
+- `demo_all_rules.pcap` — Triggers all 12 custom signature demo rules
+- `monitor_large/` — 8 weekly snapshots of a simulated 550-node office network for testing the Network Monitor
 
 ## Star History
-
-If you find TracePcap useful, consider giving it a star! ⭐
 
 <a href="https://star-history.com/#NotYuSheng/TracePcap&Date">
   <picture>

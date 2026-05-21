@@ -56,9 +56,19 @@ export const API_ENDPOINTS = {
   IP_ORG_RULES: '/ip-org-rules',
   IP_ORG_RULE_DELETE: (id: number) => `/ip-org-rules/${id}`,
 
+  // System
+  SYSTEM_TIME: '/system/time',
+
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
   COMPARE_REPORT_DOWNLOAD: '/files/compare/report',
+
+  // Entity Notes
+  ENTITY_NOTE: (entityType: string, entityKey: string) =>
+    `/entity-notes?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  ENTITY_NOTE_UPSERT: '/entity-notes',
+  ENTITY_NOTE_HISTORY: (entityType: string, entityKey: string) =>
+    `/entity-notes/history?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
 } as const;
 
 export const MONITOR_ENDPOINTS = {
@@ -73,4 +83,36 @@ export const MONITOR_ENDPOINTS = {
   CHANGE: (networkId: string, eventId: string) => `/monitor/networks/${networkId}/changes/${eventId}`,
   BASELINE_DEFINITIONS: (networkId: string) =>
     `/monitor/networks/${networkId}/baseline/definitions`,
+  EXTERNAL_EVENTS: (networkId: string) => `/monitor/networks/${networkId}/external-events`,
+  EXTERNAL_EVENT: (networkId: string, eventId: string) =>
+    `/monitor/networks/${networkId}/external-events/${eventId}`,
+  ANNOTATIONS: (networkId: string) => `/monitor/networks/${networkId}/annotations`,
+  ANNOTATION: (networkId: string, annotationId: string) =>
+    `/monitor/networks/${networkId}/annotations/${annotationId}`,
+  INSIGHTS_LATEST: (networkId: string) => `/monitor/networks/${networkId}/insights/latest`,
+  INSIGHTS_GENERATE: (networkId: string) => `/monitor/networks/${networkId}/insights/generate`,
+  SNAPSHOT_PATCH: (networkId: string, snapshotId: string) =>
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
+  SNAPSHOT_INSIGHT_LATEST: (networkId: string, snapshotId: string) =>
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights/latest`,
+  SNAPSHOT_INSIGHT_GENERATE: (networkId: string, snapshotId: string) =>
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights/generate`,
+};
+
+export const SUBNET_ENDPOINTS = {
+  SUBNETS: '/subnets',
+  SUBNET_DELETE: (id: number) => `/subnets/${id}`,
+  SUBNET_DETECT: (fileId: string) => `/subnets/detect?fileId=${fileId}`,
+  SUBNET_DETECT_NETWORK: (networkId: string) => `/subnets/detect/network?networkId=${networkId}`,
+  SUBNET_SAVE_DETECTED: '/subnets/detected',
+};
+
+export const INSIGHTS_ENDPOINTS = {
+  NODE_ROLE: (entityType: string, entityKey: string) =>
+    `/node-roles?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  NODE_ROLE_UPSERT: '/node-roles',
+  NODE_ROLE_DELETE: (entityType: string, entityKey: string) =>
+    `/node-roles?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  NODE_ROLE_SUGGEST: (entityType: string, entityKey: string, fileId: string) =>
+    `/node-roles/suggest?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}&fileId=${fileId}`,
 };

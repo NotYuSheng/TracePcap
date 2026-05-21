@@ -37,6 +37,12 @@ public class NetworkSnapshotEntity {
   @Column(name = "is_baseline", nullable = false)
   private boolean isBaseline = false;
 
+  @Column(name = "context")
+  private String context;
+
+  @Column(name = "notes")
+  private String notes;
+
   @CreationTimestamp
   @Column(name = "added_at", nullable = false, updatable = false)
   private LocalDateTime addedAt;

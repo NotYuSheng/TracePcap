@@ -1,5 +1,7 @@
 package com.tracepcap.common.controller;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,13 @@ public class SystemController {
 
   @Value("${llm.api.timeout-seconds:300}")
   private int llmTimeoutSeconds;
+
+  /** Returns the server's current local datetime (ISO-8601, no timezone offset). */
+  @GetMapping("/time")
+  public ResponseEntity<Map<String, String>> getServerTime() {
+    return ResponseEntity.ok(
+        Map.of("now", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))));
+  }
 
   /**
    * Returns runtime limits derived from APP_MEMORY_MB so the frontend never needs build-time baked

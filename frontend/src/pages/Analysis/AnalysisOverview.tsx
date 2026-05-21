@@ -14,6 +14,7 @@ import {
 import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
+import { EntityDetailModal } from '@components/common/EntityDetailModal';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -115,6 +116,10 @@ export const AnalysisOverview = () => {
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
 
+  // Entity detail modal
+  type EntityModalState = { type: 'PROTOCOL' | 'APPLICATION'; key: string; name: string } | null;
+  const [entityModal, setEntityModal] = useState<EntityModalState>(null);
+
   useEffect(() => {
     conversationService
       .getSignatureRules()
@@ -174,12 +179,8 @@ export const AnalysisOverview = () => {
                     color: getTextColor(appColor),
                     cursor: 'pointer',
                   }}
-                  title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click to filter conversations`}
-                  onClick={() =>
-                    navigate(
-                      `/analysis/${fileId}/conversations?app=${encodeURIComponent(app.name)}`
-                    )
-                  }
+                  title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click for details`}
+                  onClick={() => setEntityModal({ type: 'APPLICATION', key: app.name, name: app.name })}
                 >
                   {app.name}
                 </button>
@@ -214,12 +215,8 @@ export const AnalysisOverview = () => {
                   key={proto}
                   className="badge rounded-pill px-3 py-2 fs-6 border-0"
                   style={{ backgroundColor: bg, color: getTextColor(bg), cursor: 'pointer' }}
-                  title="Click to filter conversations by this protocol"
-                  onClick={() =>
-                    navigate(
-                      `/analysis/${fileId}/conversations?l7Protocols=${encodeURIComponent(proto)}`
-                    )
-                  }
+                  title="Click for details"
+                  onClick={() => setEntityModal({ type: 'PROTOCOL', key: proto, name: proto })}
                 >
                   {proto}
                 </button>
@@ -325,6 +322,52 @@ export const AnalysisOverview = () => {
         <div className="mt-4">
           <CategoryBreakdownChart categoryStats={data.categoryDistribution} />
         </div>
+      )}
+
+      {entityModal && (
+        <EntityDetailModal
+          entityType={entityModal.type}
+          entityKey={entityModal.key}
+          displayName={entityModal.name}
+          fileId={fileId}
+          badge={
+            entityModal.type === 'APPLICATION' ? (
+              <span
+                className="badge rounded-pill"
+                style={{
+                  backgroundColor: getAppColor(entityModal.name),
+                  color: getTextColor(getAppColor(entityModal.name)),
+                  fontSize: '0.75rem',
+                }}
+              >
+                App
+              </span>
+            ) : (
+              <span
+                className="badge rounded-pill"
+                style={{
+                  backgroundColor: getL7ProtocolColor(entityModal.name),
+                  color: getTextColor(getL7ProtocolColor(entityModal.name)),
+                  fontSize: '0.75rem',
+                }}
+              >
+                Protocol
+              </span>
+            )
+          }
+          onViewConversations={
+            entityModal.type === 'APPLICATION'
+              ? () =>
+                  navigate(
+                    `/analysis/${fileId}/conversations?app=${encodeURIComponent(entityModal.key)}`
+                  )
+              : () =>
+                  navigate(
+                    `/analysis/${fileId}/conversations?l7Protocols=${encodeURIComponent(entityModal.key)}`
+                  )
+          }
+          onClose={() => setEntityModal(null)}
+        />
       )}
     </div>
   );

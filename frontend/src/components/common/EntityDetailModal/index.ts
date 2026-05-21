@@ -1,0 +1,1 @@
+export { EntityDetailModal } from './EntityDetailModal';

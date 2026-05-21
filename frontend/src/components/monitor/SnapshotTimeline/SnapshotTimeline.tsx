@@ -1,19 +1,20 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
-import { Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Modal } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
 import { ScrollableTable } from '@/components/common/ScrollableTable';
-import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEventBadge';
+import { SnapshotDetailModal } from '@/components/monitor/SnapshotDetailModal/SnapshotDetailModal';
 import { parseDateTime } from '@/utils/dateUtils';
 
 interface SnapshotTimelineProps {
+  networkId: string;
   snapshots: NetworkSnapshot[];
   changeEvents: ChangeEvent[];
   onRemove: (snapshotId: string) => Promise<void>;
   onAddSnapshot: () => void;
-  onSelectSnapshot: (snapshotId: string) => void;
   onPatchChange: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
+  onSnapshotUpdated: (updated: NetworkSnapshot) => void;
 }
 
 type SortDir = 'asc' | 'desc';
@@ -42,16 +43,18 @@ function getStartMs(snap: NetworkSnapshot): number {
 }
 
 export const SnapshotTimeline = ({
+  networkId,
   snapshots,
   changeEvents,
   onRemove,
   onAddSnapshot,
-  onSelectSnapshot,
   onPatchChange,
+  onSnapshotUpdated,
 }: SnapshotTimelineProps) => {
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const [changesSnap, setChangesSnap] = useState<NetworkSnapshot | null>(null);
+  const [detailSnap, setDetailSnap] = useState<NetworkSnapshot | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<'diagram' | 'changes' | 'context' | 'insights'>('diagram');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -96,7 +99,8 @@ export const SnapshotTimeline = ({
         </div>
       ) : (
         <>
-          <ScrollableTable>
+          <div className="border rounded overflow-hidden">
+          <ScrollableTable maxHeight="50vh">
             <table className="table table-hover align-middle mb-0">
               <thead>
                 <tr>
@@ -114,20 +118,16 @@ export const SnapshotTimeline = ({
               <tbody>
                 {paginated.map(snap => {
                   return (
-                    <tr key={snap.id}>
+                    <tr
+                      key={snap.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => { setDetailInitialTab('diagram'); setDetailSnap(snap); }}
+                    >
                       <td>
                         <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
                       </td>
                       <td>
-                        <Button
-                          size="sm"
-                          variant="link"
-                          className="p-0 text-start text-break"
-                          onClick={() => onSelectSnapshot(snap.id)}
-                          title="View network diagram"
-                        >
-                          {snap.fileName}
-                        </Button>
+                        <span className="fw-medium text-break">{snap.fileName}</span>
                       </td>
                       <td>
                         <small className="text-muted">{formatDuration(snap.startTime, snap.endTime)}</small>
@@ -145,7 +145,7 @@ export const SnapshotTimeline = ({
                             size="sm"
                             className="border-0 py-0 px-1"
                             style={{ fontSize: '0.75em' }}
-                            onClick={() => setChangesSnap(snap)}
+                            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
                           >
                             {snap.criticalCount} critical
                             {snap.changeCount > snap.criticalCount &&
@@ -158,13 +158,13 @@ export const SnapshotTimeline = ({
                             size="sm"
                             className="border-0 py-0 px-1"
                             style={{ fontSize: '0.75em' }}
-                            onClick={() => setChangesSnap(snap)}
+                            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
                           >
                             {snap.changeCount} change{snap.changeCount !== 1 ? 's' : ''}
                           </Button>
                         )}
                       </td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         <Button
                           size="sm"
                           variant="outline-danger"
@@ -181,8 +181,7 @@ export const SnapshotTimeline = ({
               </tbody>
             </table>
           </ScrollableTable>
-
-          <Card.Footer className="border-top pt-2 mt-2">
+          <div className="border-top px-3 py-2">
             <Pagination
               currentPage={page}
               totalPages={totalPages}
@@ -192,35 +191,27 @@ export const SnapshotTimeline = ({
               showPageSizeSelector
               onPageSizeChange={size => { setPageSize(size); setPage(1); }}
             />
-          </Card.Footer>
+          </div>
+          </div>
         </>
       )}
 
-      {/* Changes detail modal */}
-      <Modal show={!!changesSnap} onHide={() => setChangesSnap(null)} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="bi bi-activity me-2"></i>
-            Changes — {changesSnap?.fileName}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          {(() => {
-            const events = changeEvents.filter(e => e.toSnapshotId === changesSnap?.id);
-            if (events.length === 0) {
-              return <p className="text-muted mb-0">No change events for this snapshot.</p>;
-            }
-            return events.map(event => (
-              <ChangeEventBadge
-                key={event.id}
-                event={event}
-                snapshots={snapshots}
-                onPatch={onPatchChange}
-              />
-            ));
-          })()}
-        </Modal.Body>
-      </Modal>
+      {/* Snapshot Detail modal */}
+      {detailSnap && (
+        <SnapshotDetailModal
+          snapshot={detailSnap}
+          networkId={networkId}
+          changeEvents={changeEvents}
+          snapshots={snapshots}
+          initialTab={detailInitialTab}
+          onPatchChange={onPatchChange}
+          onSnapshotUpdated={updated => {
+            setDetailSnap(updated);
+            onSnapshotUpdated(updated);
+          }}
+          onHide={() => setDetailSnap(null)}
+        />
+      )}
 
       <Modal show={!!confirmRemove} onHide={() => setConfirmRemove(null)} centered>
         <Modal.Header closeButton>

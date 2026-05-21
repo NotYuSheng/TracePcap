@@ -27,4 +27,11 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
           + " WHERE s.network.id = :networkId"
           + " ORDER BY s.file.startTime ASC NULLS LAST, s.addedAt ASC")
   List<NetworkSnapshotEntity> findOrderedByStartTime(@Param("networkId") UUID networkId);
+
+  @Query(
+      "SELECT s FROM NetworkSnapshotEntity s"
+          + " JOIN FETCH s.file"
+          + " WHERE s.network.id = :networkId"
+          + " ORDER BY s.snapshotOrder ASC")
+  List<NetworkSnapshotEntity> findByNetworkIdWithFileOrderBySnapshotOrderAsc(@Param("networkId") UUID networkId);
 }

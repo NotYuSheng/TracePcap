@@ -25,6 +25,8 @@ public class FileMetadataDto {
 
   private String status;
 
+  private String source;
+
   private Integer packetCount;
 
   private Long duration;

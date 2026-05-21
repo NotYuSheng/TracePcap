@@ -39,6 +39,7 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
     schemas: public
+    ignore-missing-migrations: true
 
   # File Upload Configuration
   servlet:
