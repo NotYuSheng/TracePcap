@@ -461,7 +461,7 @@ export const ConversationDetail = ({
         </Card.Body>
       </div>
 
-      <div className="card">
+      <Card>
         <Card.Header>
           <ul className="nav nav-tabs card-header-tabs">
             <li className="nav-item">
@@ -628,7 +628,7 @@ export const ConversationDetail = ({
             <SessionTab conversationId={conversation.id} protocol={conversation.protocol.name} />
           </Card.Body>
         )}
-      </div>
+      </Card>
 
       {devicePopup && (
         <DeviceClassificationPopup info={devicePopup} onClose={() => setDevicePopup(null)} />
