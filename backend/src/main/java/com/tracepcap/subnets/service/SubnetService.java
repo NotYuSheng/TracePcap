@@ -97,15 +97,13 @@ public class SubnetService {
     int totalSnapshots = fileIds.size();
     if (totalSnapshots == 0) return Collections.emptyList();
 
-    // Per-snapshot detection: cidr -> host count for that snapshot
+    // Per-snapshot detection: cidr -> number of snapshots it appeared in
     Map<String, Integer> cidrSnapshotCount = new LinkedHashMap<>();
-    Map<String, Integer> cidrMaxHosts = new LinkedHashMap<>();
 
     for (UUID fileId : fileIds) {
       List<SubnetDefinitionDto> snapCandidates = detectFromFile(fileId);
       for (SubnetDefinitionDto c : snapCandidates) {
         cidrSnapshotCount.merge(c.getCidr(), 1, Integer::sum);
-        cidrMaxHosts.merge(c.getCidr(), c.getHostCount(), Math::max);
       }
     }
 

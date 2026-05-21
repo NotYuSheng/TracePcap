@@ -139,7 +139,7 @@ public class NodeRoleService {
       String appSql = """
           SELECT app_name, COUNT(*) as cnt
           FROM conversations
-          WHERE file_id = ? AND src_ip = ? OR file_id = ? AND dst_ip = ?
+          WHERE (file_id = ? AND src_ip = ? OR file_id = ? AND dst_ip = ?)
             AND app_name IS NOT NULL
           GROUP BY app_name ORDER BY cnt DESC LIMIT 8
           """;

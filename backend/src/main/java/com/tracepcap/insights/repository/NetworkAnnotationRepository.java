@@ -11,4 +11,6 @@ public interface NetworkAnnotationRepository
     extends JpaRepository<NetworkAnnotationEntity, UUID> {
 
   List<NetworkAnnotationEntity> findByNetworkIdOrderByCreatedAtDesc(UUID networkId);
+
+  List<NetworkAnnotationEntity> findTop10ByNetworkIdOrderByCreatedAtDesc(UUID networkId);
 }
