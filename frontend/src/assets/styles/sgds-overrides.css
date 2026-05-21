@@ -478,7 +478,7 @@
 .card-header button.nav-link {
   display: inline-block !important;
   padding: 0.5rem 1rem !important;
-  color: #495057 !important;
+  color: var(--tp-text-muted, #495057) !important;
   background-color: transparent !important;
   border: 1px solid transparent !important;
   border-top-left-radius: 0.3125rem !important;
@@ -489,14 +489,14 @@
 }
 
 .card-header button.nav-link.active {
-  color: #1d2939 !important;
-  background-color: #fff !important;
-  border-color: #dee2e6 #dee2e6 #fff !important;
+  color: var(--tp-text, #1d2939) !important;
+  background-color: var(--tp-surface, #fff) !important;
+  border-color: var(--tp-border, #dee2e6) var(--tp-border, #dee2e6) var(--tp-surface, #fff) !important;
 }
 
 .card-header button.nav-link:hover:not(.active) {
-  color: #1d2939 !important;
-  border-color: #e9ecef #e9ecef transparent !important;
+  color: var(--tp-text, #1d2939) !important;
+  border-color: var(--tp-border, #e9ecef) var(--tp-border, #e9ecef) transparent !important;
 }
 
 [data-theme='dark'] .card-header button.nav-link {
