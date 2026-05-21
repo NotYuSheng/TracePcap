@@ -1,4 +1,4 @@
-package com.tracepcap.monitor.dto;
+package com.lanturn.monitor.dto;
 
 import java.time.LocalDateTime;
 import java.util.Map;

@@ -1,9 +1,9 @@
-package com.tracepcap.notes.controller;
+package com.lanturn.notes.controller;
 
-import com.tracepcap.notes.dto.EntityHistoryEntry;
-import com.tracepcap.notes.dto.EntityNoteDto;
-import com.tracepcap.notes.dto.UpsertNoteRequest;
-import com.tracepcap.notes.service.EntityNoteService;
+import com.lanturn.notes.dto.EntityHistoryEntry;
+import com.lanturn.notes.dto.EntityNoteDto;
+import com.lanturn.notes.dto.UpsertNoteRequest;
+import com.lanturn.notes.service.EntityNoteService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

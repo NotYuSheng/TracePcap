@@ -1,8 +1,8 @@
-package com.tracepcap.insights.controller;
+package com.lanturn.insights.controller;
 
-import com.tracepcap.insights.dto.GenerateInsightRequest;
-import com.tracepcap.insights.dto.NetworkInsightDto;
-import com.tracepcap.insights.service.NetworkInsightService;
+import com.lanturn.insights.dto.GenerateInsightRequest;
+import com.lanturn.insights.dto.NetworkInsightDto;
+import com.lanturn.insights.service.NetworkInsightService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

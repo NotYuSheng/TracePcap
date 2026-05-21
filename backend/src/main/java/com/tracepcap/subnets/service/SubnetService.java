@@ -1,11 +1,11 @@
-package com.tracepcap.subnets.service;
+package com.lanturn.subnets.service;
 
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
-import com.tracepcap.subnets.dto.SubnetDefinitionDto;
-import com.tracepcap.subnets.dto.UpsertSubnetRequest;
-import com.tracepcap.subnets.entity.SubnetDefinitionEntity;
-import com.tracepcap.subnets.repository.SubnetDefinitionRepository;
+import com.lanturn.analysis.repository.HostClassificationRepository;
+import com.lanturn.monitor.repository.NetworkSnapshotRepository;
+import com.lanturn.subnets.dto.SubnetDefinitionDto;
+import com.lanturn.subnets.dto.UpsertSubnetRequest;
+import com.lanturn.subnets.entity.SubnetDefinitionEntity;
+import com.lanturn.subnets.repository.SubnetDefinitionRepository;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;

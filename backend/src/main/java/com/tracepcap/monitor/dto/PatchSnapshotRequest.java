@@ -1,4 +1,4 @@
-package com.tracepcap.monitor.dto;
+package com.lanturn.monitor.dto;
 
 import lombok.Data;
 

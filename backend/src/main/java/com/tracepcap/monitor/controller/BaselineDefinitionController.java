@@ -1,8 +1,8 @@
-package com.tracepcap.monitor.controller;
+package com.lanturn.monitor.controller;
 
-import com.tracepcap.monitor.dto.BaselineDefinitionDto;
-import com.tracepcap.monitor.dto.CreateBaselineDefinitionRequest;
-import com.tracepcap.monitor.service.BaselineService;
+import com.lanturn.monitor.dto.BaselineDefinitionDto;
+import com.lanturn.monitor.dto.CreateBaselineDefinitionRequest;
+import com.lanturn.monitor.service.BaselineService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;

@@ -1,14 +1,14 @@
-package com.tracepcap.insights.service;
+package com.lanturn.insights.service;
 
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.insights.dto.CreateAnnotationRequest;
-import com.tracepcap.insights.dto.NetworkAnnotationDto;
-import com.tracepcap.insights.entity.NetworkAnnotationEntity;
-import com.tracepcap.insights.repository.NetworkAnnotationRepository;
-import com.tracepcap.monitor.entity.NetworkEntity;
-import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
-import com.tracepcap.monitor.repository.NetworkRepository;
-import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.insights.dto.CreateAnnotationRequest;
+import com.lanturn.insights.dto.NetworkAnnotationDto;
+import com.lanturn.insights.entity.NetworkAnnotationEntity;
+import com.lanturn.insights.repository.NetworkAnnotationRepository;
+import com.lanturn.monitor.entity.NetworkEntity;
+import com.lanturn.monitor.entity.NetworkSnapshotEntity;
+import com.lanturn.monitor.repository.NetworkRepository;
+import com.lanturn.monitor.repository.NetworkSnapshotRepository;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;

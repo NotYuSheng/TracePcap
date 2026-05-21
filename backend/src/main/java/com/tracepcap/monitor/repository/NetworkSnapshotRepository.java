@@ -1,6 +1,6 @@
-package com.tracepcap.monitor.repository;
+package com.lanturn.monitor.repository;
 
-import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
+import com.lanturn.monitor.entity.NetworkSnapshotEntity;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

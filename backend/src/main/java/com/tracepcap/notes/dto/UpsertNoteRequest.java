@@ -1,4 +1,4 @@
-package com.tracepcap.notes.dto;
+package com.lanturn.notes.dto;
 
 import lombok.Data;
 

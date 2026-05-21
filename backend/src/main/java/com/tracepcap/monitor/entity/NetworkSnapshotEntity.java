@@ -1,6 +1,6 @@
-package com.tracepcap.monitor.entity;
+package com.lanturn.monitor.entity;
 
-import com.tracepcap.file.entity.FileEntity;
+import com.lanturn.file.entity.FileEntity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;

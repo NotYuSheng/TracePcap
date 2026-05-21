@@ -1,8 +1,8 @@
-package com.tracepcap.insights.controller;
+package com.lanturn.insights.controller;
 
-import com.tracepcap.insights.dto.CreateExternalEventRequest;
-import com.tracepcap.insights.dto.NetworkExternalEventDto;
-import com.tracepcap.insights.service.NetworkExternalEventService;
+import com.lanturn.insights.dto.CreateExternalEventRequest;
+import com.lanturn.insights.dto.NetworkExternalEventDto;
+import com.lanturn.insights.service.NetworkExternalEventService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package com.tracepcap.subnets.entity;
+package com.lanturn.subnets.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

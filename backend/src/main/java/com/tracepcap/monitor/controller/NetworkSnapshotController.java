@@ -1,9 +1,9 @@
-package com.tracepcap.monitor.controller;
+package com.lanturn.monitor.controller;
 
-import com.tracepcap.monitor.dto.AddSnapshotRequest;
-import com.tracepcap.monitor.dto.NetworkSnapshotDto;
-import com.tracepcap.monitor.dto.PatchSnapshotRequest;
-import com.tracepcap.monitor.service.SnapshotService;
+import com.lanturn.monitor.dto.AddSnapshotRequest;
+import com.lanturn.monitor.dto.NetworkSnapshotDto;
+import com.lanturn.monitor.dto.PatchSnapshotRequest;
+import com.lanturn.monitor.service.SnapshotService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;

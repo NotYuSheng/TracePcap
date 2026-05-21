@@ -1,6 +1,6 @@
-package com.tracepcap.monitor.repository;
+package com.lanturn.monitor.repository;
 
-import com.tracepcap.monitor.entity.NetworkEntity;
+import com.lanturn.monitor.entity.NetworkEntity;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

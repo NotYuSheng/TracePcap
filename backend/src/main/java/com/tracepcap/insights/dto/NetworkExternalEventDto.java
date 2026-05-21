@@ -1,4 +1,4 @@
-package com.tracepcap.insights.dto;
+package com.lanturn.insights.dto;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

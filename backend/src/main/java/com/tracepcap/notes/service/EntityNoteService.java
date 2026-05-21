@@ -1,10 +1,10 @@
-package com.tracepcap.notes.service;
+package com.lanturn.notes.service;
 
-import com.tracepcap.notes.dto.EntityHistoryEntry;
-import com.tracepcap.notes.dto.EntityNoteDto;
-import com.tracepcap.notes.dto.UpsertNoteRequest;
-import com.tracepcap.notes.entity.EntityNoteEntity;
-import com.tracepcap.notes.repository.EntityNoteRepository;
+import com.lanturn.notes.dto.EntityHistoryEntry;
+import com.lanturn.notes.dto.EntityNoteDto;
+import com.lanturn.notes.dto.UpsertNoteRequest;
+import com.lanturn.notes.entity.EntityNoteEntity;
+import com.lanturn.notes.repository.EntityNoteRepository;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;

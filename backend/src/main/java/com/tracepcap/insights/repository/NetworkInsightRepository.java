@@ -1,6 +1,6 @@
-package com.tracepcap.insights.repository;
+package com.lanturn.insights.repository;
 
-import com.tracepcap.insights.entity.NetworkInsightEntity;
+import com.lanturn.insights.entity.NetworkInsightEntity;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

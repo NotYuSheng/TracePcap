@@ -1,6 +1,6 @@
-package com.tracepcap.insights.repository;
+package com.lanturn.insights.repository;
 
-import com.tracepcap.insights.entity.NodeRoleEntity;
+import com.lanturn.insights.entity.NodeRoleEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

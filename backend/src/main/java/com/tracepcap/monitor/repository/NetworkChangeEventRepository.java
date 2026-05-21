@@ -1,8 +1,8 @@
-package com.tracepcap.monitor.repository;
+package com.lanturn.monitor.repository;
 
-import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
-import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
-import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
+import com.lanturn.monitor.entity.NetworkChangeEventEntity;
+import com.lanturn.monitor.entity.NetworkChangeEventEntity.ChangeType;
+import com.lanturn.monitor.entity.NetworkChangeEventEntity.Severity;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

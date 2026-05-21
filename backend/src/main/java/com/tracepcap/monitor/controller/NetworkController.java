@@ -1,8 +1,8 @@
-package com.tracepcap.monitor.controller;
+package com.lanturn.monitor.controller;
 
-import com.tracepcap.monitor.dto.CreateNetworkRequest;
-import com.tracepcap.monitor.dto.NetworkDto;
-import com.tracepcap.monitor.service.NetworkService;
+import com.lanturn.monitor.dto.CreateNetworkRequest;
+import com.lanturn.monitor.dto.NetworkDto;
+import com.lanturn.monitor.service.NetworkService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;

@@ -1,6 +1,6 @@
-package com.tracepcap.subnets.repository;
+package com.lanturn.subnets.repository;
 
-import com.tracepcap.subnets.entity.SubnetDefinitionEntity;
+import com.lanturn.subnets.entity.SubnetDefinitionEntity;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

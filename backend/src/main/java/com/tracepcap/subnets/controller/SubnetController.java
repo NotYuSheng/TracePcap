@@ -1,8 +1,8 @@
-package com.tracepcap.subnets.controller;
+package com.lanturn.subnets.controller;
 
-import com.tracepcap.subnets.dto.SubnetDefinitionDto;
-import com.tracepcap.subnets.dto.UpsertSubnetRequest;
-import com.tracepcap.subnets.service.SubnetService;
+import com.lanturn.subnets.dto.SubnetDefinitionDto;
+import com.lanturn.subnets.dto.UpsertSubnetRequest;
+import com.lanturn.subnets.service.SubnetService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

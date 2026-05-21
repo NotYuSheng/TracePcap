@@ -1,9 +1,9 @@
-package com.tracepcap.insights.controller;
+package com.lanturn.insights.controller;
 
-import com.tracepcap.insights.dto.CreateAnnotationRequest;
-import com.tracepcap.insights.dto.NetworkAnnotationDto;
-import com.tracepcap.insights.dto.UpdateAnnotationRequest;
-import com.tracepcap.insights.service.NetworkAnnotationService;
+import com.lanturn.insights.dto.CreateAnnotationRequest;
+import com.lanturn.insights.dto.NetworkAnnotationDto;
+import com.lanturn.insights.dto.UpdateAnnotationRequest;
+import com.lanturn.insights.service.NetworkAnnotationService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

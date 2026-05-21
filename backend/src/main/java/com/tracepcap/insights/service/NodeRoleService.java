@@ -1,14 +1,14 @@
-package com.tracepcap.insights.service;
+package com.lanturn.insights.service;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.insights.dto.NodeRoleDto;
-import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
-import com.tracepcap.insights.entity.NodeRoleEntity;
-import com.tracepcap.insights.repository.NodeRoleRepository;
-import com.tracepcap.story.service.LlmClient;
+import com.lanturn.analysis.repository.HostClassificationRepository;
+import com.lanturn.insights.dto.NodeRoleDto;
+import com.lanturn.insights.dto.UpsertNodeRoleRequest;
+import com.lanturn.insights.entity.NodeRoleEntity;
+import com.lanturn.insights.repository.NodeRoleRepository;
+import com.lanturn.story.service.LlmClient;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

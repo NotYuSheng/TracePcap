@@ -1,4 +1,4 @@
-package com.tracepcap.notes.dto;
+package com.lanturn.notes.dto;
 
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;

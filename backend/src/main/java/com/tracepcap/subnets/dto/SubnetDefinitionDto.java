@@ -1,4 +1,4 @@
-package com.tracepcap.subnets.dto;
+package com.lanturn.subnets.dto;
 
 import java.time.LocalDateTime;
 import lombok.Builder;

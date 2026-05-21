@@ -1,12 +1,12 @@
-package com.tracepcap.insights.service;
+package com.lanturn.insights.service;
 
-import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.insights.dto.CreateExternalEventRequest;
-import com.tracepcap.insights.dto.NetworkExternalEventDto;
-import com.tracepcap.insights.entity.NetworkExternalEventEntity;
-import com.tracepcap.insights.repository.NetworkExternalEventRepository;
-import com.tracepcap.monitor.entity.NetworkEntity;
-import com.tracepcap.monitor.repository.NetworkRepository;
+import com.lanturn.common.exception.ResourceNotFoundException;
+import com.lanturn.insights.dto.CreateExternalEventRequest;
+import com.lanturn.insights.dto.NetworkExternalEventDto;
+import com.lanturn.insights.entity.NetworkExternalEventEntity;
+import com.lanturn.insights.repository.NetworkExternalEventRepository;
+import com.lanturn.monitor.entity.NetworkEntity;
+import com.lanturn.monitor.repository.NetworkRepository;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;

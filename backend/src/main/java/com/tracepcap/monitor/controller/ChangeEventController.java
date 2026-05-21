@@ -1,9 +1,9 @@
-package com.tracepcap.monitor.controller;
+package com.lanturn.monitor.controller;
 
-import com.tracepcap.monitor.dto.ChangeEventDto;
-import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
-import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
-import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
+import com.lanturn.monitor.dto.ChangeEventDto;
+import com.lanturn.monitor.entity.NetworkChangeEventEntity.ChangeType;
+import com.lanturn.monitor.entity.NetworkChangeEventEntity.Severity;
+import com.lanturn.monitor.repository.NetworkChangeEventRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,7 +57,7 @@ public class ChangeEventController {
         .orElse(ResponseEntity.notFound().build());
   }
 
-  private ChangeEventDto toDto(com.tracepcap.monitor.entity.NetworkChangeEventEntity e) {
+  private ChangeEventDto toDto(com.lanturn.monitor.entity.NetworkChangeEventEntity e) {
     return ChangeEventDto.builder()
         .id(e.getId())
         .networkId(e.getNetwork().getId())

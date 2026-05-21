@@ -1,6 +1,6 @@
-package com.tracepcap.insights.repository;
+package com.lanturn.insights.repository;
 
-import com.tracepcap.insights.entity.NetworkExternalEventEntity;
+import com.lanturn.insights.entity.NetworkExternalEventEntity;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;

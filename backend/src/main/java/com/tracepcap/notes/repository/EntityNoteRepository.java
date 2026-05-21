@@ -1,6 +1,6 @@
-package com.tracepcap.notes.repository;
+package com.lanturn.notes.repository;
 
-import com.tracepcap.notes.entity.EntityNoteEntity;
+import com.lanturn.notes.entity.EntityNoteEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

@@ -1,7 +1,7 @@
-package com.tracepcap.monitor.repository;
+package com.lanturn.monitor.repository;
 
-import com.tracepcap.monitor.entity.BaselineDefinitionEntity;
-import com.tracepcap.monitor.entity.BaselineDefinitionEntity.BaselineEntryType;
+import com.lanturn.monitor.entity.BaselineDefinitionEntity;
+import com.lanturn.monitor.entity.BaselineDefinitionEntity.BaselineEntryType;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

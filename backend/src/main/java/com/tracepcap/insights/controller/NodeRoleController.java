@@ -1,9 +1,9 @@
-package com.tracepcap.insights.controller;
+package com.lanturn.insights.controller;
 
-import com.tracepcap.insights.dto.NodeRoleDto;
-import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
-import com.tracepcap.insights.service.InsufficientEvidenceException;
-import com.tracepcap.insights.service.NodeRoleService;
+import com.lanturn.insights.dto.NodeRoleDto;
+import com.lanturn.insights.dto.UpsertNodeRoleRequest;
+import com.lanturn.insights.service.InsufficientEvidenceException;
+import com.lanturn.insights.service.NodeRoleService;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
