@@ -226,7 +226,7 @@ export const ConversationDetail = ({
 
   return (
     <div className="conversation-detail">
-      <div className="card mb-4">
+      <Card className="mb-4">
         <Card.Header className="d-flex align-items-center justify-content-between">
           <h5 className="mb-0">Conversation Details</h5>
           {extractedCount != null && extractedCount > 0 && fileId && (
@@ -459,10 +459,10 @@ export const ConversationDetail = ({
             </div>
           </div>
         </Card.Body>
-      </div>
+      </Card>
 
       <div className="card">
-        <Card.Header>
+        <div className="card-header">
           <ul className="nav nav-tabs card-header-tabs">
             <li className="nav-item">
               <button
@@ -484,7 +484,7 @@ export const ConversationDetail = ({
               </button>
             </li>
           </ul>
-        </Card.Header>
+        </div>
 
         {activeTab === 'packets' && (
           <Card.Body className="p-0">

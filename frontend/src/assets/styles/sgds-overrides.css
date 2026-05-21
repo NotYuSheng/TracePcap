@@ -464,3 +464,47 @@
   background-color: var(--tp-surface) !important;
   color: var(--tp-text) !important;
 }
+
+/* Restore visibility of nav-tab buttons inside card-header when inside an SGDS modal context.
+   SGDS .sgds.nav-tabs collapses the ul to width:0 via flex layout. */
+.card-header ul.nav-tabs {
+  display: flex !important;
+  flex-direction: row !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+
+.card-header button.nav-link {
+  display: inline-block !important;
+  padding: 0.5rem 1rem !important;
+  color: var(--tp-text-muted, #495057) !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-top-left-radius: 0.3125rem !important;
+  border-top-right-radius: 0.3125rem !important;
+  cursor: pointer !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+}
+
+.card-header button.nav-link.active {
+  color: var(--tp-text, #1d2939) !important;
+  background-color: var(--tp-surface, #fff) !important;
+  border-color: var(--tp-border, #dee2e6) var(--tp-border, #dee2e6) var(--tp-surface, #fff) !important;
+}
+
+.card-header button.nav-link:hover:not(.active) {
+  color: var(--tp-text, #1d2939) !important;
+  border-color: var(--tp-border, #e9ecef) var(--tp-border, #e9ecef) transparent !important;
+}
+
+[data-theme='dark'] .card-header button.nav-link {
+  color: var(--tp-text-muted, #adb5bd) !important;
+}
+
+[data-theme='dark'] .card-header button.nav-link.active {
+  color: var(--tp-text) !important;
+  background-color: var(--tp-surface) !important;
+  border-color: var(--tp-border) var(--tp-border) var(--tp-surface) !important;
+}
