@@ -439,7 +439,7 @@ export const AnalysisPage = () => {
         <ul
           ref={tabsRefCallback}
           className="nav nav-tabs"
-          style={{ borderBottom: 'none', paddingTop: '1px' }}
+          style={{ paddingTop: '1px', paddingBottom: '1px' }}
           onScroll={e => {
             const el = e.currentTarget as HTMLUListElement;
             const s = el.scrollLeft;

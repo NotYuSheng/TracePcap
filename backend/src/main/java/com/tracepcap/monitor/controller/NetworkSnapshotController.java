@@ -2,6 +2,7 @@ package com.tracepcap.monitor.controller;
 
 import com.tracepcap.monitor.dto.AddSnapshotRequest;
 import com.tracepcap.monitor.dto.NetworkSnapshotDto;
+import com.tracepcap.monitor.dto.PatchSnapshotRequest;
 import com.tracepcap.monitor.service.SnapshotService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -27,6 +28,14 @@ public class NetworkSnapshotController {
   public NetworkSnapshotDto addSnapshot(
       @PathVariable UUID networkId, @Valid @RequestBody AddSnapshotRequest request) {
     return snapshotService.addSnapshot(networkId, request.getFileId());
+  }
+
+  @PatchMapping("/{snapshotId}")
+  public NetworkSnapshotDto patchSnapshot(
+      @PathVariable UUID networkId,
+      @PathVariable UUID snapshotId,
+      @RequestBody PatchSnapshotRequest request) {
+    return snapshotService.patchSnapshot(networkId, snapshotId, request);
   }
 
   @DeleteMapping("/{snapshotId}")

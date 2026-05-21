@@ -34,7 +34,7 @@ let captureSeq = 0;
 async function captureLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  layoutType: 'forceDirected2d' | 'hierarchicalTd'
+  layoutType: 'circular' | 'hierarchicalTd'
 ): Promise<string> {
   // Force light mode on the html element for the duration of the capture so
   // the PDF diagram is always rendered on a white background regardless of
@@ -161,7 +161,7 @@ export async function captureNetworkDiagrams(
 ): Promise<DiagramImages> {
   // Sequential — captures are serialised to avoid two Sigma instances
   // competing for the same DOM container pool.
-  const forceDirected = await captureLayout(nodes, edges, 'forceDirected2d');
+  const forceDirected = await captureLayout(nodes, edges, 'circular');
   const hierarchical = await captureLayout(nodes, edges, 'hierarchicalTd');
 
   return { forceDirected, hierarchical };

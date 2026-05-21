@@ -41,13 +41,13 @@ export const NetworkCard = ({ network, onClick, onDelete }: NetworkCardProps) =>
           {network.criticalChanges > 0 && (
             <div className="text-center">
               <div className="fw-semibold text-danger">{network.criticalChanges}</div>
-              <small className="text-muted">Unreviewed Critical</small>
+              <small className="text-muted">Critical</small>
             </div>
           )}
           {network.warningChanges > 0 && (
             <div className="text-center">
               <div className="fw-semibold text-warning">{network.warningChanges}</div>
-              <small className="text-muted">Unreviewed Warnings</small>
+              <small className="text-muted">Warnings</small>
             </div>
           )}
           {network.criticalChanges === 0 && network.warningChanges === 0 && network.snapshotCount > 1 && (
@@ -56,6 +56,14 @@ export const NetworkCard = ({ network, onClick, onDelete }: NetworkCardProps) =>
                 <i className="bi bi-check-circle-fill"></i>
               </div>
               <small className="text-muted">No changes</small>
+            </div>
+          )}
+          {network.hasInsights && (
+            <div className="text-center">
+              <div className="fw-semibold text-primary">
+                <i className="bi bi-stars"></i>
+              </div>
+              <small className="text-muted">Insights</small>
             </div>
           )}
         </div>

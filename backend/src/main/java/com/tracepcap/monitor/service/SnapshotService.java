@@ -5,7 +5,9 @@ import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.entity.FileEntity.FileStatus;
 import com.tracepcap.file.repository.FileRepository;
+import com.tracepcap.insights.repository.SnapshotInsightRepository;
 import com.tracepcap.monitor.dto.NetworkSnapshotDto;
+import com.tracepcap.monitor.dto.PatchSnapshotRequest;
 import com.tracepcap.monitor.entity.NetworkEntity;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
@@ -30,6 +32,7 @@ public class SnapshotService {
   private final FileRepository fileRepository;
   private final ChangeDetectionService changeDetectionService;
   private final NetworkChangeEventRepository changeEventRepository;
+  private final SnapshotInsightRepository snapshotInsightRepository;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -120,6 +123,18 @@ public class SnapshotService {
     return toDto(snapshot, changeCount, criticalCount);
   }
 
+  public NetworkSnapshotDto patchSnapshot(UUID networkId, UUID snapshotId, PatchSnapshotRequest req) {
+    NetworkSnapshotEntity snapshot = snapshotRepository.findById(snapshotId)
+        .filter(s -> s.getNetwork().getId().equals(networkId))
+        .orElseThrow(() -> new ResourceNotFoundException("Snapshot not found: " + snapshotId));
+    if (req.getContext() != null) snapshot.setContext(req.getContext());
+    if (req.getNotes() != null) snapshot.setNotes(req.getNotes());
+    snapshot = snapshotRepository.save(snapshot);
+    long changeCount = changeEventRepository.countByToSnapshotId(snapshotId);
+    long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshotId);
+    return toDto(snapshot, changeCount, criticalCount);
+  }
+
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
     networkService.findOrThrow(networkId);
     snapshotRepository
@@ -185,6 +200,9 @@ public class SnapshotService {
         .totalBytes(s.getFile().getTotalBytes())
         .changeCount(changeCount)
         .criticalCount(criticalCount)
+        .context(s.getContext())
+        .notes(s.getNotes())
+        .hasInsights(snapshotInsightRepository.existsBySnapshotId(s.getId()))
         .addedAt(s.getAddedAt())
         .build();
   }

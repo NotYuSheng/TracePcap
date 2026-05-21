@@ -21,7 +21,7 @@ interface DeviceClassificationPopupProps {
 
 export function DeviceClassificationPopup({ info, onClose }: DeviceClassificationPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
-  const signals = buildDeviceSignals({ manufacturer: info.manufacturer, ttl: info.ttl, confidence: info.confidence });
+  const { fired: signals } = buildDeviceSignals({ manufacturer: info.manufacturer, ttl: info.ttl, confidence: info.confidence, deviceType: info.deviceType?.toString() });
   const level = confidenceLevel(info.confidence);
   const badgeBg = deviceTypeColor(info.deviceType);
 

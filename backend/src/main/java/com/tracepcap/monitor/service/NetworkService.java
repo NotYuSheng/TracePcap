@@ -4,6 +4,7 @@ import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.monitor.dto.NetworkDto;
 import com.tracepcap.monitor.dto.CreateNetworkRequest;
 import com.tracepcap.monitor.entity.NetworkEntity;
+import com.tracepcap.insights.repository.NetworkInsightRepository;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
 import com.tracepcap.monitor.repository.NetworkRepository;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
@@ -24,6 +25,7 @@ public class NetworkService {
   private final NetworkRepository networkRepository;
   private final NetworkSnapshotRepository snapshotRepository;
   private final NetworkChangeEventRepository changeEventRepository;
+  private final NetworkInsightRepository insightRepository;
 
   @Transactional(readOnly = true)
   public List<NetworkDto> getAllNetworks() {
@@ -67,6 +69,7 @@ public class NetworkService {
         .snapshotCount((int) snapshotRepository.countByNetworkId(e.getId()))
         .criticalChanges(changeEventRepository.countCriticalByNetworkId(e.getId()))
         .warningChanges(changeEventRepository.countWarningByNetworkId(e.getId()))
+        .hasInsights(insightRepository.existsByNetworkId(e.getId()))
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
         .build();

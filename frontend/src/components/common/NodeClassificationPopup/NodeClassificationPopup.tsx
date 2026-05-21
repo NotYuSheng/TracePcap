@@ -61,7 +61,7 @@ export function NodeClassificationPopup({ info, onClose }: Props) {
   const evText = typeEvidence(info.nodeType, info.typeEvidence);
   const deviceBg = info.deviceType ? deviceTypeColor(info.deviceType) : undefined;
   const confidence = info.deviceConfidence ?? 0;
-  const deviceSignals = buildDeviceSignals({ manufacturer: info.manufacturer, ttl: info.ttl, confidence });
+  const { fired: deviceSignals } = buildDeviceSignals({ manufacturer: info.manufacturer, ttl: info.ttl, confidence, deviceType: info.deviceType?.toString() });
 
   useClickOutside(popupRef, onClose);
 

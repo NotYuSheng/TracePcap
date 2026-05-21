@@ -1,4 +1,4 @@
-/* Top phantom scrollbar — sits above the table, synced via JS */
+/* Phantom scrollbar — sits below the table, synced via JS */
 .sct-top-scrollbar {
   overflow: scroll hidden;
   height: 6px;

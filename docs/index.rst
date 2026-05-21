@@ -1,7 +1,9 @@
 TracePcap Documentation
 =======================
 
-**TracePcap** is an intelligent, self-hosted PCAP analysis platform with AI-powered insights and interactive network visualization. Designed for air-gapped and offline deployments — GeoIP lookups use a bundled offline database by default, with optional enrichment via ipinfo.io when internet access is available.
+**TracePcap** is a self-hosted PCAP analysis workbench for black-box network analysis — situations where you work from captured traffic alone, with no prior knowledge of the network. It derives device inventory, topology, session content, and behavioural patterns purely from observed packets, making it well-suited for network audits, incident response, penetration test reconnaissance, and research.
+
+Designed for air-gapped and offline deployments — GeoIP lookups use a bundled offline database by default, with optional enrichment via ipinfo.io when internet access is available.
 
 .. toctree::
    :maxdepth: 2

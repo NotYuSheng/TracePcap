@@ -20,6 +20,8 @@ public interface NetworkChangeEventRepository
 
   List<NetworkChangeEventEntity> findByToSnapshotId(UUID toSnapshotId);
 
+  List<NetworkChangeEventEntity> findByToSnapshotIdOrderByDetectedAtDesc(UUID toSnapshotId);
+
   void deleteByToSnapshotId(UUID toSnapshotId);
 
   void deleteByNetworkId(UUID networkId);

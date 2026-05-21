@@ -4,7 +4,10 @@ import { Badge, Button, Modal } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
-import { buildDeviceSignals, confidenceLevel } from '@/utils/deviceType';
+import { buildDeviceSignals, confidenceLevel, type DeviceSignalInfo } from '@/utils/deviceType';
+import { entityNotesService, type EntityNote } from '@/features/notes/services/entityNotesService';
+import { insightsService } from '@/features/insights/services/insightsService';
+import type { NodeRole } from '@/features/insights/types/insights.types';
 
 /** Deterministic hue (0–360) from any string. */
 function stringHue(s: string): number {
@@ -65,8 +68,25 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   const [macLastSeen, setMacLastSeen] = useState<Map<string, NetworkSnapshot>>(new Map());
   const [loading, setLoading] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [search, setSearch] = useState('');
   const [historyPage, setHistoryPage] = useState(0);
   const HISTORY_PAGE_SIZE = 5;
+
+  // Notes state
+  const [noteText, setNoteText] = useState('');
+  const [savedNote, setSavedNote] = useState<EntityNote | null>(null);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [modalTab, setModalTab] = useState<'details' | 'notes'>('details');
+
+  // Role state
+  const [role, setRole] = useState<NodeRole | null>(null);
+  const [roleSuggesting, setRoleSuggesting] = useState(false);
+  const [roleSuggestError, setRoleSuggestError] = useState<string | null>(null);
+  const [roleInfoOpen, setRoleInfoOpen] = useState(false);
+  const [roleEditing, setRoleEditing] = useState(false);
+  const [roleLabelDraft, setRoleLabelDraft] = useState('');
+  const [roleDescDraft, setRoleDescDraft] = useState('');
+  const [roleSaving, setRoleSaving] = useState(false);
 
   useEffect(() => {
     if (!selectedMac) return;
@@ -118,6 +138,17 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   const openModal = (mac: string) => {
     setSelectedMac(mac);
     setHistoryPage(0);
+    setModalTab('details');
+    setNoteText('');
+    setSavedNote(null);
+    setRole(null);
+    setRoleEditing(false);
+    setRoleSuggestError(null);
+    setRoleInfoOpen(false);
+    entityNotesService.getNote('DEVICE', mac).then(note => {
+      if (note) { setSavedNote(note); setNoteText(note.note); }
+    });
+    insightsService.getNodeRole('DEVICE', mac).then(r => setRole(r ?? null)).catch(() => {});
     const entries = macHistory.get(mac) ?? [];
     if (entries.every(e => e.apps.length > 0 || e.protocols.length > 0)) return; // already loaded
     setModalLoading(true);
@@ -165,10 +196,23 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   const selectedHistory = selectedMac ? (macHistory.get(selectedMac) ?? []) : [];
   const isActive = selectedMac ? latestMacs.has(selectedMac) : false;
 
+  const q = search.trim().toLowerCase();
+  const visibleActive = q ? active.filter(mac => mac.toLowerCase().includes(q)) : active;
+  const visibleAbsent = q ? absent.filter(mac => mac.toLowerCase().includes(q)) : absent;
+
   return (
     <>
+      <div className="mb-3">
+        <input
+          type="search"
+          className="form-control form-control-sm"
+          placeholder="Search MAC addresses…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
       <div className="d-flex flex-wrap gap-2">
-        {active.map(mac => (
+        {visibleActive.map(mac => (
           <Button
             key={mac}
             type="button"
@@ -182,7 +226,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
             {mac}
           </Button>
         ))}
-        {absent.map(mac => (
+        {visibleAbsent.map(mac => (
           <Button
             key={mac}
             type="button"
@@ -205,29 +249,190 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
       )}
 
       <Modal show={!!selectedMac} onHide={() => setSelectedMac(null)} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="bi bi-device-hdd me-2"></i>
-            {selectedMac}
-            {' '}
-            <Badge bg={isActive ? 'success' : 'secondary'} className="ms-2">
-              {isActive ? 'Active' : 'Gone'}
-            </Badge>
+        <Modal.Header closeButton className="flex-column align-items-start pb-1">
+          <Modal.Title className="d-flex align-items-center gap-2 flex-wrap">
+            <i className="bi bi-device-hdd me-1"></i>
+            <span className="font-monospace">{selectedMac}</span>
+            {(() => {
+              if (isActive) return <Badge bg="success" style={{ fontSize: '0.7rem' }}>Active</Badge>;
+              const lastSnap = selectedMac ? macLastSeen.get(selectedMac) : null;
+              const lastTime = lastSnap?.startTime ? parseDateTime(lastSnap.startTime as unknown as string | number[]) : null;
+              const days = lastTime ? Math.floor((Date.now() - lastTime) / 86400000) : null;
+              return <Badge bg="secondary" style={{ fontSize: '0.7rem' }}>Inactive{days != null && days > 0 ? ` · ${days}d ago` : ''}</Badge>;
+            })()}
           </Modal.Title>
+          <ul className="nav nav-pills gap-1 mt-2" style={{ paddingTop: '2px', paddingBottom: '2px' }}>
+            <li className="nav-item">
+              <button
+                className={`nav-link py-1 px-3${modalTab === 'details' ? ' active' : ''}`}
+                style={{ fontSize: '0.875rem' }}
+                onClick={() => setModalTab('details')}
+              >
+                <i className="bi bi-info-circle me-1" />Details
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link py-1 px-3${modalTab === 'notes' ? ' active' : ''}`}
+                style={{ fontSize: '0.875rem' }}
+                onClick={() => setModalTab('notes')}
+              >
+                <i className="bi bi-sticky me-1" />
+                Notes
+                {savedNote && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>1</span>}
+              </button>
+            </li>
+          </ul>
         </Modal.Header>
         <Modal.Body>
-          {selectedHistory.length === 0 ? (
+          {modalTab === 'notes' && (
+            <div>
+              <p className="text-muted small mb-2">Notes are saved globally for this device and persist across all captures.</p>
+              <textarea
+                className="form-control mb-2"
+                rows={6}
+                style={{ fontSize: '0.875rem' }}
+                placeholder={`Add notes about ${selectedMac}…`}
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+              />
+              {savedNote && (
+                <p className="text-muted" style={{ fontSize: '0.7rem' }}>
+                  Last updated: {new Date(savedNote.updatedAt).toLocaleString()}
+                </p>
+              )}
+              <div className="d-flex gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={noteSaving || noteText === (savedNote?.note ?? '')}
+                  onClick={async () => {
+                    setNoteSaving(true);
+                    try {
+                      const updated = await entityNotesService.upsertNote('DEVICE', selectedMac!, noteText);
+                      setSavedNote(updated);
+                    } finally { setNoteSaving(false); }
+                  }}
+                >
+                  {noteSaving ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-floppy me-1" />}
+                  Save Note
+                </Button>
+                {savedNote && (
+                  <Button
+                    size="sm"
+                    variant="outline-danger"
+                    onClick={async () => {
+                      await entityNotesService.deleteNote('DEVICE', selectedMac!);
+                      setSavedNote(null);
+                      setNoteText('');
+                    }}
+                  >
+                    <i className="bi bi-trash me-1" />Delete
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          {modalTab === 'details' && selectedHistory.length === 0 ? (
             <p className="text-muted">No history available.</p>
-          ) : (
+          ) : modalTab === 'details' && (
             <>
+              {/* Role section */}
+              <div className="mb-4">
+                <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center justify-content-between">
+                  <span>Role</span>
+                  {!roleEditing && (
+                    <div className="d-flex gap-1">
+                      <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
+                        onClick={() => { setRoleLabelDraft(role?.roleLabel ?? ''); setRoleDescDraft(role?.roleDescription ?? ''); setRoleEditing(true); }}>
+                        <i className="bi bi-pencil me-1" />Edit
+                      </button>
+                      <div className="d-flex align-items-center gap-1">
+                        <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
+                          onClick={async () => {
+                            if (!selectedMac) return;
+                            setRoleSuggesting(true);
+                            setRoleSuggestError(null);
+                            try { const r = await insightsService.suggestNodeRole('DEVICE', selectedMac, selectedHistory[selectedHistory.length - 1]?.snap.fileId ?? ''); setRole(r); }
+                            catch (err: unknown) { setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.'); }
+                            finally { setRoleSuggesting(false); }
+                          }}
+                          disabled={roleSuggesting}>
+                          {roleSuggesting ? <><span className="spinner-border spinner-border-sm me-1" />Suggesting…</> : <><i className="bi bi-stars me-1" />Suggest with AI</>}
+                        </button>
+                        <button
+                          className="btn btn-link btn-sm p-0 text-muted"
+                          style={{ fontSize: '0.8rem', lineHeight: 1 }}
+                          onClick={() => setRoleInfoOpen(o => !o)}
+                          title="How does this work?"
+                        >
+                          <i className="bi bi-info-circle" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </h6>
+                {roleInfoOpen && (
+                  <div className="p-2 rounded mb-2 small text-muted" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)', border: '1px solid var(--bs-border-color)' }}>
+                    <strong>How it works:</strong> The AI analyses traffic signals for this device — manufacturer OUI, device type, TTL, observed applications and protocols — and suggests an operational role label. If the signals are too sparse or generic to make a meaningful assessment, it will decline rather than guess.
+                  </div>
+                )}
+                {roleSuggestError && (
+                  <div className="d-flex align-items-start gap-2 p-2 rounded mb-2 small" style={{ background: 'var(--bs-warning-bg-subtle, #fff3cd)', color: 'var(--bs-warning-text-emphasis, #664d03)', border: '1px solid var(--bs-warning-border-subtle, #ffc107)' }}>
+                    <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
+                    <span>{roleSuggestError}</span>
+                  </div>
+                )}
+                {!role && !roleEditing && <p className="text-muted small fst-italic mb-0">No role assigned.</p>}
+                {role && !roleEditing && (
+                  <div className={`p-2 rounded small ${role.llmSuggested && !role.confirmedByHuman ? 'bg-warning-subtle border border-warning-subtle' : 'bg-light'}`}>
+                    <div className="fw-semibold">
+                      {role.roleLabel || <span className="text-muted fst-italic">No label</span>}
+                      {role.llmSuggested && !role.confirmedByHuman && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-stars me-1" />AI suggested</span>}
+                      {role.confirmedByHuman && <span className="badge bg-success ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-check-circle me-1" />Confirmed</span>}
+                    </div>
+                    {role.roleDescription && <div className="text-muted mt-1">{role.roleDescription}</div>}
+                    {role.llmSuggested && !role.confirmedByHuman && (
+                      <div className="d-flex gap-2 mt-2">
+                        <button className="btn btn-success btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
+                          onClick={async () => { if (!selectedMac || !role) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, role.roleLabel ?? '', role.roleDescription ?? '', true); setRole(r); } finally { setRoleSaving(false); } }}>
+                          <i className="bi bi-check-lg me-1" />Accept
+                        </button>
+                        <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
+                          onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { await insightsService.deleteNodeRole('DEVICE', selectedMac); setRole(null); } finally { setRoleSaving(false); } }}>
+                          <i className="bi bi-x-lg me-1" />Discard
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {roleEditing && (
+                  <div>
+                    <input className="form-control form-control-sm mb-2" placeholder="Role label (e.g. Floor Printer)" value={roleLabelDraft} onChange={e => setRoleLabelDraft(e.target.value)} />
+                    <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Description (optional)" value={roleDescDraft} onChange={e => setRoleDescDraft(e.target.value)} />
+                    <div className="d-flex gap-2">
+                      <button className="btn btn-primary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving || !roleLabelDraft.trim()}
+                        onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, roleLabelDraft, roleDescDraft, true); setRole(r); setRoleEditing(false); } finally { setRoleSaving(false); } }}>
+                        {roleSaving ? <><span className="spinner-border spinner-border-sm me-1" />Saving…</> : <><i className="bi bi-floppy me-1" />Save</>}
+                      </button>
+                      <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving} onClick={() => setRoleEditing(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Summary row from latest entry */}
               {(() => {
-                const latest = selectedHistory[selectedHistory.length - 1].host;
-                const signals = buildDeviceSignals({
+                const latestEntry = selectedHistory[selectedHistory.length - 1];
+                const latest = latestEntry.host;
+                const signalInfo: DeviceSignalInfo = {
                   manufacturer: latest.manufacturer ?? undefined,
                   ttl: latest.ttl ?? undefined,
                   confidence: latest.confidence ?? 0,
-                });
+                  deviceType: latest.deviceType ?? undefined,
+                  apps: latestEntry.apps,
+                };
+                const { fired, missing } = buildDeviceSignals(signalInfo);
                 const level = latest.confidence != null ? confidenceLevel(latest.confidence) : null;
                 return (
                   <div className="mb-3">
@@ -253,17 +458,30 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                       {latest.confidence != null && (
                         <div>
                           <small className="text-muted d-block">Confidence</small>
-                          <strong>{latest.confidence}% {level && <span className="text-muted fw-normal">— {level}</span>}</strong>
+                          <strong>{latest.confidence}%{level && <span className="text-muted fw-normal"> — {level}</span>}</strong>
                         </div>
                       )}
                     </div>
-                    {signals.length > 0 && (
-                      <div className="border rounded p-2" style={{ background: 'var(--tp-bg-subtle)' }}>
+                    {fired.length > 0 && (
+                      <div className="border rounded p-2 mb-2" style={{ background: 'var(--tp-bg-subtle)' }}>
                         <small className="text-muted fw-semibold d-block mb-1">
-                          <i className="bi bi-info-circle me-1"></i>How this is derived
+                          <i className="bi bi-bar-chart-steps me-1"></i>How this is derived
                         </small>
                         <ul className="mb-0 ps-3" style={{ fontSize: '0.78rem' }}>
-                          {signals.map((s, i) => <li key={i} className="text-muted">{s}</li>)}
+                          {fired.map((s, i) => <li key={i} className="text-muted">{s}</li>)}
+                        </ul>
+                        <small className="text-muted d-block mt-2" style={{ fontSize: '0.72rem' }}>
+                          Weights add to each type's score. Confidence = how far ahead the winner is over the runner-up (a 60-point lead = 100%).
+                        </small>
+                      </div>
+                    )}
+                    {missing.length > 0 && (
+                      <div className="border rounded p-2" style={{ background: 'var(--bs-warning-bg-subtle, #fff3cd)', borderColor: 'var(--bs-warning-border-subtle, #ffc107)' }}>
+                        <small className="fw-semibold d-block mb-1" style={{ color: 'var(--bs-warning-text-emphasis, #664d03)' }}>
+                          <i className="bi bi-lightbulb me-1"></i>What would improve confidence
+                        </small>
+                        <ul className="mb-0 ps-3" style={{ fontSize: '0.78rem', color: 'var(--bs-warning-text-emphasis, #664d03)' }}>
+                          {missing.map((s, i) => <li key={i}>{s}</li>)}
                         </ul>
                       </div>
                     )}
@@ -283,8 +501,9 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                 );
                 return (
                   <>
+                    <div className="table-responsive rounded border overflow-hidden">
                     <table className="table table-sm table-hover mb-0">
-                      <thead>
+                      <thead className="table-light" style={{ fontSize: '0.8rem' }}>
                         <tr>
                           <th className="text-muted fw-normal">#</th>
                           <th className="text-muted fw-normal">Snapshot</th>
@@ -329,6 +548,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                         })}
                       </tbody>
                     </table>
+                    </div>
                     {totalPages > 1 && (
                       <div className="d-flex align-items-center justify-content-between mt-2">
                         <small className="text-muted">

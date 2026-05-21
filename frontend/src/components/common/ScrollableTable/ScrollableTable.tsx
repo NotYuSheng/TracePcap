@@ -126,9 +126,6 @@ export const ScrollableTable = ({ children, maxHeight = '62vh' }: ScrollableTabl
 
   return (
     <div>
-      <div ref={topBarRef} className="sct-top-scrollbar" onScroll={handleTopScroll}>
-        <div ref={topInnerRef} className="sct-top-scrollbar-inner" />
-      </div>
       <div
         ref={scrollRef}
         className="sct-scroll"
@@ -137,6 +134,9 @@ export const ScrollableTable = ({ children, maxHeight = '62vh' }: ScrollableTabl
         onMouseDown={handleMiddleDown}
       >
         {children}
+      </div>
+      <div ref={topBarRef} className="sct-top-scrollbar" onScroll={handleTopScroll}>
+        <div ref={topInnerRef} className="sct-top-scrollbar-inner" />
       </div>
     </div>
   );

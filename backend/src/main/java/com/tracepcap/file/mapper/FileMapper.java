@@ -31,6 +31,7 @@ public class FileMapper {
         .duration(entity.getDuration())
         .startTime(entity.getStartTime())
         .endTime(entity.getEndTime())
+        .source(entity.getSource() != null ? entity.getSource().name() : null)
         .build();
   }
 }
