@@ -71,12 +71,15 @@ public class EntityNoteService {
   private List<EntityHistoryEntry> historyForIp(String ip) {
     String sql =
         """
-        SELECT DISTINCT f.id, f.file_name, f.start_time, f.end_time,
+        SELECT f.id, f.file_name, f.start_time, f.end_time,
                f.packet_count, f.total_bytes
         FROM files f
-        JOIN conversations c ON c.file_id = f.id
         WHERE f.status = 'COMPLETED'
-          AND (c.src_ip = ? OR c.dst_ip = ?)
+          AND EXISTS (
+            SELECT 1 FROM conversations c
+            WHERE c.file_id = f.id
+              AND (c.src_ip = ? OR c.dst_ip = ?)
+          )
         ORDER BY f.start_time DESC NULLS LAST
         LIMIT 100
         """;

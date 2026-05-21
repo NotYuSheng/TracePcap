@@ -82,7 +82,7 @@ public class NetworkInsightService {
         .collect(Collectors.toSet());
     // Load roles for entities that appear in change events
     Map<String, NodeRoleEntity> rolesByKey = nodeRoleRepository
-        .findByEntityTypeInAndEntityKeyIn(List.of("IP", "DEVICE", "APP", "PROTOCOL"), new ArrayList<>(entityKeys))
+        .findByEntityTypeInAndEntityKeyIn(List.of("IP", "DEVICE", "APPLICATION", "PROTOCOL"), new ArrayList<>(entityKeys))
         .stream()
         .collect(Collectors.toMap(NodeRoleEntity::getEntityKey, r -> r, (a, b) -> a));
 
@@ -285,7 +285,7 @@ public class NetworkInsightService {
     if (externalEvents.isEmpty()) {
       sb.append("No external events recorded.\n");
     } else {
-      externalEvents.forEach(e -> {
+      externalEvents.stream().limit(50).forEach(e -> {
         sb.append("- ").append(e.getEventTime().format(FMT)).append(": ").append(e.getTitle());
         if (e.getDescription() != null) sb.append(" — ").append(e.getDescription());
         sb.append("\n");
@@ -327,13 +327,26 @@ public class NetworkInsightService {
   private static final ObjectMapper LENIENT_MAPPER =
       new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
 
+  /**
+   * Extracts the JSON object from raw LLM output, strips fenced code-block markers,
+   * then round-trips through the lenient mapper to produce clean JSON without comments.
+   * This ensures the result is safe to store in PostgreSQL jsonb columns.
+   */
   private String extractJson(String content) {
     if (content == null || content.isBlank()) throw new RuntimeException("Empty LLM response");
     content = content.replaceAll("```json\\s*", "").replaceAll("```\\s*", "");
     int start = content.indexOf('{');
     int end = content.lastIndexOf('}');
     if (start >= 0 && end > start) {
-      return content.substring(start, end + 1);
+      String candidate = content.substring(start, end + 1);
+      try {
+        // Round-trip through lenient mapper: parses comments, produces clean JSON
+        Object parsed = LENIENT_MAPPER.readValue(candidate, Object.class);
+        return LENIENT_MAPPER.writeValueAsString(parsed);
+      } catch (Exception e) {
+        log.debug("Lenient JSON round-trip failed, returning raw candidate: {}", e.getMessage());
+        return candidate;
+      }
     }
     return content;
   }

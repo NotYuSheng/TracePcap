@@ -1,5 +1,6 @@
 package com.tracepcap.insights.service;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
@@ -24,10 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class NodeRoleService {
 
+  private static final ObjectMapper LENIENT_MAPPER =
+      new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
+
   private final NodeRoleRepository nodeRoleRepository;
   private final HostClassificationRepository hostClassificationRepository;
   private final LlmClient llmClient;
-  private final ObjectMapper objectMapper;
   private final JdbcTemplate jdbc;
 
   public Optional<NodeRoleDto> getRole(String entityType, String entityKey) {
@@ -76,7 +79,7 @@ public class NodeRoleService {
     String json = extractJson(raw);
 
     try {
-      Map<String, Object> data = objectMapper.readValue(json, new TypeReference<>() {});
+      Map<String, Object> data = LENIENT_MAPPER.readValue(json, new TypeReference<>() {});
       Object roleLabelRaw = data.get("roleLabel");
       Object roleDescRaw = data.get("roleDescription");
 
