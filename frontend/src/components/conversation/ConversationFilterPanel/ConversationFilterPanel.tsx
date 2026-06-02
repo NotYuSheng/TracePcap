@@ -267,14 +267,16 @@ export function ConversationFilterPanel({
 
               {/* Security risks toggle */}
               <div className="col-md-2 d-flex align-items-end">
-                <Form.Check className="mb-0">
-                  <Form.Check.Input
+                <div className="form-check mb-0">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
                     id="hasRisksCheck"
                     checked={filters.hasRisks}
                     onChange={e => onFiltersChange({ hasRisks: e.target.checked })}
                   />
-                  <Form.Check.Label
-                    className="small d-inline-flex align-items-center"
+                  <label
+                    className="form-check-label small d-inline-flex align-items-center"
                     htmlFor="hasRisksCheck"
                   >
                     Security risks only
@@ -283,8 +285,8 @@ export function ConversationFilterPanel({
                       title="Security risks"
                       body="Shows only conversations flagged with at least one nDPI risk indicator, such as unsafe protocols, clear-text credentials, or suspicious traffic patterns."
                     />
-                  </Form.Check.Label>
-                </Form.Check>
+                  </label>
+                </div>
               </div>
 
               {/* Protocol pills */}
@@ -705,15 +707,18 @@ export function ConversationFilterPanel({
                   </label>
                   <div className="d-flex flex-wrap gap-2">
                     {COLUMN_DEFS.map(({ key, label }) => (
-                      <Form.Check
-                        key={key}
-                        inline
-                        className="mb-0"
-                        id={`col-${key}`}
-                        label={label}
-                        checked={visibleColumns.has(key)}
-                        onChange={() => onToggleColumn(key)}
-                      />
+                      <div key={key} className="form-check form-check-inline mb-0">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id={`col-${key}`}
+                          checked={visibleColumns.has(key)}
+                          onChange={() => onToggleColumn(key)}
+                        />
+                        <label className="form-check-label" htmlFor={`col-${key}`}>
+                          {label}
+                        </label>
+                      </div>
                     ))}
                   </div>
                 </div>
