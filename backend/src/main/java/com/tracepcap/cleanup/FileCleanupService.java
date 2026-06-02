@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
-    prefix = "tracepcap.cleanup",
+    prefix = "lanturn.cleanup",
     name = "enabled",
     havingValue = "true",
     matchIfMissing = true)
@@ -33,7 +33,7 @@ public class FileCleanupService {
    * Scheduled task to clean up expired files Runs according to the cron expression configured in
    * application.yml
    */
-  @Scheduled(cron = "${tracepcap.cleanup.cron}")
+  @Scheduled(cron = "${lanturn.cleanup.cron}")
   public void cleanupExpiredFiles() {
     if (!cleanupProperties.isEnabled()) {
       log.debug("File cleanup is disabled");

@@ -314,6 +314,46 @@ Click **Custom Detection Rules** in the navbar to open the built-in YAML editor.
 
 A full set of demo rules covering every match field is in [`signatures.sample.yml`](signatures.sample.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP that triggers all 12 rules.
 
+## Quick Demo (ngrok)
+
+To expose the app publicly for a short demo using [ngrok](https://ngrok.com):
+
+1. **Install ngrok** (one-time):
+   ```bash
+   curl -sLo /tmp/ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+   tar -xzf /tmp/ngrok.tgz -C /tmp && mv /tmp/ngrok ~/.local/bin/
+   ```
+
+2. **Authenticate** (one-time, free account at [ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken)):
+   ```bash
+   ngrok config add-authtoken YOUR_TOKEN_HERE
+   ```
+
+3. **Start the app** (if not already running):
+   ```bash
+   docker compose up -d
+   ```
+   The app runs on port **8080**.
+
+4. **Start the tunnel** (runs in background, password-protected):
+   ```bash
+   nohup ~/.local/bin/ngrok http 8080 --basic-auth="demo:yourpassword" > /tmp/ngrok.log 2>&1 &
+   ```
+
+5. **Get the public URL**:
+   ```bash
+   curl -s http://localhost:4040/api/tunnels | python3 -c "import sys,json; print(json.load(sys.stdin)['tunnels'][0]['public_url'])"
+   ```
+
+6. **Stop the tunnel** when done:
+   ```bash
+   pkill ngrok
+   ```
+
+> **Note:** Only share the link with your intended audience. Stop the tunnel immediately after the demo.
+>
+> **Monitoring usage:** While the tunnel is active, open `http://localhost:4040` in your browser to see a live request inspector showing all incoming traffic.
+
 ## Sample Files
 
 The [`sample-files/`](sample-files/) directory contains example PCAPs:
