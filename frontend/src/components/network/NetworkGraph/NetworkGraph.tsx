@@ -541,14 +541,24 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     // ── Layout ────────────────────────────────────────────────────────────────
 
+    let cancelled = false;
+
+    if (!elkRef.current) {
+      elkRef.current = new ELK({
+        workerFactory: () => new Worker(ELK_WORKER_URL, { type: 'classic' }),
+      });
+    }
+
     if (layoutType === 'hierarchicalTd') {
       setLayouting(true);
       applyHierarchicalLayout(graph, elkRef.current!).then(() => {
+        if (cancelled) return;
         sigma.refresh();
         sigma.getCamera().animate({ ratio: 1 }, { duration: 400 });
         setLayouting(false);
         requestAnimationFrame(() => onLayoutCompleteRef.current?.());
       }).catch(err => {
+        if (cancelled) return;
         console.error('[NetworkGraph] ELK hierarchical layout failed:', err);
         setLayouting(false);
       });
@@ -562,6 +572,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     }
 
     return () => {
+      cancelled = true;
       sigmaRef.current?.kill();
       sigmaRef.current = null;
       elkRef.current?.terminateWorker();
