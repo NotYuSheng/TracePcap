@@ -469,7 +469,8 @@ public class FilterService {
    */
   private String cleanJsonResponse(String response) {
     if (response == null) return null;
-    String cleaned = response.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
+    String cleaned = response.replaceAll("(?s)<think>.*?</think>", "").trim();
+    cleaned = cleaned.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
     int start = cleaned.indexOf('{');
     int end = cleaned.lastIndexOf('}');
     if (start >= 0 && end > start) {

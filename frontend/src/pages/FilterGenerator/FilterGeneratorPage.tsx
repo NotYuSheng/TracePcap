@@ -139,7 +139,6 @@ export const FilterGeneratorPage = () => {
       setExecutionTime(result.executionTime);
       setTotalPages(result.totalPages || 0);
       setCurrentPage(page);
-      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     } catch (err) {
       // Provide specific error message based on the error type
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -163,6 +162,7 @@ export const FilterGeneratorPage = () => {
       }
     } finally {
       setExecuting(false);
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
   };
 
