@@ -463,15 +463,18 @@ public class FilterService {
     return suggestions.isEmpty() ? null : suggestions;
   }
 
-  /** Clean JSON response by removing markdown code blocks if present */
+  /**
+   * Extract JSON object from LLM response, stripping markdown code fences,
+   * &lt;think&gt; reasoning blocks, and any other surrounding text.
+   */
   private String cleanJsonResponse(String response) {
     if (response == null) return null;
-    String cleaned = response.trim();
-    if (cleaned.startsWith("```")) {
-      int firstNewline = cleaned.indexOf('\n');
-      if (firstNewline != -1) cleaned = cleaned.substring(firstNewline + 1);
-      if (cleaned.endsWith("```")) cleaned = cleaned.substring(0, cleaned.lastIndexOf("```"));
-      cleaned = cleaned.trim();
+    String cleaned = response.replaceAll("(?s)<think>.*?</think>", "").trim();
+    cleaned = cleaned.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
+    int start = cleaned.indexOf('{');
+    int end = cleaned.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      return cleaned.substring(start, end + 1);
     }
     return cleaned;
   }

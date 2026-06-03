@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Alert, Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import type { AnalysisData, Packet } from '@/types';
@@ -40,6 +40,7 @@ export const FilterGeneratorPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(25);
   const [totalPages, setTotalPages] = useState(0);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const validateFilter = (filter: string): { valid: boolean; message?: string } => {
     const trimmed = filter.trim();
@@ -161,6 +162,7 @@ export const FilterGeneratorPage = () => {
       }
     } finally {
       setExecuting(false);
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
   };
 
@@ -330,6 +332,9 @@ export const FilterGeneratorPage = () => {
           </div>
         </div>
       )}
+
+      {/* Results anchor – scrolled into view after execution */}
+      <div ref={resultsRef} />
 
       {/* Error Display */}
       {error && (
