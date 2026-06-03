@@ -18,7 +18,7 @@ FROM eclipse-temurin:21-jre-jammy
 # nDPI version pin — bump this arg to upgrade nDPI without changing anything else.
 # Current pinned version is sourced from ntop's stable apt repo for Ubuntu 22.04.
 # To find available versions: apt-cache policy ndpi (after adding ntop repo).
-ARG NDPI_VERSION=5.0.0-5922
+ARG NDPI_VERSION=5.0.0-5933
 
 WORKDIR /app
 
