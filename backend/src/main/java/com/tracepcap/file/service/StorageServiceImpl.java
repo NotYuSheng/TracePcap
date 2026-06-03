@@ -32,10 +32,14 @@ public class StorageServiceImpl implements StorageService {
       ensureBucketExists();
 
       // Upload file
+      String contentType = file.getContentType();
+      if (contentType == null || contentType.isBlank()) {
+        contentType = "application/octet-stream";
+      }
       minioClient.putObject(
           PutObjectArgs.builder().bucket(minioConfig.getBucket()).object(fileName).stream(
                   file.getInputStream(), file.getSize(), -1)
-              .contentType(file.getContentType())
+              .contentType(contentType)
               .build());
 
       log.info("Successfully uploaded file: {} to MinIO", fileName);

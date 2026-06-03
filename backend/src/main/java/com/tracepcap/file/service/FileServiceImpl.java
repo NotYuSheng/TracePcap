@@ -58,6 +58,9 @@ public class FileServiceImpl implements FileService {
     // Validate file
     validateFile(file);
 
+    // Strip any Windows/Unix path prefix from the original filename (legacy IE sends full path)
+    String originalFilename = stripPath(file.getOriginalFilename());
+
     // Compute SHA-256 hash to detect duplicates
     String fileHash = computeSha256(file);
 
@@ -70,7 +73,7 @@ public class FileServiceImpl implements FileService {
 
     // Generate unique ID and file name
     UUID fileId = UUID.randomUUID();
-    String fileName = fileId.toString() + getFileExtension(file.getOriginalFilename());
+    String fileName = fileId.toString() + getFileExtension(originalFilename);
     log.info("DEBUG: Generated fileId: {}, fileName: {}", fileId, fileName);
 
     try {
@@ -82,7 +85,7 @@ public class FileServiceImpl implements FileService {
       FileEntity fileEntity =
           FileEntity.builder()
               .id(fileId)
-              .fileName(file.getOriginalFilename())
+              .fileName(originalFilename)
               .fileSize(file.getSize())
               .minioPath(minioPath)
               .uploadedAt(LocalDateTime.now())
@@ -94,7 +97,7 @@ public class FileServiceImpl implements FileService {
               .build();
 
       fileEntity = fileRepository.save(fileEntity);
-      log.info("File uploaded successfully: {} (ID: {})", file.getOriginalFilename(), fileId);
+      log.info("File uploaded successfully: {} (ID: {})", originalFilename, fileId);
       log.info(
           "DEBUG: About to publish event - fileId value: {}, fileEntity.getId(): {}",
           fileId,
@@ -108,7 +111,7 @@ public class FileServiceImpl implements FileService {
       return fileMapper.toUploadResponse(fileEntity);
 
     } catch (Exception e) {
-      log.error("Failed to upload file: {}", file.getOriginalFilename(), e);
+      log.error("Failed to upload file: {}", originalFilename, e);
       throw new InvalidFileException("Failed to upload file: " + e.getMessage(), e);
     }
   }
@@ -191,9 +194,9 @@ public class FileServiceImpl implements FileService {
       throw new InvalidFileException("File size exceeds maximum allowed size of 500MB");
     }
 
-    // Check file extension
-    String originalFilename = file.getOriginalFilename();
-    if (originalFilename == null || !hasValidExtension(originalFilename)) {
+    // Check file extension (strip any Windows/Unix path prefix before checking)
+    String originalFilename = stripPath(file.getOriginalFilename());
+    if (originalFilename == null || originalFilename.isBlank() || !hasValidExtension(originalFilename)) {
       throw new InvalidFileException(
           "Invalid file type. Only .pcap, .pcapng, and .cap files are supported");
     }
@@ -209,6 +212,17 @@ public class FileServiceImpl implements FileService {
   private String getFileExtension(String filename) {
     int lastDotIndex = filename.lastIndexOf('.');
     return lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
+  }
+
+  /**
+   * Strip any Windows or Unix directory prefix from a filename so that only the bare name is
+   * stored. Legacy browsers (IE11) send the full client-side path (e.g. C:\Users\…\file.pcap)
+   * in the Content-Disposition header; modern browsers send just the filename.
+   */
+  private String stripPath(String originalFilename) {
+    if (originalFilename == null) return null;
+    int lastSep = Math.max(originalFilename.lastIndexOf('/'), originalFilename.lastIndexOf('\\'));
+    return lastSep >= 0 ? originalFilename.substring(lastSep + 1) : originalFilename;
   }
 
   @Override
