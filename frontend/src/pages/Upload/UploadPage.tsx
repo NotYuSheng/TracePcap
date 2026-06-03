@@ -20,7 +20,7 @@ export const UploadPage = () => {
   });
   const navigate = useNavigate();
 
-  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES || '.pcap,.pcapng,.cap')
+  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES?.trim() || '.pcap,.pcapng,.cap')
     .split(',')
     .map((t: string) => t.trim())
     .filter((t: string) => t.length > 0);
