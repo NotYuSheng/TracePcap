@@ -543,6 +543,12 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     let cancelled = false;
 
+    if (!elkRef.current) {
+      elkRef.current = new ELK({
+        workerFactory: () => new Worker(ELK_WORKER_URL, { type: 'classic' }),
+      });
+    }
+
     if (layoutType === 'hierarchicalTd') {
       setLayouting(true);
       applyHierarchicalLayout(graph, elkRef.current!).then(() => {
