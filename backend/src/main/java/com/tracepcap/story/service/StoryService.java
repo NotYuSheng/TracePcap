@@ -646,7 +646,8 @@ public class StoryService {
           for (ConversationEvidence ev : step.getConversations()) {
             String risks = ev.getFlowRisks() != null ? String.join(",", ev.getFlowRisks()) : "";
             String app = ev.getAppName() != null ? ev.getAppName() : "-";
-            String start = ev.getStartTime() != null ? ev.getStartTime().substring(11, 19) : "-";
+            String startRaw = ev.getStartTime() != null ? ev.getStartTime() : "-";
+            String start = startRaw.length() >= 11 ? startRaw.substring(11, Math.min(startRaw.length(), 19)) : startRaw;
             prompt.append(
                 String.format(
                     "| %s | %s | %d | %s | %s | %d | %s | %s |\n",
@@ -679,7 +680,7 @@ public class StoryService {
     prompt.append("| time | packets | bytes | notes |\n");
     prompt.append("|------|---------|-------|-------|\n");
     for (TimelineDataDto bin : bins) {
-      String ts = bin.getTimestamp() != null ? bin.getTimestamp().toString().substring(0, 19) : "-";
+      String ts = bin.getTimestamp() != null ? bin.getTimestamp().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")) : "-";
       long bytes = bin.getBytes() != null ? bin.getBytes() : 0;
       String bytesHuman =
           bytes > 1_048_576
