@@ -4,9 +4,12 @@ import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
+import { NetworkControls } from '@/components/network/NetworkControls';
 import { NodeDetails } from '@/components/network/NodeDetails';
 import type { GraphNode } from '@/features/network/types';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
+import { toggleSet } from '@/features/network/constants';
+import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
 import { parseDateTime } from '@/utils/dateUtils';
 
 interface MonitorNetworkDiagramProps {
@@ -31,8 +34,6 @@ function labelForChange(
   switch (changeType) {
     case 'MAC_ADDED':      return 'New device';
     case 'IP_MAC_DRIFT':
-      // ARP spoof: IP is entityKey, MAC changed (old.mac → new.mac)
-      // DHCP drift: MAC is entityKey, IP changed (old.ip → new.ip)
       return (oldValue?.['mac'] && newValue?.['mac'] && oldValue['mac'] !== newValue['mac']) ? 'Potential ARP spoof' : 'IP reassignment';
     case 'GATEWAY_CHANGE': return 'Gateway changed';
     case 'ASN_CHANGE':     return 'New ISP';
@@ -71,11 +72,9 @@ function buildHighlightMap(events: ChangeEvent[], toSnapshotId: string): Map<str
         const oldIp = e.oldValue?.['ip'] as string | undefined;
         const newIp = e.newValue?.['ip'] as string | undefined;
         if (oldMac && newMac && oldMac !== newMac) {
-          // ARP spoof: entityKey is the IP, MAC changed
           addHl(e.entityKey, `MAC changed from ${oldMac} to ${newMac}`);
           addHl(newMac, `Now claiming IP ${e.entityKey} (was ${oldMac})`);
         } else {
-          // DHCP reassignment: entityKey is the MAC, IP changed
           addHl(e.entityKey, `IP changed from ${oldIp ?? '?'} to ${newIp ?? '?'}`);
           if (newIp) addHl(newIp, `MAC ${e.entityKey} moved here from ${oldIp ?? '?'}`);
         }
@@ -118,12 +117,54 @@ export const MonitorNetworkDiagram = ({
   const [selectedId, setSelectedId] = useState<string>(initialSnapshotId);
   const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>('circular');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
-  // Sync to the clicked snapshot each time the modal opens
+  // ── Filter state ──────────────────────────────────────────────────────────
+  const [ipFilter, setIpFilter] = useState('');
+  const [portFilter, setPortFilter] = useState('');
+  const [hasRisksOnly, setHasRisksOnly] = useState(false);
+  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
+  const [activeNodeFilters, setActiveNodeFilters] = useState<string[]>([]);
+  const [activeAppFilters, setActiveAppFilters] = useState<string[]>([]);
+  const [activeL7Protocols, setActiveL7Protocols] = useState<string[]>([]);
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);
+  const [activeRiskTypes, setActiveRiskTypes] = useState<string[]>([]);
+  const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
+  const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
+  const [activeCountries, setActiveCountries] = useState<string[]>([]);
+
+  const toggleLegendProtocol = toggleSet(setActiveLegendProtocols);
+  const toggleNodeFilter    = toggleSet(setActiveNodeFilters);
+  const toggleAppFilter     = toggleSet(setActiveAppFilters);
+  const toggleL7Protocol    = toggleSet(setActiveL7Protocols);
+  const toggleCategory      = toggleSet(setActiveCategories);
+  const toggleRiskType      = toggleSet(setActiveRiskTypes);
+  const toggleCustomSig     = toggleSet(setActiveCustomSigs);
+  const toggleFileType      = toggleSet(setActiveFileTypes);
+  const toggleCountry       = toggleSet(setActiveCountries);
+
+  const clearAllFilters = () => {
+    setActiveLegendProtocols([]);
+    setActiveNodeFilters([]);
+    setIpFilter('');
+    setPortFilter('');
+    setActiveAppFilters([]);
+    setActiveL7Protocols([]);
+    setActiveCategories([]);
+    setActiveRiskTypes([]);
+    setActiveCustomSigs([]);
+    setActiveFileTypes([]);
+    setActiveCountries([]);
+    setHasRisksOnly(false);
+  };
+
+  // Sync to the clicked snapshot each time the modal opens; reset UI state
   useEffect(() => {
     if (show && initialSnapshotId) {
       setSelectedId(initialSnapshotId);
       setSelectedNode(null);
+      setIsFullscreen(false);
     }
   }, [show, initialSnapshotId]);
 
@@ -156,6 +197,169 @@ export const MonitorNetworkDiagram = ({
 
   const { nodes, edges, loading } = useNetworkData(selectedSnap?.fileId ?? '');
 
+  // ── "Present" sets ────────────────────────────────────────────────────────
+
+  const presentNodeTypes = useMemo(() => {
+    const s = new Set<string>();
+    nodes.forEach(n => s.add(n.data.nodeType));
+    return s;
+  }, [nodes]);
+
+  const presentDeviceTypes = useMemo(() => {
+    const s = new Set<string>();
+    nodes.forEach(n => { if (n.data.deviceType) s.add(n.data.deviceType); });
+    return s;
+  }, [nodes]);
+
+  const presentEdgeLegendKeys = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(edge => {
+      const proto = edge.data.protocol.toUpperCase();
+      const app = (edge.data.appName ?? '').toUpperCase();
+      ['HTTP', 'HTTPS', 'DNS', 'TCP', 'UDP', 'ICMP', 'ARP', 'STP', 'LLDP', 'CDP', 'EAPOL'].forEach(
+        key => { if (edgeMatchesLegendKey(proto, app, key)) s.add(key); }
+      );
+    });
+    return s;
+  }, [edges]);
+
+  const presentAppNames = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => { if (e.data.appName) s.add(e.data.appName); });
+    return [...s].sort();
+  }, [edges]);
+
+  const presentL7Protocols = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => { if (e.data.l7Protocol) s.add(e.data.l7Protocol); });
+    return [...s].sort();
+  }, [edges]);
+
+  const presentCategories = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => { if (e.data.category) s.add(e.data.category); });
+    return [...s].sort();
+  }, [edges]);
+
+  const presentRiskTypes = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => e.data.flowRisks?.forEach(r => s.add(r)));
+    return [...s].sort();
+  }, [edges]);
+
+  const presentCustomSigs = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => e.data.customSignatures?.forEach(sig => s.add(sig)));
+    return [...s].sort();
+  }, [edges]);
+
+  const presentFileTypes = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => e.data.detectedFileTypes?.forEach(f => s.add(f)));
+    return [...s].sort();
+  }, [edges]);
+
+  const presentCountries = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(e => {
+      if (e.data.srcCountry) s.add(e.data.srcCountry);
+      if (e.data.dstCountry) s.add(e.data.dstCountry);
+    });
+    return [...s].sort();
+  }, [edges]);
+
+  // ── Filter logic ──────────────────────────────────────────────────────────
+
+  const { filteredNodes, filteredEdges } = useMemo(() => {
+    let filtered = edges;
+
+    if (hasRisksOnly) filtered = filtered.filter(e => e.data.hasRisks);
+    if (activeLegendProtocols.length > 0) {
+      filtered = filtered.filter(edge => {
+        const proto = edge.data.protocol.toUpperCase();
+        const app = (edge.data.appName ?? '').toUpperCase();
+        return activeLegendProtocols.some(key => edgeMatchesLegendKey(proto, app, key));
+      });
+    }
+    if (activeAppFilters.length > 0)
+      filtered = filtered.filter(e => activeAppFilters.includes(e.data.appName ?? ''));
+    if (activeL7Protocols.length > 0)
+      filtered = filtered.filter(e => activeL7Protocols.includes(e.data.l7Protocol ?? ''));
+    if (activeCategories.length > 0)
+      filtered = filtered.filter(e => activeCategories.includes(e.data.category ?? ''));
+    if (activeRiskTypes.length > 0)
+      filtered = filtered.filter(e => activeRiskTypes.some(r => e.data.flowRisks?.includes(r)));
+    if (activeCustomSigs.length > 0)
+      filtered = filtered.filter(e => activeCustomSigs.some(s => e.data.customSignatures?.includes(s)));
+    if (activeFileTypes.length > 0)
+      filtered = filtered.filter(e => activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f)));
+    if (activeCountries.length > 0)
+      filtered = filtered.filter(e =>
+        activeCountries.includes(e.data.srcCountry ?? '') ||
+        activeCountries.includes(e.data.dstCountry ?? '')
+      );
+    if (activeNodeFilters.length > 0) {
+      const matchingIds = new Set(
+        nodes
+          .filter(n =>
+            activeNodeFilters.some(key => {
+              if (key.startsWith('nt:')) return n.data.nodeType === key.slice(3);
+              if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
+              return false;
+            })
+          )
+          .map(n => n.id)
+      );
+      filtered = filtered.filter(e => matchingIds.has(e.source) || matchingIds.has(e.target));
+    }
+    if (portFilter) {
+      const portNum = parseInt(portFilter, 10);
+      if (!isNaN(portNum))
+        filtered = filtered.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
+    }
+
+    const hasActiveFilters =
+      activeLegendProtocols.length > 0 || activeNodeFilters.length > 0 ||
+      activeAppFilters.length > 0 || activeL7Protocols.length > 0 ||
+      activeCategories.length > 0 || activeRiskTypes.length > 0 ||
+      activeCustomSigs.length > 0 || activeFileTypes.length > 0 ||
+      activeCountries.length > 0 || hasRisksOnly ||
+      ipFilter.length > 0 || portFilter.length > 0;
+
+    const ipLower = ipFilter.toLowerCase();
+    let visibleNodes = nodes;
+    if (ipFilter) {
+      visibleNodes = nodes.filter(
+        n =>
+          n.data.ip.toLowerCase().includes(ipLower) ||
+          (n.data.hostname ?? '').toLowerCase().includes(ipLower)
+      );
+    }
+
+    if (hasActiveFilters) {
+      const matchedByIp = new Set(visibleNodes.map(n => n.id));
+      if (ipFilter)
+        filtered = filtered.filter(e => matchedByIp.has(e.source) || matchedByIp.has(e.target));
+      const visibleNodeIds = new Set<string>();
+      filtered.forEach(e => { visibleNodeIds.add(e.source); visibleNodeIds.add(e.target); });
+      visibleNodes = nodes.filter(n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id)));
+    }
+
+    return { filteredNodes: visibleNodes, filteredEdges: filtered };
+  }, [
+    nodes, edges, activeLegendProtocols, activeNodeFilters, activeAppFilters,
+    activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs,
+    activeFileTypes, activeCountries, hasRisksOnly, ipFilter, portFilter,
+  ]);
+
+  const activeFilterCount =
+    activeLegendProtocols.length + activeNodeFilters.length + activeAppFilters.length +
+    activeL7Protocols.length + activeCategories.length + activeRiskTypes.length +
+    activeCustomSigs.length + activeFileTypes.length + activeCountries.length +
+    (ipFilter ? 1 : 0) + (portFilter ? 1 : 0) + (hasRisksOnly ? 1 : 0);
+
+  // ── Change legend ─────────────────────────────────────────────────────────
+
   const legendItems = useMemo(() => {
     if (!highlightedNodes) return [];
     const seen = new Map<string, string>();
@@ -167,15 +371,35 @@ export const MonitorNetworkDiagram = ({
 
   return (
     <>
-    <Modal show={show} onHide={onHide} centered size="xl">
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered={!isFullscreen}
+      size={isFullscreen ? undefined : 'xl'}
+      dialogClassName={isFullscreen ? 'modal-fullscreen' : undefined}
+    >
       <Modal.Header closeButton>
-        <Modal.Title>
+        <Modal.Title className="d-flex align-items-center w-100 me-2">
           <i className="bi bi-diagram-3 me-2"></i>
           Network Diagram — {selectedSnap?.fileName ?? ''}
+          <Button
+            variant="link"
+            size="sm"
+            className="ms-auto p-0 text-muted"
+            onClick={() => setIsFullscreen(f => !f)}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
+          </Button>
         </Modal.Title>
       </Modal.Header>
 
-      <Modal.Body style={{ padding: '1rem 1.25rem' }}>
+      <Modal.Body
+        style={{
+          padding: '1rem 1.25rem',
+          ...(isFullscreen ? { display: 'flex', flexDirection: 'column', overflow: 'hidden' } : {}),
+        }}
+      >
         {/* Snapshot selector + comparison info */}
         <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
           <div className="d-flex align-items-center gap-2">
@@ -235,8 +459,11 @@ export const MonitorNetworkDiagram = ({
           )}
         </div>
 
-        {/* Graph — fixed height; network-graph-wrapper height overridden to 100% via class */}
-        <div className="monitor-diagram-graph" style={{ height: 480 }}>
+        {/* Graph */}
+        <div
+          className="monitor-diagram-graph"
+          style={isFullscreen ? { flex: 1, minHeight: 0 } : { height: 480 }}
+        >
           {loading ? (
             <div className="d-flex align-items-center justify-content-center h-100 text-muted">
               <Spinner animation="border" size="sm" className="me-2" />
@@ -244,12 +471,14 @@ export const MonitorNetworkDiagram = ({
             </div>
           ) : (
             <NetworkGraph
-              nodes={nodes}
-              edges={edges}
+              nodes={filteredNodes}
+              edges={filteredEdges}
               highlightedNodes={highlightedNodes}
               layoutType={layoutType}
               onLayoutChange={setLayoutType}
               onNodeClick={node => setSelectedNode(node)}
+              onFilterClick={() => setShowFilterModal(true)}
+              activeFilterCount={activeFilterCount}
             />
           )}
         </div>
@@ -273,6 +502,66 @@ export const MonitorNetworkDiagram = ({
         zIndex={1070}
       />
     )}
+
+    {/* Filter modal — rendered outside the main modal so it stacks on top */}
+    <Modal show={showFilterModal} onHide={() => setShowFilterModal(false)} size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Filters</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <NetworkControls
+          activeLegendProtocols={activeLegendProtocols}
+          onLegendProtocolClick={toggleLegendProtocol}
+          onLegendProtocolClear={() => setActiveLegendProtocols([])}
+          presentEdgeLegendKeys={presentEdgeLegendKeys}
+          activeNodeFilters={activeNodeFilters}
+          onNodeFilterClick={toggleNodeFilter}
+          onNodeFilterClear={() => setActiveNodeFilters([])}
+          presentNodeTypes={presentNodeTypes}
+          presentDeviceTypes={presentDeviceTypes}
+          ipFilter={ipFilter}
+          onIpFilterChange={setIpFilter}
+          portFilter={portFilter}
+          onPortFilterChange={setPortFilter}
+          activeAppFilters={activeAppFilters}
+          onAppFilterClick={toggleAppFilter}
+          onAppFilterClear={() => setActiveAppFilters([])}
+          presentAppNames={presentAppNames}
+          activeL7Protocols={activeL7Protocols}
+          onL7ProtocolClick={toggleL7Protocol}
+          onL7ProtocolClear={() => setActiveL7Protocols([])}
+          presentL7Protocols={presentL7Protocols}
+          activeCategories={activeCategories}
+          onCategoryClick={toggleCategory}
+          onCategoryClear={() => setActiveCategories([])}
+          presentCategories={presentCategories}
+          activeRiskTypes={activeRiskTypes}
+          onRiskTypeClick={toggleRiskType}
+          onRiskTypeClear={() => setActiveRiskTypes([])}
+          presentRiskTypes={presentRiskTypes}
+          activeCustomSigs={activeCustomSigs}
+          onCustomSigClick={toggleCustomSig}
+          onCustomSigClear={() => setActiveCustomSigs([])}
+          presentCustomSigs={presentCustomSigs}
+          activeFileTypes={activeFileTypes}
+          onFileTypeClick={toggleFileType}
+          onFileTypeClear={() => setActiveFileTypes([])}
+          presentFileTypes={presentFileTypes}
+          activeCountries={activeCountries}
+          onCountryClick={toggleCountry}
+          onCountryClear={() => setActiveCountries([])}
+          presentCountries={presentCountries}
+          hasRisksOnly={hasRisksOnly}
+          onHasRisksOnlyChange={setHasRisksOnly}
+          activeFilterCount={activeFilterCount}
+          onClearAllFilters={clearAllFilters}
+          defaultCollapsed={false}
+        />
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowFilterModal(false)}>Close</Button>
+      </Modal.Footer>
+    </Modal>
     </>
   );
 };
