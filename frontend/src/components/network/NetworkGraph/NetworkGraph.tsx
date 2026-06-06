@@ -406,6 +406,16 @@ export const NetworkGraph = memo(function NetworkGraph({
     if (nodes.length === 0) return;
     if (!containerReady) return;
 
+    // Hide canvas immediately so the layout flash (random → laid-out positions) is invisible.
+    // revealCanvas() is called once the first correct frame is ready.
+    const canvasEl = containerRef.current;
+    canvasEl.style.opacity = '0';
+    canvasEl.style.transition = '';
+    const revealCanvas = () => {
+      canvasEl.style.transition = 'opacity 0.15s';
+      canvasEl.style.opacity = '1';
+    };
+
     // Tear down previous instance
     sigmaRef.current?.kill();
     sigmaRef.current = null;
@@ -474,6 +484,39 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     sigmaRef.current = sigma;
 
+    // ── Node dragging ──────────────────────────────────────────────────────────
+    // Track which node is being dragged. These are plain vars (not refs) because
+    // they're local to this effect closure and reset on every rebuild.
+    let dragNode: string | null = null;
+    let dragMoved = false;
+
+    sigma.on('downNode', ({ node }) => {
+      dragNode = node;
+      dragMoved = false;
+      sigma.getCamera().disable();
+      canvasEl.style.cursor = 'grabbing';
+    });
+
+    const onDragMove = (e: MouseEvent) => {
+      if (!dragNode) return;
+      dragMoved = true;
+      const rect = canvasEl.getBoundingClientRect();
+      const pos = sigma.viewportToGraph({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      graph.setNodeAttribute(dragNode, 'x', pos.x);
+      graph.setNodeAttribute(dragNode, 'y', pos.y);
+      sigma.refresh();
+    };
+
+    const onDragEnd = () => {
+      if (!dragNode) return;
+      dragNode = null;
+      sigma.getCamera().enable();
+      canvasEl.style.cursor = '';
+    };
+
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+
     // Before each render, rebuild the label→nodeType/deviceType sidecar maps.
     // Keyed by label (IP/hostname) which is unique per node in this graph.
     sigma.on('beforeRender', () => {
@@ -513,6 +556,9 @@ export const NetworkGraph = memo(function NetworkGraph({
     });
 
     sigma.on('clickNode', ({ node, event }) => {
+      // Suppress click when the mousedown was part of a drag gesture
+      if (dragMoved) { dragMoved = false; return; }
+
       const original = nodesRef.current.find(n => n.id === node);
       if (!original) return;
 
@@ -556,6 +602,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         sigma.refresh();
         sigma.getCamera().animate({ ratio: 1 }, { duration: 400 });
         setLayouting(false);
+        revealCanvas();
         requestAnimationFrame(() => onLayoutCompleteRef.current?.());
       }).catch(err => {
         if (cancelled) return;
@@ -568,11 +615,16 @@ export const NetworkGraph = memo(function NetworkGraph({
       circular.assign(graph, { scale: 1 });
       noverlap.assign(graph, { maxIterations: 50, settings: { margin: 6 } });
       sigma.refresh();
-      requestAnimationFrame(() => onLayoutCompleteRef.current?.());
+      requestAnimationFrame(() => {
+        revealCanvas();
+        onLayoutCompleteRef.current?.();
+      });
     }
 
     return () => {
       cancelled = true;
+      document.removeEventListener('mousemove', onDragMove);
+      document.removeEventListener('mouseup', onDragEnd);
       sigmaRef.current?.kill();
       sigmaRef.current = null;
       elkRef.current?.terminateWorker();
