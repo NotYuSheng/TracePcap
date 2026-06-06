@@ -487,21 +487,37 @@ export const NetworkGraph = memo(function NetworkGraph({
     // ── Node dragging ──────────────────────────────────────────────────────────
     // Track which node is being dragged. These are plain vars (not refs) because
     // they're local to this effect closure and reset on every rebuild.
+    const DRAG_THRESHOLD_PX = 5;
     let dragNode: string | null = null;
     let dragMoved = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
 
-    sigma.on('downNode', ({ node }) => {
+    // sigma.getCamera().disable() is a valid Sigma v3 API that prevents the camera
+    // from processing pan/zoom interactions while preserving hover/click event dispatch.
+    sigma.on('downNode', ({ node, event }) => {
       dragNode = node;
       dragMoved = false;
+      dragStartX = event.x;
+      dragStartY = event.y;
       sigma.getCamera().disable();
       canvasEl.style.cursor = 'grabbing';
     });
 
     const onDragMove = (e: MouseEvent) => {
       if (!dragNode) return;
-      dragMoved = true;
       const rect = canvasEl.getBoundingClientRect();
-      const pos = sigma.viewportToGraph({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      // Only commit to a drag once the pointer has moved beyond the threshold;
+      // this prevents micro-movements from suppressing a legitimate click.
+      if (!dragMoved) {
+        const dx = x - dragStartX;
+        const dy = y - dragStartY;
+        if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
+        dragMoved = true;
+      }
+      const pos = sigma.viewportToGraph({ x, y });
       graph.setNodeAttribute(dragNode, 'x', pos.x);
       graph.setNodeAttribute(dragNode, 'y', pos.y);
       sigma.refresh();
