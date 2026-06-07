@@ -36,11 +36,13 @@ public class StorageServiceImpl implements StorageService {
       if (contentType == null || contentType.isBlank()) {
         contentType = "application/octet-stream";
       }
-      minioClient.putObject(
-          PutObjectArgs.builder().bucket(minioConfig.getBucket()).object(fileName).stream(
-                  file.getInputStream(), file.getSize(), -1)
-              .contentType(contentType)
-              .build());
+      try (var is = file.getInputStream()) {
+        minioClient.putObject(
+            PutObjectArgs.builder().bucket(minioConfig.getBucket()).object(fileName).stream(
+                    is, file.getSize(), -1)
+                .contentType(contentType)
+                .build());
+      }
 
       log.info("Successfully uploaded file: {} to MinIO", fileName);
       return fileName;

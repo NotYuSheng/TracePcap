@@ -4,6 +4,8 @@ import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
+import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
+import type { CustomPrivateRange } from '@/features/intelligence/types/customPrivateRange.types';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 
 interface IpDriftPanelProps {
@@ -27,8 +29,13 @@ interface ConversationsResponse {
   data: ConversationSummary[];
 }
 
-function isPrivateIp(ip: string): boolean {
+function isRfc1918(ip: string): boolean {
   return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
+}
+
+function isPrivateIp(ip: string, customRanges: CustomPrivateRange[]): boolean {
+  if (isRfc1918(ip)) return true;
+  return customRanges.some(r => ipInCidr(ip, r.cidr));
 }
 
 function ipToInt(ip: string): number {
@@ -45,7 +52,6 @@ function ipInCidr(ip: string, cidr: string): boolean {
     return false;
   }
 }
-
 
 function stringHue(s: string): number {
   let h = 0;
@@ -108,11 +114,136 @@ function IpBadgeGroup({
   );
 }
 
+function PrivateOverridesSection({
+  customRanges,
+  onSaved,
+  onDeleted,
+}: {
+  customRanges: CustomPrivateRange[];
+  onSaved: (r: CustomPrivateRange) => void;
+  onDeleted: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [cidr, setCidr] = useState('');
+  const [label, setLabel] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const handleAdd = async () => {
+    const trimmed = cidr.trim();
+    if (!trimmed) return;
+    setAdding(true);
+    setAddError(null);
+    try {
+      const created = await customPrivateRangeService.create(trimmed, label.trim());
+      onSaved(created);
+      setCidr('');
+      setLabel('');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: unknown } })?.response?.data;
+      setAddError(typeof msg === 'string' ? msg : 'Failed to add range');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await customPrivateRangeService.delete(id);
+      onDeleted(id);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: unknown } })?.response?.data;
+      setAddError(typeof msg === 'string' ? msg : 'Failed to delete range');
+    }
+  };
+
+  return (
+    <div className="mt-3 pt-2 border-top">
+      <button
+        type="button"
+        className="btn btn-link btn-sm p-0 text-muted text-decoration-none d-flex align-items-center gap-1"
+        style={{ fontSize: '0.8rem' }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <i className={`bi bi-chevron-${open ? 'up' : 'down'}`}></i>
+        <i className="bi bi-lock ms-1"></i>
+        Private IP overrides
+        {customRanges.length > 0 && (
+          <span className="badge bg-secondary ms-1" style={{ fontSize: '0.7rem' }}>
+            {customRanges.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="mt-2" style={{ fontSize: '0.82rem' }}>
+          <p className="text-muted mb-2" style={{ fontSize: '0.78rem' }}>
+            Add a public IP or CIDR that should be treated as internal (e.g. a public address used by a private terminal).
+          </p>
+          {customRanges.length > 0 && (
+            <table className="table table-sm table-borderless mb-2">
+              <tbody>
+                {customRanges.map(r => (
+                  <tr key={r.id}>
+                    <td className="font-monospace py-1 ps-0">{r.cidr}</td>
+                    <td className="text-muted py-1">{r.label ?? <em>—</em>}</td>
+                    <td className="text-end py-1 pe-0">
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 text-danger"
+                        onClick={() => handleDelete(r.id)}
+                        title="Remove override"
+                      >
+                        <i className="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="d-flex gap-2 flex-wrap align-items-center">
+            <input
+              type="text"
+              className="form-control form-control-sm font-monospace"
+              style={{ maxWidth: 180 }}
+              placeholder="IP or CIDR"
+              value={cidr}
+              onChange={e => setCidr(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            />
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              style={{ maxWidth: 160 }}
+              placeholder="Label (optional)"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            />
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleAdd}
+              disabled={adding || !cidr.trim()}
+            >
+              {adding ? 'Adding…' : 'Add'}
+            </Button>
+          </div>
+          {addError && <div className="text-danger mt-1" style={{ fontSize: '0.78rem' }}>{addError}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => {
   const [selectedAbsent, setSelectedAbsent] = useState<AbsentEntity | null>(null);
   const [selectedIp, setSelectedIp] = useState<SelectedIp>(null);
   const [privateIps, setPrivateIps] = useState<EntityGroup>({ active: [], absent: [] });
   const [publicIps, setPublicIps] = useState<EntityGroup>({ active: [], absent: [] });
+  const [customRanges, setCustomRanges] = useState<CustomPrivateRange[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -120,6 +251,10 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
   const latestSnap = sorted[sorted.length - 1];
   const latestFileId = latestSnap?.fileId ?? '';
   const latestStartTime = latestSnap?.startTime as unknown as string | null ?? null;
+
+  useEffect(() => {
+    customPrivateRangeService.list().then(setCustomRanges).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (sorted.length === 0) return;
@@ -172,12 +307,12 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
         return { active, absent };
       };
 
-      setPrivateIps(buildGroup(isPrivateIp));
-      setPublicIps(buildGroup(ip => !isPrivateIp(ip)));
+      setPrivateIps(buildGroup(ip => isPrivateIp(ip, customRanges)));
+      setPublicIps(buildGroup(ip => !isPrivateIp(ip, customRanges)));
       setLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshots.map(s => s.id).join(',')]);
+  }, [snapshots.map(s => s.id).join(','), customRanges]);
 
   if (loading) {
     return <div className="text-muted small text-center py-3"><Spinner animation="border" size="sm" className="me-2" />Loading…</div>;
@@ -251,30 +386,32 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
               />
             </div>
           ))}
-          {(unmatchedActive.length > 0 || unmatchedAbsent.length > 0) && (
+          {unmatchedActive.filter(ip => isPrivateIp(ip, customRanges)).length > 0 || unmatchedAbsent.filter(e => isPrivateIp(e.key, customRanges)).length > 0 ? (
             <div className="mb-3">
               <small className="text-muted fw-semibold d-block mb-1">
-                <i className="bi bi-question-circle me-1"></i>Unmatched
+                <i className="bi bi-house me-1"></i>Private
               </small>
               <IpBadgeGroup
-                items={filterIps(unmatchedActive.filter(ip => isPrivateIp(ip)))}
-                absentItems={filterAbsent(unmatchedAbsent.filter(e => isPrivateIp(e.key)))}
+                items={filterIps(unmatchedActive.filter(ip => isPrivateIp(ip, customRanges)))}
+                absentItems={filterAbsent(unmatchedAbsent.filter(e => isPrivateIp(e.key, customRanges)))}
                 onAbsentClick={setSelectedAbsent}
                 onActiveClick={ip => setSelectedIp({ ip, fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
               />
-              {unmatchedActive.filter(ip => !isPrivateIp(ip)).length > 0 || unmatchedAbsent.filter(e => !isPrivateIp(e.key)).length > 0 ? (
-                <div className="mt-2">
-                  <small className="text-muted fst-italic d-block mb-1">Public</small>
-                  <IpBadgeGroup
-                    items={filterIps(unmatchedActive.filter(ip => !isPrivateIp(ip)))}
-                    absentItems={filterAbsent(unmatchedAbsent.filter(e => !isPrivateIp(e.key)))}
-                    onAbsentClick={setSelectedAbsent}
-                    onActiveClick={ip => setSelectedIp({ ip, fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
-                  />
-                </div>
-              ) : null}
             </div>
-          )}
+          ) : null}
+          {unmatchedActive.filter(ip => !isPrivateIp(ip, customRanges)).length > 0 || unmatchedAbsent.filter(e => !isPrivateIp(e.key, customRanges)).length > 0 ? (
+            <div className="mb-3">
+              <small className="text-muted fw-semibold d-block mb-1">
+                <i className="bi bi-globe me-1"></i>Public
+              </small>
+              <IpBadgeGroup
+                items={filterIps(unmatchedActive.filter(ip => !isPrivateIp(ip, customRanges)))}
+                absentItems={filterAbsent(unmatchedAbsent.filter(e => !isPrivateIp(e.key, customRanges)))}
+                onAbsentClick={setSelectedAbsent}
+                onActiveClick={ip => setSelectedIp({ ip, fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
+              />
+            </div>
+          ) : null}
         </>
       ) : (
         <>
@@ -312,6 +449,11 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
           Greyed-out addresses are no longer seen. Click for details.
         </small>
       )}
+      <PrivateOverridesSection
+        customRanges={customRanges}
+        onSaved={r => setCustomRanges(prev => [r, ...prev.filter(x => x.cidr !== r.cidr)])}
+        onDeleted={id => setCustomRanges(prev => prev.filter(r => r.id !== id))}
+      />
       {selectedAbsent && (
         <EntityDetailModal
           entityType="IP"
