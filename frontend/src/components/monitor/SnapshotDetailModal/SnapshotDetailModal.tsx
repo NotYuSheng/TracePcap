@@ -8,7 +8,7 @@ import { NetworkControls } from '@/components/network/NetworkControls';
 import { NodeDetails } from '@/components/network/NodeDetails';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
 import { toggleSet } from '@/features/network/constants';
-import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
+import { edgeMatchesLegendKey, applyNetworkFilters } from '@/features/network/services/networkService';
 import { insightsService } from '@/features/insights/services/insightsService';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NetworkInsight, InsightOptions } from '@/features/insights/types/insights.types';
@@ -204,56 +204,22 @@ export const SnapshotDetailModal = ({
   const presentCountries   = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (e.data.srcCountry) s.add(e.data.srcCountry); if (e.data.dstCountry) s.add(e.data.dstCountry); }); return [...s].sort(); }, [edges]);
 
   // Filter logic
-  const { filteredNodes, filteredEdges } = useMemo(() => {
-    let filtered = edges;
-    if (hasRisksOnly) filtered = filtered.filter(e => e.data.hasRisks);
-    if (activeLegendProtocols.length > 0)
-      filtered = filtered.filter(edge => {
-        const proto = edge.data.protocol.toUpperCase();
-        const app = (edge.data.appName ?? '').toUpperCase();
-        return activeLegendProtocols.some(key => edgeMatchesLegendKey(proto, app, key));
-      });
-    if (activeAppFilters.length > 0)   filtered = filtered.filter(e => activeAppFilters.includes(e.data.appName ?? ''));
-    if (activeL7Protocols.length > 0)  filtered = filtered.filter(e => activeL7Protocols.includes(e.data.l7Protocol ?? ''));
-    if (activeCategories.length > 0)   filtered = filtered.filter(e => activeCategories.includes(e.data.category ?? ''));
-    if (activeRiskTypes.length > 0)    filtered = filtered.filter(e => activeRiskTypes.some(r => e.data.flowRisks?.includes(r)));
-    if (activeCustomSigs.length > 0)   filtered = filtered.filter(e => activeCustomSigs.some(s => e.data.customSignatures?.includes(s)));
-    if (activeFileTypes.length > 0)    filtered = filtered.filter(e => activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f)));
-    if (activeCountries.length > 0)    filtered = filtered.filter(e => activeCountries.includes(e.data.srcCountry ?? '') || activeCountries.includes(e.data.dstCountry ?? ''));
-    if (activeNodeFilters.length > 0) {
-      const matchingIds = new Set(
-        nodes.filter(n => activeNodeFilters.some(key => {
-          if (key.startsWith('nt:')) return n.data.nodeType === key.slice(3);
-          if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
-          return false;
-        })).map(n => n.id)
-      );
-      filtered = filtered.filter(e => matchingIds.has(e.source) || matchingIds.has(e.target));
-    }
-    if (portFilter) {
-      const portNum = parseInt(portFilter, 10);
-      if (!isNaN(portNum)) filtered = filtered.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
-    }
-    const hasActiveFilters =
-      activeLegendProtocols.length > 0 || activeNodeFilters.length > 0 ||
-      activeAppFilters.length > 0 || activeL7Protocols.length > 0 ||
-      activeCategories.length > 0 || activeRiskTypes.length > 0 ||
-      activeCustomSigs.length > 0 || activeFileTypes.length > 0 ||
-      activeCountries.length > 0 || hasRisksOnly ||
-      ipFilter.length > 0 || portFilter.length > 0;
-    const ipLower = ipFilter.toLowerCase();
-    let visibleNodes = nodes;
-    if (ipFilter)
-      visibleNodes = nodes.filter(n => n.data.ip.toLowerCase().includes(ipLower) || (n.data.hostname ?? '').toLowerCase().includes(ipLower));
-    if (hasActiveFilters) {
-      const matchedByIp = new Set(visibleNodes.map(n => n.id));
-      if (ipFilter) filtered = filtered.filter(e => matchedByIp.has(e.source) || matchedByIp.has(e.target));
-      const visibleNodeIds = new Set<string>();
-      filtered.forEach(e => { visibleNodeIds.add(e.source); visibleNodeIds.add(e.target); });
-      visibleNodes = nodes.filter(n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id)));
-    }
-    return { filteredNodes: visibleNodes, filteredEdges: filtered };
-  }, [nodes, edges, activeLegendProtocols, activeNodeFilters, activeAppFilters, activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, hasRisksOnly, ipFilter, portFilter]);
+  const { filteredNodes, filteredEdges } = useMemo(() =>
+    applyNetworkFilters(nodes, edges, {
+      hasRisksOnly,
+      activeLegendProtocols,
+      activeAppFilters,
+      activeL7Protocols,
+      activeCategories,
+      activeRiskTypes,
+      activeCustomSigs,
+      activeFileTypes,
+      activeCountries,
+      activeNodeFilters,
+      portFilter,
+      ipFilter,
+    }),
+  [nodes, edges, hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNodeFilters, portFilter, ipFilter]);
 
   const activeFilterCount =
     activeLegendProtocols.length + activeNodeFilters.length + activeAppFilters.length +

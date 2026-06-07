@@ -297,7 +297,17 @@ export const FileList = () => {
                         backgroundColor: isSelected ? 'rgba(13,110,253,0.08)' : undefined,
                         borderLeft: isSelected ? '3px solid #0d6efd' : '3px solid transparent',
                       }}
+                      role={isCompleted ? 'checkbox' : undefined}
+                      aria-checked={isCompleted ? isSelected : undefined}
+                      tabIndex={isCompleted ? 0 : -1}
                       onClick={() => handleRowClick(file.fileId, file.status)}
+                      onKeyDown={e => {
+                        if (!isCompleted) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRowClick(file.fileId, file.status);
+                        }
+                      }}
                     >
                       <div className="flex-grow-1">
                         <div className="d-flex align-items-center gap-2">
