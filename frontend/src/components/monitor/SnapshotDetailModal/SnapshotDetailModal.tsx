@@ -4,8 +4,11 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEventBadge';
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
+import { NetworkControls } from '@/components/network/NetworkControls';
 import { NodeDetails } from '@/components/network/NodeDetails';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
+import { toggleSet } from '@/features/network/constants';
+import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
 import { insightsService } from '@/features/insights/services/insightsService';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NetworkInsight, InsightOptions } from '@/features/insights/types/insights.types';
@@ -119,6 +122,46 @@ export const SnapshotDetailModal = ({
   const [diagramSnapshotId, setDiagramSnapshotId] = useState(snapshot.id);
   const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>('circular');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Filter state
+  const [ipFilter, setIpFilter] = useState('');
+  const [portFilter, setPortFilter] = useState('');
+  const [hasRisksOnly, setHasRisksOnly] = useState(false);
+  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
+  const [activeNodeFilters, setActiveNodeFilters] = useState<string[]>([]);
+  const [activeAppFilters, setActiveAppFilters] = useState<string[]>([]);
+  const [activeL7Protocols, setActiveL7Protocols] = useState<string[]>([]);
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);
+  const [activeRiskTypes, setActiveRiskTypes] = useState<string[]>([]);
+  const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
+  const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
+  const [activeCountries, setActiveCountries] = useState<string[]>([]);
+
+  const toggleLegendProtocol = toggleSet(setActiveLegendProtocols);
+  const toggleNodeFilter    = toggleSet(setActiveNodeFilters);
+  const toggleAppFilter     = toggleSet(setActiveAppFilters);
+  const toggleL7Protocol    = toggleSet(setActiveL7Protocols);
+  const toggleCategory      = toggleSet(setActiveCategories);
+  const toggleRiskType      = toggleSet(setActiveRiskTypes);
+  const toggleCustomSig     = toggleSet(setActiveCustomSigs);
+  const toggleFileType      = toggleSet(setActiveFileTypes);
+  const toggleCountry       = toggleSet(setActiveCountries);
+
+  const clearAllFilters = () => {
+    setActiveLegendProtocols([]);
+    setActiveNodeFilters([]);
+    setIpFilter('');
+    setPortFilter('');
+    setActiveAppFilters([]);
+    setActiveL7Protocols([]);
+    setActiveCategories([]);
+    setActiveRiskTypes([]);
+    setActiveCustomSigs([]);
+    setActiveFileTypes([]);
+    setActiveCountries([]);
+    setHasRisksOnly(false);
+  };
 
   const diagramSnap = sorted.find(s => s.id === diagramSnapshotId) ?? snapshot;
   const diagramIndex = sorted.findIndex(s => s.id === diagramSnapshotId);
@@ -137,6 +180,86 @@ export const SnapshotDetailModal = ({
   }, [highlightedNodes]);
 
   const { nodes, edges, loading: graphLoading } = useNetworkData(diagramSnap.fileId);
+
+  // "Present" sets for filter options
+  const presentNodeTypes = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => s.add(n.data.nodeType)); return s; }, [nodes]);
+  const presentDeviceTypes = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => { if (n.data.deviceType) s.add(n.data.deviceType); }); return s; }, [nodes]);
+  const presentEdgeLegendKeys = useMemo(() => {
+    const s = new Set<string>();
+    edges.forEach(edge => {
+      const proto = edge.data.protocol.toUpperCase();
+      const app = (edge.data.appName ?? '').toUpperCase();
+      ['HTTP', 'HTTPS', 'DNS', 'TCP', 'UDP', 'ICMP', 'ARP', 'STP', 'LLDP', 'CDP', 'EAPOL'].forEach(
+        key => { if (edgeMatchesLegendKey(proto, app, key)) s.add(key); }
+      );
+    });
+    return s;
+  }, [edges]);
+  const presentAppNames    = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (e.data.appName) s.add(e.data.appName); }); return [...s].sort(); }, [edges]);
+  const presentL7Protocols = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (e.data.l7Protocol) s.add(e.data.l7Protocol); }); return [...s].sort(); }, [edges]);
+  const presentCategories  = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (e.data.category) s.add(e.data.category); }); return [...s].sort(); }, [edges]);
+  const presentRiskTypes   = useMemo(() => { const s = new Set<string>(); edges.forEach(e => e.data.flowRisks?.forEach(r => s.add(r))); return [...s].sort(); }, [edges]);
+  const presentCustomSigs  = useMemo(() => { const s = new Set<string>(); edges.forEach(e => e.data.customSignatures?.forEach(sig => s.add(sig))); return [...s].sort(); }, [edges]);
+  const presentFileTypes   = useMemo(() => { const s = new Set<string>(); edges.forEach(e => e.data.detectedFileTypes?.forEach(f => s.add(f))); return [...s].sort(); }, [edges]);
+  const presentCountries   = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (e.data.srcCountry) s.add(e.data.srcCountry); if (e.data.dstCountry) s.add(e.data.dstCountry); }); return [...s].sort(); }, [edges]);
+
+  // Filter logic
+  const { filteredNodes, filteredEdges } = useMemo(() => {
+    let filtered = edges;
+    if (hasRisksOnly) filtered = filtered.filter(e => e.data.hasRisks);
+    if (activeLegendProtocols.length > 0)
+      filtered = filtered.filter(edge => {
+        const proto = edge.data.protocol.toUpperCase();
+        const app = (edge.data.appName ?? '').toUpperCase();
+        return activeLegendProtocols.some(key => edgeMatchesLegendKey(proto, app, key));
+      });
+    if (activeAppFilters.length > 0)   filtered = filtered.filter(e => activeAppFilters.includes(e.data.appName ?? ''));
+    if (activeL7Protocols.length > 0)  filtered = filtered.filter(e => activeL7Protocols.includes(e.data.l7Protocol ?? ''));
+    if (activeCategories.length > 0)   filtered = filtered.filter(e => activeCategories.includes(e.data.category ?? ''));
+    if (activeRiskTypes.length > 0)    filtered = filtered.filter(e => activeRiskTypes.some(r => e.data.flowRisks?.includes(r)));
+    if (activeCustomSigs.length > 0)   filtered = filtered.filter(e => activeCustomSigs.some(s => e.data.customSignatures?.includes(s)));
+    if (activeFileTypes.length > 0)    filtered = filtered.filter(e => activeFileTypes.some(f => e.data.detectedFileTypes?.includes(f)));
+    if (activeCountries.length > 0)    filtered = filtered.filter(e => activeCountries.includes(e.data.srcCountry ?? '') || activeCountries.includes(e.data.dstCountry ?? ''));
+    if (activeNodeFilters.length > 0) {
+      const matchingIds = new Set(
+        nodes.filter(n => activeNodeFilters.some(key => {
+          if (key.startsWith('nt:')) return n.data.nodeType === key.slice(3);
+          if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
+          return false;
+        })).map(n => n.id)
+      );
+      filtered = filtered.filter(e => matchingIds.has(e.source) || matchingIds.has(e.target));
+    }
+    if (portFilter) {
+      const portNum = parseInt(portFilter, 10);
+      if (!isNaN(portNum)) filtered = filtered.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
+    }
+    const hasActiveFilters =
+      activeLegendProtocols.length > 0 || activeNodeFilters.length > 0 ||
+      activeAppFilters.length > 0 || activeL7Protocols.length > 0 ||
+      activeCategories.length > 0 || activeRiskTypes.length > 0 ||
+      activeCustomSigs.length > 0 || activeFileTypes.length > 0 ||
+      activeCountries.length > 0 || hasRisksOnly ||
+      ipFilter.length > 0 || portFilter.length > 0;
+    const ipLower = ipFilter.toLowerCase();
+    let visibleNodes = nodes;
+    if (ipFilter)
+      visibleNodes = nodes.filter(n => n.data.ip.toLowerCase().includes(ipLower) || (n.data.hostname ?? '').toLowerCase().includes(ipLower));
+    if (hasActiveFilters) {
+      const matchedByIp = new Set(visibleNodes.map(n => n.id));
+      if (ipFilter) filtered = filtered.filter(e => matchedByIp.has(e.source) || matchedByIp.has(e.target));
+      const visibleNodeIds = new Set<string>();
+      filtered.forEach(e => { visibleNodeIds.add(e.source); visibleNodeIds.add(e.target); });
+      visibleNodes = nodes.filter(n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id)));
+    }
+    return { filteredNodes: visibleNodes, filteredEdges: filtered };
+  }, [nodes, edges, activeLegendProtocols, activeNodeFilters, activeAppFilters, activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, hasRisksOnly, ipFilter, portFilter]);
+
+  const activeFilterCount =
+    activeLegendProtocols.length + activeNodeFilters.length + activeAppFilters.length +
+    activeL7Protocols.length + activeCategories.length + activeRiskTypes.length +
+    activeCustomSigs.length + activeFileTypes.length + activeCountries.length +
+    (ipFilter ? 1 : 0) + (portFilter ? 1 : 0) + (hasRisksOnly ? 1 : 0);
 
   // Keyboard left/right to navigate snapshots on diagram tab
   useEffect(() => {
@@ -304,12 +427,14 @@ export const SnapshotDetailModal = ({
               ) : (
                 <NetworkGraph
                   key={diagramSnap.id}
-                  nodes={nodes}
-                  edges={edges}
+                  nodes={filteredNodes}
+                  edges={filteredEdges}
                   highlightedNodes={highlightedNodes}
                   layoutType={layoutType}
                   onLayoutChange={setLayoutType}
                   onNodeClick={node => setSelectedNode(node)}
+                  onFilterClick={() => setShowFilterModal(true)}
+                  activeFilterCount={activeFilterCount}
                 />
               )}
             </div>
@@ -411,6 +536,66 @@ export const SnapshotDetailModal = ({
         zIndex={1070}
       />
     )}
+
+    {/* Filter modal — rendered outside the main modal so it stacks on top */}
+    <Modal show={showFilterModal} onHide={() => setShowFilterModal(false)} size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Filters</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <NetworkControls
+          activeLegendProtocols={activeLegendProtocols}
+          onLegendProtocolClick={toggleLegendProtocol}
+          onLegendProtocolClear={() => setActiveLegendProtocols([])}
+          presentEdgeLegendKeys={presentEdgeLegendKeys}
+          activeNodeFilters={activeNodeFilters}
+          onNodeFilterClick={toggleNodeFilter}
+          onNodeFilterClear={() => setActiveNodeFilters([])}
+          presentNodeTypes={presentNodeTypes}
+          presentDeviceTypes={presentDeviceTypes}
+          ipFilter={ipFilter}
+          onIpFilterChange={setIpFilter}
+          portFilter={portFilter}
+          onPortFilterChange={setPortFilter}
+          activeAppFilters={activeAppFilters}
+          onAppFilterClick={toggleAppFilter}
+          onAppFilterClear={() => setActiveAppFilters([])}
+          presentAppNames={presentAppNames}
+          activeL7Protocols={activeL7Protocols}
+          onL7ProtocolClick={toggleL7Protocol}
+          onL7ProtocolClear={() => setActiveL7Protocols([])}
+          presentL7Protocols={presentL7Protocols}
+          activeCategories={activeCategories}
+          onCategoryClick={toggleCategory}
+          onCategoryClear={() => setActiveCategories([])}
+          presentCategories={presentCategories}
+          activeRiskTypes={activeRiskTypes}
+          onRiskTypeClick={toggleRiskType}
+          onRiskTypeClear={() => setActiveRiskTypes([])}
+          presentRiskTypes={presentRiskTypes}
+          activeCustomSigs={activeCustomSigs}
+          onCustomSigClick={toggleCustomSig}
+          onCustomSigClear={() => setActiveCustomSigs([])}
+          presentCustomSigs={presentCustomSigs}
+          activeFileTypes={activeFileTypes}
+          onFileTypeClick={toggleFileType}
+          onFileTypeClear={() => setActiveFileTypes([])}
+          presentFileTypes={presentFileTypes}
+          activeCountries={activeCountries}
+          onCountryClick={toggleCountry}
+          onCountryClear={() => setActiveCountries([])}
+          presentCountries={presentCountries}
+          hasRisksOnly={hasRisksOnly}
+          onHasRisksOnlyChange={setHasRisksOnly}
+          activeFilterCount={activeFilterCount}
+          onClearAllFilters={clearAllFilters}
+          defaultCollapsed={false}
+        />
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowFilterModal(false)}>Close</Button>
+      </Modal.Footer>
+    </Modal>
     </>
   );
 };
