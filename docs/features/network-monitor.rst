@@ -176,7 +176,7 @@ Capture Timeline
 ----------------
 
 The Capture Timeline table lists all snapshots in order. Clicking any row opens
-the **Snapshot Detail** modal, which contains four tabs:
+the **Snapshot Detail** modal, which contains five tabs:
 
 - **Network Diagram** — topology graph for that snapshot with change highlights
   overlaid. Navigate between snapshots with the prev/next arrows or dropdown;
@@ -185,6 +185,7 @@ the **Snapshot Detail** modal, which contains four tabs:
   compared to its predecessor.
 - **Context & Notes** — free-text fields for capturing what was happening during
   this capture (sent to the AI when generating insights).
+- **Subnets** — per-snapshot subnet overrides (see `Per-Snapshot Subnet Overrides`_).
 - **Insights** — AI-generated analysis scoped to this single snapshot (see
   `Network Insights`_ below).
 
@@ -315,6 +316,39 @@ tighter prefixes.
 Saved subnets are global across all networks and can be edited or deleted at any
 time. Each saved subnet row has a **diagram** button to open the Subnet Diagram
 modal, which filters the topology graph to show only nodes within that CIDR.
+
+Per-Snapshot Subnet Overrides
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Individual snapshots can carry their own subnet list that **shadows** the global
+definitions for that snapshot's change detection and IP grouping. Snapshots
+without overrides fall back to the global config unchanged.
+
+To set overrides for a snapshot:
+
+1. Open the snapshot via the Capture Timeline.
+2. Go to the **Subnets** tab.
+3. If no overrides exist, click **Customize for this snapshot** — the current
+   global definitions are pre-populated as *Inherited* rows.
+4. Add, edit, or remove rows. Inherited rows carry a grey *Inherited* badge;
+   rows you add carry no badge.
+5. Click **Save subnet overrides**.
+
+To revert a snapshot to global definitions, click **Reset to global** — this
+clears all overrides for that snapshot.
+
+Overrides can also be set at upload time: in the **Add PCAP Snapshot** dialog,
+expand the **Subnet Overrides (optional)** section before clicking upload.
+
+**When to use per-snapshot overrides:**
+
+- A capture was taken on a network segment with a different CIDR structure than
+  the rest of the dataset.
+- During incident investigation you want to scope subnet labels to the specific
+  segments involved (e.g. ``10.0.3.0/24 — Floor 3 OT Devices``) without
+  changing the global definitions used by every other snapshot.
+- A one-off capture contains traffic from a third-party network that should not
+  influence the global subnet inventory.
 
 Node Role Annotation
 --------------------
@@ -525,10 +559,10 @@ Snapshots
      - List snapshots ordered by capture time.
    * - ``POST``
      - ``/api/monitor/networks/{networkId}/snapshots``
-     - Add a snapshot. Body: ``{ "fileId": "uuid" }``. Triggers change detection automatically.
+     - Add a snapshot. Body: ``{ "fileId": "uuid", "subnetOverrides": [...]? }``. ``subnetOverrides`` is optional; omit or pass ``null`` to use global definitions. Triggers change detection automatically.
    * - ``PATCH``
      - ``/api/monitor/networks/{networkId}/snapshots/{snapshotId}``
-     - Update snapshot context or notes. Body: ``{ "context": "string?", "notes": "string?" }``.
+     - Update snapshot context, notes, or subnet overrides. Body: ``{ "context": "string?", "notes": "string?", "subnetOverrides": [{ "cidr": "string", "label": "string?", "description": "string?", "inherited": boolean }]? }``. ``subnetOverrides: null`` leaves overrides unchanged; ``[]`` clears all (reverts to global); a non-empty list replaces the existing overrides.
    * - ``DELETE``
      - ``/api/monitor/networks/{networkId}/snapshots/{snapshotId}``
      - Remove a snapshot and re-run change detection for affected pairs.
