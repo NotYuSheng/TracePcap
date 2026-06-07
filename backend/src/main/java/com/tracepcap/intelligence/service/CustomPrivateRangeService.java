@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,10 @@ public class CustomPrivateRangeService {
   private static final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
       new ConcurrentHashMap<>();
 
+  // Matches dotted-decimal IPv4 or hex-colon IPv6 — rejects hostnames before DNS lookup
+  private static final Pattern NUMERIC_IP =
+      Pattern.compile("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F]*:[0-9a-fA-F:.]*$");
+
   public List<CustomPrivateRangeDto> list() {
     return repository.findAllByOrderByCreatedAtDesc().stream()
         .map(e -> CustomPrivateRangeDto.builder().id(e.getId()).cidr(e.getCidr()).label(e.getLabel()).build())
@@ -32,13 +37,19 @@ public class CustomPrivateRangeService {
 
   public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
     String cidr = dto.getCidr().trim();
+    // Determine IP and optional prefix parts
+    String ipPart = cidr.contains("/") ? cidr.split("/")[0].trim() : cidr;
+    // Reject hostnames — only numeric IPs are accepted to prevent DNS resolution
+    if (!NUMERIC_IP.matcher(ipPart).matches()) {
+      throw new IllegalArgumentException("Invalid IP address: " + ipPart);
+    }
     // Normalise bare IP to /32 or /128
     if (!cidr.contains("/")) {
       try {
-        InetAddress addr = InetAddress.getByName(cidr);
-        cidr = cidr + (addr.getAddress().length == 4 ? "/32" : "/128");
+        InetAddress addr = InetAddress.getByName(ipPart);
+        cidr = addr.getHostAddress() + (addr.getAddress().length == 4 ? "/32" : "/128");
       } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid IP address: " + cidr);
+        throw new IllegalArgumentException("Invalid IP address: " + ipPart);
       }
     }
     // Validate CIDR
@@ -50,23 +61,29 @@ public class CustomPrivateRangeService {
       int prefix = Integer.parseInt(parts[1].trim());
       if (prefix < 0 || prefix > prefixMax)
         throw new IllegalArgumentException("Prefix length out of range for " + cidr);
+      cidr = addr.getHostAddress() + "/" + prefix;
     } catch (IllegalArgumentException e) {
       throw e;
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
     }
     String label = dto.getLabel() != null && !dto.getLabel().isBlank() ? dto.getLabel().trim() : null;
+    if (label != null && label.length() > 255) {
+      throw new IllegalArgumentException("Label cannot exceed 255 characters");
+    }
     CustomPrivateRangeEntity entity = CustomPrivateRangeEntity.builder()
         .cidr(cidr)
         .label(label)
         .createdAt(LocalDateTime.now())
         .build();
     entity = repository.save(entity);
+    cidrCache.clear();
     return CustomPrivateRangeDto.builder().id(entity.getId()).cidr(entity.getCidr()).label(entity.getLabel()).build();
   }
 
   public void delete(Long id) {
     repository.deleteById(id);
+    cidrCache.clear();
   }
 
   /** Loads all custom private ranges for use in batch classification. */
