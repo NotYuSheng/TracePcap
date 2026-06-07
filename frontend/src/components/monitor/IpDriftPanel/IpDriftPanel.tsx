@@ -151,8 +151,9 @@ function PrivateOverridesSection({
     try {
       await customPrivateRangeService.delete(id);
       onDeleted(id);
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: unknown } })?.response?.data;
+      setAddError(typeof msg === 'string' ? msg : 'Failed to delete range');
     }
   };
 

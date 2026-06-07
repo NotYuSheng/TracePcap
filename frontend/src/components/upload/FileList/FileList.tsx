@@ -207,7 +207,19 @@ export const FileList = () => {
                 type="button"
                 variant={hideMonitor ? 'outline-secondary' : 'secondary'}
                 size="sm"
-                onClick={() => setHideMonitor(v => !v)}
+                onClick={() => setHideMonitor(v => {
+                  const next = !v;
+                  if (next) {
+                    setSelectedForCompare(prev => {
+                      const monitorIds = new Set(files.filter(f => f.source === 'MONITOR').map(f => f.fileId));
+                      if ([...prev].every(id => !monitorIds.has(id))) return prev;
+                      const next = new Set(prev);
+                      monitorIds.forEach(id => next.delete(id));
+                      return next;
+                    });
+                  }
+                  return next;
+                })}
                 title={hideMonitor ? 'Show monitor network files' : 'Hide monitor network files'}
               >
                 <i className={`bi bi-${hideMonitor ? 'eye-slash' : 'eye'} me-1`}></i>
