@@ -651,6 +651,12 @@ export const NetworkDetailPage = () => {
                       adds a <strong>Consistency</strong> score — subnets seen in more snapshots
                       float to the top. Single-snapshot candidates are flagged in amber.
                     </p>
+                    <p className="mb-2">
+                      <strong>Per-snapshot overrides.</strong> Individual snapshots can carry their
+                      own subnet list that shadows the global definitions for that snapshot's change
+                      detection. Set overrides from the <em>Subnets</em> tab inside a snapshot's
+                      detail view.
+                    </p>
                     <p className="fw-semibold mb-1">Limitations</p>
                     <ul className="mb-0 ps-3">
                       <li className="mb-1"><strong>Prefix range /20–/29 only.</strong> Very large blocks or micro-segments (/30–/32) are outside the search range.</li>
