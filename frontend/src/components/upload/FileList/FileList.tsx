@@ -259,92 +259,115 @@ export const FileList = () => {
             </div>
           ) : files.length === 0 ? (
             <div className="text-center text-muted py-4">
-              <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
+              <p className="mb-0">No recent meetings. Upload or record your first meeting to get started!</p>
             </div>
-          ) : (
-            <div
-              className="list-group list-group-flush"
-              style={{ maxHeight: '13.5rem', overflowY: 'auto' }}
-            >
-              {files.filter(f => !hideMonitor || f.source !== 'MONITOR').map(file => (
-                <div
-                  key={file.fileId}
-                  className="list-group-item d-flex justify-content-between align-items-center"
-                  style={
-                    file.status.toLowerCase() === 'completed' ? { cursor: 'pointer' } : undefined
-                  }
-                  onClick={() => handleRowClick(file.fileId, file.status)}
-                >
-                  <div className="flex-grow-1">
-                    <div className="d-flex align-items-center gap-2">
-                      <Form.Check.Input
-                        type="checkbox"
-                        className="mt-0 flex-shrink-0"
-                        checked={selectedForCompare.has(file.fileId)}
-                        disabled={file.status.toLowerCase() !== 'completed'}
-                        title={
-                          file.status.toLowerCase() !== 'completed'
-                            ? 'File must be fully processed to compare'
-                            : 'Select for comparison'
+          ) : (() => {
+            const displayedFiles = files.filter(f => !hideMonitor || f.source !== 'MONITOR');
+            if (displayedFiles.length === 0) {
+              return (
+                <div className="text-center text-muted py-4">
+                  <p className="mb-0">
+                    No recent meetings. Upload or record your first meeting to get started!{' '}
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 align-baseline text-muted"
+                      style={{ fontSize: 'inherit' }}
+                      onClick={() => setHideMonitor(false)}
+                    >
+                      Show monitor files
+                    </button>
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div
+                className="list-group list-group-flush"
+                style={{ maxHeight: '13.5rem', overflowY: 'auto' }}
+              >
+                {displayedFiles.map(file => {
+                  const isSelected = selectedForCompare.has(file.fileId);
+                  const isCompleted = file.status.toLowerCase() === 'completed';
+                  return (
+                    <div
+                      key={file.fileId}
+                      className="list-group-item d-flex justify-content-between align-items-center"
+                      style={{
+                        cursor: isCompleted ? 'pointer' : undefined,
+                        backgroundColor: isSelected ? 'rgba(13,110,253,0.08)' : undefined,
+                        borderLeft: isSelected ? '3px solid #0d6efd' : '3px solid transparent',
+                      }}
+                      role={isCompleted ? 'checkbox' : undefined}
+                      aria-checked={isCompleted ? isSelected : undefined}
+                      tabIndex={isCompleted ? 0 : -1}
+                      onClick={() => handleRowClick(file.fileId, file.status)}
+                      onKeyDown={e => {
+                        if (!isCompleted) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRowClick(file.fileId, file.status);
                         }
-                        onChange={() => toggleCompareSelect(file.fileId)}
-                        onClick={e => e.stopPropagation()}
-                      />
-                      <i
-                        className="bi bi-file-earmark-binary text-primary"
-                        style={{ fontSize: '1.2rem' }}
-                      ></i>
-                      <div>
-                        <div className="fw-medium d-flex align-items-center gap-2">
-                          {file.fileName}
-                          {file.source === 'MONITOR' && (
-                            <Badge bg="info" text="dark" style={{ fontSize: '0.65rem' }}>
-                              Monitor
-                            </Badge>
-                          )}
+                      }}
+                    >
+                      <div className="flex-grow-1">
+                        <div className="d-flex align-items-center gap-2">
+                          <i
+                            className="bi bi-file-earmark-binary text-primary"
+                            style={{ fontSize: '1.2rem' }}
+                          ></i>
+                          <div>
+                            <div className="fw-medium d-flex align-items-center gap-2">
+                              {file.fileName}
+                              {file.source === 'MONITOR' && (
+                                <Badge bg="info" text="dark" style={{ fontSize: '0.65rem' }}>
+                                  Monitor
+                                </Badge>
+                              )}
+                            </div>
+                            <small className="text-muted">
+                              {formatFileSize(file.fileSize)} •{' '}
+                              {formatDate(parseDateTime(file.uploadedAt))}
+                              {!isCompleted && (
+                                <Badge
+                                  bg="secondary"
+                                  className="ms-2"
+                                  style={{ fontSize: '0.7rem' }}
+                                >
+                                  {file.status.toLowerCase()}
+                                </Badge>
+                              )}
+                            </small>
+                          </div>
                         </div>
-                        <small className="text-muted">
-                          {formatFileSize(file.fileSize)} •{' '}
-                          {formatDate(parseDateTime(file.uploadedAt))}
-                          {file.status.toLowerCase() !== 'completed' && (
-                            <Badge
-                              bg="secondary"
-                              className="ms-2"
-                              style={{ fontSize: '0.7rem' }}
-                            >
-                              {file.status.toLowerCase()}
-                            </Badge>
-                          )}
-                        </small>
+                      </div>
+                      <div
+                        className="d-flex gap-2 align-items-center"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => navigate(`/analysis/${file.fileId}`)}
+                        >
+                          <i className="bi bi-graph-up me-1"></i>
+                          Analyze
+                        </Button>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-danger"
+                          onClick={() => setPendingDeleteFile(file)}
+                          title="Delete this file"
+                        >
+                          <i className="bi bi-trash"></i>
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <div
-                    className="d-flex gap-2 align-items-center"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => navigate(`/analysis/${file.fileId}`)}
-                    >
-                      <i className="bi bi-graph-up me-1"></i>
-                      Analyze
-                    </Button>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0 text-danger"
-                      onClick={() => setPendingDeleteFile(file)}
-                      title="Delete this file"
-                    >
-                      <i className="bi bi-trash"></i>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </Card.Body>
         <Card.Footer className="text-muted small">
           <AlertCircle size={14} className="me-1" />

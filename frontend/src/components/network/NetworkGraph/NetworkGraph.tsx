@@ -659,20 +659,23 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigmaRef.current?.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
   }, []);
 
-  if (nodes.length === 0) {
-    return (
-      <div className="network-graph-empty">
-        <i className="bi bi-diagram-3" style={{ fontSize: '4rem', opacity: 0.3 }} />
-        <h5 className="mt-3 text-muted">No Network Data Available</h5>
-        <p className="text-muted">Upload a pcap file to visualize network topology</p>
-      </div>
-    );
-  }
-
   return (
     <div className="network-graph-wrapper" style={{ background: darkMode ? DARK_BG : LIGHT_BG }}>
-      {/* Sigma canvas mount point */}
+      {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
       <div className="network-graph-canvas" ref={containerRef} />
+
+      {/* Empty-state overlay — sits on top when there is nothing to show */}
+      {nodes.length === 0 && (
+        <div className="network-graph-empty" style={{ position: 'absolute', inset: 0 }}>
+          <i className="bi bi-diagram-3" style={{ fontSize: '4rem', opacity: 0.3 }} />
+          <h5 className="mt-3 text-muted">No Network Data Available</h5>
+          <p className="text-muted">
+            {activeFilterCount > 0
+              ? 'No nodes match the current filters.'
+              : 'Upload a pcap file to visualize network topology'}
+          </p>
+        </div>
+      )}
 
       {/* ── Bottom-right controls ────────────────────────────────────────── */}
       <div className="ng-overlay-controls">
