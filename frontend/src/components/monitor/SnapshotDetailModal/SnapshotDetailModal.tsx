@@ -270,7 +270,7 @@ export const SnapshotDetailModal = ({
     })));
     setSubnetCustomizeMode(saved.length > 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedOverrideKey]);
+  }, [snapshot.id, savedOverrideKey]);
 
   const handleLoadGlobalSubnets = useCallback(async () => {
     setLoadingGlobals(true);

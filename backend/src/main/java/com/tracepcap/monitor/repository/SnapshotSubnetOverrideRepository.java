@@ -13,7 +13,8 @@ import org.springframework.stereotype.Repository;
 public interface SnapshotSubnetOverrideRepository
     extends JpaRepository<SnapshotSubnetOverrideEntity, Long> {
 
-  List<SnapshotSubnetOverrideEntity> findBySnapshotId(UUID snapshotId);
+  @Query("SELECT o FROM SnapshotSubnetOverrideEntity o WHERE o.snapshot.id = :snapshotId")
+  List<SnapshotSubnetOverrideEntity> findBySnapshotId(@Param("snapshotId") UUID snapshotId);
 
   @Modifying
   @Query("DELETE FROM SnapshotSubnetOverrideEntity o WHERE o.snapshot.id = :snapshotId")
