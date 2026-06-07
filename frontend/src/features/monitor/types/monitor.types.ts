@@ -10,6 +10,21 @@ export interface Network {
   updatedAt: string;
 }
 
+export interface SubnetOverride {
+  id: number | null;
+  cidr: string;
+  label: string | null;
+  description: string | null;
+  inherited: boolean;
+}
+
+export interface SubnetOverrideInput {
+  cidr: string;
+  label: string | null;
+  description: string | null;
+  inherited: boolean;
+}
+
 export interface NetworkSnapshot {
   id: string;
   networkId: string;
@@ -26,6 +41,7 @@ export interface NetworkSnapshot {
   notes: string | null;
   hasInsights: boolean;
   addedAt: string;
+  subnetOverrides: SubnetOverride[];
 }
 
 export type ChangeType =

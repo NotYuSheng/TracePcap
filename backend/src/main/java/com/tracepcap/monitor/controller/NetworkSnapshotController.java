@@ -27,7 +27,7 @@ public class NetworkSnapshotController {
   @ResponseStatus(HttpStatus.CREATED)
   public NetworkSnapshotDto addSnapshot(
       @PathVariable UUID networkId, @Valid @RequestBody AddSnapshotRequest request) {
-    return snapshotService.addSnapshot(networkId, request.getFileId());
+    return snapshotService.addSnapshot(networkId, request.getFileId(), request.getSubnetOverrides());
   }
 
   @PatchMapping("/{snapshotId}")

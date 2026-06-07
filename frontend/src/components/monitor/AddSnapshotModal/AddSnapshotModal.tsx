@@ -1,16 +1,19 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Modal } from '@govtechsg/sgds-react';
+import { Alert, Badge, Button, Modal } from '@govtechsg/sgds-react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { uploadService } from '@/features/upload/services/uploadService';
+import { subnetService } from '@/features/subnets/services/subnetService';
+import type { SubnetOverrideInput } from '@/features/monitor/types/monitor.types';
+import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 
 interface AddSnapshotModalProps {
   show: boolean;
   onHide: () => void;
   existingFileIds: string[];
-  onAdd: (fileId: string) => Promise<void>;
+  onAdd: (fileId: string, subnetOverrides?: SubnetOverrideInput[]) => Promise<void>;
 }
 
 async function pollUntilComplete(fileId: string, signal: AbortSignal): Promise<void> {
@@ -21,6 +24,10 @@ async function pollUntilComplete(fileId: string, signal: AbortSignal): Promise<v
     if (status === 'ERROR' || status === 'FAILED') throw new Error('Analysis failed');
     await new Promise(r => setTimeout(r, 2000));
   }
+}
+
+function globalToInput(s: SubnetDefinition): SubnetOverrideInput {
+  return { cidr: s.cidr, label: s.label ?? null, description: s.description ?? null, inherited: true };
 }
 
 export const AddSnapshotModal = ({
@@ -35,6 +42,13 @@ export const AddSnapshotModal = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Subnet override state
+  const [showSubnets, setShowSubnets] = useState(false);
+  const [subnetOverrides, setSubnetOverrides] = useState<SubnetOverrideInput[]>([]);
+  const [subnetOverridesActive, setSubnetOverridesActive] = useState(false);
+  const [loadingSubnets, setLoadingSubnets] = useState(false);
+  const [newCidr, setNewCidr] = useState('');
+
   useEffect(() => {
     if (!show) return;
     setUploadFiles([]);
@@ -42,7 +56,43 @@ export const AddSnapshotModal = ({
     setUploadPhase('idle');
     setUploadCurrent(0);
     setUploadError(null);
+    setShowSubnets(false);
+    setSubnetOverrides([]);
+    setSubnetOverridesActive(false);
+    setNewCidr('');
   }, [show]);
+
+  const handleToggleSubnets = async () => {
+    const next = !showSubnets;
+    setShowSubnets(next);
+    if (next && !subnetOverridesActive) {
+      setLoadingSubnets(true);
+      try {
+        const globals = await subnetService.list();
+        setSubnetOverrides(globals.map(globalToInput));
+        setSubnetOverridesActive(true);
+      } finally {
+        setLoadingSubnets(false);
+      }
+    }
+  };
+
+  const updateOverride = (index: number, field: 'cidr' | 'label', value: string | null) => {
+    setSubnetOverrides(prev => prev.map((o, i) =>
+      i === index ? { ...o, [field]: value, inherited: field === 'cidr' ? false : o.inherited } : o
+    ));
+  };
+
+  const removeOverride = (index: number) => {
+    setSubnetOverrides(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addOverride = () => {
+    const cidr = newCidr.trim();
+    if (!cidr) return;
+    setSubnetOverrides(prev => [...prev, { cidr, label: null, description: null, inherited: false }]);
+    setNewCidr('');
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'application/vnd.tcpdump.pcap': ['.pcap', '.pcapng', '.cap'] },
@@ -56,6 +106,8 @@ export const AddSnapshotModal = ({
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setUploadError(null);
+
+    const overridesToSend = subnetOverridesActive ? subnetOverrides : undefined;
 
     try {
       for (let i = 0; i < uploadFiles.length; i++) {
@@ -84,7 +136,7 @@ export const AddSnapshotModal = ({
         await pollUntilComplete(fileId, ctrl.signal);
 
         setUploadPhase('adding');
-        await onAdd(fileId);
+        await onAdd(fileId, overridesToSend);
       }
 
       setUploadPhase('done');
@@ -149,6 +201,116 @@ export const AddSnapshotModal = ({
                 </>
               )}
             </div>
+
+            {/* Subnet Overrides collapsible */}
+            <div className="border rounded mb-3">
+              <button
+                type="button"
+                className="btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+                onClick={handleToggleSubnets}
+              >
+                <span className="d-flex align-items-center gap-2">
+                  <i className="bi bi-diagram-2 text-secondary" />
+                  <span className="fw-semibold small">Subnet Overrides</span>
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>optional</span>
+                  {subnetOverridesActive && (
+                    <Badge bg={subnetOverrides.length > 0 ? 'primary' : 'secondary'} style={{ fontSize: '0.65rem' }}>
+                      {subnetOverrides.length > 0 ? `${subnetOverrides.length} ranges` : 'empty — no subnets'}
+                    </Badge>
+                  )}
+                </span>
+                <i className={`bi bi-chevron-${showSubnets ? 'up' : 'down'} text-muted`} style={{ fontSize: '0.75rem' }} />
+              </button>
+
+              {showSubnets && (
+                <div className="px-3 pb-3 border-top">
+                  {loadingSubnets ? (
+                    <div className="text-center py-3">
+                      <Spinner animation="border" size="sm" className="text-primary" />
+                      <span className="ms-2 text-muted small">Loading global subnets…</span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-muted mb-2 mt-2" style={{ fontSize: '0.8rem' }}>
+                        Pre-populated from global subnet definitions.
+                        Modify to override internal/external classification for this snapshot only.
+                        <strong className="d-block mt-1">Inherited</strong> ranges came from the global config; you can remove or edit them.
+                      </p>
+
+                      {subnetOverrides.length > 0 ? (
+                        <div className="table-responsive mb-2">
+                          <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.8rem' }}>
+                            <thead className="table-light">
+                              <tr>
+                                <th style={{ width: '38%' }}>CIDR</th>
+                                <th>Label</th>
+                                <th style={{ width: '5rem' }}></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {subnetOverrides.map((o, i) => (
+                                <tr key={i}>
+                                  <td>
+                                    <input
+                                      className="form-control form-control-sm font-monospace"
+                                      value={o.cidr}
+                                      onChange={e => updateOverride(i, 'cidr', e.target.value)}
+                                      style={{ fontSize: '0.78rem' }}
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      className="form-control form-control-sm"
+                                      value={o.label ?? ''}
+                                      onChange={e => updateOverride(i, 'label', e.target.value || null as any)}
+                                      placeholder="Optional"
+                                      style={{ fontSize: '0.78rem' }}
+                                    />
+                                  </td>
+                                  <td className="text-center align-middle">
+                                    {o.inherited && (
+                                      <span className="badge bg-secondary me-1" style={{ fontSize: '0.6rem' }}>Inherited</span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-danger p-0"
+                                      style={{ width: 22, height: 22, lineHeight: 1 }}
+                                      onClick={() => removeOverride(i)}
+                                      title="Remove"
+                                    >
+                                      <i className="bi bi-x" style={{ fontSize: '0.75rem' }} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-muted text-center small py-2 mb-2">
+                          No subnet ranges — all IPs will be treated as external.
+                        </p>
+                      )}
+
+                      <div className="d-flex gap-2 align-items-center">
+                        <input
+                          className="form-control form-control-sm font-monospace"
+                          placeholder="e.g. 192.168.1.0/24"
+                          value={newCidr}
+                          onChange={e => setNewCidr(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
+                          style={{ maxWidth: 200, fontSize: '0.8rem' }}
+                        />
+                        <Button size="sm" variant="outline-primary" onClick={addOverride} disabled={!newCidr.trim()}>
+                          <i className="bi bi-plus me-1" />Add CIDR
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             {uploadError && <Alert variant="danger" className="py-2">{uploadError}</Alert>}
             <Button
               variant="primary"
