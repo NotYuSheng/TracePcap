@@ -252,19 +252,25 @@ export const SnapshotDetailModal = ({
 
   // Subnets tab state
   const [subnetDraft, setSubnetDraft] = useState<SubnetOverrideInput[]>(
-    snapshot.subnetOverrides.map(o => ({ cidr: o.cidr, label: o.label, description: o.description, inherited: o.inherited }))
+    (snapshot.subnetOverrides ?? []).map(o => ({ cidr: o.cidr, label: o.label, description: o.description, inherited: o.inherited }))
   );
+  const [subnetCustomizeMode, setSubnetCustomizeMode] = useState((snapshot.subnetOverrides ?? []).length > 0);
   const [subnetNewCidr, setSubnetNewCidr] = useState('');
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [savingSubnets, setSavingSubnets] = useState(false);
-  const subnetOverridesActive = subnetDraft.length > 0 || snapshot.subnetOverrides.length > 0;
+  const subnetOverridesActive = subnetCustomizeMode;
 
-  // Keep draft in sync when parent updates the snapshot (e.g. after save)
+  // Stable key: changes only when the server-persisted overrides actually change (IDs rotate on each save)
+  const savedOverrideKey = (snapshot.subnetOverrides ?? []).map(o => o.id).join(',');
+  // Keep draft in sync when parent updates the snapshot (e.g. after save), without resetting on every poll
   useEffect(() => {
-    setSubnetDraft(snapshot.subnetOverrides.map(o => ({
+    const saved = snapshot.subnetOverrides ?? [];
+    setSubnetDraft(saved.map(o => ({
       cidr: o.cidr, label: o.label, description: o.description, inherited: o.inherited,
     })));
-  }, [snapshot.subnetOverrides]);
+    setSubnetCustomizeMode(saved.length > 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedOverrideKey]);
 
   const handleLoadGlobalSubnets = useCallback(async () => {
     setLoadingGlobals(true);
@@ -273,14 +279,17 @@ export const SnapshotDetailModal = ({
       setSubnetDraft(globals.map((s: SubnetDefinition) => ({
         cidr: s.cidr, label: s.label ?? null, description: s.description ?? null, inherited: true,
       })));
+    } catch {
+      // fetch failed — user can still add CIDRs manually
     } finally {
+      setSubnetCustomizeMode(true);
       setLoadingGlobals(false);
     }
   }, []);
 
   const updateSubnetRow = (i: number, field: 'cidr' | 'label', value: string | null) => {
     setSubnetDraft(prev => prev.map((o, idx) =>
-      idx === i ? { ...o, [field]: value, inherited: field === 'cidr' ? false : o.inherited } : o
+      idx === i ? { ...o, [field]: value, inherited: false } : o
     ));
   };
 
@@ -313,6 +322,7 @@ export const SnapshotDetailModal = ({
       });
       onSnapshotUpdated(updated);
       setSubnetDraft([]);
+      setSubnetCustomizeMode(false);
     } finally {
       setSavingSubnets(false);
     }
@@ -400,9 +410,9 @@ export const SnapshotDetailModal = ({
                 {tab === 'subnets'  && (
                   <>
                     Subnets
-                    {snapshot.subnetOverrides.length > 0 && (
+                    {(snapshot.subnetOverrides ?? []).length > 0 && (
                       <span className="badge rounded-pill ms-1" style={{ fontSize: '0.6rem', background: '#0d6efd', color: '#fff' }}>
-                        {snapshot.subnetOverrides.length}
+                        {(snapshot.subnetOverrides ?? []).length}
                       </span>
                     )}
                   </>
@@ -643,7 +653,7 @@ export const SnapshotDetailModal = ({
                   </div>
                 ) : (
                   <p className="text-muted text-center small py-2 mb-3 border rounded">
-                    No subnet ranges — all IPs will be treated as external.
+                    No ranges configured. Saving an empty list reverts this snapshot to global definitions.
                   </p>
                 )}
 

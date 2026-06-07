@@ -34,7 +34,7 @@ public class NetworkSnapshotController {
   public NetworkSnapshotDto patchSnapshot(
       @PathVariable UUID networkId,
       @PathVariable UUID snapshotId,
-      @RequestBody PatchSnapshotRequest request) {
+      @Valid @RequestBody PatchSnapshotRequest request) {
     return snapshotService.patchSnapshot(networkId, snapshotId, request);
   }
 

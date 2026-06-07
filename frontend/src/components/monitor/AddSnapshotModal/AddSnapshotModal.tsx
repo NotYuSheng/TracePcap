@@ -70,8 +70,10 @@ export const AddSnapshotModal = ({
       try {
         const globals = await subnetService.list();
         setSubnetOverrides(globals.map(globalToInput));
-        setSubnetOverridesActive(true);
+      } catch {
+        // fetch failed — user can still add CIDRs manually
       } finally {
+        setSubnetOverridesActive(true);
         setLoadingSubnets(false);
       }
     }
@@ -79,7 +81,7 @@ export const AddSnapshotModal = ({
 
   const updateOverride = (index: number, field: 'cidr' | 'label', value: string | null) => {
     setSubnetOverrides(prev => prev.map((o, i) =>
-      i === index ? { ...o, [field]: value, inherited: field === 'cidr' ? false : o.inherited } : o
+      i === index ? { ...o, [field]: value, inherited: false } : o
     ));
   };
 
@@ -262,7 +264,7 @@ export const AddSnapshotModal = ({
                                     <input
                                       className="form-control form-control-sm"
                                       value={o.label ?? ''}
-                                      onChange={e => updateOverride(i, 'label', e.target.value || null as any)}
+                                      onChange={e => updateOverride(i, 'label', e.target.value || null)}
                                       placeholder="Optional"
                                       style={{ fontSize: '0.78rem' }}
                                     />
@@ -288,7 +290,7 @@ export const AddSnapshotModal = ({
                         </div>
                       ) : (
                         <p className="text-muted text-center small py-2 mb-2">
-                          No subnet ranges — all IPs will be treated as external.
+                          No ranges configured. If left empty, global subnet definitions will be used.
                         </p>
                       )}
 

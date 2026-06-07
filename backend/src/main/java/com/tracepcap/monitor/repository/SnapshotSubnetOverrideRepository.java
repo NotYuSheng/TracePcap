@@ -4,6 +4,7 @@ import com.tracepcap.monitor.entity.SnapshotSubnetOverrideEntity;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,9 @@ public interface SnapshotSubnetOverrideRepository
 
   List<SnapshotSubnetOverrideEntity> findBySnapshotId(UUID snapshotId);
 
-  void deleteBySnapshotId(UUID snapshotId);
+  @Modifying
+  @Query("DELETE FROM SnapshotSubnetOverrideEntity o WHERE o.snapshot.id = :snapshotId")
+  void deleteBySnapshotId(@Param("snapshotId") UUID snapshotId);
 
   @Query("SELECT o FROM SnapshotSubnetOverrideEntity o WHERE o.snapshot.id IN :ids")
   List<SnapshotSubnetOverrideEntity> findBySnapshotIdIn(@Param("ids") List<UUID> ids);
