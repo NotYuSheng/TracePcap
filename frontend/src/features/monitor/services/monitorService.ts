@@ -6,6 +6,7 @@ import type {
   ChangeEvent,
   BaselineDefinition,
   BaselineEntryType,
+  SubnetOverrideInput,
 } from '../types/monitor.types';
 
 export const monitorService = {
@@ -32,9 +33,16 @@ export const monitorService = {
       .get<NetworkSnapshot[]>(MONITOR_ENDPOINTS.SNAPSHOTS(networkId))
       .then(r => r.data),
 
-  addSnapshot: (networkId: string, fileId: string): Promise<NetworkSnapshot> =>
+  addSnapshot: (
+    networkId: string,
+    fileId: string,
+    subnetOverrides?: SubnetOverrideInput[],
+  ): Promise<NetworkSnapshot> =>
     apiClient
-      .post<NetworkSnapshot>(MONITOR_ENDPOINTS.SNAPSHOTS(networkId), { fileId })
+      .post<NetworkSnapshot>(MONITOR_ENDPOINTS.SNAPSHOTS(networkId), {
+        fileId,
+        ...(subnetOverrides && subnetOverrides.length > 0 ? { subnetOverrides } : {}),
+      })
       .then(r => r.data),
 
   removeSnapshot: (networkId: string, snapshotId: string): Promise<void> =>

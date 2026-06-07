@@ -12,6 +12,7 @@ import type {
   ChangeEvent,
   BaselineDefinition,
   BaselineEntryType,
+  SubnetOverrideInput,
 } from '@/features/monitor/types/monitor.types';
 import type {
   NetworkExternalEvent,
@@ -185,9 +186,9 @@ export const NetworkDetailPage = () => {
     return () => clearInterval(interval);
   }, [loadAll, pollInterval]);
 
-  const handleAddSnapshot = async (fileId: string) => {
+  const handleAddSnapshot = async (fileId: string, subnetOverrides?: SubnetOverrideInput[]) => {
     if (!networkId) return;
-    await monitorService.addSnapshot(networkId, fileId);
+    await monitorService.addSnapshot(networkId, fileId, subnetOverrides);
     await loadAll(false);
   };
 
@@ -649,6 +650,12 @@ export const NetworkDetailPage = () => {
                       <strong>Scan All Snapshots</strong> runs detection across every snapshot and
                       adds a <strong>Consistency</strong> score — subnets seen in more snapshots
                       float to the top. Single-snapshot candidates are flagged in amber.
+                    </p>
+                    <p className="mb-2">
+                      <strong>Per-snapshot overrides.</strong> Individual snapshots can carry their
+                      own subnet list that shadows the global definitions for that snapshot's change
+                      detection. Set overrides from the <em>Subnets</em> tab inside a snapshot's
+                      detail view.
                     </p>
                     <p className="fw-semibold mb-1">Limitations</p>
                     <ul className="mb-0 ps-3">

@@ -1,6 +1,7 @@
 package com.tracepcap.monitor.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
@@ -23,4 +24,5 @@ public class NetworkSnapshotDto {
   private String notes;
   private boolean hasInsights;
   private LocalDateTime addedAt;
+  private List<SnapshotSubnetOverrideDto> subnetOverrides;
 }

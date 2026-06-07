@@ -8,10 +8,15 @@ import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.insights.repository.SnapshotInsightRepository;
 import com.tracepcap.monitor.dto.NetworkSnapshotDto;
 import com.tracepcap.monitor.dto.PatchSnapshotRequest;
+import com.tracepcap.monitor.dto.SnapshotSubnetOverrideDto;
+import com.tracepcap.monitor.dto.SubnetOverrideInput;
 import com.tracepcap.monitor.entity.NetworkEntity;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
+import com.tracepcap.monitor.entity.SnapshotSubnetOverrideEntity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
+import com.tracepcap.monitor.repository.SnapshotSubnetOverrideRepository;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +38,7 @@ public class SnapshotService {
   private final ChangeDetectionService changeDetectionService;
   private final NetworkChangeEventRepository changeEventRepository;
   private final SnapshotInsightRepository snapshotInsightRepository;
+  private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -41,18 +47,27 @@ public class SnapshotService {
         snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(networkId);
     if (snapshots.isEmpty()) return List.of();
 
-    // Bulk-fetch counts to avoid N+1 queries
     List<UUID> ids = snapshots.stream().map(NetworkSnapshotEntity::getId).collect(Collectors.toList());
     Map<UUID, Long> changeCounts = changeEventRepository.countByToSnapshotIds(ids);
     Map<UUID, Long> criticalCounts = changeEventRepository.countCriticalByToSnapshotIds(ids);
 
+    // Batch-fetch all subnet overrides to avoid N+1
+    Map<UUID, List<SnapshotSubnetOverrideDto>> overridesMap =
+        subnetOverrideRepository.findBySnapshotIdIn(ids).stream()
+            .collect(Collectors.groupingBy(
+                o -> o.getSnapshot().getId(),
+                Collectors.mapping(this::toOverrideDto, Collectors.toList())));
+
     return snapshots.stream()
-        .map(s -> toDto(s, changeCounts.getOrDefault(s.getId(), 0L),
-                           criticalCounts.getOrDefault(s.getId(), 0L)))
+        .map(s -> toDto(
+            s,
+            changeCounts.getOrDefault(s.getId(), 0L),
+            criticalCounts.getOrDefault(s.getId(), 0L),
+            overridesMap.getOrDefault(s.getId(), Collections.emptyList())))
         .collect(Collectors.toList());
   }
 
-  public NetworkSnapshotDto addSnapshot(UUID networkId, UUID fileId) {
+  public NetworkSnapshotDto addSnapshot(UUID networkId, UUID fileId, List<SubnetOverrideInput> subnetOverrides) {
     NetworkEntity network = networkService.findOrThrow(networkId);
 
     FileEntity file =
@@ -79,6 +94,21 @@ public class SnapshotService {
             .build();
     snapshot = snapshotRepository.save(snapshot);
 
+    // Save subnet overrides if provided
+    if (subnetOverrides != null && !subnetOverrides.isEmpty()) {
+      final NetworkSnapshotEntity savedSnapshot = snapshot;
+      List<SnapshotSubnetOverrideEntity> entities = subnetOverrides.stream()
+          .map(o -> SnapshotSubnetOverrideEntity.builder()
+              .snapshot(savedSnapshot)
+              .cidr(o.getCidr())
+              .label(o.getLabel())
+              .description(o.getDescription())
+              .inherited(o.isInherited())
+              .build())
+          .collect(Collectors.toList());
+      subnetOverrideRepository.saveAll(entities);
+    }
+
     // Reorder all snapshots by capture start time
     reorderSnapshots(networkId);
 
@@ -92,7 +122,6 @@ public class SnapshotService {
       int newOrder = snapshot.getSnapshotOrder();
       NetworkSnapshotEntity prev = newOrder > 0 ? ordered.get(newOrder - 1) : null;
 
-      // Detect: prev → new
       if (prev != null) {
         try {
           changeDetectionService.detectChanges(prev, snapshot);
@@ -103,8 +132,6 @@ public class SnapshotService {
         }
       }
 
-      // If the new snapshot was inserted mid-timeline, the successor's events now reflect
-      // the wrong predecessor. Delete its stale events and re-detect: new → successor.
       if (newOrder + 1 < ordered.size()) {
         NetworkSnapshotEntity successor = ordered.get(newOrder + 1);
         changeEventRepository.deleteByToSnapshotId(successor.getId());
@@ -120,7 +147,8 @@ public class SnapshotService {
 
     long changeCount = changeEventRepository.countByToSnapshotId(snapshot.getId());
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshot.getId());
-    return toDto(snapshot, changeCount, criticalCount);
+    List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshot.getId());
+    return toDto(snapshot, changeCount, criticalCount, overrides);
   }
 
   public NetworkSnapshotDto patchSnapshot(UUID networkId, UUID snapshotId, PatchSnapshotRequest req) {
@@ -130,9 +158,29 @@ public class SnapshotService {
     if (req.getContext() != null) snapshot.setContext(req.getContext());
     if (req.getNotes() != null) snapshot.setNotes(req.getNotes());
     snapshot = snapshotRepository.save(snapshot);
+
+    // null = untouched; empty list = clear all; non-empty = replace
+    if (req.getSubnetOverrides() != null) {
+      subnetOverrideRepository.deleteBySnapshotId(snapshotId);
+      if (!req.getSubnetOverrides().isEmpty()) {
+        final NetworkSnapshotEntity savedSnapshot = snapshot;
+        List<SnapshotSubnetOverrideEntity> entities = req.getSubnetOverrides().stream()
+            .map(o -> SnapshotSubnetOverrideEntity.builder()
+                .snapshot(savedSnapshot)
+                .cidr(o.getCidr())
+                .label(o.getLabel())
+                .description(o.getDescription())
+                .inherited(o.isInherited())
+                .build())
+            .collect(Collectors.toList());
+        subnetOverrideRepository.saveAll(entities);
+      }
+    }
+
     long changeCount = changeEventRepository.countByToSnapshotId(snapshotId);
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshotId);
-    return toDto(snapshot, changeCount, criticalCount);
+    List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshotId);
+    return toDto(snapshot, changeCount, criticalCount, overrides);
   }
 
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
@@ -149,10 +197,6 @@ public class SnapshotService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Recomputes snapshot_order for all snapshots in the network, sorted by file.startTime ASC
-   * (ties broken by addedAt ASC).
-   */
   private void reorderSnapshots(UUID networkId) {
     List<NetworkSnapshotEntity> ordered =
         snapshotRepository.findOrderedByStartTime(networkId);
@@ -165,10 +209,6 @@ public class SnapshotService {
     }
   }
 
-  /**
-   * Deletes all change events for the network then re-runs detection for every consecutive pair
-   * from the first snapshot onward.
-   */
   private void rerunChangeDetectionChain(UUID networkId) {
     changeEventRepository.deleteByNetworkId(networkId);
 
@@ -187,7 +227,24 @@ public class SnapshotService {
     }
   }
 
-  NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount) {
+  private List<SnapshotSubnetOverrideDto> fetchOverrideDtos(UUID snapshotId) {
+    return subnetOverrideRepository.findBySnapshotId(snapshotId).stream()
+        .map(this::toOverrideDto)
+        .collect(Collectors.toList());
+  }
+
+  private SnapshotSubnetOverrideDto toOverrideDto(SnapshotSubnetOverrideEntity o) {
+    return SnapshotSubnetOverrideDto.builder()
+        .id(o.getId())
+        .cidr(o.getCidr())
+        .label(o.getLabel())
+        .description(o.getDescription())
+        .inherited(o.isInherited())
+        .build();
+  }
+
+  NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount,
+      List<SnapshotSubnetOverrideDto> overrides) {
     return NetworkSnapshotDto.builder()
         .id(s.getId())
         .networkId(s.getNetwork().getId())
@@ -204,6 +261,7 @@ public class SnapshotService {
         .notes(s.getNotes())
         .hasInsights(snapshotInsightRepository.existsBySnapshotId(s.getId()))
         .addedAt(s.getAddedAt())
+        .subnetOverrides(overrides)
         .build();
   }
 }

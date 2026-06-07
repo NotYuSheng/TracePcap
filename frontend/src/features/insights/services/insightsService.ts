@@ -7,7 +7,7 @@ import type {
   NetworkInsight,
   InsightOptions,
 } from '../types/insights.types';
-import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
+import type { NetworkSnapshot, SubnetOverrideInput } from '@/features/monitor/types/monitor.types';
 
 export const insightsService = {
   // ── Node Roles ───────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export const insightsService = {
   patchSnapshot: (
     networkId: string,
     snapshotId: string,
-    patch: { context?: string; notes?: string },
+    patch: { context?: string; notes?: string; subnetOverrides?: SubnetOverrideInput[] | null },
   ): Promise<NetworkSnapshot> =>
     apiClient
       .patch<NetworkSnapshot>(MONITOR_ENDPOINTS.SNAPSHOT_PATCH(networkId, snapshotId), patch)
