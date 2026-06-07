@@ -27,6 +27,7 @@ export const FileList = () => {
   const [pendingDeleteFile, setPendingDeleteFile] = useState<FileMetadata | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
+  const [hideMonitor, setHideMonitor] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -201,7 +202,17 @@ export const FileList = () => {
             </div>
           </div>
           {files.length > 0 && (
-            <div className="d-flex gap-2">
+            <div className="d-flex gap-2 align-items-center">
+              <Button
+                type="button"
+                variant={hideMonitor ? 'outline-secondary' : 'secondary'}
+                size="sm"
+                onClick={() => setHideMonitor(v => !v)}
+                title={hideMonitor ? 'Show monitor network files' : 'Hide monitor network files'}
+              >
+                <i className={`bi bi-${hideMonitor ? 'eye-slash' : 'eye'} me-1`}></i>
+                Monitor files
+              </Button>
               {selectedForCompare.size >= 2 && (
                 <Button
                   type="button"
@@ -243,7 +254,7 @@ export const FileList = () => {
               className="list-group list-group-flush"
               style={{ maxHeight: '13.5rem', overflowY: 'auto' }}
             >
-              {files.map(file => (
+              {files.filter(f => !hideMonitor || f.source !== 'MONITOR').map(file => (
                 <div
                   key={file.fileId}
                   className="list-group-item d-flex justify-content-between align-items-center"
@@ -326,6 +337,8 @@ export const FileList = () => {
         <Card.Footer className="text-muted small">
           <AlertCircle size={14} className="me-1" />
           Files are automatically deleted after 12 hours
+          <span className="ms-2 text-muted">·</span>
+          <span className="ms-2">Monitor network files are exempt and will not expire</span>
         </Card.Footer>
       </Card>
 

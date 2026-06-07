@@ -6,6 +6,8 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
+import com.tracepcap.intelligence.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.EntityType;
@@ -49,6 +51,7 @@ public class ChangeDetectionService {
   private final ConversationRepository conversationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final NetworkChangeEventRepository changeEventRepository;
+  private final CustomPrivateRangeService customPrivateRangeService;
 
   /**
    * Compare two consecutive snapshots and persist NetworkChangeEventEntity records. fromSnapshot
@@ -180,8 +183,9 @@ public class ChangeDetectionService {
 
     if (fromFileId == null) return List.of();
 
-    Set<String> fromExternalIps = externalIpsForFile(fromFileId);
-    Set<String> toExternalIps = externalIpsForFile(toFileId);
+    List<CustomPrivateRangeEntity> customRanges = customPrivateRangeService.loadRanges();
+    Set<String> fromExternalIps = externalIpsForFile(fromFileId, customRanges);
+    Set<String> toExternalIps = externalIpsForFile(toFileId, customRanges);
 
     Map<String, IpGeoInfoEntity> fromGeo = geoMapFor(fromExternalIps);
     Map<String, IpGeoInfoEntity> toGeo = geoMapFor(toExternalIps);
@@ -216,8 +220,8 @@ public class ChangeDetectionService {
     // Lost ASNs are not actionable on their own — gateway change covers the important case
 
     // Gateway heuristic: top-traffic external IP
-    String fromGateway = topExternalIp(fromFileId, fromGeo);
-    String toGateway = topExternalIp(toFileId, toGeo);
+    String fromGateway = topExternalIp(fromFileId, fromGeo, customRanges);
+    String toGateway = topExternalIp(toFileId, toGeo, customRanges);
     if (fromGateway != null && toGateway != null && !fromGateway.equals(toGateway)) {
       IpGeoInfoEntity fromGeoEntry = fromGeo.get(fromGateway);
       IpGeoInfoEntity toGeoEntry = toGeo.get(toGateway);
@@ -386,11 +390,11 @@ public class ChangeDetectionService {
     return result;
   }
 
-  private Set<String> externalIpsForFile(UUID fileId) {
+  private Set<String> externalIpsForFile(UUID fileId, List<CustomPrivateRangeEntity> customRanges) {
     if (fileId == null) return Set.of();
     return conversationRepository.findByFileId(fileId).stream()
         .flatMap(c -> Stream.of(c.getSrcIp(), c.getDstIp()))
-        .filter(ip -> ip != null && !isPrivate(ip))
+        .filter(ip -> ip != null && !isPrivate(ip, customRanges))
         .collect(Collectors.toSet());
   }
 
@@ -413,15 +417,15 @@ public class ChangeDetectionService {
   }
 
   /** Returns the external IP with the highest total bytes for a file (gateway heuristic). */
-  private String topExternalIp(UUID fileId, Map<String, IpGeoInfoEntity> geoMap) {
+  private String topExternalIp(UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<CustomPrivateRangeEntity> customRanges) {
     if (fileId == null || geoMap.isEmpty()) return null;
     Map<String, Long> ipBytes = new HashMap<>();
     for (ConversationEntity c : conversationRepository.findByFileId(fileId)) {
       String dst = c.getDstIp();
       String src = c.getSrcIp();
       String external = null;
-      if (dst != null && !isPrivate(dst) && geoMap.containsKey(dst)) external = dst;
-      else if (src != null && !isPrivate(src) && geoMap.containsKey(src)) external = src;
+      if (dst != null && !isPrivate(dst, customRanges) && geoMap.containsKey(dst)) external = dst;
+      else if (src != null && !isPrivate(src, customRanges) && geoMap.containsKey(src)) external = src;
       if (external != null) {
         ipBytes.merge(external, c.getTotalBytes() != null ? c.getTotalBytes() : 0L, Long::sum);
       }
@@ -456,7 +460,7 @@ public class ChangeDetectionService {
         .collect(Collectors.toSet());
   }
 
-  private static boolean isPrivate(String ip) {
+  private boolean isPrivate(String ip, List<CustomPrivateRangeEntity> customRanges) {
     if (ip == null) return true;
     for (String prefix : PRIVATE_PREFIXES) {
       if (ip.startsWith(prefix)) return true;
@@ -471,7 +475,7 @@ public class ChangeDetectionService {
         } catch (NumberFormatException ignored) { }
       }
     }
-    return false;
+    return customPrivateRangeService.isOverriddenPrivate(ip, customRanges);
   }
 
   private static String orEmpty(String s) {

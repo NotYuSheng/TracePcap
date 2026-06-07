@@ -143,7 +143,7 @@ PCAP, PCAPNG, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
 
 ## How Network Monitor Works
 
-The Monitor is designed for black-box analysis — it assumes you know nothing about the network upfront and builds understanding from the traffic itself:
+The Monitor is designed for black-box retrospective analysis — it assumes you know nothing about the network upfront and builds understanding from the traffic itself:
 
 - **No prior knowledge needed** — subnet structure, device roles, and topology are all inferred from observed traffic
 - **Snapshots, not agents** — there is no persistent sensor; you feed in PCAPs and the tool compares them
