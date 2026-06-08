@@ -81,6 +81,10 @@ export const AddSnapshotModal = ({
   };
 
   const updateOverride = (index: number, field: 'cidr' | 'label', value: string | null) => {
+    if (field === 'cidr') {
+      const nextCidr = (value ?? '').trim().toLowerCase();
+      if (nextCidr && subnetOverrides.some((o, i) => i !== index && o.cidr.trim().toLowerCase() === nextCidr)) return;
+    }
     setSubnetOverridesActive(true);
     setSubnetOverrides(prev => prev.map((o, i) =>
       i === index ? { ...o, [field]: value, inherited: false } : o
@@ -95,6 +99,8 @@ export const AddSnapshotModal = ({
   const addOverride = () => {
     const cidr = newCidr.trim();
     if (!cidr) return;
+    const normalized = cidr.toLowerCase();
+    if (subnetOverrides.some(o => o.cidr.trim().toLowerCase() === normalized)) return;
     setSubnetOverridesActive(true);
     setSubnetOverrides(prev => [...prev, { cidr, label: null, description: null, inherited: false }]);
     setNewCidr('');

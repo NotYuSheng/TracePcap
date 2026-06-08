@@ -526,7 +526,7 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     const onDragEnd = () => {
       if (!dragNode) return;
-      if (dragMoved) suppressNextClick = true;
+      suppressNextClick = dragMoved;
       dragNode = null;
       dragMoved = false;
       sigma.getCamera().enable();

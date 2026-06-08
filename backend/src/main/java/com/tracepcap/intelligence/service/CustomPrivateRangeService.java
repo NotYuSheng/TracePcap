@@ -155,6 +155,11 @@ public class CustomPrivateRangeService {
       if (parts.length != 2) return Optional.empty();
       byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
       int prefixLen = Integer.parseInt(parts[1].trim());
+      int maxPrefix = networkBytes.length * 8;
+      if (prefixLen < 0 || prefixLen > maxPrefix) {
+        log.warn("CIDR prefix out of range for {}: {}", cidr, prefixLen);
+        return Optional.empty();
+      }
       return Optional.of(new ParsedCidr(networkBytes, prefixLen));
     } catch (Exception e) {
       log.warn("Failed to pre-parse CIDR {}: {}", cidr, e.getMessage());
