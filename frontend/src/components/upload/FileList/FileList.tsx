@@ -259,7 +259,7 @@ export const FileList = () => {
             </div>
           ) : files.length === 0 ? (
             <div className="text-center text-muted py-4">
-              <p className="mb-0">No recent meetings. Upload or record your first meeting to get started!</p>
+              <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
             </div>
           ) : (() => {
             const displayedFiles = files.filter(f => !hideMonitor || f.source !== 'MONITOR');
@@ -267,7 +267,7 @@ export const FileList = () => {
               return (
                 <div className="text-center text-muted py-4">
                   <p className="mb-0">
-                    No recent meetings. Upload or record your first meeting to get started!{' '}
+                    No uploads here. All PCAP files are monitor-sourced and hidden.{' '}
                     <button
                       type="button"
                       className="btn btn-link p-0 align-baseline text-muted"

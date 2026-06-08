@@ -175,6 +175,9 @@ public class SnapshotService {
             .collect(Collectors.toList());
         subnetOverrideRepository.saveAll(entities);
       }
+      // Subnet classification changed — recompute change events for the whole network
+      // so that the updated internal/external IP grouping is reflected immediately.
+      rerunChangeDetectionChain(networkId);
     }
 
     long changeCount = changeEventRepository.countByToSnapshotId(snapshotId);

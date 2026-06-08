@@ -65,7 +65,9 @@ export const AddSnapshotModal = ({
   const handleToggleSubnets = async () => {
     const next = !showSubnets;
     setShowSubnets(next);
-    if (next && !subnetOverridesActive) {
+    // Load globals for display but do NOT set subnetOverridesActive — overrides are only
+    // sent if the user explicitly edits the list (add/remove/modify a row).
+    if (next && !subnetOverridesActive && subnetOverrides.length === 0) {
       setLoadingSubnets(true);
       try {
         const globals = await subnetService.list();
@@ -73,25 +75,27 @@ export const AddSnapshotModal = ({
       } catch {
         // fetch failed — user can still add CIDRs manually
       } finally {
-        setSubnetOverridesActive(true);
         setLoadingSubnets(false);
       }
     }
   };
 
   const updateOverride = (index: number, field: 'cidr' | 'label', value: string | null) => {
+    setSubnetOverridesActive(true);
     setSubnetOverrides(prev => prev.map((o, i) =>
       i === index ? { ...o, [field]: value, inherited: false } : o
     ));
   };
 
   const removeOverride = (index: number) => {
+    setSubnetOverridesActive(true);
     setSubnetOverrides(prev => prev.filter((_, i) => i !== index));
   };
 
   const addOverride = () => {
     const cidr = newCidr.trim();
     if (!cidr) return;
+    setSubnetOverridesActive(true);
     setSubnetOverrides(prev => [...prev, { cidr, label: null, description: null, inherited: false }]);
     setNewCidr('');
   };
