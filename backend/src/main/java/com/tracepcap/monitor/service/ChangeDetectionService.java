@@ -6,14 +6,15 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.EntityType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
+import com.tracepcap.monitor.entity.SnapshotSubnetOverrideEntity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
+import com.tracepcap.monitor.repository.SnapshotSubnetOverrideRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,6 +53,7 @@ public class ChangeDetectionService {
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final NetworkChangeEventRepository changeEventRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
+  private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
 
   /**
    * Compare two consecutive snapshots and persist NetworkChangeEventEntity records. fromSnapshot
@@ -183,9 +185,10 @@ public class ChangeDetectionService {
 
     if (fromFileId == null) return List.of();
 
-    List<CustomPrivateRangeEntity> customRanges = customPrivateRangeService.loadRanges();
-    Set<String> fromExternalIps = externalIpsForFile(fromFileId, customRanges);
-    Set<String> toExternalIps = externalIpsForFile(toFileId, customRanges);
+    List<String> fromCidrs = effectiveCidrs(fromSnapshot);
+    List<String> toCidrs = effectiveCidrs(toSnapshot);
+    Set<String> fromExternalIps = externalIpsForFile(fromFileId, fromCidrs);
+    Set<String> toExternalIps = externalIpsForFile(toFileId, toCidrs);
 
     Map<String, IpGeoInfoEntity> fromGeo = geoMapFor(fromExternalIps);
     Map<String, IpGeoInfoEntity> toGeo = geoMapFor(toExternalIps);
@@ -220,8 +223,8 @@ public class ChangeDetectionService {
     // Lost ASNs are not actionable on their own — gateway change covers the important case
 
     // Gateway heuristic: top-traffic external IP
-    String fromGateway = topExternalIp(fromFileId, fromGeo, customRanges);
-    String toGateway = topExternalIp(toFileId, toGeo, customRanges);
+    String fromGateway = topExternalIp(fromFileId, fromGeo, fromCidrs);
+    String toGateway = topExternalIp(toFileId, toGeo, toCidrs);
     if (fromGateway != null && toGateway != null && !fromGateway.equals(toGateway)) {
       IpGeoInfoEntity fromGeoEntry = fromGeo.get(fromGateway);
       IpGeoInfoEntity toGeoEntry = toGeo.get(toGateway);
@@ -390,11 +393,11 @@ public class ChangeDetectionService {
     return result;
   }
 
-  private Set<String> externalIpsForFile(UUID fileId, List<CustomPrivateRangeEntity> customRanges) {
+  private Set<String> externalIpsForFile(UUID fileId, List<String> customCidrs) {
     if (fileId == null) return Set.of();
     return conversationRepository.findByFileId(fileId).stream()
         .flatMap(c -> Stream.of(c.getSrcIp(), c.getDstIp()))
-        .filter(ip -> ip != null && !isPrivate(ip, customRanges))
+        .filter(ip -> ip != null && !isPrivate(ip, customCidrs))
         .collect(Collectors.toSet());
   }
 
@@ -417,15 +420,15 @@ public class ChangeDetectionService {
   }
 
   /** Returns the external IP with the highest total bytes for a file (gateway heuristic). */
-  private String topExternalIp(UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<CustomPrivateRangeEntity> customRanges) {
+  private String topExternalIp(UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<String> customCidrs) {
     if (fileId == null || geoMap.isEmpty()) return null;
     Map<String, Long> ipBytes = new HashMap<>();
     for (ConversationEntity c : conversationRepository.findByFileId(fileId)) {
       String dst = c.getDstIp();
       String src = c.getSrcIp();
       String external = null;
-      if (dst != null && !isPrivate(dst, customRanges) && geoMap.containsKey(dst)) external = dst;
-      else if (src != null && !isPrivate(src, customRanges) && geoMap.containsKey(src)) external = src;
+      if (dst != null && !isPrivate(dst, customCidrs) && geoMap.containsKey(dst)) external = dst;
+      else if (src != null && !isPrivate(src, customCidrs) && geoMap.containsKey(src)) external = src;
       if (external != null) {
         ipBytes.merge(external, c.getTotalBytes() != null ? c.getTotalBytes() : 0L, Long::sum);
       }
@@ -460,7 +463,7 @@ public class ChangeDetectionService {
         .collect(Collectors.toSet());
   }
 
-  private boolean isPrivate(String ip, List<CustomPrivateRangeEntity> customRanges) {
+  private boolean isPrivate(String ip, List<String> customCidrs) {
     if (ip == null) return true;
     for (String prefix : PRIVATE_PREFIXES) {
       if (ip.startsWith(prefix)) return true;
@@ -475,7 +478,26 @@ public class ChangeDetectionService {
         } catch (NumberFormatException ignored) { }
       }
     }
-    return customPrivateRangeService.isOverriddenPrivate(ip, customRanges);
+    return customPrivateRangeService.isInCidrs(ip, customCidrs);
+  }
+
+  /**
+   * Returns the effective CIDR list for a snapshot: its own subnet overrides if any are defined,
+   * otherwise falls back to the global custom private ranges.
+   */
+  private List<String> effectiveCidrs(NetworkSnapshotEntity snapshot) {
+    if (snapshot != null) {
+      List<SnapshotSubnetOverrideEntity> overrides =
+          snapshotSubnetOverrideRepository.findBySnapshotId(snapshot.getId());
+      if (!overrides.isEmpty()) {
+        return overrides.stream()
+            .map(SnapshotSubnetOverrideEntity::getCidr)
+            .collect(Collectors.toList());
+      }
+    }
+    return customPrivateRangeService.loadRanges().stream()
+        .map(e -> e.getCidr())
+        .collect(Collectors.toList());
   }
 
   private static String orEmpty(String s) {

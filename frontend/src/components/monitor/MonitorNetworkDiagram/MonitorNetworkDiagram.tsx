@@ -161,7 +161,12 @@ export const MonitorNetworkDiagram = ({
 
   // Sync to the clicked snapshot each time the modal opens; reset UI state
   useEffect(() => {
-    if (show && initialSnapshotId) {
+    if (!show) {
+      setSelectedNode(null);
+      setShowFilterModal(false);
+      return;
+    }
+    if (initialSnapshotId) {
       setSelectedId(initialSnapshotId);
       setSelectedNode(null);
       setIsFullscreen(false);

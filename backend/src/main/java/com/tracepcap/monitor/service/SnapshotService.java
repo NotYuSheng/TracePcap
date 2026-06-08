@@ -175,6 +175,31 @@ public class SnapshotService {
             .collect(Collectors.toList());
         subnetOverrideRepository.saveAll(entities);
       }
+      // Subnet classification changed — recompute only the transitions involving this
+      // snapshot (prev->snapshot and snapshot->successor) rather than the full chain.
+      changeEventRepository.deleteByToSnapshotId(snapshotId);
+      List<NetworkSnapshotEntity> ordered =
+          snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(networkId);
+      int idx = -1;
+      for (int i = 0; i < ordered.size(); i++) {
+        if (ordered.get(i).getId().equals(snapshotId)) { idx = i; break; }
+      }
+      if (idx > 0) {
+        try {
+          changeDetectionService.detectChanges(ordered.get(idx - 1), snapshot);
+        } catch (Exception e) {
+          log.error("Change detection failed prev->snapshot {}: {}", snapshotId, e.getMessage(), e);
+        }
+      }
+      if (idx >= 0 && idx + 1 < ordered.size()) {
+        NetworkSnapshotEntity successor = ordered.get(idx + 1);
+        changeEventRepository.deleteByToSnapshotId(successor.getId());
+        try {
+          changeDetectionService.detectChanges(snapshot, successor);
+        } catch (Exception e) {
+          log.error("Change detection failed snapshot->successor {}: {}", snapshotId, e.getMessage(), e);
+        }
+      }
     }
 
     long changeCount = changeEventRepository.countByToSnapshotId(snapshotId);

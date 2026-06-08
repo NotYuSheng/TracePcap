@@ -22,7 +22,7 @@ public class CustomPrivateRangeService {
   private final CustomPrivateRangeRepository repository;
 
   private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
-  private static final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
+  private final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
       new ConcurrentHashMap<>();
 
   // Matches dotted-decimal IPv4 or hex-colon IPv6 — rejects hostnames before DNS lookup
@@ -37,8 +37,9 @@ public class CustomPrivateRangeService {
 
   public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
     String cidr = dto.getCidr().trim();
-    // Determine IP and optional prefix parts
-    String ipPart = cidr.contains("/") ? cidr.split("/")[0].trim() : cidr;
+    // Determine IP and optional prefix parts — indexOf avoids split edge-case with bare "/"
+    int slashIdx = cidr.indexOf('/');
+    String ipPart = slashIdx >= 0 ? cidr.substring(0, slashIdx).trim() : cidr;
     // Reject hostnames — only numeric IPs are accepted to prevent DNS resolution
     if (!NUMERIC_IP.matcher(ipPart).matches()) {
       throw new IllegalArgumentException("Invalid IP address: " + ipPart);
@@ -97,36 +98,55 @@ public class CustomPrivateRangeService {
    */
   public boolean isOverriddenPrivate(String ip, List<CustomPrivateRangeEntity> ranges) {
     if (ip == null || ranges.isEmpty()) return false;
+    byte[] addrBytes = resolveAddress(ip);
+    if (addrBytes == null) return false;
     for (CustomPrivateRangeEntity range : ranges) {
-      if (inCidr(ip, range.getCidr())) return true;
+      if (inCidrBytes(addrBytes, range.getCidr())) return true;
     }
     return false;
   }
 
-  private boolean inCidr(String ip, String cidr) {
-    if (ip == null || cidr == null) return false;
-    try {
-      Optional<ParsedCidr> opt = cidrCache.computeIfAbsent(cidr, this::parseCidr);
-      if (opt.isEmpty()) return false;
-      ParsedCidr parsed = opt.get();
-      byte[] addrBytes = InetAddress.getByName(ip).getAddress();
-      byte[] netBytes = parsed.networkBytes();
-      int prefixLen = parsed.prefixLen();
-      if (netBytes.length != addrBytes.length) return false;
-      int fullBytes = prefixLen / 8;
-      int remainingBits = prefixLen % 8;
-      for (int i = 0; i < fullBytes; i++) {
-        if (netBytes[i] != addrBytes[i]) return false;
-      }
-      if (remainingBits > 0 && fullBytes < netBytes.length) {
-        int mask = 0xFF & (0xFF << (8 - remainingBits));
-        if ((netBytes[fullBytes] & mask) != (addrBytes[fullBytes] & mask)) return false;
-      }
-      return true;
-    } catch (Exception e) {
-      log.warn("CIDR match error ip={} cidr={}: {}", ip, cidr, e.getMessage());
-      return false;
+  /**
+   * Returns true if the IP falls within any of the provided CIDR strings.
+   * Used by callers that work with plain CIDR lists rather than entity objects.
+   */
+  public boolean isInCidrs(String ip, List<String> cidrs) {
+    if (ip == null || cidrs.isEmpty()) return false;
+    byte[] addrBytes = resolveAddress(ip);
+    if (addrBytes == null) return false;
+    for (String cidr : cidrs) {
+      if (inCidrBytes(addrBytes, cidr)) return true;
     }
+    return false;
+  }
+
+  private byte[] resolveAddress(String ip) {
+    try {
+      return InetAddress.getByName(ip).getAddress();
+    } catch (Exception e) {
+      log.warn("Failed to resolve IP address {}: {}", ip, e.getMessage());
+      return null;
+    }
+  }
+
+  private boolean inCidrBytes(byte[] addrBytes, String cidr) {
+    if (cidr == null) return false;
+    Optional<ParsedCidr> opt = cidrCache.computeIfAbsent(cidr, this::parseCidr);
+    if (opt.isEmpty()) return false;
+    ParsedCidr parsed = opt.get();
+    byte[] netBytes = parsed.networkBytes();
+    int prefixLen = parsed.prefixLen();
+    if (netBytes.length != addrBytes.length) return false;
+    int fullBytes = prefixLen / 8;
+    int remainingBits = prefixLen % 8;
+    for (int i = 0; i < fullBytes; i++) {
+      if (netBytes[i] != addrBytes[i]) return false;
+    }
+    if (remainingBits > 0 && fullBytes < netBytes.length) {
+      int mask = 0xFF & (0xFF << (8 - remainingBits));
+      if ((netBytes[fullBytes] & mask) != (addrBytes[fullBytes] & mask)) return false;
+    }
+    return true;
   }
 
   private Optional<ParsedCidr> parseCidr(String cidr) {
@@ -135,6 +155,11 @@ public class CustomPrivateRangeService {
       if (parts.length != 2) return Optional.empty();
       byte[] networkBytes = InetAddress.getByName(parts[0].trim()).getAddress();
       int prefixLen = Integer.parseInt(parts[1].trim());
+      int maxPrefix = networkBytes.length * 8;
+      if (prefixLen < 0 || prefixLen > maxPrefix) {
+        log.warn("CIDR prefix out of range for {}: {}", cidr, prefixLen);
+        return Optional.empty();
+      }
       return Optional.of(new ParsedCidr(networkBytes, prefixLen));
     } catch (Exception e) {
       log.warn("Failed to pre-parse CIDR {}: {}", cidr, e.getMessage());

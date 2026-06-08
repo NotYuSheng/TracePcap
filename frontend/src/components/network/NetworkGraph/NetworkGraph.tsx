@@ -490,6 +490,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     const DRAG_THRESHOLD_PX = 5;
     let dragNode: string | null = null;
     let dragMoved = false;
+    let suppressNextClick = false;
     let dragStartX = 0;
     let dragStartY = 0;
 
@@ -525,7 +526,9 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     const onDragEnd = () => {
       if (!dragNode) return;
+      suppressNextClick = dragMoved;
       dragNode = null;
+      dragMoved = false;
       sigma.getCamera().enable();
       canvasEl.style.cursor = '';
     };
@@ -573,7 +576,7 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     sigma.on('clickNode', ({ node, event }) => {
       // Suppress click when the mousedown was part of a drag gesture
-      if (dragMoved) { dragMoved = false; return; }
+      if (suppressNextClick) { suppressNextClick = false; return; }
 
       const original = nodesRef.current.find(n => n.id === node);
       if (!original) return;
