@@ -90,6 +90,10 @@ interface NetworkControlsProps {
   onNetLabelClick?: (label: string) => void;
   onNetLabelClear?: () => void;
   presentNetLabels?: string[];
+  activeGhostFilters?: string[];
+  onGhostFilterClick?: (flag: string) => void;
+  onGhostFilterClear?: () => void;
+  presentGhostFlags?: Set<string>;
   /** Whether the panel starts collapsed. Defaults to false (expanded). */
   defaultCollapsed?: boolean;
 }
@@ -164,6 +168,10 @@ export function NetworkControls({
   onNetLabelClick,
   onNetLabelClear,
   presentNetLabels = [],
+  activeGhostFilters = [],
+  onGhostFilterClick,
+  onGhostFilterClear,
+  presentGhostFlags = new Set(),
   defaultCollapsed = false,
 }: NetworkControlsProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
@@ -292,15 +300,86 @@ export function NetworkControls({
 
                 {/* Has risks */}
                 <div className="col-md-2 d-flex align-items-end">
-                  <Form.Check
-                    className="mb-0"
-                    type="checkbox"
-                    id="ncHasRisks"
-                    label="Security risks only"
-                    checked={hasRisksOnly}
-                    onChange={e => onHasRisksOnlyChange(e.target.checked)}
-                  />
+                  <div className="form-check mb-0">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id="ncHasRisks"
+                      checked={hasRisksOnly}
+                      onChange={e => onHasRisksOnlyChange(e.target.checked)}
+                    />
+                    <label className="form-check-label" htmlFor="ncHasRisks">
+                      Security risks only
+                    </label>
+                  </div>
                 </div>
+
+                {/* Ghost / Phantom Node Filters */}
+                {presentGhostFlags.size > 0 && onGhostFilterClick && (
+                  <div className="col-12">
+                    <PillSectionHeader
+                      label="Ghost Node Filters"
+                      info={
+                        <InfoPopover
+                          id="nc-info-ghost"
+                          title="Ghost Node Filters"
+                          body={
+                            <>
+                              Hide phantom hosts that appear in the graph only because they were
+                              scan targets or probe artefacts — never real communicating hosts.
+                              <br /><br />
+                              <strong>No response</strong> — only ever appeared as a destination;
+                              no replies observed (any protocol).<br />
+                              <strong>ARP no-reply</strong> — ARP request targets that never sent
+                              an ARP reply.<br />
+                              <strong>ICMP unreachable</strong> — ICMP-probed hosts that never
+                              responded.<br />
+                              <strong>TTL exceeded</strong> — intermediate hops that only appeared
+                              by sending ICMP TTL-exceeded replies (traceroute artefacts).<br /><br />
+                              Filters are off by default; enabling one hides matching nodes and
+                              their edges.
+                            </>
+                          }
+                        />
+                      }
+                      onSelectAll={() => {
+                        const allFlags = ['no-response', 'arp-no-reply', 'icmp-unreachable', 'ttl-exceeded'];
+                        allFlags.forEach(f => {
+                          if (presentGhostFlags.has(f) && !activeGhostFilters.includes(f))
+                            onGhostFilterClick(f);
+                        });
+                      }}
+                      onDeselectAll={onGhostFilterClear ?? (() => {})}
+                    />
+                    <div className="d-flex flex-wrap gap-1 mt-1">
+                      {(
+                        [
+                          { flag: 'no-response',      label: 'No response',       icon: 'bi-slash-circle',   color: '#e74c3c' },
+                          { flag: 'arp-no-reply',     label: 'ARP no-reply',      icon: 'bi-broadcast',      color: '#e67e22' },
+                          { flag: 'icmp-unreachable', label: 'ICMP unreachable',  icon: 'bi-exclamation-octagon', color: '#c0392b' },
+                          { flag: 'ttl-exceeded',     label: 'TTL exceeded',      icon: 'bi-hourglass-split', color: '#8e44ad' },
+                        ] as { flag: string; label: string; icon: string; color: string }[]
+                      )
+                        .filter(({ flag }) => presentGhostFlags.has(flag))
+                        .map(({ flag, label, icon, color }) => {
+                          const isActive = activeGhostFilters.includes(flag);
+                          return (
+                            <button
+                              key={flag}
+                              type="button"
+                              className={filterPillClass(isActive)}
+                              style={isActive ? { backgroundColor: color, color: '#fff' } : undefined}
+                              onClick={() => onGhostFilterClick(flag)}
+                              title={isActive ? `Showing: ${label} nodes hidden` : `Click to hide ${label} nodes`}
+                            >
+                              <i className={`bi ${icon} me-1`} style={{ fontSize: '0.75rem' }} />
+                              {label}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Node Types */}
                 {(presentNodeTypes.size > 0 || presentDeviceTypes.size > 0) && <div className="col-12">
