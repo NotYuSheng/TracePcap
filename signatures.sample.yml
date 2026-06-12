@@ -25,6 +25,14 @@
 #                      multiple entries are OR-matched by default
 #                      set match_all: true on the rule to AND all entries instead
 #
+#   payload_regex    - list of regular expressions applied to the ASCII/UTF-8 decoded payload
+#                      each entry requires:
+#                        pattern: "regex"          - standard regular expression
+#                      optional per-entry:
+#                        case_insensitive: true    - case-insensitive match (default: false)
+#                      multiple entries are OR-matched by default; set match_all: true to AND
+#                      payload_contains and payload_regex can coexist in the same rule (both must match)
+#
 # Severity colors in the UI:
 #   critical -> red   | high -> orange   | medium -> amber   | low -> purple
 #
@@ -183,6 +191,47 @@ signatures:
       protocol: UDP
     payload_contains:
       - hex: "0010"   # QTYPE 16 = TXT record
+
+  # --- payload_regex: single pattern ---
+  # Detect HTTP Basic-auth credentials encoded in cleartext (case-insensitive).
+  - name: http_basic_auth_regex
+    description: HTTP Authorization header with Basic scheme detected via regex
+    severity: critical
+    payload_regex:
+      - pattern: "Authorization:\\s*Basic\\s+[A-Za-z0-9+/=]+"
+        case_insensitive: true
+
+  # --- payload_regex: multiple patterns (OR-matched by default) ---
+  # Flag any payload that looks like it contains an email address or a phone number.
+  - name: pii_in_payload
+    description: Possible PII (email address or phone number) detected in payload
+    severity: high
+    payload_regex:
+      - pattern: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+      - pattern: "\\b\\d{3}[\\s.\\-]?\\d{3}[\\s.\\-]?\\d{4}\\b"
+
+  # --- payload_regex + match_all: all patterns must appear ---
+  # Flag HTTP responses that include a Set-Cookie header AND a JWT-shaped value.
+  - name: jwt_set_cookie
+    description: HTTP response setting a JWT token in a cookie
+    severity: high
+    match_all: true
+    payload_regex:
+      - pattern: "Set-Cookie:"
+        case_insensitive: true
+      - pattern: "eyJ[A-Za-z0-9_\\-]+\\.eyJ[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+"
+
+  # --- payload_regex combined with match fields ---
+  # Detect SQL injection probes on plain HTTP traffic.
+  - name: sql_injection_probe
+    description: Possible SQL injection string detected in HTTP payload
+    severity: critical
+    match:
+      protocol: TCP
+      dstPort: 80
+    payload_regex:
+      - pattern: "(?:UNION\\s+SELECT|DROP\\s+TABLE|INSERT\\s+INTO|'\\s*OR\\s*'1'\\s*=\\s*'1)"
+        case_insensitive: true
 
   # --- device_type: pin an IP to a specific device category ---
   # Any IP communicating with 192.168.1.50 will be labelled "CCTV Camera".
