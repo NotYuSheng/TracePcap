@@ -38,8 +38,7 @@ File Retention
      - ``12``
      - Number of hours after upload before a file is automatically deleted
        (only applies when ``FILE_RETENTION_ENABLED=true``). Monitor Network
-       files are always exempt from automatic deletion regardless of this
-       setting.
+       files are exempt from automatic deletion by default.
 
 Nginx Configuration
 -------------------

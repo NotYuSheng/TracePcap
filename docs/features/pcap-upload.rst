@@ -71,6 +71,6 @@ entirely (see :doc:`../configuration/environment-variables`).
 
 .. note::
 
-   Monitor Network files are **always exempt** from automatic deletion,
-   regardless of the retention settings. They persist until you manually delete
-   the network or the individual snapshot.
+   Monitor Network files are **exempt by default** from automatic deletion.
+   They persist until you manually delete the network or the individual
+   snapshot, unless a custom monitor retention period is explicitly configured.

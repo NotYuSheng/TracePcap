@@ -260,7 +260,8 @@ it correctly.
 1. Open the network detail page and scroll to the **IP Addresses** drift panel.
 2. Expand the **Private IP Overrides** section at the bottom of the panel.
 3. Enter an IP address (e.g. ``203.0.113.42``) or a CIDR range
-   (e.g. ``203.0.113.0/24``). A bare IP is stored as a ``/32``.
+   (e.g. ``203.0.113.0/24``). A bare IP is stored as a ``/32`` (or ``/128``
+   for IPv6).
 4. Optionally enter a label (e.g. ``Branch Office Router``).
 5. Click **Add override**.
 
@@ -813,7 +814,8 @@ Overrides are global (not per-network). All endpoints are prefixed with
      - ``/api/custom-private-ranges``
      - Create an override. Body: ``{ "cidr": "string", "label": "string?" }``.
        A bare IP (e.g. ``"203.0.113.42"``) is automatically normalised to
-       ``/32``. Returns 400 if the CIDR is invalid or already exists.
+       ``/32`` (or ``/128`` for IPv6). Returns 400 if the CIDR is invalid or
+       already exists.
    * - ``DELETE``
      - ``/api/custom-private-ranges/{id}``
      - Delete an override by ID.
