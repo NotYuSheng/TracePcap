@@ -56,3 +56,21 @@ Managing Uploads
 The main file list shows all uploaded PCAPs with their status, size, upload
 date, and detected statistics. You can delete a file from this view, which
 removes both the database metadata and the object from MinIO.
+
+Monitor Network files are **hidden by default** in this list to reduce clutter
+when many snapshots have been uploaded. Use the **Show Monitor files** toggle
+(top-right of the file list) to include them.
+
+File Retention
+~~~~~~~~~~~~~~
+
+By default, uploaded files are automatically deleted **12 hours** after upload.
+This window is configurable via the ``FILE_RETENTION_HOURS`` environment
+variable. Set ``FILE_RETENTION_ENABLED=false`` to disable automatic deletion
+entirely (see :doc:`../configuration/environment-variables`).
+
+.. note::
+
+   Monitor Network files are **always exempt** from automatic deletion,
+   regardless of the retention settings. They persist until you manually delete
+   the network or the individual snapshot.

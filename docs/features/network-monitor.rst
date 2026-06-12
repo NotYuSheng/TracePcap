@@ -244,6 +244,40 @@ Click any IP badge to open the **Entity Detail** modal, which shows:
 
 Absent addresses follow the same greyed-out / strikethrough pattern.
 
+Private IP Overrides
+~~~~~~~~~~~~~~~~~~~~
+
+By default, TracePcap classifies addresses according to RFC 1918
+(``10.0.0.0/8``, ``172.16.0.0/12``, ``192.168.0.0/16``) and RFC 6598
+(``100.64.0.0/10``). Some networks use public IP address space internally
+(e.g. a terminal that is assigned a routable address but is physically
+on a private LAN). Private IP Overrides let you reclassify any public IP
+or CIDR range as internal so that change-detection and IP grouping treat
+it correctly.
+
+**How to add an override:**
+
+1. Open the network detail page and scroll to the **IP Addresses** drift panel.
+2. Expand the **Private IP Overrides** section at the bottom of the panel.
+3. Enter an IP address (e.g. ``203.0.113.42``) or a CIDR range
+   (e.g. ``203.0.113.0/24``). A bare IP is stored as a ``/32``.
+4. Optionally enter a label (e.g. ``Branch Office Router``).
+5. Click **Add override**.
+
+Overrides take effect immediately. Matching IPs move from the **Public**
+group into the **Private** group (or into the appropriate subnet group if
+subnet definitions are also configured). They are also excluded from
+ASN/gateway change analysis — so a gateway change involving an overridden
+IP will not generate a ``GATEWAY_CHANGE`` or ``ASN_CHANGE`` event.
+
+Overrides are global across all networks. To remove one, click the trash
+icon next to it in the list.
+
+.. note::
+
+   Overrides affect IP *classification* only. Traffic to and from overridden
+   addresses is still captured, analysed, and displayed normally.
+
 Baseline Definitions
 --------------------
 
@@ -758,3 +792,28 @@ Entity notes are global (not per-network). All endpoints are prefixed with ``/ap
    * - ``DELETE``
      - ``/api/entity-notes?entityType={type}&entityKey={key}``
      - Delete a note.
+
+Private IP Overrides
+~~~~~~~~~~~~~~~~~~~~
+
+Overrides are global (not per-network). All endpoints are prefixed with
+``/api/custom-private-ranges``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 45 45
+
+   * - Method
+     - Path
+     - Description
+   * - ``GET``
+     - ``/api/custom-private-ranges``
+     - List all private IP overrides.
+   * - ``POST``
+     - ``/api/custom-private-ranges``
+     - Create an override. Body: ``{ "cidr": "string", "label": "string?" }``.
+       A bare IP (e.g. ``"203.0.113.42"``) is automatically normalised to
+       ``/32``. Returns 400 if the CIDR is invalid or already exists.
+   * - ``DELETE``
+     - ``/api/custom-private-ranges/{id}``
+     - Delete an override by ID.

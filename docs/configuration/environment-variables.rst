@@ -19,6 +19,28 @@ Upload Configuration
      - Maximum PCAP file size in bytes (default 512 MB). Applies to both the
        Spring Boot backend and the nginx reverse proxy.
 
+File Retention
+--------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - Variable
+     - Default
+     - Description
+   * - ``FILE_RETENTION_ENABLED``
+     - ``true``
+     - Set to ``false`` to keep uploaded files indefinitely and disable the
+       automatic cleanup scheduler entirely. Useful for air-gapped or
+       long-term-audit deployments where evidence preservation is required.
+   * - ``FILE_RETENTION_HOURS``
+     - ``12``
+     - Number of hours after upload before a file is automatically deleted
+       (only applies when ``FILE_RETENTION_ENABLED=true``). Monitor Network
+       files are always exempt from automatic deletion regardless of this
+       setting.
+
 Nginx Configuration
 -------------------
 
