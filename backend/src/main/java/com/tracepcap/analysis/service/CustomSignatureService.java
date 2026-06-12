@@ -5,10 +5,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +60,8 @@ public class CustomSignatureService {
 
   static final int MAX_REGEX_PAYLOAD_BYTES = 65536;
 
+  private final Map<String, Pattern> patternCache = new ConcurrentHashMap<>();
+
   @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
 
@@ -82,9 +86,10 @@ public class CustomSignatureService {
         List<Map<String, Object>> payloadContains =
             (List<Map<String, Object>>) rule.get("payload_contains");
 
+        Object payloadRegexObj = rule.get("payload_regex");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> payloadRegex =
-            (List<Map<String, Object>>) rule.get("payload_regex");
+            payloadRegexObj instanceof List ? (List<Map<String, Object>>) payloadRegexObj : null;
 
         // A rule must specify at least one criterion
         boolean hasMatch = match != null && !match.isEmpty();
@@ -382,6 +387,8 @@ public class CustomSignatureService {
       List<PcapParserService.PacketInfo> packets,
       List<Map<String, Object>> patterns,
       boolean matchAll) {
+    // Lazily decoded payloads — populated on first access for each packet index
+    String[] decoded = new String[packets.size()];
     for (Map<String, Object> entry : patterns) {
       Object patternObj = entry.get("pattern");
       if (patternObj == null) {
@@ -394,26 +401,31 @@ public class CustomSignatureService {
         continue;
       }
 
-      int flags = Pattern.DOTALL;
-      if (Boolean.TRUE.equals(entry.get("case_insensitive"))) {
-        flags |= Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
-      }
+      final int flags = Boolean.TRUE.equals(entry.get("case_insensitive"))
+          ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+          : 0;
 
-      Pattern compiled;
-      try {
-        compiled = Pattern.compile(patternStr, flags);
-      } catch (PatternSyntaxException e) {
-        log.warn("Invalid regex pattern '{}': {}", patternStr, e.getMessage());
+      final String cacheKey = patternStr + "::" + flags;
+      Pattern compiled = patternCache.computeIfAbsent(cacheKey, k -> {
+        try {
+          return Pattern.compile(patternStr, flags);
+        } catch (PatternSyntaxException e) {
+          log.warn("Invalid regex pattern '{}': {}", patternStr, e.getMessage());
+          return null;
+        }
+      });
+
+      if (compiled == null) {
         if (matchAll) return false;
         continue;
       }
 
       boolean found = false;
-      for (PcapParserService.PacketInfo pkt : packets) {
-        String payloadHex = pkt.getPayload();
+      for (int i = 0; i < packets.size(); i++) {
+        String payloadHex = packets.get(i).getPayload();
         if (payloadHex == null || payloadHex.isEmpty()) continue;
-        String ascii = hexToAscii(payloadHex);
-        if (compiled.matcher(ascii).find()) {
+        if (decoded[i] == null) decoded[i] = hexToAscii(payloadHex);
+        if (compiled.matcher(decoded[i]).find()) {
           found = true;
           break;
         }
@@ -425,19 +437,17 @@ public class CustomSignatureService {
     return matchAll;
   }
 
-  /** Decodes a lowercase hex string to a character string, capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes. */
+  /** Decodes a hex-encoded payload to a UTF-8 string, capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes. */
   private String hexToAscii(String hex) {
     if (hex == null) return "";
-    // Ensure even length and cap at the byte limit
     int hexLen = Math.min(hex.length() & ~1, MAX_REGEX_PAYLOAD_BYTES * 2);
-    StringBuilder sb = new StringBuilder(hexLen / 2);
+    byte[] bytes = new byte[hexLen / 2];
+    int out = 0;
     for (int i = 0; i < hexLen; i += 2) {
-      try {
-        sb.append((char) Integer.parseInt(hex.substring(i, i + 2), 16));
-      } catch (NumberFormatException e) {
-        sb.append('?');
-      }
+      int h1 = Character.digit(hex.charAt(i), 16);
+      int h2 = Character.digit(hex.charAt(i + 1), 16);
+      bytes[out++] = (h1 == -1 || h2 == -1) ? (byte) '?' : (byte) ((h1 << 4) | h2);
     }
-    return sb.toString();
+    return new String(bytes, 0, out, StandardCharsets.UTF_8);
   }
 }

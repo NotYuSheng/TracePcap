@@ -457,7 +457,7 @@ packets += pkts_jwt
 packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59013, 80,
     b"GET /search?q=' OR '1'='1&type=user HTTP/1.1\r\nHost: target.example.com\r\n\r\n")
 
-print(f"Payload-inspection demo: 9 flows (5 payload_contains + 4 payload_regex) added")
+print("Payload-inspection demo: 9 flows (5 payload_contains + 4 payload_regex) added")
 
 # ── write synthetic pcap ──────────────────────────────────────────────────────
 synthetic_path = os.path.join(SCRIPT_DIR, "_synthetic_rules.pcap")

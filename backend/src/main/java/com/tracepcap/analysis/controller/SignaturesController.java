@@ -97,9 +97,9 @@ public class SignaturesController {
           Map<String, Object> rule = (Map<String, Object>) ruleObj;
           String ruleName = rule.get("name") != null ? rule.get("name").toString() : "(unnamed)";
 
-          @SuppressWarnings("unchecked")
-          List<?> regexEntries = (List<?>) rule.get("payload_regex");
-          if (regexEntries == null) continue;
+          Object regexEntriesObj = rule.get("payload_regex");
+          if (!(regexEntriesObj instanceof List)) continue;
+          List<?> regexEntries = (List<?>) regexEntriesObj;
 
           for (int i = 0; i < regexEntries.size(); i++) {
             Object entryObj = regexEntries.get(i);
