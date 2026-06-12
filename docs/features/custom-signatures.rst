@@ -92,7 +92,13 @@ Match Fields
 Payload Matching
 ----------------
 
-In addition to ``match`` fields, rules can search raw packet payloads:
+In addition to ``match`` fields, rules can inspect raw packet payloads using
+byte-string patterns (``payload_contains``) or regular expressions
+(``payload_regex``). Both can be combined with ``match`` fields in the same
+rule — all conditions must be satisfied for the rule to fire.
+
+``payload_contains``
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
 
@@ -103,8 +109,8 @@ In addition to ``match`` fields, rules can search raw packet payloads:
 Patterns are searched against the raw payload bytes of each packet in the
 conversation. A match on any single packet is sufficient.
 
-Multiple ``payload_contains`` entries are **OR-matched** by default. Set
-``match_all: true`` on the rule to require **all** patterns (AND):
+Multiple entries are **OR-matched** by default. Set ``match_all: true`` on the
+rule to require **all** patterns (AND):
 
 .. code-block:: yaml
 
@@ -114,8 +120,29 @@ Multiple ``payload_contains`` entries are **OR-matched** by default. Set
        - ascii: "POST /"
        - ascii: "token"
 
-``payload_contains`` can be combined with ``match`` fields — both conditions
-must be satisfied for the rule to fire.
+``payload_regex``
+~~~~~~~~~~~~~~~~~
+
+Regular expressions can be used in place of (or alongside) ``payload_contains``:
+
+.. code-block:: yaml
+
+   payload_regex:
+     - pattern: "Authorization:\\s*Basic\\s+[A-Za-z0-9+/=]+"
+       case_insensitive: true    # optional, default false
+
+Patterns are standard Java regular expressions applied against the
+**ASCII/UTF-8 decoded payload** of each packet. A match on any single packet
+in the conversation is sufficient.
+
+- ``case_insensitive: true`` enables case-insensitive matching for that entry.
+- The same ``match_all`` flag applies: set ``match_all: true`` on the rule to
+  require **all** ``payload_regex`` entries to match.
+- Regex syntax errors are caught when the file is saved — the editor displays
+  an inline error identifying the rule and the offending pattern index.
+
+``payload_contains`` and ``payload_regex`` can coexist in the same rule; both
+must match (AND).
 
 Device Type Override
 --------------------
@@ -192,16 +219,34 @@ Examples
        match:
          ja3: "a0e9f5d64349fb13191bc781f81f42e1"
 
-     # Cleartext credential detection
+     # Cleartext credential detection (payload_contains)
      - name: cleartext_credentials
        severity: critical
        payload_contains:
          - ascii: "Authorization: Basic"
          - ascii: "password="
 
-See ``signatures.sample.yml`` for a full set of 17 annotated example rules
-covering every match field. The script ``sample-files/gen_demo.py`` generates
-a PCAP that triggers all demo rules at once.
+     # Regex: HTTP Basic-auth header (case-insensitive)
+     - name: http_basic_auth_regex
+       severity: critical
+       payload_regex:
+         - pattern: "Authorization:\\s*Basic\\s+[A-Za-z0-9+/=]+"
+           case_insensitive: true
+
+     # Regex: SQL injection probe on plain HTTP (match + payload_regex)
+     - name: sql_injection_probe
+       severity: critical
+       match:
+         protocol: TCP
+         dstPort: 80
+       payload_regex:
+         - pattern: "(?:UNION\\s+SELECT|DROP\\s+TABLE|'\\s*OR\\s*'1'\\s*=\\s*'1)"
+           case_insensitive: true
+
+See ``signatures.sample.yml`` for a full set of 21 annotated example rules
+covering every match field, payload byte pattern, and regex pattern. The script
+``sample-files/gen_demo.py`` generates ``demo_all_rules.pcap``, which triggers
+all 21 rules at once.
 
 For a deep-dive rule authoring guide, see :doc:`../configuration/signature-rules`.
 

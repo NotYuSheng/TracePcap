@@ -55,7 +55,7 @@ This makes it well-suited for:
 | **Network Monitor** | Load multiple PCAPs as ordered snapshots to track device, IP, protocol, and topology changes over time — useful for repeated audits or ongoing capture sessions |
 | **Subnet Detection & Labelling** | Infer subnet structure from traffic patterns or define CIDRs manually; group observed IPs by subnet across all snapshots |
 | **Node Role Annotation** | Annotate any IP or device with a role label (e.g. "SCADA Controller", "Historian"); AI-suggested from traffic signals, human-confirmable |
-| **Custom Signature Rules** | YAML-based detection rules matched against IP, CIDR, port, JA3, hostname, app, and protocol fields; live-reloaded without restart |
+| **Custom Signature Rules** | YAML-based detection rules matched against IP, CIDR, port, JA3, hostname, app, protocol, payload byte patterns, and regex patterns; live-reloaded without restart |
 | **Export Options** | PDF report (with live topology capture), per-conversation PCAP, bulk PCAP export, and CSV export |
 | **Real-time Processing** | Asynchronous analysis with detailed progress tracking |
 | **Multi-protocol Support** | TCP, UDP, ICMP, and application-layer protocols including TLS, HTTP, DNS, QUIC, and L2 protocols (ARP, STP, LLDP, CDP) |
@@ -310,9 +310,35 @@ Rules fire when **all** specified match fields are satisfied. All fields are opt
 | `app` | string | Case-insensitive nDPI application name | `"Telegram"`, `"TOR"` |
 | `protocol` | string | Case-insensitive transport protocol | `"TCP"`, `"UDP"` |
 
+### Payload inspection
+
+Rules can also match against packet payload bytes using `payload_contains` (exact byte strings) or `payload_regex` (regular expressions). These can be combined with `match` fields — all criteria must pass.
+
+#### `payload_contains`
+
+```yaml
+payload_contains:
+  - ascii: "GET /admin"       # plain ASCII string
+  - hex: "255044462d"         # hex bytes (%PDF-)
+```
+
+Multiple entries are OR-matched by default. Set `match_all: true` on the rule to require all entries to match (AND).
+
+#### `payload_regex`
+
+```yaml
+payload_regex:
+  - pattern: "Authorization:\\s*Basic\\s+[A-Za-z0-9+/=]+"
+    case_insensitive: true   # optional, default false
+```
+
+Patterns are standard Java regular expressions applied against the ASCII/UTF-8 decoded payload of each packet. The same `match_all` flag applies across `payload_regex` entries. Regex syntax errors are caught when the rule file is saved — the editor displays an inline error identifying the rule and pattern index.
+
+---
+
 Click **Custom Detection Rules** in the navbar to open the built-in YAML editor. Changes take effect on the next analysis run — no restart required.
 
-A full set of demo rules covering every match field is in [`signatures.sample.yml`](signatures.sample.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP that triggers all 12 rules.
+A full set of demo rules covering every match field, payload byte pattern, and regex pattern is in [`signatures.sample.yml`](signatures.sample.yml). The script [`sample-files/gen_demo.py`](sample-files/gen_demo.py) generates a PCAP (`demo_all_rules.pcap`) that triggers all 21 rules.
 
 ## Sample Files
 

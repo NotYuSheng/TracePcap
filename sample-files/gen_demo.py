@@ -381,6 +381,84 @@ for peer_ip, sport, dport, payload in STAR_PEERS:
 
 print(f"Star-graph demo: {HUB_IP} ↔ {len(STAR_PEERS)} peers added")
 
+# ── payload_contains & payload_regex demo flows ───────────────────────────────
+# These flows exercise the payload-inspection rules from signatures.sample.yml.
+# They use a dedicated synthetic target IP so they don't conflict with the match
+# rules above.  nDPI may classify some flows as "HTTP" or unknown — the rules
+# fire on payload content, not on the app name.
+
+PAYLOAD_TARGET = "203.0.113.100"
+
+# --- http_get_admin: literal "GET /admin" in payload ---
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59000, 80,
+    b"GET /admin HTTP/1.1\r\nHost: target.example.com\r\n\r\n")
+
+# --- pdf_in_payload: %PDF- magic bytes (0x25504446 2d) ---
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59001, 80,
+    b"HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4 1 0 obj<</Type/Catalog>>")
+
+# --- cleartext_credentials: password= field in POST body ---
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59002, 80,
+    b"POST /login HTTP/1.1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n"
+    b"username=admin&password=secret123")
+
+# --- http_post_with_token: POST method + token field (match_all) ---
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59003, 8080,
+    b"POST /api/v1/auth HTTP/1.1\r\nContent-Type: application/json\r\n\r\n"
+    b"{\"username\":\"admin\",\"token\":\"abc123xyz\"}")
+
+# --- dns_txt_response: DNS TXT query (QTYPE 0x0010 = 16) over UDP port 53 ---
+packets += [
+    eth() / IP(src=CLIENT_IP, dst=DNS_SERVER)
+    / UDP(sport=59004, dport=53)
+    / DNS(rd=1, qd=DNSQR(qname="exfil.evil.com", qtype="TXT")),
+    eth(src_mac=GW_MAC, dst_mac=CLIENT_MAC) / IP(src=DNS_SERVER, dst=CLIENT_IP)
+    / UDP(sport=53, dport=59004)
+    / DNS(qr=1, aa=1,
+          qd=DNSQR(qname="exfil.evil.com", qtype="TXT"),
+          an=DNSRR(rrname="exfil.evil.com", type=16, rdata=b"c2Vuc2l0aXZlZGF0YQ==")),
+]
+
+# --- http_basic_auth_regex: Authorization: Basic header (regex, case-insensitive) ---
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59010, 80,
+    b"GET /secure HTTP/1.1\r\nHost: target.example.com\r\n"
+    b"Authorization: Basic dXNlcjpwYXNz\r\n\r\n")
+
+# --- pii_in_payload: email address + phone number (regex OR) ---
+# Use a JSON body so raw @ and hyphens appear as literal characters for the regex.
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59011, 8080,
+    b"POST /contact HTTP/1.1\r\nContent-Type: application/json\r\n\r\n"
+    b'{"name":"John Doe","email":"john.doe@example.com","phone":"555-123-4567"}')
+
+# --- jwt_set_cookie: Set-Cookie header + JWT-shaped value (regex match_all) ---
+jwt_req = b"GET /dashboard HTTP/1.1\r\nHost: target.example.com\r\n\r\n"
+jwt_resp = (
+    b"HTTP/1.1 200 OK\r\n"
+    b"Set-Cookie: auth=eyJhbGciOiJIUzI1NiJ9"
+    b".eyJ1c2VyIjoiYWRtaW4ifQ"
+    b".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c; Path=/\r\n"
+    b"Content-Length: 2\r\n\r\nOK"
+)
+pkts_jwt = tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59012, 80, jwt_req)
+pkts_jwt += [
+    eth(src_mac=GW_MAC, dst_mac=CLIENT_MAC)
+    / IP(src=PAYLOAD_TARGET, dst=CLIENT_IP)
+    / TCP(sport=80, dport=59012, flags="PA", seq=5001, ack=1001 + len(jwt_req))
+    / Raw(jwt_resp),
+    eth()
+    / IP(src=CLIENT_IP, dst=PAYLOAD_TARGET)
+    / TCP(sport=59012, dport=80, flags="A",
+          seq=1001 + len(jwt_req), ack=5001 + len(jwt_resp)),
+]
+packets += pkts_jwt
+
+# --- sql_injection_probe: SQL injection pattern in HTTP GET (TCP dstPort 80) ---
+# Use raw bytes (not URL-encoded) so the regex can match the literal characters.
+packets += tcp_flow(CLIENT_IP, PAYLOAD_TARGET, 59013, 80,
+    b"GET /search?q=' OR '1'='1&type=user HTTP/1.1\r\nHost: target.example.com\r\n\r\n")
+
+print(f"Payload-inspection demo: 9 flows (5 payload_contains + 4 payload_regex) added")
+
 # ── write synthetic pcap ──────────────────────────────────────────────────────
 synthetic_path = os.path.join(SCRIPT_DIR, "_synthetic_rules.pcap")
 wrpcap(synthetic_path, packets)
