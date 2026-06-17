@@ -271,13 +271,15 @@ export const NetworkDiagramPage = () => {
     }
 
     // Ghost filter: hide nodes matching active ghost types and their edges
-    if (activeGhostFilters.length > 0) {
-      const ghostIds = new Set(
-        nodes
-          .filter(n => n.data.ghostFlags?.some(flag => activeGhostFilters.includes(flag)))
-          .map(n => n.id)
-      );
-      filtered = filtered.filter(e => !ghostIds.has(e.source) && !ghostIds.has(e.target));
+    const hiddenGhostIds = new Set<string>(
+      activeGhostFilters.length > 0
+        ? nodes
+            .filter(n => n.data.ghostFlags?.some(flag => activeGhostFilters.includes(flag)))
+            .map(n => n.id)
+        : []
+    );
+    if (hiddenGhostIds.size > 0) {
+      filtered = filtered.filter(e => !hiddenGhostIds.has(e.source) && !hiddenGhostIds.has(e.target));
     }
 
     const hasActiveFilters =
@@ -296,9 +298,10 @@ export const NetworkDiagramPage = () => {
       portFilter.length > 0;
 
     const ipLower = ipFilter.toLowerCase();
-    let visibleNodes = nodes;
+    // Start with ghost-hidden nodes already excluded so IP search can't resurface them.
+    let visibleNodes = nodes.filter(n => !hiddenGhostIds.has(n.id));
     if (ipFilter) {
-      visibleNodes = nodes.filter(
+      visibleNodes = visibleNodes.filter(
         n =>
           n.data.ip.toLowerCase().includes(ipLower) ||
           (n.data.hostname ?? '').toLowerCase().includes(ipLower)
@@ -316,7 +319,7 @@ export const NetworkDiagramPage = () => {
         visibleNodeIds.add(e.target);
       });
       visibleNodes = nodes.filter(
-        n => visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id))
+        n => !hiddenGhostIds.has(n.id) && (visibleNodeIds.has(n.id) || (ipFilter && matchedByIp.has(n.id)))
       );
     }
 
