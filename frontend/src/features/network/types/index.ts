@@ -55,6 +55,15 @@ export interface NodeData {
   ttl?: number;
   /** Which file(s) this node appears in — set only in compare mode. */
   sources?: string[];
+  /**
+   * Ghost/phantom node flags — set when a node shows signs of being an
+   * unreachable or scan-artefact host. Possible values:
+   *   'no-response'      — only ever appeared as dst in unidirectional conversations
+   *   'arp-no-reply'     — subset of no-response, only ARP protocol
+   *   'icmp-unreachable' — subset of no-response, only ICMP protocol
+   *   'ttl-exceeded'     — only appeared as src of unidirectional ICMP (traceroute hop)
+   */
+  ghostFlags?: string[];
   // ── Cluster fields — only set on synthetic cluster nodes ─────────────────
   /** True when this node represents a collapsed /24 subnet cluster. */
   isCluster?: boolean;

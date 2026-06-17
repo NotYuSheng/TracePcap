@@ -384,6 +384,13 @@ export function buildNetworkGraph(
   // ndpiAppSets[ip] = set of distinct nDPI appName values seen on inbound edges (dst = ip)
   const ndpiAppSets: Record<string, Set<string>> = {};
 
+  // Ghost/phantom node detection tracking
+  const ghostAppearsAsSrc = new Set<string>();
+  const ghostAppearsAsDst = new Set<string>();
+  const ghostBidirectional = new Set<string>(); // IPs involved in any truly bidirectional conv
+  const ghostProtoAsSrc: Record<string, Set<string>> = {};
+  const ghostProtoAsDst: Record<string, Set<string>> = {};
+
   // Seed all known hosts from the analysis summary so the node count matches
   // the "Unique Hosts" figure on the overview, even for hosts that fall outside
   // the conversation rendering limit below.
@@ -449,6 +456,24 @@ export function buildNetworkGraph(
 
     // Create edge
     edges.push(createEdge(conv, src.ip, dst.ip));
+
+    // Ghost node detection: track per-conversation roles and directionality.
+    // Use both conv.direction and a direct flowRisks check — ARP conversations
+    // are never flagged with 'unidirectional_traffic' by the backend even when
+    // the ARP target never replied, so we need the fallback.
+    ghostAppearsAsSrc.add(src.ip);
+    ghostAppearsAsDst.add(dst.ip);
+    const convIsUnidirectional =
+      conv.direction === 'unidirectional' ||
+      (conv.flowRisks ?? []).includes('unidirectional_traffic');
+    if (!convIsUnidirectional) {
+      ghostBidirectional.add(src.ip);
+      ghostBidirectional.add(dst.ip);
+    }
+    if (!ghostProtoAsSrc[src.ip]) ghostProtoAsSrc[src.ip] = new Set();
+    ghostProtoAsSrc[src.ip].add(protocol);
+    if (!ghostProtoAsDst[dst.ip]) ghostProtoAsDst[dst.ip] = new Set();
+    ghostProtoAsDst[dst.ip].add(protocol);
   });
 
   // Classify node types based on accumulated nDPI app / port / peer data
@@ -459,6 +484,49 @@ export function buildNetworkGraph(
       peerSets[ip]?.size || 0,
       ndpiAppSets[ip] ?? new Set()
     );
+  });
+
+  // Compute ghost/phantom node flags for each node in the map
+  Object.keys(nodeMap).forEach(ip => {
+    const node = nodeMap[ip];
+    const ghostFlags: string[] = [];
+
+    const asSrc = ghostAppearsAsSrc.has(ip);
+    const asDst = ghostAppearsAsDst.has(ip);
+    const bidir = ghostBidirectional.has(ip);
+    const dstProtos = ghostProtoAsDst[ip];
+    const srcProtos = ghostProtoAsSrc[ip];
+
+    // No response: only appears as dst in unidirectional conversations (any protocol)
+    if (!asSrc && asDst && !bidir) {
+      ghostFlags.push('no-response');
+    }
+
+    // ARP no-reply: only appears as dst in ARP — skip bidir check because the
+    // backend never emits 'unidirectional_traffic' for ARP; dst-only is sufficient
+    if (!asSrc && asDst && dstProtos?.size === 1 && dstProtos.has('ARP')) {
+      ghostFlags.push('arp-no-reply');
+    }
+
+    // ICMP unreachable: subset of no-response, only ICMP protocol as dst
+    if (
+      !asSrc && asDst && !bidir &&
+      dstProtos?.size === 1 && (dstProtos.has('ICMP') || dstProtos.has('ICMPV6'))
+    ) {
+      ghostFlags.push('icmp-unreachable');
+    }
+
+    // TTL exceeded: only appears as src in unidirectional ICMP (traceroute intermediate hops)
+    if (
+      asSrc && !asDst && !bidir &&
+      srcProtos?.size === 1 && (srcProtos.has('ICMP') || srcProtos.has('ICMPV6'))
+    ) {
+      ghostFlags.push('ttl-exceeded');
+    }
+
+    if (ghostFlags.length > 0) {
+      node.data.ghostFlags = ghostFlags;
+    }
   });
 
   // Apply backend device classifications (deviceType, confidence, manufacturer)
@@ -542,6 +610,8 @@ export function applyNetworkFilters(
     activeNodeFilters: string[];
     portFilter: string;
     ipFilter: string;
+    /** Ghost node flags to hide (e.g. 'no-response', 'arp-no-reply', 'ttl-exceeded', 'icmp-unreachable'). */
+    activeGhostFilters?: string[];
   }
 ): { filteredNodes: GraphNode[]; filteredEdges: GraphEdge[] } {
   const {
@@ -557,6 +627,7 @@ export function applyNetworkFilters(
     activeNodeFilters,
     portFilter,
     ipFilter,
+    activeGhostFilters = [],
   } = filters;
 
   let fe = allEdges;
@@ -614,6 +685,16 @@ export function applyNetworkFilters(
     const portNum = parseInt(portFilter, 10);
     if (!isNaN(portNum))
       fe = fe.filter(e => e.data.srcPort === portNum || e.data.dstPort === portNum);
+  }
+
+  // Ghost filter: hide nodes matching the active ghost types and their edges
+  if (activeGhostFilters.length > 0) {
+    const ghostIds = new Set(
+      allNodes
+        .filter(n => n.data.ghostFlags?.some(flag => activeGhostFilters.includes(flag)))
+        .map(n => n.id)
+    );
+    fe = fe.filter(e => !ghostIds.has(e.source) && !ghostIds.has(e.target));
   }
 
   const visibleIds = new Set<string>();

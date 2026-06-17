@@ -174,14 +174,15 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
       <div className="modal-dialog modal-lg modal-dialog-scrollable">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 id="node-details-title" className="modal-title font-monospace">
-              {node.data.ip}
-              {node.data.hostname && (
-                <small className="text-muted ms-2 fw-normal node-details-hostname">
-                  ({node.data.hostname})
-                </small>
-              )}
-            </h5>
+            <div id="node-details-title" className="modal-title">
+              <div className="fw-semibold">Node Details</div>
+              <div className="font-monospace fw-normal" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
+                {node.data.ip}
+                {node.data.hostname && (
+                  <span className="ms-2 node-details-hostname">({node.data.hostname})</span>
+                )}
+              </div>
+            </div>
             <button
               type="button"
               className="btn-close ms-3"
@@ -237,6 +238,38 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
             {/* ── DETAILS TAB ────────────────────────────────────────── */}
             {activeTab === 'details' && (
               <>
+                {/* Ghost node warning */}
+                {node.data.ghostFlags && node.data.ghostFlags.length > 0 && (
+                  <div className="d-flex align-items-start gap-2 rounded p-2 mb-3 small" style={{ background: '#fff3cd', border: '1px solid #ffc10755' }}>
+                    <i className="bi bi-slash-circle text-warning mt-1 flex-shrink-0" />
+                    <div>
+                      <span className="fw-semibold text-warning-emphasis">Phantom node</span>
+                      <span className="text-muted ms-2">
+                        {node.data.ghostFlags.includes('arp-no-reply') && 'ARP request target — never replied.'}
+                        {node.data.ghostFlags.includes('ttl-exceeded') && 'Traceroute intermediate hop — only appeared via ICMP TTL-exceeded replies.'}
+                        {node.data.ghostFlags.includes('icmp-unreachable') && !node.data.ghostFlags.includes('arp-no-reply') && !node.data.ghostFlags.includes('ttl-exceeded') && 'ICMP probe target — never responded.'}
+                        {node.data.ghostFlags.includes('no-response') && !node.data.ghostFlags.includes('arp-no-reply') && !node.data.ghostFlags.includes('icmp-unreachable') && !node.data.ghostFlags.includes('ttl-exceeded') && 'Scan target — received traffic but never sent a reply.'}
+                      </span>
+                      <div className="mt-1 d-flex flex-wrap gap-1">
+                        {node.data.ghostFlags.map(flag => {
+                          const meta: Record<string, { label: string; color: string }> = {
+                            'no-response':      { label: 'No response',      color: '#e74c3c' },
+                            'arp-no-reply':     { label: 'ARP no-reply',     color: '#e67e22' },
+                            'icmp-unreachable': { label: 'ICMP unreachable', color: '#c0392b' },
+                            'ttl-exceeded':     { label: 'TTL exceeded',     color: '#8e44ad' },
+                          };
+                          const { label, color } = meta[flag] ?? { label: flag, color: '#6c757d' };
+                          return (
+                            <span key={flag} className="badge" style={{ backgroundColor: color, color: '#fff', fontSize: '0.7rem' }}>
+                              {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Identity */}
                 <div className="row mb-3">
                   <div className="col-sm-6">
