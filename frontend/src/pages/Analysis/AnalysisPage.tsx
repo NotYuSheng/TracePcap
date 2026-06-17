@@ -49,6 +49,8 @@ export interface NetworkDiagramFilterState {
   setActiveFileTypes: Dispatch<SetStateAction<string[]>>;
   activeCountries: string[];
   setActiveCountries: Dispatch<SetStateAction<string[]>>;
+  activeGhostFilters: string[];
+  setActiveGhostFilters: Dispatch<SetStateAction<string[]>>;
 }
 
 export interface StoryGenerationState {
@@ -235,6 +237,7 @@ export const AnalysisPage = () => {
   const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
   const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
   const [activeCountries, setActiveCountries] = useState<string[]>([]);
+  const [activeGhostFilters, setActiveGhostFilters] = useState<string[]>([]);
 
   const networkDiagramFilters: NetworkDiagramFilterState = {
     nodeLimit, setNodeLimit,
@@ -250,6 +253,7 @@ export const AnalysisPage = () => {
     activeCustomSigs, setActiveCustomSigs,
     activeFileTypes, setActiveFileTypes,
     activeCountries, setActiveCountries,
+    activeGhostFilters, setActiveGhostFilters,
   };
 
   // NetworkDiagramPage writes its current filtered nodes/edges here so the

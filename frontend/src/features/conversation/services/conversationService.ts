@@ -120,7 +120,9 @@ function transformConversation(
     packetCount: apiData.packetCount,
     totalBytes: apiData.totalBytes,
     packets,
-    direction: 'bidirectional',
+    direction: (apiData.flowRisks ?? []).includes('unidirectional_traffic')
+      ? 'unidirectional'
+      : 'bidirectional',
   };
 }
 

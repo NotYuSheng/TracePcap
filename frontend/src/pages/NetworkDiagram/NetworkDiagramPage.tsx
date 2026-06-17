@@ -36,6 +36,7 @@ export const NetworkDiagramPage = () => {
     activeCustomSigs, setActiveCustomSigs,
     activeFileTypes, setActiveFileTypes,
     activeCountries, setActiveCountries,
+    activeGhostFilters, setActiveGhostFilters,
   } = networkDiagramFilters;
 
   // Draft value for the custom node count input — only applied on Enter/blur
@@ -47,6 +48,7 @@ export const NetworkDiagramPage = () => {
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
+  const toggleGhostFilter = toggleSet(setActiveGhostFilters);
   const toggleLegendProtocol = toggleSet(setActiveLegendProtocols);
   const toggleNodeFilter = toggleSet(setActiveNodeFilters);
   const toggleAppFilter = toggleSet(setActiveAppFilters);
@@ -69,6 +71,7 @@ export const NetworkDiagramPage = () => {
     setActiveCustomSigs([]);
     setActiveFileTypes([]);
     setActiveCountries([]);
+    setActiveGhostFilters([]);
     setHasRisksOnly(false);
   };
 
@@ -171,6 +174,12 @@ export const NetworkDiagramPage = () => {
     return [...vals].sort();
   }, [edges]);
 
+  const presentGhostFlags = useMemo(() => {
+    const flags = new Set<string>();
+    nodes.forEach(n => n.data.ghostFlags?.forEach(f => flags.add(f)));
+    return flags;
+  }, [nodes]);
+
   // country options as "code|name" strings (matching ConversationFilterPanel convention)
   const presentCountries = useMemo(() => {
     const map = new Map<string, string>();
@@ -261,6 +270,16 @@ export const NetworkDiagramPage = () => {
       }
     }
 
+    // Ghost filter: hide nodes matching active ghost types and their edges
+    if (activeGhostFilters.length > 0) {
+      const ghostIds = new Set(
+        nodes
+          .filter(n => n.data.ghostFlags?.some(flag => activeGhostFilters.includes(flag)))
+          .map(n => n.id)
+      );
+      filtered = filtered.filter(e => !ghostIds.has(e.source) && !ghostIds.has(e.target));
+    }
+
     const hasActiveFilters =
       activeLegendProtocols.length > 0 ||
       activeNodeFilters.length > 0 ||
@@ -271,6 +290,7 @@ export const NetworkDiagramPage = () => {
       activeCustomSigs.length > 0 ||
       activeFileTypes.length > 0 ||
       activeCountries.length > 0 ||
+      activeGhostFilters.length > 0 ||
       hasRisksOnly ||
       ipFilter.length > 0 ||
       portFilter.length > 0;
@@ -313,6 +333,7 @@ export const NetworkDiagramPage = () => {
     activeCustomSigs,
     activeFileTypes,
     activeCountries,
+    activeGhostFilters,
     hasRisksOnly,
     ipFilter,
     portFilter,
@@ -328,6 +349,7 @@ export const NetworkDiagramPage = () => {
     activeCustomSigs.length +
     activeFileTypes.length +
     activeCountries.length +
+    activeGhostFilters.length +
     (ipFilter ? 1 : 0) +
     (portFilter ? 1 : 0) +
     (hasRisksOnly ? 1 : 0);
@@ -341,6 +363,7 @@ export const NetworkDiagramPage = () => {
       activeLegendProtocols, activeNodeFilters, activeAppFilters,
       activeL7Protocols, activeCategories, activeRiskTypes,
       activeCustomSigs, activeFileTypes, activeCountries,
+      activeGhostFilters,
     });
     const nodeLimitNote =
       hiddenNodes > 0
@@ -591,6 +614,10 @@ export const NetworkDiagramPage = () => {
             presentCountries={presentCountries}
             hasRisksOnly={hasRisksOnly}
             onHasRisksOnlyChange={setHasRisksOnly}
+            activeGhostFilters={activeGhostFilters}
+            onGhostFilterClick={toggleGhostFilter}
+            onGhostFilterClear={() => setActiveGhostFilters([])}
+            presentGhostFlags={presentGhostFlags}
             activeFilterCount={activeFilterCount}
             onClearAllFilters={clearAllFilters}
           />

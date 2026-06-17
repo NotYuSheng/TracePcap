@@ -108,6 +108,13 @@ export function toggleSet(setter: React.Dispatch<React.SetStateAction<string[]>>
  * snapshot. Used in both NetworkDiagramPage (ref sync) and AnalysisPage (PDF
  * report). Centralised here so the two sites stay in sync automatically.
  */
+const GHOST_FLAG_LABELS: Record<string, string> = {
+  'no-response':      'No response',
+  'arp-no-reply':     'ARP no-reply',
+  'icmp-unreachable': 'ICMP unreachable',
+  'ttl-exceeded':     'TTL exceeded',
+};
+
 export function buildActiveFilterLabels(filters: {
   ipFilter: string;
   portFilter: string;
@@ -121,6 +128,7 @@ export function buildActiveFilterLabels(filters: {
   activeCustomSigs: string[];
   activeFileTypes: string[];
   activeCountries: string[];
+  activeGhostFilters?: string[];
 }): string[] {
   const labels: string[] = [];
   if (filters.ipFilter) labels.push(`IP: ${filters.ipFilter}`);
@@ -144,6 +152,10 @@ export function buildActiveFilterLabels(filters: {
     labels.push(`File type: ${filters.activeFileTypes.join(', ')}`);
   if (filters.activeCountries.length > 0)
     labels.push(`Country: ${filters.activeCountries.join(', ')}`);
+  if (filters.activeGhostFilters && filters.activeGhostFilters.length > 0)
+    labels.push(
+      `Hide ghost: ${filters.activeGhostFilters.map(f => GHOST_FLAG_LABELS[f] ?? f).join(', ')}`
+    );
   return labels;
 }
 
