@@ -296,6 +296,7 @@ export const AnalysisPage = () => {
         activeLegendProtocols, activeNodeFilters, activeAppFilters,
         activeL7Protocols, activeCategories, activeRiskTypes,
         activeCustomSigs, activeFileTypes, activeCountries,
+        activeGhostFilters,
       });
 
       let diagramNodes = filteredNodes;
@@ -328,7 +329,7 @@ export const AnalysisPage = () => {
           graph.nodes, graph.edges, {
             hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols,
             activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes,
-            activeCountries, activeNodeFilters, portFilter, ipFilter,
+            activeCountries, activeNodeFilters, portFilter, ipFilter, activeGhostFilters,
           }
         );
 
