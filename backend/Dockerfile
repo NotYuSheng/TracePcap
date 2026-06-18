@@ -15,23 +15,21 @@ RUN mvn clean package -DskipTests -B
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-jammy
 
-# nDPI version pin — bump this arg to upgrade nDPI without changing anything else.
-# Current pinned version is sourced from ntop's stable apt repo for Ubuntu 22.04.
-# To find available versions: apt-cache policy ndpi (after adding ntop repo).
-ARG NDPI_VERSION=5.0.0-5935
-
 WORKDIR /app
 
 # Install runtime dependencies:
 #   tshark  — PCAP/pcapng parser
-#   ndpi    — ndpiReader for application-layer DPI (pinned via NDPI_VERSION arg)
+#   ndpi    — ndpiReader for application-layer DPI (latest from ntop apt repo)
 #   tzdata  — timezone data
 #   gosu    — privilege-drop helper for entrypoint
 #
 # The ntop apt repo is required because Ubuntu 22.04's built-in nDPI (4.2-2)
 # lacks H.225/H.245 session tracking and several protocol signatures added in v5.
 #
-# To upgrade nDPI: bump NDPI_VERSION above, rebuild the image, and redeploy
+# nDPI is intentionally unpinned: ntop's stable repo only keeps the latest
+# rolling build, so pinning an exact version breaks the build once that .deb is
+# rotated out (404). We always install the latest available and record it in
+# /opt/ndpi-version. To refresh nDPI: rebuild the image and redeploy
 # (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh).
 #
 # BuildKit cache mounts keep downloaded apt packages cached across rebuilds.
@@ -50,13 +48,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         tshark \
         tzdata \
-        gosu && \
-    if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "ndpi=${NDPI_VERSION}"; then \
-        echo "${NDPI_VERSION}" > /opt/ndpi-version; \
-    else \
-        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ndpi && \
-        dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version; \
-    fi && \
+        gosu \
+        ndpi && \
+    dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version && \
     apt-get purge -y --auto-remove gnupg
 
 # Download DB-IP Lite City MMDB (offline GeoIP).
