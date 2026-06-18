@@ -18,6 +18,11 @@ jobs:
     name: Playwright smoke tests
     runs-on: ubuntu-latest
 
+    # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
+    # to 80. Pin it to 8888 to match the readiness check and the test baseURL.
+    env:
+      NGINX_PORT: '8888'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
