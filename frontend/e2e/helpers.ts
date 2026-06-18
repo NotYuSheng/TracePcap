@@ -38,10 +38,15 @@ export async function uploadAndProcessFixture(request: APIRequestContext): Promi
   let status = 'pending';
   while (Date.now() < deadline) {
     const r = await request.get(`/api/files/${fileId}`);
-    if (r.ok()) {
-      status = (await r.json()).status;
-      if (status === 'completed' || status === 'failed') break;
+    if (!r.ok()) {
+      throw new Error(`Failed to get file status: ${r.status()} ${r.statusText()}`);
     }
+    const body = await r.json();
+    status = body.status;
+    if (!status) {
+      throw new Error(`Response body missing 'status' field: ${JSON.stringify(body)}`);
+    }
+    if (status === 'completed' || status === 'failed') break;
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
   expect(status, `file processing did not complete (status: ${status})`).toBe('completed');
