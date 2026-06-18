@@ -29,14 +29,24 @@ export const RouteErrorBoundary = () => {
     }
   } else if (error instanceof Error) {
     message = error.message;
+  } else if (error && typeof error === 'object') {
+    const errObj = error as Record<string, unknown>;
+    if (typeof errObj.message === 'string') message = errObj.message;
+    else if (typeof errObj.error === 'string') message = errObj.error;
   }
 
-  const detail =
-    error instanceof Error
-      ? error.stack || error.message
-      : typeof error === 'string'
-        ? error
-        : undefined;
+  let detail: string | undefined;
+  if (error instanceof Error) {
+    detail = error.stack || error.message;
+  } else if (typeof error === 'string') {
+    detail = error;
+  } else if (error && typeof error === 'object') {
+    try {
+      detail = JSON.stringify(error, null, 2);
+    } catch {
+      detail = String(error);
+    }
+  }
 
   return (
     <Container className="route-error-boundary">

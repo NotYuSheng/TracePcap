@@ -41,7 +41,11 @@ export async function uploadAndProcessFixture(request: APIRequestContext): Promi
     if (!r.ok()) {
       throw new Error(`Failed to get file status: ${r.status()} ${r.statusText()}`);
     }
-    status = (await r.json()).status;
+    const body = await r.json();
+    status = body.status;
+    if (!status) {
+      throw new Error(`Response body missing 'status' field: ${JSON.stringify(body)}`);
+    }
     if (status === 'completed' || status === 'failed') break;
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
