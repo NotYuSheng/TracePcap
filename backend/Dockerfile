@@ -18,7 +18,7 @@ FROM eclipse-temurin:21-jre-jammy
 # nDPI version pin — bump this arg to upgrade nDPI without changing anything else.
 # Current pinned version is sourced from ntop's stable apt repo for Ubuntu 22.04.
 # To find available versions: apt-cache policy ndpi (after adding ntop repo).
-ARG NDPI_VERSION=5.0.0-5933
+ARG NDPI_VERSION=5.0.0-5935
 
 WORKDIR /app
 
@@ -49,12 +49,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         tshark \
-        "ndpi=${NDPI_VERSION}" \
         tzdata \
         gosu && \
-    apt-get purge -y --auto-remove gnupg && \
-    # Write the pinned version to a file for introspection.
-    echo "${NDPI_VERSION}" > /opt/ndpi-version
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "ndpi=${NDPI_VERSION}"; then \
+        echo "${NDPI_VERSION}" > /opt/ndpi-version; \
+    else \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ndpi && \
+        dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version; \
+    fi && \
+    apt-get purge -y --auto-remove gnupg
 
 # Download DB-IP Lite City MMDB (offline GeoIP).
 # Published monthly at https://db-ip.com/db/download/ip-to-city-lite
