@@ -3,6 +3,7 @@ package com.tracepcap.monitor.service;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.monitor.dto.NetworkDto;
 import com.tracepcap.monitor.dto.CreateNetworkRequest;
+import com.tracepcap.monitor.dto.UpdateNetworkRequest;
 import com.tracepcap.monitor.entity.NetworkEntity;
 import com.tracepcap.insights.repository.NetworkInsightRepository;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
@@ -45,6 +46,17 @@ public class NetworkService {
             .name(request.getName().trim())
             .description(request.getDescription())
             .build();
+    return toDto(networkRepository.save(entity));
+  }
+
+  public NetworkDto updateNetwork(UUID networkId, UpdateNetworkRequest request) {
+    NetworkEntity entity = findOrThrow(networkId);
+    if (request.getName() != null) {
+      entity.setName(request.getName().trim());
+    }
+    if (request.getDescription() != null) {
+      entity.setDescription(request.getDescription().trim().isEmpty() ? null : request.getDescription().trim());
+    }
     return toDto(networkRepository.save(entity));
   }
 

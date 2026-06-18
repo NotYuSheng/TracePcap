@@ -7,6 +7,7 @@ import { monitorService } from '@/features/monitor/services/monitorService';
 import type { Network } from '@/features/monitor/types/monitor.types';
 import { NetworkCard } from '@/components/monitor/NetworkCard/NetworkCard';
 import { CreateNetworkModal } from '@/components/monitor/CreateNetworkModal/CreateNetworkModal';
+import { EditNetworkModal } from '@/components/monitor/EditNetworkModal/EditNetworkModal';
 
 export const MonitorPage = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export const MonitorPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editNetwork, setEditNetwork] = useState<Network | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -39,6 +41,13 @@ export const MonitorPage = () => {
   const handleCreate = async (name: string, description: string) => {
     const network = await monitorService.createNetwork(name, description);
     setNetworks(prev => [network, ...prev]);
+  };
+
+  const handleUpdate = async (name: string, description: string) => {
+    if (!editNetwork) return;
+    const updated = await monitorService.updateNetwork(editNetwork.id, name, description);
+    setNetworks(prev => prev.map(n => n.id === updated.id ? updated : n));
+    setEditNetwork(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -132,6 +141,7 @@ export const MonitorPage = () => {
               <NetworkCard
                 network={network}
                 onClick={() => navigate(`/monitor/${network.id}`)}
+                onEdit={() => setEditNetwork(network)}
                 onDelete={() => setConfirmDeleteId(network.id)}
               />
             </Col>
@@ -143,6 +153,14 @@ export const MonitorPage = () => {
         show={showCreate}
         onHide={() => setShowCreate(false)}
         onCreate={handleCreate}
+      />
+
+      <EditNetworkModal
+        show={!!editNetwork}
+        onHide={() => setEditNetwork(null)}
+        initialName={editNetwork?.name ?? ''}
+        initialDescription={editNetwork?.description ?? null}
+        onSave={handleUpdate}
       />
 
       <Modal show={!!confirmDeleteId} onHide={() => setConfirmDeleteId(null)} centered>

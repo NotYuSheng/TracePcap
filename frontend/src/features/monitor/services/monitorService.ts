@@ -23,6 +23,11 @@ export const monitorService = {
       .post<Network>(MONITOR_ENDPOINTS.NETWORKS, { name, description })
       .then(r => r.data),
 
+  updateNetwork: (id: string, name: string, description: string): Promise<Network> =>
+    apiClient
+      .patch<Network>(MONITOR_ENDPOINTS.NETWORK(id), { name, description })
+      .then(r => r.data),
+
   deleteNetwork: (id: string): Promise<void> =>
     apiClient.delete(MONITOR_ENDPOINTS.NETWORK(id)).then(() => undefined),
 

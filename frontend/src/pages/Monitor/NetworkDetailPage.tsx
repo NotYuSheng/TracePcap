@@ -793,6 +793,7 @@ export const NetworkDetailPage = () => {
         onAdd={handleAddSnapshot}
       />
 
+
     </Container>
   );
 };

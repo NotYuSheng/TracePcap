@@ -256,7 +256,12 @@ enabled. Wait for all eight to reach status *Completed*.
 **Step 2 — Create a Network Monitor session**
 
 Navigate to **Monitor** → **Create Network** → name it
-``Office Audit — Corp HQ`` (or similar).
+``Office Audit — Corp HQ`` and set the description to::
+
+    Corporate HQ office network — weekly PCAP captures from the managed switch spanning eight weeks. Segment covers staff workstations, servers, printers, and BYOD WiFi.
+
+The description is included in the LLM prompt when generating Network Insights,
+giving the model useful context about the environment and capture method.
 
 **Step 3 — Add snapshots**
 
