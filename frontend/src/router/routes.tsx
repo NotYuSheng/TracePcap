@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout } from '@components/common/Layout';
+import { RouteErrorBoundary } from '@components/common/RouteErrorBoundary';
 import { UploadPage } from '@pages/Upload';
 import { AnalysisPage } from '@pages/Analysis';
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -26,6 +28,7 @@ export const router = createBrowserRouter([
       {
         path: 'analysis/:fileId',
         element: <AnalysisPage />,
+        errorElement: <RouteErrorBoundary />,
         children: [
           {
             index: true,

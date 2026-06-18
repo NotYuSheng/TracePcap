@@ -1,0 +1,65 @@
+.route-error-boundary {
+  max-width: 640px;
+  margin: 3rem auto;
+}
+
+.route-error-boundary .alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.route-error-icon {
+  font-size: 2rem;
+  color: var(--tracepcap-danger);
+}
+
+.route-error-content {
+  flex: 1;
+}
+
+.route-error-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #842029;
+}
+
+.route-error-text {
+  margin-bottom: 1rem;
+  color: #58151c;
+}
+
+.route-error-detail {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 1rem;
+}
+
+.route-error-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.route-error-actions button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+[data-theme='dark'] .route-error-title {
+  color: #f8d7da;
+}
+
+[data-theme='dark'] .route-error-text {
+  color: #f1aeb5;
+}
+
+[data-theme='dark'] .route-error-detail {
+  background: rgba(255, 255, 255, 0.08);
+}
