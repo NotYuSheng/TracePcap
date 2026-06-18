@@ -44,7 +44,7 @@ export const MonitorPage = () => {
 
   const handleUpdate = async (name: string, description: string) => {
     if (!editNetwork) return;
-    const updated = await monitorService.updateNetwork(editNetwork.id, name, description || undefined);
+    const updated = await monitorService.updateNetwork(editNetwork.id, name, description);
     setNetworks(prev => prev.map(n => n.id === updated.id ? updated : n));
     setEditNetwork(null);
   };

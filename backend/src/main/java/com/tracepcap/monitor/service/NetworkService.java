@@ -51,8 +51,12 @@ public class NetworkService {
 
   public NetworkDto updateNetwork(UUID networkId, UpdateNetworkRequest request) {
     NetworkEntity entity = findOrThrow(networkId);
-    entity.setName(request.getName().trim());
-    entity.setDescription(request.getDescription());
+    if (request.getName() != null) {
+      entity.setName(request.getName().trim());
+    }
+    if (request.getDescription() != null) {
+      entity.setDescription(request.getDescription().trim().isEmpty() ? null : request.getDescription().trim());
+    }
     return toDto(networkRepository.save(entity));
   }
 
