@@ -7,7 +7,8 @@ import {
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
-import { Alert, Card } from '@govtechsg/sgds-react';
+import { Card } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 

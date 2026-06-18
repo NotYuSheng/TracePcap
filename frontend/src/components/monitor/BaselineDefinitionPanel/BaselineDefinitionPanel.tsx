@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
-import { Alert, Badge, Button, Form } from '@govtechsg/sgds-react';
+import { Badge, Button, Form } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import type {
   BaselineDefinition,
   BaselineEntryType,

@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Alert, Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { tracerService, type TracerStep, type TracerStepsResponse } from '@/features/tracer/tracerService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 

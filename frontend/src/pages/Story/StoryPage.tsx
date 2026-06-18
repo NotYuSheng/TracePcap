@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Alert, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
 import type { TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';

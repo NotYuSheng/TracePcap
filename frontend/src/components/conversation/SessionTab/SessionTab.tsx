@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
-import { Alert, Badge, Button, ButtonGroup, Card } from '@govtechsg/sgds-react';
+import { Badge, Button, ButtonGroup, Card } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type {
   SessionData,

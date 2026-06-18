@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Badge, Button } from '@govtechsg/sgds-react';
+import { Badge, Button } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import type { NetworkInsight, InsightAudience, InsightFocus, InsightOptions } from '@/features/insights/types/insights.types';
 

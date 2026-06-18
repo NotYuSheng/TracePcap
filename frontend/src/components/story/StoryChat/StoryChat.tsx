@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useRef, useEffect } from 'react';
-import { Alert, Button, Card, Form } from '@govtechsg/sgds-react';
+import { Button, Card, Form } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { storyService } from '@/features/story/services/storyService';
 
 interface Message {

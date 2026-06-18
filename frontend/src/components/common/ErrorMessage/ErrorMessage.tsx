@@ -1,4 +1,5 @@
-import { Alert, Button } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import './ErrorMessage.css';
 
 interface ErrorMessageProps {

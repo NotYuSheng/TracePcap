@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
-import { Alert, Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { apiClient } from '@/services/api/client';
 import { ipOrgRuleService, type IpOrgRule } from '@/features/intelligence/services/ipOrgRuleService';
 

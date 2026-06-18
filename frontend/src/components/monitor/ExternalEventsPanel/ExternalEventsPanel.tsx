@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Button, Form } from '@govtechsg/sgds-react';
+import { Button, Form } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';

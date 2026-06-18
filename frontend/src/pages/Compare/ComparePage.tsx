@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Alert, Badge, Button, Card, Form } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import type { GraphNode } from '@/features/network/types';

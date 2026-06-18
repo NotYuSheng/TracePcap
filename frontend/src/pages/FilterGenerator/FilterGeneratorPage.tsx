@@ -1,7 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Alert, Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import type { AnalysisData, Packet } from '@/types';
 import { apiClient } from '@/services/api/client';
 import { filterService } from '@/features/filter/services/filterService';

@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Alert, Badge, Button, Form } from '@govtechsg/sgds-react';
+import { Badge, Button, Form } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {

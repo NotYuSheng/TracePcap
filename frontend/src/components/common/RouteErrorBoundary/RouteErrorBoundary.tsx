@@ -1,4 +1,5 @@
-import { Alert, Button, Container } from '@govtechsg/sgds-react';
+import { Button, Container } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { isRouteErrorResponse, useRouteError, useNavigate } from 'react-router-dom';
 import './RouteErrorBoundary.css';
 
