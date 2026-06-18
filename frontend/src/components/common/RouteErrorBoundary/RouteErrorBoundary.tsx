@@ -27,6 +27,8 @@ export const RouteErrorBoundary = () => {
       if (typeof data.message === 'string') message = data.message;
       else if (typeof data.error === 'string') message = data.error;
     }
+  } else if (error instanceof Error) {
+    message = error.message;
   }
 
   const detail =
