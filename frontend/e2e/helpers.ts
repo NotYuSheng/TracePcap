@@ -32,15 +32,19 @@ export async function uploadAndProcessFixture(request: APIRequestContext): Promi
   const fileId: string = body.fileId ?? body.existingFileId;
   expect(fileId).toBeTruthy();
 
-  await expect
-    .poll(
-      async () => {
-        const r = await request.get(`/api/files/${fileId}`);
-        return r.ok() ? (await r.json()).status : 'pending';
-      },
-      { timeout: 60_000, intervals: [1000, 2000] }
-    )
-    .toBe('completed');
+  // Poll until processing finishes; fail fast if the backend marks it 'failed'
+  // instead of waiting out the whole timeout.
+  const deadline = Date.now() + 60_000;
+  let status = 'pending';
+  while (Date.now() < deadline) {
+    const r = await request.get(`/api/files/${fileId}`);
+    if (r.ok()) {
+      status = (await r.json()).status;
+      if (status === 'completed' || status === 'failed') break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  expect(status, `file processing did not complete (status: ${status})`).toBe('completed');
 
   return fileId;
 }

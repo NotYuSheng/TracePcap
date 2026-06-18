@@ -1,4 +1,4 @@
-import { test, expect, request as pwRequest } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { uploadAndProcessFixture, LLM_UNREACHABLE_502 } from './helpers';
 
 /**
@@ -9,13 +9,10 @@ import { uploadAndProcessFixture, LLM_UNREACHABLE_502 } from './helpers';
  * is actually visible with its message.
  */
 
-const BASE = process.env.E2E_BASE_URL || 'http://localhost:8888';
 let fileId: string;
 
-test.beforeAll(async () => {
-  const ctx = await pwRequest.newContext({ baseURL: BASE });
-  fileId = await uploadAndProcessFixture(ctx);
-  await ctx.dispose();
+test.beforeAll(async ({ request }) => {
+  fileId = await uploadAndProcessFixture(request);
 });
 
 test('Story tab shows an error alert when story generation returns 502', async ({ page }) => {
