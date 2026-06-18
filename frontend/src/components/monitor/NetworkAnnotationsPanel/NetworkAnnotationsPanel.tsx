@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Button } from '@govtechsg/sgds-react';
+import { Button } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import type { NetworkAnnotation } from '@/features/insights/types/insights.types';
 

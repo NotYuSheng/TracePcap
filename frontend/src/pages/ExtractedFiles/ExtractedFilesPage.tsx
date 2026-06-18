@@ -11,7 +11,8 @@ import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Alert, Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { formatBytes } from '@/utils/formatters';
 import '@components/conversation/ConversationFilterPanel/ConversationFilterPanel.css';
 

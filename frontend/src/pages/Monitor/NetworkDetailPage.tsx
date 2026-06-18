@@ -1,7 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Alert, Badge, Button, Card, Container, Form, OverlayTrigger, Popover, Row, Col } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Container, Form, OverlayTrigger, Popover, Row, Col } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import { insightsService } from '@/features/insights/services/insightsService';
 import { subnetService } from '@/features/subnets/services/subnetService';

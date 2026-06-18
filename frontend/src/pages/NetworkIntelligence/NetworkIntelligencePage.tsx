@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Alert, Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Button, Card, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import type { AnalysisData } from '@/types';
 import {
   intelligenceService,

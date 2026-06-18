@@ -1,7 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Container, Form, Modal, Row, Col } from '@govtechsg/sgds-react';
+import { Button, Container, Form, Modal, Row, Col } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import type { Network } from '@/features/monitor/types/monitor.types';
 import { NetworkCard } from '@/components/monitor/NetworkCard/NetworkCard';

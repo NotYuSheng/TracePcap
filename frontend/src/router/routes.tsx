@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout } from '@components/common/Layout';
+import { RouteErrorBoundary } from '@components/common/RouteErrorBoundary';
 import { UploadPage } from '@pages/Upload';
 import { AnalysisPage } from '@pages/Analysis';
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -26,34 +28,44 @@ export const router = createBrowserRouter([
       {
         path: 'analysis/:fileId',
         element: <AnalysisPage />,
+        errorElement: <RouteErrorBoundary />,
+        // errorElement on each child tab so a throw renders inside AnalysisPage's
+        // <Outlet> (keeping the header/tabs), instead of replacing the whole shell.
         children: [
           {
             index: true,
             element: <AnalysisOverview />,
+            errorElement: <RouteErrorBoundary />,
           },
           {
             path: 'conversations',
             element: <ConversationPage />,
+            errorElement: <RouteErrorBoundary />,
           },
           {
             path: 'story',
             element: <StoryPage />,
+            errorElement: <RouteErrorBoundary />,
           },
           {
             path: 'filter-generator',
             element: <FilterGeneratorPage />,
+            errorElement: <RouteErrorBoundary />,
           },
           {
             path: 'network-diagram',
             element: <NetworkDiagramPage />,
+            errorElement: <RouteErrorBoundary />,
           },
           {
             path: 'extracted-files',
             element: <ExtractedFilesPage />,
+            errorElement: <RouteErrorBoundary />,
           },
           {
             path: 'network-intelligence',
             element: <NetworkIntelligencePage />,
+            errorElement: <RouteErrorBoundary />,
           },
         ],
       },

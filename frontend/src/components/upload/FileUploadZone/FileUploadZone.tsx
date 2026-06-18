@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Alert, Card } from '@govtechsg/sgds-react';
+import { Card } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { CloudUpload } from 'lucide-react';
 import { formatBytes } from '@/utils/formatters';
 import './FileUploadZone.css';

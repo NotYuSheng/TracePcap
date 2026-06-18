@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
-import { Alert, Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 
 interface CreateNetworkModalProps {
   show: boolean;

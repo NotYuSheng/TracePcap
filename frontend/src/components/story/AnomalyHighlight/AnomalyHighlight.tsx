@@ -1,4 +1,5 @@
-import { Alert, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import type { Highlight } from '@/types';
 import { formatTimestamp } from '@/utils/formatters';
 

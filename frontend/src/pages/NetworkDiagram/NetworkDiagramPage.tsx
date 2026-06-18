@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Alert, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import type { GraphNode } from '@/features/network/types';
 import {
   useNetworkData,

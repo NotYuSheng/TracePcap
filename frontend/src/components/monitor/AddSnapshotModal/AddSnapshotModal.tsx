@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Badge, Button, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
