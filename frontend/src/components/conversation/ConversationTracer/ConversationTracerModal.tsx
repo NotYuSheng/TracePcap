@@ -58,6 +58,19 @@ const COLOR_ACTIVE = '#0072c6';   // traced peer (blue)
 const COLOR_RESPONDED = '#107c10'; // peer that replied (green)
 const COLOR_SILENT = '#9aa0a6';    // peer that never replied (muted gray)
 
+/** Legend swatch — defined at module scope to avoid recreating the component each render. */
+function Swatch({ color, dashed, text }: { color: string; dashed?: boolean; text: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <svg width={16} height={10} aria-hidden="true">
+        <circle cx={5} cy={5} r={4} fill="none" stroke={color} strokeWidth={1.5}
+          strokeDasharray={dashed ? '2 2' : undefined} opacity={dashed ? 0.7 : 1} />
+      </svg>
+      {text}
+    </span>
+  );
+}
+
 function peerPos(index: number, total: number): { x: number; y: number } {
   // Start from top (−π/2) so single peer appears directly above center
   const angle = (2 * Math.PI * index) / total - Math.PI / 2;
@@ -373,15 +386,6 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
                 {peers.length > 1 && (() => {
                   const respondedCount = peers.filter(p => p.responded).length;
                   const silentCount = peers.length - respondedCount;
-                  const Swatch = ({ color, dashed, text }: { color: string; dashed?: boolean; text: string }) => (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <svg width={16} height={10} aria-hidden="true">
-                        <circle cx={5} cy={5} r={4} fill="none" stroke={color} strokeWidth={1.5}
-                          strokeDasharray={dashed ? '2 2' : undefined} opacity={dashed ? 0.7 : 1} />
-                      </svg>
-                      {text}
-                    </span>
-                  );
                   return (
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 10, color: 'var(--tp-text-muted)', marginBottom: 4 }}>
                       <Swatch color={COLOR_RESPONDED} text={`Responded (${respondedCount})`} />

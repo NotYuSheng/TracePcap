@@ -87,8 +87,7 @@ public class ConversationTracerService {
     List<ConversationEntity> hostConvs = conversationRepository.findByFileIdAndIp(fileId, hostIp);
 
     Set<UUID> respondedConvIds = new HashSet<>(
-        packetRepository.findConversationIdsWithReplyFromPeer(
-            hostConvs.stream().map(ConversationEntity::getId).toList(), hostIp));
+        packetRepository.findConversationIdsWithReplyFromPeer(fileId, hostIp));
 
     // Aggregate per peer IP: a peer counts as responding if any of its conversations had a reply.
     // Preserve packetCount-desc ordering from the query via a LinkedHashMap.
@@ -97,7 +96,7 @@ public class ConversationTracerService {
     Map<String, Boolean> respondedByPeer = new HashMap<>();
 
     for (ConversationEntity c : hostConvs) {
-      String peerIp = c.getSrcIp().equals(hostIp) ? c.getDstIp() : c.getSrcIp();
+      String peerIp = hostIp.equals(c.getSrcIp()) ? c.getDstIp() : c.getSrcIp();
       if (peerIp == null || peerIp.equals(hostIp)) continue;
       boolean replied = respondedConvIds.contains(c.getId());
       respondedByPeer.merge(peerIp, replied, Boolean::logicalOr);
