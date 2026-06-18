@@ -2,8 +2,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
-import { tracerService, type TracerStep, type TracerStepsResponse } from '@/features/tracer/tracerService';
-import { conversationService } from '@/features/conversation/services/conversationService';
+import { tracerService, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
 
 function AiExplanationInfoPopover() {
   const popover = (
@@ -42,7 +41,6 @@ function AiExplanationInfoPopover() {
 
 interface ConversationTracerModalProps {
   conversationId: string;
-  fileId: string;
   onClose: () => void;
 }
 
@@ -54,6 +52,11 @@ const CX = SVG_W / 2;
 const CY = SVG_H / 2;
 const PEER_R = 150; // radius of the peer ring
 const NODE_R = 26;  // node circle radius
+
+// Node state colors
+const COLOR_ACTIVE = '#0072c6';   // traced peer (blue)
+const COLOR_RESPONDED = '#107c10'; // peer that replied (green)
+const COLOR_SILENT = '#9aa0a6';    // peer that never replied (muted gray)
 
 function peerPos(index: number, total: number): { x: number; y: number } {
   // Start from top (−π/2) so single peer appears directly above center
@@ -74,11 +77,11 @@ function shortIp(ip: string): string {
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 
-export const ConversationTracerModal = ({ conversationId, fileId, onClose }: ConversationTracerModalProps) => {
+export const ConversationTracerModal = ({ conversationId, onClose }: ConversationTracerModalProps) => {
   const [tracer, setTracer] = useState<TracerStepsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [peers, setPeers] = useState<string[]>([]);
+  const [peers, setPeers] = useState<TracerPeer[]>([]);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -105,31 +108,23 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
       .finally(() => setLoading(false));
   }, [conversationId]);
 
-  // Fetch all conversations for srcIp → build peer list
+  // Fetch the host's peers with response status → build peer ring
   useEffect(() => {
-    if (!tracer || !fileId) return;
-    const srcIp = tracer.srcIp;
-    conversationService.getConversations(fileId, {
-      ip: srcIp,
-      port: '', payloadContains: '',
-      protocols: [], l7Protocols: [], apps: [], categories: [],
-      hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [],
-      deviceTypes: [], countries: [],
-      sortBy: '', sortDir: 'desc',
-      page: 1, pageSize: 50,
-    }).then(result => {
-      const peerSet = new Set<string>();
-      result.data.forEach(c => {
-        const [src, dst] = c.endpoints;
-        peerSet.add(src.ip === srcIp ? dst.ip : src.ip);
+    if (!tracer) return;
+    tracerService.getPeers(conversationId)
+      .then(result => {
+        // Keep the ring readable: always include the traced peer, then fill up to 12.
+        const traced = result.peers.filter(p => p.ip === tracer.dstIp);
+        const others = result.peers.filter(p => p.ip !== tracer.dstIp);
+        const ordered = [...traced, ...others].slice(0, 12);
+        setPeers(ordered.length > 0
+          ? ordered
+          : [{ ip: tracer.dstIp, conversationId, protocol: tracer.protocol, packetCount: 0, responded: false }]);
+      })
+      .catch(() => {
+        setPeers([{ ip: tracer.dstIp, conversationId, protocol: tracer.protocol, packetCount: 0, responded: false }]);
       });
-      // Always include the traced conversation's peer
-      peerSet.add(tracer.dstIp);
-      setPeers([...peerSet].slice(0, 12));
-    }).catch(() => {
-      setPeers([tracer.dstIp]);
-    });
-  }, [tracer, fileId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tracer, conversationId]);
 
   // Fetch LLM explanations after steps load
   useEffect(() => {
@@ -218,7 +213,7 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
 
   // Compute dot position for the current step
   const activePeerIp = tracer?.dstIp ?? null;
-  const activePeerIdx = peers.indexOf(activePeerIp ?? '');
+  const activePeerIdx = peers.findIndex(p => p.ip === activePeerIp);
   const dotPos = useMemo(() => {
     if (!step || activePeerIdx < 0) return null;
     const pos = peerPos(activePeerIdx, peers.length);
@@ -284,17 +279,22 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                   style={{ width: '100%', height: 'auto', maxHeight: 260, display: 'block' }}
                 >
                   {/* Edges */}
-                  {peers.map((ip, i) => {
+                  {peers.map((peer, i) => {
                     const pos = peerPos(i, peers.length);
-                    const isActive = ip === activePeerIp;
+                    const isActive = peer.ip === activePeerIp;
+                    const color = isActive
+                      ? COLOR_ACTIVE
+                      : peer.responded ? COLOR_RESPONDED : COLOR_SILENT;
+                    // Silent peers: dashed + dimmed; responded/active: solid edge.
                     return (
                       <line
-                        key={ip}
+                        key={peer.ip}
                         x1={CX} y1={CY}
                         x2={pos.x} y2={pos.y}
-                        stroke={isActive ? '#0072c6' : 'var(--tp-border)'}
+                        stroke={color}
                         strokeWidth={isActive ? 2.5 : 1.5}
-                        strokeDasharray={isActive ? undefined : '5 4'}
+                        strokeDasharray={peer.responded || isActive ? undefined : '5 4'}
+                        opacity={peer.responded || isActive ? 1 : 0.5}
                       />
                     );
                   })}
@@ -325,41 +325,71 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
                   </text>
 
                   {/* Peer nodes */}
-                  {peers.map((ip, i) => {
+                  {peers.map((peer, i) => {
                     const pos = peerPos(i, peers.length);
-                    const isActive = ip === activePeerIp;
+                    const isActive = peer.ip === activePeerIp;
+                    const silent = !peer.responded && !isActive;
+                    const color = isActive
+                      ? COLOR_ACTIVE
+                      : peer.responded ? COLOR_RESPONDED : COLOR_SILENT;
+                    const label = isActive
+                      ? 'Traced'
+                      : peer.responded ? 'Responded' : 'No response';
                     // Place label above or below based on y position
                     const labelY = pos.y < CY
                       ? pos.y - NODE_R - 6
                       : pos.y + NODE_R + 13;
                     return (
-                      <g key={ip}>
+                      <g key={peer.ip} opacity={silent ? 0.55 : 1}>
                         <circle
                           cx={pos.x} cy={pos.y} r={NODE_R}
                           fill={isActive ? 'var(--tp-surface-hover)' : 'var(--tp-bg-subtle)'}
-                          stroke={isActive ? '#0072c6' : 'var(--tp-text-muted)'}
+                          stroke={color}
                           strokeWidth={isActive ? 2 : 1.5}
+                          strokeDasharray={silent ? '4 3' : undefined}
                         />
                         <text
                           x={pos.x} y={pos.y + 4}
                           textAnchor="middle" dominantBaseline="middle"
                           fontSize={8} fontFamily="monospace"
-                          fill={isActive ? '#0050a0' : 'var(--tp-text-muted)'}
+                          fill={color}
                         >
-                          {shortIp(ip)}
+                          {shortIp(peer.ip)}
                         </text>
                         <text
                           x={pos.x} y={labelY}
                           textAnchor="middle" fontSize={10}
-                          fill={isActive ? '#0072c6' : 'var(--tp-text-muted)'}
+                          fill={color}
                           fontWeight={isActive ? 600 : 400}
                         >
-                          {isActive ? 'Traced' : 'Peer'}
+                          {label}
                         </text>
                       </g>
                     );
                   })}
                 </svg>
+
+                {/* Legend + scan summary — only meaningful when probing multiple peers */}
+                {peers.length > 1 && (() => {
+                  const respondedCount = peers.filter(p => p.responded).length;
+                  const silentCount = peers.length - respondedCount;
+                  const Swatch = ({ color, dashed, text }: { color: string; dashed?: boolean; text: string }) => (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <svg width={16} height={10} aria-hidden="true">
+                        <circle cx={5} cy={5} r={4} fill="none" stroke={color} strokeWidth={1.5}
+                          strokeDasharray={dashed ? '2 2' : undefined} opacity={dashed ? 0.7 : 1} />
+                      </svg>
+                      {text}
+                    </span>
+                  );
+                  return (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 10, color: 'var(--tp-text-muted)', marginBottom: 4 }}>
+                      <Swatch color={COLOR_RESPONDED} text={`Responded (${respondedCount})`} />
+                      <Swatch color={COLOR_SILENT} dashed text={`No response (${silentCount})`} />
+                      <Swatch color={COLOR_ACTIVE} text="Traced" />
+                    </div>
+                  );
+                })()}
 
                 {/* Step info */}
                 {step?.info && (

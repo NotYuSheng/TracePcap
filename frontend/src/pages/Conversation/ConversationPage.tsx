@@ -498,7 +498,6 @@ export const ConversationPage = () => {
       {tracerConversationId && (
         <ConversationTracerModal
           conversationId={tracerConversationId}
-          fileId={fileId}
           onClose={() => setTracerConversationId(null)}
         />
       )}

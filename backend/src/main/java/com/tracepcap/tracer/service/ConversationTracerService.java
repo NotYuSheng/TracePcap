@@ -71,6 +71,59 @@ public class ConversationTracerService {
         .build();
   }
 
+  /**
+   * Returns the peers the traced host exchanged packets with, each flagged as responding or silent.
+   * The host is the initiator (srcIp) of the given conversation. "Responded" is determined directly
+   * from packet directions — a peer responded if it sent at least one packet back to the host —
+   * which is reliable across protocols (ARP, ICMP, TCP/UDP port scans) regardless of nDPI risks.
+   */
+  public TracerPeersResponse getPeers(UUID conversationId) {
+    ConversationEntity conv = conversationRepository.findById(conversationId)
+        .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
+
+    String hostIp = conv.getSrcIp();
+    UUID fileId = conv.getFile().getId();
+
+    List<ConversationEntity> hostConvs = conversationRepository.findByFileIdAndIp(fileId, hostIp);
+
+    Set<UUID> respondedConvIds = new HashSet<>(
+        packetRepository.findConversationIdsWithReplyFromPeer(
+            hostConvs.stream().map(ConversationEntity::getId).toList(), hostIp));
+
+    // Aggregate per peer IP: a peer counts as responding if any of its conversations had a reply.
+    // Preserve packetCount-desc ordering from the query via a LinkedHashMap.
+    Map<String, TracerPeer.TracerPeerBuilder> byPeer = new LinkedHashMap<>();
+    Map<String, Long> packetTotals = new HashMap<>();
+    Map<String, Boolean> respondedByPeer = new HashMap<>();
+
+    for (ConversationEntity c : hostConvs) {
+      String peerIp = c.getSrcIp().equals(hostIp) ? c.getDstIp() : c.getSrcIp();
+      if (peerIp == null || peerIp.equals(hostIp)) continue;
+      boolean replied = respondedConvIds.contains(c.getId());
+      respondedByPeer.merge(peerIp, replied, Boolean::logicalOr);
+      packetTotals.merge(peerIp, c.getPacketCount() != null ? c.getPacketCount() : 0L, Long::sum);
+      byPeer.computeIfAbsent(
+          peerIp,
+          ip -> TracerPeer.builder()
+              .ip(ip)
+              .conversationId(c.getId().toString())
+              .protocol(c.getProtocol()));
+    }
+
+    List<TracerPeer> peers = byPeer.entrySet().stream()
+        .map(e -> e.getValue()
+            .packetCount(packetTotals.getOrDefault(e.getKey(), 0L))
+            .responded(Boolean.TRUE.equals(respondedByPeer.get(e.getKey())))
+            .build())
+        .toList();
+
+    return TracerPeersResponse.builder()
+        .conversationId(conversationId.toString())
+        .hostIp(hostIp)
+        .peers(peers)
+        .build();
+  }
+
   public TracerExplainResponse explainSteps(UUID conversationId) {
     // Return from cache if available
     List<StepExplanation> cached = explanationCache.get(conversationId);

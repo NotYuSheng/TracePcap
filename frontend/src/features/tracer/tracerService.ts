@@ -23,6 +23,20 @@ export interface TracerStepsResponse {
   steps: TracerStep[];
 }
 
+export interface TracerPeer {
+  ip: string;
+  conversationId: string;
+  protocol: string;
+  packetCount: number;
+  responded: boolean;
+}
+
+export interface TracerPeersResponse {
+  conversationId: string;
+  hostIp: string;
+  peers: TracerPeer[];
+}
+
 export interface StepExplanation {
   stepIndex: number;
   explanation: string;
@@ -38,6 +52,13 @@ export const tracerService = {
   async getSteps(conversationId: string): Promise<TracerStepsResponse> {
     const res = await apiClient.get<TracerStepsResponse>(
       API_ENDPOINTS.TRACER_STEPS(conversationId)
+    );
+    return res.data;
+  },
+
+  async getPeers(conversationId: string): Promise<TracerPeersResponse> {
+    const res = await apiClient.get<TracerPeersResponse>(
+      API_ENDPOINTS.TRACER_PEERS(conversationId)
     );
     return res.data;
   },

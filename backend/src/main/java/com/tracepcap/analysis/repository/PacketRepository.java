@@ -21,4 +21,15 @@ public interface PacketRepository extends JpaRepository<PacketEntity, UUID> {
       "SELECT p.packetNumber FROM PacketEntity p"
           + " WHERE p.conversation.id IN :ids ORDER BY p.packetNumber ASC")
   List<Long> findPacketNumbersByConversationIds(@Param("ids") List<UUID> ids);
+
+  /**
+   * Of the given conversations, returns the ids that contain at least one packet sent by a host
+   * other than {@code hostIp} — i.e. the peer transmitted back, so it "responded". Used by the
+   * conversation tracer to distinguish responding from silent nodes (e.g. ARP/ICMP/port scans).
+   */
+  @Query(
+      "SELECT DISTINCT p.conversation.id FROM PacketEntity p"
+          + " WHERE p.conversation.id IN :ids AND p.srcIp <> :hostIp")
+  List<UUID> findConversationIdsWithReplyFromPeer(
+      @Param("ids") List<UUID> ids, @Param("hostIp") String hostIp);
 }
