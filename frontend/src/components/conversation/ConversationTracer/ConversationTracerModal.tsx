@@ -203,8 +203,8 @@ export const ConversationTracerModal = ({ conversationId, fileId, onClose }: Con
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
-      if (e.key === 'ArrowRight') next();
-      if (e.key === 'ArrowLeft') prev();
+      if (e.key === 'ArrowRight') { e.stopPropagation(); next(); }
+      if (e.key === 'ArrowLeft') { e.stopPropagation(); prev(); }
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
