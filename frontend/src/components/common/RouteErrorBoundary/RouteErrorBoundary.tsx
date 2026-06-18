@@ -19,13 +19,19 @@ export const RouteErrorBoundary = () => {
     'An unexpected error occurred and this view could not be displayed. Try reloading the page.';
 
   if (isRouteErrorResponse(error)) {
-    title = `${error.status} ${error.statusText}`;
-    message = (error.data as string) || message;
+    title = `${error.status} ${error.statusText}`.trim();
+    if (typeof error.data === 'string' && error.data.trim()) {
+      message = error.data;
+    } else if (error.data && typeof error.data === 'object') {
+      const data = error.data as Record<string, unknown>;
+      if (typeof data.message === 'string') message = data.message;
+      else if (typeof data.error === 'string') message = data.error;
+    }
   }
 
   const detail =
     error instanceof Error
-      ? error.message
+      ? error.stack || error.message
       : typeof error === 'string'
         ? error
         : undefined;
