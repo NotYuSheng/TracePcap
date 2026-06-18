@@ -2,6 +2,7 @@ package com.tracepcap.monitor.controller;
 
 import com.tracepcap.monitor.dto.CreateNetworkRequest;
 import com.tracepcap.monitor.dto.NetworkDto;
+import com.tracepcap.monitor.dto.UpdateNetworkRequest;
 import com.tracepcap.monitor.service.NetworkService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,6 +32,12 @@ public class NetworkController {
   @ResponseStatus(HttpStatus.CREATED)
   public NetworkDto createNetwork(@Valid @RequestBody CreateNetworkRequest request) {
     return networkService.createNetwork(request);
+  }
+
+  @PatchMapping("/{networkId}")
+  public NetworkDto updateNetwork(
+      @PathVariable UUID networkId, @Valid @RequestBody UpdateNetworkRequest request) {
+    return networkService.updateNetwork(networkId, request);
   }
 
   @DeleteMapping("/{networkId}")

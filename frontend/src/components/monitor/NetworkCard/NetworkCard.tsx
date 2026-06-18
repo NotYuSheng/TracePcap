@@ -4,29 +4,44 @@ import type { Network } from '@/features/monitor/types/monitor.types';
 interface NetworkCardProps {
   network: Network;
   onClick: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }
 
-export const NetworkCard = ({ network, onClick, onDelete }: NetworkCardProps) => {
+export const NetworkCard = ({ network, onClick, onEdit, onDelete }: NetworkCardProps) => {
   return (
     <Card className="h-100" style={{ cursor: 'pointer' }} onClick={onClick}>
       <Card.Body>
         <div className="d-flex justify-content-between align-items-start mb-2">
           <h5 className="mb-0 text-break">{network.name}</h5>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-danger"
-            className="ms-2 flex-shrink-0"
-            onClick={e => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Delete network"
-            aria-label="Delete network"
-          >
-            <i className="bi bi-trash"></i>
-          </Button>
+          <div className="d-flex gap-1 ms-2 flex-shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-secondary"
+              onClick={e => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              title="Edit network"
+              aria-label="Edit network"
+            >
+              <i className="bi bi-pencil"></i>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-danger"
+              onClick={e => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              title="Delete network"
+              aria-label="Delete network"
+            >
+              <i className="bi bi-trash"></i>
+            </Button>
+          </div>
         </div>
 
         {network.description && (
