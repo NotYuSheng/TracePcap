@@ -1,0 +1,29 @@
+name: Notify on new issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  notify:
+    if: github.event.issue.user.login != 'NotYuSheng'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@4226df7daafa6fc901a43789c49bf7ab309066e7 # v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "New issue on TracePcap: ${{ github.event.issue.title }}"
+          to: notyusheng@gmail.com
+          from: TracePcap Notifications <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            A new issue was opened by ${{ github.event.issue.user.login }}:
+
+            Title: ${{ github.event.issue.title }}
+            URL:   ${{ github.event.issue.html_url }}
+
+            ${{ github.event.issue.body }}
