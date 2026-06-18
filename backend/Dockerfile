@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         gosu \
         ndpi && \
     dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version && \
-    apt-get purge -y --auto-remove gnupg
+    apt-get purge -y --auto-remove gnupg curl
 
 # Download DB-IP Lite City MMDB (offline GeoIP).
 # Published monthly at https://db-ip.com/db/download/ip-to-city-lite
