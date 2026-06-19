@@ -19,7 +19,8 @@ ALIVE = {
     7: "aa:bb:cc:00:00:07",
     11: "aa:bb:cc:00:00:0b",
 }
-TARGETS = range(1, 13)  # probe .1 .. .12
+SCANNER_LAST_OCTET = int(SCANNER_IP.rsplit(".", 1)[1])
+TARGETS = [n for n in range(1, 13) if n != SCANNER_LAST_OCTET]  # probe .1 .. .12 (skip scanner)
 
 pkts = []
 for n in TARGETS:

@@ -124,19 +124,22 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   // Fetch the host's peers with response status → build peer ring
   useEffect(() => {
     if (!tracer) return;
+    let cancelled = false;
+    const fallback = [{ ip: tracer.dstIp, conversationId, protocol: tracer.protocol, packetCount: 0, responded: false }];
     tracerService.getPeers(conversationId)
       .then(result => {
+        if (cancelled) return;
         // Keep the ring readable: always include the traced peer, then fill up to 12.
         const traced = result.peers.filter(p => p.ip === tracer.dstIp);
         const others = result.peers.filter(p => p.ip !== tracer.dstIp);
         const ordered = [...traced, ...others].slice(0, 12);
-        setPeers(ordered.length > 0
-          ? ordered
-          : [{ ip: tracer.dstIp, conversationId, protocol: tracer.protocol, packetCount: 0, responded: false }]);
+        setPeers(ordered.length > 0 ? ordered : fallback);
       })
       .catch(() => {
-        setPeers([{ ip: tracer.dstIp, conversationId, protocol: tracer.protocol, packetCount: 0, responded: false }]);
+        if (cancelled) return;
+        setPeers(fallback);
       });
+    return () => { cancelled = true; };
   }, [tracer, conversationId]);
 
   // Fetch LLM explanations after steps load
@@ -384,8 +387,10 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
 
                 {/* Legend + scan summary — only meaningful when probing multiple peers */}
                 {peers.length > 1 && (() => {
-                  const respondedCount = peers.filter(p => p.responded).length;
-                  const silentCount = peers.length - respondedCount;
+                  // Counts exclude the traced peer, which is shown as its own state.
+                  const nonTraced = peers.filter(p => p.ip !== activePeerIp);
+                  const respondedCount = nonTraced.filter(p => p.responded).length;
+                  const silentCount = nonTraced.length - respondedCount;
                   return (
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 10, color: 'var(--tp-text-muted)', marginBottom: 4 }}>
                       <Swatch color={COLOR_RESPONDED} text={`Responded (${respondedCount})`} />
