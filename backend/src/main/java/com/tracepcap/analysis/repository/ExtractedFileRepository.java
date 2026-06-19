@@ -11,6 +11,9 @@ public interface ExtractedFileRepository extends JpaRepository<ExtractedFileEnti
 
   List<ExtractedFileEntity> findByFileIdOrderByCreatedAtAsc(UUID fileId);
 
+  List<ExtractedFileEntity> findByFileIdAndSkippedReasonOrderByCreatedAtAsc(
+      UUID fileId, String skippedReason);
+
   List<ExtractedFileEntity> findByConversationId(UUID conversationId);
 
   long countByConversationId(UUID conversationId);

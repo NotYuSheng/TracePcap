@@ -183,6 +183,12 @@ public class FileExtractionService {
 
     log.info("Starting file extraction for PCAP {}", file.getId());
 
+    // Clear any limit-hit warnings from a previous extraction of this file so a fresh run that
+    // no longer hits the limits doesn't leave stale warnings on the record.
+    file.setExtractionMatchLimitConvIds(null);
+    file.setExtractionConversationLimitSkippedCount(0);
+    file.setExtractionConversationLimitSkippedIds(null);
+
     // Load all conversations once — shared by both extraction strategies
     List<ConversationEntity> allConvs =
         (savedConversationIds == null || savedConversationIds.isEmpty())

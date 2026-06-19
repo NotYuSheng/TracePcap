@@ -29,6 +29,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @RequiredArgsConstructor
 public class ExtractedFilesController {
 
+  /** Upper bound on size-skipped files returned in the warnings response. */
+  private static final int MAX_SIZE_LIMIT_FILES = 100;
+
   private final ExtractedFileRepository extractedFileRepository;
   private final FileRepository fileRepository;
   private final StorageService storageService;
@@ -59,10 +62,13 @@ public class ExtractedFilesController {
             .findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
-    // Size-limit skips are persisted as extracted_files rows — list them from there.
+    // Size-limit skips are persisted as extracted_files rows — query just those, capped to
+    // keep the response bounded on captures with very many skipped files.
     List<ExtractionWarningsResponse.SkippedFile> sizeLimitFiles =
-        extractedFileRepository.findByFileIdOrderByCreatedAtAsc(fileId).stream()
-            .filter(e -> "exceeds_size_limit".equals(e.getSkippedReason()))
+        extractedFileRepository
+            .findByFileIdAndSkippedReasonOrderByCreatedAtAsc(fileId, "exceeds_size_limit")
+            .stream()
+            .limit(MAX_SIZE_LIMIT_FILES)
             .map(
                 e ->
                     ExtractionWarningsResponse.SkippedFile.builder()
@@ -87,14 +93,23 @@ public class ExtractedFilesController {
             .build());
   }
 
-  /** Parses a comma-separated list of conversation UUIDs into a list (empty when null/blank). */
+  /**
+   * Parses a comma-separated list of conversation UUIDs into a list (empty when null/blank).
+   * Malformed tokens are skipped rather than failing the whole request.
+   */
   private static List<UUID> parseConvIds(String csv) {
     if (csv == null || csv.isBlank()) return List.of();
-    return java.util.Arrays.stream(csv.split(","))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .map(UUID::fromString)
-        .collect(Collectors.toList());
+    List<UUID> ids = new java.util.ArrayList<>();
+    for (String token : csv.split(",")) {
+      String s = token.trim();
+      if (s.isEmpty()) continue;
+      try {
+        ids.add(UUID.fromString(s));
+      } catch (IllegalArgumentException e) {
+        log.warn("Skipping malformed conversation id in extraction warning: {}", s);
+      }
+    }
+    return ids;
   }
 
   /** MIME types the browser can safely render inline without a plugin. */

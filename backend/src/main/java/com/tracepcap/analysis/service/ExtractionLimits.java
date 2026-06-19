@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -31,5 +32,26 @@ public class ExtractionLimits {
   /** Convenience accessor returning the per-file size limit in bytes. */
   public long maxFileSizeBytes() {
     return (long) maxFileSizeMb * 1024 * 1024;
+  }
+
+  /**
+   * Fail fast on misconfiguration so a bad value is caught at startup rather than crashing
+   * mid-analysis. {@code maxMatchesPerStream} must be at least 1 (0 would still extract one file
+   * yet report the cap as hit). The other two may be 0 — meaning "scan no raw streams" / "store no
+   * extracted files" respectively — but never negative (which would break {@code subList}/{@code
+   * limit} and size comparisons downstream).
+   */
+  @PostConstruct
+  void validate() {
+    if (maxMatchesPerStream < 1 || maxStreamConversations < 0 || maxFileSizeMb < 0) {
+      throw new IllegalStateException(
+          "Invalid extraction limits (maxMatchesPerStream must be >= 1; the others >= 0): "
+              + "maxMatchesPerStream="
+              + maxMatchesPerStream
+              + ", maxStreamConversations="
+              + maxStreamConversations
+              + ", maxFileSizeMb="
+              + maxFileSizeMb);
+    }
   }
 }

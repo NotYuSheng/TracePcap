@@ -26,7 +26,7 @@ interface AnalysisOutletContext {
 type SortField = 'filename' | 'mimeType' | 'fileSize' | 'extractionMethod';
 type SortDir = 'asc' | 'desc';
 
-const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb: number }) => {
+const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb?: number }) => {
   const [collapsed, setCollapsed] = useState(true);
   return (
     <Card className="mb-3" style={{ overflow: 'hidden' }}>
@@ -68,7 +68,8 @@ const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb: number }) => {
           <p className="mb-0">
             All extracted files are stored as raw bytes only — no execution or active-content
             rendering occurs. A safety disclaimer is shown before each download. Individual files
-            larger than {maxFileSizeMb} MB are not stored; they appear in this list with a{' '}
+            larger than {maxFileSizeMb != null ? `${maxFileSizeMb} MB` : 'the configured limit'} are
+            not stored; they appear in this list with a{' '}
             <Badge bg="warning" text="dark" style={{ fontSize: '0.85em' }}>Too large</Badge>{' '}
             badge so you can see they were detected but skipped.
           </p>
@@ -378,7 +379,7 @@ export const ExtractedFilesPage = () => {
           </Alert>
         )}
 
-      <ExtractionInfoCard maxFileSizeMb={warnings?.maxFileSizeMb ?? 50} />
+      <ExtractionInfoCard maxFileSizeMb={warnings?.maxFileSizeMb} />
 
       {/* Filter panel */}
       {allMimeTypes.length > 0 && (
@@ -528,7 +529,11 @@ export const ExtractedFilesPage = () => {
                           <Badge
                             bg="warning"
                             text="dark"
-                            title={`File exceeds the ${warnings?.maxFileSizeMb ?? 50} MB size limit and was not stored`}
+                            title={
+                              warnings?.maxFileSizeMb != null
+                                ? `File exceeds the ${warnings.maxFileSizeMb} MB size limit and was not stored`
+                                : 'File exceeds the configured size limit and was not stored'
+                            }
                           >
                             <i className="bi bi-slash-circle me-1"></i>
                             Too large
