@@ -26,6 +26,14 @@ public interface ConversationRepository
 
   long countByFileId(UUID fileId);
 
+  /** All conversations in a file in which the given IP is either endpoint (initiator or peer). */
+  @Query(
+      "SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND (c.srcIp = :ip OR c.dstIp = :ip)"
+          + " ORDER BY c.packetCount DESC")
+  List<ConversationEntity> findByFileIdAndIp(
+      @Param("fileId") UUID fileId, @Param("ip") String ip);
+
   /** Returns the distinct detected file types present in packets for the given file. */
   @Query(
       "SELECT DISTINCT p.detectedFileType FROM PacketEntity p"

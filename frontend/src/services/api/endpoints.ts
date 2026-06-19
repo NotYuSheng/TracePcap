@@ -50,6 +50,7 @@ export const API_ENDPOINTS = {
 
   // Conversation Tracer
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,
+  TRACER_PEERS: (conversationId: string) => `/tracer/${conversationId}/peers`,
   TRACER_EXPLAIN: (conversationId: string) => `/tracer/${conversationId}/explain`,
 
   // IP Org Rules (Network Labels)
