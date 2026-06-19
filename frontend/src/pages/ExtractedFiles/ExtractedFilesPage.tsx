@@ -3,9 +3,11 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
 import {
   getExtractedFiles,
+  getExtractionWarnings,
   getDownloadUrl,
   getPreviewUrl,
   type ExtractedFile,
+  type ExtractionWarnings,
 } from '@features/extractedFiles/services/extractedFilesService';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -24,7 +26,7 @@ interface AnalysisOutletContext {
 type SortField = 'filename' | 'mimeType' | 'fileSize' | 'extractionMethod';
 type SortDir = 'asc' | 'desc';
 
-const ExtractionInfoCard = () => {
+const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb: number }) => {
   const [collapsed, setCollapsed] = useState(true);
   return (
     <Card className="mb-3" style={{ overflow: 'hidden' }}>
@@ -66,7 +68,7 @@ const ExtractionInfoCard = () => {
           <p className="mb-0">
             All extracted files are stored as raw bytes only — no execution or active-content
             rendering occurs. A safety disclaimer is shown before each download. Individual files
-            larger than 50 MB are not stored; they appear in this list with a{' '}
+            larger than {maxFileSizeMb} MB are not stored; they appear in this list with a{' '}
             <Badge bg="warning" text="dark" style={{ fontSize: '0.85em' }}>Too large</Badge>{' '}
             badge so you can see they were detected but skipped.
           </p>
@@ -104,6 +106,39 @@ function nativePreviewMode(mimeType: string | null): 'audio' | 'video' | 'image'
   if (mimeType === 'video/mp4' || mimeType === 'video/webm' || mimeType === 'video/ogg') return 'video';
   return null;
 }
+
+/** Renders a capped, comma-separated list of conversation links (by short id) for a warning. */
+const ConvLinks = ({
+  ids,
+  fileId,
+  navigate,
+}: {
+  ids: string[];
+  fileId: string;
+  navigate: ReturnType<typeof useNavigate>;
+}) => {
+  const MAX = 10;
+  const shown = ids.slice(0, MAX);
+  return (
+    <>
+      {shown.map((cid, i) => (
+        <span key={cid}>
+          <Button
+            variant="link"
+            size="sm"
+            className="p-0 align-baseline font-monospace"
+            style={{ fontSize: 'inherit' }}
+            onClick={() => navigate(`/analysis/${fileId}/conversations?highlight=${cid}`)}
+          >
+            {cid.slice(0, 8)}
+          </Button>
+          {i < shown.length - 1 ? ', ' : ''}
+        </span>
+      ))}
+      {ids.length > MAX && <span> and {ids.length - MAX} more</span>}
+    </>
+  );
+};
 
 function methodBadge(method: string | null) {
   if (method === 'tshark_http') return <Badge bg="primary">HTTP</Badge>;
@@ -155,6 +190,7 @@ export const ExtractedFilesPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
   const navigate = useNavigate();
   const [files, setFiles] = useState<ExtractedFile[]>([]);
+  const [warnings, setWarnings] = useState<ExtractionWarnings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDownload, setPendingDownload] = useState<ExtractedFile | null>(null);
@@ -176,6 +212,10 @@ export const ExtractedFilesPage = () => {
       .then(setFiles)
       .catch(err => setError(err?.message ?? 'Failed to load extracted files'))
       .finally(() => setLoading(false));
+    // Warnings are non-critical — failure here should not block the file list.
+    getExtractionWarnings(fileId)
+      .then(setWarnings)
+      .catch(() => setWarnings(null));
   }, [fileId]);
 
   const handleSort = (field: SortField) => {
@@ -247,7 +287,98 @@ export const ExtractedFilesPage = () => {
         </Badge>
       </div>
 
-      <ExtractionInfoCard />
+      {warnings &&
+        (warnings.matchLimitConversationIds.length > 0 ||
+          warnings.conversationLimitSkippedCount > 0 ||
+          warnings.sizeLimitFiles.length > 0) && (
+          <Alert variant="warning" className="mb-3">
+            <Alert.Heading className="h6 mb-2">
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              Extraction may be incomplete
+            </Alert.Heading>
+            <p className="mb-2 small">
+              One or more extraction limits were reached for this capture, so some files may be
+              missing from the list below. Raise the relevant environment variable and re-run the
+              analysis to extract more. Conversation links are shown by short stream id.
+            </p>
+            <ul className="mb-0 small">
+              {warnings.matchLimitConversationIds.length > 0 && (
+                <li>
+                  <strong>{warnings.matchLimitConversationIds.length}</strong> raw stream(s) hit the
+                  per-stream cap of <strong>{warnings.maxMatchesPerStream}</strong> file(s) —
+                  additional embedded files may exist. Raise{' '}
+                  <code>EXTRACTION_MAX_MATCHES_PER_STREAM</code>. Affected:{' '}
+                  <ConvLinks
+                    ids={warnings.matchLimitConversationIds}
+                    fileId={fileId}
+                    navigate={navigate}
+                  />
+                  .
+                </li>
+              )}
+              {warnings.conversationLimitSkippedCount > 0 && (
+                <li>
+                  <strong>{warnings.conversationLimitSkippedCount}</strong> non-HTTP stream(s) with
+                  detected files were not scanned (only the first{' '}
+                  <strong>{warnings.maxStreamConversations}</strong> are). Raise{' '}
+                  <code>EXTRACTION_MAX_STREAM_CONVERSATIONS</code>.
+                  {warnings.conversationLimitSkippedIds.length > 0 && (
+                    <>
+                      {' '}
+                      Skipped:{' '}
+                      <ConvLinks
+                        ids={warnings.conversationLimitSkippedIds}
+                        fileId={fileId}
+                        navigate={navigate}
+                      />
+                      .
+                    </>
+                  )}
+                </li>
+              )}
+              {warnings.sizeLimitFiles.length > 0 && (
+                <li>
+                  <strong>{warnings.sizeLimitFiles.length}</strong> file(s) exceeded the{' '}
+                  <strong>{warnings.maxFileSizeMb} MB</strong> per-file limit and were not stored
+                  (shown with a “Too large” badge below). Raise{' '}
+                  <code>EXTRACTION_MAX_FILE_SIZE_MB</code>.
+                  <ul className="mb-0">
+                    {warnings.sizeLimitFiles.slice(0, 10).map(f => (
+                      <li key={f.id}>
+                        <span className="font-monospace">{f.filename ?? '(unnamed)'}</span>
+                        {f.fileSize != null && <> ({formatBytes(f.fileSize)})</>}
+                        {f.conversationId && (
+                          <>
+                            {' '}
+                            —{' '}
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 align-baseline"
+                              style={{ fontSize: 'inherit' }}
+                              onClick={() =>
+                                navigate(
+                                  `/analysis/${fileId}/conversations?highlight=${f.conversationId}`
+                                )
+                              }
+                            >
+                              view conversation
+                            </Button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                    {warnings.sizeLimitFiles.length > 10 && (
+                      <li>and {warnings.sizeLimitFiles.length - 10} more</li>
+                    )}
+                  </ul>
+                </li>
+              )}
+            </ul>
+          </Alert>
+        )}
+
+      <ExtractionInfoCard maxFileSizeMb={warnings?.maxFileSizeMb ?? 50} />
 
       {/* Filter panel */}
       {allMimeTypes.length > 0 && (
@@ -397,7 +528,7 @@ export const ExtractedFilesPage = () => {
                           <Badge
                             bg="warning"
                             text="dark"
-                            title="File exceeds the 50 MB size limit and was not stored"
+                            title={`File exceeds the ${warnings?.maxFileSizeMb ?? 50} MB size limit and was not stored`}
                           >
                             <i className="bi bi-slash-circle me-1"></i>
                             Too large

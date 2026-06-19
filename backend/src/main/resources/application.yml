@@ -162,6 +162,11 @@ tracepcap:
   overview:
     apps-limited: ${OVERVIEW_APPS_LIMITED:true}   # true = cap detected apps list; false = show all
     apps-max: ${OVERVIEW_APPS_MAX:100}            # Max apps shown when apps-limited=true
+  extraction:
+    # File-extraction limits. Raise these to extract more from large/synthetic captures.
+    max-matches-per-stream: ${EXTRACTION_MAX_MATCHES_PER_STREAM:20}   # Max files per raw TCP/UDP stream
+    max-stream-conversations: ${EXTRACTION_MAX_STREAM_CONVERSATIONS:50} # Max non-HTTP streams scanned per PCAP
+    max-file-size-mb: ${EXTRACTION_MAX_FILE_SIZE_MB:50}              # Max size of a single extracted file (MB)
   signatures:
     path: ${SIGNATURES_PATH:/app/config/signatures.yml}  # Path to the custom signatures YAML file
   geo:

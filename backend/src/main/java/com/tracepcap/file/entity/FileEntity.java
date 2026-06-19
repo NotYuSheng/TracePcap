@@ -46,6 +46,22 @@ public class FileEntity {
   @Column(name = "enable_file_extraction", nullable = false)
   private boolean enableFileExtraction = true;
 
+  /**
+   * Comma-separated conversation IDs whose raw stream hit the per-stream match cap during
+   * extraction (more embedded files may exist). Null/empty when the cap was never reached.
+   */
+  @Column(name = "extraction_match_limit_conv_ids", columnDefinition = "text")
+  private String extractionMatchLimitConvIds;
+
+  /** Total non-HTTP file-bearing streams that were not scanned because of the conversation cap. */
+  @Builder.Default
+  @Column(name = "extraction_conversation_limit_skipped_count", nullable = false)
+  private int extractionConversationLimitSkippedCount = 0;
+
+  /** Comma-separated (capped) conversation IDs of streams skipped by the conversation cap. */
+  @Column(name = "extraction_conversation_limit_skipped_ids", columnDefinition = "text")
+  private String extractionConversationLimitSkippedIds;
+
   @Column(name = "uploaded_at", nullable = false)
   private LocalDateTime uploadedAt;
 

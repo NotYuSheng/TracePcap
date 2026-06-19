@@ -41,12 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FileExtractionService {
 
-  /** Maximum size of a single extracted file stored in MinIO (50 MB). */
-  private static final int MAX_EXTRACTED_FILE_BYTES = 50 * 1024 * 1024;
-
   /**
    * Maximum bytes buffered per raw stream during reassembly (200 MB). This is intentionally larger
-   * than {@link #MAX_EXTRACTED_FILE_BYTES} so that magic-byte scanning can still find files near
+   * than the configurable per-file size limit so that magic-byte scanning can still find files near
    * the end of a large stream, while preventing a single runaway stream from exhausting heap.
    */
   private static final int MAX_STREAM_BUFFER_BYTES = 200 * 1024 * 1024;
@@ -54,14 +51,11 @@ public class FileExtractionService {
   /** Skipped-reason value written to DB when a file exceeds the per-file size limit. */
   private static final String REASON_EXCEEDS_SIZE_LIMIT = "exceeds_size_limit";
 
-  /** Maximum number of non-HTTP conversations to scan for embedded files. */
-  private static final int MAX_RAW_STREAM_CONVERSATIONS = 50;
-
   /**
-   * Maximum embedded files extracted per raw stream. Prevents runaway extraction on streams that
-   * contain many magic-byte sequences (e.g. synthetic test data or binary protocols).
+   * Maximum conversation IDs recorded per limit-hit warning. Bounds the size of the warning detail
+   * stored on the file row (and rendered in the UI) when very large captures hit a limit.
    */
-  private static final int MAX_MATCHES_PER_STREAM = 20;
+  private static final int MAX_RECORDED_CONV_IDS = 100;
 
   private static final Tika TIKA = new Tika();
 
@@ -168,6 +162,7 @@ public class FileExtractionService {
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
   private final StorageService storageService;
+  private final ExtractionLimits limits;
 
   // -------------------------------------------------------------------------
   // Public entry point
@@ -471,7 +466,7 @@ public class FileExtractionService {
 
     if (convIdsWithFiles.isEmpty()) return;
 
-    List<ConversationEntity> candidates =
+    List<ConversationEntity> eligible =
         allConvs.stream()
             .filter(c -> convIdsWithFiles.contains(c.getId()))
             .filter(
@@ -479,8 +474,23 @@ public class FileExtractionService {
                   String tp = c.getTsharkProtocol();
                   return tp == null || !tp.toUpperCase().contains("HTTP");
                 })
-            .limit(MAX_RAW_STREAM_CONVERSATIONS)
             .toList();
+
+    if (eligible.size() > limits.getMaxStreamConversations()) {
+      List<ConversationEntity> skipped =
+          eligible.subList(limits.getMaxStreamConversations(), eligible.size());
+      log.warn(
+          "PCAP {} has {} non-HTTP streams with file-type hits — scanning only the first {} "
+              + "(raise EXTRACTION_MAX_STREAM_CONVERSATIONS to scan more)",
+          file.getId(),
+          eligible.size(),
+          limits.getMaxStreamConversations());
+      file.setExtractionConversationLimitSkippedCount(skipped.size());
+      file.setExtractionConversationLimitSkippedIds(joinConvIds(skipped));
+    }
+
+    List<ConversationEntity> candidates =
+        eligible.stream().limit(limits.getMaxStreamConversations()).toList();
 
     if (candidates.isEmpty()) return;
 
@@ -512,22 +522,40 @@ public class FileExtractionService {
     // Single tshark pass to read all required streams at once.
     Map<String, byte[]> streamData = readAllStreams(tempPcapFile, tcpIds, udpIds);
 
+    List<ConversationEntity> matchCapped = new ArrayList<>();
     for (Map.Entry<ConversationEntity, StreamInfo> entry : convStreamMap.entrySet()) {
       ConversationEntity conv = entry.getKey();
       StreamInfo info = entry.getValue();
       byte[] streamBytes = streamData.get(info.transport() + ":" + info.index());
       if (streamBytes == null || streamBytes.length == 0) continue;
       try {
-        processMagicMatches(file, conv, streamBytes);
+        if (processMagicMatches(file, conv, streamBytes)) matchCapped.add(conv);
       } catch (Exception e) {
         log.debug(
             "Stream extraction skipped for conversation {}: {}", conv.getId(), e.getMessage());
       }
     }
+    if (!matchCapped.isEmpty()) {
+      file.setExtractionMatchLimitConvIds(joinConvIds(matchCapped));
+    }
   }
 
-  private void processMagicMatches(FileEntity file, ConversationEntity conv, byte[] streamBytes) {
+  /**
+   * Scans a single reassembled stream for embedded files.
+   *
+   * @return {@code true} if the per-stream match cap was reached (more files may exist)
+   */
+  private boolean processMagicMatches(
+      FileEntity file, ConversationEntity conv, byte[] streamBytes) {
     List<MagicMatch> segments = findMagicMatches(streamBytes);
+    boolean capReached = segments.size() >= limits.getMaxMatchesPerStream();
+    if (capReached) {
+      log.warn(
+          "Raw stream for conversation {} hit the {}-file extraction cap — additional embedded "
+              + "files may exist (raise EXTRACTION_MAX_MATCHES_PER_STREAM to extract more)",
+          conv.getId(),
+          limits.getMaxMatchesPerStream());
+    }
     for (MagicMatch seg : segments) {
       int start = seg.start();
       int end = seg.end();
@@ -535,12 +563,12 @@ public class FileExtractionService {
       long segSize = (long) end - start;
       String ext = seg.ext();
       String name = "stream-" + conv.getId().toString().substring(0, 8) + "-" + start + "." + ext;
-      if (segSize > MAX_EXTRACTED_FILE_BYTES) {
+      if (segSize > limits.maxFileSizeBytes()) {
         log.warn(
             "Skipping magic-byte extracted file {} ({} bytes) — exceeds {} MB limit",
             name,
             segSize,
-            MAX_EXTRACTED_FILE_BYTES / 1024 / 1024);
+            limits.getMaxFileSizeMb());
         recordSkippedFile(file, conv.getId(), name, segSize, "magic_bytes");
         continue;
       }
@@ -552,6 +580,15 @@ public class FileExtractionService {
       String mime = detectMime(fileData);
       storeExtractedFile(file, conv.getId(), fileData, name, mime, sha256, "magic_bytes");
     }
+    return capReached;
+  }
+
+  /** Joins conversation IDs into a comma-separated string, capped to limit DB/UI bloat. */
+  private static String joinConvIds(List<ConversationEntity> convs) {
+    return convs.stream()
+        .limit(MAX_RECORDED_CONV_IDS)
+        .map(c -> c.getId().toString())
+        .collect(Collectors.joining(","));
   }
 
   // -------------------------------------------------------------------------
@@ -785,7 +822,7 @@ public class FileExtractionService {
       if (ext.isEmpty()) ext = "bin";
 
       results.add(new MagicMatch(start, data.length, mime, ext));
-      if (results.size() >= MAX_MATCHES_PER_STREAM) break;
+      if (results.size() >= limits.getMaxMatchesPerStream()) break;
       // Jump past this match's signature region to avoid re-detecting the same file body,
       // then reset the automaton so it starts fresh from the new position.
       i = start + 256;
@@ -889,12 +926,12 @@ public class FileExtractionService {
       throws Exception {
     long rawSize = localFile.length();
     if (rawSize == 0) return;
-    if (rawSize > MAX_EXTRACTED_FILE_BYTES) {
+    if (rawSize > limits.maxFileSizeBytes()) {
       log.warn(
           "Skipping extracted file {} ({} bytes) — exceeds {} MB limit",
           localFile.getName(),
           rawSize,
-          MAX_EXTRACTED_FILE_BYTES / 1024 / 1024);
+          limits.getMaxFileSizeMb());
       recordSkippedFile(file, conversationId, localFile.getName(), rawSize, method);
       return;
     }

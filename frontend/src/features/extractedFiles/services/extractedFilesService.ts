@@ -13,8 +13,32 @@ export interface ExtractedFile {
   createdAt: string;
 }
 
+export interface SkippedFile {
+  id: string;
+  conversationId: string | null;
+  filename: string | null;
+  fileSize: number | null;
+}
+
+export interface ExtractionWarnings {
+  matchLimitConversationIds: string[];
+  conversationLimitSkippedCount: number;
+  conversationLimitSkippedIds: string[];
+  sizeLimitFiles: SkippedFile[];
+  maxMatchesPerStream: number;
+  maxStreamConversations: number;
+  maxFileSizeMb: number;
+}
+
 export async function getExtractedFiles(fileId: string): Promise<ExtractedFile[]> {
   const response = await apiClient.get<ExtractedFile[]>(API_ENDPOINTS.EXTRACTED_FILES(fileId));
+  return response.data;
+}
+
+export async function getExtractionWarnings(fileId: string): Promise<ExtractionWarnings> {
+  const response = await apiClient.get<ExtractionWarnings>(
+    API_ENDPOINTS.EXTRACTED_FILES_WARNINGS(fileId)
+  );
   return response.data;
 }
 
