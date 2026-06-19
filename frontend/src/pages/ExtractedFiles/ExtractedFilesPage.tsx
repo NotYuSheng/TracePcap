@@ -26,6 +26,7 @@ interface AnalysisOutletContext {
 type SortField = 'filename' | 'mimeType' | 'fileSize' | 'extractionMethod';
 type SortDir = 'asc' | 'desc';
 
+/** Collapsible explainer card describing how files are extracted and the per-file size limit. */
 const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb?: number }) => {
   const [collapsed, setCollapsed] = useState(true);
   return (
@@ -79,6 +80,7 @@ const ExtractionInfoCard = ({ maxFileSizeMb }: { maxFileSizeMb?: number }) => {
   );
 };
 
+/** Maps a MIME type to a Bootstrap icon class for the filename column. */
 function mimeIcon(mimeType: string | null): string {
   if (!mimeType) return 'bi-file-earmark';
   if (mimeType.startsWith('image/')) return 'bi-file-earmark-image';
@@ -141,12 +143,14 @@ const ConvLinks = ({
   );
 };
 
+/** Renders a colored badge for the extraction method (HTTP vs raw stream). */
 function methodBadge(method: string | null) {
   if (method === 'tshark_http') return <Badge bg="primary">HTTP</Badge>;
   if (method === 'magic_bytes') return <Badge bg="secondary">Raw stream</Badge>;
   return <Badge bg="light" text="dark">{method ?? '—'}</Badge>;
 }
 
+/** Returns a copy of `files` sorted by the given field/direction (unchanged when no field). */
 function sortFiles(files: ExtractedFile[], by: SortField | '', dir: SortDir): ExtractedFile[] {
   if (!by) return files;
   return [...files].sort((a, b) => {
@@ -160,6 +164,7 @@ function sortFiles(files: ExtractedFile[], by: SortField | '', dir: SortDir): Ex
   });
 }
 
+/** Renders a truncated SHA-256 with a click-to-copy button. */
 const CopyHash = ({ hash }: { hash: string }) => {
   const [copied, setCopied] = useState(false);
   const copy = useCallback(() => {
@@ -187,6 +192,10 @@ const CopyHash = ({ hash }: { hash: string }) => {
   );
 };
 
+/**
+ * Extracted Files tab: lists files carved from a capture, with sorting, MIME filtering, inline
+ * preview/download, and an "extraction may be incomplete" banner when any limit was hit.
+ */
 export const ExtractedFilesPage = () => {
   const { fileId } = useOutletContext<AnalysisOutletContext>();
   const navigate = useNavigate();
