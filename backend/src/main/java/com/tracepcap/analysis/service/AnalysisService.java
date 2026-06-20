@@ -138,13 +138,9 @@ public class AnalysisService {
         customSignatureService.applySignatures(parseResult.getConversations());
         Map<String, String> deviceOverrides =
             customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
-        Map<String, HostnameResolverService.ResolvedHostname> hostnames;
-        try {
-          hostnames = hostnameResolverService.resolve(tempFile);
-        } catch (Exception e) {
-          log.warn("[{}] Hostname resolution failed: {}", fileId, e.getMessage());
-          hostnames = java.util.Map.of();
-        }
+        // resolve() degrades gracefully and never throws — it returns a (possibly empty) map.
+        Map<String, HostnameResolverService.ResolvedHostname> hostnames =
+            hostnameResolverService.resolve(tempFile);
         List<HostClassificationEntity> hostClassifications =
             deviceClassifierService.classify(
                 file,

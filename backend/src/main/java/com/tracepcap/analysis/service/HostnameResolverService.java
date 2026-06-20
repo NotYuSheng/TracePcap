@@ -4,8 +4,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -50,7 +54,8 @@ public class HostnameResolverService {
    * be derived from DHCP, mDNS, NBNS or reverse DNS.
    */
   public Map<String, ResolvedHostname> resolve(File pcapFile) {
-    Map<String, ResolvedHostname> result = new HashMap<>();
+    // Concurrent: the stdout reader (background thread) writes while the main thread reads size().
+    Map<String, ResolvedHostname> result = new ConcurrentHashMap<>();
 
     // Fields (pipe-separated, first occurrence only):
     //   0 _ws.col.Protocol  1 ip.src  2 dhcp.option.hostname
@@ -94,8 +99,11 @@ public class HostnameResolverService {
             "nbns.addr");
     pb.redirectErrorStream(false);
 
+    Process process = null;
+    ExecutorService ioExecutor = null;
     try {
-      Process process = pb.start();
+      process = pb.start();
+      final Process proc = process;
 
       // Drain stderr so it can't block stdout.
       Thread stderrThread =
@@ -103,8 +111,7 @@ public class HostnameResolverService {
               () -> {
                 try (BufferedReader err =
                     new BufferedReader(
-                        new InputStreamReader(
-                            process.getErrorStream(), StandardCharsets.UTF_8))) {
+                        new InputStreamReader(proc.getErrorStream(), StandardCharsets.UTF_8))) {
                   while (err.readLine() != null) {
                     // discard
                   }
@@ -115,23 +122,47 @@ public class HostnameResolverService {
       stderrThread.setDaemon(true);
       stderrThread.start();
 
-      try (BufferedReader reader =
-          new BufferedReader(
-              new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          if (line.isEmpty()) continue;
-          parseRow(line.split("\\|", -1), result);
+      // Read stdout on a separate thread so a tshark that hangs while holding stdout open
+      // can't block the waitFor timeout below indefinitely.
+      ioExecutor = Executors.newSingleThreadExecutor();
+      Future<?> stdoutTask =
+          ioExecutor.submit(
+              () -> {
+                try (BufferedReader reader =
+                    new BufferedReader(
+                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                  String line;
+                  while ((line = reader.readLine()) != null) {
+                    if (!line.isEmpty()) parseRow(line.split("\\|", -1), result);
+                  }
+                } catch (Exception ignored) {
+                  // best-effort
+                }
+              });
+
+      boolean finished = process.waitFor(2, TimeUnit.MINUTES);
+      if (!finished) {
+        log.warn("Hostname resolution timed out; returning {} partial result(s)", result.size());
+      } else {
+        int exit = process.exitValue();
+        if (exit != 0) {
+          log.warn("Hostname resolution: tshark exited with code {}; results may be partial", exit);
+        }
+        // Let the reader drain any output still buffered after the process exited.
+        try {
+          stdoutTask.get(5, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+          // best-effort
         }
       }
-
-      boolean finished = process.waitFor(2, java.util.concurrent.TimeUnit.MINUTES);
-      if (!finished) {
-        process.destroyForcibly();
-        log.warn("Hostname resolution timed out; returning {} partial result(s)", result.size());
-      }
+    } catch (InterruptedException e) {
+      log.warn("Hostname resolution interrupted");
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       log.warn("Hostname resolution failed: {}", e.getMessage());
+    } finally {
+      if (process != null) process.destroyForcibly();
+      if (ioExecutor != null) ioExecutor.shutdownNow();
     }
 
     log.info("Resolved {} host name(s) from DHCP/mDNS/NBNS/reverse-DNS", result.size());
@@ -240,7 +271,8 @@ public class HostnameResolverService {
   /** Converts a reverse-DNS "4.3.2.1.in-addr.arpa" question to the IPv4 "1.2.3.4". */
   private String arpaToIp(String qryName) {
     if (qryName == null) return null;
-    String name = qryName.trim().toLowerCase();
+    // DNS query names may carry a trailing dot ("4.3.2.1.in-addr.arpa."); strip it first.
+    String name = stripTrailingDot(qryName).toLowerCase();
     if (!name.endsWith(".in-addr.arpa")) return null; // IPv6 ip6.arpa not supported
     String labels = name.substring(0, name.length() - ".in-addr.arpa".length());
     String[] octets = labels.split("\\.");

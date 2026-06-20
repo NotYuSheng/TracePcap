@@ -342,9 +342,10 @@ public class NetworkIntelligenceService {
               : "both";
           // Prefer the host's own discovered name (DHCP/mDNS/NBNS/reverse DNS) over the
           // nDPI SNI, which records the server a client connected to rather than the host itself.
-          String hostname = device != null && device.getHostname() != null
-              ? device.getHostname() : acc.hostname;
-          String hostnameSource = device != null ? device.getHostnameSource() : null;
+          boolean useDeviceHostname = device != null && device.getHostname() != null;
+          String hostname = useDeviceHostname ? device.getHostname() : acc.hostname;
+          // Only attach a discovery-source badge when the passively-discovered name is the one shown.
+          String hostnameSource = useDeviceHostname ? device.getHostnameSource() : null;
           return HostSummaryDto.builder()
               .ip(ip)
               .hostname(hostname)
