@@ -121,6 +121,11 @@ export function ConversationFilterPanel({
   useEffect(() => {
     setPayloadInput(filters.payloadContains);
   }, [filters.payloadContains]);
+  // Clear the IDS search box when the alert option source changes (e.g. switching files),
+  // otherwise a stale query can silently hide all options for the new dataset.
+  useEffect(() => {
+    setIdsSearch('');
+  }, [suricataAlertOptions]);
 
   const handleIpChange = (value: string) => {
     setIpInput(value);

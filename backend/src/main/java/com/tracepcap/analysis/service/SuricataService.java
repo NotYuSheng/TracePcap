@@ -6,6 +6,7 @@ import com.tracepcap.analysis.entity.ConversationEntity;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -106,24 +107,32 @@ public class SuricataService {
               "unix-command.enabled=no");
 
       Process process = pb.start();
+      try {
+        Thread stdoutDrainer = drainAsync(process.getInputStream(), "stdout");
+        Thread stderrDrainer = drainAsync(process.getErrorStream(), "stderr");
+        stdoutDrainer.start();
+        stderrDrainer.start();
 
-      Thread stdoutDrainer = drainAsync(process.getInputStream(), "stdout");
-      Thread stderrDrainer = drainAsync(process.getErrorStream(), "stderr");
-      stdoutDrainer.start();
-      stderrDrainer.start();
+        int exitCode = process.waitFor();
+        stdoutDrainer.join();
+        stderrDrainer.join();
 
-      int exitCode = process.waitFor();
-      stdoutDrainer.join();
-      stderrDrainer.join();
+        if (exitCode != 0) {
+          log.warn("suricata exited with code {} — skipping IDS alerts", exitCode);
+          return result;
+        }
 
-      if (exitCode != 0) {
-        log.warn("suricata exited with code {} — skipping IDS alerts", exitCode);
-        return result;
+        parseEveJson(outDir.resolve(EVE_JSON), result);
+        log.debug("Suricata produced alerts for {} distinct flows", result.size());
+      } finally {
+        // Never leak the subprocess if waitFor was interrupted or parsing threw.
+        if (process.isAlive()) process.destroyForcibly();
       }
 
-      parseEveJson(outDir.resolve(EVE_JSON), result);
-      log.debug("Suricata produced alerts for {} distinct flows", result.size());
-
+    } catch (InterruptedException e) {
+      // Restore the interrupted status so callers up the stack can react.
+      Thread.currentThread().interrupt();
+      log.warn("Suricata process execution was interrupted", e);
     } catch (Exception e) {
       if (isNotFoundError(e)) {
         log.warn(
@@ -242,7 +251,7 @@ public class SuricataService {
    * casing/naming; IP+port pairs are unique enough to map an alert to its conversation.
    */
   private String flowKey(String ip, Integer port, String ip2, Integer port2, String proto) {
-    return String.format("%s:%s->%s:%s", ip, port, ip2, port2);
+    return ip + ":" + port + "->" + ip2 + ":" + port2;
   }
 
   /** Drains a process stream on a daemon thread so the subprocess never blocks on a full pipe. */
@@ -250,7 +259,8 @@ public class SuricataService {
     Thread t =
         new Thread(
             () -> {
-              try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
+              try (BufferedReader reader =
+                  new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                   log.debug("suricata {}: {}", label, line);

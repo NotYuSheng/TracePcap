@@ -277,10 +277,14 @@ export const ConversationList = ({
                                 backgroundColor: IDS_BADGE.bg,
                                 color: IDS_BADGE.text,
                                 whiteSpace: 'nowrap',
+                                maxWidth: '24rem',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: 'inline-block',
                               }}
                               title={alert}
                             >
-                              {alert}
+                              {alert.length > 96 ? `${alert.slice(0, 96)}…` : alert}
                             </span>
                           ))}
                         </div>

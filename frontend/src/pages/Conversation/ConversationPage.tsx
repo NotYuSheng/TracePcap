@@ -79,10 +79,15 @@ export const ConversationPage = () => {
       .getCustomSignatures(fileId)
       .then(setCustomSignatureOptions)
       .catch(console.error);
+    // Clear first so stale options from the previous file aren't shown while/if the fetch fails.
+    setSuricataAlertOptions([]);
     conversationService
       .getSuricataAlerts(fileId)
       .then(setSuricataAlertOptions)
-      .catch(console.error);
+      .catch(err => {
+        console.error(err);
+        setSuricataAlertOptions([]);
+      });
     conversationService
       .getSignatureRules()
       .then(rules => {

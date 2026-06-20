@@ -234,13 +234,15 @@ public class ConversationsController {
 
     PrintWriter writer = response.getWriter();
     writer.println(
-        "srcIp,srcPort,dstIp,dstPort,protocol,appName,category,hostname,packetCount,totalBytes,durationMs,startTime,endTime,flowRisks,customSignatures");
+        "srcIp,srcPort,dstIp,dstPort,protocol,appName,category,hostname,packetCount,totalBytes,durationMs,startTime,endTime,flowRisks,customSignatures,suricataAlerts");
     for (ConversationResponse r : rows) {
       String flowRisksValue = r.getFlowRisks() != null ? String.join("; ", r.getFlowRisks()) : "";
       String customSigsValue =
           r.getCustomSignatures() != null ? String.join("; ", r.getCustomSignatures()) : "";
+      String suricataAlertsValue =
+          r.getSuricataAlerts() != null ? String.join("; ", r.getSuricataAlerts()) : "";
       writer.printf(
-          "%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,%s,%s%n",
+          "%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s,%s,%s,%s%n",
           escapeCsv(r.getSrcIp()),
           escapeCsv(r.getSrcPort()),
           escapeCsv(r.getDstIp()),
@@ -255,7 +257,8 @@ public class ConversationsController {
           r.getStartTime() != null ? escapeCsv(CSV_DT.format(r.getStartTime())) : "",
           r.getEndTime() != null ? escapeCsv(CSV_DT.format(r.getEndTime())) : "",
           escapeCsv(flowRisksValue),
-          escapeCsv(customSigsValue));
+          escapeCsv(customSigsValue),
+          escapeCsv(suricataAlertsValue));
     }
     writer.flush();
   }

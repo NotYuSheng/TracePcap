@@ -41,11 +41,15 @@ public interface ConversationRepository
           + " ORDER BY p.detectedFileType")
   List<String> findDistinctFileTypesByFileId(@Param("fileId") UUID fileId);
 
-  /** Returns only conversations that have at least one nDPI risk flag or Suricata IDS alert. */
+  /**
+   * Returns only conversations that have at least one nDPI risk flag, custom signature match, or
+   * Suricata IDS alert — matching the {@code hasRisks} Specification predicate in {@link #buildSpec}.
+   */
   @Query(
       value =
           "SELECT * FROM conversations WHERE file_id = :fileId"
               + " AND ((flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0)"
+              + " OR (custom_signatures IS NOT NULL AND array_length(custom_signatures, 1) > 0)"
               + " OR (suricata_alerts IS NOT NULL AND array_length(suricata_alerts, 1) > 0))",
       nativeQuery = true)
   List<ConversationEntity> findByFileIdWithRisks(@Param("fileId") UUID fileId);
