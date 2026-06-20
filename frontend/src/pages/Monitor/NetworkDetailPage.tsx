@@ -154,24 +154,38 @@ const SectionSideNav = ({ sections }: { sections: SectionDef[] }) => {
     // The observer callback only reports sections whose visibility *changed*,
     // so track the full visible set and pick the topmost one each time.
     const visibleIds = new Set<string>();
+
+    const pickActive = () => {
+      // At the very bottom the last section may be too short to ever reach the
+      // active band (capped at 45% of the viewport), so force it active there.
+      const atBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 2;
+      if (atBottom) {
+        setActive(ids[ids.length - 1]);
+        return;
+      }
+      let topId: string | null = null;
+      let topY = Infinity;
+      visibleIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const y = el.getBoundingClientRect().top;
+        if (y < topY) {
+          topY = y;
+          topId = id;
+        }
+      });
+      if (topId) setActive(topId);
+    };
+
     const observer = new IntersectionObserver(
       entries => {
         for (const e of entries) {
           if (e.isIntersecting) visibleIds.add(e.target.id);
           else visibleIds.delete(e.target.id);
         }
-        let topId: string | null = null;
-        let topY = Infinity;
-        visibleIds.forEach(id => {
-          const el = document.getElementById(id);
-          if (!el) return;
-          const y = el.getBoundingClientRect().top;
-          if (y < topY) {
-            topY = y;
-            topId = id;
-          }
-        });
-        if (topId) setActive(topId);
+        pickActive();
       },
       // Top boundary sits just above where an anchored section lands
       // (scroll-margin-top: 124px), so a clicked section counts as active.
@@ -179,7 +193,13 @@ const SectionSideNav = ({ sections }: { sections: SectionDef[] }) => {
       { rootMargin: '-116px 0px -55% 0px', threshold: 0 },
     );
     els.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
+
+    // Catch the bottom-of-page case, where intersection state may not change.
+    window.addEventListener('scroll', pickActive, { passive: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', pickActive);
+    };
   }, [sectionIds]);
 
   const handleClick = (e: React.MouseEvent<HTMLElement>, id: string) => {
