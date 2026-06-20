@@ -458,6 +458,11 @@ public class FileExtractionService {
   // Raw stream extraction
   // -------------------------------------------------------------------------
 
+  /**
+   * Reconstructs non-HTTP TCP/UDP streams whose packets had file-type detections and scans them for
+   * embedded files via magic-byte matching. Records on {@code file} which conversations hit the
+   * per-stream match cap and how many streams were skipped by the conversation cap.
+   */
   private void extractFromRawStreams(
       FileEntity file, File tempPcapFile, List<ConversationEntity> allConvs) {
 

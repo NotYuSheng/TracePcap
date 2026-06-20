@@ -167,6 +167,7 @@ function sortFiles(files: ExtractedFile[], by: SortField | '', dir: SortDir): Ex
 /** Renders a truncated SHA-256 with a click-to-copy button. */
 const CopyHash = ({ hash }: { hash: string }) => {
   const [copied, setCopied] = useState(false);
+  /** Copies the full hash to the clipboard and briefly shows a confirmation state. */
   const copy = useCallback(() => {
     navigator.clipboard.writeText(hash).then(() => {
       setCopied(true);
@@ -228,6 +229,7 @@ export const ExtractedFilesPage = () => {
       .catch(() => setWarnings(null));
   }, [fileId]);
 
+  /** Cycles a column's sort state on header click: asc → desc → unsorted. */
   const handleSort = (field: SortField) => {
     if (sortBy !== field) {
       setSortBy(field);
@@ -240,6 +242,7 @@ export const ExtractedFilesPage = () => {
     }
   };
 
+  /** A clickable table header cell that sorts by `field` and shows the current sort direction. */
   const SortableHeader = ({ field, label }: { field: SortField; label: string }) => {
     const isActive = sortBy === field;
     const icon = !isActive
@@ -257,8 +260,10 @@ export const ExtractedFilesPage = () => {
     );
   };
 
+  /** Opens the safety-disclaimer modal before a file is downloaded. */
   const handleDownloadRequest = (file: ExtractedFile) => setPendingDownload(file);
 
+  /** Performs the actual download of the pending file once the disclaimer is accepted. */
   const confirmDownload = () => {
     if (!pendingDownload) return;
     const url = getDownloadUrl(fileId, pendingDownload.id);
