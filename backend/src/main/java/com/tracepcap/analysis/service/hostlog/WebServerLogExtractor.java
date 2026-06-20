@@ -75,8 +75,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     final Map<Integer, Integer> statusCounts = new LinkedHashMap<>();
     String contentType; // representative (first seen)
     String serverSoftware; // first Server header seen for this endpoint's server
-    Integer requestFrame; // frame.number of the first request (for "view packet" links)
-    Integer responseFrame; // frame.number of the first response
+    Long requestFrame; // frame.number of the first request (for "view packet" links)
+    Long responseFrame; // frame.number of the first response
   }
 
   /** Per-server bookkeeping for the api/web decision and the read-side enumeration check. */
@@ -160,7 +160,13 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
               .responseFrame(agg.responseFrame)
               .build());
     }
-    if (!rows.isEmpty()) httpEndpointLogRepository.saveAll(rows);
+    if (!rows.isEmpty()) {
+      try {
+        httpEndpointLogRepository.saveAll(rows);
+      } catch (Exception ex) {
+        log.warn("Failed to persist {} HTTP endpoint row(s): {}", rows.size(), ex.getMessage());
+      }
+    }
   }
 
   // ── Row parsing ─────────────────────────────────────────────────────────────
@@ -177,7 +183,7 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     if (f.length < 8) return;
     String stream = f[0];
     String method = upperOrNull(firstValue(f[3]));
-    String uri = firstValue(f[4]);
+    String uri = trimToNull(f[4]); // not firstValue — a request URI may legitimately contain ','
     Integer status = parseIntOrNull(firstValue(f[5]));
 
     if (method != null && uri != null) {
@@ -200,7 +206,7 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       if (server == null) return;
       String contentType = normaliseContentType(firstValue(f[6]));
       String serverSoftware = trimToNull(f[7]);
-      Integer respFrame = parseIntOrNull(f.length > 8 ? firstValue(f[8]) : null);
+      Long respFrame = parseLongOrNull(f.length > 8 ? firstValue(f[8]) : null);
       WebServerStats stats = serverStats.computeIfAbsent(server, k -> new WebServerStats());
       stats.totalResponses++;
       if (contentType != null && contentType.contains("json")) stats.jsonResponses++;
@@ -209,10 +215,14 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       // Recover the request's method+path+frame (FIFO within the stream); fall back to the response's
       // own request URI when unmatched.
       Deque<String[]> queue = pendingByStream.get(stream);
-      String[] req = (queue != null && !queue.isEmpty()) ? queue.pollFirst() : null;
+      String[] req = null;
+      if (queue != null) {
+        req = queue.pollFirst();
+        if (queue.isEmpty()) pendingByStream.remove(stream); // free finished streams
+      }
       String reqMethod = req != null ? req[0] : null;
       String path = req != null ? req[1] : normalisePath(uri);
-      Integer reqFrame = (req != null) ? parseIntOrNull(req[2]) : null;
+      Long reqFrame = (req != null) ? parseLongOrNull(req[2]) : null;
       if (path == null) return;
       recordEndpoint(
           server, reqMethod, path, status, contentType, serverSoftware, reqFrame, respFrame, endpoints);
@@ -227,8 +237,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       int status,
       String contentType,
       String serverSoftware,
-      Integer requestFrame,
-      Integer responseFrame,
+      Long requestFrame,
+      Long responseFrame,
       Map<String, EndpointAgg> endpoints) {
     String key = server + "|" + (method == null ? "" : method) + "|" + path;
     EndpointAgg agg = endpoints.computeIfAbsent(key, k -> new EndpointAgg());
@@ -376,6 +386,16 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     if (raw == null) return null;
     try {
       return Integer.parseInt(raw.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  /** Parses a tshark frame.number; returns null when absent or unparseable. */
+  private static Long parseLongOrNull(String raw) {
+    if (raw == null) return null;
+    try {
+      return Long.parseLong(raw.trim());
     } catch (NumberFormatException e) {
       return null;
     }

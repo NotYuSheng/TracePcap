@@ -102,7 +102,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     final Set<String> resolvedIps = new LinkedHashSet<>();
     String responseCode; // representative rcode name
     boolean resolvable; // true once any response was NOERROR with at least one answer
-    Integer sampleFrame; // frame.number of the first response packet (for "view packet" links)
+    Long sampleFrame; // frame.number of the first response packet (for "view packet" links)
   }
 
   /** Per-server NXDOMAIN bookkeeping for suspicion scoring. */
@@ -266,7 +266,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     // Fields are fixed except the query name (field 2), which — in tunnelled/malformed DNS — may
     // itself contain the '|' separator. frame.number + ip.src lead and the five answer fields trail,
     // so re-join everything in between to recover the full query name.
-    Integer frame = parseFrame(f[0]);
+    Long frame = parseFrame(f[0]);
     String serverIp = trimToNull(f[1]);
     String rawQueryName =
         (f.length == 8) ? f[2] : String.join("|", Arrays.copyOfRange(f, 2, f.length - 5));
@@ -336,11 +336,11 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
   }
 
   /** Parses a tshark frame.number; returns null when absent or unparseable. */
-  private static Integer parseFrame(String raw) {
+  private static Long parseFrame(String raw) {
     String v = firstValue(raw);
     if (v == null) return null;
     try {
-      return Integer.parseInt(v);
+      return Long.parseLong(v);
     } catch (NumberFormatException e) {
       return null;
     }

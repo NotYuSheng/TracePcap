@@ -229,11 +229,13 @@ public class PcapParserService {
             }
             String payloadHex = TsharkHexUtil.toHex(tsharkPayload, PacketEntity.PAYLOAD_BYTE_LIMIT);
             // Stored packet number = tshark frame.number (absolute, file-wide); fall back to the
-            // running counter if the field is somehow absent.
+            // running counter if the field is somehow absent. frame.number is the last field, so read
+            // it from the end — a '|' inside an earlier column (e.g. Info) would shift fixed indices.
             long frameNumber = packetNumber;
-            if (f.length > 19 && !f[19].isEmpty()) {
+            String rawFrame = f.length > 19 ? f[f.length - 1] : null;
+            if (rawFrame != null && !rawFrame.isEmpty()) {
               try {
-                frameNumber = Long.parseLong(f[19].trim());
+                frameNumber = Long.parseLong(rawFrame.trim());
               } catch (NumberFormatException ignored) {
                 // keep counter fallback
               }

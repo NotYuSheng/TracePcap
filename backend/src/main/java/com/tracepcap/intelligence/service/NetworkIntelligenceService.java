@@ -594,11 +594,14 @@ public class NetworkIntelligenceService {
 
   /** Reconstructs TLS metadata for a server from the existing conversation enrichment; null if none. */
   private WebServerDetailResponse.TlsInfo buildTlsInfo(UUID fileId, String serverIp) {
-    List<ConversationEntity> convs =
-        conversationRepository.findByFileIdAndIp(fileId, serverIp).stream()
-            .filter(c -> serverIp.equals(c.getDstIp())) // this host acting as the TLS server
-            .toList();
-    if (convs.isEmpty()) return null;
+    List<ConversationEntity> all = conversationRepository.findByFileIdAndIp(fileId, serverIp);
+    if (all.isEmpty()) return null;
+    // The host is the TLS server when it's the connection destination (the authoritative direction).
+    // If a capture stored the flow reversed (e.g. the client SYN wasn't captured) the host can appear
+    // as the source, so fall back to all of its conversations rather than silently dropping the cert.
+    List<ConversationEntity> serverSide =
+        all.stream().filter(c -> serverIp.equals(c.getDstIp())).toList();
+    List<ConversationEntity> convs = serverSide.isEmpty() ? all : serverSide;
 
     List<String> sniNames =
         convs.stream().map(ConversationEntity::getHostname).filter(h -> h != null).distinct().sorted().toList();

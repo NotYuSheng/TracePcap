@@ -155,7 +155,7 @@ export const ConversationPage = () => {
     const next = new URLSearchParams(searchParams);
     next.delete('packet');
     setSearchParams(next, { replace: true });
-    if (!Number.isFinite(frame)) return;
+    if (!Number.isSafeInteger(frame) || frame <= 0) return;
     setDetailLoading(true);
     intelligenceService
       .getPacketLocation(fileId, frame)

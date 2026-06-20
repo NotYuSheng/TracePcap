@@ -75,9 +75,9 @@ public class HttpEndpointLogEntity {
 
   /** frame.number of the first request packet for this endpoint — links to the sent packet. */
   @Column(name = "request_frame")
-  private Integer requestFrame;
+  private Long requestFrame;
 
   /** frame.number of the first response packet for this endpoint — links to the response packet. */
   @Column(name = "response_frame")
-  private Integer responseFrame;
+  private Long responseFrame;
 }

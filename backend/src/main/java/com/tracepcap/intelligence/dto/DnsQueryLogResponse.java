@@ -39,6 +39,6 @@ public class DnsQueryLogResponse {
     private int queryCount;
     private boolean resolvable;
     /** frame.number of the response packet this row came from (for "view packet"); null if unknown. */
-    private Integer frame;
+    private Long frame;
   }
 }
