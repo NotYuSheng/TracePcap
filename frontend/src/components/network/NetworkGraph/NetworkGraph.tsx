@@ -10,6 +10,7 @@ import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
 import { deviceTypeColor, deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
+import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
 import './NetworkGraph.css';
 
 // ---------------------------------------------------------------------------
@@ -103,6 +104,47 @@ function getNodeIcon(nodeType: string, deviceType: string): string {
  *   3. Accent-colored Bootstrap Icon centered inside
  *   4. Text label below
  */
+/**
+ * Builds the ordered list of text lines drawn under a node, from the user's label
+ * configuration. Cluster nodes ignore the config and keep their descriptive label.
+ * Always returns at least one line so a node is never left unlabelled.
+ */
+function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
+  if (node.data.isCluster) return node.label ? [node.label] : [];
+
+  const lines: string[] = [];
+  for (const opt of cfg.fields) {
+    if (!opt.enabled) continue;
+    let value: string | undefined;
+    switch (opt.field) {
+      case 'ip':
+        value = node.data.ip;
+        break;
+      case 'hostname':
+        value = node.data.hostname;
+        break;
+      case 'mac':
+        value = node.data.mac;
+        break;
+      case 'deviceType':
+        value =
+          node.data.deviceType && node.data.deviceType !== 'UNKNOWN'
+            ? deviceTypeLabel(node.data.deviceType)
+            : undefined;
+        break;
+      case 'manufacturer':
+        value = node.data.manufacturer;
+        break;
+    }
+    if (value) lines.push(value);
+  }
+  const custom = cfg.customText.trim();
+  if (custom) lines.push(custom);
+  // Never render an unlabelled node — fall back to IP (or the node's display label).
+  if (lines.length === 0) lines.push(node.data.ip || node.label || '');
+  return lines.filter(Boolean);
+}
+
 function drawNodeLabel(
   ctx: CanvasRenderingContext2D,
   data: { x: number; y: number; size: number; label: string | null; color: string },
@@ -110,6 +152,7 @@ function drawNodeLabel(
   nodeFill: string,
   ntMap: Map<string, string>,
   dtMap: Map<string, string>,
+  linesMap: Map<string, string[]>,
   hlMap?: Map<string, NodeHighlight>,
 ): void {
   const { x, y, size, label, color: accentColor } = data;
@@ -149,13 +192,19 @@ function drawNodeLabel(
   ctx.textBaseline = 'middle';
   ctx.fillText(cp, x, y);
 
-  // Text label below
-  if (label) {
+  // Text label(s) below — one line per configured field.
+  // An empty label means the node is dimmed (hover) and should draw no text.
+  const lines = label ? linesMap.get(label) ?? [label] : [];
+  if (lines.length > 0) {
     ctx.font = `500 11px Inter, system-ui, sans-serif`;
     ctx.fillStyle = labelColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(label, x, y + size + 3);
+    let lineY = y + size + 3;
+    for (const line of lines) {
+      ctx.fillText(line, x, lineY);
+      lineY += 13;
+    }
   }
 }
 
@@ -356,6 +405,9 @@ export const NetworkGraph = memo(function NetworkGraph({
   const graphRef = useRef<Graph | null>(null);
   const nodeTypeByLabel = useRef<Map<string, string>>(new Map());
   const deviceTypeByLabel = useRef<Map<string, string>>(new Map());
+  // Per-node text lines (keyed by the node's label), derived from the user's label config.
+  const nodeLinesByLabel = useRef<Map<string, string[]>>(new Map());
+  const nodeLabelConfig = useStore(s => s.nodeLabelConfig);
   const elkRef = useRef<InstanceType<typeof ELK> | null>(null);
   if (!elkRef.current) {
     elkRef.current = new ELK({
@@ -378,6 +430,14 @@ export const NetworkGraph = memo(function NetworkGraph({
     highlightedNodesRef.current = highlightedNodes;
     sigmaRef.current?.refresh();
   }, [highlightedNodes]);
+
+  // Recompute node text lines when the label config changes, then redraw (no relayout).
+  useEffect(() => {
+    const lines = new Map<string, string[]>();
+    for (const n of nodesRef.current) lines.set(n.label, buildNodeLines(n, nodeLabelConfig));
+    nodeLinesByLabel.current = lines;
+    sigmaRef.current?.refresh();
+  }, [nodeLabelConfig]);
 
   // Hidden neighbor lookup
   const hiddenNodeMap = useMemo(
@@ -423,6 +483,13 @@ export const NetworkGraph = memo(function NetworkGraph({
     const graph = buildGraph(nodes, edges, primarySource);
     graphRef.current = graph;
 
+    // Seed the per-node text lines before the first paint. Read config fresh so a
+    // config change alone doesn't force a full graph rebuild + relayout (handled below).
+    const initialCfg = useStore.getState().nodeLabelConfig;
+    const initialLines = new Map<string, string[]>();
+    for (const n of nodes) initialLines.set(n.label, buildNodeLines(n, initialCfg));
+    nodeLinesByLabel.current = initialLines;
+
     const bgColor = darkMode ? DARK_BG : LIGHT_BG;
     const nodeFill = darkMode ? DARK_SURFACE : '#ffffff';
     const labelColor = darkMode ? '#c9d1d9' : '#212529';
@@ -438,10 +505,10 @@ export const NetworkGraph = memo(function NetworkGraph({
       minEdgeThickness: 0.5,
       zIndex: true,
       defaultDrawNodeLabel: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, highlightedNodesRef.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current);
       },
       defaultDrawNodeHover: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, highlightedNodesRef.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current);
       },
       nodeReducer: (node, data) => {
         const res = { ...data };

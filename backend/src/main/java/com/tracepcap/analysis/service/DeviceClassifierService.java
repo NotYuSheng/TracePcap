@@ -140,6 +140,7 @@ public class DeviceClassifierService {
    * @param hostTtls first-seen TTL per source IP
    * @param hostMacs first-seen MAC per source IP
    * @param deviceOverrides IP → custom device type string set by YAML rules (may be empty)
+   * @param hostnames IP → passively-discovered hostname/source (may be empty)
    * @return one HostClassificationEntity per unique IP
    */
   public List<HostClassificationEntity> classify(
@@ -147,7 +148,8 @@ public class DeviceClassifierService {
       List<PcapParserService.ConversationInfo> conversations,
       Map<String, Integer> hostTtls,
       Map<String, String> hostMacs,
-      Map<String, String> deviceOverrides) {
+      Map<String, String> deviceOverrides,
+      Map<String, HostnameResolverService.ResolvedHostname> hostnames) {
 
     // Build per-host profiles from all conversations
     Map<String, HostProfile> profiles = new LinkedHashMap<>();
@@ -195,6 +197,17 @@ public class DeviceClassifierService {
               .deviceType(deviceType)
               .confidence(confidence)
               .build());
+    }
+
+    // Attach passively-discovered hostnames (DHCP/mDNS/NBNS/reverse DNS) to matching hosts.
+    if (hostnames != null && !hostnames.isEmpty()) {
+      for (HostClassificationEntity host : results) {
+        HostnameResolverService.ResolvedHostname rh = hostnames.get(host.getIp());
+        if (rh != null) {
+          host.setHostname(rh.hostname());
+          host.setHostnameSource(rh.source());
+        }
+      }
     }
 
     log.info("Classified {} hosts", results.size());

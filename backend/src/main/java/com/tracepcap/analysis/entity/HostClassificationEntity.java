@@ -38,6 +38,20 @@ public class HostClassificationEntity {
   @Column(name = "manufacturer", length = 100)
   private String manufacturer;
 
+  /**
+   * Passively-discovered hostname for this host (e.g. "Johns-MacBook.local", "DESKTOP-AB12"). Null
+   * when no name was observed in the capture.
+   */
+  @Column(name = "hostname", length = 255)
+  private String hostname;
+
+  /**
+   * How {@link #hostname} was discovered. One of: {@code reverse_dns}, {@code mdns}, {@code nbns},
+   * {@code dhcp}, {@code manual}. Null when no hostname is set.
+   */
+  @Column(name = "hostname_source", length = 20)
+  private String hostnameSource;
+
   /** First-seen IP TTL value (may be null for non-IP traffic). */
   @Column(name = "ttl")
   private Integer ttl;

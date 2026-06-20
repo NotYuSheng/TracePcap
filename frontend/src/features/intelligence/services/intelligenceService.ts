@@ -59,6 +59,7 @@ export interface ClusterGraphResponse {
 export interface HostSummary {
   ip: string;
   hostname: string | null;
+  hostnameSource: string | null;
   totalBytes: number;
   packetCount: number;
   conversationCount: number;

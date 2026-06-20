@@ -2,6 +2,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
 import { Badge, Button } from '@govtechsg/sgds-react';
 import { formatBytes } from '@/utils/formatters';
+import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import type { HostSummary, SortBy } from '@/features/intelligence/services/intelligenceService';
 
 const GEO_SOURCE_INFO = {
@@ -100,11 +101,20 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
               <tr key={host.ip}>
                 <td className="text-muted">{page * pageSize + i + 1}</td>
                 <td>
-                  <span className="fw-semibold" style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                    {host.ip}
-                  </span>
-                  {host.hostname && (
-                    <div className="text-info" style={{ fontSize: 10 }}>{host.hostname}</div>
+                  {host.hostname ? (
+                    <>
+                      <div className="d-flex align-items-center gap-1">
+                        <span className="fw-semibold" style={{ fontSize: 11 }}>{host.hostname}</span>
+                        <HostnameSourceBadge source={host.hostnameSource} />
+                      </div>
+                      <div className="text-muted" style={{ fontFamily: 'monospace', fontSize: 10 }}>
+                        {host.ip}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="fw-semibold" style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                      {host.ip}
+                    </span>
                   )}
                 </td>
                 <td>{formatBytes(host.totalBytes)}</td>

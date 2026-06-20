@@ -414,10 +414,17 @@ export interface HostClassification {
   ip: string;
   mac?: string;
   manufacturer?: string;
+  /** Passively-discovered hostname for the host (DHCP/mDNS/NBNS/reverse DNS). */
+  hostname?: string;
+  /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
+  hostnameSource?: HostnameSource;
   ttl?: number;
   deviceType: DeviceType;
   confidence: number;
 }
+
+/** How a host's name was discovered from passive traffic. */
+export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'dhcp' | 'manual';
 
 // Filter Generator Types
 export interface FilterGenerationRequest {

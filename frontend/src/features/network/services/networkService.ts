@@ -540,6 +540,13 @@ export function buildNetworkGraph(
         nodeMap[ip].data.manufacturer = c.manufacturer;
         nodeMap[ip].data.ttl = c.ttl;
         if (c.mac && !nodeMap[ip].data.mac) nodeMap[ip].data.mac = c.mac;
+        // The classifier's hostname identifies the host itself (DHCP/mDNS/NBNS/reverse
+        // DNS) and is more authoritative than the SNI-derived conversation hostname.
+        if (c.hostname) {
+          nodeMap[ip].data.hostname = c.hostname;
+          nodeMap[ip].data.hostnameSource = c.hostnameSource;
+          if (nodeMap[ip].label === ip) nodeMap[ip].label = c.hostname;
+        }
       }
     });
   }
