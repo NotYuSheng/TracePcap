@@ -71,5 +71,37 @@ export const webServiceTab: ServiceTabConfig<WebServerDetail, HttpEndpoint> = {
     },
     { header: 'Content-Type', cell: row => row.contentType ?? <span className="text-muted">—</span> },
     { header: 'Count', cell: row => row.requestCount },
+    {
+      header: 'Packets',
+      cell: (row, ctx) => {
+        if (row.requestFrame == null && row.responseFrame == null) {
+          return <span className="text-muted">—</span>;
+        }
+        return (
+          <span className="d-flex gap-2">
+            {row.requestFrame != null && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0"
+                title="View the request packet"
+                onClick={() => ctx.openPacket(row.requestFrame!)}
+              >
+                <i className="bi bi-box-arrow-up-right me-1" />Req
+              </button>
+            )}
+            {row.responseFrame != null && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm p-0"
+                title="View the response packet"
+                onClick={() => ctx.openPacket(row.responseFrame!)}
+              >
+                <i className="bi bi-box-arrow-up-right me-1" />Resp
+              </button>
+            )}
+          </span>
+        );
+      },
+    },
   ],
 };

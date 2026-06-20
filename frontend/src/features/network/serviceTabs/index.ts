@@ -2,7 +2,7 @@ import type { ServiceTabConfig } from './types';
 import { dnsServiceTab } from './dnsServiceTab';
 import { webServiceTab } from './webServiceTab';
 
-export type { ServiceTabConfig, ServiceLogColumn, ServiceLogInfoField } from './types';
+export type { ServiceTabConfig, ServiceLogColumn, ServiceLogInfoField, ServiceLogCellContext } from './types';
 
 /**
  * Registry mapping a host service role → the tab the node modal renders for it. Add a role = add an

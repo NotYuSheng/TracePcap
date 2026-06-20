@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert } from '@components/common/Alert';
-import type { ServiceTabConfig } from '@/features/network/serviceTabs';
+import type { ServiceTabConfig, ServiceLogCellContext } from '@/features/network/serviceTabs';
 
 interface ServiceLogTabProps {
   fileId: string;
@@ -14,9 +15,19 @@ interface ServiceLogTabProps {
  * — DNS today, web/API servers later — by swapping the {@link ServiceTabConfig}.
  */
 export function ServiceLogTab({ fileId, ip, config }: ServiceLogTabProps) {
+  const navigate = useNavigate();
   const [detail, setDetail] = useState<unknown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Cell context: lets columns render "view packet" links that jump to the Conversations tab.
+  const cellCtx = useMemo<ServiceLogCellContext>(
+    () => ({
+      fileId,
+      openPacket: frame => navigate(`/analysis/${fileId}/conversations?packet=${frame}`),
+    }),
+    [fileId, navigate],
+  );
 
   useEffect(() => {
     let active = true;
@@ -79,7 +90,7 @@ export function ServiceLogTab({ fileId, ip, config }: ServiceLogTabProps) {
             {rows.map((row, i) => (
               <tr key={i} style={config.rowStyle?.(row)}>
                 {config.columns.map(col => (
-                  <td key={col.header}>{col.cell(row)}</td>
+                  <td key={col.header}>{col.cell(row, cellCtx)}</td>
                 ))}
               </tr>
             ))}

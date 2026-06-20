@@ -49,5 +49,21 @@ export const dnsServiceTab: ServiceTabConfig<DnsQueryLogResponse, DnsQueryEntry>
         ),
     },
     { header: 'Count', cell: row => row.queryCount },
+    {
+      header: 'Packet',
+      cell: (row, ctx) =>
+        row.frame != null ? (
+          <button
+            type="button"
+            className="btn btn-link btn-sm p-0"
+            title="View this DNS response packet"
+            onClick={() => ctx.openPacket(row.frame!)}
+          >
+            <i className="bi bi-box-arrow-up-right me-1" />#{row.frame}
+          </button>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
   ],
 };

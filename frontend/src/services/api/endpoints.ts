@@ -56,6 +56,8 @@ export const API_ENDPOINTS = {
     `/network/intelligence/${fileId}/web-servers`,
   NETWORK_INTELLIGENCE_WEB_DETAIL: (fileId: string, serverIp: string) =>
     `/network/intelligence/${fileId}/web/${encodeURIComponent(serverIp)}`,
+  NETWORK_INTELLIGENCE_PACKET_LOCATION: (fileId: string, packetNumber: number) =>
+    `/network/intelligence/${fileId}/packet-location/${packetNumber}`,
 
   // Conversation Tracer
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,

@@ -75,6 +75,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     final Map<Integer, Integer> statusCounts = new LinkedHashMap<>();
     String contentType; // representative (first seen)
     String serverSoftware; // first Server header seen for this endpoint's server
+    Integer requestFrame; // frame.number of the first request (for "view packet" links)
+    Integer responseFrame; // frame.number of the first response
   }
 
   /** Per-server bookkeeping for the api/web decision and the read-side enumeration check. */
@@ -96,13 +98,14 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     // tshark surfaces the request URI on the response but not the method, so we correlate request →
     // response per TCP stream (FIFO, valid for HTTP/1.x ordering).
     // Fields: 0 tcp.stream 1 ip.src 2 ip.dst 3 method 4 uri 5 status 6 content_type 7 server
+    //   8 frame.number
     Map<String, Deque<String[]>> pendingByStream = new HashMap<>();
     runPass(
         pcap,
         "http",
         new String[] {
           "tcp.stream", "ip.src", "ip.dst", "http.request.method", "http.request.uri",
-          "http.response.code", "http.content_type", "http.server"
+          "http.response.code", "http.content_type", "http.server", "frame.number"
         },
         f -> parseHttpFrame(f, endpoints, serverStats, pendingByStream));
 
@@ -153,6 +156,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
               .topStatus(topStatus(agg.statusCounts))
               .contentType(agg.contentType)
               .serverSoftware(agg.serverSoftware)
+              .requestFrame(agg.requestFrame)
+              .responseFrame(agg.responseFrame)
               .build());
     }
     if (!rows.isEmpty()) httpEndpointLogRepository.saveAll(rows);
@@ -184,9 +189,10 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       if (path != null && isApiPath(path)) stats.hasApiPath = true;
       if (isWriteVerb(method)) stats.hasWriteVerb = true;
       if (path != null) {
+        String reqFrame = f.length > 8 ? trimToNull(f[8]) : null;
         pendingByStream
             .computeIfAbsent(stream, k -> new ArrayDeque<>())
-            .addLast(new String[] {method, path});
+            .addLast(new String[] {method, path, reqFrame});
       }
     } else if (status != null) {
       // Response frame — the server is the source.
@@ -194,19 +200,22 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       if (server == null) return;
       String contentType = normaliseContentType(firstValue(f[6]));
       String serverSoftware = trimToNull(f[7]);
+      Integer respFrame = parseIntOrNull(f.length > 8 ? firstValue(f[8]) : null);
       WebServerStats stats = serverStats.computeIfAbsent(server, k -> new WebServerStats());
       stats.totalResponses++;
       if (contentType != null && contentType.contains("json")) stats.jsonResponses++;
       else if (contentType != null && contentType.contains("html")) stats.htmlResponses++;
 
-      // Recover the request's method+path (FIFO within the stream); fall back to the response's own
-      // request URI when unmatched.
+      // Recover the request's method+path+frame (FIFO within the stream); fall back to the response's
+      // own request URI when unmatched.
       Deque<String[]> queue = pendingByStream.get(stream);
       String[] req = (queue != null && !queue.isEmpty()) ? queue.pollFirst() : null;
       String reqMethod = req != null ? req[0] : null;
       String path = req != null ? req[1] : normalisePath(uri);
+      Integer reqFrame = (req != null) ? parseIntOrNull(req[2]) : null;
       if (path == null) return;
-      recordEndpoint(server, reqMethod, path, status, contentType, serverSoftware, endpoints);
+      recordEndpoint(
+          server, reqMethod, path, status, contentType, serverSoftware, reqFrame, respFrame, endpoints);
     }
   }
 
@@ -218,6 +227,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       int status,
       String contentType,
       String serverSoftware,
+      Integer requestFrame,
+      Integer responseFrame,
       Map<String, EndpointAgg> endpoints) {
     String key = server + "|" + (method == null ? "" : method) + "|" + path;
     EndpointAgg agg = endpoints.computeIfAbsent(key, k -> new EndpointAgg());
@@ -228,6 +239,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     else agg.successCount++;
     if (agg.contentType == null && contentType != null) agg.contentType = contentType;
     if (agg.serverSoftware == null && serverSoftware != null) agg.serverSoftware = serverSoftware;
+    if (agg.requestFrame == null && requestFrame != null) agg.requestFrame = requestFrame;
+    if (agg.responseFrame == null && responseFrame != null) agg.responseFrame = responseFrame;
   }
 
   /** A server is "API-like" when JSON dominates its responses, or it uses REST write verbs / api paths. */

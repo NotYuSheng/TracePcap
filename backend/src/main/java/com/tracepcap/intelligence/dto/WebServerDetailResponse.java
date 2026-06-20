@@ -42,6 +42,9 @@ public class WebServerDetailResponse {
     private int clientErrorCount;
     private int serverErrorCount;
     private String contentType;
+    /** frame.number of the first request/response packet (for "view packet"); null if unknown. */
+    private Integer requestFrame;
+    private Integer responseFrame;
   }
 
   /** TLS metadata observed for the server, reconstructed from conversation enrichment. */

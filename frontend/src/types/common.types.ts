@@ -1,6 +1,8 @@
 // Packet and Network Types
 export interface Packet {
   id: string;
+  /** Frame number within the capture (matches tshark frame.number); used for deep-link highlighting. */
+  packetNumber?: number;
   timestamp: number;
   source: NetworkEndpoint;
   destination: NetworkEndpoint;

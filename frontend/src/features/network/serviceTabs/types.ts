@@ -1,9 +1,16 @@
 import type { CSSProperties, ReactNode } from 'react';
 
+/** Context passed to a column cell so it can render actions like "view packet" links. */
+export interface ServiceLogCellContext {
+  fileId: string;
+  /** Opens the packet with the given frame number (navigates to the Conversations tab). */
+  openPacket: (frame: number) => void;
+}
+
 /** One column of a service-log detail table. */
 export interface ServiceLogColumn<Row> {
   header: string;
-  cell: (row: Row) => ReactNode;
+  cell: (row: Row, ctx: ServiceLogCellContext) => ReactNode;
 }
 
 /**

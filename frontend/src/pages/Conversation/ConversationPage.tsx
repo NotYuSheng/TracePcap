@@ -11,6 +11,7 @@ import {
 import type { ColumnKey } from '@/features/conversation/constants';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
+import { intelligenceService } from '@/features/intelligence/services/intelligenceService';
 import { ConversationList } from '@components/conversation/ConversationList';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
 import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
@@ -53,6 +54,7 @@ export const ConversationPage = () => {
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
   const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
+  const [highlightPacket, setHighlightPacket] = useState<number | null>(null);
 
   const toggleColumn = useCallback((key: ColumnKey) => {
     setVisibleColumns(prev => {
@@ -144,6 +146,31 @@ export const ConversationPage = () => {
       .finally(() => setDetailLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-open the conversation containing a specific packet when navigated with ?packet=<frameNumber>
+  // (e.g. from a "view packet" link in the DNS / HTTP service tabs), then highlight that packet.
+  useEffect(() => {
+    const packetParam = searchParams.get('packet');
+    if (!packetParam) return;
+    const frame = Number(packetParam);
+    const next = new URLSearchParams(searchParams);
+    next.delete('packet');
+    setSearchParams(next, { replace: true });
+    if (!Number.isFinite(frame)) return;
+    setDetailLoading(true);
+    intelligenceService
+      .getPacketLocation(fileId, frame)
+      .then(loc => {
+        if (!loc) return undefined;
+        return conversationService.getConversationDetail(loc.conversationId).then(conv => {
+          setSelectedConversation(conv);
+          setSelectedIndex(-1);
+          setHighlightPacket(frame);
+        });
+      })
+      .catch(err => console.error('Failed to open packet:', err))
+      .finally(() => setDetailLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch conversations whenever filters change
   useEffect(() => {
     if (!fileId) return;
@@ -188,7 +215,10 @@ export const ConversationPage = () => {
     }
   }, []);
 
-  const closeModal = useCallback(() => setSelectedConversation(null), []);
+  const closeModal = useCallback(() => {
+    setSelectedConversation(null);
+    setHighlightPacket(null);
+  }, []);
 
   const exportConversationCsv = useCallback((conversation: Conversation) => {
     const hexToAscii = (hex: string) => {
@@ -510,6 +540,7 @@ export const ConversationPage = () => {
                 signatureSeverities={signatureSeverities}
                 hostClassMap={hostClassMap}
                 fileId={fileId}
+                highlightPacketNumber={highlightPacket}
               />
             )
           )}

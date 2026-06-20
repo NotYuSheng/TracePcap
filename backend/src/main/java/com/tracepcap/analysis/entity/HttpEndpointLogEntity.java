@@ -72,4 +72,12 @@ public class HttpEndpointLogEntity {
   /** Response Server header (e.g. "nginx/1.18.0"); null when not sent. */
   @Column(name = "server_software", length = 255)
   private String serverSoftware;
+
+  /** frame.number of the first request packet for this endpoint — links to the sent packet. */
+  @Column(name = "request_frame")
+  private Integer requestFrame;
+
+  /** frame.number of the first response packet for this endpoint — links to the response packet. */
+  @Column(name = "response_frame")
+  private Integer responseFrame;
 }

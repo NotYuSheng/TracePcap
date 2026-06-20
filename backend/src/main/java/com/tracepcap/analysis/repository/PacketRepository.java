@@ -12,6 +12,9 @@ import org.springframework.stereotype.Repository;
 public interface PacketRepository extends JpaRepository<PacketEntity, UUID> {
   List<PacketEntity> findByConversationIdOrderByPacketNumberAsc(UUID conversationId);
 
+  /** Locates a packet by its frame number within a file (packetNumber == tshark frame.number). */
+  java.util.Optional<PacketEntity> findFirstByFile_IdAndPacketNumber(UUID fileId, Long packetNumber);
+
   @Query(
       "SELECT p.conversation.id, p.detectedFileType FROM PacketEntity p"
           + " WHERE p.conversation.id IN :ids AND p.detectedFileType IS NOT NULL")

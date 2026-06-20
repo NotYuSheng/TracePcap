@@ -94,6 +94,7 @@ export interface DnsQueryEntry {
   resolvedIps: string[];
   queryCount: number;
   resolvable: boolean;
+  frame: number | null;
 }
 
 export interface DnsQueryLogResponse {
@@ -115,6 +116,13 @@ export interface HttpEndpoint {
   clientErrorCount: number;
   serverErrorCount: number;
   contentType: string | null;
+  requestFrame: number | null;
+  responseFrame: number | null;
+}
+
+export interface PacketLocation {
+  conversationId: string;
+  packetNumber: number;
 }
 
 export interface TlsInfo {
@@ -204,5 +212,17 @@ export const intelligenceService = {
       API_ENDPOINTS.NETWORK_INTELLIGENCE_WEB_DETAIL(fileId, serverIp)
     );
     return res.data;
+  },
+
+  /** Resolves a packet frame number to the conversation that contains it (null if not found). */
+  async getPacketLocation(fileId: string, packetNumber: number): Promise<PacketLocation | null> {
+    try {
+      const res = await apiClient.get<PacketLocation>(
+        API_ENDPOINTS.NETWORK_INTELLIGENCE_PACKET_LOCATION(fileId, packetNumber)
+      );
+      return res.data;
+    } catch {
+      return null;
+    }
   },
 };

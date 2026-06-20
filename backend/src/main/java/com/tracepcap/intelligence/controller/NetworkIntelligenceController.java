@@ -3,6 +3,7 @@ package com.tracepcap.intelligence.controller;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.intelligence.dto.ClusterGraphResponse;
 import com.tracepcap.intelligence.dto.DnsQueryLogResponse;
+import com.tracepcap.intelligence.dto.PacketLocationResponse;
 import com.tracepcap.intelligence.dto.ServiceServerSummaryDto;
 import com.tracepcap.intelligence.dto.TopHostsResponse;
 import com.tracepcap.intelligence.dto.WebServerDetailResponse;
@@ -131,5 +132,15 @@ public class NetworkIntelligenceController {
       @PathVariable UUID fileId, @PathVariable String serverIp) {
     log.info("GET /api/network/intelligence/{}/web/{}", fileId, serverIp);
     return ResponseEntity.ok(intelligenceService.computeWebServerDetail(fileId, serverIp));
+  }
+
+  @GetMapping("/{fileId}/packet-location/{packetNumber}")
+  @Operation(
+      summary = "Locate a packet by frame number",
+      description = "Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.")
+  public ResponseEntity<PacketLocationResponse> locatePacket(
+      @PathVariable UUID fileId, @PathVariable long packetNumber) {
+    PacketLocationResponse location = intelligenceService.locatePacket(fileId, packetNumber);
+    return location != null ? ResponseEntity.ok(location) : ResponseEntity.notFound().build();
   }
 }

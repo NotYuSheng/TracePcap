@@ -11,6 +11,7 @@ import com.tracepcap.analysis.repository.DnsQueryLogRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.HttpEndpointLogRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor;
 import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.intelligence.dto.*;
@@ -32,6 +33,7 @@ public class NetworkIntelligenceService {
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final DnsQueryLogRepository dnsQueryLogRepository;
   private final HttpEndpointLogRepository httpEndpointLogRepository;
+  private final PacketRepository packetRepository;
   private final IpOrgRuleService ipOrgRuleService;
   private final GeoIpService geoIpService;
 
@@ -445,6 +447,7 @@ public class NetworkIntelligenceService {
                         .resolvedIps(splitResolvedIps(r.getResolvedIps()))
                         .queryCount(r.getQueryCount())
                         .resolvable(r.isResolvable())
+                        .frame(r.getSampleFrame())
                         .build())
             .collect(Collectors.toList());
 
@@ -557,6 +560,8 @@ public class NetworkIntelligenceService {
                         .clientErrorCount(r.getClientErrorCount())
                         .serverErrorCount(r.getServerErrorCount())
                         .contentType(r.getContentType())
+                        .requestFrame(r.getRequestFrame())
+                        .responseFrame(r.getResponseFrame())
                         .build())
             .collect(Collectors.toList());
 
@@ -638,6 +643,20 @@ public class NetworkIntelligenceService {
       serverError += r.getServerErrorCount();
     }
     return new WebCounts(success, clientError, serverError);
+  }
+
+  /** Resolves a frame number to the conversation that contains it, so the UI can open + highlight it. */
+  public PacketLocationResponse locatePacket(UUID fileId, long packetNumber) {
+    return packetRepository
+        .findFirstByFile_IdAndPacketNumber(fileId, packetNumber)
+        .filter(p -> p.getConversation() != null)
+        .map(
+            p ->
+                PacketLocationResponse.builder()
+                    .conversationId(p.getConversation().getId())
+                    .packetNumber(packetNumber)
+                    .build())
+        .orElse(null);
   }
 
   private boolean hasRole(HostClassificationEntity host, String role) {

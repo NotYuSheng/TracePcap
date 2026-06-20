@@ -131,6 +131,7 @@ function transformConversation(
 function transformPacket(apiData: PacketApiResponse, protocol: Protocol): Packet {
   return {
     id: apiData.id,
+    packetNumber: apiData.packetNumber,
     timestamp: parseDateTime(apiData.timestamp),
     source: { ip: apiData.srcIp, port: apiData.srcPort ?? 0 },
     destination: { ip: apiData.dstIp, port: apiData.dstPort ?? 0 },
