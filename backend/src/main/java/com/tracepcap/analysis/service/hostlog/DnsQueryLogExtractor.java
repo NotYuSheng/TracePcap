@@ -148,7 +148,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
       ServerStats s = e.getValue();
       if (s.totalResponses < nxdomainMinQueries) continue;
       double ratio = (double) s.nxdomainResponses / s.totalResponses;
-      if (ratio >= nxdomainSuspiciousRatio) {
+      if (ratio > nxdomainSuspiciousRatio) { // strictly "exceeds" the configured threshold
         String reason =
             String.format(
                 "%.0f%% NXDOMAIN over %d responses", ratio * 100, s.totalResponses);
@@ -233,9 +233,11 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
           log.warn("DNS query log: tshark exited with code {}; results may be partial", exit);
         }
         try {
-          stdoutTask.get(5, TimeUnit.SECONDS);
-        } catch (Exception ignored) {
-          // best-effort
+          // tshark has exited; give the reader a generous window to drain any buffered output so a
+          // large query log isn't silently truncated. Match the overall extraction budget.
+          stdoutTask.get(2, TimeUnit.MINUTES);
+        } catch (Exception e) {
+          log.warn("DNS query log: stdout drain did not complete; results may be partial");
         }
       }
     } catch (InterruptedException e) {

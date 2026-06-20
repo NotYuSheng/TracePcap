@@ -460,7 +460,7 @@ public class NetworkIntelligenceService {
     }
 
     boolean suspicious(double ratioThreshold, int minQueries) {
-      return total() >= minQueries && nxdomainRatio() >= ratioThreshold;
+      return total() >= minQueries && nxdomainRatio() > ratioThreshold; // strictly exceeds
     }
   }
 

@@ -26,8 +26,13 @@ public record HostContext(
     String hostname,
     Set<String> serviceRoles) {
 
+  /** Enforces the documented non-null contract and makes {@code serviceRoles} immutable. */
+  public HostContext {
+    serviceRoles = (serviceRoles == null) ? Set.of() : Set.copyOf(serviceRoles);
+  }
+
   /** True when this host was detected serving the given role (e.g. {@code "dns"}). */
   public boolean hasServiceRole(String role) {
-    return serviceRoles != null && serviceRoles.contains(role);
+    return serviceRoles.contains(role);
   }
 }

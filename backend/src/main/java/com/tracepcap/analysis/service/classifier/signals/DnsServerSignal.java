@@ -19,7 +19,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class DnsServerSignal implements DeviceClassificationSignal {
 
-  static final int WEIGHT = 60;
+  /**
+   * Deliberately dominant: a host that <em>observably answered DNS</em> is a DNS server, so this
+   * authoritative evidence outranks the summed heuristic votes (OUI/TTL/app/traffic) which top out
+   * far below this. A plain +60 could be overtaken by a busy host that also serves DNS, leaving it
+   * mislabelled as SERVER/ROUTER; this guarantees DNS_SERVER wins while staying a normal weighted
+   * signal (no special-casing in the classifier core).
+   */
+  static final int WEIGHT = 1000;
 
   @Override
   public String name() {

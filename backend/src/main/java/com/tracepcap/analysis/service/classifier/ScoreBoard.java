@@ -41,9 +41,9 @@ public class ScoreBoard {
         .orElse(fallback);
   }
 
-  /** Reasons that voted for the given type, in the order they fired. */
+  /** Reasons that voted for the given type, in the order they fired (defensive copy). */
   public List<String> reasonsFor(String deviceType) {
-    return reasons.getOrDefault(deviceType, List.of());
+    return List.copyOf(reasons.getOrDefault(deviceType, List.of()));
   }
 
   /**

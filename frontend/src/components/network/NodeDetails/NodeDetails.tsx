@@ -169,6 +169,13 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
     .filter((t): t is ServiceTabConfig<unknown, unknown> => Boolean(t));
   const activeServiceTab = serviceTabs.find(t => `svc:${t.role}` === activeTab);
 
+  // If the selected service tab is no longer offered (e.g. the modal re-rendered for a node without
+  // that role), fall back to Details so the body never goes blank.
+  useEffect(() => {
+    const isBaseTab = activeTab === 'details' || activeTab === 'history' || activeTab === 'notes';
+    if (!isBaseTab && !activeServiceTab) setActiveTab('details');
+  }, [activeTab, activeServiceTab]);
+
   const noteChanged = noteText !== (savedNote?.note ?? '');
 
   return (
