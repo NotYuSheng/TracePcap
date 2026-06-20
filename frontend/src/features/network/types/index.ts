@@ -35,6 +35,8 @@ export interface NodeData {
   /** True when this node is identified by a MAC address (pure L2 device with no IP). */
   isL2?: boolean;
   hostname?: string;
+  /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
+  hostnameSource?: string;
   packetsSent: number;
   packetsReceived: number;
   bytesSent: number;

@@ -340,9 +340,15 @@ public class NetworkIntelligenceService {
           String role = acc.clientConversations > acc.serverConversations * 2 ? "client"
               : acc.serverConversations > acc.clientConversations * 2 ? "server"
               : "both";
+          // Prefer the host's own discovered name (DHCP/mDNS/NBNS/reverse DNS) over the
+          // nDPI SNI, which records the server a client connected to rather than the host itself.
+          String hostname = device != null && device.getHostname() != null
+              ? device.getHostname() : acc.hostname;
+          String hostnameSource = device != null ? device.getHostnameSource() : null;
           return HostSummaryDto.builder()
               .ip(ip)
-              .hostname(acc.hostname)
+              .hostname(hostname)
+              .hostnameSource(hostnameSource)
               .totalBytes(acc.totalBytes)
               .packetCount(acc.packetCount)
               .conversationCount(acc.conversationCount)

@@ -72,6 +72,7 @@ public class AnalysisService {
   private final SuricataService suricataService;
   private final CustomSignatureService customSignatureService;
   private final DeviceClassifierService deviceClassifierService;
+  private final HostnameResolverService hostnameResolverService;
   private final GeoIpService geoIpService;
   private final FileExtractionService fileExtractionService;
   private final AnalysisRecordService analysisRecordService;
@@ -137,13 +138,21 @@ public class AnalysisService {
         customSignatureService.applySignatures(parseResult.getConversations());
         Map<String, String> deviceOverrides =
             customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
+        Map<String, HostnameResolverService.ResolvedHostname> hostnames;
+        try {
+          hostnames = hostnameResolverService.resolve(tempFile);
+        } catch (Exception e) {
+          log.warn("[{}] Hostname resolution failed: {}", fileId, e.getMessage());
+          hostnames = java.util.Map.of();
+        }
         List<HostClassificationEntity> hostClassifications =
             deviceClassifierService.classify(
                 file,
                 parseResult.getConversations(),
                 parseResult.getHostTtls(),
                 parseResult.getHostMacs(),
-                deviceOverrides);
+                deviceOverrides,
+                hostnames);
         hostClassificationRepository.saveAll(hostClassifications);
         try {
           Set<String> allIps =

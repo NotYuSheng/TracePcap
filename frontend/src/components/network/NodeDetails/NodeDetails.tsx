@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { NODE_TYPE_CONFIG, getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
@@ -287,7 +288,10 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                       {node.data.hostname && (
                         <>
                           <dt className="col-5 text-muted">Hostname</dt>
-                          <dd className="col-7 mb-1">{node.data.hostname}</dd>
+                          <dd className="col-7 mb-1 d-flex align-items-center gap-1">
+                            <span>{node.data.hostname}</span>
+                            <HostnameSourceBadge source={node.data.hostnameSource} />
+                          </dd>
                         </>
                       )}
 

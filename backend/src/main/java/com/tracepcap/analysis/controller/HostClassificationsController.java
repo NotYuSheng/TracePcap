@@ -31,6 +31,8 @@ public class HostClassificationsController {
                         .ip(e.getIp())
                         .mac(e.getMac())
                         .manufacturer(e.getManufacturer())
+                        .hostname(e.getHostname())
+                        .hostnameSource(e.getHostnameSource())
                         .ttl(e.getTtl())
                         .deviceType(e.getDeviceType())
                         .confidence(e.getConfidence())
