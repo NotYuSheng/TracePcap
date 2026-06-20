@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
 
   // Extracted Files
   EXTRACTED_FILES: (fileId: string) => `/files/${fileId}/extractions`,
+  EXTRACTED_FILES_WARNINGS: (fileId: string) => `/files/${fileId}/extractions/warnings`,
   EXTRACTED_FILE_DOWNLOAD: (fileId: string, extractionId: string) =>
     `/files/${fileId}/extractions/${extractionId}/download`,
 

@@ -88,6 +88,10 @@ services:
       # Network Intelligence cluster limits
       INTELLIGENCE_MAX_CLUSTERS: ${INTELLIGENCE_MAX_CLUSTERS:-60}
       INTELLIGENCE_MAX_EDGES: ${INTELLIGENCE_MAX_EDGES:-200}
+      # File extraction limits (see .env.example)
+      EXTRACTION_MAX_MATCHES_PER_STREAM: ${EXTRACTION_MAX_MATCHES_PER_STREAM:-20}
+      EXTRACTION_MAX_STREAM_CONVERSATIONS: ${EXTRACTION_MAX_STREAM_CONVERSATIONS:-50}
+      EXTRACTION_MAX_FILE_SIZE_MB: ${EXTRACTION_MAX_FILE_SIZE_MB:-50}
       # Timezone Configuration
       TZ: Asia/Singapore
     volumes:

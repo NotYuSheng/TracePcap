@@ -1,9 +1,13 @@
 package com.tracepcap.analysis.controller;
 
 import com.tracepcap.analysis.dto.ExtractedFileResponse;
+import com.tracepcap.analysis.dto.ExtractionWarningsResponse;
 import com.tracepcap.analysis.entity.ExtractedFileEntity;
 import com.tracepcap.analysis.repository.ExtractedFileRepository;
+import com.tracepcap.analysis.service.ExtractionLimits;
 import com.tracepcap.common.exception.ResourceNotFoundException;
+import com.tracepcap.file.entity.FileEntity;
+import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.file.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import java.io.InputStream;
@@ -25,8 +29,13 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @RequiredArgsConstructor
 public class ExtractedFilesController {
 
+  /** Upper bound on size-skipped files returned in the warnings response. */
+  private static final int MAX_SIZE_LIMIT_FILES = 100;
+
   private final ExtractedFileRepository extractedFileRepository;
+  private final FileRepository fileRepository;
   private final StorageService storageService;
+  private final ExtractionLimits extractionLimits;
 
   @GetMapping
   @Operation(summary = "List all files extracted from a PCAP capture")
@@ -42,6 +51,65 @@ public class ExtractedFilesController {
         entities.stream().map(this::toResponse).collect(Collectors.toList());
 
     return ResponseEntity.ok(response);
+  }
+
+  @GetMapping("/warnings")
+  @Operation(summary = "Report which file-extraction limits were hit for a PCAP capture")
+  public ResponseEntity<ExtractionWarningsResponse> extractionWarnings(@PathVariable UUID fileId) {
+
+    FileEntity file =
+        fileRepository
+            .findById(fileId)
+            .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+
+    // Size-limit skips are persisted as extracted_files rows — query just those, capped to
+    // keep the response bounded on captures with very many skipped files.
+    List<ExtractionWarningsResponse.SkippedFile> sizeLimitFiles =
+        extractedFileRepository
+            .findByFileIdAndSkippedReasonOrderByCreatedAtAsc(fileId, "exceeds_size_limit")
+            .stream()
+            .limit(MAX_SIZE_LIMIT_FILES)
+            .map(
+                e ->
+                    ExtractionWarningsResponse.SkippedFile.builder()
+                        .id(e.getId())
+                        .conversationId(
+                            e.getConversation() != null ? e.getConversation().getId() : null)
+                        .filename(e.getFilename())
+                        .fileSize(e.getFileSize())
+                        .build())
+            .collect(Collectors.toList());
+
+    return ResponseEntity.ok(
+        ExtractionWarningsResponse.builder()
+            .matchLimitConversationIds(parseConvIds(file.getExtractionMatchLimitConvIds()))
+            .conversationLimitSkippedCount(file.getExtractionConversationLimitSkippedCount())
+            .conversationLimitSkippedIds(
+                parseConvIds(file.getExtractionConversationLimitSkippedIds()))
+            .sizeLimitFiles(sizeLimitFiles)
+            .maxMatchesPerStream(extractionLimits.getMaxMatchesPerStream())
+            .maxStreamConversations(extractionLimits.getMaxStreamConversations())
+            .maxFileSizeMb(extractionLimits.getMaxFileSizeMb())
+            .build());
+  }
+
+  /**
+   * Parses a comma-separated list of conversation UUIDs into a list (empty when null/blank).
+   * Malformed tokens are skipped rather than failing the whole request.
+   */
+  private static List<UUID> parseConvIds(String csv) {
+    if (csv == null || csv.isBlank()) return List.of();
+    List<UUID> ids = new java.util.ArrayList<>();
+    for (String token : csv.split(",")) {
+      String s = token.trim();
+      if (s.isEmpty()) continue;
+      try {
+        ids.add(UUID.fromString(s));
+      } catch (IllegalArgumentException e) {
+        log.warn("Skipping malformed conversation id in extraction warning: {}", s);
+      }
+    }
+    return ids;
   }
 
   /** MIME types the browser can safely render inline without a plugin. */
