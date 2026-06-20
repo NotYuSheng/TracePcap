@@ -106,6 +106,42 @@ export interface DnsQueryLogResponse {
   entries: DnsQueryEntry[];
 }
 
+export interface HttpEndpoint {
+  method: string | null;
+  path: string;
+  topStatus: number | null;
+  requestCount: number;
+  successCount: number;
+  clientErrorCount: number;
+  serverErrorCount: number;
+  contentType: string | null;
+}
+
+export interface TlsInfo {
+  subject: string | null;
+  issuer: string | null;
+  ja3s: string | null;
+  sniNames: string[];
+  notBefore: string | null;
+  notAfter: string | null;
+}
+
+export interface WebServerDetail {
+  serverIp: string;
+  hostname: string | null;
+  api: boolean;
+  totalRequests: number;
+  successCount: number;
+  clientErrorCount: number;
+  serverErrorCount: number;
+  clientErrorRatio: number;
+  suspicious: boolean;
+  serverSoftware: string | null;
+  contentTypes: string[];
+  tls: TlsInfo | null;
+  endpoints: HttpEndpoint[];
+}
+
 export const intelligenceService = {
   async getClusters(fileId: string, groupBy: GroupBy, filters?: IntelClusterFilters): Promise<ClusterGraphResponse> {
     // Start from the canonical endpoint (includes ?groupBy=X) and append extra filter params
@@ -152,6 +188,20 @@ export const intelligenceService = {
   async getDnsQueryLog(fileId: string, serverIp: string): Promise<DnsQueryLogResponse> {
     const res = await apiClient.get<DnsQueryLogResponse>(
       API_ENDPOINTS.NETWORK_INTELLIGENCE_DNS_LOG(fileId, serverIp)
+    );
+    return res.data;
+  },
+
+  async getWebServers(fileId: string): Promise<ServiceServerSummary[]> {
+    const res = await apiClient.get<ServiceServerSummary[]>(
+      API_ENDPOINTS.NETWORK_INTELLIGENCE_WEB_SERVERS(fileId)
+    );
+    return res.data;
+  },
+
+  async getWebServerDetail(fileId: string, serverIp: string): Promise<WebServerDetail> {
+    const res = await apiClient.get<WebServerDetail>(
+      API_ENDPOINTS.NETWORK_INTELLIGENCE_WEB_DETAIL(fileId, serverIp)
     );
     return res.data;
   },

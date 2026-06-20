@@ -45,6 +45,7 @@ export function ServiceLogTab({ fileId, ip, config }: ServiceLogTabProps) {
 
   const rows = config.getRows(detail);
   const banner = config.getBanner(detail);
+  const infoFields = config.getInfoFields?.(detail) ?? [];
 
   return (
     <div>
@@ -53,6 +54,16 @@ export function ServiceLogTab({ fileId, ip, config }: ServiceLogTabProps) {
           <i className="bi bi-shield-exclamation me-2" />
           {banner}
         </Alert>
+      )}
+      {infoFields.length > 0 && (
+        <dl className="row mb-2 small">
+          {infoFields.map(field => (
+            <div className="col-12 d-flex gap-2 mb-1" key={field.label}>
+              <dt className="text-muted" style={{ minWidth: 130, flexShrink: 0 }}>{field.label}</dt>
+              <dd className="mb-0">{field.value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
       <p className="text-muted small mb-2">{config.getSummary(detail)}</p>
       <div className="table-responsive rounded border overflow-hidden">

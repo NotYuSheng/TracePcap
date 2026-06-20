@@ -5,6 +5,7 @@ import com.tracepcap.intelligence.dto.ClusterGraphResponse;
 import com.tracepcap.intelligence.dto.DnsQueryLogResponse;
 import com.tracepcap.intelligence.dto.ServiceServerSummaryDto;
 import com.tracepcap.intelligence.dto.TopHostsResponse;
+import com.tracepcap.intelligence.dto.WebServerDetailResponse;
 import com.tracepcap.intelligence.service.NetworkIntelligenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -111,5 +112,24 @@ public class NetworkIntelligenceController {
       @PathVariable UUID fileId, @PathVariable String serverIp) {
     log.info("GET /api/network/intelligence/{}/dns/{}", fileId, serverIp);
     return ResponseEntity.ok(intelligenceService.computeDnsQueryLog(fileId, serverIp));
+  }
+
+  @GetMapping("/{fileId}/web-servers")
+  @Operation(
+      summary = "List web/API servers and their HTTP health",
+      description = "Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).")
+  public ResponseEntity<List<ServiceServerSummaryDto>> getWebServers(@PathVariable UUID fileId) {
+    log.info("GET /api/network/intelligence/{}/web-servers", fileId);
+    return ResponseEntity.ok(intelligenceService.computeWebServers(fileId));
+  }
+
+  @GetMapping("/{fileId}/web/{serverIp}")
+  @Operation(
+      summary = "Get the HTTP endpoint log + detail for one web/API server",
+      description = "Returns the per-endpoint log (method, path, status-class counts, content type) plus server software, content types and TLS metadata (cleartext HTTP only for endpoints; TLS detail for HTTPS).")
+  public ResponseEntity<WebServerDetailResponse> getWebServerDetail(
+      @PathVariable UUID fileId, @PathVariable String serverIp) {
+    log.info("GET /api/network/intelligence/{}/web/{}", fileId, serverIp);
+    return ResponseEntity.ok(intelligenceService.computeWebServerDetail(fileId, serverIp));
   }
 }

@@ -408,6 +408,8 @@ export type DeviceType =
   | 'SERVER'
   | 'IOT'
   | 'DNS_SERVER'
+  | 'WEB_SERVER'
+  | 'API_SERVER'
   | 'UNKNOWN'
   | string; // custom override values from YAML
 

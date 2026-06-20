@@ -30,4 +30,15 @@ export interface ServiceTabConfig<Detail = unknown, Row = unknown> {
   getSummary: (detail: Detail) => string;
   /** Alert-banner text when the host looks suspicious for this role; null when not. */
   getBanner: (detail: Detail) => string | null;
+  /**
+   * Optional server-level key/value detail rendered as a definition list above the table (e.g. a web
+   * server's software, content types and TLS info). Return an empty array to render nothing.
+   */
+  getInfoFields?: (detail: Detail) => ServiceLogInfoField[];
+}
+
+/** A label/value pair in the server-level info block. */
+export interface ServiceLogInfoField {
+  label: string;
+  value: ReactNode;
 }

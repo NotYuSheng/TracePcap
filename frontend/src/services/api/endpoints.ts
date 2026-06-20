@@ -52,6 +52,10 @@ export const API_ENDPOINTS = {
     `/network/intelligence/${fileId}/dns-servers`,
   NETWORK_INTELLIGENCE_DNS_LOG: (fileId: string, serverIp: string) =>
     `/network/intelligence/${fileId}/dns/${encodeURIComponent(serverIp)}`,
+  NETWORK_INTELLIGENCE_WEB_SERVERS: (fileId: string) =>
+    `/network/intelligence/${fileId}/web-servers`,
+  NETWORK_INTELLIGENCE_WEB_DETAIL: (fileId: string, serverIp: string) =>
+    `/network/intelligence/${fileId}/web/${encodeURIComponent(serverIp)}`,
 
   // Conversation Tracer
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,

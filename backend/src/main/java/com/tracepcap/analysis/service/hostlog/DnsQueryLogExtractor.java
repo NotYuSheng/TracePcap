@@ -162,7 +162,9 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
         serverStats.size(),
         suspicions.size());
     // Every host that answered a DNS query is a DNS server, regardless of suspicion.
-    return new HostServiceLogResult(new LinkedHashSet<>(serverStats.keySet()), suspicions);
+    Map<String, String> roleByServerIp = new LinkedHashMap<>();
+    for (String ip : serverStats.keySet()) roleByServerIp.put(ip, ROLE);
+    return new HostServiceLogResult(roleByServerIp, suspicions);
   }
 
   // ── tshark pass ───────────────────────────────────────────────────────────

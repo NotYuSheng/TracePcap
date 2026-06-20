@@ -76,6 +76,8 @@ const DEVICE_TYPE_ICONS: Record<string, string> = {
   SERVER:         '\uf52c', // bi-server
   IOT:            '\uf46b', // bi-cpu
   DNS_SERVER:     '\uf40d', // bi-hdd-network
+  WEB_SERVER:     '\uf3ee', // bi-globe
+  API_SERVER:     '\uf411', // bi-hdd-stack
 };
 
 const FALLBACK_ICON = '\uf505'; // bi-question-circle

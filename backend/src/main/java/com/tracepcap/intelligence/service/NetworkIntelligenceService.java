@@ -4,11 +4,14 @@ import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.DnsQueryLogEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.tracepcap.analysis.entity.HttpEndpointLogEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.DnsQueryLogRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.repository.HttpEndpointLogRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor;
 import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.intelligence.dto.*;
 import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
@@ -28,6 +31,7 @@ public class NetworkIntelligenceService {
   private final HostClassificationRepository hostClassificationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final DnsQueryLogRepository dnsQueryLogRepository;
+  private final HttpEndpointLogRepository httpEndpointLogRepository;
   private final IpOrgRuleService ipOrgRuleService;
   private final GeoIpService geoIpService;
 
@@ -45,6 +49,12 @@ public class NetworkIntelligenceService {
 
   @Value("${tracepcap.dns.nxdomain-min-queries:20}")
   private int dnsNxdomainMinQueries;
+
+  @Value("${tracepcap.http.client-error-suspicious-ratio:0.5}")
+  private double httpClientErrorSuspiciousRatio;
+
+  @Value("${tracepcap.http.min-requests:20}")
+  private int httpMinRequests;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -482,6 +492,161 @@ public class NetworkIntelligenceService {
   private List<String> splitResolvedIps(String joined) {
     if (joined == null || joined.isBlank()) return List.of();
     return Arrays.stream(joined.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+  }
+
+  // ── Web / API server log (#362 follow-up) ───────────────────────────────────
+
+  /**
+   * Lists every host classified as a web/API server (roles {@code api}/{@code web} — includes
+   * HTTPS-only hosts with no cleartext endpoints), with a per-server roll-up of success vs. error
+   * responses and the 4xx-enumeration verdict. Sorted most-active first.
+   */
+  public List<ServiceServerSummaryDto> computeWebServers(UUID fileId) {
+    List<HostClassificationEntity> webHosts =
+        hostClassificationRepository.findByFileId(fileId).stream()
+            .filter(h -> hasRole(h, WebServerLogExtractor.ROLE_API)
+                || hasRole(h, WebServerLogExtractor.ROLE_WEB))
+            .toList();
+    if (webHosts.isEmpty()) return List.of();
+
+    Map<String, List<HttpEndpointLogEntity>> byServer =
+        httpEndpointLogRepository.findByFileId(fileId).stream()
+            .collect(Collectors.groupingBy(HttpEndpointLogEntity::getServerIp));
+
+    return webHosts.stream()
+        .map(
+            host -> {
+              WebCounts c = countWeb(byServer.getOrDefault(host.getIp(), List.of()));
+              return ServiceServerSummaryDto.builder()
+                  .serverIp(host.getIp())
+                  .hostname(host.getHostname())
+                  .role(hasRole(host, WebServerLogExtractor.ROLE_API) ? "api" : "web")
+                  .totalRequests(c.total())
+                  .okCount(c.success)
+                  .failedCount(c.clientError + c.serverError)
+                  .anomalyRatio(c.clientErrorRatio())
+                  .suspicious(c.suspicious(httpClientErrorSuspiciousRatio, httpMinRequests))
+                  .build();
+            })
+        .sorted(Comparator.comparingLong(ServiceServerSummaryDto::getTotalRequests).reversed())
+        .collect(Collectors.toList());
+  }
+
+  /** Full endpoint log + server detail (software, content types, TLS) for one web/API server. */
+  public WebServerDetailResponse computeWebServerDetail(UUID fileId, String serverIp) {
+    List<HttpEndpointLogEntity> rows =
+        httpEndpointLogRepository.findByFileIdAndServerIp(fileId, serverIp);
+    WebCounts c = countWeb(rows);
+    HostClassificationEntity host =
+        hostClassificationRepository.findByFileIdAndIp(fileId, serverIp).orElse(null);
+
+    List<WebServerDetailResponse.HttpEndpointDto> endpoints =
+        rows.stream()
+            .sorted(
+                Comparator.comparingInt(HttpEndpointLogEntity::getRequestCount)
+                    .reversed()
+                    .thenComparing(HttpEndpointLogEntity::getPath))
+            .map(
+                r ->
+                    WebServerDetailResponse.HttpEndpointDto.builder()
+                        .method(r.getMethod())
+                        .path(r.getPath())
+                        .topStatus(r.getTopStatus())
+                        .requestCount(r.getRequestCount())
+                        .successCount(r.getSuccessCount())
+                        .clientErrorCount(r.getClientErrorCount())
+                        .serverErrorCount(r.getServerErrorCount())
+                        .contentType(r.getContentType())
+                        .build())
+            .collect(Collectors.toList());
+
+    String serverSoftware =
+        rows.stream().map(HttpEndpointLogEntity::getServerSoftware).filter(s -> s != null).findFirst().orElse(null);
+    List<String> contentTypes =
+        rows.stream()
+            .map(HttpEndpointLogEntity::getContentType)
+            .filter(ct -> ct != null)
+            .distinct()
+            .sorted()
+            .toList();
+
+    return WebServerDetailResponse.builder()
+        .serverIp(serverIp)
+        .hostname(host != null ? host.getHostname() : null)
+        .api(host != null && hasRole(host, WebServerLogExtractor.ROLE_API))
+        .totalRequests(c.total())
+        .successCount(c.success)
+        .clientErrorCount(c.clientError)
+        .serverErrorCount(c.serverError)
+        .clientErrorRatio(c.clientErrorRatio())
+        .suspicious(c.suspicious(httpClientErrorSuspiciousRatio, httpMinRequests))
+        .serverSoftware(serverSoftware)
+        .contentTypes(contentTypes)
+        .tls(buildTlsInfo(fileId, serverIp))
+        .endpoints(endpoints)
+        .build();
+  }
+
+  /** Reconstructs TLS metadata for a server from the existing conversation enrichment; null if none. */
+  private WebServerDetailResponse.TlsInfo buildTlsInfo(UUID fileId, String serverIp) {
+    List<ConversationEntity> convs =
+        conversationRepository.findByFileIdAndIp(fileId, serverIp).stream()
+            .filter(c -> serverIp.equals(c.getDstIp())) // this host acting as the TLS server
+            .toList();
+    if (convs.isEmpty()) return null;
+
+    List<String> sniNames =
+        convs.stream().map(ConversationEntity::getHostname).filter(h -> h != null).distinct().sorted().toList();
+    ConversationEntity cert =
+        convs.stream().filter(c -> c.getTlsSubject() != null || c.getTlsIssuer() != null).findFirst().orElse(null);
+    String ja3s =
+        convs.stream().map(ConversationEntity::getJa3Server).filter(j -> j != null).findFirst().orElse(null);
+
+    if (cert == null && ja3s == null && sniNames.isEmpty()) return null;
+    return WebServerDetailResponse.TlsInfo.builder()
+        .subject(cert != null ? cert.getTlsSubject() : null)
+        .issuer(cert != null ? cert.getTlsIssuer() : null)
+        .ja3s(ja3s)
+        .sniNames(sniNames)
+        .notBefore(cert != null ? cert.getTlsNotBefore() : null)
+        .notAfter(cert != null ? cert.getTlsNotAfter() : null)
+        .build();
+  }
+
+  /** Roll-up of a web server's endpoint rows by status class. */
+  private record WebCounts(long success, long clientError, long serverError) {
+    long total() {
+      return success + clientError + serverError;
+    }
+
+    double clientErrorRatio() {
+      return total() == 0 ? 0.0 : (double) clientError / total();
+    }
+
+    boolean suspicious(double ratioThreshold, int minRequests) {
+      return total() >= minRequests && clientErrorRatio() > ratioThreshold; // strictly exceeds
+    }
+  }
+
+  private WebCounts countWeb(List<HttpEndpointLogEntity> rows) {
+    long success = 0;
+    long clientError = 0;
+    long serverError = 0;
+    for (HttpEndpointLogEntity r : rows) {
+      success += r.getSuccessCount();
+      clientError += r.getClientErrorCount();
+      serverError += r.getServerErrorCount();
+    }
+    return new WebCounts(success, clientError, serverError);
+  }
+
+  private boolean hasRole(HostClassificationEntity host, String role) {
+    String roles = host.getServiceRoles();
+    if (roles == null || roles.isBlank()) return false;
+    for (String r : roles.split(",")) {
+      if (r.trim().equals(role)) return true;
+    }
+    return false;
   }
 
   // ── Filter helpers ────────────────────────────────────────────────────────
