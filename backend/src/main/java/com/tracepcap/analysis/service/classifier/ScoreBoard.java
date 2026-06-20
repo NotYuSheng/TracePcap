@@ -52,6 +52,7 @@ public class ScoreBoard {
    * margin = conflicted signals.
    */
   public int confidence(int marginForFull) {
+    if (marginForFull <= 0) return 100; // degenerate config — any positive margin is "full"
     List<Integer> sorted =
         scores.values().stream().sorted(Comparator.reverseOrder()).toList();
     if (sorted.isEmpty() || sorted.get(0) == 0) return 0;

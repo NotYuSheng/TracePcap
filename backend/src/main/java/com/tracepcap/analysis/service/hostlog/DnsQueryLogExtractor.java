@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -91,6 +92,10 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     return ROLE;
   }
 
+  /** Aggregation key — typed rather than a delimiter-joined string so a pipe in a query name (as
+   *  tunnelled/malformed traffic may contain) can't collide or corrupt keys. */
+  record QueryKey(String serverIp, String queryName, String queryType) {}
+
   /** Mutable accumulator for one (serverIp, queryName, queryType) group. */
   static final class QueryAgg {
     int count;
@@ -107,22 +112,22 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
 
   @Override
   public HostServiceLogResult extractAndPersist(FileEntity file, File pcap) {
-    Map<String, QueryAgg> groups = new LinkedHashMap<>(); // key: serverIp|queryName|queryType
+    Map<QueryKey, QueryAgg> groups = new LinkedHashMap<>();
     Map<String, ServerStats> serverStats = new LinkedHashMap<>();
 
     runTshark(pcap, groups, serverStats);
 
     // Persist aggregated rows.
     List<DnsQueryLogEntity> rows = new ArrayList<>(groups.size());
-    for (Map.Entry<String, QueryAgg> e : groups.entrySet()) {
-      String[] key = e.getKey().split("\\|", -1);
+    for (Map.Entry<QueryKey, QueryAgg> e : groups.entrySet()) {
+      QueryKey key = e.getKey();
       QueryAgg agg = e.getValue();
       rows.add(
           DnsQueryLogEntity.builder()
               .file(file)
-              .serverIp(key[0])
-              .queryName(key[1])
-              .queryType(key[2].isEmpty() ? null : key[2])
+              .serverIp(key.serverIp())
+              .queryName(key.queryName())
+              .queryType(key.queryType().isEmpty() ? null : key.queryType())
               .responseCode(agg.responseCode)
               .resolvedIps(agg.resolvedIps.isEmpty() ? null : String.join(",", agg.resolvedIps))
               .queryCount(agg.count)
@@ -163,7 +168,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
   // ── tshark pass ───────────────────────────────────────────────────────────
 
   private void runTshark(
-      File pcap, Map<String, QueryAgg> groups, Map<String, ServerStats> serverStats) {
+      File pcap, Map<QueryKey, QueryAgg> groups, Map<String, ServerStats> serverStats) {
     // Fields (pipe-separated): 0 ip.src  1 dns.qry.name  2 dns.qry.type
     //   3 dns.flags.rcode  4 dns.a  5 dns.aaaa  6 dns.count.answers
     // Default occurrence aggregator (",") keeps every answer record in dns.a/dns.aaaa.
@@ -194,29 +199,14 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
             "dns.aaaa",
             "-e",
             "dns.count.answers");
-    pb.redirectErrorStream(false);
+    // Discard stderr natively (no drain thread needed); we only consume stdout.
+    pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     Process process = null;
     ExecutorService ioExecutor = null;
     try {
       process = pb.start();
       final Process proc = process;
-
-      Thread stderrThread =
-          new Thread(
-              () -> {
-                try (BufferedReader err =
-                    new BufferedReader(
-                        new InputStreamReader(proc.getErrorStream(), StandardCharsets.UTF_8))) {
-                  while (err.readLine() != null) {
-                    // discard
-                  }
-                } catch (Exception ignored) {
-                  // best-effort
-                }
-              });
-      stderrThread.setDaemon(true);
-      stderrThread.start();
 
       ioExecutor = Executors.newSingleThreadExecutor();
       Future<?> stdoutTask =
@@ -227,7 +217,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
                         new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
                   String line;
                   while ((line = reader.readLine()) != null) {
-                    if (!line.isEmpty()) parseRow(line.split("\\|", -1), groups, serverStats);
+                    if (!line.isEmpty()) parseRow(line, groups, serverStats);
                   }
                 } catch (Exception ignored) {
                   // best-effort
@@ -262,28 +252,34 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
   // ── Row parsing ─────────────────────────────────────────────────────────────
 
   static void parseRow(
-      String[] f, Map<String, QueryAgg> groups, Map<String, ServerStats> serverStats) {
+      String line, Map<QueryKey, QueryAgg> groups, Map<String, ServerStats> serverStats) {
+    String[] f = line.split("\\|", -1);
     if (f.length < 7) return;
+    // Fields are fixed except the query name (field 1), which — in tunnelled/malformed DNS — may
+    // itself contain the '|' separator. ip.src is the first field and the five trailing fields are
+    // fixed, so re-join everything in between to recover the full query name.
     String serverIp = trimToNull(f[0]);
-    String queryName = stripTrailingDot(firstValue(f[1]));
+    String rawQueryName =
+        (f.length == 7) ? f[1] : String.join("|", Arrays.copyOfRange(f, 1, f.length - 5));
+    String queryName = stripTrailingDot(firstValue(rawQueryName));
     if (serverIp == null || queryName == null) return;
     if (queryName.length() > QUERY_NAME_MAX_LENGTH) {
       queryName = queryName.substring(0, QUERY_NAME_MAX_LENGTH);
     }
 
-    String queryType = qtypeName(firstValue(f[2]));
-    String rawRcode = firstValue(f[3]);
+    String queryType = qtypeName(firstValue(f[f.length - 5]));
+    String rawRcode = firstValue(f[f.length - 4]);
     String responseCode = rcodeName(rawRcode);
     boolean isNoError = "0".equals(rawRcode);
     boolean isNxdomain = "3".equals(rawRcode);
 
     Set<String> answers = new LinkedHashSet<>();
-    addValues(answers, f[4]);
-    addValues(answers, f[5]);
+    addValues(answers, f[f.length - 3]);
+    addValues(answers, f[f.length - 2]);
     // A query is "resolved" when it was answered successfully (NOERROR with at least one answer
     // record), regardless of record type — an MX/TXT/CNAME/PTR lookup with no A/AAAA still counts.
     // NOERROR with zero answers (NODATA) and NXDOMAIN are both unresolved.
-    boolean resolvable = isNoError && parseAnswerCount(f[6]) > 0;
+    boolean resolvable = isNoError && parseAnswerCount(f[f.length - 1]) > 0;
 
     // Per-server NXDOMAIN scoring (packet-level).
     ServerStats stats = serverStats.computeIfAbsent(serverIp, k -> new ServerStats());
@@ -291,7 +287,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     if (isNxdomain) stats.nxdomainResponses++;
 
     // Aggregate into the (server, name, type) group.
-    String key = serverIp + "|" + queryName + "|" + (queryType == null ? "" : queryType);
+    QueryKey key = new QueryKey(serverIp, queryName, queryType == null ? "" : queryType);
     QueryAgg agg = groups.computeIfAbsent(key, k -> new QueryAgg());
     agg.count++;
     agg.resolvedIps.addAll(answers);
