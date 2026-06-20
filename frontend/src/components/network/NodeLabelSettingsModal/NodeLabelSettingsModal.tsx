@@ -135,7 +135,10 @@ export const NodeLabelSettingsModal = ({ show, onHide, container }: NodeLabelSet
           </Form.Text>
         </Form.Group>
 
-        <div className="border rounded p-3 text-center" style={{ background: 'var(--sgds-light, #f8f9fa)' }}>
+        <div
+          className="border rounded p-3 text-center"
+          style={{ background: 'var(--tp-bg-subtle)', color: 'var(--tp-text)' }}
+        >
           <div className="text-muted small mb-2">Preview</div>
           <i className="bi bi-pc-display-horizontal" style={{ fontSize: 24 }} />
           {previewLines.length > 0 ? (
