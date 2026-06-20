@@ -321,6 +321,7 @@ The [`sample-files/`](sample-files/) directory contains example PCAPs:
 - `atm_capture1.cap` — ATM network traffic sample
 - `free5gc.pcap` — 5G core network traffic sample
 - `demo_all_rules.pcap` — Triggers all 12 custom signature demo rules
+- `dns_demo.pcap` — Two LAN resolvers answering a variety of DNS record types (A, AAAA, CNAME, MX, TXT, PTR, SRV) for the Network Intelligence "DNS Servers" view. Regenerate with [`sample-files/gen_dns_demo.py`](sample-files/gen_dns_demo.py)
 - `monitor_large/` — 8 weekly snapshots of a simulated 550-node office network for testing the Network Monitor
 
 ## Star History

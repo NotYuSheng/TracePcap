@@ -48,6 +48,10 @@ export const API_ENDPOINTS = {
     `/network/intelligence/${fileId}/clusters?groupBy=${groupBy}`,
   NETWORK_INTELLIGENCE_TOP_HOSTS: (fileId: string, sortBy: string, limit: number) =>
     `/network/intelligence/${fileId}/top-hosts?sortBy=${sortBy}&limit=${limit}`,
+  NETWORK_INTELLIGENCE_DNS_SERVERS: (fileId: string) =>
+    `/network/intelligence/${fileId}/dns-servers`,
+  NETWORK_INTELLIGENCE_DNS_LOG: (fileId: string, serverIp: string) =>
+    `/network/intelligence/${fileId}/dns/${encodeURIComponent(serverIp)}`,
 
   // Conversation Tracer
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,

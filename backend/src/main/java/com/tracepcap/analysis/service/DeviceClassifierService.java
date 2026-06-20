@@ -1,7 +1,11 @@
 package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.config.DeviceClassificationProperties;
+import com.tracepcap.analysis.service.classifier.DeviceClassificationSignal;
+import com.tracepcap.analysis.service.classifier.DeviceTypes;
+import com.tracepcap.analysis.service.classifier.HostContext;
+import com.tracepcap.analysis.service.classifier.HostProfile;
+import com.tracepcap.analysis.service.classifier.ScoreBoard;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -36,22 +40,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DeviceClassifierService {
 
-  // -------------------------------------------------------------------------
-  // Device type constants
-  // -------------------------------------------------------------------------
-
-  public static final String ROUTER = "ROUTER";
-  public static final String MOBILE = "MOBILE";
-  public static final String LAPTOP_DESKTOP = "LAPTOP_DESKTOP";
-  public static final String SERVER = "SERVER";
-  public static final String IOT = "IOT";
-  public static final String UNKNOWN = "UNKNOWN";
+  /** Score margin (winner − runner-up) that maps to 100% confidence; smaller margins scale down. */
+  private static final int CONFIDENCE_MARGIN_FOR_FULL = 60;
 
   // -------------------------------------------------------------------------
   // OUI vendor lookup — loaded at startup from /usr/share/wireshark/manuf
   // -------------------------------------------------------------------------
 
-  private final DeviceClassificationProperties classificationProps;
+  /** All registered classification signals, injected by Spring (extension seam — add a bean). */
+  private final List<DeviceClassificationSignal> signals;
 
   @Value("${app.wireshark.manuf-path:/usr/share/wireshark/manuf}")
   private String manufFile;
@@ -63,28 +60,28 @@ public class DeviceClassifierService {
   private static final Map<String, String> VENDOR_HINT_OVERLAY = new LinkedHashMap<>();
 
   static {
-    VENDOR_HINT_OVERLAY.put("apple", MOBILE);
-    VENDOR_HINT_OVERLAY.put("samsung", MOBILE);
-    VENDOR_HINT_OVERLAY.put("google", MOBILE);
-    VENDOR_HINT_OVERLAY.put("oneplus", MOBILE);
-    VENDOR_HINT_OVERLAY.put("xiaomi", MOBILE);
-    VENDOR_HINT_OVERLAY.put("cisco", ROUTER);
-    VENDOR_HINT_OVERLAY.put("huawei", ROUTER);
-    VENDOR_HINT_OVERLAY.put("tp-link", ROUTER);
-    VENDOR_HINT_OVERLAY.put("tplink", ROUTER);
-    VENDOR_HINT_OVERLAY.put("netgear", ROUTER);
-    VENDOR_HINT_OVERLAY.put("asus", ROUTER);
-    VENDOR_HINT_OVERLAY.put("ubiquiti", ROUTER);
-    VENDOR_HINT_OVERLAY.put("mikrotik", ROUTER);
-    VENDOR_HINT_OVERLAY.put("dell", LAPTOP_DESKTOP);
-    VENDOR_HINT_OVERLAY.put("intel", LAPTOP_DESKTOP);
-    VENDOR_HINT_OVERLAY.put("lenovo", LAPTOP_DESKTOP);
-    VENDOR_HINT_OVERLAY.put("hewlett packard", LAPTOP_DESKTOP);
-    VENDOR_HINT_OVERLAY.put("hp inc", LAPTOP_DESKTOP);
-    VENDOR_HINT_OVERLAY.put("acer", LAPTOP_DESKTOP);
-    VENDOR_HINT_OVERLAY.put("raspberry pi", IOT);
-    VENDOR_HINT_OVERLAY.put("espressif", IOT);
-    VENDOR_HINT_OVERLAY.put("arduino", IOT);
+    VENDOR_HINT_OVERLAY.put("apple", DeviceTypes.MOBILE);
+    VENDOR_HINT_OVERLAY.put("samsung", DeviceTypes.MOBILE);
+    VENDOR_HINT_OVERLAY.put("google", DeviceTypes.MOBILE);
+    VENDOR_HINT_OVERLAY.put("oneplus", DeviceTypes.MOBILE);
+    VENDOR_HINT_OVERLAY.put("xiaomi", DeviceTypes.MOBILE);
+    VENDOR_HINT_OVERLAY.put("cisco", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("huawei", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("tp-link", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("tplink", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("netgear", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("asus", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("ubiquiti", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("mikrotik", DeviceTypes.ROUTER);
+    VENDOR_HINT_OVERLAY.put("dell", DeviceTypes.LAPTOP_DESKTOP);
+    VENDOR_HINT_OVERLAY.put("intel", DeviceTypes.LAPTOP_DESKTOP);
+    VENDOR_HINT_OVERLAY.put("lenovo", DeviceTypes.LAPTOP_DESKTOP);
+    VENDOR_HINT_OVERLAY.put("hewlett packard", DeviceTypes.LAPTOP_DESKTOP);
+    VENDOR_HINT_OVERLAY.put("hp inc", DeviceTypes.LAPTOP_DESKTOP);
+    VENDOR_HINT_OVERLAY.put("acer", DeviceTypes.LAPTOP_DESKTOP);
+    VENDOR_HINT_OVERLAY.put("raspberry pi", DeviceTypes.IOT);
+    VENDOR_HINT_OVERLAY.put("espressif", DeviceTypes.IOT);
+    VENDOR_HINT_OVERLAY.put("arduino", DeviceTypes.IOT);
   }
 
   @PostConstruct
@@ -141,6 +138,8 @@ public class DeviceClassifierService {
    * @param hostMacs first-seen MAC per source IP
    * @param deviceOverrides IP → custom device type string set by YAML rules (may be empty)
    * @param hostnames IP → passively-discovered hostname/source (may be empty)
+   * @param serviceRolesByIp IP → service roles the host was detected serving, e.g. {@code "dns"}
+   *     (may be empty); feeds role-aware signals and is recorded on each host
    * @return one HostClassificationEntity per unique IP
    */
   public List<HostClassificationEntity> classify(
@@ -149,7 +148,8 @@ public class DeviceClassifierService {
       Map<String, Integer> hostTtls,
       Map<String, String> hostMacs,
       Map<String, String> deviceOverrides,
-      Map<String, HostnameResolverService.ResolvedHostname> hostnames) {
+      Map<String, HostnameResolverService.ResolvedHostname> hostnames,
+      Map<String, Set<String>> serviceRolesByIp) {
 
     // Build per-host profiles from all conversations
     Map<String, HostProfile> profiles = new LinkedHashMap<>();
@@ -167,6 +167,7 @@ public class DeviceClassifierService {
       String mac = hostMacs.get(ip);
       String manufacturer = resolveManufacturer(mac);
       String ouiHint = resolveOuiHint(mac);
+      Set<String> roles = serviceRolesByIp.getOrDefault(ip, Set.of());
 
       // Check YAML device_type override first
       if (deviceOverrides.containsKey(ip)) {
@@ -179,13 +180,23 @@ public class DeviceClassifierService {
                 .ttl(ttl)
                 .deviceType(deviceOverrides.get(ip))
                 .confidence(100)
+                .serviceRoles(joinRoles(roles))
                 .build());
         continue;
       }
 
-      Map<String, Integer> scores = new HashMap<>();
-      String deviceType = scoreAndClassify(ip, profile, ttl, ouiHint, scores);
-      int confidence = computeConfidence(scores);
+      // Run every registered signal into a shared score board; the highest-scoring type wins.
+      HostContext ctx = new HostContext(ip, profile, ttl, mac, manufacturer, ouiHint, null, roles);
+      ScoreBoard board = new ScoreBoard();
+      for (DeviceClassificationSignal signal : signals) {
+        try {
+          signal.contribute(ctx, board);
+        } catch (Exception e) {
+          log.warn("Classification signal '{}' failed for {}: {}", signal.name(), ip, e.getMessage());
+        }
+      }
+      String deviceType = board.winner(DeviceTypes.UNKNOWN);
+      int confidence = board.confidence(CONFIDENCE_MARGIN_FOR_FULL);
 
       results.add(
           HostClassificationEntity.builder()
@@ -196,6 +207,7 @@ public class DeviceClassifierService {
               .ttl(ttl)
               .deviceType(deviceType)
               .confidence(confidence)
+              .serviceRoles(joinRoles(roles))
               .build());
     }
 
@@ -278,145 +290,8 @@ public class DeviceClassifierService {
     return null;
   }
 
-  /**
-   * Core classifier: weighs signals and returns the most likely device type. Populates {@code
-   * scoresOut} with the final per-type scores so the caller can compute a margin-based confidence.
-   */
-  private String scoreAndClassify(
-      String ip, HostProfile p, Integer ttl, String ouiHint, Map<String, Integer> scoresOut) {
-
-    Map<String, Integer> scores = scoresOut;
-    scores.put(ROUTER, 0);
-    scores.put(MOBILE, 0);
-    scores.put(LAPTOP_DESKTOP, 0);
-    scores.put(SERVER, 0);
-    scores.put(IOT, 0);
-
-    // --- Signal 1: OUI hint ---
-    if (ouiHint != null) {
-      scores.merge(ouiHint, 40, Integer::sum);
-    }
-
-    // --- Signal 2: TTL fingerprinting ---
-    if (ttl != null) {
-      int normalised = normaliseTtl(ttl);
-      if (normalised == 128) {
-        // Windows → laptop/desktop
-        scores.merge(LAPTOP_DESKTOP, 30, Integer::sum);
-      } else if (normalised == 64) {
-        // Linux/Unix/Android/iOS — could be server, mobile, router
-        scores.merge(SERVER, 10, Integer::sum);
-        scores.merge(MOBILE, 10, Integer::sum);
-        scores.merge(ROUTER, 10, Integer::sum);
-      } else if (normalised == 255) {
-        // Cisco/network devices
-        scores.merge(ROUTER, 30, Integer::sum);
-      }
-    }
-
-    // --- Signal 3: nDPI app profile ---
-    Set<String> mobileApps = classificationProps.getMobileApps();
-    Set<String> desktopApps = classificationProps.getDesktopApps();
-    Set<String> serverApps = classificationProps.getServerApps();
-    Set<String> iotCategories = classificationProps.getIotCategories();
-    for (String app : p.apps) {
-      if (mobileApps.contains(app)) scores.merge(MOBILE, 20, Integer::sum);
-      if (desktopApps.contains(app)) scores.merge(LAPTOP_DESKTOP, 20, Integer::sum);
-      if (serverApps.contains(app)) scores.merge(SERVER, 20, Integer::sum);
-    }
-    for (String cat : p.categories) {
-      if (iotCategories.contains(cat)) scores.merge(IOT, 15, Integer::sum);
-      if ("Web".equals(cat) || "Media".equals(cat)) scores.merge(LAPTOP_DESKTOP, 5, Integer::sum);
-    }
-
-    // --- Signal 4: Traffic patterns ---
-    // High peer count → likely router
-    if (p.peers.size() >= 15) {
-      scores.merge(ROUTER, 35, Integer::sum);
-    } else if (p.peers.size() >= 8) {
-      scores.merge(ROUTER, 15, Integer::sum);
-    }
-
-    // Only receives on well-known ports, never initiates → server
-    boolean receivesOnWellKnown = p.receivedOnPorts.stream().anyMatch(port -> port < 1024);
-    boolean neverInitiates = p.initiatedCount == 0;
-    if (neverInitiates && receivesOnWellKnown) {
-      scores.merge(SERVER, 35, Integer::sum);
-    } else if (neverInitiates) {
-      scores.merge(SERVER, 15, Integer::sum);
-    }
-
-    // Low variety + low volume → IoT
-    if (p.apps.size() <= 2 && p.conversationCount <= 5 && p.totalPackets < 200) {
-      scores.merge(IOT, 20, Integer::sum);
-    }
-
-    // Mostly initiates traffic (client-like) with varied apps → mobile/laptop
-    double initiateRatio =
-        p.conversationCount > 0 ? (double) p.initiatedCount / p.conversationCount : 0;
-    if (initiateRatio > 0.7 && p.apps.size() > 3) {
-      scores.merge(MOBILE, 10, Integer::sum);
-      scores.merge(LAPTOP_DESKTOP, 10, Integer::sum);
-    }
-
-    // DNS/NTP only → router/server
-    boolean onlyInfraApps =
-        !p.apps.isEmpty()
-            && p.apps.stream()
-                .allMatch(a -> a.equalsIgnoreCase("DNS") || a.equalsIgnoreCase("NTP"));
-    if (onlyInfraApps) {
-      scores.merge(ROUTER, 20, Integer::sum);
-      scores.merge(SERVER, 15, Integer::sum);
-    }
-
-    return scores.entrySet().stream()
-        .max(Map.Entry.comparingByValue())
-        .filter(e -> e.getValue() > 0)
-        .map(Map.Entry::getKey)
-        .orElse(UNKNOWN);
-  }
-
-  /**
-   * Confidence based on the score margin between the winning type and the second-best type. A large
-   * margin means the classification is unambiguous; a small margin means the signals are
-   * conflicted.
-   *
-   * <p>Scale: margin ≥ 60 → 100 %, scaled linearly down to 0 % at margin = 0.
-   */
-  private int computeConfidence(Map<String, Integer> scores) {
-    List<Integer> sorted = scores.values().stream().sorted(Comparator.reverseOrder()).toList();
-    if (sorted.isEmpty() || sorted.get(0) == 0) return 0;
-    int best = sorted.get(0);
-    int second = sorted.size() > 1 ? sorted.get(1) : 0;
-    int margin = best - second;
-    // Clamp margin to [0, 60] and scale to [0, 100]
-    return Math.min(100, (int) Math.round(margin * 100.0 / 60.0));
-  }
-
-  /**
-   * Normalises an observed IP TTL to the most likely initial value (64, 128, or 255). The initial
-   * TTL decrements by 1 per hop, so we pick the nearest standard value that is >= the observed
-   * value.
-   */
-  private int normaliseTtl(int ttl) {
-    if (ttl > 128) return 255;
-    if (ttl > 64) return 128;
-    return 64;
-  }
-
-  // -------------------------------------------------------------------------
-  // Per-host profile accumulator (internal, not persisted)
-  // -------------------------------------------------------------------------
-
-  private static class HostProfile {
-    long totalBytes = 0;
-    long totalPackets = 0;
-    int conversationCount = 0;
-    int initiatedCount = 0;
-    Set<String> apps = new LinkedHashSet<>();
-    Set<String> categories = new LinkedHashSet<>();
-    Set<Integer> dstPorts = new LinkedHashSet<>();
-    Set<Integer> receivedOnPorts = new LinkedHashSet<>();
-    Set<String> peers = new LinkedHashSet<>();
+  /** Joins detected service roles into the comma-separated form stored on the host (null if none). */
+  private String joinRoles(Set<String> roles) {
+    return (roles == null || roles.isEmpty()) ? null : String.join(",", roles);
   }
 }

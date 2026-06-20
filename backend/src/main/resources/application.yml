@@ -176,6 +176,11 @@ tracepcap:
   intelligence:
     max-clusters: ${INTELLIGENCE_MAX_CLUSTERS:60}   # Max cluster nodes returned per groupBy request
     max-edges: ${INTELLIGENCE_MAX_EDGES:200}         # Max edges returned per groupBy request
+  dns:
+    # A DNS server whose share of NXDOMAIN responses exceeds this ratio (over at least
+    # nxdomain-min-queries) is flagged suspicious — a signal of DNS tunnelling / DGA.
+    nxdomain-suspicious-ratio: ${DNS_NXDOMAIN_SUSPICIOUS_RATIO:0.5}
+    nxdomain-min-queries: ${DNS_NXDOMAIN_MIN_QUERIES:20}
   device-classification:
     # nDPI application/category names used to infer host device types.
     # When a conversation's detected app matches an entry here, it adds weight

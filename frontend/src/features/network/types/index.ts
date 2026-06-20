@@ -47,8 +47,10 @@ export interface NodeData {
   connections: number;
   nodeType: NodeType;
   nodeTypeEvidence: NodeTypeEvidence;
-  /** Device type from backend classification (e.g. ROUTER, MOBILE, SERVER). */
+  /** Device type from backend classification (e.g. ROUTER, MOBILE, SERVER, DNS_SERVER). */
   deviceType?: DeviceType;
+  /** Service roles this host was detected serving (e.g. ["dns"]); drives node-modal tabs. */
+  serviceRoles?: string[];
   /** Confidence score 0–100 from the classifier. */
   deviceConfidence?: number;
   /** Manufacturer from OUI lookup. */

@@ -66,4 +66,19 @@ public class HostClassificationEntity {
   /** Classification confidence from 0–100. Higher = more signals agreed. */
   @Column(name = "confidence", nullable = false)
   private int confidence;
+
+  /**
+   * True when this host acted as a DNS server whose share of NXDOMAIN responses exceeded the
+   * configured threshold — a signal of DNS tunnelling or a domain-generation algorithm. Set during
+   * analysis from {@code DnsQueryLogExtractor}.
+   */
+  @Column(name = "dns_suspicious", nullable = false)
+  private boolean dnsSuspicious;
+
+  /**
+   * Comma-joined service roles this host was detected serving (e.g. {@code "dns"}). Drives the
+   * device classification and the per-role activity tabs in the node modal. Null when none.
+   */
+  @Column(name = "service_roles", columnDefinition = "text")
+  private String serviceRoles;
 }

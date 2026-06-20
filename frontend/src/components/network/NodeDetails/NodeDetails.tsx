@@ -7,6 +7,8 @@ import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
+import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
 import {
   entityNotesService,
@@ -25,7 +27,9 @@ interface NodeDetailsProps {
   zIndex?: number;
 }
 
-type Tab = 'details' | 'history' | 'notes';
+type BaseTab = 'details' | 'history' | 'notes';
+/** Active tab id: a base tab, or a service-role tab keyed as `svc:<role>` (e.g. "svc:dns"). */
+type Tab = BaseTab | string;
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -159,6 +163,19 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
 
   const typeInfo = NODE_TYPE_CONFIG[node.data.nodeType] ?? NODE_TYPE_CONFIG['unknown'];
 
+  // Service-role tabs (DNS today; web/API servers later) for the roles this host was detected serving.
+  const serviceTabs = (node.data.serviceRoles ?? [])
+    .map(getServiceTab)
+    .filter((t): t is ServiceTabConfig<unknown, unknown> => Boolean(t));
+  const activeServiceTab = serviceTabs.find(t => `svc:${t.role}` === activeTab);
+
+  // If the selected service tab is no longer offered (e.g. the modal re-rendered for a node without
+  // that role), fall back to Details so the body never goes blank.
+  useEffect(() => {
+    const isBaseTab = activeTab === 'details' || activeTab === 'history' || activeTab === 'notes';
+    if (!isBaseTab && !activeServiceTab) setActiveTab('details');
+  }, [activeTab, activeServiceTab]);
+
   const noteChanged = noteText !== (savedNote?.note ?? '');
 
   return (
@@ -214,6 +231,21 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                   </button>
                 </li>
               ))}
+              {serviceTabs.map(svc => {
+                const id = `svc:${svc.role}`;
+                return (
+                  <li key={id} className="nav-item">
+                    <button
+                      className={`nav-link py-1 px-3${activeTab === id ? ' active' : ''}`}
+                      style={{ fontSize: '0.875rem' }}
+                      onClick={() => setActiveTab(id)}
+                    >
+                      <i className={`bi ${svc.icon} me-1`} />
+                      {svc.label}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -563,6 +595,11 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                 </div>
               </div>
             )}
+
+            {/* ── SERVICE-ROLE TAB (DNS, …) ──────────────────────────── */}
+            {activeServiceTab && (
+              <ServiceLogTab fileId={fileId} ip={node.data.ip} config={activeServiceTab} />
+            )}
           </div>
         </div>
       </div>
@@ -593,6 +630,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
             deviceConfidence: node.data.deviceConfidence,
             manufacturer: node.data.manufacturer,
             ttl: node.data.ttl,
+            serviceRoles: node.data.serviceRoles,
           }}
           onClose={() => setClassificationPopupOpen(false)}
         />

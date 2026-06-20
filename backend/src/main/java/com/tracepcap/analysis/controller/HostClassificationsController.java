@@ -4,6 +4,7 @@ import com.tracepcap.analysis.dto.HostClassificationResponse;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import io.swagger.v3.oas.annotations.Operation;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -36,8 +37,15 @@ public class HostClassificationsController {
                         .ttl(e.getTtl())
                         .deviceType(e.getDeviceType())
                         .confidence(e.getConfidence())
+                        .serviceRoles(splitRoles(e.getServiceRoles()))
                         .build())
             .toList();
     return ResponseEntity.ok(response);
+  }
+
+  /** Splits the comma-joined service_roles column into a list (empty when null/blank). */
+  private static List<String> splitRoles(String joined) {
+    if (joined == null || joined.isBlank()) return List.of();
+    return Arrays.stream(joined.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 }
