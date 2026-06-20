@@ -11,6 +11,7 @@ const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
   LAPTOP_DESKTOP: { label: 'Laptop / Desktop', color: '#3b82f6' }, // blue
   SERVER:         { label: 'Server',           color: '#10b981' }, // emerald
   IOT:            { label: 'IoT Device',       color: '#ec4899' }, // pink
+  DNS_SERVER:     { label: 'DNS Server',       color: '#0ea5e9' }, // sky
   UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
 };
 
@@ -48,6 +49,8 @@ export interface DeviceSignalInfo {
   deviceType?: string;
   /** Apps seen in conversations for this host */
   apps?: string[];
+  /** Service roles this host was detected serving (e.g. ["dns"]). */
+  serviceRoles?: string[];
   /** Number of distinct peer IPs */
   peerCount?: number;
   /** Number of conversations initiated by this host */
@@ -97,6 +100,11 @@ export function buildDeviceSignals(info: DeviceSignalInfo): DeviceSignalResult {
   const fired: string[] = [];
   const missing: string[] = [];
   const dtype = typeLabel(info.deviceType);
+
+  // ── Service roles (authoritative) ─────────────────────────────────────────
+  if (info.serviceRoles?.includes('dns')) {
+    fired.push('Answered DNS queries → +60 to DNS Server (authoritative — outranks heuristics)');
+  }
 
   // ── OUI / manufacturer ──────────────────────────────────────────────────
   if (info.manufacturer) {
@@ -188,6 +196,7 @@ const DEVICE_TYPE_ICONS: Partial<Record<DeviceType, string>> = {
   LAPTOP_DESKTOP: 'bi-laptop',
   SERVER:         'bi-server',
   IOT:            'bi-cpu',
+  DNS_SERVER:     'bi-hdd-network',
 };
 
 /**
@@ -204,5 +213,6 @@ export const DEVICE_TYPES: DeviceType[] = [
   'LAPTOP_DESKTOP',
   'SERVER',
   'IOT',
+  'DNS_SERVER',
   'UNKNOWN',
 ];

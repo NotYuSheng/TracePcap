@@ -2,6 +2,8 @@ package com.tracepcap.intelligence.controller;
 
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.intelligence.dto.ClusterGraphResponse;
+import com.tracepcap.intelligence.dto.DnsQueryLogResponse;
+import com.tracepcap.intelligence.dto.ServiceServerSummaryDto;
 import com.tracepcap.intelligence.dto.TopHostsResponse;
 import com.tracepcap.intelligence.service.NetworkIntelligenceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -90,5 +92,24 @@ public class NetworkIntelligenceController {
     int safeLimit = Math.min(limit, 500);
     TopHostsResponse response = intelligenceService.computeTopHosts(fileId, sortBy, safeLimit);
     return ResponseEntity.ok(response);
+  }
+
+  @GetMapping("/{fileId}/dns-servers")
+  @Operation(
+      summary = "List DNS servers and their resolution health",
+      description = "Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).")
+  public ResponseEntity<List<ServiceServerSummaryDto>> getDnsServers(@PathVariable UUID fileId) {
+    log.info("GET /api/network/intelligence/{}/dns-servers", fileId);
+    return ResponseEntity.ok(intelligenceService.computeDnsServers(fileId));
+  }
+
+  @GetMapping("/{fileId}/dns/{serverIp}")
+  @Operation(
+      summary = "Get the DNS query log for one DNS server",
+      description = "Returns the per-domain query log (hostname queried, response code, resolved IPs, query count, resolvable) for the given DNS server, plus summary counts and the suspicious verdict.")
+  public ResponseEntity<DnsQueryLogResponse> getDnsQueryLog(
+      @PathVariable UUID fileId, @PathVariable String serverIp) {
+    log.info("GET /api/network/intelligence/{}/dns/{}", fileId, serverIp);
+    return ResponseEntity.ok(intelligenceService.computeDnsQueryLog(fileId, serverIp));
   }
 }

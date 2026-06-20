@@ -75,6 +75,7 @@ const DEVICE_TYPE_ICONS: Record<string, string> = {
   LAPTOP_DESKTOP: '\uf456', // bi-laptop
   SERVER:         '\uf52c', // bi-server
   IOT:            '\uf46b', // bi-cpu
+  DNS_SERVER:     '\uf40d', // bi-hdd-network
 };
 
 const FALLBACK_ICON = '\uf505'; // bi-question-circle

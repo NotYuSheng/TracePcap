@@ -15,6 +15,10 @@ import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor;
+import com.tracepcap.analysis.service.hostlog.HostServiceLogExtractor;
+import com.tracepcap.analysis.service.hostlog.HostServiceLogResult;
+import com.tracepcap.analysis.service.hostlog.HostServiceSuspicion;
 import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
@@ -73,6 +77,7 @@ public class AnalysisService {
   private final CustomSignatureService customSignatureService;
   private final DeviceClassifierService deviceClassifierService;
   private final HostnameResolverService hostnameResolverService;
+  private final List<HostServiceLogExtractor> hostServiceLogExtractors;
   private final GeoIpService geoIpService;
   private final FileExtractionService fileExtractionService;
   private final AnalysisRecordService analysisRecordService;
@@ -141,6 +146,11 @@ public class AnalysisService {
         // resolve() degrades gracefully and never throws — it returns a (possibly empty) map.
         Map<String, HostnameResolverService.ResolvedHostname> hostnames =
             hostnameResolverService.resolve(tempFile);
+        // Per-host service activity logs (DNS today; web servers etc. later). Each extractor runs
+        // one tshark pass, persists its own rows, and reports which hosts serve its role + any
+        // suspicious ones. Runs before classification so a host's roles can drive its device type
+        // (e.g. a DNS responder → DNS_SERVER). Adding a role needs no change here.
+        ServiceLogOutcome serviceLogs = runServiceLogExtractors(file, tempFile);
         List<HostClassificationEntity> hostClassifications =
             deviceClassifierService.classify(
                 file,
@@ -148,7 +158,9 @@ public class AnalysisService {
                 parseResult.getHostTtls(),
                 parseResult.getHostMacs(),
                 deviceOverrides,
-                hostnames);
+                hostnames,
+                serviceLogs.rolesByIp());
+        applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
         hostClassificationRepository.saveAll(hostClassifications);
         try {
           Set<String> allIps =
@@ -1106,5 +1118,53 @@ public class AnalysisService {
    */
   private static String[] toNullableArray(List<String> list) {
     return (list == null || list.isEmpty()) ? null : list.toArray(new String[0]);
+  }
+
+  /** Collected output of all service-log extractors: which roles each IP serves, plus suspicions. */
+  private record ServiceLogOutcome(
+      Map<String, Set<String>> rolesByIp, List<HostServiceSuspicion> suspicions) {}
+
+  /**
+   * Runs every registered {@link HostServiceLogExtractor} over the capture. Each extractor persists
+   * its own activity-log rows and reports which hosts serve its role + any suspicious ones. Returns
+   * the per-IP role map (fed into device classification) and the combined suspicion list. A new
+   * service role just adds an extractor bean — nothing here changes.
+   */
+  private ServiceLogOutcome runServiceLogExtractors(FileEntity file, File pcap) {
+    Map<String, Set<String>> rolesByIp = new HashMap<>();
+    List<HostServiceSuspicion> suspicions = new ArrayList<>();
+    for (HostServiceLogExtractor extractor : hostServiceLogExtractors) {
+      try {
+        HostServiceLogResult result = extractor.extractAndPersist(file, pcap);
+        for (String ip : result.serverIps()) {
+          rolesByIp.computeIfAbsent(ip, k -> new LinkedHashSet<>()).add(extractor.role());
+        }
+        suspicions.addAll(result.suspicions());
+      } catch (Exception e) {
+        log.warn("Host service log extractor '{}' failed: {}", extractor.role(), e.getMessage());
+      }
+    }
+    return new ServiceLogOutcome(rolesByIp, suspicions);
+  }
+
+  /**
+   * Flags the host classifications named in {@code suspicions}. A new service role adds one {@code
+   * if} branch mapping its role to the relevant flag — nothing else changes.
+   */
+  private void applyServiceLogSuspicions(
+      List<HostClassificationEntity> hostClassifications, List<HostServiceSuspicion> suspicions) {
+    if (suspicions.isEmpty()) return;
+    Map<String, HostClassificationEntity> byIp = new HashMap<>();
+    for (HostClassificationEntity h : hostClassifications) {
+      byIp.put(h.getIp(), h);
+    }
+    for (HostServiceSuspicion s : suspicions) {
+      HostClassificationEntity host = byIp.get(s.ip());
+      if (host == null) continue; // external server with no classification — skip silently
+      if (DnsQueryLogExtractor.ROLE.equals(s.role())) {
+        host.setDnsSuspicious(true);
+      }
+      // Future roles: else if (HttpEndpointLogExtractor.ROLE.equals(s.role())) host.setWebSuspicious(true);
+    }
   }
 }

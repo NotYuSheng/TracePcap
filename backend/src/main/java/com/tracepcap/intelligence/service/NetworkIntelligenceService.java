@@ -2,9 +2,11 @@ package com.tracepcap.intelligence.service;
 
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.entity.DnsQueryLogEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.repository.DnsQueryLogRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.service.GeoIpService;
@@ -25,6 +27,7 @@ public class NetworkIntelligenceService {
   private final ConversationRepository conversationRepository;
   private final HostClassificationRepository hostClassificationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final DnsQueryLogRepository dnsQueryLogRepository;
   private final IpOrgRuleService ipOrgRuleService;
   private final GeoIpService geoIpService;
 
@@ -36,6 +39,12 @@ public class NetworkIntelligenceService {
 
   @Value("${tracepcap.intelligence.max-edges:200}")
   private int maxEdges;
+
+  @Value("${tracepcap.dns.nxdomain-suspicious-ratio:0.5}")
+  private double dnsNxdomainSuspiciousRatio;
+
+  @Value("${tracepcap.dns.nxdomain-min-queries:20}")
+  private int dnsNxdomainMinQueries;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -364,6 +373,115 @@ public class NetworkIntelligenceService {
         .collect(Collectors.toList());
 
     return TopHostsResponse.builder().hosts(hosts).build();
+  }
+
+  // ── DNS query log (#362) ────────────────────────────────────────────────────
+
+  /**
+   * Lists every host that answered DNS queries in the capture, with a per-server roll-up of
+   * resolved vs. failed queries and the NXDOMAIN-based suspicious verdict. Sorted most-active first.
+   */
+  public List<ServiceServerSummaryDto> computeDnsServers(UUID fileId) {
+    List<DnsQueryLogEntity> rows = dnsQueryLogRepository.findByFileId(fileId);
+    if (rows.isEmpty()) return List.of();
+
+    Map<String, List<DnsQueryLogEntity>> byServer =
+        rows.stream().collect(Collectors.groupingBy(DnsQueryLogEntity::getServerIp));
+    Map<String, HostClassificationEntity> hostByIp = new HashMap<>();
+    hostClassificationRepository.findByFileId(fileId).forEach(h -> hostByIp.put(h.getIp(), h));
+
+    return byServer.entrySet().stream()
+        .map(
+            e -> {
+              String ip = e.getKey();
+              DnsCounts c = countDns(e.getValue());
+              HostClassificationEntity host = hostByIp.get(ip);
+              return ServiceServerSummaryDto.builder()
+                  .serverIp(ip)
+                  .hostname(host != null ? host.getHostname() : null)
+                  .role("dns")
+                  .totalRequests(c.total())
+                  .okCount(c.resolved)
+                  .failedCount(c.failed)
+                  .anomalyRatio(c.nxdomainRatio())
+                  .suspicious(c.suspicious(dnsNxdomainSuspiciousRatio, dnsNxdomainMinQueries))
+                  .build();
+            })
+        .sorted(Comparator.comparingLong(ServiceServerSummaryDto::getTotalRequests).reversed())
+        .collect(Collectors.toList());
+  }
+
+  /** Full per-domain query log for a single DNS server, with summary counts and suspicious verdict. */
+  public DnsQueryLogResponse computeDnsQueryLog(UUID fileId, String serverIp) {
+    List<DnsQueryLogEntity> rows = dnsQueryLogRepository.findByFileIdAndServerIp(fileId, serverIp);
+    DnsCounts c = countDns(rows);
+    HostClassificationEntity host =
+        hostClassificationRepository.findByFileIdAndIp(fileId, serverIp).orElse(null);
+
+    // General DNS log ordering: most-queried domains first, then alphabetically. Unresolvable rows
+    // stay visually distinct via row styling rather than being forced to the top.
+    List<DnsQueryLogResponse.DnsQueryEntryDto> entries =
+        rows.stream()
+            .sorted(
+                Comparator.comparingInt(DnsQueryLogEntity::getQueryCount)
+                    .reversed()
+                    .thenComparing(DnsQueryLogEntity::getQueryName))
+            .map(
+                r ->
+                    DnsQueryLogResponse.DnsQueryEntryDto.builder()
+                        .queryName(r.getQueryName())
+                        .queryType(r.getQueryType())
+                        .responseCode(r.getResponseCode())
+                        .resolvedIps(splitResolvedIps(r.getResolvedIps()))
+                        .queryCount(r.getQueryCount())
+                        .resolvable(r.isResolvable())
+                        .build())
+            .collect(Collectors.toList());
+
+    return DnsQueryLogResponse.builder()
+        .serverIp(serverIp)
+        .hostname(host != null ? host.getHostname() : null)
+        .resolvedCount(c.resolved)
+        .failedCount(c.failed)
+        .nxdomainRatio(c.nxdomainRatio())
+        .suspicious(c.suspicious(dnsNxdomainSuspiciousRatio, dnsNxdomainMinQueries))
+        .entries(entries)
+        .build();
+  }
+
+  /** Roll-up of a DNS server's aggregated query rows (counted as distinct queries, not packets). */
+  private record DnsCounts(long resolved, long failed, long nxdomain) {
+    long total() {
+      return resolved + failed;
+    }
+
+    double nxdomainRatio() {
+      return total() == 0 ? 0.0 : (double) nxdomain / total();
+    }
+
+    boolean suspicious(double ratioThreshold, int minQueries) {
+      return total() >= minQueries && nxdomainRatio() >= ratioThreshold;
+    }
+  }
+
+  private DnsCounts countDns(List<DnsQueryLogEntity> rows) {
+    long resolved = 0;
+    long failed = 0;
+    long nxdomain = 0;
+    for (DnsQueryLogEntity r : rows) {
+      if (r.isResolvable()) {
+        resolved++;
+      } else {
+        failed++;
+      }
+      if ("NXDOMAIN".equals(r.getResponseCode())) nxdomain++;
+    }
+    return new DnsCounts(resolved, failed, nxdomain);
+  }
+
+  private List<String> splitResolvedIps(String joined) {
+    if (joined == null || joined.isBlank()) return List.of();
+    return Arrays.stream(joined.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 
   // ── Filter helpers ────────────────────────────────────────────────────────

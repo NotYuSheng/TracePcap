@@ -75,6 +75,37 @@ export interface TopHostsResponse {
   hosts: HostSummary[];
 }
 
+/** Role-agnostic summary of a host acting as a service server (DNS today; web servers later). */
+export interface ServiceServerSummary {
+  serverIp: string;
+  hostname: string | null;
+  role: string;
+  totalRequests: number;
+  okCount: number;
+  failedCount: number;
+  anomalyRatio: number;
+  suspicious: boolean;
+}
+
+export interface DnsQueryEntry {
+  queryName: string;
+  queryType: string | null;
+  responseCode: string | null;
+  resolvedIps: string[];
+  queryCount: number;
+  resolvable: boolean;
+}
+
+export interface DnsQueryLogResponse {
+  serverIp: string;
+  hostname: string | null;
+  resolvedCount: number;
+  failedCount: number;
+  nxdomainRatio: number;
+  suspicious: boolean;
+  entries: DnsQueryEntry[];
+}
+
 export const intelligenceService = {
   async getClusters(fileId: string, groupBy: GroupBy, filters?: IntelClusterFilters): Promise<ClusterGraphResponse> {
     // Start from the canonical endpoint (includes ?groupBy=X) and append extra filter params
@@ -107,6 +138,20 @@ export const intelligenceService = {
   ): Promise<TopHostsResponse> {
     const res = await apiClient.get<TopHostsResponse>(
       API_ENDPOINTS.NETWORK_INTELLIGENCE_TOP_HOSTS(fileId, sortBy, limit)
+    );
+    return res.data;
+  },
+
+  async getDnsServers(fileId: string): Promise<ServiceServerSummary[]> {
+    const res = await apiClient.get<ServiceServerSummary[]>(
+      API_ENDPOINTS.NETWORK_INTELLIGENCE_DNS_SERVERS(fileId)
+    );
+    return res.data;
+  },
+
+  async getDnsQueryLog(fileId: string, serverIp: string): Promise<DnsQueryLogResponse> {
+    const res = await apiClient.get<DnsQueryLogResponse>(
+      API_ENDPOINTS.NETWORK_INTELLIGENCE_DNS_LOG(fileId, serverIp)
     );
     return res.data;
   },

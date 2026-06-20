@@ -536,6 +536,7 @@ export function buildNetworkGraph(
       const c = classMap.get(ip);
       if (c) {
         nodeMap[ip].data.deviceType = c.deviceType;
+        nodeMap[ip].data.serviceRoles = c.serviceRoles;
         nodeMap[ip].data.deviceConfidence = c.confidence;
         nodeMap[ip].data.manufacturer = c.manufacturer;
         nodeMap[ip].data.ttl = c.ttl;

@@ -407,6 +407,7 @@ export type DeviceType =
   | 'LAPTOP_DESKTOP'
   | 'SERVER'
   | 'IOT'
+  | 'DNS_SERVER'
   | 'UNKNOWN'
   | string; // custom override values from YAML
 
@@ -421,6 +422,8 @@ export interface HostClassification {
   ttl?: number;
   deviceType: DeviceType;
   confidence: number;
+  /** Service roles this host was detected serving (e.g. ["dns"]); drives node-modal tabs. */
+  serviceRoles?: string[];
 }
 
 /** How a host's name was discovered from passive traffic. */
