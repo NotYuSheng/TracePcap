@@ -3,7 +3,11 @@ import { Button, Card, Modal } from '@govtechsg/sgds-react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { AnalysisData, Conversation, HostClassification } from '@/types';
 import type { SortField } from '@/features/conversation/types';
-import { loadVisibleColumns, COLUMN_STORAGE_KEY } from '@/features/conversation/constants';
+import {
+  loadVisibleColumns,
+  defaultVisibleColumns,
+  COLUMN_STORAGE_KEY,
+} from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -43,6 +47,7 @@ export const ConversationPage = () => {
   const [fileTypeOptions, setFileTypeOptions] = useState<string[]>([]);
   const [riskTypeOptions, setRiskTypeOptions] = useState<string[]>([]);
   const [customSignatureOptions, setCustomSignatureOptions] = useState<string[]>([]);
+  const [suricataAlertOptions, setSuricataAlertOptions] = useState<string[]>([]);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
@@ -59,6 +64,12 @@ export const ConversationPage = () => {
     });
   }, []);
 
+  // Restore the default visible-column set, clearing any stored override.
+  const resetColumns = useCallback(() => {
+    localStorage.removeItem(COLUMN_STORAGE_KEY);
+    setVisibleColumns(defaultVisibleColumns());
+  }, []);
+
   // Fetch available file types and risk types once per file
   useEffect(() => {
     if (!fileId) return;
@@ -67,6 +78,10 @@ export const ConversationPage = () => {
     conversationService
       .getCustomSignatures(fileId)
       .then(setCustomSignatureOptions)
+      .catch(console.error);
+    conversationService
+      .getSuricataAlerts(fileId)
+      .then(setSuricataAlertOptions)
       .catch(console.error);
     conversationService
       .getSignatureRules()
@@ -351,12 +366,14 @@ export const ConversationPage = () => {
             fileTypes={fileTypeOptions}
             riskTypes={riskTypeOptions}
             customSignatureOptions={customSignatureOptions}
+            suricataAlertOptions={suricataAlertOptions}
             signatureSeverities={signatureSeverities}
             countryOptions={countryOptions}
             presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
             visibleColumns={visibleColumns}
             onToggleColumn={toggleColumn}
+            onResetColumns={resetColumns}
           />
         </div>
       </div>

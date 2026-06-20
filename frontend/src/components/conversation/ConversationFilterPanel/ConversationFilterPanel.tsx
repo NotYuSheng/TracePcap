@@ -11,6 +11,7 @@ import {
   getTextColor,
   getSeverityColor,
   RISK_BADGE,
+  IDS_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
@@ -38,12 +39,14 @@ interface ConversationFilterPanelProps {
   fileTypes: string[];
   riskTypes: string[];
   customSignatureOptions: string[];
+  suricataAlertOptions: string[];
   signatureSeverities?: Record<string, string>;
   countryOptions: string[];
   presentDeviceTypes?: string[];
   activeFilterCount: number;
   visibleColumns: Set<ColumnKey>;
   onToggleColumn: (key: ColumnKey) => void;
+  onResetColumns?: () => void;
   hideColumnToggle?: boolean;
   defaultOpen?: boolean;
 }
@@ -89,12 +92,14 @@ export function ConversationFilterPanel({
   fileTypes,
   riskTypes,
   customSignatureOptions,
+  suricataAlertOptions,
   signatureSeverities = {},
   countryOptions,
   presentDeviceTypes,
   activeFilterCount,
   visibleColumns,
   onToggleColumn,
+  onResetColumns,
   hideColumnToggle = false,
   defaultOpen,
 }: ConversationFilterPanelProps) {
@@ -102,6 +107,7 @@ export function ConversationFilterPanel({
   const [ipInput, setIpInput] = useState(filters.ip);
   const [portInput, setPortInput] = useState(filters.port);
   const [payloadInput, setPayloadInput] = useState(filters.payloadContains);
+  const [idsSearch, setIdsSearch] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const payloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -620,6 +626,61 @@ export function ConversationFilterPanel({
                 </div>
               )}
 
+              {/* Suricata IDS alerts — searchable list (signatures are long and can be many) */}
+              {suricataAlertOptions.length > 0 && (
+                <div className="col-12">
+                  <PillSectionHeader
+                    label="IDS Alerts"
+                    info={
+                      <InfoPopover
+                        id="info-idsalerts"
+                        title="IDS Alerts"
+                        body="Filter by Suricata IDS signature alerts (Emerging Threats Open ruleset). Only signatures that matched at least one conversation in this file are shown."
+                      />
+                    }
+                    onSelectAll={() => onFiltersChange({ suricataAlerts: suricataAlertOptions })}
+                    onDeselectAll={() => onFiltersChange({ suricataAlerts: [] })}
+                  />
+                  {suricataAlertOptions.length > 8 && (
+                    <input
+                      type="text"
+                      className="form-control form-control-sm mb-2"
+                      placeholder="Search IDS alerts…"
+                      value={idsSearch}
+                      onChange={e => setIdsSearch(e.target.value)}
+                    />
+                  )}
+                  <div
+                    className="d-flex flex-column gap-1"
+                    style={{ maxHeight: '180px', overflowY: 'auto' }}
+                  >
+                    {suricataAlertOptions
+                      .filter(a => a.toLowerCase().includes(idsSearch.toLowerCase()))
+                      .map(alert => {
+                        const isActive = filters.suricataAlerts.includes(alert);
+                        return (
+                          <label
+                            key={alert}
+                            className="d-flex align-items-start gap-2"
+                            style={{ cursor: 'pointer', fontSize: '0.8rem' }}
+                          >
+                            <input
+                              type="checkbox"
+                              className="form-check-input mt-1 flex-shrink-0"
+                              style={isActive ? { backgroundColor: IDS_BADGE.bg, borderColor: IDS_BADGE.bg } : undefined}
+                              checked={isActive}
+                              onChange={() =>
+                                toggle('suricataAlerts', alert, filters.suricataAlerts)
+                              }
+                            />
+                            <span>{alert}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
               {/* Country filter */}
               {countryOptions.length > 0 && (
                 <div className="col-12">
@@ -702,9 +763,22 @@ export function ConversationFilterPanel({
               {/* Column visibility */}
               {!hideColumnToggle && (
                 <div className="col-12 pt-1 border-top mt-3">
-                  <label className="filter-section-label d-block mb-2">
-                    <i className="bi bi-layout-three-columns me-1"></i>Columns
-                  </label>
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <label className="filter-section-label d-block mb-0">
+                      <i className="bi bi-layout-three-columns me-1"></i>Columns
+                    </label>
+                    {onResetColumns && (
+                      <Button
+                        size="sm"
+                        variant="link"
+                        className="p-0 text-decoration-none"
+                        onClick={onResetColumns}
+                        title="Restore the default set of visible columns"
+                      >
+                        <i className="bi bi-arrow-counterclockwise me-1"></i>Reset to default
+                      </Button>
+                    )}
+                  </div>
                   <div className="d-flex flex-wrap gap-2">
                     {COLUMN_DEFS.map(({ key, label }) => (
                       <div key={key} className="form-check form-check-inline mb-0">

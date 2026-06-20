@@ -43,6 +43,10 @@ public class FileEntity {
   private boolean enableNdpi = true;
 
   @Builder.Default
+  @Column(name = "enable_suricata", nullable = false)
+  private boolean enableSuricata = true;
+
+  @Builder.Default
   @Column(name = "enable_file_extraction", nullable = false)
   private boolean enableFileExtraction = true;
 

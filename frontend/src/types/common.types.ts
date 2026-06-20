@@ -63,6 +63,7 @@ export interface Conversation {
   tlsNotAfter?: number;
   flowRisks: string[];
   customSignatures: string[];
+  suricataAlerts: string[];
   httpUserAgents: string[];
   detectedFileTypes: string[];
   startTime: number;
@@ -323,6 +324,7 @@ export interface ConversationEvidence {
   startTime?: string | null;
   endTime?: string | null;
   flowRisks?: string[];
+  suricataAlerts?: string[];
   tlsIssuer?: string | null;
   tlsSubject?: string | null;
   ja3Client?: string | null;

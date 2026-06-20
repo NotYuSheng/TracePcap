@@ -72,6 +72,9 @@ public class ConversationsController {
       @Parameter(description = "Comma-separated list of custom signature rule names to include")
           @RequestParam(required = false)
           String customSignatures,
+      @Parameter(description = "Comma-separated list of Suricata IDS alerts to include")
+          @RequestParam(required = false)
+          String suricataAlerts,
       @Parameter(
               description =
                   "Filter conversations whose payload contains this pattern (ASCII or hex, e.g."
@@ -115,6 +118,7 @@ public class ConversationsController {
             fileTypes,
             riskTypes,
             customSignatures,
+            suricataAlerts,
             payloadContains,
             sortBy,
             sortDir,
@@ -163,6 +167,13 @@ public class ConversationsController {
     return ResponseEntity.ok(analysisService.getDistinctCustomSignatures(fileId));
   }
 
+  /** Returns the distinct Suricata IDS alert strings present for this file. */
+  @GetMapping("/{fileId}/suricata-alerts")
+  @Operation(summary = "List distinct Suricata IDS alerts for a file")
+  public ResponseEntity<List<String>> getSuricataAlerts(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(analysisService.getDistinctSuricataAlerts(fileId));
+  }
+
   /**
    * Returns the distinct country codes seen in external IPs for this file, as "CC|Country" strings.
    */
@@ -187,6 +198,7 @@ public class ConversationsController {
       @RequestParam(required = false) String fileTypes,
       @RequestParam(required = false) String riskTypes,
       @RequestParam(required = false) String customSignatures,
+      @RequestParam(required = false) String suricataAlerts,
       @RequestParam(required = false) String payloadContains,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
@@ -208,6 +220,7 @@ public class ConversationsController {
             fileTypes,
             riskTypes,
             customSignatures,
+            suricataAlerts,
             payloadContains,
             sortBy,
             sortDir,
@@ -262,6 +275,7 @@ public class ConversationsController {
       @RequestParam(required = false) String fileTypes,
       @RequestParam(required = false) String riskTypes,
       @RequestParam(required = false) String customSignatures,
+      @RequestParam(required = false) String suricataAlerts,
       @RequestParam(required = false) String payloadContains,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortDir,
@@ -283,6 +297,7 @@ public class ConversationsController {
             fileTypes,
             riskTypes,
             customSignatures,
+            suricataAlerts,
             payloadContains,
             sortBy,
             sortDir,
@@ -342,6 +357,7 @@ public class ConversationsController {
       String fileTypes,
       String riskTypes,
       String customSignatures,
+      String suricataAlerts,
       String payloadContains,
       String sortBy,
       String sortDir,
@@ -360,6 +376,7 @@ public class ConversationsController {
         .fileTypes(splitComma(fileTypes))
         .riskTypes(splitComma(riskTypes))
         .customSignatures(splitComma(customSignatures))
+        .suricataAlerts(splitComma(suricataAlerts))
         .payloadContains(payloadContains)
         .deviceTypes(splitComma(deviceTypes))
         .countries(splitComma(countries))

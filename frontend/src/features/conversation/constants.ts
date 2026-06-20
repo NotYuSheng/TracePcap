@@ -7,6 +7,7 @@ export type ColumnKey =
   | 'category'
   | 'risks'
   | 'customRules'
+  | 'idsAlerts'
   | 'fileTypes'
   | 'srcCountry'
   | 'dstCountry'
@@ -24,6 +25,7 @@ export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boole
   { key: 'category', label: 'Category', defaultVisible: true },
   { key: 'risks', label: 'Risks', defaultVisible: true },
   { key: 'customRules', label: 'Custom Rules', defaultVisible: true },
+  { key: 'idsAlerts', label: 'IDS Alerts', defaultVisible: true },
   { key: 'fileTypes', label: 'File Type', defaultVisible: true },
   { key: 'srcCountry', label: 'Src Country', defaultVisible: false },
   { key: 'dstCountry', label: 'Dst Country', defaultVisible: false },
@@ -33,7 +35,12 @@ export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boole
   { key: 'startTime', label: 'Start Time', defaultVisible: true },
 ];
 
-export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v5';
+export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v6';
+
+/** The default set of visible columns, ignoring any stored user override. */
+export function defaultVisibleColumns(): Set<ColumnKey> {
+  return new Set(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key));
+}
 
 export function loadVisibleColumns(): Set<ColumnKey> {
   try {
@@ -42,5 +49,5 @@ export function loadVisibleColumns(): Set<ColumnKey> {
   } catch {
     /* ignore */
   }
-  return new Set(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key));
+  return defaultVisibleColumns();
 }

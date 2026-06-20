@@ -18,10 +18,11 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
 # Install runtime dependencies:
-#   tshark  — PCAP/pcapng parser
-#   ndpi    — ndpiReader for application-layer DPI (latest from ntop apt repo)
-#   tzdata  — timezone data
-#   gosu    — privilege-drop helper for entrypoint
+#   tshark    — PCAP/pcapng parser
+#   ndpi      — ndpiReader for application-layer DPI (latest from ntop apt repo)
+#   suricata  — offline IDS engine for signature-based threat detection (eve.json)
+#   tzdata    — timezone data
+#   gosu      — privilege-drop helper for entrypoint
 #
 # The ntop apt repo is required because Ubuntu 22.04's built-in nDPI (4.2-2)
 # lacks H.225/H.245 session tracking and several protocol signatures added in v5.
@@ -49,9 +50,38 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         tshark \
         tzdata \
         gosu \
+        suricata \
         ndpi && \
     dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version && \
+    dpkg-query -W -f='${Version}' suricata > /opt/suricata-version && \
     apt-get purge -y --auto-remove gnupg curl
+
+# Fetch the Emerging Threats Open ruleset at build time (internet is available during build,
+# same curl pattern as the DB-IP MMDB download below). The jammy `suricata` package does not bundle
+# `suricata-update`, so we download the ET Open tarball directly and concatenate every *.rules file
+# into /etc/suricata/rules/suricata.rules — the path the packaged /etc/suricata/suricata.yaml
+# already references (default-rule-path: /etc/suricata/rules + `rule-files: [suricata.rules]`). ET's
+# classification / reference configs are copied into /etc/suricata so rule classtypes resolve. This keeps
+# signature-based detection fully offline at runtime (per the offline requirement).
+#
+# Rules are made world-readable so the non-root `spring` runtime user can load them.
+#
+# To refresh the ruleset in air-gapped deployments: rebuild the image and redeploy
+# (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh) —
+# analogous to the nDPI refresh flow above.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl && \
+    mkdir -p /etc/suricata/rules /tmp/etrules && \
+    curl -fsSL "https://rules.emergingthreats.net/open/suricata/emerging.rules.tar.gz" \
+        | tar -xz -C /tmp/etrules && \
+    cat /tmp/etrules/rules/*.rules > /etc/suricata/rules/suricata.rules && \
+    cp /tmp/etrules/rules/*.config /etc/suricata/ 2>/dev/null || true && \
+    rm -rf /tmp/etrules && \
+    date -u +%Y-%m-%d > /opt/suricata-ruleset-version && \
+    chmod -R a+rX /etc/suricata && \
+    apt-get purge -y --auto-remove curl
 
 # Download DB-IP Lite City MMDB (offline GeoIP).
 # Published monthly at https://db-ip.com/db/download/ip-to-city-lite

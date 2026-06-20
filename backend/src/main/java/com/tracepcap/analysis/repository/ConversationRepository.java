@@ -41,11 +41,12 @@ public interface ConversationRepository
           + " ORDER BY p.detectedFileType")
   List<String> findDistinctFileTypesByFileId(@Param("fileId") UUID fileId);
 
-  /** Returns only conversations that have at least one risk flag. */
+  /** Returns only conversations that have at least one nDPI risk flag or Suricata IDS alert. */
   @Query(
       value =
           "SELECT * FROM conversations WHERE file_id = :fileId"
-              + " AND flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0",
+              + " AND ((flow_risks IS NOT NULL AND array_length(flow_risks, 1) > 0)"
+              + " OR (suricata_alerts IS NOT NULL AND array_length(suricata_alerts, 1) > 0))",
       nativeQuery = true)
   List<ConversationEntity> findByFileIdWithRisks(@Param("fileId") UUID fileId);
 
@@ -254,6 +255,16 @@ public interface ConversationRepository
       nativeQuery = true)
   List<String> findDistinctCustomSignaturesByFileId(@Param("fileId") UUID fileId);
 
+  /** Returns the distinct Suricata IDS alert strings present across a file's conversations. */
+  @Query(
+      value =
+          "SELECT DISTINCT unnest(suricata_alerts) AS alert"
+              + " FROM conversations WHERE file_id = :fileId"
+              + " AND suricata_alerts IS NOT NULL AND array_length(suricata_alerts, 1) > 0"
+              + " ORDER BY alert",
+      nativeQuery = true)
+  List<String> findDistinctSuricataAlertsByFileId(@Param("fileId") UUID fileId);
+
   /**
    * Returns fan-out candidates: source IPs connecting to more than 5 distinct destination IPs.
    * Columns: [src_ip, distinct_dst_ips, total_flows]
@@ -362,10 +373,13 @@ public interface ConversationRepository
         predicates.add(root.get("category").in(params.getCategories()));
       }
 
-      // Has flow risks or custom signature matches
+      // Has flow risks, custom signature, or Suricata IDS alert matches
       if (Boolean.TRUE.equals(params.getHasRisks())) {
         predicates.add(
-            cb.or(cb.isNotNull(root.get("flowRisks")), cb.isNotNull(root.get("customSignatures"))));
+            cb.or(
+                cb.isNotNull(root.get("flowRisks")),
+                cb.isNotNull(root.get("customSignatures")),
+                cb.isNotNull(root.get("suricataAlerts"))));
       }
 
       // Risk type filter (nDPI flow risks)
@@ -400,6 +414,23 @@ public interface ConversationRepository
                             0))
                 .collect(java.util.stream.Collectors.toList());
         predicates.add(cb.or(sigPreds.toArray(new Predicate[0])));
+      }
+
+      // Suricata IDS alert filter
+      if (params.getSuricataAlerts() != null && !params.getSuricataAlerts().isEmpty()) {
+        List<Predicate> alertPreds =
+            params.getSuricataAlerts().stream()
+                .map(
+                    alert ->
+                        cb.greaterThan(
+                            cb.function(
+                                "array_position",
+                                Integer.class,
+                                root.get("suricataAlerts"),
+                                cb.literal(alert)),
+                            0))
+                .collect(java.util.stream.Collectors.toList());
+        predicates.add(cb.or(alertPreds.toArray(new Predicate[0])));
       }
 
       // File type multi-value — EXISTS subquery against packets table

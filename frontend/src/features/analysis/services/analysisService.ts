@@ -29,6 +29,7 @@ export const analysisService = {
       endTime: conv.endTime || endTime,
       flowRisks: conv.flowRisks ?? [],
       customSignatures: conv.customSignatures ?? [],
+      suricataAlerts: conv.suricataAlerts ?? [],
     }));
 
     const uniqueHosts = (summary.uniqueHosts || []).map((host: any) => ({

@@ -316,6 +316,7 @@ export const AnalysisPage = () => {
           conversationService.getConversations(fileId, {
             ip: '', port: '', payloadContains: '', protocols: [], l7Protocols: [], apps: [],
             categories: [], hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [],
+            suricataAlerts: [],
             deviceTypes: [], countries: [], sortBy: '', sortDir: 'asc', page: 1, pageSize: 10000,
           }),
           conversationService.getHostClassifications(fileId).catch(() => undefined),

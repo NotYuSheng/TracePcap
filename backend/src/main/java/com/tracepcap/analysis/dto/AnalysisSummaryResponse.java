@@ -74,6 +74,7 @@ public class AnalysisSummaryResponse {
     private Long totalBytes;
     private List<String> flowRisks;
     private List<String> customSignatures;
+    private List<String> suricataAlerts;
   }
 
   @Data

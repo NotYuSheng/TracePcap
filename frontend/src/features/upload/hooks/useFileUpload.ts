@@ -21,7 +21,11 @@ export const useFileUpload = () => {
   const uploadFiles = useCallback(
     async (
       files: File[],
-      options: AnalysisOptions = { enableNdpi: true, enableFileExtraction: true }
+      options: AnalysisOptions = {
+        enableNdpi: true,
+        enableSuricata: true,
+        enableFileExtraction: true,
+      }
     ) => {
       const entries: UploadEntry[] = files.map((f, i) => ({
         id: `${Date.now()}-${i}`,

@@ -43,6 +43,7 @@ async function fetchGraphForFile(fileId: string) {
       fileTypes: [],
       riskTypes: [],
       customSignatures: [],
+      suricataAlerts: [],
       deviceTypes: [],
       countries: [],
       sortBy: '',
