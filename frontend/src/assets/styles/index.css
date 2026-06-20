@@ -102,6 +102,40 @@ body {
   color: var(--tp-text-muted);
 }
 
+/* Network detail page: sticky in-page section nav + scroll anchors */
+.tp-anchor {
+  /* Clear the sticky page header (~112px) when an anchor is scrolled into view */
+  scroll-margin-top: 124px;
+}
+
+.tp-section-nav.sidenav.sticky {
+  /* Sit just below the sticky page header (112px) so the nav isn't clipped */
+  --sgds-sidenav-sticky-top: 124px;
+}
+
+.tp-section-nav .nav-link {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--tp-text-muted);
+  border-radius: var(--sgds-border-radius, 0.3125rem);
+  /* 3px transparent accent reserved on every state so the active bar
+     doesn't shift text; weight is kept constant to avoid reflow/wrapping */
+  border-left: 3px solid transparent;
+  padding: 0.4rem 0.65rem;
+}
+
+.tp-section-nav .nav-link:hover {
+  color: var(--tp-text);
+  background-color: var(--tp-surface-hover);
+}
+
+.tp-section-nav .nav-link.active {
+  color: var(--sgds-primary);
+  background-color: var(--tp-surface-hover);
+  border-left-color: var(--sgds-primary);
+}
+
 /* Analysis page nav-tabs: single scrollable row with fade + scroll buttons */
 .nav-tabs-scroll-wrapper {
   display: flex;

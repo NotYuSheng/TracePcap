@@ -1,7 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Badge, Button, Card, Container, Form, OverlayTrigger, Popover, Row, Col } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Container, Form, OverlayTrigger, Popover, Row, Col, SideNav } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import { insightsService } from '@/features/insights/services/insightsService';
@@ -123,6 +123,108 @@ const MonitorInfoCard = () => {
         </Card.Body>
       )}
     </Card>
+  );
+};
+
+interface SectionDef {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+/**
+ * Sticky in-page navigation for the (long) network detail page. Renders one
+ * SideNav.Link per visible section and tracks which section is in view via an
+ * IntersectionObserver so the active link stays in sync while scrolling.
+ */
+const SectionSideNav = ({ sections }: { sections: SectionDef[] }) => {
+  const [active, setActive] = useState(sections[0]?.id ?? '');
+  // Stable dependency: the effect only needs to re-run when the set of section
+  // ids changes (e.g. the Traffic Overview section appears once 2+ snapshots
+  // exist), not on every parent re-render from polling.
+  const sectionIds = sections.map(s => s.id).join('|');
+
+  useEffect(() => {
+    const ids = sectionIds.split('|').filter(Boolean);
+    const els = ids
+      .map(id => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (els.length === 0) return;
+
+    // The observer callback only reports sections whose visibility *changed*,
+    // so track the full visible set and pick the topmost one each time.
+    const visibleIds = new Set<string>();
+
+    const pickActive = () => {
+      // At the very bottom the last section may be too short to ever reach the
+      // active band (capped at 45% of the viewport), so force it active there.
+      const atBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 2;
+      if (atBottom) {
+        setActive(ids[ids.length - 1]);
+        return;
+      }
+      let topId: string | null = null;
+      let topY = Infinity;
+      visibleIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const y = el.getBoundingClientRect().top;
+        if (y < topY) {
+          topY = y;
+          topId = id;
+        }
+      });
+      if (topId) setActive(topId);
+    };
+
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const e of entries) {
+          if (e.isIntersecting) visibleIds.add(e.target.id);
+          else visibleIds.delete(e.target.id);
+        }
+        pickActive();
+      },
+      // Top boundary sits just above where an anchored section lands
+      // (scroll-margin-top: 124px), so a clicked section counts as active.
+      // The -55% bottom margin keeps the "active" band in the upper viewport.
+      { rootMargin: '-116px 0px -55% 0px', threshold: 0 },
+    );
+    els.forEach(el => observer.observe(el));
+
+    // Catch the bottom-of-page case, where intersection state may not change.
+    window.addEventListener('scroll', pickActive, { passive: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', pickActive);
+    };
+  }, [sectionIds]);
+
+  const handleClick = (e: React.MouseEvent<HTMLElement>, id: string) => {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActive(id);
+    }
+  };
+
+  return (
+    <SideNav sticky activeNavLinkKey={active} className="tp-section-nav">
+      {sections.map(s => (
+        <SideNav.Link
+          key={s.id}
+          eventKey={s.id}
+          href={`#${s.id}`}
+          onClick={(e: React.MouseEvent<HTMLElement>) => handleClick(e, s.id)}
+        >
+          <i className={`bi ${s.icon} me-2`}></i>
+          {s.label}
+        </SideNav.Link>
+      ))}
+    </SideNav>
   );
 };
 
@@ -287,6 +389,20 @@ export const NetworkDetailPage = () => {
   const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / EVENT_PAGE_SIZE));
   const pagedEvents = filteredEvents.slice((eventPage - 1) * EVENT_PAGE_SIZE, eventPage * EVENT_PAGE_SIZE);
 
+  const navSections: SectionDef[] = [
+    { id: 'sec-timeline', label: 'Capture Timeline', icon: 'bi-clock-history' },
+    ...(snapshots.length >= 2
+      ? [{ id: 'sec-traffic', label: 'Traffic Overview', icon: 'bi-bar-chart-line' }]
+      : []),
+    { id: 'sec-changes', label: 'Change Events', icon: 'bi-activity' },
+    { id: 'sec-drift', label: 'Drift Panels', icon: 'bi-hdd-network' },
+    { id: 'sec-baseline', label: 'Baseline Definitions', icon: 'bi-shield-check' },
+    { id: 'sec-subnets', label: 'Subnet Definitions', icon: 'bi-diagram-2' },
+    { id: 'sec-external', label: 'External Events', icon: 'bi-calendar-event' },
+    { id: 'sec-annotations', label: 'Analyst Annotations', icon: 'bi-pencil-square' },
+    { id: 'sec-insights', label: 'Network Insights', icon: 'bi-stars' },
+  ];
+
   if (loading) {
     return (
       <Container className="py-5 text-center">
@@ -359,8 +475,13 @@ export const NetworkDetailPage = () => {
 
       <MonitorInfoCard />
 
+      <Row>
+        <Col xs={12} lg={3} xl={2} className="d-none d-lg-block">
+          <SectionSideNav sections={navSections} />
+        </Col>
+        <Col xs={12} lg={9} xl={10}>
       {/* Snapshots */}
-      <Card className="mb-4">
+      <Card id="sec-timeline" className="mb-4 tp-anchor">
         <Card.Body>
           <h5 className="card-title mb-3">
             <i className="bi bi-clock-history me-2"></i>Capture Timeline
@@ -381,7 +502,7 @@ export const NetworkDetailPage = () => {
 
       {/* Traffic Overview Chart */}
       {snapshots.length >= 2 && (
-        <Card className="mb-4">
+        <Card id="sec-traffic" className="mb-4 tp-anchor">
           <Card.Header>
             <h6 className="mb-0">
               <i className="bi bi-bar-chart-line me-2"></i>Traffic Overview
@@ -394,7 +515,7 @@ export const NetworkDetailPage = () => {
       )}
 
       {/* Change Events */}
-      <Card className="mb-4" style={{ overflow: 'hidden' }}>
+      <Card id="sec-changes" className="mb-4 tp-anchor" style={{ overflow: 'hidden' }}>
         <Card.Header className="d-flex justify-content-between align-items-center">
           <h6 className="mb-0">
             <i className="bi bi-activity me-2"></i>Change Events
@@ -526,7 +647,7 @@ export const NetworkDetailPage = () => {
       </Card>
 
       {/* Drift Panels */}
-      <Row className="mb-4">
+      <Row id="sec-drift" className="mb-4 tp-anchor">
         <Col xs={12} md={4} className="mb-3 mb-md-0">
           <Card className="h-100">
             <Card.Header>
@@ -566,7 +687,7 @@ export const NetworkDetailPage = () => {
       </Row>
 
       {/* Baseline Definitions */}
-      <Card>
+      <Card id="sec-baseline" className="tp-anchor">
         <Card.Body>
           <div className="d-flex align-items-center mb-3">
             <h5 className="card-title mb-0">
@@ -621,7 +742,7 @@ export const NetworkDetailPage = () => {
       </Card>
 
       {/* Subnet Definitions */}
-      <Card className="mt-4">
+      <Card id="sec-subnets" className="mt-4 tp-anchor">
         <Card.Body>
           <div className="d-flex align-items-center mb-3">
             <h5 className="card-title mb-0">
@@ -693,7 +814,7 @@ export const NetworkDetailPage = () => {
       </Card>
 
       {/* External Events */}
-      <Card className="mt-4">
+      <Card id="sec-external" className="mt-4 tp-anchor">
         <Card.Body>
           <h5 className="card-title mb-3">
             <i className="bi bi-calendar-event me-2"></i>External Events
@@ -710,7 +831,7 @@ export const NetworkDetailPage = () => {
       </Card>
 
       {/* Analyst Annotations */}
-      <Card className="mt-4">
+      <Card id="sec-annotations" className="mt-4 tp-anchor">
         <Card.Body>
           <h5 className="card-title mb-3">
             <i className="bi bi-pencil-square me-2"></i>Analyst Annotations
@@ -728,7 +849,7 @@ export const NetworkDetailPage = () => {
       </Card>
 
       {/* Network Insights */}
-      <Card className="mt-4 mb-4">
+      <Card id="sec-insights" className="mt-4 mb-4 tp-anchor">
         <Card.Body>
           <div className="d-flex align-items-center mb-3">
             <h5 className="card-title mb-0">
@@ -785,6 +906,8 @@ export const NetworkDetailPage = () => {
           />
         </Card.Body>
       </Card>
+        </Col>
+      </Row>
 
       <AddSnapshotModal
         show={showAddSnapshot}
