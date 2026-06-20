@@ -23,6 +23,7 @@ public class ConversationEntity {
   public static final int HOSTNAME_MAX_LENGTH = 255;
   public static final int JA3_HASH_LENGTH = 32;
   public static final int PROTOCOL_MAX_LENGTH = 100;
+  public static final int SURICATA_ALERT_MAX_LENGTH = 512;
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -58,6 +59,9 @@ public class ConversationEntity {
 
   @Column(name = "custom_signatures", columnDefinition = "text[]")
   private String[] customSignatures;
+
+  @Column(name = "suricata_alerts", columnDefinition = "text[]")
+  private String[] suricataAlerts;
 
   @Column(name = "http_user_agents", columnDefinition = "text[]")
   private String[] httpUserAgents;

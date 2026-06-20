@@ -489,7 +489,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
         port: '', payloadContains: '',
         protocols: [], l7Protocols: [], apps: [],
         categories: [], hasRisks: false, fileTypes: [],
-        riskTypes: [], customSignatures: [], deviceTypes: [],
+        riskTypes: [], customSignatures: [], suricataAlerts: [], deviceTypes: [],
         countries: [], sortBy: 'bytes', sortDir: 'desc',
         page: 1, pageSize: 8,
       })

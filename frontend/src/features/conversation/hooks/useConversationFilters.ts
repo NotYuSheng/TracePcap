@@ -32,6 +32,7 @@ export function useConversationFilters() {
       fileTypes: splitComma(searchParams.get('fileTypes')),
       riskTypes: splitComma(searchParams.get('riskTypes')),
       customSignatures: splitComma(searchParams.get('customSignatures')),
+      suricataAlerts: splitComma(searchParams.get('suricataAlerts')),
       deviceTypes: splitComma(searchParams.get('deviceTypes')),
       countries: splitComma(searchParams.get('countries')),
       sortBy: (searchParams.get('sortBy') ?? '') as SortField,
@@ -56,6 +57,7 @@ export function useConversationFilters() {
         filters.fileTypes.length > 0,
         filters.riskTypes.length > 0,
         filters.customSignatures.length > 0,
+        filters.suricataAlerts.length > 0,
         filters.deviceTypes.length > 0,
         filters.countries.length > 0,
       ].filter(Boolean).length,
@@ -82,6 +84,7 @@ export function useConversationFilters() {
             fileTypes: splitComma(prev.get('fileTypes')),
             riskTypes: splitComma(prev.get('riskTypes')),
             customSignatures: splitComma(prev.get('customSignatures')),
+            suricataAlerts: splitComma(prev.get('suricataAlerts')),
             deviceTypes: splitComma(prev.get('deviceTypes')),
             countries: splitComma(prev.get('countries')),
             sortBy: (prev.get('sortBy') ?? '') as SortField,
@@ -109,6 +112,7 @@ export function useConversationFilters() {
           set('fileTypes', joinComma(merged.fileTypes));
           set('riskTypes', joinComma(merged.riskTypes));
           set('customSignatures', joinComma(merged.customSignatures));
+          set('suricataAlerts', joinComma(merged.suricataAlerts));
           set('deviceTypes', joinComma(merged.deviceTypes ?? []));
           set('countries', joinComma(merged.countries ?? []));
           set('sortBy', merged.sortBy || undefined);

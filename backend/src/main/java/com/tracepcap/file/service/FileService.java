@@ -21,7 +21,11 @@ public interface FileService {
    * @return upload response with file metadata
    */
   FileUploadResponse uploadFile(
-      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction, FileSource source);
+      MultipartFile file,
+      boolean enableNdpi,
+      boolean enableSuricata,
+      boolean enableFileExtraction,
+      FileSource source);
 
   /**
    * Get file metadata by ID
@@ -75,9 +79,14 @@ public interface FileService {
    *
    * @param fileIds ordered list of file IDs to merge
    * @param enableNdpi whether to run nDPI on the merged file
+   * @param enableSuricata whether to run Suricata IDS on the merged file
    * @param enableFileExtraction whether to run file extraction on the merged file
    * @return upload response for the newly created merged file
    */
   FileUploadResponse mergeFiles(
-      List<UUID> fileIds, String mergedFileName, boolean enableNdpi, boolean enableFileExtraction);
+      List<UUID> fileIds,
+      String mergedFileName,
+      boolean enableNdpi,
+      boolean enableSuricata,
+      boolean enableFileExtraction);
 }

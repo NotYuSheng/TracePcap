@@ -65,7 +65,7 @@ export function SubnetDiagramModal({ subnet, snapshots, onHide, defaultSnapId }:
       const filters: ConversationFilters = {
         ip: '', port: '', payloadContains: '', protocols: [], l7Protocols: [],
         apps: [], categories: [], hasRisks: false, fileTypes: [], riskTypes: [],
-        customSignatures: [], deviceTypes: [], countries: [],
+        customSignatures: [], suricataAlerts: [], deviceTypes: [], countries: [],
         sortBy: 'startTime' as ConversationFilters['sortBy'],
         sortDir: 'desc' as ConversationFilters['sortDir'],
         page: 1, pageSize: 10000,

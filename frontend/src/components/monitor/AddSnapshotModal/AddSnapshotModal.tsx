@@ -134,7 +134,12 @@ export const AddSnapshotModal = ({
           const result = await uploadService.uploadPcap(
             file,
             p => setUploadProgress(p),
-            { enableNdpi: true, enableFileExtraction: true, source: 'MONITOR' },
+            {
+              enableNdpi: true,
+              enableSuricata: true,
+              enableFileExtraction: true,
+              source: 'MONITOR',
+            },
           );
           fileId = result.fileId;
         } catch (uploadErr: any) {

@@ -32,6 +32,7 @@ import {
   getTextColor,
   getSeverityColor,
   RISK_BADGE,
+  IDS_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import './ConversationList.css';
@@ -105,6 +106,7 @@ export const ConversationList = ({
               {col('category') && <th>Category</th>}
               {col('risks') && <th>Risks</th>}
               {col('customRules') && <th>Custom Rules</th>}
+              {col('idsAlerts') && <th>IDS Alerts</th>}
               {col('fileTypes') && (
                 <th style={{ whiteSpace: 'nowrap' }}>File Type</th>
               )}
@@ -257,6 +259,34 @@ export const ConversationList = ({
                               </span>
                             );
                           })}
+                        </div>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  )}
+                  {col('idsAlerts') && (
+                    <td>
+                      {conversation.suricataAlerts && conversation.suricataAlerts.length > 0 ? (
+                        <div className="d-inline-flex flex-wrap gap-1">
+                          {conversation.suricataAlerts.map(alert => (
+                            <span
+                              key={alert}
+                              className="badge"
+                              style={{
+                                backgroundColor: IDS_BADGE.bg,
+                                color: IDS_BADGE.text,
+                                whiteSpace: 'nowrap',
+                                maxWidth: '24rem',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: 'inline-block',
+                              }}
+                              title={alert}
+                            >
+                              {alert.length > 96 ? `${alert.slice(0, 96)}…` : alert}
+                            </span>
+                          ))}
                         </div>
                       ) : (
                         <span className="text-muted">—</span>

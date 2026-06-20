@@ -32,6 +32,7 @@ interface ConversationApiResponse {
   tlsNotAfter?: string | number[] | null;
   flowRisks?: string[] | null;
   customSignatures?: string[] | null;
+  suricataAlerts?: string[] | null;
   httpUserAgents?: string[] | null;
   detectedFileTypes?: string[] | null;
   srcGeo?: ConversationGeoInfo | null;
@@ -111,6 +112,7 @@ function transformConversation(
     tlsNotAfter: apiData.tlsNotAfter != null ? parseDateTime(apiData.tlsNotAfter) : undefined,
     flowRisks: apiData.flowRisks ?? [],
     customSignatures: apiData.customSignatures ?? [],
+    suricataAlerts: apiData.suricataAlerts ?? [],
     httpUserAgents: apiData.httpUserAgents ?? [],
     detectedFileTypes: apiData.detectedFileTypes ?? [],
     srcGeo: apiData.srcGeo ?? undefined,
@@ -220,6 +222,8 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
     if (filters.customSignatures.length > 0)
       params.customSignatures = filters.customSignatures.join(',');
+    if (filters.suricataAlerts.length > 0)
+      params.suricataAlerts = filters.suricataAlerts.join(',');
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.deviceTypes = filters.deviceTypes.join(',');
     if (filters.countries && filters.countries.length > 0)
@@ -261,6 +265,8 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
     if (filters.customSignatures.length > 0)
       params.set('customSignatures', filters.customSignatures.join(','));
+    if (filters.suricataAlerts.length > 0)
+      params.set('suricataAlerts', filters.suricataAlerts.join(','));
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.set('deviceTypes', filters.deviceTypes.join(','));
     if (filters.countries && filters.countries.length > 0)
@@ -295,6 +301,8 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.set('riskTypes', filters.riskTypes.join(','));
     if (filters.customSignatures.length > 0)
       params.set('customSignatures', filters.customSignatures.join(','));
+    if (filters.suricataAlerts.length > 0)
+      params.set('suricataAlerts', filters.suricataAlerts.join(','));
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.set('deviceTypes', filters.deviceTypes.join(','));
     if (filters.countries && filters.countries.length > 0)
@@ -310,6 +318,14 @@ export const conversationService = {
    */
   getCustomSignatures: async (fileId: string): Promise<string[]> => {
     const response = await apiClient.get<string[]>(`/conversations/${fileId}/custom-signatures`);
+    return response.data;
+  },
+
+  /**
+   * Returns distinct Suricata IDS alert strings present in this file's conversations.
+   */
+  getSuricataAlerts: async (fileId: string): Promise<string[]> => {
+    const response = await apiClient.get<string[]>(`/conversations/${fileId}/suricata-alerts`);
     return response.data;
   },
 

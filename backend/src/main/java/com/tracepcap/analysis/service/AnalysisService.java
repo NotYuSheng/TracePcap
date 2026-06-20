@@ -69,6 +69,7 @@ public class AnalysisService {
   private final PcapParserService pcapParserService;
   private final NdpiService ndpiService;
   private final TsharkEnrichmentService tsharkEnrichmentService;
+  private final SuricataService suricataService;
   private final CustomSignatureService customSignatureService;
   private final DeviceClassifierService deviceClassifierService;
   private final GeoIpService geoIpService;
@@ -120,11 +121,16 @@ public class AnalysisService {
         if (file.isEnableNdpi()) {
           ndpiService.enrich(tempFile, parseResult.getConversations());
           tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
-          log.info(
-              "[{}] [3/7] nDPI + tshark enrichment: {}ms", fileId, System.currentTimeMillis() - t);
-        } else {
-          log.info("[{}] [3/7] nDPI + tshark enrichment: skipped", fileId);
         }
+        if (file.isEnableSuricata()) {
+          suricataService.enrich(tempFile, parseResult.getConversations());
+        }
+        log.info(
+            "[{}] [3/7] Enrichment (nDPI={}, Suricata={}): {}ms",
+            fileId,
+            file.isEnableNdpi(),
+            file.isEnableSuricata(),
+            System.currentTimeMillis() - t);
 
         // Stage 4: Signatures, device classification, geo-IP
         t = System.currentTimeMillis();
@@ -207,6 +213,7 @@ public class AnalysisService {
                   .tlsNotAfter(convInfo.getTlsNotAfter())
                   .flowRisks(toNullableArray(convInfo.getFlowRisks()))
                   .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
+                  .suricataAlerts(toNullableArray(convInfo.getSuricataAlerts()))
                   .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
                   .packetCount(convInfo.getPacketCount())
                   .totalBytes(convInfo.getTotalBytes())
@@ -437,7 +444,9 @@ public class AnalysisService {
                 conv ->
                     (conv.getFlowRisks() != null && conv.getFlowRisks().length > 0)
                         || (conv.getCustomSignatures() != null
-                            && conv.getCustomSignatures().length > 0))
+                            && conv.getCustomSignatures().length > 0)
+                        || (conv.getSuricataAlerts() != null
+                            && conv.getSuricataAlerts().length > 0))
             .count();
 
     List<String> triggeredCustomRules =
@@ -485,6 +494,10 @@ public class AnalysisService {
                         .customSignatures(
                             conv.getCustomSignatures() != null
                                 ? Arrays.asList(conv.getCustomSignatures())
+                                : List.of())
+                        .suricataAlerts(
+                            conv.getSuricataAlerts() != null
+                                ? Arrays.asList(conv.getSuricataAlerts())
                                 : List.of())
                         .build())
             .collect(Collectors.toList());
@@ -605,6 +618,12 @@ public class AnalysisService {
   @Transactional(readOnly = true)
   public List<String> getDistinctCustomSignatures(UUID fileId) {
     return conversationRepository.findDistinctCustomSignaturesByFileId(fileId);
+  }
+
+  /** Returns distinct Suricata IDS alert strings present in this file's conversations. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctSuricataAlerts(UUID fileId) {
+    return conversationRepository.findDistinctSuricataAlertsByFileId(fileId);
   }
 
   /**
@@ -916,6 +935,7 @@ public class AnalysisService {
         .tlsNotAfter(conv.getTlsNotAfter())
         .flowRisks(toList(conv.getFlowRisks()))
         .customSignatures(toList(conv.getCustomSignatures()))
+        .suricataAlerts(toList(conv.getSuricataAlerts()))
         .httpUserAgents(toList(conv.getHttpUserAgents()))
         .detectedFileTypes(fileTypeMap.getOrDefault(conv.getId(), List.of()))
         .packetCount(conv.getPacketCount())
@@ -977,6 +997,7 @@ public class AnalysisService {
                   .tlsNotAfter(conv.getTlsNotAfter())
                   .flowRisks(toList(conv.getFlowRisks()))
                   .customSignatures(toList(conv.getCustomSignatures()))
+                  .suricataAlerts(toList(conv.getSuricataAlerts()))
                   .httpUserAgents(toList(conv.getHttpUserAgents()))
                   .packetCount(conv.getPacketCount())
                   .totalBytes(conv.getTotalBytes())
@@ -1056,6 +1077,7 @@ public class AnalysisService {
         .tlsNotAfter(conversation.getTlsNotAfter())
         .flowRisks(toList(conversation.getFlowRisks()))
         .customSignatures(toList(conversation.getCustomSignatures()))
+        .suricataAlerts(toList(conversation.getSuricataAlerts()))
         .httpUserAgents(toList(conversation.getHttpUserAgents()))
         .packetCount(conversation.getPacketCount())
         .totalBytes(conversation.getTotalBytes())

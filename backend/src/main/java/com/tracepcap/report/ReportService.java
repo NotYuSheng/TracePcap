@@ -262,6 +262,7 @@ public class ReportService {
       {"Upload Time", formatDt(file.getUploadedAt())},
       {"Status", file.getStatus() != null ? file.getStatus().name() : "—"},
       {"nDPI Enrichment", file.isEnableNdpi() ? "Enabled" : "Disabled"},
+      {"Suricata IDS", file.isEnableSuricata() ? "Enabled" : "Disabled"},
       {"File Extraction", file.isEnableFileExtraction() ? "Enabled" : "Disabled"},
     };
     doc.add(kvTable(rows));

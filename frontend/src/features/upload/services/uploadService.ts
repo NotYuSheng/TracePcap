@@ -6,6 +6,7 @@ export type FileSource = 'ANALYSIS' | 'MONITOR';
 
 export interface AnalysisOptions {
   enableNdpi: boolean;
+  enableSuricata: boolean;
   enableFileExtraction: boolean;
   source?: FileSource;
 }
@@ -17,11 +18,16 @@ export const uploadService = {
   uploadPcap: async (
     file: File,
     onProgress?: (progress: number) => void,
-    options: AnalysisOptions = { enableNdpi: true, enableFileExtraction: true }
+    options: AnalysisOptions = {
+      enableNdpi: true,
+      enableSuricata: true,
+      enableFileExtraction: true,
+    }
   ): Promise<UploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('enableNdpi', String(options.enableNdpi));
+    formData.append('enableSuricata', String(options.enableSuricata));
     formData.append('enableFileExtraction', String(options.enableFileExtraction));
     formData.append('source', options.source ?? 'ANALYSIS');
 

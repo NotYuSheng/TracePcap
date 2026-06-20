@@ -11,6 +11,7 @@ import {
   getTextColor,
   getSeverityColor,
   RISK_BADGE,
+  IDS_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
@@ -366,6 +367,27 @@ export const ConversationDetail = ({
                             </Badge>
                           );
                         })}
+                      </div>
+                    </dd>
+                  </>
+                )}
+                {conversation.suricataAlerts && conversation.suricataAlerts.length > 0 && (
+                  <>
+                    <dt className="col-sm-4">IDS Alerts:</dt>
+                    <dd className="col-sm-8">
+                      <div className="d-flex flex-wrap gap-1">
+                        {conversation.suricataAlerts.map(alert => (
+                          <Badge
+                            key={alert}
+                            style={{
+                              backgroundColor: IDS_BADGE.bg,
+                              color: IDS_BADGE.text,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {alert}
+                          </Badge>
+                        ))}
                       </div>
                     </dd>
                   </>

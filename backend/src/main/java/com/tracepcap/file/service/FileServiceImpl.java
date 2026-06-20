@@ -52,7 +52,11 @@ public class FileServiceImpl implements FileService {
   @Override
   @Transactional
   public FileUploadResponse uploadFile(
-      MultipartFile file, boolean enableNdpi, boolean enableFileExtraction, FileSource source) {
+      MultipartFile file,
+      boolean enableNdpi,
+      boolean enableSuricata,
+      boolean enableFileExtraction,
+      FileSource source) {
     log.info("Starting file upload: {}", file.getOriginalFilename());
 
     // Validate file
@@ -93,6 +97,7 @@ public class FileServiceImpl implements FileService {
               .fileHash(fileHash)
               .source(source != null ? source : FileSource.ANALYSIS)
               .enableNdpi(enableNdpi)
+              .enableSuricata(enableSuricata)
               .enableFileExtraction(enableFileExtraction)
               .build();
 
@@ -228,7 +233,11 @@ public class FileServiceImpl implements FileService {
   @Override
   @Transactional
   public FileUploadResponse mergeFiles(
-      List<UUID> fileIds, String mergedFileName, boolean enableNdpi, boolean enableFileExtraction) {
+      List<UUID> fileIds,
+      String mergedFileName,
+      boolean enableNdpi,
+      boolean enableSuricata,
+      boolean enableFileExtraction) {
     if (fileIds == null || fileIds.size() < 2) {
       throw new InvalidFileException("At least two files are required for merging");
     }
@@ -315,6 +324,7 @@ public class FileServiceImpl implements FileService {
               .status(FileEntity.FileStatus.PROCESSING)
               .fileHash(fileHash)
               .enableNdpi(enableNdpi)
+              .enableSuricata(enableSuricata)
               .enableFileExtraction(enableFileExtraction)
               .build();
 

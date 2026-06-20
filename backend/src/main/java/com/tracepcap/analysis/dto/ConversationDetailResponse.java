@@ -31,6 +31,7 @@ public class ConversationDetailResponse {
   private LocalDateTime tlsNotAfter;
   private List<String> flowRisks;
   private List<String> customSignatures;
+  private List<String> suricataAlerts;
   private List<String> httpUserAgents;
   private Long packetCount;
   private Long totalBytes;

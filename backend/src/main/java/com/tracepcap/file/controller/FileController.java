@@ -39,17 +39,20 @@ public class FileController {
   public ResponseEntity<FileUploadResponse> uploadFile(
       @RequestParam("file") MultipartFile file,
       @RequestParam(value = "enableNdpi", defaultValue = "true") boolean enableNdpi,
+      @RequestParam(value = "enableSuricata", defaultValue = "true") boolean enableSuricata,
       @RequestParam(value = "enableFileExtraction", defaultValue = "true")
           boolean enableFileExtraction,
       @RequestParam(value = "source", defaultValue = "ANALYSIS") FileSource source) {
     log.info(
-        "Received file upload request: {} (ndpi={}, extraction={}, source={})",
+        "Received file upload request: {} (ndpi={}, suricata={}, extraction={}, source={})",
         file.getOriginalFilename(),
         enableNdpi,
+        enableSuricata,
         enableFileExtraction,
         source);
 
-    FileUploadResponse response = fileService.uploadFile(file, enableNdpi, enableFileExtraction, source);
+    FileUploadResponse response =
+        fileService.uploadFile(file, enableNdpi, enableSuricata, enableFileExtraction, source);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -115,6 +118,7 @@ public class FileController {
   public ResponseEntity<FileUploadResponse> mergeFiles(
       @Valid @RequestBody MergeFilesRequest request,
       @RequestParam(value = "enableNdpi", defaultValue = "true") boolean enableNdpi,
+      @RequestParam(value = "enableSuricata", defaultValue = "true") boolean enableSuricata,
       @RequestParam(value = "enableFileExtraction", defaultValue = "true")
           boolean enableFileExtraction) {
 
@@ -124,7 +128,11 @@ public class FileController {
 
     FileUploadResponse response =
         fileService.mergeFiles(
-            request.getFileIds(), request.getMergedFileName(), enableNdpi, enableFileExtraction);
+            request.getFileIds(),
+            request.getMergedFileName(),
+            enableNdpi,
+            enableSuricata,
+            enableFileExtraction);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }

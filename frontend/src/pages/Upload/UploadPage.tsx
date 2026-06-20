@@ -16,6 +16,7 @@ export const UploadPage = () => {
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [analysisOptions, setAnalysisOptions] = useState<AnalysisOptions>({
     enableNdpi: true,
+    enableSuricata: true,
     enableFileExtraction: true,
   });
   const navigate = useNavigate();
@@ -49,7 +50,11 @@ export const UploadPage = () => {
 
   const handleFileSelect = (files: File[]) => {
     if (!analysisOptionsEnabled) {
-      uploadFiles(files, { enableNdpi: true, enableFileExtraction: true });
+      uploadFiles(files, {
+        enableNdpi: true,
+        enableSuricata: true,
+        enableFileExtraction: true,
+      });
     } else {
       setPendingFiles(files);
     }
@@ -116,6 +121,24 @@ export const UploadPage = () => {
                     <div className="text-muted" style={{ fontSize: '0.82rem' }}>
                       Identifies apps (Zoom, Chrome, etc.), traffic categories, and security risks.
                       Adds ~1–2 min for large captures.
+                    </div>
+                  </div>
+                </label>
+
+                <label className="d-flex align-items-start gap-3" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    className="form-check-input mt-1 flex-shrink-0"
+                    checked={analysisOptions.enableSuricata}
+                    onChange={e =>
+                      setAnalysisOptions(o => ({ ...o, enableSuricata: e.target.checked }))
+                    }
+                  />
+                  <div>
+                    <div className="fw-semibold">Suricata IDS threat detection</div>
+                    <div className="text-muted" style={{ fontSize: '0.82rem' }}>
+                      Flags known threats using Emerging Threats Open signatures (IDS alerts). Loads
+                      a large ruleset, adding ~30–60s per capture.
                     </div>
                   </div>
                 </label>

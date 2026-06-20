@@ -108,6 +108,7 @@ export function useNetworkData(
           fileTypes: [],
           riskTypes: [],
           customSignatures: [],
+          suricataAlerts: [],
           deviceTypes: [],
           countries: [],
           sortBy: '',
