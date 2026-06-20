@@ -9,6 +9,7 @@ import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { NetworkControls } from '@/components/network/NetworkControls';
 import { NodeDetails } from '@/components/network/NodeDetails';
+import { NodeLabelSettingsModal } from '@/components/network/NodeLabelSettingsModal';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
 import { toggleSet } from '@/features/network/constants';
 import { edgeMatchesLegendKey, applyNetworkFilters } from '@/features/network/services/networkService';
@@ -126,6 +127,7 @@ export const SnapshotDetailModal = ({
   const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>('circular');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showLabelModal, setShowLabelModal] = useState(false);
 
   // Filter state
   const [ipFilter, setIpFilter] = useState('');
@@ -476,6 +478,15 @@ export const SnapshotDetailModal = ({
                   ))}
                 </div>
               )}
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted ms-auto"
+                onClick={() => setShowLabelModal(true)}
+                title="Customize node labels"
+              >
+                <i className="bi bi-tags" />
+              </Button>
             </div>
             <div className="monitor-diagram-graph" style={{ height: 460 }}>
               {graphLoading ? (
@@ -775,6 +786,9 @@ export const SnapshotDetailModal = ({
         <Button variant="secondary" onClick={() => setShowFilterModal(false)}>Close</Button>
       </Modal.Footer>
     </Modal>
+
+    {/* Node-label settings — separate modal so it stacks above the diagram */}
+    <NodeLabelSettingsModal show={showLabelModal} onHide={() => setShowLabelModal(false)} />
     </>
   );
 };

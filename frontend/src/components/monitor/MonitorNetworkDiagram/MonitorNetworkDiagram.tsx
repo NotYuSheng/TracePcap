@@ -6,6 +6,7 @@ import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGra
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { NetworkControls } from '@/components/network/NetworkControls';
 import { NodeDetails } from '@/components/network/NodeDetails';
+import { NodeLabelSettingsModal } from '@/components/network/NodeLabelSettingsModal';
 import type { GraphNode } from '@/features/network/types';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
 import { toggleSet } from '@/features/network/constants';
@@ -119,6 +120,7 @@ export const MonitorNetworkDiagram = ({
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showLabelModal, setShowLabelModal] = useState(false);
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [ipFilter, setIpFilter] = useState('');
@@ -164,6 +166,7 @@ export const MonitorNetworkDiagram = ({
     if (!show) {
       setSelectedNode(null);
       setShowFilterModal(false);
+      setShowLabelModal(false);
       return;
     }
     if (initialSnapshotId) {
@@ -390,7 +393,16 @@ export const MonitorNetworkDiagram = ({
           <Button
             variant="link"
             size="sm"
-            className="ms-auto p-0 text-muted"
+            className="ms-auto p-0 text-muted me-3"
+            onClick={() => setShowLabelModal(true)}
+            title="Customize node labels"
+          >
+            <i className="bi bi-tags" />
+          </Button>
+          <Button
+            variant="link"
+            size="sm"
+            className="p-0 text-muted"
             onClick={() => setIsFullscreen(f => !f)}
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           >
@@ -567,6 +579,9 @@ export const MonitorNetworkDiagram = ({
         <Button variant="secondary" onClick={() => setShowFilterModal(false)}>Close</Button>
       </Modal.Footer>
     </Modal>
+
+    {/* Node-label settings — separate modal so it stacks above the diagram */}
+    <NodeLabelSettingsModal show={showLabelModal} onHide={() => setShowLabelModal(false)} />
     </>
   );
 };
