@@ -1136,9 +1136,11 @@ public class AnalysisService {
     for (HostServiceLogExtractor extractor : hostServiceLogExtractors) {
       try {
         HostServiceLogResult result = extractor.extractAndPersist(file, pcap);
-        for (String ip : result.serverIps()) {
-          rolesByIp.computeIfAbsent(ip, k -> new LinkedHashSet<>()).add(extractor.role());
-        }
+        result
+            .roleByServerIp()
+            .forEach(
+                (ip, role) ->
+                    rolesByIp.computeIfAbsent(ip, k -> new LinkedHashSet<>()).add(role));
         suspicions.addAll(result.suspicions());
       } catch (Exception e) {
         log.warn("Host service log extractor '{}' failed: {}", extractor.role(), e.getMessage());

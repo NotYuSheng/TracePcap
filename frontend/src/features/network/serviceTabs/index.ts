@@ -1,18 +1,20 @@
 import type { ServiceTabConfig } from './types';
 import { dnsServiceTab } from './dnsServiceTab';
+import { webServiceTab } from './webServiceTab';
 
-export type { ServiceTabConfig, ServiceLogColumn } from './types';
+export type { ServiceTabConfig, ServiceLogColumn, ServiceLogInfoField, ServiceLogCellContext } from './types';
 
 /**
- * Registry of per-service-role tabs the node modal can show, keyed by role. Add a role = add an
+ * Registry mapping a host service role → the tab the node modal renders for it. Add a role = add an
  * entry here (plus its backend extractor + classification signal). The modal renders one tab per
- * role a host serves, in registry order.
+ * role a host serves. The web tab is registered under both `api` and `web` since both share the
+ * same HTTP endpoint view.
  */
-const SERVICE_TABS: ServiceTabConfig<unknown, unknown>[] = [
-  dnsServiceTab as ServiceTabConfig<unknown, unknown>,
-];
-
-const BY_ROLE = new Map(SERVICE_TABS.map(t => [t.role, t]));
+const BY_ROLE = new Map<string, ServiceTabConfig<unknown, unknown>>([
+  ['dns', dnsServiceTab as ServiceTabConfig<unknown, unknown>],
+  ['api', webServiceTab as ServiceTabConfig<unknown, unknown>],
+  ['web', webServiceTab as ServiceTabConfig<unknown, unknown>],
+]);
 
 /** Returns the tab config for a role, or undefined when the role has no registered tab. */
 export function getServiceTab(role: string): ServiceTabConfig<unknown, unknown> | undefined {

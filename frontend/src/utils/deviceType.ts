@@ -11,7 +11,11 @@ const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
   LAPTOP_DESKTOP: { label: 'Laptop / Desktop', color: '#3b82f6' }, // blue
   SERVER:         { label: 'Server',           color: '#10b981' }, // emerald
   IOT:            { label: 'IoT Device',       color: '#ec4899' }, // pink
+  // Service-server family — a cohesive cool ramp (sky → indigo → purple), kept clearly off the
+  // generic SERVER green so they're easy to tell apart on the diagram.
   DNS_SERVER:     { label: 'DNS Server',       color: '#0ea5e9' }, // sky
+  WEB_SERVER:     { label: 'Web Server',       color: '#6366f1' }, // indigo
+  API_SERVER:     { label: 'API Server',       color: '#a855f7' }, // purple
   UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
 };
 
@@ -103,7 +107,13 @@ export function buildDeviceSignals(info: DeviceSignalInfo): DeviceSignalResult {
 
   // ── Service roles (authoritative) ─────────────────────────────────────────
   if (info.serviceRoles?.includes('dns')) {
-    fired.push('Answered DNS queries → +60 to DNS Server (authoritative — outranks heuristics)');
+    fired.push('Answered DNS queries → DNS Server (authoritative — outranks heuristics)');
+  }
+  if (info.serviceRoles?.includes('api')) {
+    fired.push('Served an HTTP API → API Server (authoritative — outranks heuristics)');
+  }
+  if (info.serviceRoles?.includes('web')) {
+    fired.push('Served HTTP/TLS → Web Server (authoritative — outranks heuristics)');
   }
 
   // ── OUI / manufacturer ──────────────────────────────────────────────────
@@ -197,6 +207,8 @@ const DEVICE_TYPE_ICONS: Partial<Record<DeviceType, string>> = {
   SERVER:         'bi-server',
   IOT:            'bi-cpu',
   DNS_SERVER:     'bi-hdd-network',
+  WEB_SERVER:     'bi-globe',
+  API_SERVER:     'bi-hdd-stack',
 };
 
 /**
@@ -214,5 +226,7 @@ export const DEVICE_TYPES: DeviceType[] = [
   'SERVER',
   'IOT',
   'DNS_SERVER',
+  'WEB_SERVER',
+  'API_SERVER',
   'UNKNOWN',
 ];

@@ -102,6 +102,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     final Set<String> resolvedIps = new LinkedHashSet<>();
     String responseCode; // representative rcode name
     boolean resolvable; // true once any response was NOERROR with at least one answer
+    Long sampleFrame; // frame.number of the first response packet (for "view packet" links)
   }
 
   /** Per-server NXDOMAIN bookkeeping for suspicion scoring. */
@@ -132,6 +133,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
               .resolvedIps(agg.resolvedIps.isEmpty() ? null : String.join(",", agg.resolvedIps))
               .queryCount(agg.count)
               .resolvable(agg.resolvable)
+              .sampleFrame(agg.sampleFrame)
               .build());
     }
     if (!rows.isEmpty()) {
@@ -162,18 +164,20 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
         serverStats.size(),
         suspicions.size());
     // Every host that answered a DNS query is a DNS server, regardless of suspicion.
-    return new HostServiceLogResult(new LinkedHashSet<>(serverStats.keySet()), suspicions);
+    Map<String, String> roleByServerIp = new LinkedHashMap<>();
+    for (String ip : serverStats.keySet()) roleByServerIp.put(ip, ROLE);
+    return new HostServiceLogResult(roleByServerIp, suspicions);
   }
 
   // ── tshark pass ───────────────────────────────────────────────────────────
 
   private void runTshark(
       File pcap, Map<QueryKey, QueryAgg> groups, Map<String, ServerStats> serverStats) {
-    // Fields (pipe-separated): 0 ip.src  1 dns.qry.name  2 dns.qry.type
-    //   3 dns.flags.rcode  4 dns.a  5 dns.aaaa  6 dns.count.answers
-    // Default occurrence aggregator (",") keeps every answer record in dns.a/dns.aaaa.
-    // dns.count.answers (ANCOUNT) lets us treat any successfully-answered query as resolved —
-    // including non-address types (MX, TXT, CNAME, PTR, SRV …) that carry no A/AAAA record.
+    // Fields (pipe-separated): 0 frame.number  1 ip.src  2 dns.qry.name  3 dns.qry.type
+    //   4 dns.flags.rcode  5 dns.a  6 dns.aaaa  7 dns.count.answers
+    // frame.number leads (numeric, no '|') and the five answer-related fields trail, so a '|' in the
+    // query name still parses via right-anchoring. dns.count.answers (ANCOUNT) lets us treat any
+    // successfully-answered query as resolved — including non-address types (MX/TXT/CNAME/PTR/SRV).
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -185,6 +189,8 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
             "fields",
             "-E",
             "separator=|",
+            "-e",
+            "frame.number",
             "-e",
             "ip.src",
             "-e",
@@ -256,13 +262,14 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
   static void parseRow(
       String line, Map<QueryKey, QueryAgg> groups, Map<String, ServerStats> serverStats) {
     String[] f = line.split("\\|", -1);
-    if (f.length < 7) return;
-    // Fields are fixed except the query name (field 1), which — in tunnelled/malformed DNS — may
-    // itself contain the '|' separator. ip.src is the first field and the five trailing fields are
-    // fixed, so re-join everything in between to recover the full query name.
-    String serverIp = trimToNull(f[0]);
+    if (f.length < 8) return;
+    // Fields are fixed except the query name (field 2), which — in tunnelled/malformed DNS — may
+    // itself contain the '|' separator. frame.number + ip.src lead and the five answer fields trail,
+    // so re-join everything in between to recover the full query name.
+    Long frame = parseFrame(f[0]);
+    String serverIp = trimToNull(f[1]);
     String rawQueryName =
-        (f.length == 7) ? f[1] : String.join("|", Arrays.copyOfRange(f, 1, f.length - 5));
+        (f.length == 8) ? f[2] : String.join("|", Arrays.copyOfRange(f, 2, f.length - 5));
     String queryName = stripTrailingDot(firstValue(rawQueryName));
     if (serverIp == null || queryName == null) return;
     if (queryName.length() > QUERY_NAME_MAX_LENGTH) {
@@ -293,6 +300,7 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     QueryAgg agg = groups.computeIfAbsent(key, k -> new QueryAgg());
     agg.count++;
     agg.resolvedIps.addAll(answers);
+    if (agg.sampleFrame == null && frame != null) agg.sampleFrame = frame; // first response packet
     if (resolvable) {
       agg.resolvable = true;
       agg.responseCode = responseCode; // a successful answer wins the representative code
@@ -325,6 +333,17 @@ public class DnsQueryLogExtractor implements HostServiceLogExtractor {
     if (raw == null) return null;
     String t = raw.trim();
     return t.isEmpty() ? null : t;
+  }
+
+  /** Parses a tshark frame.number; returns null when absent or unparseable. */
+  private static Long parseFrame(String raw) {
+    String v = firstValue(raw);
+    if (v == null) return null;
+    try {
+      return Long.parseLong(v);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   /** Parses tshark's dns.count.answers (ANCOUNT); returns 0 when absent or unparseable. */

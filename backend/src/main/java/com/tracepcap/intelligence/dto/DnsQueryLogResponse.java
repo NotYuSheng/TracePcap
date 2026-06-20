@@ -38,5 +38,7 @@ public class DnsQueryLogResponse {
     private List<String> resolvedIps;
     private int queryCount;
     private boolean resolvable;
+    /** frame.number of the response packet this row came from (for "view packet"); null if unknown. */
+    private Long frame;
   }
 }

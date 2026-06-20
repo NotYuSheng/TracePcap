@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +25,8 @@ interface ConversationDetailProps {
   signatureSeverities?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
   fileId?: string;
+  /** When set, the packet with this frame number is scrolled into view and briefly highlighted. */
+  highlightPacketNumber?: number | null;
 }
 
 function countryFlag(code: string): string {
@@ -159,6 +161,7 @@ export const ConversationDetail = ({
   signatureSeverities = {},
   hostClassMap,
   fileId,
+  highlightPacketNumber,
 }: ConversationDetailProps) => {
   const navigate = useNavigate();
   const [source, destination] = conversation.endpoints;
@@ -168,6 +171,17 @@ export const ConversationDetail = ({
   const [extractedCount, setExtractedCount] = useState<number | null>(null);
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
   const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
+  const highlightRowRef = useRef<HTMLTableRowElement>(null);
+
+  // When deep-linked to a specific packet, switch to the Packets tab and scroll it into view.
+  useEffect(() => {
+    if (highlightPacketNumber == null) return;
+    setActiveTab('packets');
+    const t = setTimeout(() => {
+      highlightRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [highlightPacketNumber, conversation.id]);
 
   const openDevicePopup = (
     cls: HostClassification,
@@ -546,8 +560,14 @@ export const ConversationDetail = ({
                       <>
                         <tr
                           key={packet.id}
+                          ref={packet.packetNumber === highlightPacketNumber ? highlightRowRef : undefined}
                           onClick={() => togglePacket(packet.id)}
-                          style={{ cursor: packet.payload ? 'pointer' : 'default' }}
+                          style={{
+                            cursor: packet.payload ? 'pointer' : 'default',
+                            ...(packet.packetNumber === highlightPacketNumber
+                              ? { backgroundColor: '#fff3cd', boxShadow: 'inset 3px 0 0 #ffc107' }
+                              : {}),
+                          }}
                           className={expandedPacketId === packet.id ? 'table-active' : undefined}
                         >
                           <td className="text-muted">{index + 1}</td>

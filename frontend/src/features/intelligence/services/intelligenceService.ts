@@ -94,6 +94,7 @@ export interface DnsQueryEntry {
   resolvedIps: string[];
   queryCount: number;
   resolvable: boolean;
+  frame: number | null;
 }
 
 export interface DnsQueryLogResponse {
@@ -104,6 +105,49 @@ export interface DnsQueryLogResponse {
   nxdomainRatio: number;
   suspicious: boolean;
   entries: DnsQueryEntry[];
+}
+
+export interface HttpEndpoint {
+  method: string | null;
+  path: string;
+  topStatus: number | null;
+  requestCount: number;
+  successCount: number;
+  clientErrorCount: number;
+  serverErrorCount: number;
+  contentType: string | null;
+  requestFrame: number | null;
+  responseFrame: number | null;
+}
+
+export interface PacketLocation {
+  conversationId: string;
+  packetNumber: number;
+}
+
+export interface TlsInfo {
+  subject: string | null;
+  issuer: string | null;
+  ja3s: string | null;
+  sniNames: string[];
+  notBefore: string | null;
+  notAfter: string | null;
+}
+
+export interface WebServerDetail {
+  serverIp: string;
+  hostname: string | null;
+  api: boolean;
+  totalRequests: number;
+  successCount: number;
+  clientErrorCount: number;
+  serverErrorCount: number;
+  clientErrorRatio: number;
+  suspicious: boolean;
+  serverSoftware: string | null;
+  contentTypes: string[];
+  tls: TlsInfo | null;
+  endpoints: HttpEndpoint[];
 }
 
 export const intelligenceService = {
@@ -154,5 +198,31 @@ export const intelligenceService = {
       API_ENDPOINTS.NETWORK_INTELLIGENCE_DNS_LOG(fileId, serverIp)
     );
     return res.data;
+  },
+
+  async getWebServers(fileId: string): Promise<ServiceServerSummary[]> {
+    const res = await apiClient.get<ServiceServerSummary[]>(
+      API_ENDPOINTS.NETWORK_INTELLIGENCE_WEB_SERVERS(fileId)
+    );
+    return res.data;
+  },
+
+  async getWebServerDetail(fileId: string, serverIp: string): Promise<WebServerDetail> {
+    const res = await apiClient.get<WebServerDetail>(
+      API_ENDPOINTS.NETWORK_INTELLIGENCE_WEB_DETAIL(fileId, serverIp)
+    );
+    return res.data;
+  },
+
+  /** Resolves a packet frame number to the conversation that contains it (null if not found). */
+  async getPacketLocation(fileId: string, packetNumber: number): Promise<PacketLocation | null> {
+    try {
+      const res = await apiClient.get<PacketLocation>(
+        API_ENDPOINTS.NETWORK_INTELLIGENCE_PACKET_LOCATION(fileId, packetNumber)
+      );
+      return res.data;
+    } catch {
+      return null;
+    }
   },
 };

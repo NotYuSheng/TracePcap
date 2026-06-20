@@ -1,18 +1,21 @@
 package com.tracepcap.analysis.service.hostlog;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Outcome of running a {@link HostServiceLogExtractor} over a capture.
  *
- * @param serverIps the IPs detected serving this role (e.g. every host that answered DNS) — used to
- *     tag hosts with their service roles and drive device classification
+ * @param roleByServerIp the role each detected server plays for this extractor, keyed by IP (e.g.
+ *     every DNS responder → {@code "dns"}; a web host → {@code "api"} or {@code "web"}). Drives
+ *     per-host service tagging and device classification. A single extractor may assign different
+ *     roles to different hosts.
  * @param suspicions servers that exhibited anomalous behaviour for this role
  */
-public record HostServiceLogResult(Set<String> serverIps, List<HostServiceSuspicion> suspicions) {
+public record HostServiceLogResult(
+    Map<String, String> roleByServerIp, List<HostServiceSuspicion> suspicions) {
 
   public static HostServiceLogResult empty() {
-    return new HostServiceLogResult(Set.of(), List.of());
+    return new HostServiceLogResult(Map.of(), List.of());
   }
 }

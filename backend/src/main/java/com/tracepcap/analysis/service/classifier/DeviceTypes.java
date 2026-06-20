@@ -16,5 +16,7 @@ public final class DeviceTypes {
   public static final String SERVER = "SERVER";
   public static final String IOT = "IOT";
   public static final String DNS_SERVER = "DNS_SERVER";
+  public static final String WEB_SERVER = "WEB_SERVER";
+  public static final String API_SERVER = "API_SERVER";
   public static final String UNKNOWN = "UNKNOWN";
 }

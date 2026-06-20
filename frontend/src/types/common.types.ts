@@ -1,6 +1,8 @@
 // Packet and Network Types
 export interface Packet {
   id: string;
+  /** Frame number within the capture (matches tshark frame.number); used for deep-link highlighting. */
+  packetNumber?: number;
   timestamp: number;
   source: NetworkEndpoint;
   destination: NetworkEndpoint;
@@ -408,6 +410,8 @@ export type DeviceType =
   | 'SERVER'
   | 'IOT'
   | 'DNS_SERVER'
+  | 'WEB_SERVER'
+  | 'API_SERVER'
   | 'UNKNOWN'
   | string; // custom override values from YAML
 

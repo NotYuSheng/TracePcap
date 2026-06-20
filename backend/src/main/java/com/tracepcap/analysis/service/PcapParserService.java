@@ -80,9 +80,13 @@ public class PcapParserService {
             "-e",
             "arp.dst.proto_ipv4",
             "-e",
-            "eth.dst");
+            "eth.dst",
+            "-e",
+            "frame.number");
     pb.redirectErrorStream(false);
 
+    // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
+    // the real tshark frame.number (field 19) so other passes can locate a packet by frame number.
     long packetNumber = 0;
     try {
       Process process = pb.start();
@@ -224,10 +228,22 @@ public class PcapParserService {
               tsharkPayload = f[13]; // udp.payload
             }
             String payloadHex = TsharkHexUtil.toHex(tsharkPayload, PacketEntity.PAYLOAD_BYTE_LIMIT);
+            // Stored packet number = tshark frame.number (absolute, file-wide); fall back to the
+            // running counter if the field is somehow absent. frame.number is the last field, so read
+            // it from the end — a '|' inside an earlier column (e.g. Info) would shift fixed indices.
+            long frameNumber = packetNumber;
+            String rawFrame = f.length > 19 ? f[f.length - 1] : null;
+            if (rawFrame != null && !rawFrame.isEmpty()) {
+              try {
+                frameNumber = Long.parseLong(rawFrame.trim());
+              } catch (NumberFormatException ignored) {
+                // keep counter fallback
+              }
+            }
             conv.getPackets()
                 .add(
                     buildPacketInfo(
-                        packetNumber,
+                        frameNumber,
                         timestamp,
                         srcIp,
                         srcPort,

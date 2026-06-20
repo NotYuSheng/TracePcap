@@ -23,7 +23,8 @@ class DnsQueryLogExtractorTest {
       String serverIp, String name, String qtype, String rcode, String a, String aaaa, String ancount) {
     if (groups == null) groups = new LinkedHashMap<>();
     if (serverStats == null) serverStats = new LinkedHashMap<>();
-    String line = String.join("|", serverIp, name, qtype, rcode, a, aaaa, ancount);
+    // Leading field is frame.number (numeric, pipe-safe); use a fixed dummy frame for unit rows.
+    String line = String.join("|", "1", serverIp, name, qtype, rcode, a, aaaa, ancount);
     DnsQueryLogExtractor.parseRow(line, groups, serverStats);
   }
 

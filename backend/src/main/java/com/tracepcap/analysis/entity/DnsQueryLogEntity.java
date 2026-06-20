@@ -60,4 +60,8 @@ public class DnsQueryLogEntity {
   /** True when the query resolved successfully (NOERROR with at least one answer). */
   @Column(name = "resolvable", nullable = false)
   private boolean resolvable;
+
+  /** frame.number of the first response packet for this query — links the row to its packet. */
+  @Column(name = "sample_frame")
+  private Long sampleFrame;
 }
