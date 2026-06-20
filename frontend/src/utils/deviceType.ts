@@ -11,9 +11,11 @@ const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
   LAPTOP_DESKTOP: { label: 'Laptop / Desktop', color: '#3b82f6' }, // blue
   SERVER:         { label: 'Server',           color: '#10b981' }, // emerald
   IOT:            { label: 'IoT Device',       color: '#ec4899' }, // pink
+  // Service-server family — a cohesive cool ramp (sky → indigo → purple), kept clearly off the
+  // generic SERVER green so they're easy to tell apart on the diagram.
   DNS_SERVER:     { label: 'DNS Server',       color: '#0ea5e9' }, // sky
-  WEB_SERVER:     { label: 'Web Server',       color: '#14b8a6' }, // teal
-  API_SERVER:     { label: 'API Server',       color: '#6366f1' }, // indigo
+  WEB_SERVER:     { label: 'Web Server',       color: '#6366f1' }, // indigo
+  API_SERVER:     { label: 'API Server',       color: '#a855f7' }, // purple
   UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
 };
 
