@@ -14,6 +14,7 @@ import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
+import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
@@ -44,6 +45,7 @@ export const NetworkDiagramPage = () => {
   const [customInput, setCustomInput] = useState('');
   const [showSignificanceModal, setShowSignificanceModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showLabelModal, setShowLabelModal] = useState(false);
   const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } =
     useNetworkData(fileId, data, nodeLimit);
 
@@ -93,13 +95,14 @@ export const NetworkDiagramPage = () => {
     if (!isFullscreen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (showLabelModal) { setShowLabelModal(false); return; }
       if (showFilterModal) { setShowFilterModal(false); return; }
       if (selectedNode) { setSelectedNode(null); return; }
       setIsFullscreen(false);
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isFullscreen, showFilterModal, selectedNode]);
+  }, [isFullscreen, showFilterModal, showLabelModal, selectedNode]);
 
   // ─── "Present" sets: only show options that exist in the data ───────────────
 
@@ -527,15 +530,26 @@ export const NetworkDiagramPage = () => {
           <Card className={isFullscreen ? 'nd-css-fullscreen' : ''} ref={graphCardRef}>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-muted"
-                onClick={toggleFullscreen}
-                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              >
-                <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-              </Button>
+              <div className="d-flex align-items-center gap-3">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 text-muted"
+                  onClick={() => setShowLabelModal(true)}
+                  title="Customize node labels"
+                >
+                  <i className="bi bi-tags" />
+                </Button>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 text-muted"
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                >
+                  <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
+                </Button>
+              </div>
             </Card.Header>
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
@@ -563,6 +577,12 @@ export const NetworkDiagramPage = () => {
           onClose={() => setSelectedNode(null)}
         />
       )}
+
+      <NodeLabelSettingsModal
+        show={showLabelModal}
+        onHide={() => setShowLabelModal(false)}
+        container={graphCardRef.current ?? undefined}
+      />
 
       <Modal
         show={showFilterModal}
