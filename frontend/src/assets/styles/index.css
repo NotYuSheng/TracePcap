@@ -119,6 +119,9 @@ body {
   font-size: 0.875rem;
   color: var(--tp-text-muted);
   border-radius: var(--sgds-border-radius, 0.3125rem);
+  /* 3px transparent accent reserved on every state so the active bar
+     doesn't shift text; weight is kept constant to avoid reflow/wrapping */
+  border-left: 3px solid transparent;
   padding: 0.4rem 0.65rem;
 }
 
@@ -130,7 +133,7 @@ body {
 .tp-section-nav .nav-link.active {
   color: var(--sgds-primary);
   background-color: var(--tp-surface-hover);
-  font-weight: 600;
+  border-left-color: var(--sgds-primary);
 }
 
 /* Analysis page nav-tabs: single scrollable row with fade + scroll buttons */
