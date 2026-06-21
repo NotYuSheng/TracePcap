@@ -64,10 +64,6 @@ class PipelineIntegrationTest {
         "minio.endpoint", () -> "http://" + MINIO.getHost() + ":" + MINIO.getMappedPort(9000));
     registry.add("minio.access-key", () -> "minioadmin");
     registry.add("minio.secret-key", () -> "minioadmin");
-    // application.yml defaults this to the SpEL literal #{null}, which @ConfigurationProperties
-    // binding (unlike @Value) does not evaluate — so it must be set explicitly for tests. The LLM
-    // is never exercised here; this is just a parseable stub so the context can boot.
-    registry.add("llm.api.context-length", () -> "8192");
   }
 
   @Autowired private TestRestTemplate rest;
