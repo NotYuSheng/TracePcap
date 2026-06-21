@@ -141,9 +141,8 @@ public class AnalysisService {
 
         // Stage 4: Signatures, device classification, geo-IP
         t = System.currentTimeMillis();
-        signatureApplier.applySignatures(parseResult.getConversations());
         Map<String, String> deviceOverrides =
-            signatureApplier.getDeviceTypeOverrides(parseResult.getConversations());
+            signatureApplier.applySignatures(parseResult.getConversations());
         // resolve() degrades gracefully and never throws — it returns a (possibly empty) map.
         Map<String, HostnameResolverService.ResolvedHostname> hostnames =
             hostnameResolverService.resolve(tempFile);

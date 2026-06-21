@@ -13,14 +13,15 @@ import java.util.Map;
 public interface SignatureApplier {
 
   /**
-   * Evaluates all configured rules against each conversation and appends matched rule names to the
-   * conversation's custom-signatures list, in place.
+   * Evaluates all configured rules against each conversation in a single pass: appends matched rule
+   * names to each conversation's custom-signatures list (in place), and returns a map of IP address
+   * → custom device type for IPs matched by a rule carrying a {@code device_type}.
+   *
+   * <p>Combining both outputs into one call avoids re-reading and re-parsing the rules file, and
+   * removes the ordering dependency the previous two-method contract had (the device-type overrides
+   * are derived from the matches applied here).
+   *
+   * @return device-type overrides keyed by IP; empty if no rules carry a {@code device_type}
    */
-  void applySignatures(List<PcapParserService.ConversationInfo> conversations);
-
-  /**
-   * Returns a map of IP address → custom device type for IPs involved in conversations matched by a
-   * rule carrying a {@code device_type}. Call after {@link #applySignatures}.
-   */
-  Map<String, String> getDeviceTypeOverrides(List<PcapParserService.ConversationInfo> conversations);
+  Map<String, String> applySignatures(List<PcapParserService.ConversationInfo> conversations);
 }
