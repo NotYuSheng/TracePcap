@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.classifier;
+package com.tracepcap.hostclassification.service.classifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

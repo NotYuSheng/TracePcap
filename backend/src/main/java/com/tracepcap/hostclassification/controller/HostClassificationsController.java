@@ -1,6 +1,6 @@
-package com.tracepcap.analysis.controller;
+package com.tracepcap.hostclassification.controller;
 
-import com.tracepcap.analysis.dto.HostClassificationResponse;
+import com.tracepcap.hostclassification.dto.HostClassificationResponse;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import io.swagger.v3.oas.annotations.Operation;

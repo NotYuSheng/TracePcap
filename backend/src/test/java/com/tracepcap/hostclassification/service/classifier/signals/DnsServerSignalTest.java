@@ -1,11 +1,11 @@
-package com.tracepcap.analysis.service.classifier.signals;
+package com.tracepcap.hostclassification.service.classifier.signals;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tracepcap.analysis.service.classifier.DeviceTypes;
-import com.tracepcap.analysis.service.classifier.HostContext;
-import com.tracepcap.analysis.service.classifier.HostProfile;
-import com.tracepcap.analysis.service.classifier.ScoreBoard;
+import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
+import com.tracepcap.hostclassification.service.classifier.HostContext;
+import com.tracepcap.hostclassification.service.classifier.HostProfile;
+import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 

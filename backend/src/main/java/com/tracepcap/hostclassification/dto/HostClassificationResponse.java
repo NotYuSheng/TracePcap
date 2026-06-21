@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.dto;
+package com.tracepcap.hostclassification.dto;
 
 import java.util.List;
 import lombok.Builder;

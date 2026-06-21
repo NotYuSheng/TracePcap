@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.classifier;
+package com.tracepcap.hostclassification.service.classifier;
 
 import java.util.LinkedHashSet;
 import java.util.Set;

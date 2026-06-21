@@ -16,6 +16,7 @@ import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.spi.FileExtractionStage;
+import com.tracepcap.analysis.spi.HostClassifier;
 import com.tracepcap.analysis.spi.SignatureApplier;
 import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor;
 import com.tracepcap.analysis.service.hostlog.HostServiceLogExtractor;
@@ -77,7 +78,7 @@ public class AnalysisService {
   private final TsharkEnrichmentService tsharkEnrichmentService;
   private final SuricataService suricataService;
   private final SignatureApplier signatureApplier;
-  private final DeviceClassifierService deviceClassifierService;
+  private final HostClassifier hostClassifier;
   private final HostnameResolverService hostnameResolverService;
   private final List<HostServiceLogExtractor> hostServiceLogExtractors;
   private final GeoIpService geoIpService;
@@ -153,7 +154,7 @@ public class AnalysisService {
         // (e.g. a DNS responder → DNS_SERVER). Adding a role needs no change here.
         ServiceLogOutcome serviceLogs = runServiceLogExtractors(file, tempFile);
         List<HostClassificationEntity> hostClassifications =
-            deviceClassifierService.classify(
+            hostClassifier.classify(
                 file,
                 parseResult.getConversations(),
                 parseResult.getHostTtls(),
