@@ -15,6 +15,9 @@ export function useEntityNote(entityType: EntityType, entityKey: string) {
   const [noteDeleting, setNoteDeleting] = useState(false);
 
   useEffect(() => {
+    // Reset so a previous entity's note can't leak when the modal is reused.
+    setSavedNote(null);
+    setNoteText('');
     entityNotesService.getNote(entityType, entityKey).then(note => {
       if (note) { setSavedNote(note); setNoteText(note.note); }
     });

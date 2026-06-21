@@ -25,6 +25,8 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
   const [statsError, setStatsError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Reset so a previous entity's stats can't leak when the modal is reused.
+    setStats(null);
     if (!fileId || (entityType !== 'APPLICATION' && entityType !== 'PROTOCOL')) return;
     setStatsLoading(true);
     setStatsError(null);

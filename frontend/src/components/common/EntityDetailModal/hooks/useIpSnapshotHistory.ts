@@ -13,7 +13,11 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
   const [ipHistoryLoading, setIpHistoryLoading] = useState(false);
 
   useEffect(() => {
+    // Reset so a previous entity's history can't leak when the modal is reused.
+    setIpSnapHistory([]);
     if (entityType !== 'IP' || !snapshots || snapshots.length === 0) return;
+    // `active` guards against stale responses applying after the entity changes/unmounts.
+    let active = true;
     setIpHistoryLoading(true);
     const sorted = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
     Promise.all(
@@ -24,6 +28,7 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
           .catch(() => ({ snap, host: null }))
       )
     ).then(results => {
+      if (!active) return;
       // Only keep snapshots where this IP appeared
       const seen = results.filter(r => r.host !== null);
       if (seen.length === 0) { setIpSnapHistory([]); setIpHistoryLoading(false); return; }
@@ -42,8 +47,13 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
             }))
             .catch(() => ({ snap, host, apps: [], protocols: [] }))
         )
-      ).then(entries => { setIpSnapHistory(entries); setIpHistoryLoading(false); });
-    }).catch(() => setIpHistoryLoading(false));
+      ).then(entries => {
+        if (!active) return;
+        setIpSnapHistory(entries);
+        setIpHistoryLoading(false);
+      });
+    }).catch(() => { if (active) setIpHistoryLoading(false); });
+    return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityType, entityKey, snapshots?.map(s => s.id).join(',')]);
 

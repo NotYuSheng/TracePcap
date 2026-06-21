@@ -11,6 +11,8 @@ export function useHostClassification(entityType: EntityType, entityKey: string,
   const [hostClass, setHostClass] = useState<HostClassification | null>(null);
 
   useEffect(() => {
+    // Reset so a previous entity's classification can't leak when the modal is reused.
+    setHostClass(null);
     if (entityType !== 'IP' || !fileId) return;
     apiClient
       .get<HostClassification[]>(`/files/${fileId}/host-classifications`)

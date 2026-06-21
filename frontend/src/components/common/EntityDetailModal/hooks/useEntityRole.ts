@@ -20,6 +20,11 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
 
   // Load node role on mount for IP/DEVICE
   useEffect(() => {
+    // Reset so a previous entity's role/drafts can't leak when the modal is reused.
+    setRole(null);
+    setRoleLabelDraft('');
+    setRoleDescDraft('');
+    setRoleEditing(false);
     if (!showRole) return;
     setRoleLoading(true);
     insightsService

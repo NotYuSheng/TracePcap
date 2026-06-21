@@ -14,7 +14,8 @@ export function useEntityHistory(entityType: EntityType, entityKey: string) {
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (history.length > 0 || historyLoading) return;
+    // Reset so a previous entity's history can't leak when the modal is reused.
+    setHistory([]);
     setHistoryLoading(true);
     setHistoryError(null);
     entityNotesService
@@ -22,7 +23,6 @@ export function useEntityHistory(entityType: EntityType, entityKey: string) {
       .then(entries => setHistory(entries))
       .catch(() => setHistoryError('Failed to load history'))
       .finally(() => setHistoryLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityType, entityKey]);
 
   return { history, historyLoading, historyError };
