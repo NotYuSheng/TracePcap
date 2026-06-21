@@ -1,6 +1,6 @@
-package com.tracepcap.analysis.service;
+package com.tracepcap.timeline.service;
 
-import com.tracepcap.analysis.dto.TimelineDataDto;
+import com.tracepcap.timeline.dto.TimelineDataDto;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.common.exception.ResourceNotFoundException;

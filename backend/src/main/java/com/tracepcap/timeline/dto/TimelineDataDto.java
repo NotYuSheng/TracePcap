@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.dto;
+package com.tracepcap.timeline.dto;
 
 import java.time.LocalDateTime;
 import java.util.Map;
