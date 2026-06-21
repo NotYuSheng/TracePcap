@@ -68,15 +68,19 @@ public class FileController {
 
     if (page < 1) page = 1;
     if (pageSize < 1) pageSize = 20;
+    else if (pageSize > 100) pageSize = 100; // cap to bound DB load / response size
 
-    // Parse sort parameter
-    String[] sortParams = sort.split(",");
+    // Parse sort parameter; fall back to a stable default for blank/malformed input
+    // (e.g. "?sort=" or "?sort=,asc") rather than letting an empty field reach Sort.by().
+    String[] sortParams = sort == null ? new String[0] : sort.split(",");
+    String sortField =
+        sortParams.length > 0 && !sortParams[0].isBlank() ? sortParams[0].trim() : "uploadedAt";
     Sort.Direction direction =
-        sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc")
+        sortParams.length > 1 && "asc".equalsIgnoreCase(sortParams[1].trim())
             ? Sort.Direction.ASC
             : Sort.Direction.DESC;
     // PageRequest is 0-indexed; the public API is 1-indexed (matches PagedResponse).
-    Pageable pageable = PageRequest.of(page - 1, pageSize, Sort.by(direction, sortParams[0]));
+    Pageable pageable = PageRequest.of(page - 1, pageSize, Sort.by(direction, sortField));
 
     Page<FileMetadataDto> files = fileService.getAllFiles(pageable, source);
 
