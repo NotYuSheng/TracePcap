@@ -1,0 +1,35 @@
+name: Backend Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/test-backend.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: mvn verify (JUnit + Testcontainers)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Testcontainers needs a Docker daemon; ubuntu-latest runners provide one.
+      - name: Run unit + integration tests
+        run: mvn -B clean verify
