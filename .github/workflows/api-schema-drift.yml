@@ -1,0 +1,65 @@
+name: API Schema Drift
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'scripts/openapi-snapshot.mjs'
+      - 'openapi/baseline.json'
+      - '.github/workflows/api-schema-drift.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  schema-drift:
+    name: OpenAPI contract snapshot
+    runs-on: ubuntu-latest
+
+    # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
+    # to 80. Pin it to 8888 to match the readiness check and the snapshot URL.
+    env:
+      NGINX_PORT: '8888'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for app to be ready
+        # Use 127.0.0.1, not localhost: Docker publishes the port on IPv4 only,
+        # but localhost can resolve to IPv6 (::1) first and fail to connect.
+        run: |
+          for i in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8888/api/v1/files)" = "200" ]; then
+              echo "App is up"; exit 0
+            fi
+            sleep 5
+          done
+          echo "App did not become ready in time"
+          docker compose logs --tail=100
+          exit 1
+
+      - name: Regenerate OpenAPI snapshot
+        run: node scripts/openapi-snapshot.mjs
+        env:
+          OPENAPI_URL: http://127.0.0.1:8888/v3/api-docs
+
+      - name: Fail on uncommitted API drift
+        run: |
+          if ! git diff --exit-code -- openapi/baseline.json; then
+            echo "::error::OpenAPI spec drifted from openapi/baseline.json. If intentional, run 'node scripts/openapi-snapshot.mjs' with the stack up and commit the result."
+            exit 1
+          fi
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
