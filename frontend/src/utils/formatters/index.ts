@@ -42,11 +42,11 @@ export const formatDuration = (ms: number): string => {
 /**
  * Format timestamp to readable date/time
  * @param timestamp - Unix timestamp in milliseconds
- * @returns Formatted string (e.g., "Jan 31, 2026 14:30:45")
+ * @returns Formatted string (e.g., "31 Jan 2026, 14:30:45")
  */
 export const formatTimestamp = (timestamp: number): string => {
   const date = new Date(timestamp);
-  return date.toLocaleString('en-US', {
+  return date.toLocaleString('en-GB', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

@@ -179,7 +179,7 @@ export const FilterGeneratorPage = () => {
   };
 
   const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString();
+    return new Date(timestamp).toLocaleString('en-GB');
   };
 
   const formatBytes = (bytes: number) => {

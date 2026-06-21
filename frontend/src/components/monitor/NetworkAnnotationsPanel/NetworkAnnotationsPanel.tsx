@@ -73,7 +73,7 @@ function AnnotationRow({
       <div style={{ flex: 1 }}>
         <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{annotation.body}</div>
         <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
-          {new Date(annotation.createdAt).toLocaleString()}
+          {new Date(annotation.createdAt).toLocaleString('en-GB')}
           {annotation.updatedAt !== annotation.createdAt && ' (edited)'}
         </div>
       </div>

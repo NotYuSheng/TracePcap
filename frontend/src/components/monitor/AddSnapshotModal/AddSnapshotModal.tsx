@@ -49,6 +49,7 @@ export const AddSnapshotModal = ({
   const [subnetOverridesActive, setSubnetOverridesActive] = useState(false);
   const [loadingSubnets, setLoadingSubnets] = useState(false);
   const [newCidr, setNewCidr] = useState('');
+  const [newLabel, setNewLabel] = useState('');
 
   useEffect(() => {
     if (!show) return;
@@ -61,6 +62,7 @@ export const AddSnapshotModal = ({
     setSubnetOverrides([]);
     setSubnetOverridesActive(false);
     setNewCidr('');
+    setNewLabel('');
   }, [show]);
 
   const handleToggleSubnets = async () => {
@@ -103,8 +105,20 @@ export const AddSnapshotModal = ({
     const normalized = cidr.toLowerCase();
     if (subnetOverrides.some(o => o.cidr.trim().toLowerCase() === normalized)) return;
     setSubnetOverridesActive(true);
-    setSubnetOverrides(prev => [...prev, { cidr, label: null, description: null, inherited: false }]);
+    setSubnetOverrides(prev => [...prev, { cidr, label: newLabel.trim() || null, description: null, inherited: false }]);
     setNewCidr('');
+    setNewLabel('');
+  };
+
+  // Warn before discarding unsaved work (selected files or edited subnet overrides).
+  const hasUnsavedChanges = uploadFiles.length > 0 || subnetOverridesActive || newCidr.trim().length > 0 || newLabel.trim().length > 0;
+
+  const handleClose = () => {
+    if (isBusy) return;
+    if (hasUnsavedChanges && !window.confirm('Discard unsaved changes? Your selected file and subnet overrides will be lost.')) {
+      return;
+    }
+    onHide();
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -180,7 +194,7 @@ export const AddSnapshotModal = ({
   };
 
   return (
-    <Modal show={show} onHide={isBusy ? undefined : onHide} size="lg">
+    <Modal show={show} onHide={isBusy ? undefined : handleClose} size="lg">
       <Modal.Header closeButton={!isBusy}>
         <Modal.Title>Add PCAP Snapshot</Modal.Title>
       </Modal.Header>
@@ -296,7 +310,7 @@ export const AddSnapshotModal = ({
                                       onClick={() => removeOverride(i)}
                                       title="Remove"
                                     >
-                                      <i className="bi bi-x" style={{ fontSize: '0.75rem' }} />
+                                      <i className="bi bi-trash" style={{ fontSize: '0.7rem' }} />
                                     </button>
                                   </td>
                                 </tr>
@@ -310,12 +324,20 @@ export const AddSnapshotModal = ({
                         </p>
                       )}
 
-                      <div className="d-flex gap-2 align-items-center">
+                      <div className="d-flex gap-2 align-items-center flex-wrap">
                         <input
                           className="form-control form-control-sm font-monospace"
                           placeholder="e.g. 192.168.1.0/24"
                           value={newCidr}
                           onChange={e => setNewCidr(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
+                          style={{ maxWidth: 200, fontSize: '0.8rem' }}
+                        />
+                        <input
+                          className="form-control form-control-sm"
+                          placeholder="Label (optional)"
+                          value={newLabel}
+                          onChange={e => setNewLabel(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOverride(); } }}
                           style={{ maxWidth: 200, fontSize: '0.8rem' }}
                         />

@@ -931,6 +931,10 @@
             "type": "string"
           }
         },
+        "required": [
+          "eventTime",
+          "title"
+        ],
         "type": "object"
       },
       "CreateNetworkRequest": {
@@ -5951,6 +5955,55 @@
           }
         },
         "summary": "Delete an external event",
+        "tags": [
+          "Network External Events"
+        ]
+      },
+      "put": {
+        "operationId": "updateExternalEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExternalEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkExternalEventDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Update an external event",
         "tags": [
           "Network External Events"
         ]

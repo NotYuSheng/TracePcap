@@ -22,7 +22,7 @@ type SortDir = 'asc' | 'desc';
 function formatCaptureDate(start: string | null): string {
   if (!start) return '—';
   const ms = parseDateTime(start as unknown as string | number[]);
-  return new Date(ms).toLocaleString();
+  return new Date(ms).toLocaleString('en-GB');
 }
 
 function formatDuration(start: string | null, end: string | null): string {

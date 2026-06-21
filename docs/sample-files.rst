@@ -284,47 +284,96 @@ IPs by subnet.
 
 **Step 5 — Annotate key devices**
 
-Click IP badges in the drift panels to open the Entity Detail modal. Assign
-role labels to the named devices:
+Click IP badges in the drift panels to open the Entity Detail modal. There are
+two distinct fields — keep them separate:
+
+- **Role label** (Details tab → *Role*) describes *what a host is* — its stable
+  identity or function (e.g. "File Server (SMB)", "Alice — Staff Workstation").
+  Saving a role label marks it as a **Manual label**. A manual label records the
+  analyst's identity assignment; it is **not** a clean bill of health. Future
+  deviating behaviour from that host is still detected and flagged, so do **not**
+  bake time-bounded behaviour (violations, "FTP exfil weeks 4–6") into the label.
+- **Notes** (Notes tab) is where behavioural observations belong — what the host
+  *did*, when, and with what evidence. Notes are also fed to the LLM during
+  insight generation.
+
+Assign clean role labels to the named devices:
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 75
+   :widths: 18 32 50
 
    * - IP
-     - Suggested role label
+     - Role label
+     - Notes (behavioural observations)
    * - ``10.0.2.10``
      - File Server (SMB)
+     - —
    * - ``10.0.2.20``
      - Mail Server (SMTP/IMAP)
+     - —
    * - ``10.0.2.30``
      - Internal Web Server
+     - —
    * - ``10.0.3.5``
      - Floor Printer A (IPP)
+     - —
    * - ``10.0.3.6``
      - Floor Printer B (IPP)
+     - —
    * - ``10.0.1.10``
-     - Alice — Staff Workstation (compliant)
+     - Alice — Staff Workstation
+     - Compliant throughout; useful as a "normal" baseline for comparison.
    * - ``10.0.1.11``
-     - Bob — Staff Workstation (FTP exfil weeks 4–6)
+     - Bob — Staff Workstation
+     - FTP exfiltration to ``192.0.2.99`` (``STOR report_q4.pdf``), weeks 4–6.
    * - ``10.0.1.12``
-     - Carol — Staff Workstation (Telnet weeks 3–6)
+     - Carol — Staff Workstation
+     - Joined week 3; Telnet to file server with cleartext credentials, weeks 3–6.
    * - ``10.0.4.20``
-     - Bob's Personal Laptop (VPN bypass + BitTorrent)
+     - Bob's Personal Laptop
+     - BYOD on corporate WiFi; WireGuard VPN bypass + BitTorrent, weeks 2–6.
    * - ``10.0.4.50``
-     - Unknown Device — Raspberry Pi OUI (shadow device)
+     - *(leave unlabelled — see below)*
+     - Optional, **after** running Suggest with AI: unknown device, RPi OUI
+       ``b8:27:eb``, no DNS hostname, ARP-spoofs ``10.0.1.11``, SMB + Telnet to
+       file server, weeks 5–6.
 
-Use **Suggest with AI** on ``10.0.4.50`` to see how the LLM characterises the
-device from its traffic behaviour alone (unusual OUI, ARP spoofing, SMB + Telnet
-to internal servers, no hostname).
+Leave ``10.0.4.50`` **without a role label** for now. Then use **Suggest with
+AI** on it to see how the LLM characterises the device from its traffic
+behaviour alone, with no human hint to anchor on (unusual OUI, ARP spoofing,
+SMB + Telnet to internal servers, no hostname).
+
+.. note::
+   **Expected Suggest with AI result for** ``10.0.4.50``. The model should
+   refuse to treat it as a sanctioned asset and instead flag it as an
+   unidentified / rogue device — e.g. *"Unidentified host with a Raspberry Pi
+   (``b8:27:eb``) OUI and no DNS hostname, exhibiting ARP spoofing and lateral
+   SMB/Telnet access to the internal file server — likely an unauthorised or
+   rogue device warranting investigation."* Exact wording varies by model, but a
+   good answer picks up the unusual OUI, the missing hostname, the ARP anomaly,
+   and the internal-server access. This is the payoff of leaving it unlabelled:
+   the suggestion is the AI's blind characterisation, not an echo of your label.
 
 **Step 6 — Add external events**
 
-In the **External Events** panel, log the audit milestone that explains the
-behavioural shift:
+In the **External Events** panel, click **Add Event** and log the audit
+milestone that explains the behavioural shift. Each event has three fields:
 
-- Date: start of week 7 — *"Audit notice issued to staff — policy violations
-  flagged for remediation"*
+- **Date & Time** *(required)* — when the real-world event actually happened, not
+  when you are logging it. Set this to the start of the **week 7** capture window
+  (the date of ``week7_violations_drop_gateway_back.pcap``) so the LLM can line
+  the event up with the violation drop-off. The field pre-fills with the server's
+  current time — change it to the event's real date.
+- **Title** *(required)* — a short, scannable summary, e.g.
+  *"Audit notice issued to staff — policy violations flagged for remediation"*.
+- **Description** *(optional)* — longer context, e.g. *"IT/Security circulated a
+  memo to all staff after preliminary audit findings; staff were told to cease
+  unsanctioned services (VPN, BitTorrent, FTP, Telnet) pending remediation."*
+
+To fix a mistake later — for example if you set the wrong date — click the
+**pencil** icon on the event row to edit any field, or the **trash** icon to
+remove it.
 
 **Step 7 — Generate insights**
 

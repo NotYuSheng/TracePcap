@@ -93,7 +93,7 @@ function buildHighlightMap(events: ChangeEvent[], toSnapshotId: string): Map<str
 function formatSnapLabel(snap: NetworkSnapshot): string {
   if (snap.startTime) {
     const ms = parseDateTime(snap.startTime as unknown as string | number[]);
-    return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(ms).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
   }
   return snap.fileName;
 }
@@ -258,9 +258,25 @@ export const SnapshotDetailModal = ({
   );
   const [subnetCustomizeMode, setSubnetCustomizeMode] = useState((snapshot.subnetOverrides ?? []).length > 0);
   const [subnetNewCidr, setSubnetNewCidr] = useState('');
+  const [subnetNewLabel, setSubnetNewLabel] = useState('');
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [savingSubnets, setSavingSubnets] = useState(false);
   const subnetOverridesActive = subnetCustomizeMode;
+
+  // Detect unsaved subnet edits by comparing the draft against the persisted overrides.
+  const serializeOverrides = (rows: { cidr: string; label: string | null; description: string | null }[]) =>
+    rows.map(o => `${o.cidr}|${o.label ?? ''}|${o.description ?? ''}`).join(',');
+  const subnetChanged =
+    serializeOverrides(subnetDraft) !== serializeOverrides(snapshot.subnetOverrides ?? []);
+  const hasUnsavedChanges = contextChanged || subnetChanged || subnetNewCidr.trim().length > 0;
+
+  const handleHide = () => {
+    if (hasUnsavedChanges &&
+        !window.confirm('Discard unsaved changes? Your edits to context, notes, or subnet overrides will be lost.')) {
+      return;
+    }
+    onHide();
+  };
 
   // Stable key: changes only when the server-persisted overrides actually change (IDs rotate on each save)
   const savedOverrideKey = (snapshot.subnetOverrides ?? []).map(o => o.id).join(',');
@@ -300,8 +316,9 @@ export const SnapshotDetailModal = ({
   const addSubnetRow = () => {
     const cidr = subnetNewCidr.trim();
     if (!cidr) return;
-    setSubnetDraft(prev => [...prev, { cidr, label: null, description: null, inherited: false }]);
+    setSubnetDraft(prev => [...prev, { cidr, label: subnetNewLabel.trim() || null, description: null, inherited: false }]);
     setSubnetNewCidr('');
+    setSubnetNewLabel('');
   };
 
   const handleSaveSubnets = async () => {
@@ -365,7 +382,7 @@ export const SnapshotDetailModal = ({
 
   return (
     <>
-    <Modal show onHide={onHide} centered size="xl" scrollable>
+    <Modal show onHide={handleHide} centered size="xl" scrollable>
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-camera-reels me-2" />
@@ -654,7 +671,7 @@ export const SnapshotDetailModal = ({
                                 onClick={() => removeSubnetRow(i)}
                                 title="Remove"
                               >
-                                <i className="bi bi-x" style={{ fontSize: '0.75rem' }} />
+                                <i className="bi bi-trash" style={{ fontSize: '0.7rem' }} />
                               </button>
                             </td>
                           </tr>
@@ -668,12 +685,20 @@ export const SnapshotDetailModal = ({
                   </p>
                 )}
 
-                <div className="d-flex gap-2 align-items-center mb-3">
+                <div className="d-flex gap-2 align-items-center mb-3 flex-wrap">
                   <input
                     className="form-control form-control-sm font-monospace"
                     placeholder="e.g. 192.168.1.0/24"
                     value={subnetNewCidr}
                     onChange={e => setSubnetNewCidr(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubnetRow(); } }}
+                    style={{ maxWidth: 200, fontSize: '0.82rem' }}
+                  />
+                  <input
+                    className="form-control form-control-sm"
+                    placeholder="Label (optional)"
+                    value={subnetNewLabel}
+                    onChange={e => setSubnetNewLabel(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubnetRow(); } }}
                     style={{ maxWidth: 200, fontSize: '0.82rem' }}
                   />

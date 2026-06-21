@@ -60,7 +60,7 @@ function describeEvent(event: ChangeEvent): string {
 export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadgeProps) => {
   const toSnap = snapshots.find(s => s.id === event.toSnapshotId);
   const detectedMs = parseDateTime(event.detectedAt as unknown as string | number[]);
-  const formattedTime = new Date(detectedMs).toLocaleString();
+  const formattedTime = new Date(detectedMs).toLocaleString('en-GB');
 
   const [showNotes, setShowNotes] = useState(false);
   const [draftNotes, setDraftNotes] = useState(event.notes ?? '');

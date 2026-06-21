@@ -324,6 +324,21 @@ export const NetworkDetailPage = () => {
     setExternalEvents(prev => [ev, ...prev]);
   };
 
+  const handleUpdateExternalEvent = async (
+    eventId: string,
+    eventTime: string,
+    title: string,
+    description?: string,
+  ) => {
+    if (!networkId) return;
+    const ev = await insightsService.updateExternalEvent(networkId, eventId, eventTime, title, description);
+    setExternalEvents(prev =>
+      prev
+        .map(e => (e.id === eventId ? ev : e))
+        .sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime()),
+    );
+  };
+
   const handleDeleteExternalEvent = async (eventId: string) => {
     if (!networkId) return;
     await insightsService.deleteExternalEvent(networkId, eventId);
@@ -825,6 +840,7 @@ export const NetworkDetailPage = () => {
           <ExternalEventsPanel
             events={externalEvents}
             onAdd={handleAddExternalEvent}
+            onUpdate={handleUpdateExternalEvent}
             onDelete={handleDeleteExternalEvent}
           />
         </Card.Body>

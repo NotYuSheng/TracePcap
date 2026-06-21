@@ -141,7 +141,7 @@ export function SubnetDiagramModal({ subnet, snapshots, onHide, defaultSnapId }:
             </Form.Select>
             {selectedSnap?.startTime && (
               <small className="text-muted">
-                {new Date(selectedSnap.startTime as unknown as string).toLocaleDateString()}
+                {new Date(selectedSnap.startTime as unknown as string).toLocaleDateString('en-GB')}
               </small>
             )}
             <small className="text-muted ms-auto">
