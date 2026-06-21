@@ -2,11 +2,11 @@ package com.tracepcap.story.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tracepcap.analysis.dto.TimelineDataDto;
+import com.tracepcap.timeline.dto.TimelineDataDto;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.service.TimelineService;
+import com.tracepcap.timeline.service.TimelineService;
 import com.tracepcap.common.exception.ContextLengthExceededException;
 import com.tracepcap.common.exception.LlmException;
 import com.tracepcap.common.exception.ResourceNotFoundException;

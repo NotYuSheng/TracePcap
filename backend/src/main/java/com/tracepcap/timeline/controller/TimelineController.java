@@ -1,7 +1,7 @@
-package com.tracepcap.analysis.controller;
+package com.tracepcap.timeline.controller;
 
-import com.tracepcap.analysis.dto.TimelineDataDto;
-import com.tracepcap.analysis.service.TimelineService;
+import com.tracepcap.timeline.dto.TimelineDataDto;
+import com.tracepcap.timeline.service.TimelineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
