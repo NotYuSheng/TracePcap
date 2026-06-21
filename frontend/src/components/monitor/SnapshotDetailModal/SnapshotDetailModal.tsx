@@ -263,6 +263,21 @@ export const SnapshotDetailModal = ({
   const [savingSubnets, setSavingSubnets] = useState(false);
   const subnetOverridesActive = subnetCustomizeMode;
 
+  // Detect unsaved subnet edits by comparing the draft against the persisted overrides.
+  const serializeOverrides = (rows: { cidr: string; label: string | null; description: string | null }[]) =>
+    rows.map(o => `${o.cidr}|${o.label ?? ''}|${o.description ?? ''}`).join(',');
+  const subnetChanged =
+    serializeOverrides(subnetDraft) !== serializeOverrides(snapshot.subnetOverrides ?? []);
+  const hasUnsavedChanges = contextChanged || subnetChanged || subnetNewCidr.trim().length > 0;
+
+  const handleHide = () => {
+    if (hasUnsavedChanges &&
+        !window.confirm('Discard unsaved changes? Your edits to context, notes, or subnet overrides will be lost.')) {
+      return;
+    }
+    onHide();
+  };
+
   // Stable key: changes only when the server-persisted overrides actually change (IDs rotate on each save)
   const savedOverrideKey = (snapshot.subnetOverrides ?? []).map(o => o.id).join(',');
   // Keep draft in sync when parent updates the snapshot (e.g. after save), without resetting on every poll
@@ -367,7 +382,7 @@ export const SnapshotDetailModal = ({
 
   return (
     <>
-    <Modal show onHide={onHide} centered size="xl" scrollable>
+    <Modal show onHide={handleHide} centered size="xl" scrollable>
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-camera-reels me-2" />
