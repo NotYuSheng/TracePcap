@@ -2,6 +2,8 @@ package com.tracepcap.analysis.controller;
 
 import com.tracepcap.analysis.dto.TimelineDataDto;
 import com.tracepcap.analysis.service.TimelineService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDateTime;
@@ -17,8 +19,9 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Validated
 @RestController
-@RequestMapping("/api/timeline")
+@RequestMapping("/timeline")
 @RequiredArgsConstructor
+@Tag(name = "Timeline", description = "Binned traffic statistics over time for a file")
 public class TimelineController {
 
   private final TimelineService timelineService;
@@ -33,6 +36,7 @@ public class TimelineController {
    * @return List of timeline data points
    */
   @GetMapping("/{fileId}")
+  @Operation(summary = "Get binned timeline data for a file")
   public ResponseEntity<List<TimelineDataDto>> getTimeline(
       @PathVariable UUID fileId,
       @RequestParam(defaultValue = "60")
@@ -65,6 +69,7 @@ public class TimelineController {
    * @return List of timeline data points
    */
   @GetMapping("/{fileId}/range")
+  @Operation(summary = "Get binned timeline data for a specific time range")
   public ResponseEntity<List<TimelineDataDto>> getTimelineRange(
       @PathVariable UUID fileId,
       @RequestParam String start,

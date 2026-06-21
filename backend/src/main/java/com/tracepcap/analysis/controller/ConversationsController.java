@@ -9,6 +9,7 @@ import com.tracepcap.analysis.service.SessionReconstructionService;
 import com.tracepcap.common.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,8 +26,11 @@ import org.springframework.web.bind.annotation.*;
 /** REST controller for conversation operations */
 @Slf4j
 @RestController
-@RequestMapping("/api/conversations")
+@RequestMapping("/conversations")
 @RequiredArgsConstructor
+@Tag(
+    name = "Conversations",
+    description = "Per-file conversation listing, facets, export, and session reconstruction")
 public class ConversationsController {
 
   private final AnalysisService analysisService;
@@ -318,10 +322,10 @@ public class ConversationsController {
   }
 
   /** Reconstruct the full TCP/UDP session for a conversation and decode the application payload. */
-  @GetMapping("/{conversationId}/session")
+  @GetMapping("/detail/{conversationId}/session")
   @Operation(summary = "Reconstruct TCP/UDP session with application-layer payload decoding")
   public ResponseEntity<SessionResponse> getSession(@PathVariable UUID conversationId) {
-    log.info("GET /api/conversations/{}/session", conversationId);
+    log.info("GET /api/conversations/detail/{}/session", conversationId);
     return ResponseEntity.ok(sessionReconstructionService.reconstruct(conversationId));
   }
 

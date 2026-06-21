@@ -4,6 +4,7 @@ import com.tracepcap.analysis.dto.HostClassificationResponse;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -12,8 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/files")
 @RequiredArgsConstructor
+@Tag(name = "Host Classifications", description = "Per-file device-type classifications for hosts")
 public class HostClassificationsController {
 
   private final HostClassificationRepository hostClassificationRepository;

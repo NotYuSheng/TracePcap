@@ -33,7 +33,7 @@ export const useAnalysisData = (fileId: string) => {
       // Falls back to 5 minutes if the endpoint is unreachable.
       let analysisTimeoutMs = 5 * 60 * 1000;
       try {
-        const limitsRes = await fetch('/api/system/limits');
+        const limitsRes = await fetch('/api/v1/system/limits');
         if (limitsRes.ok) {
           const limits = await limitsRes.json();
           if (limits.analysisTimeoutMs) analysisTimeoutMs = limits.analysisTimeoutMs;

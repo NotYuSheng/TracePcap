@@ -2,13 +2,19 @@ package com.tracepcap.common.exception;
 
 import com.tracepcap.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** Global exception handler for REST controllers */
 @Slf4j
@@ -155,6 +161,74 @@ public class GlobalExceptionHandler {
             .build();
 
     return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
+      MethodArgumentNotValidException ex, HttpServletRequest request) {
+    Map<String, String> fieldErrors = new LinkedHashMap<>();
+    ex.getBindingResult()
+        .getFieldErrors()
+        .forEach(
+            fe ->
+                fieldErrors.putIfAbsent(
+                    fe.getField(),
+                    fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "is invalid"));
+    log.warn("Validation failed for request body: {}", fieldErrors);
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+            .message("Validation failed")
+            .path(request.getRequestURI())
+            .validationErrors(fieldErrors)
+            .build();
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<ErrorResponse> handleConstraintViolation(
+      ConstraintViolationException ex, HttpServletRequest request) {
+    Map<String, String> fieldErrors = new LinkedHashMap<>();
+    for (ConstraintViolation<?> v : ex.getConstraintViolations()) {
+      String path = v.getPropertyPath().toString();
+      // Property path is like "methodName.paramName"; keep the trailing parameter name.
+      String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+      fieldErrors.putIfAbsent(field, v.getMessage());
+    }
+    log.warn("Constraint violation on request parameters: {}", fieldErrors);
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+            .message("Validation failed")
+            .path(request.getRequestURI())
+            .validationErrors(fieldErrors)
+            .build();
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<ErrorResponse> handleNoResourceFound(
+      NoResourceFoundException ex, HttpServletRequest request) {
+    log.warn("No resource for path: {}", request.getRequestURI());
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.NOT_FOUND.value())
+            .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+            .message("Resource not found")
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
   }
 
   @ExceptionHandler(Exception.class)

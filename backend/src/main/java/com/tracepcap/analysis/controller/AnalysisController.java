@@ -6,6 +6,8 @@ import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.service.AnalysisService;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.service.FileService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,8 +19,9 @@ import org.springframework.web.bind.annotation.*;
 /** REST controller for PCAP analysis operations */
 @Slf4j
 @RestController
-@RequestMapping("/api/analysis")
+@RequestMapping("/analysis")
 @RequiredArgsConstructor
+@Tag(name = "Analysis", description = "PCAP analysis summary and protocol statistics")
 public class AnalysisController {
 
   private final AnalysisService analysisService;
@@ -30,6 +33,7 @@ public class AnalysisController {
    * Error: Analysis failed - 404 Not Found: File or analysis not found
    */
   @GetMapping("/{fileId}/summary")
+  @Operation(summary = "Get analysis summary for a file (202 while still processing)")
   public ResponseEntity<AnalysisSummaryResponse> getAnalysisSummary(@PathVariable UUID fileId) {
     log.info("GET /api/analysis/{}/summary", fileId);
 
@@ -77,6 +81,7 @@ public class AnalysisController {
    * 404 Not Found: File or analysis not found
    */
   @GetMapping("/{fileId}/protocols")
+  @Operation(summary = "Get protocol statistics for a file (202 while still processing)")
   public ResponseEntity<ProtocolStatsResponse> getProtocolStats(@PathVariable UUID fileId) {
     log.info("GET /api/analysis/{}/protocols", fileId);
 

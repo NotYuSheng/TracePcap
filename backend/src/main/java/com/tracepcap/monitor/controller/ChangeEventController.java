@@ -4,6 +4,8 @@ import com.tracepcap.monitor.dto.ChangeEventDto;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,13 +16,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/monitor/networks/{networkId}/changes")
+@RequestMapping("/monitor/networks/{networkId}/changes")
 @RequiredArgsConstructor
+@Tag(name = "Monitor Change Events", description = "Detected drift events for a monitored network")
 public class ChangeEventController {
 
   private final NetworkChangeEventRepository changeEventRepository;
 
   @GetMapping
+  @Operation(summary = "List change events, optionally filtered by type and severity")
   public List<ChangeEventDto> listChanges(
       @PathVariable UUID networkId,
       @RequestParam Optional<String> changeType,
@@ -37,6 +41,7 @@ public class ChangeEventController {
   }
 
   @PatchMapping("/{eventId}")
+  @Operation(summary = "Update a change event's reviewed flag or notes")
   public ResponseEntity<ChangeEventDto> patchEvent(
       @PathVariable UUID networkId,
       @PathVariable UUID eventId,

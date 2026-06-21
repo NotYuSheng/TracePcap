@@ -10,6 +10,7 @@ import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.file.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
@@ -25,8 +26,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 @Slf4j
 @RestController
-@RequestMapping("/api/files/{fileId}/extractions")
+@RequestMapping("/files/{fileId}/extractions")
 @RequiredArgsConstructor
+@Tag(name = "Extracted Files", description = "Files carved from a capture, with preview and download")
 public class ExtractedFilesController {
 
   /** Upper bound on size-skipped files returned in the warnings response. */

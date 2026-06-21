@@ -107,7 +107,7 @@ logging:
 # OpenAPI/Swagger Configuration
 springdoc:
   api-docs:
-    path: /api-docs
+    # Use the default /v3/api-docs path so it matches the nginx proxy allowlist
     enabled: true
   swagger-ui:
     path: /swagger-ui.html

@@ -1,5 +1,7 @@
 package com.tracepcap.story.dto;
 
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -7,6 +9,10 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class GenerateStoryRequest {
+  /** The PCAP file to generate a story for. */
+  @NotNull(message = "fileId is required")
+  private UUID fileId;
+
   private String additionalContext;
   /** Pre-built prompt supplied by the user (used when retrying after a context-length error). */
   private String customPrompt;

@@ -275,14 +275,14 @@ export const conversationService = {
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
-    return `/api/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
+    return `/api/v1/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
   },
 
   /**
    * Build a URL to export a single conversation as a PCAP file.
    */
   getConversationPcapExportUrl: (conversationId: string): string => {
-    return `/api/conversations/detail/${conversationId}/export-pcap`;
+    return `/api/v1/conversations/detail/${conversationId}/export-pcap`;
   },
 
   /**
@@ -311,7 +311,7 @@ export const conversationService = {
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
-    return `/api/conversations/${fileId}/export-pcap${qs ? '?' + qs : ''}`;
+    return `/api/v1/conversations/${fileId}/export-pcap${qs ? '?' + qs : ''}`;
   },
 
   /**
@@ -376,7 +376,9 @@ export const conversationService = {
    * Reconstruct the full TCP/UDP session for a conversation and decode the application payload.
    */
   reconstructSession: async (conversationId: string): Promise<SessionData> => {
-    const response = await apiClient.get<SessionData>(`/conversations/${conversationId}/session`);
+    const response = await apiClient.get<SessionData>(
+      `/conversations/detail/${conversationId}/session`,
+    );
     return response.data;
   },
 

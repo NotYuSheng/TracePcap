@@ -4,6 +4,8 @@ import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
 import com.tracepcap.insights.service.InsufficientEvidenceException;
 import com.tracepcap.insights.service.NodeRoleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -11,13 +13,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/node-roles")
+@RequestMapping("/node-roles")
 @RequiredArgsConstructor
+@Tag(name = "Node Roles", description = "User-assigned roles for network entities (hosts/subnets)")
 public class NodeRoleController {
 
   private final NodeRoleService service;
 
   @GetMapping
+  @Operation(summary = "Get the role assigned to an entity")
   public ResponseEntity<NodeRoleDto> getRole(
       @RequestParam String entityType,
       @RequestParam String entityKey) {
@@ -27,6 +31,7 @@ public class NodeRoleController {
   }
 
   @PutMapping
+  @Operation(summary = "Create or update an entity's role")
   public ResponseEntity<NodeRoleDto> upsert(@RequestBody UpsertNodeRoleRequest req) {
     if (req.getEntityType() == null || req.getEntityType().isBlank()) {
       return ResponseEntity.badRequest().build();
@@ -38,6 +43,7 @@ public class NodeRoleController {
   }
 
   @DeleteMapping
+  @Operation(summary = "Remove an entity's role")
   public ResponseEntity<Void> delete(
       @RequestParam String entityType,
       @RequestParam String entityKey) {
@@ -46,6 +52,7 @@ public class NodeRoleController {
   }
 
   @PostMapping("/suggest")
+  @Operation(summary = "Suggest a role for an entity based on observed traffic")
   public ResponseEntity<?> suggest(
       @RequestParam String entityType,
       @RequestParam String entityKey,

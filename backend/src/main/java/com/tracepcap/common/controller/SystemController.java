@@ -1,5 +1,7 @@
 package com.tracepcap.common.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -10,7 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/system")
+@RequestMapping("/system")
+@Tag(name = "System", description = "Server time and runtime limits")
 public class SystemController {
 
   @Value("${MAX_UPLOAD_SIZE_BYTES:536870912}")
@@ -24,6 +27,7 @@ public class SystemController {
 
   /** Returns the server's current local datetime (ISO-8601, no timezone offset). */
   @GetMapping("/time")
+  @Operation(summary = "Get the server's current local datetime")
   public ResponseEntity<Map<String, String>> getServerTime() {
     return ResponseEntity.ok(
         Map.of("now", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))));
@@ -34,6 +38,7 @@ public class SystemController {
    * values. Consumed by the upload page and the analysis polling hook.
    */
   @GetMapping("/limits")
+  @Operation(summary = "Get runtime limits (upload size, analysis and LLM timeouts)")
   public ResponseEntity<Map<String, Object>> getLimits() {
     return ResponseEntity.ok(
         Map.of(

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 /** REST controller for filter generation and execution */
 @Slf4j
 @RestController
-@RequestMapping("/api/filter")
+@RequestMapping("/filter")
 @RequiredArgsConstructor
 @Tag(
     name = "Filter Generator",
@@ -23,7 +23,7 @@ public class FilterController {
 
   private final FilterService filterService;
 
-  @PostMapping("/generate/{fileId}")
+  @PostMapping("/{fileId}/generate")
   @Operation(
       summary = "Generate filter from natural language",
       description = "Uses AI to convert a natural language query into a BPF filter expression")
@@ -39,7 +39,7 @@ public class FilterController {
     return ResponseEntity.ok(response);
   }
 
-  @PostMapping("/execute/{fileId}")
+  @PostMapping("/{fileId}/execute")
   @Operation(
       summary = "Execute filter on PCAP file with pagination",
       description =

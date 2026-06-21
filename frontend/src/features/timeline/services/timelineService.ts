@@ -48,7 +48,7 @@ export const timelineService = {
     const startISO = new Date(start).toISOString();
     const endISO = new Date(end).toISOString();
 
-    const response = await apiClient.get<TimelineApiResponse[]>(`/api/timeline/${fileId}/range`, {
+    const response = await apiClient.get<TimelineApiResponse[]>(`/api/v1/timeline/${fileId}/range`, {
       params: { start: startISO, end: endISO, maxDataPoints },
     });
     return response.data.map(transformTimelineData);
