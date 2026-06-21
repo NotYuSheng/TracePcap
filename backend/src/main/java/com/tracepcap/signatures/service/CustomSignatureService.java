@@ -1,5 +1,7 @@
-package com.tracepcap.analysis.service;
+package com.tracepcap.signatures.service;
 
+import com.tracepcap.analysis.service.PcapParserService;
+import com.tracepcap.analysis.spi.SignatureApplier;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -47,18 +49,35 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  */
 @Slf4j
 @Service
-public class CustomSignatureService {
+public class CustomSignatureService implements SignatureApplier {
 
   @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
 
   /**
-   * Evaluates all loaded rules against each conversation and appends matched rule names to the
-   * conversation's {@code flowRisks} list in-place.
+   * Evaluates all loaded rules against each conversation in a single pass: appends matched rule
+   * names to the conversation's {@code customSignatures} list in-place, and returns the device-type
+   * overrides derived from those matches.
+   *
+   * <p>The rules file is loaded once here and reused for both outputs, so callers no longer need a
+   * separate {@code getDeviceTypeOverrides} call (which re-read and re-parsed the file).
+   *
+   * <p>Device-type override example YAML:
+   *
+   * <pre>
+   * - name: my_cctv
+   *   device_type: "CCTV Camera"
+   *   match:
+   *     ip: "192.168.1.50"
+   * </pre>
+   *
+   * @return map of IP address → custom device type for IPs matched by a rule carrying a {@code
+   *     device_type}; empty if there are none
    */
-  public void applySignatures(List<PcapParserService.ConversationInfo> conversations) {
+  @Override
+  public Map<String, String> applySignatures(List<PcapParserService.ConversationInfo> conversations) {
     List<Map<String, Object>> rules = loadRules();
-    if (rules.isEmpty() || conversations.isEmpty()) return;
+    if (rules.isEmpty() || conversations.isEmpty()) return Map.of();
 
     int matchCount = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
@@ -98,27 +117,17 @@ public class CustomSignatureService {
           matchCount,
           conversations.size());
     }
+
+    return computeDeviceTypeOverrides(rules, conversations);
   }
 
   /**
-   * Returns a map of IP address → custom device type for any IPs that were involved in
-   * conversations matched by a rule containing a {@code device_type} field. Call this after {@link
-   * #applySignatures} so the conversations already carry their matched rule names.
-   *
-   * <p>Example YAML:
-   *
-   * <pre>
-   * - name: my_cctv
-   *   device_type: "CCTV Camera"
-   *   match:
-   *     ip: "192.168.1.50"
-   * </pre>
+   * Derives IP → custom device-type overrides from the already-loaded {@code rules} and the matches
+   * applied by {@link #applySignatures}. Only IPs from conversations matched by a rule carrying a
+   * {@code device_type} are included.
    */
-  public Map<String, String> getDeviceTypeOverrides(
-      List<PcapParserService.ConversationInfo> conversations) {
-    List<Map<String, Object>> rules = loadRules();
-    if (rules.isEmpty()) return Map.of();
-
+  private Map<String, String> computeDeviceTypeOverrides(
+      List<Map<String, Object>> rules, List<PcapParserService.ConversationInfo> conversations) {
     // Build rule-name → device_type map in one pass over rules
     Map<String, String> ruleDeviceType = new HashMap<>();
     for (Map<String, Object> rule : rules) {
