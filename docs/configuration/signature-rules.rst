@@ -21,7 +21,10 @@ Each rule is a YAML mapping under the top-level ``signatures`` list:
        payload_contains:          # optional: payload byte patterns
          - ascii: <string>
          - hex: <hex-string>
-       match_all: <bool>          # optional: if true, all payload_contains entries must match
+       payload_regex:             # optional: payload regex patterns
+         - pattern: <regex>
+           case_insensitive: <bool>   # optional, default false
+       match_all: <bool>          # optional: AND all payload_contains / payload_regex entries
        device_type: <string>      # optional: pin device type for matched IPs
 
 Execution Semantics
@@ -33,11 +36,18 @@ A rule fires for a given conversation when **all** of the following hold:
 2. If ``payload_contains`` is present:
 
    - Default (``match_all`` absent or ``false``): **at least one** pattern
-     matches the payload.
-   - With ``match_all: true``: **all** patterns match the payload.
+     matches the payload of any packet in the conversation.
+   - With ``match_all: true``: **all** patterns match (each may match a
+     different packet).
 
-If both ``match`` and ``payload_contains`` are specified, both conditions
-must be satisfied (AND).
+3. If ``payload_regex`` is present:
+
+   - Default: **at least one** pattern matches the decoded payload of any packet.
+   - With ``match_all: true``: **all** patterns match.
+
+If ``payload_contains`` and ``payload_regex`` are both specified, both must
+pass (AND). All three conditions — ``match``, ``payload_contains``, and
+``payload_regex`` — are ANDed together.
 
 Field Reference
 ---------------
@@ -155,12 +165,45 @@ Patterns are searched across the **raw payload bytes of each individual
 packet** in the conversation (stored as hex strings). A match on any single
 packet in the conversation is sufficient.
 
+``payload_regex``
+~~~~~~~~~~~~~~~~~
+
+List of regular expression objects. Each entry requires:
+
+- ``pattern: "<regex>"`` — a standard Java regular expression applied against
+  the **ASCII/UTF-8 decoded payload** of each packet.
+
+Optional per entry:
+
+- ``case_insensitive: true`` — enables case-insensitive (and Unicode-aware)
+  matching. Default ``false``.
+
+.. code-block:: yaml
+
+   payload_regex:
+     - pattern: "Authorization:\\s*Basic\\s+[A-Za-z0-9+/=]+"
+       case_insensitive: true
+     - pattern: "eyJ[A-Za-z0-9_\\-]+\\.eyJ[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+"
+
+A match on any single packet in the conversation is sufficient (OR across
+packets). Use ``match_all: true`` to require all entries to match.
+
+.. note::
+
+   Payloads are capped at 64 KB per packet before regex evaluation to prevent
+   catastrophic backtracking. Regex syntax errors are caught by the browser
+   editor on save — an inline error identifies the rule name and pattern index.
+
+``payload_regex`` can be combined with ``payload_contains`` and/or ``match``
+in the same rule; all specified conditions must be satisfied.
+
 ``match_all``
 ~~~~~~~~~~~~~
 
-Boolean. Default ``false``. When ``true``, all ``payload_contains`` entries
-must match (AND semantics). When ``false`` or absent, any single entry
-matching is sufficient (OR semantics).
+Boolean. Default ``false``. When ``true``, **all** ``payload_contains`` entries
+and **all** ``payload_regex`` entries must each find a match somewhere in the
+conversation's packets (AND semantics). When ``false`` or absent, any single
+entry matching is sufficient (OR semantics).
 
 ``device_type``
 ~~~~~~~~~~~~~~~
@@ -190,7 +233,13 @@ container. The file is read fresh on every analysis run.
 Validating Rules
 ----------------
 
-The browser editor validates YAML syntax on save and highlights errors inline.
+The browser editor performs two levels of validation on save:
+
+1. **YAML syntax** — the file must be valid YAML.
+2. **Regex syntax** — every ``payload_regex`` pattern is compiled and any
+   invalid pattern returns an inline error identifying the rule name and
+   pattern index (e.g. ``Rule "my_rule": invalid regex at payload_regex[0]: …``).
+
 Semantic errors (e.g. invalid severity, malformed CIDR) are reported in the
 backend logs:
 

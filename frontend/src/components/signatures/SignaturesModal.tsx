@@ -139,6 +139,9 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
               Edit <code>signatures.yml</code> to define custom detection rules. Matched rules appear as
               risk flags alongside nDPI's built-in detections. Changes take effect on the next file
               analysis — no restart required.
+              Use <code>payload_contains</code> for exact byte/ASCII matches, or{' '}
+              <code>payload_regex</code> for regular expression patterns (supports{' '}
+              <code>case_insensitive: true</code> per entry). Regex syntax errors are caught on save.
             </p>
 
             {loading ? (

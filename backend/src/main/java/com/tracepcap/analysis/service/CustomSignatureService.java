@@ -5,10 +5,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -43,11 +47,20 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * <ul>
  *   <li>{@code payload_contains} — list of {@code {ascii: "..."}} or {@code {hex: "..."}} entries;
  *       OR-matched by default, AND-matched when {@code match_all: true} is set on the rule.
+ *   <li>{@code payload_regex} — list of {@code {pattern: "..."}} entries (standard Java regex
+ *       applied against the ASCII/UTF-8 decoded payload); supports optional {@code
+ *       case_insensitive: true} per entry. Uses the same {@code match_all} flag as {@code
+ *       payload_contains}. Payloads are capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes per
+ *       packet to prevent catastrophic backtracking.
  * </ul>
  */
 @Slf4j
 @Service
 public class CustomSignatureService {
+
+  static final int MAX_REGEX_PAYLOAD_BYTES = 65536;
+
+  private final Map<String, Pattern> patternCache = new ConcurrentHashMap<>();
 
   @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
@@ -73,17 +86,28 @@ public class CustomSignatureService {
         List<Map<String, Object>> payloadContains =
             (List<Map<String, Object>>) rule.get("payload_contains");
 
+        Object payloadRegexObj = rule.get("payload_regex");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> payloadRegex =
+            payloadRegexObj instanceof List ? (List<Map<String, Object>>) payloadRegexObj : null;
+
         // A rule must specify at least one criterion
         boolean hasMatch = match != null && !match.isEmpty();
         boolean hasPayload = payloadContains != null && !payloadContains.isEmpty();
-        if (!hasMatch && !hasPayload) continue;
+        boolean hasRegex = payloadRegex != null && !payloadRegex.isEmpty();
+        if (!hasMatch && !hasPayload && !hasRegex) continue;
 
-        // All specified criteria must pass (AND between match block and payload_contains)
+        // All specified criteria must pass (AND between match block, payload_contains, payload_regex)
         if (hasMatch && !matches(conv, match)) continue;
 
+        boolean matchAll = Boolean.TRUE.equals(rule.get("match_all"));
+
         if (hasPayload) {
-          boolean matchAll = Boolean.TRUE.equals(rule.get("match_all"));
           if (!payloadContainsMatch(conv.getPackets(), payloadContains, matchAll)) continue;
+        }
+
+        if (hasRegex) {
+          if (!payloadRegexMatch(conv.getPackets(), payloadRegex, matchAll)) continue;
         }
 
         if (!conv.getCustomSignatures().contains(name)) {
@@ -349,5 +373,81 @@ public class CustomSignatureService {
     String s = hex.toLowerCase();
     if (s.startsWith("0x")) s = s.substring(2);
     return s.replaceAll("[\\s:\\-]", "");
+  }
+
+  /**
+   * Returns true if at least one (OR) or all (AND when {@code matchAll=true}) of the given regex
+   * patterns match any packet payload in the conversation.
+   *
+   * <p>Each entry is a map with a required {@code pattern} key (standard Java regex) and an
+   * optional {@code case_insensitive: true} flag. Payloads are decoded from hex to ASCII/UTF-8 and
+   * capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes per packet to prevent backtracking issues.
+   */
+  private boolean payloadRegexMatch(
+      List<PcapParserService.PacketInfo> packets,
+      List<Map<String, Object>> patterns,
+      boolean matchAll) {
+    // Lazily decoded payloads — populated on first access for each packet index
+    String[] decoded = new String[packets.size()];
+    for (Map<String, Object> entry : patterns) {
+      Object patternObj = entry.get("pattern");
+      if (patternObj == null) {
+        if (matchAll) return false;
+        continue;
+      }
+      String patternStr = patternObj.toString();
+      if (patternStr.isBlank()) {
+        if (matchAll) return false;
+        continue;
+      }
+
+      final int flags = Boolean.TRUE.equals(entry.get("case_insensitive"))
+          ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+          : 0;
+
+      final String cacheKey = patternStr + "::" + flags;
+      Pattern compiled = patternCache.computeIfAbsent(cacheKey, k -> {
+        try {
+          return Pattern.compile(patternStr, flags);
+        } catch (PatternSyntaxException e) {
+          log.warn("Invalid regex pattern '{}': {}", patternStr, e.getMessage());
+          return null;
+        }
+      });
+
+      if (compiled == null) {
+        if (matchAll) return false;
+        continue;
+      }
+
+      boolean found = false;
+      for (int i = 0; i < packets.size(); i++) {
+        String payloadHex = packets.get(i).getPayload();
+        if (payloadHex == null || payloadHex.isEmpty()) continue;
+        if (decoded[i] == null) decoded[i] = hexToAscii(payloadHex);
+        if (compiled.matcher(decoded[i]).find()) {
+          found = true;
+          break;
+        }
+      }
+
+      if (matchAll && !found) return false;
+      if (!matchAll && found) return true;
+    }
+    return matchAll;
+  }
+
+  /** Decodes a hex-encoded payload to a UTF-8 string, capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes. */
+  private String hexToAscii(String hex) {
+    if (hex == null) return "";
+    int hexLen = Math.min(hex.length() & ~1, MAX_REGEX_PAYLOAD_BYTES * 2);
+    byte[] bytes = new byte[hexLen / 2];
+    int out = 0;
+    for (int i = 0; i < hexLen; i += 2) {
+      int h1 = Character.digit(hex.charAt(i), 16);
+      int h2 = Character.digit(hex.charAt(i + 1), 16);
+      bytes[out++] = (h1 == -1 || h2 == -1) ? (byte) '?' : (byte) ((h1 << 4) | h2);
+    }
+    return new String(bytes, 0, out, StandardCharsets.UTF_8);
   }
 }

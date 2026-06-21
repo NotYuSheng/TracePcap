@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -77,11 +79,46 @@ public class SignaturesController {
     String content = body.getOrDefault("content", "");
 
     // Validate it's parseable YAML before writing
+    Map<String, Object> parsed;
     try {
       Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
-      yaml.load(content);
+      parsed = yaml.load(content);
     } catch (Exception e) {
       return ResponseEntity.badRequest().body(Map.of("error", "Invalid YAML: " + e.getMessage()));
+    }
+
+    // Validate any payload_regex patterns compile correctly
+    if (parsed != null) {
+      Object signaturesObj = parsed.get("signatures");
+      if (signaturesObj instanceof List) {
+        for (Object ruleObj : (List<?>) signaturesObj) {
+          if (!(ruleObj instanceof Map)) continue;
+          @SuppressWarnings("unchecked")
+          Map<String, Object> rule = (Map<String, Object>) ruleObj;
+          String ruleName = rule.get("name") != null ? rule.get("name").toString() : "(unnamed)";
+
+          Object regexEntriesObj = rule.get("payload_regex");
+          if (!(regexEntriesObj instanceof List)) continue;
+          List<?> regexEntries = (List<?>) regexEntriesObj;
+
+          for (int i = 0; i < regexEntries.size(); i++) {
+            Object entryObj = regexEntries.get(i);
+            if (!(entryObj instanceof Map)) continue;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> entry = (Map<String, Object>) entryObj;
+            Object patternObj = entry.get("pattern");
+            if (patternObj == null) continue;
+            try {
+              Pattern.compile(patternObj.toString());
+            } catch (PatternSyntaxException e) {
+              return ResponseEntity.badRequest().body(Map.of(
+                  "error",
+                  "Rule \"" + ruleName + "\": invalid regex at payload_regex[" + i + "]: "
+                      + e.getDescription()));
+            }
+          }
+        }
+      }
     }
 
     try {
