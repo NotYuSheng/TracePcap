@@ -53,8 +53,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class WebServerLogExtractor implements HostServiceLogExtractor {
 
-  public static final String ROLE_WEB = ServiceLogRoles.WEB;
-  public static final String ROLE_API = ServiceLogRoles.API;
+  private static final String ROLE_WEB = ServiceLogRoles.WEB;
+  private static final String ROLE_API = ServiceLogRoles.API;
 
   private static final int PATH_MAX_LENGTH = 2048;
 

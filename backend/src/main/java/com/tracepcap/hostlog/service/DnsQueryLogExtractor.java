@@ -45,7 +45,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DnsQueryLogExtractor implements HostServiceLogExtractor {
 
-  public static final String ROLE = ServiceLogRoles.DNS;
+  private static final String ROLE = ServiceLogRoles.DNS;
 
   private static final int QUERY_NAME_MAX_LENGTH = 255;
 

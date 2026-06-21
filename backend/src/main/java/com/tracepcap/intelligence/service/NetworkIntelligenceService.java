@@ -523,7 +523,7 @@ public class NetworkIntelligenceService {
               return ServiceServerSummaryDto.builder()
                   .serverIp(host.getIp())
                   .hostname(host.getHostname())
-                  .role(hasRole(host, ServiceLogRoles.API) ? "api" : "web")
+                  .role(hasRole(host, ServiceLogRoles.API) ? ServiceLogRoles.API : ServiceLogRoles.WEB)
                   .totalRequests(c.total())
                   .okCount(c.success)
                   .failedCount(c.clientError + c.serverError)
