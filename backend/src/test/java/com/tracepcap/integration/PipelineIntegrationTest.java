@@ -48,7 +48,7 @@ class PipelineIntegrationTest {
 
   @Container
   static final GenericContainer<?> MINIO =
-      new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
+      new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2024-01-28T22-35-53Z"))
           .withEnv("MINIO_ROOT_USER", "minioadmin")
           .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
           .withCommand("server", "/data")

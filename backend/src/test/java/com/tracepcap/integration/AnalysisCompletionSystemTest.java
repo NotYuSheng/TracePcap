@@ -16,6 +16,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResponseErrorHandler;
@@ -50,6 +51,7 @@ class AnalysisCompletionSystemTest {
     await()
         .atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(3))
+        .ignoreExceptions() // tolerate transient connect glitches while the stack settles
         .untilAsserted(
             () -> {
               JsonNode file = getJson("/api/v1/files/" + fileId);
@@ -111,7 +113,11 @@ class AnalysisCompletionSystemTest {
   }
 
   private static RestTemplate inspectableRestTemplate() {
-    RestTemplate rt = new RestTemplate();
+    // Bound connect/read so a hung or unreachable server fails fast instead of blocking CI.
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(10_000);
+    factory.setReadTimeout(30_000);
+    RestTemplate rt = new RestTemplate(factory);
     rt.setErrorHandler(
         new ResponseErrorHandler() {
           @Override
