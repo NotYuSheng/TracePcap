@@ -146,34 +146,9 @@ class PipelineIntegrationTest {
   }
 
   @Test
-  void uploadPcap_persistsFileAndIsRetrievable() throws Exception {
-    byte[] pcap;
-    try (InputStream in = getClass().getResourceAsStream("/fixtures/ftp.pcap")) {
-      assertThat(in).as("fixture /fixtures/ftp.pcap on the test classpath").isNotNull();
-      pcap = in.readAllBytes();
-    }
-
-    MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
-    form.add(
-        "file",
-        new ByteArrayResource(pcap) {
-          @Override
-          public String getFilename() {
-            return "ftp.pcap";
-          }
-        });
-    form.add("enableNdpi", "false");
-    form.add("enableSuricata", "false");
-    form.add("enableFileExtraction", "false");
-    form.add("source", "ANALYSIS");
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-    ResponseEntity<JsonNode> upload =
-        rest.postForEntity("/api/v1/files", new HttpEntity<>(form, headers), JsonNode.class);
-
-    // 201 on a fresh container; 409 if a prior run already stored this pcap (dedup by hash).
+  void uploadPcap_persistsFileAndIsRetrievable() {
+    // 201 on a fresh container; 409 if another test in this class already stored this pcap.
+    ResponseEntity<JsonNode> upload = uploadFixture("ftp.pcap");
     assertThat(upload.getStatusCode()).isIn(HttpStatus.CREATED, HttpStatus.CONFLICT);
     JsonNode uploadBody = upload.getBody();
     assertThat(uploadBody).isNotNull();
@@ -186,6 +161,71 @@ class PipelineIntegrationTest {
     ResponseEntity<JsonNode> meta = rest.getForEntity("/api/v1/files/" + fileId, JsonNode.class);
     assertThat(meta.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(meta.getBody().get("fileName").asText()).contains("ftp");
+  }
+
+  @Test
+  void uploadSamePcapTwice_returns409Conflict() {
+    ResponseEntity<JsonNode> first = uploadFixture("ftp.pcap");
+    // Either freshly created here, or already present from another test in this class.
+    assertThat(first.getStatusCode()).isIn(HttpStatus.CREATED, HttpStatus.CONFLICT);
+
+    ResponseEntity<JsonNode> second = uploadFixture("ftp.pcap");
+    assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(second.getBody()).isNotNull();
+    assertThat(second.getBody().get("status").asInt()).isEqualTo(409);
+    assertThat(second.getBody().hasNonNull("existingFileId")).isTrue();
+  }
+
+  @Test
+  void uploadNonPcapFilename_returns422() {
+    ResponseEntity<JsonNode> res = uploadBytes("notes.txt", "not a pcap".getBytes());
+
+    assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    assertThat(res.getBody()).isNotNull();
+    assertThat(res.getBody().get("status").asInt()).isEqualTo(422);
+    assertThat(res.getBody().get("error").asText()).isEqualTo("Unprocessable Entity");
+  }
+
+  @Test
+  void constraintViolationOnQueryParam_returns400() {
+    // TimelineController is @Validated with @Min(1) on `interval`; interval=0 is rejected by the
+    // ConstraintViolationException handler before the service (and DB) are touched.
+    ResponseEntity<JsonNode> res =
+        rest.getForEntity("/api/v1/timeline/" + UUID.randomUUID() + "?interval=0", JsonNode.class);
+
+    assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(res.getBody()).isNotNull();
+    assertThat(res.getBody().get("status").asInt()).isEqualTo(400);
+    assertThat(res.getBody().path("validationErrors").has("interval")).isTrue();
+  }
+
+  private ResponseEntity<JsonNode> uploadFixture(String resourceName) {
+    try (InputStream in = getClass().getResourceAsStream("/fixtures/" + resourceName)) {
+      assertThat(in).as("fixture /fixtures/" + resourceName).isNotNull();
+      return uploadBytes(resourceName, in.readAllBytes());
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private ResponseEntity<JsonNode> uploadBytes(String filename, byte[] bytes) {
+    MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+    form.add(
+        "file",
+        new ByteArrayResource(bytes) {
+          @Override
+          public String getFilename() {
+            return filename;
+          }
+        });
+    form.add("enableNdpi", "false");
+    form.add("enableSuricata", "false");
+    form.add("enableFileExtraction", "false");
+    form.add("source", "ANALYSIS");
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+    return rest.postForEntity("/api/v1/files", new HttpEntity<>(form, headers), JsonNode.class);
   }
 
   private static HttpEntity<String> json(String body) {
