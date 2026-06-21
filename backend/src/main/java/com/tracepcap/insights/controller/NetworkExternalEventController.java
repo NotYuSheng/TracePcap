@@ -39,7 +39,7 @@ public class NetworkExternalEventController {
 
   @PutMapping("/{eventId}")
   @Operation(summary = "Update an external event")
-  public ResponseEntity<NetworkExternalEventDto> update(
+  public ResponseEntity<NetworkExternalEventDto> updateExternalEvent(
       @PathVariable UUID networkId,
       @PathVariable UUID eventId,
       @Valid @RequestBody CreateExternalEventRequest req) {
