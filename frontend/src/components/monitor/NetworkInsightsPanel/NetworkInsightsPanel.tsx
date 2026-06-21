@@ -266,7 +266,7 @@ export const NetworkInsightsPanel = ({
 
           {/* Footer */}
           <div className="text-muted border-top pt-2 mt-2 d-flex flex-wrap gap-2 align-items-center" style={{ fontSize: '0.7rem' }}>
-            <span>Generated {new Date(insight.generatedAt).toLocaleString()}</span>
+            <span>Generated {new Date(insight.generatedAt).toLocaleString('en-GB')}</span>
             {insight.modelUsed && <span>· {insight.modelUsed}</span>}
             {insight.audience && (
               <span className="badge bg-light text-muted border" style={{ fontSize: '0.65rem', fontWeight: 400 }}>

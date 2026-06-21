@@ -58,7 +58,7 @@ interface DeviceSnapshotEntry {
 function formatSnapTime(snap: NetworkSnapshot): string {
   if (!snap.startTime) return snap.fileName;
   const ms = parseDateTime(snap.startTime as unknown as string | number[]);
-  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(ms).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
@@ -298,7 +298,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
               />
               {savedNote && (
                 <p className="text-muted" style={{ fontSize: '0.7rem' }}>
-                  Last updated: {new Date(savedNote.updatedAt).toLocaleString()}
+                  Last updated: {new Date(savedNote.updatedAt).toLocaleString('en-GB')}
                 </p>
               )}
               <div className="d-flex gap-2">

@@ -509,7 +509,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                             </td>
                             <td className="small">
                               {entry.startTime
-                                ? new Date(entry.startTime).toLocaleString()
+                                ? new Date(entry.startTime).toLocaleString('en-GB')
                                 : '—'}
                             </td>
                             <td className="text-end small">
@@ -555,7 +555,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                 />
                 {savedNote && (
                   <p className="text-muted" style={{ fontSize: '0.7rem' }}>
-                    Last updated: {new Date(savedNote.updatedAt).toLocaleString()}
+                    Last updated: {new Date(savedNote.updatedAt).toLocaleString('en-GB')}
                   </p>
                 )}
                 <div className="d-flex gap-2">

@@ -137,7 +137,7 @@ export const FileList = () => {
     if (diffMins < 60) return `${diffMins} min ago`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hours ago`;
 
-    return date.toLocaleDateString();
+    return date.toLocaleDateString('en-GB');
   };
 
   const handleConfirmDelete = async () => {

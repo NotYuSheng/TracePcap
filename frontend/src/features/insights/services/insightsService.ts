@@ -81,6 +81,21 @@ export const insightsService = {
       })
       .then(r => r.data),
 
+  updateExternalEvent: (
+    networkId: string,
+    eventId: string,
+    eventTime: string,
+    title: string,
+    description?: string,
+  ): Promise<NetworkExternalEvent> =>
+    apiClient
+      .put<NetworkExternalEvent>(MONITOR_ENDPOINTS.EXTERNAL_EVENT(networkId, eventId), {
+        eventTime,
+        title,
+        description,
+      })
+      .then(r => r.data),
+
   deleteExternalEvent: (networkId: string, eventId: string): Promise<void> =>
     apiClient
       .delete(MONITOR_ENDPOINTS.EXTERNAL_EVENT(networkId, eventId))

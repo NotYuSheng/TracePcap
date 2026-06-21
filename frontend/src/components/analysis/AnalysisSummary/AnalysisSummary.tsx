@@ -127,7 +127,7 @@ export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummar
           </div>
           <div className="card-content">
             <div className="card-label">Uploaded</div>
-            <div className="card-value">{new Date(summary.uploadTime).toLocaleDateString()}</div>
+            <div className="card-value">{new Date(summary.uploadTime).toLocaleDateString('en-GB')}</div>
           </div>
         </div>
       </div>

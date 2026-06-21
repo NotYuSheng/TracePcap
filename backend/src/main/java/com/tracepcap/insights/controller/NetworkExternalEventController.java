@@ -42,6 +42,21 @@ public class NetworkExternalEventController {
     return ResponseEntity.status(HttpStatus.CREATED).body(service.createEvent(networkId, req));
   }
 
+  @PutMapping("/{eventId}")
+  @Operation(summary = "Update an external event")
+  public ResponseEntity<NetworkExternalEventDto> update(
+      @PathVariable UUID networkId,
+      @PathVariable UUID eventId,
+      @RequestBody CreateExternalEventRequest req) {
+    if (req.getTitle() == null || req.getTitle().isBlank()) {
+      return ResponseEntity.badRequest().build();
+    }
+    if (req.getEventTime() == null) {
+      return ResponseEntity.badRequest().build();
+    }
+    return ResponseEntity.ok(service.updateEvent(networkId, eventId, req));
+  }
+
   @DeleteMapping("/{eventId}")
   @Operation(summary = "Delete an external event")
   public ResponseEntity<Void> delete(

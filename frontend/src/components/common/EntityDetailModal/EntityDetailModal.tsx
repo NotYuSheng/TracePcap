@@ -346,7 +346,7 @@ export function EntityDetailModal({
   function formatSnapTime(snap: NetworkSnapshot): string {
     if (!snap.startTime) return snap.fileName;
     const ms = parseDateTime(snap.startTime as unknown as string | number[]);
-    return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(ms).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   function stringHue(s: string): number {
@@ -510,8 +510,8 @@ export function EntityDetailModal({
                             </span>
                           )}
                           {role.confirmedByHuman && (
-                            <span className="badge bg-success ms-2" style={{ fontSize: '0.65rem' }}>
-                              <i className="bi bi-check-circle me-1" />Confirmed
+                            <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }} title="Manually labelled by an analyst. Future deviating behaviour can still be flagged.">
+                              <i className="bi bi-tag me-1" />Manual label
                             </span>
                           )}
                         </div>
@@ -834,7 +834,7 @@ export function EntityDetailModal({
                               >
                                 <td className="small">{entry.fileName}</td>
                                 <td className="small text-muted">
-                                  {entry.startTime ? new Date(entry.startTime).toLocaleString() : '—'}
+                                  {entry.startTime ? new Date(entry.startTime).toLocaleString('en-GB') : '—'}
                                 </td>
                                 <td className="text-end small text-muted">
                                   {entry.packetCount != null ? formatNumber(entry.packetCount) : '—'}
@@ -869,7 +869,7 @@ export function EntityDetailModal({
                 />
                 {savedNote && (
                   <p className="text-muted" style={{ fontSize: '0.7rem' }}>
-                    Last updated: {new Date(savedNote.updatedAt).toLocaleString()}
+                    Last updated: {new Date(savedNote.updatedAt).toLocaleString('en-GB')}
                   </p>
                 )}
                 <div className="d-flex gap-2">

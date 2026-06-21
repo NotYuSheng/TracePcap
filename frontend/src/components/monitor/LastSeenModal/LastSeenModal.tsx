@@ -21,7 +21,7 @@ export const LastSeenModal = ({ show, onHide, entity }: LastSeenModalProps) => {
     : 'protocol';
 
   const formattedDate = entity.lastSeenStartTime
-    ? new Date(parseDateTime(entity.lastSeenStartTime as unknown as string | number[])).toLocaleString()
+    ? new Date(parseDateTime(entity.lastSeenStartTime as unknown as string | number[])).toLocaleString('en-GB')
     : 'Unknown';
 
   return (

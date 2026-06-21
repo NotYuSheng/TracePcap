@@ -399,9 +399,15 @@ use the **Role** section at the top of the Details tab:
 - **Suggest with AI** — the LLM analyses the device's traffic signals
   (manufacturer, device type, observed applications, protocols) and suggests a
   label. The suggestion is shown with an "AI suggested" badge.
-- **Accept** — confirms the AI suggestion; the label is saved as
-  human-confirmed.
+- **Accept** — keeps the AI suggestion; the label is saved as a
+  **Manual label** (an analyst-assigned label).
 - **Discard** — removes the unconfirmed suggestion.
+
+A label saved by an analyst (typed directly or by accepting a suggestion) carries
+a **Manual label** badge. This records *what the host is* — its identity. It is
+not a guarantee about future behaviour: the Monitor continues to detect and flag
+deviating activity from a labelled host. Keep time-bounded behavioural
+observations in **Entity Notes** rather than in the label itself.
 
 Role labels are global (not per-network) — assigning a role to an IP or device
 once makes it available wherever that entity appears, including in AI-generated

@@ -93,7 +93,7 @@ function buildHighlightMap(events: ChangeEvent[], toSnapshotId: string): Map<str
 function formatSnapLabel(snap: NetworkSnapshot): string {
   if (snap.startTime) {
     const ms = parseDateTime(snap.startTime as unknown as string | number[]);
-    return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(ms).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
   }
   return snap.fileName;
 }

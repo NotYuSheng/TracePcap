@@ -41,6 +41,20 @@ public class NetworkExternalEventService {
   }
 
   @Transactional
+  public NetworkExternalEventDto updateEvent(
+      UUID networkId, UUID eventId, CreateExternalEventRequest req) {
+    NetworkExternalEventEntity event = eventRepository.findById(eventId)
+        .orElseThrow(() -> new ResourceNotFoundException("Event not found: " + eventId));
+    if (!event.getNetwork().getId().equals(networkId)) {
+      throw new ResourceNotFoundException("Event not found in network: " + eventId);
+    }
+    event.setEventTime(req.getEventTime());
+    event.setTitle(req.getTitle());
+    event.setDescription(req.getDescription());
+    return toDto(eventRepository.save(event));
+  }
+
+  @Transactional
   public void deleteEvent(UUID networkId, UUID eventId) {
     NetworkExternalEventEntity event = eventRepository.findById(eventId)
         .orElseThrow(() -> new ResourceNotFoundException("Event not found: " + eventId));
