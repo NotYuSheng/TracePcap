@@ -1,7 +1,10 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.hostlog.service;
 
-import com.tracepcap.analysis.entity.HttpEndpointLogEntity;
-import com.tracepcap.analysis.repository.HttpEndpointLogRepository;
+import com.tracepcap.analysis.spi.HostServiceLogExtractor;
+import com.tracepcap.analysis.spi.HostServiceLogResult;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
+import com.tracepcap.hostlog.entity.HttpEndpointLogEntity;
+import com.tracepcap.hostlog.repository.HttpEndpointLogRepository;
 import com.tracepcap.file.entity.FileEntity;
 import java.io.BufferedReader;
 import java.io.File;
@@ -26,7 +29,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Detects web/API-server hosts and logs the cleartext HTTP endpoints they served (#362 follow-up) —
- * the web/API counterpart of {@link DnsQueryLogExtractor}.
+ * the web/API counterpart of {@code DnsQueryLogExtractor}.
  *
  * <p>Two read-only tshark passes:
  *
@@ -50,8 +53,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class WebServerLogExtractor implements HostServiceLogExtractor {
 
-  public static final String ROLE_WEB = "web";
-  public static final String ROLE_API = "api";
+  private static final String ROLE_WEB = ServiceLogRoles.WEB;
+  private static final String ROLE_API = ServiceLogRoles.API;
 
   private static final int PATH_MAX_LENGTH = 2048;
 

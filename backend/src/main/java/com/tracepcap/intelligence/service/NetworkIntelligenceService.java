@@ -2,17 +2,17 @@ package com.tracepcap.intelligence.service;
 
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.DnsQueryLogEntity;
+import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.entity.HttpEndpointLogEntity;
+import com.tracepcap.hostlog.entity.HttpEndpointLogEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.DnsQueryLogRepository;
+import com.tracepcap.hostlog.repository.DnsQueryLogRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.HttpEndpointLogRepository;
+import com.tracepcap.hostlog.repository.HttpEndpointLogRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
-import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
 import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.intelligence.dto.*;
 import com.tracepcap.intelligence.entity.IpOrgRuleEntity;
@@ -507,8 +507,8 @@ public class NetworkIntelligenceService {
   public List<ServiceServerSummaryDto> computeWebServers(UUID fileId) {
     List<HostClassificationEntity> webHosts =
         hostClassificationRepository.findByFileId(fileId).stream()
-            .filter(h -> hasRole(h, WebServerLogExtractor.ROLE_API)
-                || hasRole(h, WebServerLogExtractor.ROLE_WEB))
+            .filter(h -> hasRole(h, ServiceLogRoles.API)
+                || hasRole(h, ServiceLogRoles.WEB))
             .toList();
     if (webHosts.isEmpty()) return List.of();
 
@@ -523,7 +523,7 @@ public class NetworkIntelligenceService {
               return ServiceServerSummaryDto.builder()
                   .serverIp(host.getIp())
                   .hostname(host.getHostname())
-                  .role(hasRole(host, WebServerLogExtractor.ROLE_API) ? "api" : "web")
+                  .role(hasRole(host, ServiceLogRoles.API) ? ServiceLogRoles.API : ServiceLogRoles.WEB)
                   .totalRequests(c.total())
                   .okCount(c.success)
                   .failedCount(c.clientError + c.serverError)
@@ -578,7 +578,7 @@ public class NetworkIntelligenceService {
     return WebServerDetailResponse.builder()
         .serverIp(serverIp)
         .hostname(host != null ? host.getHostname() : null)
-        .api(host != null && hasRole(host, WebServerLogExtractor.ROLE_API))
+        .api(host != null && hasRole(host, ServiceLogRoles.API))
         .totalRequests(c.total())
         .successCount(c.success)
         .clientErrorCount(c.clientError)

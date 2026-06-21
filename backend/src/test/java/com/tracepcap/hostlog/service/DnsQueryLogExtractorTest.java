@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.hostlog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor.QueryAgg;
-import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor.QueryKey;
-import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor.ServerStats;
+import com.tracepcap.hostlog.service.DnsQueryLogExtractor.QueryAgg;
+import com.tracepcap.hostlog.service.DnsQueryLogExtractor.QueryKey;
+import com.tracepcap.hostlog.service.DnsQueryLogExtractor.ServerStats;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

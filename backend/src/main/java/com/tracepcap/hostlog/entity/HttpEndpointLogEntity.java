@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.entity;
+package com.tracepcap.hostlog.entity;
 
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.persistence.*;

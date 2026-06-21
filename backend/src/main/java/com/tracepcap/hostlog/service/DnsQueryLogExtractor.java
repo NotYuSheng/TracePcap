@@ -1,7 +1,11 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.hostlog.service;
 
-import com.tracepcap.analysis.entity.DnsQueryLogEntity;
-import com.tracepcap.analysis.repository.DnsQueryLogRepository;
+import com.tracepcap.analysis.spi.HostServiceLogExtractor;
+import com.tracepcap.analysis.spi.HostServiceLogResult;
+import com.tracepcap.analysis.spi.HostServiceSuspicion;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
+import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
+import com.tracepcap.hostlog.repository.DnsQueryLogRepository;
 import com.tracepcap.file.entity.FileEntity;
 import java.io.BufferedReader;
 import java.io.File;
@@ -24,7 +28,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Extracts the DNS query log for hosts acting as DNS servers (#362) — the first implementation of
- * {@link HostServiceLogExtractor}.
+ * {@link com.tracepcap.analysis.spi.HostServiceLogExtractor}.
  *
  * <p>Runs a single read-only tshark pass over the capture, selecting DNS <em>responses</em>, and
  * aggregates them per {@code (serverIp, queryName, queryType)} into {@link DnsQueryLogEntity} rows:
@@ -41,7 +45,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DnsQueryLogExtractor implements HostServiceLogExtractor {
 
-  public static final String ROLE = "dns";
+  private static final String ROLE = ServiceLogRoles.DNS;
 
   private static final int QUERY_NAME_MAX_LENGTH = 255;
 

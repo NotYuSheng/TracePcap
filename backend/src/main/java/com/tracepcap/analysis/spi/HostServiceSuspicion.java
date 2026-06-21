@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.analysis.spi;
 
 /**
  * A server host flagged as suspicious by a {@link HostServiceLogExtractor}.

@@ -1,6 +1,6 @@
-package com.tracepcap.analysis.repository;
+package com.tracepcap.hostlog.repository;
 
-import com.tracepcap.analysis.entity.DnsQueryLogEntity;
+import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

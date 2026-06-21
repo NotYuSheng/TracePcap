@@ -1,9 +1,9 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.hostlog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor.EndpointAgg;
-import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor.WebServerStats;
+import com.tracepcap.hostlog.service.WebServerLogExtractor.EndpointAgg;
+import com.tracepcap.hostlog.service.WebServerLogExtractor.WebServerStats;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;

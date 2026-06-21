@@ -18,10 +18,10 @@ import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.spi.FileExtractionStage;
 import com.tracepcap.analysis.spi.HostClassifier;
 import com.tracepcap.analysis.spi.SignatureApplier;
-import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor;
-import com.tracepcap.analysis.service.hostlog.HostServiceLogExtractor;
-import com.tracepcap.analysis.service.hostlog.HostServiceLogResult;
-import com.tracepcap.analysis.service.hostlog.HostServiceSuspicion;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
+import com.tracepcap.analysis.spi.HostServiceLogExtractor;
+import com.tracepcap.analysis.spi.HostServiceLogResult;
+import com.tracepcap.analysis.spi.HostServiceSuspicion;
 import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
@@ -1165,7 +1165,7 @@ public class AnalysisService {
     for (HostServiceSuspicion s : suspicions) {
       HostClassificationEntity host = byIp.get(s.ip());
       if (host == null) continue; // external server with no classification — skip silently
-      if (DnsQueryLogExtractor.ROLE.equals(s.role())) {
+      if (ServiceLogRoles.DNS.equals(s.role())) {
         host.setDnsSuspicious(true);
       }
       // Future roles: else if (HttpEndpointLogExtractor.ROLE.equals(s.role())) host.setWebSuspicious(true);
