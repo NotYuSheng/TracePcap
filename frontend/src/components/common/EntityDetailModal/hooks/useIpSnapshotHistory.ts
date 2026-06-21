@@ -55,7 +55,7 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
     }).catch(() => { if (active) setIpHistoryLoading(false); });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityType, entityKey, snapshots?.map(s => s.id).join(',')]);
+  }, [entityType, entityKey, snapshots?.map(s => s.id)?.join(',')]);
 
   return { ipSnapHistory, ipHistoryLoading };
 }

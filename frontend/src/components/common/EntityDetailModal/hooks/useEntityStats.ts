@@ -25,6 +25,7 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
   const [statsError, setStatsError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     // Reset so a previous entity's stats can't leak when the modal is reused.
     setStats(null);
     if (!fileId || (entityType !== 'APPLICATION' && entityType !== 'PROTOCOL')) return;
@@ -34,6 +35,7 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
     apiClient
       .get<ConvApiResponse>(`/conversations/${fileId}?${param}&pageSize=500&page=1`)
       .then(res => {
+        if (!active) return;
         const rows = res.data.data;
         const total = res.data.total;
         const packets = rows.reduce((s, r) => s + r.packetCount, 0);
@@ -50,8 +52,9 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
           .map(([ip, b]) => ({ ip, bytes: b }));
         setStats({ conversationCount: total, packetCount: packets, totalBytes: bytes, topPeers });
       })
-      .catch(() => setStatsError('Failed to load details'))
-      .finally(() => setStatsLoading(false));
+      .catch(() => { if (active) setStatsError('Failed to load details'); })
+      .finally(() => { if (active) setStatsLoading(false); });
+    return () => { active = false; };
   }, [fileId, entityType, entityKey]);
 
   return { stats, statsLoading, statsError };

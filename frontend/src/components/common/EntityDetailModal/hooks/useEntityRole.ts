@@ -20,6 +20,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
 
   // Load node role on mount for IP/DEVICE
   useEffect(() => {
+    let active = true;
     // Reset so a previous entity's role/drafts can't leak when the modal is reused.
     setRole(null);
     setRoleLabelDraft('');
@@ -29,8 +30,9 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     setRoleLoading(true);
     insightsService
       .getNodeRole(entityType, entityKey)
-      .then(r => setRole(r))
-      .finally(() => setRoleLoading(false));
+      .then(r => { if (active) setRole(r); })
+      .finally(() => { if (active) setRoleLoading(false); });
+    return () => { active = false; };
   }, [showRole, entityType, entityKey]);
 
   const suggest = async () => {
