@@ -39,7 +39,10 @@ export function useNetworkDetailData(networkId: string | undefined) {
   const [pollInterval, setPollInterval] = useState(30); // seconds
 
   const loadAll = useCallback(async (showSpinner = false) => {
-    if (!networkId) return;
+    if (!networkId) {
+      setLoading(false);
+      return;
+    }
     if (showSpinner) setLoading(true);
     try {
       const [net, snaps, events, defs, evts, annots, ins, subs] = await Promise.all([

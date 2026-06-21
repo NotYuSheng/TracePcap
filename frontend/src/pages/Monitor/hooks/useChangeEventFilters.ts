@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { ChangeEvent } from '@/features/monitor/types/monitor.types';
 
 export type SeverityFilter = 'ALL' | 'CRITICAL' | 'WARNING' | 'INFO';
@@ -17,18 +17,18 @@ export function useChangeEventFilters(changeEvents: ChangeEvent[]) {
   const [reviewedFilter, setReviewedFilter] = useState<ReviewedFilter>('UNREVIEWED');
   const [eventPage, setEventPage] = useState(1);
 
-  const changeTypes = ['ALL', ...Array.from(new Set(changeEvents.map(e => e.changeType)))];
+  const changeTypes = useMemo(() => ['ALL', ...Array.from(new Set(changeEvents.map(e => e.changeType)))], [changeEvents]);
 
-  const filteredEvents = changeEvents.filter(e => {
+  const filteredEvents = useMemo(() => changeEvents.filter(e => {
     if (severityFilter !== 'ALL' && e.severity !== severityFilter) return false;
     if (changeTypeFilter !== 'ALL' && e.changeType !== changeTypeFilter) return false;
     if (reviewedFilter === 'UNREVIEWED' && e.reviewed) return false;
     if (reviewedFilter === 'REVIEWED' && !e.reviewed) return false;
     return true;
-  });
+  }), [changeEvents, severityFilter, changeTypeFilter, reviewedFilter]);
 
   const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / EVENT_PAGE_SIZE));
-  const pagedEvents = filteredEvents.slice((eventPage - 1) * EVENT_PAGE_SIZE, eventPage * EVENT_PAGE_SIZE);
+  const pagedEvents = useMemo(() => filteredEvents.slice((eventPage - 1) * EVENT_PAGE_SIZE, eventPage * EVENT_PAGE_SIZE), [filteredEvents, eventPage]);
 
   const selectSeverity = (f: SeverityFilter) => { setSeverityFilter(f); setEventPage(1); };
   const selectChangeType = (t: string) => { setChangeTypeFilter(t); setEventPage(1); };
