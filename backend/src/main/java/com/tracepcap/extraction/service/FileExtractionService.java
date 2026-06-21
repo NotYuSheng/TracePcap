@@ -1,10 +1,11 @@
-package com.tracepcap.analysis.service;
+package com.tracepcap.extraction.service;
 
 import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.ExtractedFileEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.ExtractedFileRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.FileExtractionStage;
+import com.tracepcap.extraction.entity.ExtractedFileEntity;
+import com.tracepcap.extraction.repository.ExtractedFileRepository;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.service.StorageService;
 import jakarta.persistence.EntityManager;
@@ -39,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class FileExtractionService {
+public class FileExtractionService implements FileExtractionStage {
 
   /**
    * Maximum bytes buffered per raw stream during reassembly (200 MB). This is intentionally larger
@@ -179,6 +180,7 @@ public class FileExtractionService {
    * @param savedConversationIds IDs of conversations already persisted to DB for this file
    */
   @Transactional
+  @Override
   public void extractFiles(FileEntity file, File tempPcapFile, List<UUID> savedConversationIds) {
 
     log.info("Starting file extraction for PCAP {}", file.getId());

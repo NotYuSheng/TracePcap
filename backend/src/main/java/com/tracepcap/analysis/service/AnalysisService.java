@@ -15,6 +15,7 @@ import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.FileExtractionStage;
 import com.tracepcap.analysis.spi.SignatureApplier;
 import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor;
 import com.tracepcap.analysis.service.hostlog.HostServiceLogExtractor;
@@ -80,7 +81,7 @@ public class AnalysisService {
   private final HostnameResolverService hostnameResolverService;
   private final List<HostServiceLogExtractor> hostServiceLogExtractors;
   private final GeoIpService geoIpService;
-  private final FileExtractionService fileExtractionService;
+  private final FileExtractionStage fileExtractionStage;
   private final AnalysisRecordService analysisRecordService;
 
   @Transactional
@@ -292,7 +293,7 @@ public class AnalysisService {
         t = System.currentTimeMillis();
         if (file.isEnableFileExtraction()) {
           try {
-            fileExtractionService.extractFiles(file, tempFile, savedConversationIds);
+            fileExtractionStage.extractFiles(file, tempFile, savedConversationIds);
             log.info("[{}] [7/7] File extraction: {}ms", fileId, System.currentTimeMillis() - t);
           } catch (Exception e) {
             log.warn(
