@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service;
+package com.tracepcap.extraction.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;

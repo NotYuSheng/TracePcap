@@ -1,5 +1,6 @@
-package com.tracepcap.analysis.entity;
+package com.tracepcap.extraction.entity;
 
+import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

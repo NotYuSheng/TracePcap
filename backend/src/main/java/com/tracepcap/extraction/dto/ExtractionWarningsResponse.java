@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.dto;
+package com.tracepcap.extraction.dto;
 
 import java.util.List;
 import java.util.UUID;

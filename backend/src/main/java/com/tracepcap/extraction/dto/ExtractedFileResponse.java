@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.dto;
+package com.tracepcap.extraction.dto;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

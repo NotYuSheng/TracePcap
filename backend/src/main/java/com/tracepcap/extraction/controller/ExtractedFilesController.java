@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.controller;
+package com.tracepcap.extraction.controller;
 
-import com.tracepcap.analysis.dto.ExtractedFileResponse;
-import com.tracepcap.analysis.dto.ExtractionWarningsResponse;
-import com.tracepcap.analysis.entity.ExtractedFileEntity;
-import com.tracepcap.analysis.repository.ExtractedFileRepository;
-import com.tracepcap.analysis.service.ExtractionLimits;
+import com.tracepcap.extraction.dto.ExtractedFileResponse;
+import com.tracepcap.extraction.dto.ExtractionWarningsResponse;
+import com.tracepcap.extraction.entity.ExtractedFileEntity;
+import com.tracepcap.extraction.repository.ExtractedFileRepository;
+import com.tracepcap.extraction.service.ExtractionLimits;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
