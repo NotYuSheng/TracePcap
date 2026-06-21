@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.controller;
+package com.tracepcap.conversation.controller;
 
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.dto.SessionResponse;
-import com.tracepcap.analysis.service.AnalysisService;
+import com.tracepcap.conversation.service.ConversationQueryService;
 import com.tracepcap.analysis.service.SessionReconstructionService;
 import com.tracepcap.common.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.*;
     description = "Per-file conversation listing, facets, export, and session reconstruction")
 public class ConversationsController {
 
-  private final AnalysisService analysisService;
+  private final ConversationQueryService conversationQueryService;
   private final SessionReconstructionService sessionReconstructionService;
 
   private static final DateTimeFormatter CSV_DT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -147,35 +147,35 @@ public class ConversationsController {
         sortBy,
         sortDir);
 
-    return ResponseEntity.ok(analysisService.getConversations(fileId, page, pageSize, params));
+    return ResponseEntity.ok(conversationQueryService.getConversations(fileId, page, pageSize, params));
   }
 
   /** Returns the distinct detected file types found in packets for this file. */
   @GetMapping("/{fileId}/file-types")
   @Operation(summary = "List distinct detected file types for a file")
   public ResponseEntity<List<String>> getFileTypes(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(analysisService.getDistinctFileTypes(fileId));
+    return ResponseEntity.ok(conversationQueryService.getDistinctFileTypes(fileId));
   }
 
   /** Returns the distinct nDPI risk type strings present in at-risk conversations for this file. */
   @GetMapping("/{fileId}/risk-types")
   @Operation(summary = "List distinct nDPI risk types for a file")
   public ResponseEntity<List<String>> getRiskTypes(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(analysisService.getDistinctRiskTypes(fileId));
+    return ResponseEntity.ok(conversationQueryService.getDistinctRiskTypes(fileId));
   }
 
   /** Returns the distinct custom signature rule names triggered for this file. */
   @GetMapping("/{fileId}/custom-signatures")
   @Operation(summary = "List distinct custom signature rule names for a file")
   public ResponseEntity<List<String>> getCustomSignatures(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(analysisService.getDistinctCustomSignatures(fileId));
+    return ResponseEntity.ok(conversationQueryService.getDistinctCustomSignatures(fileId));
   }
 
   /** Returns the distinct Suricata IDS alert strings present for this file. */
   @GetMapping("/{fileId}/suricata-alerts")
   @Operation(summary = "List distinct Suricata IDS alerts for a file")
   public ResponseEntity<List<String>> getSuricataAlerts(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(analysisService.getDistinctSuricataAlerts(fileId));
+    return ResponseEntity.ok(conversationQueryService.getDistinctSuricataAlerts(fileId));
   }
 
   /**
@@ -184,7 +184,7 @@ public class ConversationsController {
   @GetMapping("/{fileId}/countries")
   @Operation(summary = "List distinct country codes seen in external IPs for a file")
   public ResponseEntity<List<String>> getCountries(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(analysisService.getDistinctCountries(fileId));
+    return ResponseEntity.ok(conversationQueryService.getDistinctCountries(fileId));
   }
 
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
@@ -231,7 +231,7 @@ public class ConversationsController {
             search,
             deviceTypes,
             countries);
-    List<ConversationResponse> rows = analysisService.getConversationsForExport(fileId, params);
+    List<ConversationResponse> rows = conversationQueryService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
     response.setHeader("Content-Disposition", "attachment; filename=\"conversations.csv\"");
@@ -312,12 +312,12 @@ public class ConversationsController {
             deviceTypes,
             countries);
 
-    String filename = analysisService.getBulkPcapFilename(fileId);
+    String filename = conversationQueryService.getBulkPcapFilename(fileId);
     response.setContentType("application/vnd.tcpdump.pcap");
     response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
 
     try (OutputStream out = response.getOutputStream()) {
-      analysisService.exportConversationsAsPcap(fileId, params, out);
+      conversationQueryService.exportConversationsAsPcap(fileId, params, out);
     }
   }
 
@@ -335,7 +335,7 @@ public class ConversationsController {
   public ResponseEntity<ConversationDetailResponse> getConversationDetail(
       @PathVariable UUID conversationId) {
     log.info("GET /api/conversations/detail/{}", conversationId);
-    return ResponseEntity.ok(analysisService.getConversationDetail(conversationId));
+    return ResponseEntity.ok(conversationQueryService.getConversationDetail(conversationId));
   }
 
   /** Export a single conversation as a PCAP file filtered from the original capture. */
@@ -344,11 +344,11 @@ public class ConversationsController {
   public void exportConversationAsPcap(
       @PathVariable UUID conversationId, HttpServletResponse response) throws IOException {
     log.info("GET /api/conversations/detail/{}/export-pcap", conversationId);
-    String filename = analysisService.getConversationPcapFilename(conversationId);
+    String filename = conversationQueryService.getConversationPcapFilename(conversationId);
     response.setContentType("application/vnd.tcpdump.pcap");
     response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
     try (OutputStream out = response.getOutputStream()) {
-      analysisService.exportConversationAsPcap(conversationId, out);
+      conversationQueryService.exportConversationAsPcap(conversationId, out);
     }
   }
 
