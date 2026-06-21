@@ -139,7 +139,11 @@ llm:
     model: ${LLM_MODEL:gpt-4}
     temperature: ${LLM_TEMPERATURE:0.7}
     max-tokens: ${LLM_MAX_TOKENS:2000}
-    context-length: ${LLM_CONTEXT_LENGTH:#{null}}
+    # Empty default (not #{null}): @ConfigurationProperties binding does not evaluate SpEL, so an
+    # unset LLM_CONTEXT_LENGTH must resolve to "" (which binds to a null Integer = auto-detect),
+    # not the literal "#{null}". Compose already passes an empty value; this keeps it working when
+    # the var is absent entirely (e.g. tests, minimal deployments).
+    context-length: ${LLM_CONTEXT_LENGTH:}
     timeout-seconds: ${LLM_TIMEOUT:300}
   retry:
     max-attempts: 3
