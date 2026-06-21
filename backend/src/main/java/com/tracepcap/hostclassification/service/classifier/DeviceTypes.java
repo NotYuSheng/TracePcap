@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.classifier;
+package com.tracepcap.hostclassification.service.classifier;
 
 /**
  * Canonical device-type identifiers a {@link DeviceClassificationSignal} can vote for. Plain string

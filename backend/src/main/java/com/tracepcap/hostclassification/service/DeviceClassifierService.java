@@ -1,11 +1,14 @@
-package com.tracepcap.analysis.service;
+package com.tracepcap.hostclassification.service;
 
 import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.service.classifier.DeviceClassificationSignal;
-import com.tracepcap.analysis.service.classifier.DeviceTypes;
-import com.tracepcap.analysis.service.classifier.HostContext;
-import com.tracepcap.analysis.service.classifier.HostProfile;
-import com.tracepcap.analysis.service.classifier.ScoreBoard;
+import com.tracepcap.analysis.service.HostnameResolverService;
+import com.tracepcap.analysis.service.PcapParserService;
+import com.tracepcap.analysis.spi.HostClassifier;
+import com.tracepcap.hostclassification.service.classifier.DeviceClassificationSignal;
+import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
+import com.tracepcap.hostclassification.service.classifier.HostContext;
+import com.tracepcap.hostclassification.service.classifier.HostProfile;
+import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -38,7 +41,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DeviceClassifierService {
+public class DeviceClassifierService implements HostClassifier {
 
   /** Score margin (winner − runner-up) that maps to 100% confidence; smaller margins scale down. */
   private static final int CONFIDENCE_MARGIN_FOR_FULL = 60;
@@ -142,6 +145,7 @@ public class DeviceClassifierService {
    *     (may be empty); feeds role-aware signals and is recorded on each host
    * @return one HostClassificationEntity per unique IP
    */
+  @Override
   public List<HostClassificationEntity> classify(
       FileEntity file,
       List<PcapParserService.ConversationInfo> conversations,

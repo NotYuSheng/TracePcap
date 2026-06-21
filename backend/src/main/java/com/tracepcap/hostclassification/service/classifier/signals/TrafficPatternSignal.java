@@ -1,10 +1,10 @@
-package com.tracepcap.analysis.service.classifier.signals;
+package com.tracepcap.hostclassification.service.classifier.signals;
 
-import com.tracepcap.analysis.service.classifier.DeviceClassificationSignal;
-import com.tracepcap.analysis.service.classifier.DeviceTypes;
-import com.tracepcap.analysis.service.classifier.HostContext;
-import com.tracepcap.analysis.service.classifier.HostProfile;
-import com.tracepcap.analysis.service.classifier.ScoreBoard;
+import com.tracepcap.hostclassification.service.classifier.DeviceClassificationSignal;
+import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
+import com.tracepcap.hostclassification.service.classifier.HostContext;
+import com.tracepcap.hostclassification.service.classifier.HostProfile;
+import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
 import org.springframework.stereotype.Component;
 
 /**

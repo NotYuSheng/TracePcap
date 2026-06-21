@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.classifier;
+package com.tracepcap.hostclassification.service.classifier;
 
 /**
  * A pluggable contributor to device classification. Each implementation inspects a {@link HostContext}

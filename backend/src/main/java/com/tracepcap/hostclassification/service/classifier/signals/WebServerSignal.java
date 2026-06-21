@@ -1,15 +1,15 @@
-package com.tracepcap.analysis.service.classifier.signals;
+package com.tracepcap.hostclassification.service.classifier.signals;
 
-import com.tracepcap.analysis.service.classifier.DeviceClassificationSignal;
-import com.tracepcap.analysis.service.classifier.DeviceTypes;
-import com.tracepcap.analysis.service.classifier.HostContext;
-import com.tracepcap.analysis.service.classifier.ScoreBoard;
+import com.tracepcap.hostclassification.service.classifier.DeviceClassificationSignal;
+import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
+import com.tracepcap.hostclassification.service.classifier.HostContext;
+import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
 import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor;
 import org.springframework.stereotype.Component;
 
 /**
  * Classifies a host as a {@code WEB_SERVER} when it was observed serving HTTP/TLS but not in an
- * API-like way (see {@link com.tracepcap.analysis.service.classifier.signals.ApiServerSignal}). Like
+ * API-like way (see {@link com.tracepcap.hostclassification.service.classifier.signals.ApiServerSignal}). Like
  * {@link DnsServerSignal}, this is authoritative observed evidence, so it carries a dominant weight
  * that outranks the heuristic signals.
  */
