@@ -4,7 +4,7 @@ import com.tracepcap.hostclassification.service.classifier.DeviceClassificationS
 import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
 import com.tracepcap.hostclassification.service.classifier.HostContext;
 import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
-import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,7 +25,7 @@ public class WebServerSignal implements DeviceClassificationSignal {
 
   @Override
   public void contribute(HostContext ctx, ScoreBoard board) {
-    if (ctx.hasServiceRole(WebServerLogExtractor.ROLE_WEB)) {
+    if (ctx.hasServiceRole(ServiceLogRoles.WEB)) {
       board.add(DeviceTypes.WEB_SERVER, WEIGHT, "Served HTTP/TLS → +" + WEIGHT);
     }
   }

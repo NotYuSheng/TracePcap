@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.analysis.spi;
 
 import java.util.List;
 import java.util.Map;

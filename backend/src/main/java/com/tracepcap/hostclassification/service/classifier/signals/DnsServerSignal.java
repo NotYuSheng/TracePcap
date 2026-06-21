@@ -4,12 +4,12 @@ import com.tracepcap.hostclassification.service.classifier.DeviceClassificationS
 import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
 import com.tracepcap.hostclassification.service.classifier.HostContext;
 import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
-import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
 import org.springframework.stereotype.Component;
 
 /**
  * Classifies a host as a {@code DNS_SERVER} when it was observed answering DNS queries (the {@code
- * dns} service role, detected by {@link DnsQueryLogExtractor}). This is authoritative evidence — the
+ * dns} service role, detected by {@code DnsQueryLogExtractor}). This is authoritative evidence — the
  * host actually served DNS — so it carries a strong weight that outranks the heuristic signals,
  * making a resolver classify as a DNS server rather than a generic SERVER/ROUTER.
  *
@@ -35,7 +35,7 @@ public class DnsServerSignal implements DeviceClassificationSignal {
 
   @Override
   public void contribute(HostContext ctx, ScoreBoard board) {
-    if (ctx.hasServiceRole(DnsQueryLogExtractor.ROLE)) {
+    if (ctx.hasServiceRole(ServiceLogRoles.DNS)) {
       board.add(DeviceTypes.DNS_SERVER, WEIGHT, "Answered DNS queries → +" + WEIGHT);
     }
   }

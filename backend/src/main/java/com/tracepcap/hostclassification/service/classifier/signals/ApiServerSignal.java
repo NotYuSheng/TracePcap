@@ -4,12 +4,12 @@ import com.tracepcap.hostclassification.service.classifier.DeviceClassificationS
 import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
 import com.tracepcap.hostclassification.service.classifier.HostContext;
 import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
-import com.tracepcap.analysis.service.hostlog.WebServerLogExtractor;
+import com.tracepcap.analysis.spi.ServiceLogRoles;
 import org.springframework.stereotype.Component;
 
 /**
  * Classifies a host as an {@code API_SERVER} when it served HTTP in an API-like way (JSON responses,
- * REST write verbs, or {@code /api}-style paths — decided by {@link WebServerLogExtractor}). Like
+ * REST write verbs, or {@code /api}-style paths — decided by {@code WebServerLogExtractor}). Like
  * {@link DnsServerSignal}, this is authoritative observed evidence with a dominant weight so it wins
  * over the heuristic signals. A host is tagged {@code api} <em>or</em> {@code web}, never both, so
  * this and {@link WebServerSignal} don't collide.
@@ -26,7 +26,7 @@ public class ApiServerSignal implements DeviceClassificationSignal {
 
   @Override
   public void contribute(HostContext ctx, ScoreBoard board) {
-    if (ctx.hasServiceRole(WebServerLogExtractor.ROLE_API)) {
+    if (ctx.hasServiceRole(ServiceLogRoles.API)) {
       board.add(DeviceTypes.API_SERVER, WEIGHT, "Served an HTTP API → +" + WEIGHT);
     }
   }

@@ -1,4 +1,4 @@
-package com.tracepcap.analysis.service.hostlog;
+package com.tracepcap.analysis.spi;
 
 import com.tracepcap.file.entity.FileEntity;
 import java.io.File;
@@ -7,7 +7,7 @@ import java.io.File;
  * Extracts a per-host "service activity log" for hosts acting in a particular server role.
  *
  * <p>This is the reusable seam behind the Network Intelligence per-host service views. DNS is the
- * first implementation ({@link DnsQueryLogExtractor}, surfacing which domains a DNS server resolves
+ * first implementation ({@code DnsQueryLogExtractor}, surfacing which domains a DNS server resolves
  * and which fail); future roles — e.g. an HTTP/API endpoint log for web servers — implement this
  * same contract and are picked up automatically.
  *
