@@ -13,6 +13,11 @@
  * CI runs this and then `git diff --exit-code openapi/baseline.json`, so any
  * unintended change to the API contract fails the build. Intended changes are
  * accepted by regenerating and committing the baseline.
+ *
+ * Note: springdoc derives each operation's `operationId` from the controller
+ * method name. Keep method names unique across controllers — a duplicate (e.g.
+ * two `update()` methods) renames another endpoint's operationId and churns the
+ * contract. See CONTRIBUTING.md → "API Contract Workflow".
  */
 import fs from 'node:fs';
 import path from 'node:path';
