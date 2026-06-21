@@ -258,6 +258,7 @@ export const SnapshotDetailModal = ({
   );
   const [subnetCustomizeMode, setSubnetCustomizeMode] = useState((snapshot.subnetOverrides ?? []).length > 0);
   const [subnetNewCidr, setSubnetNewCidr] = useState('');
+  const [subnetNewLabel, setSubnetNewLabel] = useState('');
   const [loadingGlobals, setLoadingGlobals] = useState(false);
   const [savingSubnets, setSavingSubnets] = useState(false);
   const subnetOverridesActive = subnetCustomizeMode;
@@ -300,8 +301,9 @@ export const SnapshotDetailModal = ({
   const addSubnetRow = () => {
     const cidr = subnetNewCidr.trim();
     if (!cidr) return;
-    setSubnetDraft(prev => [...prev, { cidr, label: null, description: null, inherited: false }]);
+    setSubnetDraft(prev => [...prev, { cidr, label: subnetNewLabel.trim() || null, description: null, inherited: false }]);
     setSubnetNewCidr('');
+    setSubnetNewLabel('');
   };
 
   const handleSaveSubnets = async () => {
@@ -654,7 +656,7 @@ export const SnapshotDetailModal = ({
                                 onClick={() => removeSubnetRow(i)}
                                 title="Remove"
                               >
-                                <i className="bi bi-x" style={{ fontSize: '0.75rem' }} />
+                                <i className="bi bi-trash" style={{ fontSize: '0.7rem' }} />
                               </button>
                             </td>
                           </tr>
@@ -668,12 +670,20 @@ export const SnapshotDetailModal = ({
                   </p>
                 )}
 
-                <div className="d-flex gap-2 align-items-center mb-3">
+                <div className="d-flex gap-2 align-items-center mb-3 flex-wrap">
                   <input
                     className="form-control form-control-sm font-monospace"
                     placeholder="e.g. 192.168.1.0/24"
                     value={subnetNewCidr}
                     onChange={e => setSubnetNewCidr(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubnetRow(); } }}
+                    style={{ maxWidth: 200, fontSize: '0.82rem' }}
+                  />
+                  <input
+                    className="form-control form-control-sm"
+                    placeholder="Label (optional)"
+                    value={subnetNewLabel}
+                    onChange={e => setSubnetNewLabel(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubnetRow(); } }}
                     style={{ maxWidth: 200, fontSize: '0.82rem' }}
                   />
