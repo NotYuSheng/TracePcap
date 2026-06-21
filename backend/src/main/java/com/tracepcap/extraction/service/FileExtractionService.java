@@ -24,7 +24,6 @@ import org.apache.tika.mime.MimeType;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Extracts files embedded in packet streams from a PCAP file.
@@ -175,11 +174,18 @@ public class FileExtractionService implements FileExtractionStage {
    * <p>Must be called within the same transaction that saved the conversations so that
    * flushed-but-uncommitted conversation rows are visible to repository queries.
    *
+   * <p>Intentionally <strong>not</strong> annotated {@code @Transactional}: it runs inside the
+   * caller's ({@code AnalysisService.analyzeFile}) transaction. An inner transactional boundary
+   * here would, on any thrown {@link RuntimeException}, mark the shared transaction rollback-only —
+   * and the caller's catch block (which treats extraction as optional/non-fatal) could not clear
+   * that, so the whole analysis would be rolled back at commit with an {@code
+   * UnexpectedRollbackException}. {@code REQUIRES_NEW} is not an option either, since the
+   * conversations this reads are still uncommitted in the caller's transaction.
+   *
    * @param file the persisted FileEntity
    * @param tempPcapFile the PCAP on local disk (will not be deleted here)
    * @param savedConversationIds IDs of conversations already persisted to DB for this file
    */
-  @Transactional
   @Override
   public void extractFiles(FileEntity file, File tempPcapFile, List<UUID> savedConversationIds) {
 
