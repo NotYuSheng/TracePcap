@@ -16,18 +16,19 @@ test.beforeAll(async ({ request }) => {
 });
 
 test('Story tab shows an error alert when story generation returns 502', async ({ page }) => {
-  // Force the "no existing story" state so the Generate Story button is shown,
-  // regardless of whether this file already has a story persisted.
-  await page.route('**/api/story/file/**', route =>
-    route.fulfill({ status: 204, body: '' })
-  );
-  await page.route('**/api/story/generate/**', route =>
-    route.fulfill({
-      status: 502,
-      contentType: 'application/json',
-      body: JSON.stringify(LLM_UNREACHABLE_502),
-    })
-  );
+  // Story endpoints collapsed onto /stories: GET ?fileId= (lookup) and POST (generate).
+  // One route, branched by method — force "no existing story" (204) so the Generate
+  // button shows, and a 502 on generate.
+  await page.route('**/api/v1/stories**', route => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify(LLM_UNREACHABLE_502),
+      });
+    }
+    return route.fulfill({ status: 204, body: '' });
+  });
 
   await page.goto(`/analysis/${fileId}/story`);
   await page.getByRole('button', { name: /Generate Story/i }).click();
@@ -39,7 +40,7 @@ test('Story tab shows an error alert when story generation returns 502', async (
 });
 
 test('Filter Generator shows an error alert when filter generation returns 502', async ({ page }) => {
-  await page.route('**/api/filter/generate/**', route =>
+  await page.route('**/api/v1/filter/*/generate', route =>
     route.fulfill({
       status: 502,
       contentType: 'application/json',

@@ -11,7 +11,7 @@ const FIXTURE_PCAP = path.resolve(here, '../../sample-files/ftp.pcap');
  * returning the fileId. Used so the analysis pages have real data to render.
  */
 export async function uploadAndProcessFixture(request: APIRequestContext): Promise<string> {
-  const upload = await request.post('/api/files', {
+  const upload = await request.post('/api/v1/files', {
     multipart: {
       file: {
         name: 'ftp.pcap',
@@ -37,7 +37,7 @@ export async function uploadAndProcessFixture(request: APIRequestContext): Promi
   const deadline = Date.now() + 60_000;
   let status = 'pending';
   while (Date.now() < deadline) {
-    const r = await request.get(`/api/files/${fileId}`);
+    const r = await request.get(`/api/v1/files/${fileId}`);
     if (!r.ok()) {
       throw new Error(`Failed to get file status: ${r.status()} ${r.statusText()}`);
     }
