@@ -68,5 +68,5 @@ export function getDownloadUrl(fileId: string, extractionId: string): string {
 
 /** Builds the inline-preview URL for an extracted file (browser-renderable types only). */
 export function getPreviewUrl(fileId: string, extractionId: string): string {
-  return `/api/files/${fileId}/extractions/${extractionId}/preview`;
+  return `/api/v1/files/${fileId}/extractions/${extractionId}/preview`;
 }

@@ -14,16 +14,14 @@ export const storyService = {
     maxFindings?: number,
     maxRiskMatrix?: number
   ): Promise<Story> => {
-    const body: Record<string, string | number> = {};
+    const body: Record<string, string | number> = { fileId };
     if (additionalContext?.trim()) body.additionalContext = additionalContext.trim();
     if (customPrompt?.trim()) body.customPrompt = customPrompt.trim();
     if (maxFindings !== undefined) body.maxFindings = maxFindings;
     if (maxRiskMatrix !== undefined) body.maxRiskMatrix = maxRiskMatrix;
-    const response = await apiClient.post<Story>(
-      API_ENDPOINTS.GENERATE_STORY(fileId),
-      Object.keys(body).length > 0 ? body : undefined,
-      { ...(timeoutMs !== undefined && { timeout: timeoutMs + 10000 }) }
-    );
+    const response = await apiClient.post<Story>(API_ENDPOINTS.STORIES, body, {
+      ...(timeoutMs !== undefined && { timeout: timeoutMs + 10000 }),
+    });
     return response.data;
   },
 

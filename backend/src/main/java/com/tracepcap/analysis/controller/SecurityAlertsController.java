@@ -3,6 +3,7 @@ package com.tracepcap.analysis.controller;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.service.AnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,9 @@ import org.springframework.web.bind.annotation.*;
 /** REST controller for nDPI security alerts per file. */
 @Slf4j
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/files")
 @RequiredArgsConstructor
+@Tag(name = "Security Alerts", description = "Per-file nDPI security alerts")
 public class SecurityAlertsController {
 
   private final AnalysisService analysisService;

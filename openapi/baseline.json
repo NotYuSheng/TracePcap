@@ -1,0 +1,7218 @@
+{
+  "components": {
+    "schemas": {
+      "AddSnapshotRequest": {
+        "properties": {
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "subnetOverrides": {
+            "items": {
+              "$ref": "#/components/schemas/SubnetOverrideInput"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "fileId"
+        ],
+        "type": "object"
+      },
+      "AnalysisSummaryResponse": {
+        "properties": {
+          "analysisId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "analyzedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "categoryDistribution": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryStat"
+            },
+            "type": "array"
+          },
+          "detectedApplications": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedApplication"
+            },
+            "type": "array"
+          },
+          "detectedApplicationsTruncated": {
+            "type": "boolean"
+          },
+          "detectedL7Protocols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocolDistribution": {
+            "items": {
+              "$ref": "#/components/schemas/ProtocolStat"
+            },
+            "type": "array"
+          },
+          "securityAlertCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "timeRange": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "topConversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "type": "array"
+          },
+          "totalConversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPackets": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "triggeredCustomRules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "uniqueHosts": {
+            "items": {
+              "$ref": "#/components/schemas/UniqueHost"
+            },
+            "type": "array"
+          },
+          "uploadTime": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Anomaly": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AsnEntry": {
+        "properties": {
+          "asn": {
+            "type": "string"
+          },
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "country": {
+            "type": "string"
+          },
+          "flowCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "org": {
+            "type": "string"
+          },
+          "pct": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "BaselineDefinitionDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "entityValue": {
+            "type": "string"
+          },
+          "entryType": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BeaconCandidate": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "avgIntervalMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "cv": {
+            "format": "double",
+            "type": "number"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "flowCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CategoryStat": {
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "category": {
+            "type": "string"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "ChangeEventDto": {
+        "properties": {
+          "changeType": {
+            "type": "string"
+          },
+          "detectedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "fromSnapshotId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "newValue": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "oldValue": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "reviewed": {
+            "type": "boolean"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "toSnapshotId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Chunk": {
+        "properties": {
+          "binary": {
+            "type": "boolean"
+          },
+          "byteLength": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ClusterEdgeDto": {
+        "properties": {
+          "conversationCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dominantProtocol": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ClusterGraphResponse": {
+        "properties": {
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterNodeDto"
+            },
+            "type": "array"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterEdgeDto"
+            },
+            "type": "array"
+          },
+          "groupType": {
+            "type": "string"
+          },
+          "hiddenClusters": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ClusterNodeDto": {
+        "properties": {
+          "conversationCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dominantProtocols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "geoSource": {
+            "type": "string"
+          },
+          "groupType": {
+            "type": "string"
+          },
+          "hostCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipBytes": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "ipConversations": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "ipPeers": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "ipRisks": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "label": {
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": "number"
+          },
+          "lon": {
+            "format": "double",
+            "type": "number"
+          },
+          "riskCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sampleIps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "topRiskTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPackets": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CompareReportRequest": {
+        "properties": {
+          "activeFilters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fileIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fileLabels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "forceDirectedImage": {
+            "type": "string"
+          },
+          "hierarchicalImage": {
+            "type": "string"
+          },
+          "nodeLimitNote": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConversationDetailResponse": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "customSignatures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "dstGeo": {
+            "$ref": "#/components/schemas/GeoInfo"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "flowRisks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "httpUserAgents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ja3Client": {
+            "type": "string"
+          },
+          "ja3Server": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "packets": {
+            "items": {
+              "$ref": "#/components/schemas/PacketResponse"
+            },
+            "type": "array"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcGeo": {
+            "$ref": "#/components/schemas/GeoInfo"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "suricataAlerts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tlsIssuer": {
+            "type": "string"
+          },
+          "tlsNotAfter": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tlsNotBefore": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tlsSubject": {
+            "type": "string"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tsharkProtocol": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConversationEvidence": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "flowRisks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "ja3Client": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "tlsIssuer": {
+            "type": "string"
+          },
+          "tlsSubject": {
+            "type": "string"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ConversationResponse": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "customSignatures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "detectedFileTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "dstGeo": {
+            "$ref": "#/components/schemas/GeoInfo"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "flowRisks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "httpUserAgents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ja3Client": {
+            "type": "string"
+          },
+          "ja3Server": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcGeo": {
+            "$ref": "#/components/schemas/GeoInfo"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "suricataAlerts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tlsIssuer": {
+            "type": "string"
+          },
+          "tlsNotAfter": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tlsNotBefore": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tlsSubject": {
+            "type": "string"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tsharkProtocol": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConversationSummary": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "customSignatures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "endTime": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "flowRisks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "suricataAlerts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Correlation": {
+        "properties": {
+          "explanation": {
+            "type": "string"
+          },
+          "externalEvent": {
+            "type": "string"
+          },
+          "networkChange": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Coverage": {
+        "properties": {
+          "bytesCoveragePct": {
+            "format": "double",
+            "type": "number"
+          },
+          "shownConversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "shownPackets": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalConversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPackets": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CreateAnnotationRequest": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CreateBaselineDefinitionRequest": {
+        "properties": {
+          "entityKey": {
+            "type": "string"
+          },
+          "entityValue": {
+            "type": "string"
+          },
+          "entryType": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityKey",
+          "entryType"
+        ],
+        "type": "object"
+      },
+      "CreateExternalEventRequest": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "eventTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CreateNetworkRequest": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "CustomPrivateRangeDto": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DetectedApplication": {
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DnsQueryEntryDto": {
+        "properties": {
+          "frame": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "queryCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "queryName": {
+            "type": "string"
+          },
+          "queryType": {
+            "type": "string"
+          },
+          "resolvable": {
+            "type": "boolean"
+          },
+          "resolvedIps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "responseCode": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DnsQueryLogResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DnsQueryEntryDto"
+            },
+            "type": "array"
+          },
+          "failedCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "nxdomainRatio": {
+            "format": "double",
+            "type": "number"
+          },
+          "resolvedCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "serverIp": {
+            "type": "string"
+          },
+          "suspicious": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "EntityHistoryEntry": {
+        "properties": {
+          "endTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EntityNoteDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ExtractedFileResponse": {
+        "properties": {
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "extractionMethod": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "skippedReason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ExtractionWarningsResponse": {
+        "properties": {
+          "conversationLimitSkippedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "conversationLimitSkippedIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "matchLimitConversationIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxFileSizeMb": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxMatchesPerStream": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxStreamConversations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sizeLimitFiles": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedFile"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "FileMetadataDto": {
+        "properties": {
+          "duration": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "packetCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "startTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FileUploadResponse": {
+        "properties": {
+          "fileId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "storageLocation": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FilterExecutionRequest": {
+        "properties": {
+          "filter": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "type": "object"
+      },
+      "FilterExecutionResponse": {
+        "properties": {
+          "executionTime": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "packets": {
+            "items": {
+              "$ref": "#/components/schemas/PacketDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalMatches": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FilterGenerationRequest": {
+        "properties": {
+          "naturalLanguageQuery": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "naturalLanguageQuery"
+        ],
+        "type": "object"
+      },
+      "FilterGenerationResponse": {
+        "properties": {
+          "confidence": {
+            "format": "double",
+            "type": "number"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "filter": {
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Finding": {
+        "properties": {
+          "affectedIps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "severity": {
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "NDPI_RISK",
+              "BEACON",
+              "TLS_ANOMALY",
+              "VOLUME",
+              "FAN_OUT",
+              "LONG_SESSION",
+              "UNKNOWN_APP",
+              "PORT_PROTOCOL_MISMATCH"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GenerateInsightRequest": {
+        "properties": {
+          "audience": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GenerateStoryRequest": {
+        "properties": {
+          "additionalContext": {
+            "type": "string"
+          },
+          "customPrompt": {
+            "type": "string"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxFindings": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxRiskMatrix": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fileId"
+        ],
+        "type": "object"
+      },
+      "GeoInfo": {
+        "properties": {
+          "asn": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "geoSource": {
+            "type": "string"
+          },
+          "org": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Highlight": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "anomaly",
+              "insight",
+              "warning",
+              "info"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HistoryEntry": {
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HostClassificationResponse": {
+        "properties": {
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "hostnameSource": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "mac": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "serviceRoles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ttl": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HostSummaryDto": {
+        "properties": {
+          "conversationCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "country": {
+            "type": "string"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "geoSource": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "hostnameSource": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "org": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "riskCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HttpEndpointDto": {
+        "properties": {
+          "clientErrorCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "requestCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requestFrame": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "responseFrame": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "serverErrorCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "successCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "topStatus": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HttpExchange": {
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/HttpMessage"
+          },
+          "response": {
+            "$ref": "#/components/schemas/HttpMessage"
+          }
+        },
+        "type": "object"
+      },
+      "HttpMessage": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "bodyBinary": {
+            "type": "boolean"
+          },
+          "bodyCompressedLength": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bodyDecompressed": {
+            "type": "boolean"
+          },
+          "bodyEncoding": {
+            "type": "string"
+          },
+          "bodyLength": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bodyTruncated": {
+            "type": "boolean"
+          },
+          "firstLine": {
+            "type": "string"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "Hypothesis": {
+        "properties": {
+          "confidence": {
+            "type": "string"
+          },
+          "hypothesis": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "queryRef": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvestigationQuery": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "hasRisks": {
+            "type": "boolean"
+          },
+          "hasTlsAnomaly": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "maxBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "minBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "minFlows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "riskType": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvestigationStep": {
+        "properties": {
+          "conversationCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationEvidence"
+            },
+            "type": "array"
+          },
+          "hypothesis": {
+            "$ref": "#/components/schemas/Hypothesis"
+          },
+          "query": {
+            "$ref": "#/components/schemas/InvestigationQuery"
+          }
+        },
+        "type": "object"
+      },
+      "IpOrgRuleDto": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MediaInfo": {
+        "properties": {
+          "codec": {
+            "type": "string"
+          },
+          "containerFormat": {
+            "type": "string"
+          },
+          "height": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "sampleRate": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "streamCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "width": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "MergeFilesRequest": {
+        "properties": {
+          "fileIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2147483647,
+            "minItems": 2,
+            "type": "array"
+          },
+          "mergedFileName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileIds"
+        ],
+        "type": "object"
+      },
+      "NarrativeSection": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "relatedData": {
+            "$ref": "#/components/schemas/RelatedData"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "summary",
+              "detail",
+              "anomaly",
+              "conclusion"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkAnnotationDto": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "criticalChanges": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "hasInsights": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "snapshotCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "warningChanges": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkEndpoint": {
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "mac": {
+            "type": "string"
+          },
+          "port": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkExternalEventDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkInsightDto": {
+        "properties": {
+          "anomalies": {
+            "items": {
+              "$ref": "#/components/schemas/Anomaly"
+            },
+            "type": "array"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "correlations": {
+            "items": {
+              "$ref": "#/components/schemas/Correlation"
+            },
+            "type": "array"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "modelUsed": {
+            "type": "string"
+          },
+          "narrativeSections": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeSection"
+            },
+            "type": "array"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkSnapshotDto": {
+        "properties": {
+          "addedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "changeCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "context": {
+            "type": "string"
+          },
+          "criticalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "hasInsights": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "snapshotOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "subnetOverrides": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotSubnetOverrideDto"
+            },
+            "type": "array"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NodeRoleDto": {
+        "properties": {
+          "confirmedByHuman": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "llmSuggested": {
+            "type": "boolean"
+          },
+          "roleDescription": {
+            "type": "string"
+          },
+          "roleLabel": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PacketDto": {
+        "properties": {
+          "destination": {
+            "$ref": "#/components/schemas/NetworkEndpoint"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "string"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/Protocol"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NetworkEndpoint"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PacketLocationResponse": {
+        "properties": {
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "packetNumber": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PacketResponse": {
+        "properties": {
+          "detectedFileType": {
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "info": {
+            "type": "string"
+          },
+          "packetNumber": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "packetSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "payload": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseConversationResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseFileMetadataDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FileMetadataDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PatchSnapshotRequest": {
+        "properties": {
+          "context": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "subnetOverrides": {
+            "items": {
+              "$ref": "#/components/schemas/SubnetOverrideInput"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Protocol": {
+        "properties": {
+          "layer": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolRiskEntry": {
+        "properties": {
+          "atRisk": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolStat": {
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "percentage": {
+            "format": "double",
+            "type": "number"
+          },
+          "protocol": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProtocolStatsResponse": {
+        "properties": {
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "protocols": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProtocolStat"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "RelatedData": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "packets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ReportRequest": {
+        "properties": {
+          "activeFilters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "forceDirectedImage": {
+            "type": "string"
+          },
+          "hierarchicalImage": {
+            "type": "string"
+          },
+          "nodeLimitNote": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ServiceServerSummaryDto": {
+        "properties": {
+          "anomalyRatio": {
+            "format": "double",
+            "type": "number"
+          },
+          "failedCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "okCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "serverIp": {
+            "type": "string"
+          },
+          "suspicious": {
+            "type": "boolean"
+          },
+          "totalRequests": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "SessionResponse": {
+        "properties": {
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            },
+            "type": "array"
+          },
+          "detectedProtocol": {
+            "type": "string"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "httpExchanges": {
+            "items": {
+              "$ref": "#/components/schemas/HttpExchange"
+            },
+            "type": "array"
+          },
+          "mediaInfo": {
+            "$ref": "#/components/schemas/MediaInfo"
+          },
+          "stunMessages": {
+            "items": {
+              "$ref": "#/components/schemas/StunMessage"
+            },
+            "type": "array"
+          },
+          "totalClientBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalServerBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "SkippedFile": {
+        "properties": {
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SnapshotSubnetOverrideDto": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inherited": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StepExplanation": {
+        "properties": {
+          "explanation": {
+            "type": "string"
+          },
+          "stepIndex": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StoryAggregates": {
+        "properties": {
+          "beaconCandidates": {
+            "items": {
+              "$ref": "#/components/schemas/BeaconCandidate"
+            },
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "protocolRiskMatrix": {
+            "items": {
+              "$ref": "#/components/schemas/ProtocolRiskEntry"
+            },
+            "type": "array"
+          },
+          "tlsAnomalySummary": {
+            "$ref": "#/components/schemas/TlsAnomalySummary"
+          },
+          "topExternalAsns": {
+            "items": {
+              "$ref": "#/components/schemas/AsnEntry"
+            },
+            "type": "array"
+          },
+          "unknownAppPct": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "StoryAnswerResponse": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "followUpQuestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "StoryQuestionRequest": {
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StoryResponse": {
+        "properties": {
+          "aggregates": {
+            "$ref": "#/components/schemas/StoryAggregates"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "highlights": {
+            "items": {
+              "$ref": "#/components/schemas/Highlight"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "investigationSteps": {
+            "items": {
+              "$ref": "#/components/schemas/InvestigationStep"
+            },
+            "type": "array"
+          },
+          "narrative": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeSection"
+            },
+            "type": "array"
+          },
+          "suggestedQuestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/StoryTimelineEvent"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "StoryTimelineEvent": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "relatedData": {
+            "$ref": "#/components/schemas/RelatedData"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "normal",
+              "suspicious",
+              "critical"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StreamingResponseBody": {
+        "type": "object"
+      },
+      "StunMessage": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "messageClass": {
+            "type": "string"
+          },
+          "messageType": {
+            "type": "string"
+          },
+          "transactionId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SubnetDefinitionDto": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "densityScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "hostCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "snapshotsSeen": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "totalSnapshots": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SubnetOverrideInput": {
+        "properties": {
+          "cidr": {
+            "pattern": "^((25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d\\d?)/(\\d|[12]\\d|3[0-2])$",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inherited": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cidr"
+        ],
+        "type": "object"
+      },
+      "TimelineDataDto": {
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocols": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TlsAnomalySummary": {
+        "properties": {
+          "expired": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "selfSigned": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unknownCa": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TlsInfo": {
+        "properties": {
+          "issuer": {
+            "type": "string"
+          },
+          "ja3s": {
+            "type": "string"
+          },
+          "notAfter": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "notBefore": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sniNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TopHostsResponse": {
+        "properties": {
+          "hosts": {
+            "items": {
+              "$ref": "#/components/schemas/HostSummaryDto"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TracerExplainResponse": {
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "explanations": {
+            "items": {
+              "$ref": "#/components/schemas/StepExplanation"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TracerPeer": {
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "responded": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "TracerPeersResponse": {
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "hostIp": {
+            "type": "string"
+          },
+          "peers": {
+            "items": {
+              "$ref": "#/components/schemas/TracerPeer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TracerStep": {
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "info": {
+            "type": "string"
+          },
+          "packetNumber": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payloadHex": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stepIndex": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TracerStepsResponse": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TracerStep"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "UniqueHost": {
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "port": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateAnnotationRequest": {
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateNetworkRequest": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "UpsertNodeRoleRequest": {
+        "properties": {
+          "confirmedByHuman": {
+            "type": "boolean"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "roleDescription": {
+            "type": "string"
+          },
+          "roleLabel": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpsertNoteRequest": {
+        "properties": {
+          "entityKey": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpsertSubnetRequest": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "WebServerDetailResponse": {
+        "properties": {
+          "api": {
+            "type": "boolean"
+          },
+          "clientErrorCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "clientErrorRatio": {
+            "format": "double",
+            "type": "number"
+          },
+          "contentTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/HttpEndpointDto"
+            },
+            "type": "array"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "serverErrorCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "serverIp": {
+            "type": "string"
+          },
+          "serverSoftware": {
+            "type": "string"
+          },
+          "successCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "suspicious": {
+            "type": "boolean"
+          },
+          "tls": {
+            "$ref": "#/components/schemas/TlsInfo"
+          },
+          "totalRequests": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "openapi": "3.0.1",
+  "paths": {
+    "/api/v1/analysis/{fileId}/protocols": {
+      "get": {
+        "operationId": "getProtocolStats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtocolStatsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get protocol statistics for a file (202 while still processing)",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/{fileId}/summary": {
+      "get": {
+        "operationId": "getAnalysisSummary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisSummaryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get analysis summary for a file (202 while still processing)",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/conversations/detail/{conversationId}": {
+      "get": {
+        "operationId": "getConversationDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get conversation details with packet stream",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/detail/{conversationId}/export-pcap": {
+      "get": {
+        "operationId": "exportConversationAsPcap",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Export a single conversation as PCAP",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/detail/{conversationId}/session": {
+      "get": {
+        "operationId": "getSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Reconstruct TCP/UDP session with application-layer payload decoding",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}": {
+      "get": {
+        "operationId": "getConversations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number (1-indexed)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of items per page",
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter by IP address or hostname (src, dst, or hostname contains)",
+            "in": "query",
+            "name": "ip",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by port number (src or dst)",
+            "in": "query",
+            "name": "port",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated list of L4 protocols to include",
+            "in": "query",
+            "name": "protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of L7 protocols (tshark) to include",
+            "in": "query",
+            "name": "l7Protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of application names to include",
+            "in": "query",
+            "name": "apps",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of categories to include",
+            "in": "query",
+            "name": "categories",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "When true, only conversations with flow risks are returned",
+            "in": "query",
+            "name": "hasRisks",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Comma-separated list of detected file types to include",
+            "in": "query",
+            "name": "fileTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of nDPI risk types to include",
+            "in": "query",
+            "name": "riskTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of custom signature rule names to include",
+            "in": "query",
+            "name": "customSignatures",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of Suricata IDS alerts to include",
+            "in": "query",
+            "name": "suricataAlerts",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter conversations whose payload contains this pattern (ASCII or hex, e.g. 'GET /admin', '0x474554', '47 45 54')",
+            "in": "query",
+            "name": "payloadContains",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Field to sort by: srcIp, dstIp, packets, bytes, duration, startTime",
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort direction: asc (default) or desc",
+            "in": "query",
+            "name": "sortDir",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Legacy alias for ip param",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of device types to include (ROUTER, MOBILE, LAPTOP_DESKTOP, SERVER, IOT, UNKNOWN, or custom)",
+            "in": "query",
+            "name": "deviceTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG)",
+            "in": "query",
+            "name": "countries",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseConversationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get conversations with filtering, sorting, and pagination",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/countries": {
+      "get": {
+        "operationId": "getCountries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List distinct country codes seen in external IPs for a file",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/custom-signatures": {
+      "get": {
+        "operationId": "getCustomSignatures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List distinct custom signature rule names for a file",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/export": {
+      "get": {
+        "operationId": "exportConversations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ip",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "port",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "l7Protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "apps",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "categories",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasRisks",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "riskTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customSignatures",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "suricataAlerts",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "payloadContains",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortDir",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "deviceTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "countries",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Export filtered conversations as CSV",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/export-pcap": {
+      "get": {
+        "operationId": "exportConversationsAsPcap",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ip",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "port",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "l7Protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "apps",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "categories",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasRisks",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "riskTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customSignatures",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "suricataAlerts",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "payloadContains",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortDir",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "deviceTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "countries",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Export filtered conversations as PCAP",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/file-types": {
+      "get": {
+        "operationId": "getFileTypes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List distinct detected file types for a file",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/risk-types": {
+      "get": {
+        "operationId": "getRiskTypes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List distinct nDPI risk types for a file",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/suricata-alerts": {
+      "get": {
+        "operationId": "getSuricataAlerts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List distinct Suricata IDS alerts for a file",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/custom-private-ranges": {
+      "get": {
+        "operationId": "list_4",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomPrivateRangeDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List custom private ranges",
+        "tags": [
+          "Custom Private Ranges"
+        ]
+      },
+      "post": {
+        "operationId": "create_3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomPrivateRangeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Add a custom private range",
+        "tags": [
+          "Custom Private Ranges"
+        ]
+      }
+    },
+    "/api/v1/custom-private-ranges/{id}": {
+      "delete": {
+        "operationId": "delete_6",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete a custom private range",
+        "tags": [
+          "Custom Private Ranges"
+        ]
+      }
+    },
+    "/api/v1/entity-notes": {
+      "delete": {
+        "operationId": "delete_5",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete an entity's note",
+        "tags": [
+          "Entity Notes"
+        ]
+      },
+      "get": {
+        "operationId": "getNote",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityNoteDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the note for an entity",
+        "tags": [
+          "Entity Notes"
+        ]
+      },
+      "put": {
+        "operationId": "upsert_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityNoteDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Create or update an entity's note",
+        "tags": [
+          "Entity Notes"
+        ]
+      }
+    },
+    "/api/v1/entity-notes/history": {
+      "get": {
+        "operationId": "getHistory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntityHistoryEntry"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the change history for an entity's note",
+        "tags": [
+          "Entity Notes"
+        ]
+      }
+    },
+    "/api/v1/files": {
+      "get": {
+        "description": "Get all uploaded files with pagination",
+        "operationId": "getAllFiles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "uploadedAt,desc",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ANALYSIS",
+                "MONITOR"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseFileMetadataDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get all files",
+        "tags": [
+          "File Management"
+        ]
+      },
+      "post": {
+        "description": "Upload a PCAP file for analysis",
+        "operationId": "uploadFile",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "enableNdpi",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "enableSuricata",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "enableFileExtraction",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "ANALYSIS",
+              "enum": [
+                "ANALYSIS",
+                "MONITOR"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Upload PCAP file",
+        "tags": [
+          "File Management"
+        ]
+      }
+    },
+    "/api/v1/files/compare/report": {
+      "post": {
+        "operationId": "downloadCompareReport",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate and download a PDF compare-topology report for multiple PCAP files",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/files/merge": {
+      "post": {
+        "description": "Merge two or more PCAP files into a single new file and trigger analysis",
+        "operationId": "mergeFiles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "enableNdpi",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "enableSuricata",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "enableFileExtraction",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeFilesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Merge PCAP files",
+        "tags": [
+          "File Management"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}": {
+      "delete": {
+        "description": "Delete a PCAP file",
+        "operationId": "deleteFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete file",
+        "tags": [
+          "File Management"
+        ]
+      },
+      "get": {
+        "description": "Get metadata for a specific file",
+        "operationId": "getFileMetadata",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMetadataDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get file metadata",
+        "tags": [
+          "File Management"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/download": {
+      "get": {
+        "description": "Download a PCAP file",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Download file",
+        "tags": [
+          "File Management"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/extractions": {
+      "get": {
+        "operationId": "listExtractions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "conversationId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExtractedFileResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List all files extracted from a PCAP capture",
+        "tags": [
+          "Extracted Files"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/extractions/warnings": {
+      "get": {
+        "operationId": "extractionWarnings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionWarningsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Report which file-extraction limits were hit for a PCAP capture",
+        "tags": [
+          "Extracted Files"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/extractions/{extractionId}/download": {
+      "get": {
+        "operationId": "download",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "extractionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Download an extracted file",
+        "tags": [
+          "Extracted Files"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/extractions/{extractionId}/preview": {
+      "get": {
+        "operationId": "preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "extractionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Preview an extracted file inline (browser-renderable types only)",
+        "tags": [
+          "Extracted Files"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/host-classifications": {
+      "get": {
+        "operationId": "getHostClassifications",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HostClassificationResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List device-type classifications for all hosts in a file",
+        "tags": [
+          "Host Classifications"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/report": {
+      "post": {
+        "operationId": "downloadReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate and download a PDF analysis report for a PCAP file",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/security-alerts": {
+      "get": {
+        "operationId": "getSecurityAlerts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get conversations with nDPI security risk flags",
+        "tags": [
+          "Security Alerts"
+        ]
+      }
+    },
+    "/api/v1/filter/{fileId}/execute": {
+      "post": {
+        "description": "Applies a BPF filter to a PCAP file and returns matching packets with pagination support",
+        "operationId": "executeFilter",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilterExecutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilterExecutionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Execute filter on PCAP file with pagination",
+        "tags": [
+          "Filter Generator"
+        ]
+      }
+    },
+    "/api/v1/filter/{fileId}/generate": {
+      "post": {
+        "description": "Uses AI to convert a natural language query into a BPF filter expression",
+        "operationId": "generateFilter",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilterGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilterGenerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate filter from natural language",
+        "tags": [
+          "Filter Generator"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/clusters": {
+      "get": {
+        "description": "Returns network hosts grouped into clusters by ASN, country, subnet, or device type. Supports the same conversation filters as the conversations endpoint to pre-filter traffic before clustering.",
+        "operationId": "getClusters",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupBy",
+            "required": false,
+            "schema": {
+              "default": "asn",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by IP address or hostname",
+            "in": "query",
+            "name": "ip",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by port number (src or dst)",
+            "in": "query",
+            "name": "port",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated L4 protocols",
+            "in": "query",
+            "name": "protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated L7 protocols",
+            "in": "query",
+            "name": "l7Protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated application names",
+            "in": "query",
+            "name": "apps",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated categories",
+            "in": "query",
+            "name": "categories",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only conversations with flow risks",
+            "in": "query",
+            "name": "hasRisks",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Comma-separated detected file types",
+            "in": "query",
+            "name": "fileTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated nDPI risk types",
+            "in": "query",
+            "name": "riskTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated custom signature rule names",
+            "in": "query",
+            "name": "customSignatures",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by payload content (ASCII or hex)",
+            "in": "query",
+            "name": "payloadContains",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated device types",
+            "in": "query",
+            "name": "deviceTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated ISO 3166-1 alpha-2 country codes",
+            "in": "query",
+            "name": "countries",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated network label names (e.g. 'Office,DMZ')",
+            "in": "query",
+            "name": "networkLabels",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClusterGraphResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get clustered network topology",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/dns-servers": {
+      "get": {
+        "description": "Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).",
+        "operationId": "getDnsServers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceServerSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List DNS servers and their resolution health",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/dns/{serverIp}": {
+      "get": {
+        "description": "Returns the per-domain query log (hostname queried, response code, resolved IPs, query count, resolvable) for the given DNS server, plus summary counts and the suspicious verdict.",
+        "operationId": "getDnsQueryLog",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "serverIp",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DnsQueryLogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the DNS query log for one DNS server",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/packet-location/{packetNumber}": {
+      "get": {
+        "description": "Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.",
+        "operationId": "locatePacket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "packetNumber",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketLocationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Locate a packet by frame number",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/top-hosts": {
+      "get": {
+        "description": "Returns the top N hosts ranked by bytes, packets, conversations, or risk count.",
+        "operationId": "getTopHosts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "default": "bytes",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopHostsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get top hosts by traffic volume",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/web-servers": {
+      "get": {
+        "description": "Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).",
+        "operationId": "getWebServers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceServerSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List web/API servers and their HTTP health",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/{fileId}/web/{serverIp}": {
+      "get": {
+        "description": "Returns the per-endpoint log (method, path, status-class counts, content type) plus server software, content types and TLS metadata (cleartext HTTP only for endpoints; TLS detail for HTTPS).",
+        "operationId": "getWebServerDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "serverIp",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebServerDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the HTTP endpoint log + detail for one web/API server",
+        "tags": [
+          "Network Intelligence"
+        ]
+      }
+    },
+    "/api/v1/ip-org-rules": {
+      "get": {
+        "operationId": "list_3",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IpOrgRuleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List IP organization rules",
+        "tags": [
+          "IP Org Rules"
+        ]
+      },
+      "post": {
+        "operationId": "create_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IpOrgRuleDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Add an IP organization rule",
+        "tags": [
+          "IP Org Rules"
+        ]
+      }
+    },
+    "/api/v1/ip-org-rules/{id}": {
+      "delete": {
+        "operationId": "delete_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete an IP organization rule",
+        "tags": [
+          "IP Org Rules"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks": {
+      "get": {
+        "operationId": "getAllNetworks",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NetworkDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List all monitored networks",
+        "tags": [
+          "Monitor Networks"
+        ]
+      },
+      "post": {
+        "operationId": "createNetwork",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNetworkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a new monitored network",
+        "tags": [
+          "Monitor Networks"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}": {
+      "delete": {
+        "operationId": "deleteNetwork",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Delete a network",
+        "tags": [
+          "Monitor Networks"
+        ]
+      },
+      "get": {
+        "operationId": "getNetwork",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get a single network by ID",
+        "tags": [
+          "Monitor Networks"
+        ]
+      },
+      "patch": {
+        "operationId": "updateNetwork",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNetworkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Update a network's metadata",
+        "tags": [
+          "Monitor Networks"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/annotations": {
+      "get": {
+        "operationId": "list_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NetworkAnnotationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List annotations for a network",
+        "tags": [
+          "Network Annotations"
+        ]
+      },
+      "post": {
+        "operationId": "create_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnnotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkAnnotationDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Create an annotation",
+        "tags": [
+          "Network Annotations"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/annotations/{annotationId}": {
+      "delete": {
+        "operationId": "delete_3",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "annotationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete an annotation",
+        "tags": [
+          "Network Annotations"
+        ]
+      },
+      "patch": {
+        "operationId": "update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "annotationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAnnotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkAnnotationDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Update an annotation's body",
+        "tags": [
+          "Network Annotations"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/baseline/definitions": {
+      "get": {
+        "operationId": "listDefinitions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BaselineDefinitionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List baseline definitions for a network",
+        "tags": [
+          "Monitor Baseline Definitions"
+        ]
+      },
+      "post": {
+        "operationId": "createDefinition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBaselineDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaselineDefinitionDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a baseline definition",
+        "tags": [
+          "Monitor Baseline Definitions"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/baseline/definitions/{definitionId}": {
+      "delete": {
+        "operationId": "deleteDefinition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "definitionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Delete a baseline definition",
+        "tags": [
+          "Monitor Baseline Definitions"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/changes": {
+      "get": {
+        "operationId": "listChanges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "changeType",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeEventDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List change events, optionally filtered by type and severity",
+        "tags": [
+          "Monitor Change Events"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/changes/{eventId}": {
+      "patch": {
+        "operationId": "patchEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": {
+                  "type": "object"
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeEventDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Update a change event's reviewed flag or notes",
+        "tags": [
+          "Monitor Change Events"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/external-events": {
+      "get": {
+        "operationId": "list_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NetworkExternalEventDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List external events for a network",
+        "tags": [
+          "Network External Events"
+        ]
+      },
+      "post": {
+        "operationId": "create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExternalEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkExternalEventDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Create an external event",
+        "tags": [
+          "Network External Events"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/external-events/{eventId}": {
+      "delete": {
+        "operationId": "delete_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete an external event",
+        "tags": [
+          "Network External Events"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/insights": {
+      "post": {
+        "operationId": "generate_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInsightRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkInsightDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate a new insight for a network",
+        "tags": [
+          "Network Insights"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/insights/latest": {
+      "get": {
+        "operationId": "getLatest_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkInsightDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the latest generated insight for a network",
+        "tags": [
+          "Network Insights"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/snapshots": {
+      "get": {
+        "operationId": "listSnapshots",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NetworkSnapshotDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List snapshots for a network",
+        "tags": [
+          "Monitor Snapshots"
+        ]
+      },
+      "post": {
+        "operationId": "addSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSnapshotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkSnapshotDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a snapshot to a network",
+        "tags": [
+          "Monitor Snapshots"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}": {
+      "delete": {
+        "operationId": "removeSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snapshotId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Remove a snapshot from a network",
+        "tags": [
+          "Monitor Snapshots"
+        ]
+      },
+      "patch": {
+        "operationId": "patchSnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snapshotId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchSnapshotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkSnapshotDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Update a snapshot's metadata",
+        "tags": [
+          "Monitor Snapshots"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insights": {
+      "post": {
+        "operationId": "generate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snapshotId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInsightRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkInsightDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate a new insight for a snapshot",
+        "tags": [
+          "Snapshot Insights"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insights/latest": {
+      "get": {
+        "operationId": "getLatest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "snapshotId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkInsightDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the latest generated insight for a snapshot",
+        "tags": [
+          "Snapshot Insights"
+        ]
+      }
+    },
+    "/api/v1/node-roles": {
+      "delete": {
+        "operationId": "delete_1",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Remove an entity's role",
+        "tags": [
+          "Node Roles"
+        ]
+      },
+      "get": {
+        "operationId": "getRole",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the role assigned to an entity",
+        "tags": [
+          "Node Roles"
+        ]
+      },
+      "put": {
+        "operationId": "upsert",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertNodeRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Create or update an entity's role",
+        "tags": [
+          "Node Roles"
+        ]
+      }
+    },
+    "/api/v1/node-roles/suggest": {
+      "post": {
+        "operationId": "suggest",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Suggest a role for an entity based on observed traffic",
+        "tags": [
+          "Node Roles"
+        ]
+      }
+    },
+    "/api/v1/signatures": {
+      "get": {
+        "operationId": "getSignatures",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get custom signatures file content",
+        "tags": [
+          "Signatures"
+        ]
+      },
+      "put": {
+        "operationId": "saveSignatures",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Save custom signatures file content",
+        "tags": [
+          "Signatures"
+        ]
+      }
+    },
+    "/api/v1/signatures/rules": {
+      "get": {
+        "operationId": "getSignatureRules",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List configured signature rules with severity",
+        "tags": [
+          "Signatures"
+        ]
+      }
+    },
+    "/api/v1/stories": {
+      "get": {
+        "description": "Get the latest story for a file, if one exists",
+        "operationId": "getStoryByFileId",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get story by file",
+        "tags": [
+          "Story Generation"
+        ]
+      },
+      "post": {
+        "description": "Generate an AI-powered narrative story for a PCAP file",
+        "operationId": "generateStory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateStoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate story",
+        "tags": [
+          "Story Generation"
+        ]
+      }
+    },
+    "/api/v1/stories/{storyId}": {
+      "get": {
+        "description": "Get a generated story by ID",
+        "operationId": "getStory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get story",
+        "tags": [
+          "Story Generation"
+        ]
+      }
+    },
+    "/api/v1/stories/{storyId}/questions": {
+      "post": {
+        "description": "Ask the LLM a question about an existing story",
+        "operationId": "askQuestion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryQuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryAnswerResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Ask a question",
+        "tags": [
+          "Story Generation"
+        ]
+      }
+    },
+    "/api/v1/subnets": {
+      "get": {
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubnetDefinitionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List defined subnets",
+        "tags": [
+          "Subnets"
+        ]
+      },
+      "post": {
+        "operationId": "upsert_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSubnetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetDefinitionDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Create or update a subnet definition",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/detect": {
+      "get": {
+        "operationId": "detect",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubnetDefinitionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Auto-detect subnets from a capture file",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/detect/network": {
+      "get": {
+        "operationId": "detectFromNetwork",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubnetDefinitionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Auto-detect subnets across a monitored network",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/detected": {
+      "post": {
+        "operationId": "saveDetected",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSubnetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetDefinitionDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Persist an auto-detected subnet",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/{id}": {
+      "delete": {
+        "operationId": "delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Delete a subnet definition",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/system/limits": {
+      "get": {
+        "operationId": "getLimits",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "object"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get runtime limits (upload size, analysis and LLM timeouts)",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/v1/system/time": {
+      "get": {
+        "operationId": "getServerTime",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the server's current local datetime",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/v1/timeline/{fileId}": {
+      "get": {
+        "operationId": "getTimeline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "interval",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxDataPoints",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 10000,
+              "minimum": 10,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineDataDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get binned timeline data for a file",
+        "tags": [
+          "Timeline"
+        ]
+      }
+    },
+    "/api/v1/timeline/{fileId}/range": {
+      "get": {
+        "operationId": "getTimelineRange",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "interval",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxDataPoints",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 10000,
+              "minimum": 10,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineDataDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get binned timeline data for a specific time range",
+        "tags": [
+          "Timeline"
+        ]
+      }
+    },
+    "/api/v1/tracer/{conversationId}/explanations": {
+      "post": {
+        "description": "Generates a plain-English explanation for each packet in the conversation using the configured LLM. Results are cached per conversation.",
+        "operationId": "explainSteps",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracerExplainResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Generate AI explanations",
+        "tags": [
+          "Conversation Tracer"
+        ]
+      }
+    },
+    "/api/v1/tracer/{conversationId}/peers": {
+      "get": {
+        "description": "Returns every peer the traced host exchanged packets with, each flagged as responding or silent — for scan-style visualisation (e.g. ARP scans).",
+        "operationId": "getPeers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracerPeersResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get traced host's peers with response status",
+        "tags": [
+          "Conversation Tracer"
+        ]
+      }
+    },
+    "/api/v1/tracer/{conversationId}/steps": {
+      "get": {
+        "description": "Returns ordered packet steps for a conversation, ready for step-through visualisation.",
+        "operationId": "getSteps",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracerStepsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get conversation steps",
+        "tags": [
+          "Conversation Tracer"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "AI-generated insights for a monitored network",
+      "name": "Network Insights"
+    },
+    {
+      "description": "Read and update the custom signature ruleset",
+      "name": "Signatures"
+    },
+    {
+      "description": "Server time and runtime limits",
+      "name": "System"
+    },
+    {
+      "description": "User-recorded external events correlated with a monitored network",
+      "name": "Network External Events"
+    },
+    {
+      "description": "User-assigned roles for network entities (hosts/subnets)",
+      "name": "Node Roles"
+    },
+    {
+      "description": "PCAP analysis summary and protocol statistics",
+      "name": "Analysis"
+    },
+    {
+      "description": "Per-file device-type classifications for hosts",
+      "name": "Host Classifications"
+    },
+    {
+      "description": "Per-file nDPI security alerts",
+      "name": "Security Alerts"
+    },
+    {
+      "description": "Detected drift events for a monitored network",
+      "name": "Monitor Change Events"
+    },
+    {
+      "description": "User-defined CIDR-to-organization label mappings",
+      "name": "IP Org Rules"
+    },
+    {
+      "description": "User-defined CIDR ranges treated as private/internal",
+      "name": "Custom Private Ranges"
+    },
+    {
+      "description": "Per-file conversation listing, facets, export, and session reconstruction",
+      "name": "Conversations"
+    },
+    {
+      "description": "User notes attached to network entities, with history",
+      "name": "Entity Notes"
+    },
+    {
+      "description": "Files carved from a capture, with preview and download",
+      "name": "Extracted Files"
+    },
+    {
+      "description": "User-defined subnet labels and auto-detection",
+      "name": "Subnets"
+    },
+    {
+      "description": "Binned traffic statistics over time for a file",
+      "name": "Timeline"
+    },
+    {
+      "description": "Manage monitored networks",
+      "name": "Monitor Networks"
+    },
+    {
+      "description": "Generate single-file and comparison PDF reports",
+      "name": "Reports"
+    },
+    {
+      "description": "APIs for natural language to pcap filter generation and execution",
+      "name": "Filter Generator"
+    },
+    {
+      "description": "AI-generated insights for a single snapshot",
+      "name": "Snapshot Insights"
+    },
+    {
+      "description": "Capture snapshots attached to a monitored network",
+      "name": "Monitor Snapshots"
+    },
+    {
+      "description": "Baseline rules used to detect drift in a monitored network",
+      "name": "Monitor Baseline Definitions"
+    },
+    {
+      "description": "APIs for AI-powered network traffic story generation",
+      "name": "Story Generation"
+    },
+    {
+      "description": "APIs for PCAP file upload, download, and management",
+      "name": "File Management"
+    },
+    {
+      "description": "Free-text annotations on a monitored network",
+      "name": "Network Annotations"
+    },
+    {
+      "description": "Large-scale network topology clustering and host analytics",
+      "name": "Network Intelligence"
+    },
+    {
+      "description": "Packet-level conversation trace with AI explanations",
+      "name": "Conversation Tracer"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 package com.tracepcap.report;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +14,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 @Slf4j
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/files")
 @RequiredArgsConstructor
+@Tag(name = "Reports", description = "Generate single-file and comparison PDF reports")
 public class ReportController {
 
   private final ReportService reportService;

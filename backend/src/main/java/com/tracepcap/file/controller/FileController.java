@@ -1,5 +1,6 @@
 package com.tracepcap.file.controller;
 
+import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.dto.MergeFilesRequest;
@@ -27,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 /** REST controller for file management operations */
 @Slf4j
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/files")
 @RequiredArgsConstructor
 @Tag(name = "File Management", description = "APIs for PCAP file upload, download, and management")
 public class FileController {
@@ -59,23 +60,32 @@ public class FileController {
 
   @GetMapping
   @Operation(summary = "Get all files", description = "Get all uploaded files with pagination")
-  public ResponseEntity<Page<FileMetadataDto>> getAllFiles(
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size,
+  public ResponseEntity<PagedResponse<FileMetadataDto>> getAllFiles(
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "20") int pageSize,
       @RequestParam(defaultValue = "uploadedAt,desc") String sort,
       @RequestParam(required = false) FileSource source) {
 
-    // Parse sort parameter
-    String[] sortParams = sort.split(",");
+    if (page < 1) page = 1;
+    if (pageSize < 1) pageSize = 20;
+    else if (pageSize > 100) pageSize = 100; // cap to bound DB load / response size
+
+    // Parse sort parameter; fall back to a stable default for blank/malformed input
+    // (e.g. "?sort=" or "?sort=,asc") rather than letting an empty field reach Sort.by().
+    String[] sortParams = sort == null ? new String[0] : sort.split(",");
+    String sortField =
+        sortParams.length > 0 && !sortParams[0].isBlank() ? sortParams[0].trim() : "uploadedAt";
     Sort.Direction direction =
-        sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc")
+        sortParams.length > 1 && "asc".equalsIgnoreCase(sortParams[1].trim())
             ? Sort.Direction.ASC
             : Sort.Direction.DESC;
-    Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
+    // PageRequest is 0-indexed; the public API is 1-indexed (matches PagedResponse).
+    Pageable pageable = PageRequest.of(page - 1, pageSize, Sort.by(direction, sortField));
 
     Page<FileMetadataDto> files = fileService.getAllFiles(pageable, source);
 
-    return ResponseEntity.ok(files);
+    return ResponseEntity.ok(
+        PagedResponse.of(files.getContent(), files.getTotalElements(), page, pageSize));
   }
 
   @GetMapping("/{fileId}")

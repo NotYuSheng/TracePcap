@@ -4,6 +4,8 @@ import com.tracepcap.insights.dto.CreateAnnotationRequest;
 import com.tracepcap.insights.dto.NetworkAnnotationDto;
 import com.tracepcap.insights.dto.UpdateAnnotationRequest;
 import com.tracepcap.insights.service.NetworkAnnotationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -12,18 +14,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/monitor/networks/{networkId}/annotations")
+@RequestMapping("/monitor/networks/{networkId}/annotations")
 @RequiredArgsConstructor
+@Tag(name = "Network Annotations", description = "Free-text annotations on a monitored network")
 public class NetworkAnnotationController {
 
   private final NetworkAnnotationService service;
 
   @GetMapping
+  @Operation(summary = "List annotations for a network")
   public List<NetworkAnnotationDto> list(@PathVariable UUID networkId) {
     return service.listAnnotations(networkId);
   }
 
   @PostMapping
+  @Operation(summary = "Create an annotation")
   public ResponseEntity<NetworkAnnotationDto> create(
       @PathVariable UUID networkId,
       @RequestBody CreateAnnotationRequest req) {
@@ -34,6 +39,7 @@ public class NetworkAnnotationController {
   }
 
   @PatchMapping("/{annotationId}")
+  @Operation(summary = "Update an annotation's body")
   public ResponseEntity<NetworkAnnotationDto> update(
       @PathVariable UUID networkId,
       @PathVariable UUID annotationId,
@@ -43,6 +49,7 @@ public class NetworkAnnotationController {
   }
 
   @DeleteMapping("/{annotationId}")
+  @Operation(summary = "Delete an annotation")
   public ResponseEntity<Void> delete(
       @PathVariable UUID networkId,
       @PathVariable UUID annotationId) {

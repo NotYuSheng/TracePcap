@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/tracer")
+@RequestMapping("/tracer")
 @RequiredArgsConstructor
 @Tag(name = "Conversation Tracer", description = "Packet-level conversation trace with AI explanations")
 public class ConversationTracerController {
@@ -39,7 +39,7 @@ public class ConversationTracerController {
     return ResponseEntity.ok(tracerService.getPeers(conversationId));
   }
 
-  @PostMapping("/{conversationId}/explain")
+  @PostMapping("/{conversationId}/explanations")
   @Operation(
       summary = "Generate AI explanations",
       description = "Generates a plain-English explanation for each packet in the conversation using the configured LLM. Results are cached per conversation.")

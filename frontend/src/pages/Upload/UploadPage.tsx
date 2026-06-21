@@ -27,7 +27,7 @@ export const UploadPage = () => {
     .filter((t: string) => t.length > 0);
 
   useEffect(() => {
-    fetch('/api/system/limits')
+    fetch('/api/v1/system/limits')
       .then(r => r.json())
       .then(data => {
         if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes);

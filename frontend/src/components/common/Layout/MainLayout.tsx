@@ -16,7 +16,7 @@ function useBackendReady() {
 
     async function check() {
       try {
-        const res = await fetch('/api/system/limits');
+        const res = await fetch('/api/v1/system/limits');
         if (res.ok) {
           if (!cancelled) setReady(true);
           return;

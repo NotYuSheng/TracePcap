@@ -13,7 +13,7 @@ RUN npm ci
 COPY frontend ./
 
 # Build-time env vars (passed from docker-compose build args / root .env)
-ARG VITE_API_BASE_URL=/api
+ARG VITE_API_BASE_URL=/api/v1
 ARG VITE_SUPPORTED_FILE_TYPES=.pcap,.pcapng,.cap
 ARG VITE_ANALYSIS_OPTIONS=false
 ARG VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false

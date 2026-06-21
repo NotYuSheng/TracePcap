@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Validated
 @RestController
-@RequestMapping("/api/network/intelligence")
+@RequestMapping("/intelligence")
 @RequiredArgsConstructor
 @Tag(name = "Network Intelligence", description = "Large-scale network topology clustering and host analytics")
 public class NetworkIntelligenceController {

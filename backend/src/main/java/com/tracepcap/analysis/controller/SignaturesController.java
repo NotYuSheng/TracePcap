@@ -1,6 +1,7 @@
 package com.tracepcap.analysis.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -20,7 +21,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 /** REST controller for reading and saving the custom signatures file. */
 @Slf4j
 @RestController
-@RequestMapping("/api/signatures")
+@RequestMapping("/signatures")
+@Tag(name = "Signatures", description = "Read and update the custom signature ruleset")
 public class SignaturesController {
 
   @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")

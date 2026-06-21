@@ -27,15 +27,15 @@ export const API_ENDPOINTS = {
   TIMELINE_RANGE: (fileId: string, start: number, end: number) =>
     `/timeline/${fileId}?start=${start}&end=${end}`,
 
-  // Story (Not yet implemented in backend)
-  GENERATE_STORY: (fileId: string) => `/story/generate/${fileId}`,
-  GET_STORY: (storyId: string) => `/story/${storyId}`,
-  GET_STORY_BY_FILE: (fileId: string) => `/story/file/${fileId}`,
-  ASK_STORY: (storyId: string) => `/story/${storyId}/ask`,
+  // Story
+  STORIES: '/stories',
+  GET_STORY: (storyId: string) => `/stories/${storyId}`,
+  GET_STORY_BY_FILE: (fileId: string) => `/stories?fileId=${fileId}`,
+  ASK_STORY: (storyId: string) => `/stories/${storyId}/questions`,
 
-  // Filter Generator (Not yet implemented in backend)
-  GENERATE_FILTER: (fileId: string) => `/filter/generate/${fileId}`,
-  EXECUTE_FILTER: (fileId: string) => `/filter/execute/${fileId}`,
+  // Filter Generator
+  GENERATE_FILTER: (fileId: string) => `/filter/${fileId}/generate`,
+  EXECUTE_FILTER: (fileId: string) => `/filter/${fileId}/execute`,
 
   // Extracted Files
   EXTRACTED_FILES: (fileId: string) => `/files/${fileId}/extractions`,
@@ -45,24 +45,24 @@ export const API_ENDPOINTS = {
 
   // Network Intelligence
   NETWORK_INTELLIGENCE_CLUSTERS: (fileId: string, groupBy: string) =>
-    `/network/intelligence/${fileId}/clusters?groupBy=${groupBy}`,
+    `/intelligence/${fileId}/clusters?groupBy=${groupBy}`,
   NETWORK_INTELLIGENCE_TOP_HOSTS: (fileId: string, sortBy: string, limit: number) =>
-    `/network/intelligence/${fileId}/top-hosts?sortBy=${sortBy}&limit=${limit}`,
+    `/intelligence/${fileId}/top-hosts?sortBy=${sortBy}&limit=${limit}`,
   NETWORK_INTELLIGENCE_DNS_SERVERS: (fileId: string) =>
-    `/network/intelligence/${fileId}/dns-servers`,
+    `/intelligence/${fileId}/dns-servers`,
   NETWORK_INTELLIGENCE_DNS_LOG: (fileId: string, serverIp: string) =>
-    `/network/intelligence/${fileId}/dns/${encodeURIComponent(serverIp)}`,
+    `/intelligence/${fileId}/dns/${encodeURIComponent(serverIp)}`,
   NETWORK_INTELLIGENCE_WEB_SERVERS: (fileId: string) =>
-    `/network/intelligence/${fileId}/web-servers`,
+    `/intelligence/${fileId}/web-servers`,
   NETWORK_INTELLIGENCE_WEB_DETAIL: (fileId: string, serverIp: string) =>
-    `/network/intelligence/${fileId}/web/${encodeURIComponent(serverIp)}`,
+    `/intelligence/${fileId}/web/${encodeURIComponent(serverIp)}`,
   NETWORK_INTELLIGENCE_PACKET_LOCATION: (fileId: string, packetNumber: number) =>
-    `/network/intelligence/${fileId}/packet-location/${packetNumber}`,
+    `/intelligence/${fileId}/packet-location/${packetNumber}`,
 
   // Conversation Tracer
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,
   TRACER_PEERS: (conversationId: string) => `/tracer/${conversationId}/peers`,
-  TRACER_EXPLAIN: (conversationId: string) => `/tracer/${conversationId}/explain`,
+  TRACER_EXPLAIN: (conversationId: string) => `/tracer/${conversationId}/explanations`,
 
   // IP Org Rules (Network Labels)
   IP_ORG_RULES: '/ip-org-rules',
@@ -102,13 +102,13 @@ export const MONITOR_ENDPOINTS = {
   ANNOTATION: (networkId: string, annotationId: string) =>
     `/monitor/networks/${networkId}/annotations/${annotationId}`,
   INSIGHTS_LATEST: (networkId: string) => `/monitor/networks/${networkId}/insights/latest`,
-  INSIGHTS_GENERATE: (networkId: string) => `/monitor/networks/${networkId}/insights/generate`,
+  INSIGHTS_GENERATE: (networkId: string) => `/monitor/networks/${networkId}/insights`,
   SNAPSHOT_PATCH: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
   SNAPSHOT_INSIGHT_LATEST: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights/latest`,
   SNAPSHOT_INSIGHT_GENERATE: (networkId: string, snapshotId: string) =>
-    `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights/generate`,
+    `/monitor/networks/${networkId}/snapshots/${snapshotId}/insights`,
 };
 
 export const SUBNET_ENDPOINTS = {

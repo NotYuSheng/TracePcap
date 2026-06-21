@@ -1,7 +1,9 @@
 package com.tracepcap.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDateTime;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,4 +36,8 @@ public class ErrorResponse {
   private Integer promptTokens;
 
   private Integer contextLength;
+
+  /** Per-field validation messages, present only on 400 validation failures. */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Map<String, String> validationErrors;
 }
