@@ -27,9 +27,13 @@ date with your change first:
 
 ```bash
 docker compose up -d --build      # rebuild & start the stack with your change
+# the backend takes a few seconds to boot — wait until it serves the spec
+until curl -sf http://localhost:8888/v3/api-docs >/dev/null; do sleep 2; done
 node scripts/openapi-snapshot.mjs # regenerate openapi/baseline.json
 git add openapi/baseline.json     # commit it alongside your code change
 ```
+
+(CI does the same readiness wait before running the script.)
 
 ### What CI enforces
 
