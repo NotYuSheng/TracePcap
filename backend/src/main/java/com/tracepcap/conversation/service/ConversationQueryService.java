@@ -162,6 +162,10 @@ public class ConversationQueryService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
+    if (conv.getFile() == null || conv.getFile().getMinioPath() == null) {
+      throw new IOException("PCAP file path not found for conversation: " + conversationId);
+    }
+
     List<Long> frameNumbers =
         packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId).stream()
             .map(PacketEntity::getPacketNumber)
@@ -209,6 +213,7 @@ public class ConversationQueryService {
           throw new IOException("tshark failed to filter PCAP (exit code " + exitCode + ")");
         }
       } catch (InterruptedException e) {
+        proc.destroyForcibly();
         Thread.currentThread().interrupt();
         throw new IOException("PCAP export interrupted", e);
       }
@@ -306,9 +311,11 @@ public class ConversationQueryService {
       try {
         int exitCode = proc.waitFor();
         if (exitCode != 0) {
-          log.warn("tshark exited with code {} during PCAP export for fileId={}", exitCode, fileId);
+          log.error("tshark exited with code {} during PCAP export for fileId={}", exitCode, fileId);
+          throw new IOException("tshark failed to filter PCAP (exit code " + exitCode + ")");
         }
       } catch (InterruptedException e) {
+        proc.destroyForcibly();
         Thread.currentThread().interrupt();
         throw new IOException("PCAP export interrupted", e);
       }
@@ -354,17 +361,18 @@ public class ConversationQueryService {
     Set<String> ips =
         conversations.stream()
             .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+            .filter(ip -> ip != null && !ip.isBlank())
             .collect(Collectors.toSet());
     try {
       return geoIpService.lookupExternal(ips);
     } catch (Exception e) {
       log.warn("Geo lookup failed during response mapping: {}", e.getMessage());
-      return Map.of();
+      return java.util.Collections.emptyMap();
     }
   }
 
   private Map<UUID, List<String>> buildFileTypeMap(List<UUID> ids) {
-    if (ids.isEmpty()) return Map.of();
+    if (ids.isEmpty()) return java.util.Collections.emptyMap();
     return packetRepository.findFileTypesByConversationIds(ids).stream()
         .collect(
             Collectors.groupingBy(
@@ -444,9 +452,10 @@ public class ConversationQueryService {
     List<PacketResponse> packetResponses =
         packets.stream().map(this::toPacketResponse).collect(Collectors.toList());
 
-    Map<String, GeoIpService.GeoResult> geoMap =
-        geoIpService.lookupExternal(
-            new HashSet<>(List.of(conversation.getSrcIp(), conversation.getDstIp())));
+    Set<String> detailIps = new HashSet<>();
+    if (conversation.getSrcIp() != null) detailIps.add(conversation.getSrcIp());
+    if (conversation.getDstIp() != null) detailIps.add(conversation.getDstIp());
+    Map<String, GeoIpService.GeoResult> geoMap = geoIpService.lookupExternal(detailIps);
 
     return ConversationDetailResponse.builder()
         .conversationId(conversation.getId())
