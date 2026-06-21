@@ -1,5 +1,7 @@
-package com.tracepcap.analysis.service;
+package com.tracepcap.signatures.service;
 
+import com.tracepcap.analysis.service.PcapParserService;
+import com.tracepcap.analysis.spi.SignatureApplier;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -47,7 +49,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  */
 @Slf4j
 @Service
-public class CustomSignatureService {
+public class CustomSignatureService implements SignatureApplier {
 
   @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
@@ -56,6 +58,7 @@ public class CustomSignatureService {
    * Evaluates all loaded rules against each conversation and appends matched rule names to the
    * conversation's {@code flowRisks} list in-place.
    */
+  @Override
   public void applySignatures(List<PcapParserService.ConversationInfo> conversations) {
     List<Map<String, Object>> rules = loadRules();
     if (rules.isEmpty() || conversations.isEmpty()) return;
@@ -114,6 +117,7 @@ public class CustomSignatureService {
    *     ip: "192.168.1.50"
    * </pre>
    */
+  @Override
   public Map<String, String> getDeviceTypeOverrides(
       List<PcapParserService.ConversationInfo> conversations) {
     List<Map<String, Object>> rules = loadRules();

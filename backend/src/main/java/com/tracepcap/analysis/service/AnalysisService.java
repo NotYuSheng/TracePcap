@@ -15,6 +15,7 @@ import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.SignatureApplier;
 import com.tracepcap.analysis.service.hostlog.DnsQueryLogExtractor;
 import com.tracepcap.analysis.service.hostlog.HostServiceLogExtractor;
 import com.tracepcap.analysis.service.hostlog.HostServiceLogResult;
@@ -74,7 +75,7 @@ public class AnalysisService {
   private final NdpiService ndpiService;
   private final TsharkEnrichmentService tsharkEnrichmentService;
   private final SuricataService suricataService;
-  private final CustomSignatureService customSignatureService;
+  private final SignatureApplier signatureApplier;
   private final DeviceClassifierService deviceClassifierService;
   private final HostnameResolverService hostnameResolverService;
   private final List<HostServiceLogExtractor> hostServiceLogExtractors;
@@ -140,9 +141,9 @@ public class AnalysisService {
 
         // Stage 4: Signatures, device classification, geo-IP
         t = System.currentTimeMillis();
-        customSignatureService.applySignatures(parseResult.getConversations());
+        signatureApplier.applySignatures(parseResult.getConversations());
         Map<String, String> deviceOverrides =
-            customSignatureService.getDeviceTypeOverrides(parseResult.getConversations());
+            signatureApplier.getDeviceTypeOverrides(parseResult.getConversations());
         // resolve() degrades gracefully and never throws — it returns a (possibly empty) map.
         Map<String, HostnameResolverService.ResolvedHostname> hostnames =
             hostnameResolverService.resolve(tempFile);
