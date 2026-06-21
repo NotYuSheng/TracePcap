@@ -5,6 +5,7 @@ import com.tracepcap.insights.dto.NetworkExternalEventDto;
 import com.tracepcap.insights.service.NetworkExternalEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -32,13 +33,7 @@ public class NetworkExternalEventController {
   @Operation(summary = "Create an external event")
   public ResponseEntity<NetworkExternalEventDto> create(
       @PathVariable UUID networkId,
-      @RequestBody CreateExternalEventRequest req) {
-    if (req.getTitle() == null || req.getTitle().isBlank()) {
-      return ResponseEntity.badRequest().build();
-    }
-    if (req.getEventTime() == null) {
-      return ResponseEntity.badRequest().build();
-    }
+      @Valid @RequestBody CreateExternalEventRequest req) {
     return ResponseEntity.status(HttpStatus.CREATED).body(service.createEvent(networkId, req));
   }
 
@@ -47,13 +42,7 @@ public class NetworkExternalEventController {
   public ResponseEntity<NetworkExternalEventDto> update(
       @PathVariable UUID networkId,
       @PathVariable UUID eventId,
-      @RequestBody CreateExternalEventRequest req) {
-    if (req.getTitle() == null || req.getTitle().isBlank()) {
-      return ResponseEntity.badRequest().build();
-    }
-    if (req.getEventTime() == null) {
-      return ResponseEntity.badRequest().build();
-    }
+      @Valid @RequestBody CreateExternalEventRequest req) {
     return ResponseEntity.ok(service.updateEvent(networkId, eventId, req));
   }
 

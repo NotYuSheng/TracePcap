@@ -389,7 +389,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                     <div className="fw-semibold">
                       {role.roleLabel || <span className="text-muted fst-italic">No label</span>}
                       {role.llmSuggested && !role.confirmedByHuman && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-stars me-1" />AI suggested</span>}
-                      {role.confirmedByHuman && <span className="badge bg-success ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-check-circle me-1" />Confirmed</span>}
+                      {role.confirmedByHuman && <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }} title="Manually labelled by an analyst. Future deviating behaviour can still be flagged."><i className="bi bi-tag me-1" />Manual label</span>}
                     </div>
                     {role.roleDescription && <div className="text-muted mt-1">{role.roleDescription}</div>}
                     {role.llmSuggested && !role.confirmedByHuman && (

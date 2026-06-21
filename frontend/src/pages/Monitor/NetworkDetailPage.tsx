@@ -332,7 +332,11 @@ export const NetworkDetailPage = () => {
   ) => {
     if (!networkId) return;
     const ev = await insightsService.updateExternalEvent(networkId, eventId, eventTime, title, description);
-    setExternalEvents(prev => prev.map(e => (e.id === eventId ? ev : e)));
+    setExternalEvents(prev =>
+      prev
+        .map(e => (e.id === eventId ? ev : e))
+        .sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime()),
+    );
   };
 
   const handleDeleteExternalEvent = async (eventId: string) => {
