@@ -31,7 +31,11 @@ export function NotesTab({
       <p className="text-muted small mb-2">
         Notes are saved globally for this {entityLabel} and persist across all captures.
       </p>
+      <label htmlFor="entity-note-textarea" className="visually-hidden">
+        Notes for {displayName}
+      </label>
       <textarea
+        id="entity-note-textarea"
         className="form-control mb-2"
         rows={6}
         style={{ fontSize: '0.875rem' }}
@@ -48,7 +52,7 @@ export function NotesTab({
         <button
           className="btn btn-primary btn-sm"
           onClick={onSave}
-          disabled={noteSaving || !noteChanged}
+          disabled={noteSaving || noteDeleting || !noteChanged}
         >
           {noteSaving ? (
             <><span className="spinner-border spinner-border-sm me-1" role="status" />Saving…</>
@@ -60,7 +64,7 @@ export function NotesTab({
           <button
             className="btn btn-outline-danger btn-sm"
             onClick={onDelete}
-            disabled={noteDeleting}
+            disabled={noteDeleting || noteSaving}
           >
             {noteDeleting
               ? <span className="spinner-border spinner-border-sm" role="status" />

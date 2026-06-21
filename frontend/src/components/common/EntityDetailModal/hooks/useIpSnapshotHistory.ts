@@ -15,6 +15,7 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
   useEffect(() => {
     // Reset so a previous entity's history can't leak when the modal is reused.
     setIpSnapHistory([]);
+    setIpHistoryLoading(false);
     if (entityType !== 'IP' || !snapshots || snapshots.length === 0) return;
     // `active` guards against stale responses applying after the entity changes/unmounts.
     let active = true;

@@ -21,16 +21,21 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
   // Load node role on mount for IP/DEVICE
   useEffect(() => {
     let active = true;
-    // Reset so a previous entity's role/drafts can't leak when the modal is reused.
+    // Reset all transient role state so nothing leaks when the modal is reused.
     setRole(null);
     setRoleLabelDraft('');
     setRoleDescDraft('');
     setRoleEditing(false);
-    if (!showRole) return;
+    setRoleSuggesting(false);
+    setRoleSuggestError(null);
+    setRoleSaving(false);
+    setRoleInfoOpen(false);
+    if (!showRole) { setRoleLoading(false); return; }
     setRoleLoading(true);
     insightsService
       .getNodeRole(entityType, entityKey)
       .then(r => { if (active) setRole(r); })
+      .catch(err => { console.error('Failed to fetch node role:', err); })
       .finally(() => { if (active) setRoleLoading(false); });
     return () => { active = false; };
   }, [showRole, entityType, entityKey]);
@@ -62,6 +67,8 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
         true,
       );
       setRole(updated);
+    } catch (err) {
+      console.error('Failed to accept role:', err);
     } finally {
       setRoleSaving(false);
     }
@@ -72,6 +79,8 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     try {
       await insightsService.deleteNodeRole(entityType, entityKey);
       setRole(null);
+    } catch (err) {
+      console.error('Failed to discard role:', err);
     } finally {
       setRoleSaving(false);
     }
@@ -95,6 +104,8 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
       );
       setRole(updated);
       setRoleEditing(false);
+    } catch (err) {
+      console.error('Failed to save role:', err);
     } finally {
       setRoleSaving(false);
     }

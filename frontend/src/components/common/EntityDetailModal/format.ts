@@ -17,7 +17,7 @@ export function formatNumber(num: number): string {
 
 export function formatSnapTime(snap: NetworkSnapshot): string {
   if (!snap.startTime) return snap.fileName;
-  const ms = parseDateTime(snap.startTime as unknown as string | number[]);
+  const ms = parseDateTime(snap.startTime);
   return new Date(ms).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 

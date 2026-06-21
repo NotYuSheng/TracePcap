@@ -19,9 +19,11 @@ export function useEntityNote(entityType: EntityType, entityKey: string) {
     // Reset so a previous entity's note can't leak when the modal is reused.
     setSavedNote(null);
     setNoteText('');
-    entityNotesService.getNote(entityType, entityKey).then(note => {
-      if (active && note) { setSavedNote(note); setNoteText(note.note); }
-    });
+    entityNotesService.getNote(entityType, entityKey)
+      .then(note => {
+        if (active && note) { setSavedNote(note); setNoteText(note.note); }
+      })
+      .catch(err => { console.error('Failed to fetch entity note:', err); });
     return () => { active = false; };
   }, [entityType, entityKey]);
 
@@ -30,6 +32,8 @@ export function useEntityNote(entityType: EntityType, entityKey: string) {
     try {
       const updated = await entityNotesService.upsertNote(entityType, entityKey, noteText);
       setSavedNote(updated);
+    } catch (err) {
+      console.error('Failed to save note:', err);
     } finally { setNoteSaving(false); }
   };
 
@@ -39,6 +43,8 @@ export function useEntityNote(entityType: EntityType, entityKey: string) {
       await entityNotesService.deleteNote(entityType, entityKey);
       setSavedNote(null);
       setNoteText('');
+    } catch (err) {
+      console.error('Failed to delete note:', err);
     } finally { setNoteDeleting(false); }
   };
 

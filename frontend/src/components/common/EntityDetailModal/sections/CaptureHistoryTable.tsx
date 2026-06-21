@@ -28,7 +28,7 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
       {!historyLoading && !historyError && history.length === 0 && (
         <p className="text-muted small fst-italic">Not seen in any uploaded files.</p>
       )}
-      {!historyLoading && history.length > 0 && (
+      {!historyLoading && !historyError && history.length > 0 && (
         <div className="table-responsive rounded border overflow-hidden">
           <table className="table table-sm table-hover mb-0">
             <thead className="table-light" style={{ fontSize: '0.8rem' }}>
@@ -44,7 +44,16 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
                 <tr
                   key={entry.fileId}
                   style={{ cursor: 'pointer' }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => { onClose(); navigate(`/analysis/${entry.fileId}`); }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onClose();
+                      navigate(`/analysis/${entry.fileId}`);
+                    }
+                  }}
                   title="Open in analysis"
                 >
                   <td className="small">{entry.fileName}</td>

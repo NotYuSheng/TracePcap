@@ -56,7 +56,15 @@ export function EntityStatsSection({ stats, statsLoading, statsError, onSelectPe
                       <tr
                         key={peer.ip}
                         style={{ cursor: 'pointer' }}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => onSelectPeer(peer.ip)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onSelectPeer(peer.ip);
+                          }
+                        }}
                         title="View IP details"
                       >
                         <td className="font-monospace small">{peer.ip}</td>

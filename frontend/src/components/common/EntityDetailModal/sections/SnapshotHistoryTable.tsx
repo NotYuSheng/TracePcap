@@ -57,11 +57,11 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
                       <small className="text-muted">—</small>
                     ) : (
                       <div className="d-flex flex-wrap gap-1">
-                        {protocols.map(p => (
-                          <Badge key={p} style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(p) }}>{p}</Badge>
+                        {protocols.map((p, i) => (
+                          <Badge key={`proto-${p}-${i}`} style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(p) }}>{p}</Badge>
                         ))}
-                        {apps.map(a => (
-                          <Badge key={a} style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(a) }}>{a}</Badge>
+                        {apps.map((a, i) => (
+                          <Badge key={`app-${a}-${i}`} style={{ fontSize: '0.65rem', fontWeight: 400, ...hashBadgeStyle(a) }}>{a}</Badge>
                         ))}
                       </div>
                     )}

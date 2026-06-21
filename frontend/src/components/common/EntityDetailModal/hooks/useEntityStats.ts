@@ -26,11 +26,12 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
 
   useEffect(() => {
     let active = true;
-    // Reset so a previous entity's stats can't leak when the modal is reused.
+    // Reset so a previous entity's stats/flags can't leak when the modal is reused.
     setStats(null);
+    setStatsLoading(false);
+    setStatsError(null);
     if (!fileId || (entityType !== 'APPLICATION' && entityType !== 'PROTOCOL')) return;
     setStatsLoading(true);
-    setStatsError(null);
     const param = entityType === 'APPLICATION' ? `apps=${encodeURIComponent(entityKey)}` : `l7Protocols=${encodeURIComponent(entityKey)}`;
     apiClient
       .get<ConvApiResponse>(`/conversations/${fileId}?${param}&pageSize=500&page=1`)
