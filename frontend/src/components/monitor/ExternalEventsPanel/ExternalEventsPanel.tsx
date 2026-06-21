@@ -48,7 +48,7 @@ export const ExternalEventsPanel = ({ events, onAdd, onUpdate, onDelete }: Exter
     // Pre-fill with server time so the datetime reflects the deployment timezone
     try {
       const res = await apiClient.get<{ now: string }>(API_ENDPOINTS.SYSTEM_TIME);
-      setEventTime(res.data.now);
+      setEventTime(toInputValue(res.data.now));
     } catch {
       setEventTime(toInputValue(new Date().toISOString()));
     }
