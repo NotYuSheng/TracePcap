@@ -55,6 +55,7 @@ export function useNetworkDetailData(networkId: string | undefined) {
         insightsService.getLatestInsight(networkId),
         subnetService.list(),
       ]);
+      setError(null);
       setNetwork(net);
       setSnapshots(snaps);
       setChangeEvents(events);
@@ -164,8 +165,8 @@ export function useNetworkDetailData(networkId: string | undefined) {
 
   const handleSubnetSaved = (subnet: SubnetDefinition) => {
     setSubnets(prev => {
-      const idx = prev.findIndex(s => s.cidr === subnet.cidr);
-      return idx >= 0 ? prev.map(s => s.cidr === subnet.cidr ? subnet : s) : [...prev, subnet];
+      const idx = prev.findIndex(s => s.id === subnet.id);
+      return idx >= 0 ? prev.map(s => s.id === subnet.id ? subnet : s) : [...prev, subnet];
     });
   };
 

@@ -39,6 +39,7 @@ export const HelpPopover = ({ id, title, children, maxWidth = 380, buttonTitle, 
       className="text-muted p-0 ms-2"
       style={{ fontSize: '0.85rem', ...buttonStyle }}
       title={buttonTitle}
+      aria-label={buttonTitle ?? title}
     >
       <i className="bi bi-info-circle"></i>
     </Button>

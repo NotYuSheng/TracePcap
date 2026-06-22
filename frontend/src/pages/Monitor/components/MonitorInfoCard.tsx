@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import { useState } from 'react';
 import { Badge, Card } from '@govtechsg/sgds-react';
 
@@ -8,12 +9,21 @@ export const MonitorInfoCard = () => {
     <Card className="mb-4" style={{ overflow: 'hidden' }}>
       <Card.Header
         className="d-flex align-items-center justify-content-between"
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
         style={{
           cursor: 'pointer',
           userSelect: 'none',
           borderBottom: collapsed ? 'none' : undefined,
         }}
         onClick={() => setCollapsed(c => !c)}
+        onKeyDown={(e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed(c => !c);
+          }
+        }}
       >
         <h6 className="mb-0">
           <i className="bi bi-info-circle me-2"></i>

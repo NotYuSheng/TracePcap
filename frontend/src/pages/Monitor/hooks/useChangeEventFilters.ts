@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { ChangeEvent } from '@/features/monitor/types/monitor.types';
 
 export type SeverityFilter = 'ALL' | 'CRITICAL' | 'WARNING' | 'INFO';
@@ -29,6 +29,10 @@ export function useChangeEventFilters(changeEvents: ChangeEvent[]) {
 
   const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / EVENT_PAGE_SIZE));
   const pagedEvents = useMemo(() => filteredEvents.slice((eventPage - 1) * EVENT_PAGE_SIZE, eventPage * EVENT_PAGE_SIZE), [filteredEvents, eventPage]);
+
+  useEffect(() => {
+    if (eventPage > totalEventPages) setEventPage(totalEventPages);
+  }, [eventPage, totalEventPages]);
 
   const selectSeverity = (f: SeverityFilter) => { setSeverityFilter(f); setEventPage(1); };
   const selectChangeType = (t: string) => { setChangeTypeFilter(t); setEventPage(1); };
