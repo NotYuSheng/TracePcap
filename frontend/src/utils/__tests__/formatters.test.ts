@@ -79,6 +79,14 @@ describe('formatIpPort', () => {
   it('returns IP only when port is omitted', () => {
     expect(formatIpPort('10.0.0.1')).toBe('10.0.0.1');
   });
+
+  it('wraps IPv6 addresses in brackets when port is provided', () => {
+    expect(formatIpPort('2001:db8::1', 80)).toBe('[2001:db8::1]:80');
+  });
+
+  it('returns bare IPv6 when port is omitted', () => {
+    expect(formatIpPort('2001:db8::1')).toBe('2001:db8::1');
+  });
 });
 
 describe('formatPercentage', () => {
