@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge, Button, ButtonGroup, Card } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -412,20 +412,9 @@ export function SessionTab({ conversationId }: SessionTabProps) {
     }
   };
 
-  // ── Pre-flight states ──────────────────────────────────────────────────────
-
-  if (!session && !loading && !error) {
-    return (
-      <div className="text-center py-5">
-        <p className="text-muted mb-3">
-          Reconstruct the full application-layer byte stream for this conversation.
-        </p>
-        <Button variant="primary" onClick={handleReconstruct}>
-          Reconstruct Session
-        </Button>
-      </div>
-    );
-  }
+  useEffect(() => {
+    handleReconstruct();
+  }, [conversationId]);
 
   if (loading) {
     return (
