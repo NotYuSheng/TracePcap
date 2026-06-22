@@ -8,7 +8,13 @@ describe('parseDateTime', () => {
 
   it('parses a Spring LocalDateTime array [Y, M, D, h, m, s]', () => {
     const ts = parseDateTime([2025, 6, 15, 10, 30, 0]);
-    expect(ts).toBe(new Date(2025, 5, 15, 10, 30, 0).getTime());
+    const date = new Date(ts);
+    expect(date.getFullYear()).toBe(2025);
+    expect(date.getMonth()).toBe(5);
+    expect(date.getDate()).toBe(15);
+    expect(date.getHours()).toBe(10);
+    expect(date.getMinutes()).toBe(30);
+    expect(date.getSeconds()).toBe(0);
   });
 
   it('returns 0 for a short array', () => {
