@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Badge, Button, ButtonGroup, Card } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -391,12 +391,15 @@ export function SessionTab({ conversationId }: SessionTabProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'parsed' | 'stun' | 'raw'>('parsed');
+  const latestRequestRef = useRef(0);
 
-  const handleReconstruct = async () => {
+  const handleReconstruct = useCallback(async () => {
+    const requestId = ++latestRequestRef.current;
     setLoading(true);
     setError(null);
     try {
       const data = await conversationService.reconstructSession(conversationId);
+      if (requestId !== latestRequestRef.current) return;
       setSession(data);
       if (data.httpExchanges && data.httpExchanges.length > 0) {
         setActiveView('parsed');
@@ -406,15 +409,18 @@ export function SessionTab({ conversationId }: SessionTabProps) {
         setActiveView('raw');
       }
     } catch (e: unknown) {
+      if (requestId !== latestRequestRef.current) return;
       setError(e instanceof Error ? e.message : 'Request failed');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestRef.current) setLoading(false);
     }
-  };
+  }, [conversationId]);
 
   useEffect(() => {
+    setSession(null);
+    setError(null);
     handleReconstruct();
-  }, [conversationId]);
+  }, [conversationId, handleReconstruct]);
 
   if (loading) {
     return (
