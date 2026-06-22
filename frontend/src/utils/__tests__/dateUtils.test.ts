@@ -20,4 +20,8 @@ describe('parseDateTime', () => {
   it('returns 0 for a short array', () => {
     expect(parseDateTime([2025, 6])).toBe(0);
   });
+
+  it('returns NaN for an invalid date string', () => {
+    expect(parseDateTime('invalid-date')).toBeNaN();
+  });
 });

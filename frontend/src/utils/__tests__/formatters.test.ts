@@ -46,6 +46,12 @@ describe('formatDuration', () => {
   it('formats hours and minutes', () => {
     expect(formatDuration(3660000)).toBe('1h 1m');
   });
+
+  it('handles boundary values', () => {
+    expect(formatDuration(0)).toBe('0ms');
+    expect(formatDuration(60000)).toBe('1m 0s');
+    expect(formatDuration(3600000)).toBe('1h 0m');
+  });
 });
 
 describe('formatNumber', () => {
