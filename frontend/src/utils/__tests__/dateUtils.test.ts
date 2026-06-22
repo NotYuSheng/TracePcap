@@ -1,9 +1,9 @@
 import { parseDateTime } from '../dateUtils';
 
 describe('parseDateTime', () => {
-  it('parses an ISO date string', () => {
-    const ts = parseDateTime('2025-06-15T10:30:00');
-    expect(ts).toBe(new Date('2025-06-15T10:30:00').getTime());
+  it('parses an ISO date string in UTC', () => {
+    const ts = parseDateTime('2025-06-15T10:30:00Z');
+    expect(ts).toBe(1749983400000);
   });
 
   it('parses a Spring LocalDateTime array [Y, M, D, h, m, s]', () => {
