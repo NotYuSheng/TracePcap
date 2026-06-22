@@ -104,7 +104,8 @@ export const formatProtocol = (protocol: string): string => {
  * @returns Formatted string (e.g., "192.168.1.1:80")
  */
 export const formatIpPort = (ip: string, port?: number): string => {
-  return port ? `${ip}:${port}` : ip;
+  if (!port) return ip;
+  return ip.includes(':') ? `[${ip}]:${port}` : `${ip}:${port}`;
 };
 
 /**

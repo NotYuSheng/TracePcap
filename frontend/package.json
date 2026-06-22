@@ -12,6 +12,8 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "lint:css:fix": "stylelint \"src/**/*.css\" --fix",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -48,6 +50,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.61.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/color-hash": "^2.0.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^24.10.1",
@@ -59,12 +63,14 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.8.1",
     "stylelint": "^17.1.0",
     "stylelint-config-css-modules": "^4.6.0",
     "stylelint-config-standard": "^40.0.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.1.9"
   }
 }
