@@ -7,6 +7,7 @@ import { FileList } from '@components/upload/FileList';
 import { UploadProgress } from '@components/upload/UploadProgress';
 import { useFileUpload } from '@features/upload/hooks/useFileUpload';
 import type { AnalysisOptions } from '@features/upload/services/uploadService';
+import { env } from '@/config/env';
 
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
 
@@ -21,10 +22,7 @@ export const UploadPage = () => {
   });
   const navigate = useNavigate();
 
-  const acceptedTypes = (import.meta.env.VITE_SUPPORTED_FILE_TYPES?.trim() || '.pcap,.pcapng,.cap')
-    .split(',')
-    .map((t: string) => t.trim())
-    .filter((t: string) => t.length > 0);
+  const acceptedTypes = env.SUPPORTED_FILE_TYPES;
 
   useEffect(() => {
     fetch('/api/v1/system/limits')
@@ -46,7 +44,7 @@ export const UploadPage = () => {
     }
   }, [uploads, isUploading, navigate]);
 
-  const analysisOptionsEnabled = import.meta.env.VITE_ANALYSIS_OPTIONS !== 'false';
+  const analysisOptionsEnabled = env.ANALYSIS_OPTIONS_ENABLED;
 
   const handleFileSelect = (files: File[]) => {
     if (!analysisOptionsEnabled) {
