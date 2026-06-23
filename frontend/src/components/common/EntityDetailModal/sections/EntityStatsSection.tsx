@@ -1,3 +1,6 @@
+import { Row, Col, Table } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { formatBytes, formatNumber } from '../format';
 import type { EntityStats } from '../types';
 
@@ -14,46 +17,46 @@ export function EntityStatsSection({ stats, statsLoading, statsError, onSelectPe
     <>
       {statsLoading && (
         <div className="text-center py-4">
-          <div className="spinner-border spinner-border-sm text-primary" role="status" />
+          <Spinner size="sm" className="text-primary" />
           <p className="text-muted mt-2 small">Loading stats…</p>
         </div>
       )}
       {statsError && (
-        <div className="alert alert-warning py-2 small">{statsError}</div>
+        <Alert variant="warning" className="py-2 small">{statsError}</Alert>
       )}
       {!statsLoading && !statsError && stats && (
         <>
-          <div className="row g-3 mb-4">
-            <div className="col-4 text-center">
+          <Row className="g-3 mb-4">
+            <Col xs={4} className="text-center">
               <div className="fw-bold fs-5">{formatNumber(stats.conversationCount)}</div>
               <small className="text-muted">Conversations</small>
-            </div>
-            <div className="col-4 text-center">
+            </Col>
+            <Col xs={4} className="text-center">
               <div className="fw-bold fs-5">{formatNumber(stats.packetCount)}</div>
               <small className="text-muted">Packets</small>
-            </div>
-            <div className="col-4 text-center">
+            </Col>
+            <Col xs={4} className="text-center">
               <div className="fw-bold fs-5">{formatBytes(stats.totalBytes)}</div>
               <small className="text-muted">Total bytes</small>
-            </div>
-          </div>
+            </Col>
+          </Row>
 
           {stats.topPeers.length > 0 && (
             <>
               <h6 className="border-bottom pb-1 mb-2">
                 Top IPs{stats.topPeers.length === 10 ? ' (top 10)' : ''}
               </h6>
-              <div className="table-responsive rounded border overflow-hidden">
-                <table className="table table-sm table-hover mb-0">
-                  <thead className="table-light" style={{ fontSize: '0.8rem' }}>
-                    <tr>
-                      <th>IP Address</th>
-                      <th className="text-end">Bytes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="rounded border overflow-hidden">
+                <Table size="sm" hover responsive className="mb-0">
+                  <Table.Header className="table-light" style={{ fontSize: '0.8rem' }}>
+                    <Table.Row>
+                      <Table.HeaderCell>IP Address</Table.HeaderCell>
+                      <Table.HeaderCell className="text-end">Bytes</Table.HeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
                     {stats.topPeers.map(peer => (
-                      <tr
+                      <Table.Row
                         key={peer.ip}
                         style={{ cursor: 'pointer' }}
                         role="button"
@@ -67,12 +70,12 @@ export function EntityStatsSection({ stats, statsLoading, statsError, onSelectPe
                         }}
                         title="View IP details"
                       >
-                        <td className="font-monospace small">{peer.ip}</td>
-                        <td className="text-end small">{formatBytes(peer.bytes)}</td>
-                      </tr>
+                        <Table.DataCell className="font-monospace small">{peer.ip}</Table.DataCell>
+                        <Table.DataCell className="text-end small">{formatBytes(peer.bytes)}</Table.DataCell>
+                      </Table.Row>
                     ))}
-                  </tbody>
-                </table>
+                  </Table.Body>
+                </Table>
               </div>
             </>
           )}

@@ -1,4 +1,5 @@
-import { Badge } from '@govtechsg/sgds-react';
+import { Badge, Table } from '@govtechsg/sgds-react';
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { formatSnapTime, hashBadgeStyle } from '../format';
 import type { IpSnapshotEntry } from '../types';
 
@@ -16,43 +17,43 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
       </h6>
       {ipHistoryLoading && (
         <div className="text-muted small py-2">
-          <span className="spinner-border spinner-border-sm me-2" role="status" />Loading…
+          <Spinner size="sm" className="me-2" />Loading…
         </div>
       )}
       {!ipHistoryLoading && ipSnapHistory.length === 0 && (
         <p className="text-muted small fst-italic">Not seen in any snapshots.</p>
       )}
       {!ipHistoryLoading && ipSnapHistory.length > 0 && (
-        <div className="table-responsive rounded border overflow-hidden">
-          <table className="table table-sm table-hover mb-0">
-            <thead className="table-light" style={{ fontSize: '0.8rem' }}>
-              <tr>
-                <th className="text-muted fw-normal">#</th>
-                <th className="text-muted fw-normal">Snapshot</th>
-                <th className="text-muted fw-normal">MAC Address</th>
-                <th className="text-muted fw-normal">Manufacturer</th>
-                <th className="text-muted fw-normal">Device Type</th>
-                <th className="text-muted fw-normal">Protocols / Apps</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded border overflow-hidden">
+          <Table size="sm" hover responsive className="mb-0">
+            <Table.Header className="table-light" style={{ fontSize: '0.8rem' }}>
+              <Table.Row>
+                <Table.HeaderCell className="text-muted fw-normal">#</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Snapshot</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">MAC Address</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Manufacturer</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Device Type</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Protocols / Apps</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {ipSnapHistory.map(({ snap, host, protocols, apps }, idx) => (
-                <tr key={snap.id}>
-                  <td><small className="text-muted">{snap.snapshotOrder + 1}</small></td>
-                  <td>
+                <Table.Row key={snap.id}>
+                  <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
+                  <Table.DataCell>
                     <small className="text-muted d-block">{formatSnapTime(snap)}</small>
                     <small className="text-muted text-break" style={{ fontSize: '0.7rem' }}>{snap.fileName}</small>
-                  </td>
-                  <td>
+                  </Table.DataCell>
+                  <Table.DataCell>
                     <code style={{ fontSize: '0.75rem' }}>{host?.mac ?? '—'}</code>
                     {idx > 0 && host?.mac && ipSnapHistory[idx - 1].host?.mac &&
                       host.mac !== ipSnapHistory[idx - 1].host!.mac && (
                         <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
                       )}
-                  </td>
-                  <td><small className="text-muted">{host?.manufacturer ?? '—'}</small></td>
-                  <td><small className="text-muted">{host?.deviceType ?? '—'}</small></td>
-                  <td>
+                  </Table.DataCell>
+                  <Table.DataCell><small className="text-muted">{host?.manufacturer ?? '—'}</small></Table.DataCell>
+                  <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
+                  <Table.DataCell>
                     {protocols.length === 0 && apps.length === 0 ? (
                       <small className="text-muted">—</small>
                     ) : (
@@ -65,11 +66,11 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
                         ))}
                       </div>
                     )}
-                  </td>
-                </tr>
+                  </Table.DataCell>
+                </Table.Row>
               ))}
-            </tbody>
-          </table>
+            </Table.Body>
+          </Table>
         </div>
       )}
     </div>

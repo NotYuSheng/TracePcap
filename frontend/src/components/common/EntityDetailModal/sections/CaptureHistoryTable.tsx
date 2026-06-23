@@ -1,3 +1,6 @@
+import { Table } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
+import { Spinner } from '@components/common/Spinner/Spinner';
 import { useNavigate } from 'react-router-dom';
 import type { EntityHistoryEntry } from '@/features/notes/services/entityNotesService';
 import { formatBytes, formatNumber } from '../format';
@@ -19,29 +22,29 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
       </h6>
       {historyLoading && (
         <div className="text-muted small py-2">
-          <span className="spinner-border spinner-border-sm me-2" role="status" />Loading…
+          <Spinner size="sm" className="me-2" />Loading…
         </div>
       )}
       {historyError && (
-        <div className="alert alert-warning py-2 small">{historyError}</div>
+        <Alert variant="warning" className="py-2 small">{historyError}</Alert>
       )}
       {!historyLoading && !historyError && history.length === 0 && (
         <p className="text-muted small fst-italic">Not seen in any uploaded files.</p>
       )}
       {!historyLoading && !historyError && history.length > 0 && (
-        <div className="table-responsive rounded border overflow-hidden">
-          <table className="table table-sm table-hover mb-0">
-            <thead className="table-light" style={{ fontSize: '0.8rem' }}>
-              <tr>
-                <th className="text-muted fw-normal">File</th>
-                <th className="text-muted fw-normal">Capture Start</th>
-                <th className="text-end text-muted fw-normal">Packets</th>
-                <th className="text-end text-muted fw-normal">Bytes</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded border overflow-hidden">
+          <Table size="sm" hover responsive className="mb-0">
+            <Table.Header className="table-light" style={{ fontSize: '0.8rem' }}>
+              <Table.Row>
+                <Table.HeaderCell className="text-muted fw-normal">File</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Capture Start</Table.HeaderCell>
+                <Table.HeaderCell className="text-end text-muted fw-normal">Packets</Table.HeaderCell>
+                <Table.HeaderCell className="text-end text-muted fw-normal">Bytes</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {history.map(entry => (
-                <tr
+                <Table.Row
                   key={entry.fileId}
                   style={{ cursor: 'pointer' }}
                   role="button"
@@ -56,20 +59,20 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
                   }}
                   title="Open in analysis"
                 >
-                  <td className="small">{entry.fileName}</td>
-                  <td className="small text-muted">
+                  <Table.DataCell className="small">{entry.fileName}</Table.DataCell>
+                  <Table.DataCell className="small text-muted">
                     {entry.startTime ? new Date(entry.startTime).toLocaleString('en-GB') : '—'}
-                  </td>
-                  <td className="text-end small text-muted">
+                  </Table.DataCell>
+                  <Table.DataCell className="text-end small text-muted">
                     {entry.packetCount != null ? formatNumber(entry.packetCount) : '—'}
-                  </td>
-                  <td className="text-end small text-muted">
+                  </Table.DataCell>
+                  <Table.DataCell className="text-end small text-muted">
                     {entry.totalBytes != null ? formatBytes(entry.totalBytes) : '—'}
-                  </td>
-                </tr>
+                  </Table.DataCell>
+                </Table.Row>
               ))}
-            </tbody>
-          </table>
+            </Table.Body>
+          </Table>
         </div>
       )}
     </div>

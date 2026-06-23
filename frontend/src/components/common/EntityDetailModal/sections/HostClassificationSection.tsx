@@ -1,3 +1,4 @@
+import { Alert } from '@components/common/Alert';
 import { buildDeviceSignals, confidenceLevel, type DeviceSignalInfo } from '@/utils/deviceType';
 import type { HostClassification } from '../types';
 
@@ -46,24 +47,24 @@ export function HostClassificationSection({ hostClass }: HostClassificationSecti
         )}
       </div>
       {fired.length > 0 && (
-        <div className="border rounded p-2 mb-2" style={{ background: 'var(--tp-bg-subtle)', fontSize: '0.78rem' }}>
+        <Alert variant="info" className="p-2 mb-2" style={{ fontSize: '0.78rem' }}>
           <small className="text-muted fw-semibold d-block mb-1">
             <i className="bi bi-bar-chart-steps me-1" />How this is derived
           </small>
           <ul className="mb-0 ps-3">
             {fired.map((s, i) => <li key={i} className="text-muted">{s}</li>)}
           </ul>
-        </div>
+        </Alert>
       )}
       {missing.length > 0 && (
-        <div className="border rounded p-2" style={{ background: 'var(--bs-warning-bg-subtle, #fff3cd)', borderColor: 'var(--bs-warning-border-subtle, #ffc107)', fontSize: '0.78rem' }}>
-          <small className="fw-semibold d-block mb-1" style={{ color: 'var(--bs-warning-text-emphasis, #664d03)' }}>
+        <Alert variant="warning" className="p-2 mb-0" style={{ fontSize: '0.78rem' }}>
+          <small className="fw-semibold d-block mb-1">
             <i className="bi bi-lightbulb me-1" />What would improve confidence
           </small>
-          <ul className="mb-0 ps-3" style={{ color: 'var(--bs-warning-text-emphasis, #664d03)' }}>
+          <ul className="mb-0 ps-3">
             {missing.map((s, i) => <li key={i}>{s}</li>)}
           </ul>
-        </div>
+        </Alert>
       )}
     </div>
   );

@@ -1,3 +1,5 @@
+import { Button, Form } from '@govtechsg/sgds-react';
+import { Spinner } from '@components/common/Spinner/Spinner';
 import type { EntityNote } from '@/features/notes/services/entityNotesService';
 
 interface NotesTabProps {
@@ -31,12 +33,13 @@ export function NotesTab({
       <p className="text-muted small mb-2">
         Notes are saved globally for this {entityLabel} and persist across all captures.
       </p>
-      <label htmlFor="entity-note-textarea" className="visually-hidden">
+      <Form.Label htmlFor="entity-note-textarea" className="visually-hidden">
         Notes for {displayName}
-      </label>
-      <textarea
+      </Form.Label>
+      <Form.Control
+        as="textarea"
         id="entity-note-textarea"
-        className="form-control mb-2"
+        className="mb-2"
         rows={6}
         style={{ fontSize: '0.875rem' }}
         placeholder={`Add notes about ${displayName}…`}
@@ -49,28 +52,30 @@ export function NotesTab({
         </p>
       )}
       <div className="d-flex gap-2">
-        <button
-          className="btn btn-primary btn-sm"
+        <Button
+          variant="primary"
+          size="sm"
           onClick={onSave}
           disabled={noteSaving || noteDeleting || !noteChanged}
         >
           {noteSaving ? (
-            <><span className="spinner-border spinner-border-sm me-1" role="status" />Saving…</>
+            <><Spinner size="sm" className="me-1" />Saving…</>
           ) : (
             <><i className="bi bi-floppy me-1" />Save Note</>
           )}
-        </button>
+        </Button>
         {savedNote && (
-          <button
-            className="btn btn-outline-danger btn-sm"
+          <Button
+            variant="outline-danger"
+            size="sm"
             onClick={onDelete}
             disabled={noteDeleting || noteSaving}
           >
             {noteDeleting
-              ? <span className="spinner-border spinner-border-sm" role="status" />
+              ? <Spinner size="sm" />
               : <><i className="bi bi-trash me-1" />Delete</>
             }
-          </button>
+          </Button>
         )}
       </div>
     </div>
