@@ -3,9 +3,10 @@ import { conversationService } from '@/features/conversation/services/conversati
 import { networkService } from '../services/networkService';
 import type { GraphNode, GraphEdge, NetworkStats } from '../types';
 import type { Conversation, HostClassification } from '@/types';
+import type { AnalysisSummary } from '@/types';
+import { env } from '@/config/env';
 
 export const MAX_DIAGRAM_NODES = 50;
-import type { AnalysisSummary } from '@/types';
 
 interface UseNetworkDataReturn {
   nodes: GraphNode[];
@@ -19,8 +20,7 @@ interface UseNetworkDataReturn {
   crossEdges: GraphEdge[];
 }
 
-export const CONVERSATION_LIMIT_ENABLED =
-  import.meta.env.VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT !== 'false';
+export const CONVERSATION_LIMIT_ENABLED = env.NETWORK_DIAGRAM_CONVERSATION_LIMIT;
 const MAX_CONVERSATIONS = 500;
 
 /**
