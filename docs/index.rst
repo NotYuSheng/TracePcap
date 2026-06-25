@@ -22,6 +22,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/network-intelligence
    features/comparison
    features/ndpi-analysis
+   features/ids-threat-detection
    features/conversations
    features/session-reconstruction
    features/file-extraction
@@ -40,6 +41,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    :caption: Configuration
 
    configuration/environment-variables
+   configuration/authentication
    configuration/llm-setup
    configuration/signature-rules
 

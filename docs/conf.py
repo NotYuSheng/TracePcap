@@ -4,9 +4,9 @@
 project = "TracePcap"
 copyright = "2025–2026, TracePcap Contributors"
 author = "TracePcap Contributors"
-release = "1.0.1"
-version = "1.0.1"
-today = "2026-05-17"
+release = "0.1.1"
+version = "0.1.1"
+today = "2026-06-26"
 
 extensions = ["sphinx_rtd_theme"]
 

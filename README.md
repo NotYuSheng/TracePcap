@@ -41,8 +41,8 @@ This makes it well-suited for:
 
 | Feature | Description |
 |---------|-------------|
-| **PCAP Upload & Management** | Upload and manage PCAP/PCAPNG/CAP files (max 512MB) with MinIO object storage; duplicate detection and configurable upload limits |
-| **Network Visualization** | Interactive network topology using React Flow + ELK layout with a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, layout controls, and clickable node detail panels |
+| **PCAP Upload & Management** | Upload and manage PCAP/PCAPNG/CAP files (upload limit derived from `APP_MEMORY_MB`, 512MB by default) with MinIO object storage; duplicate detection and configurable upload limits |
+| **Network Visualization** | Interactive network topology using Sigma.js (WebGL) + graphology with ForceAtlas2 / ELK layouts, a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, layout controls, and clickable node detail panels |
 | **nDPI Security Detection** | Deep packet inspection via nDPI v5: application identification, traffic categories, risk/alert flags, JA3/JA3S TLS fingerprints, SNI extraction, and TLS certificate metadata per conversation |
 | **Conversation Tracking** | Paginated conversation list with advanced filtering (IP, port, protocol, app, risk, custom rules, device type, country, payload pattern), multi-column sorting, column picker, and bulk PCAP export |
 | **Session Reconstruction** | TCP/UDP application-layer payload decoding with a hex+ASCII viewer for inspecting raw packet payloads |
@@ -85,8 +85,9 @@ cp .env.example .env
 
 **2. Configure `.env`:**
 ```env
-# Upload Configuration
-MAX_UPLOAD_SIZE_BYTES=536870912  # 512MB default
+# Memory & Upload Configuration
+# Upload limits are derived from this single value (max upload = 25% of it).
+APP_MEMORY_MB=2048  # 512MB max upload (default)
 
 # Nginx Port Configuration
 NGINX_PORT=80  # Change if port 80 is already in use
@@ -96,7 +97,7 @@ LLM_API_BASE_URL=http://localhost:1234/v1
 LLM_API_KEY=
 LLM_MODEL=Qwen2.5-14B-Coder-Instruct
 LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=2000
+LLM_MAX_TOKENS=8000
 ```
 
 **3. Start the application:**
@@ -174,7 +175,7 @@ Changes are compared between consecutive snapshots (ordered by capture time):
 |-----------|------------|
 | **Backend** | Spring Boot 3.2.1, Java 21, Maven, Lombok, MapStruct |
 | **Frontend** | React 19, Vite, TypeScript, SGDS React |
-| **Visualization** | React Flow + ELK (network topology), Recharts, D3.js |
+| **Visualization** | Sigma.js + graphology + ELK (network topology), React Flow (Network Intelligence cluster graph), Recharts, D3.js |
 | **Reverse Proxy** | Nginx |
 | **Packet Parsing** | tshark / Wireshark, nDPI v5 (deep packet inspection) |
 | **Database** | PostgreSQL 15 with Flyway migrations |

@@ -22,7 +22,7 @@ Starting a Comparison
 The Comparison View
 -------------------
 
-The comparison view is a React Flow graph identical to the single-file
+The comparison view uses the same Sigma.js topology graph as the single-file
 **Network Diagram**, with the following additions:
 
 Source-aware rendering
@@ -66,7 +66,7 @@ and includes it in the PDF report alongside any other active analysis sections.
 Permanent Merge
 ---------------
 
-Choosing **Merge & Analyze** calls ``POST /api/files/merge``, which:
+Choosing **Merge & Analyze** calls ``POST /api/v1/files/merge``, which:
 
 1. Downloads all selected PCAP files from MinIO.
 2. Concatenates them with ``mergecap``.

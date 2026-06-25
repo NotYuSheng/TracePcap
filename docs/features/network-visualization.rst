@@ -133,6 +133,40 @@ The filter panel (left sidebar) lets you narrow the graph by:
 
 Filters are applied interactively — the graph updates without reloading.
 
+Ghost / Phantom Node Filters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some nodes appear in the graph only because a host *probed* them — the address
+never actually sent traffic back. These **ghost** (phantom) nodes are detected
+at graph-build time and flagged so you can hide them and focus on hosts that are
+genuinely present. Four flag types are detected:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Flag
+     - Meaning
+   * - **No response**
+     - The node only ever appeared as a destination — all traffic was
+       unidirectional toward it, with nothing coming back
+       (``flowRisks: ["unidirectional_traffic"]``).
+   * - **ARP no-reply**
+     - The host was ARP-requested but never replied — a classic ARP-scan
+       artifact where the target IP is unused.
+   * - **ICMP unreachable**
+     - An ICMP *destination unreachable* was observed for the node.
+   * - **TTL exceeded**
+     - An ICMP *time-to-live exceeded* was observed (e.g. a traceroute hop, not
+       a real conversation endpoint).
+
+The **Ghost Node Filters** section in the control panel only shows the flag
+types actually present in the current capture. Each is a pill that toggles a
+**hide** filter — selecting it removes nodes carrying that flag from the graph.
+A ghost-flag banner in the Node Detail modal explains why a node was flagged.
+The active ghost filters are also honoured when exporting the topology to a PDF
+report.
+
 Click a node to open the **Node Detail Panel**, which shows:
 
 - IP address and MAC address
@@ -207,6 +241,58 @@ router, or the nDPI applications that triggered the classification).
 A legend table at the bottom of the popup summarises the signal source for
 each classification dimension (Type: network topology; Device: hardware
 fingerprinting; Role: TCP session direction).
+
+Service-Role Detection
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Beyond the port/protocol heuristics above, TracePcap runs dedicated
+**service-role extractors** during analysis that inspect what a host actually
+*serves* and classify it authoritatively. These drive distinct device types,
+node colours, and icons in the topology, and add a service-specific detail tab
+to the node modal:
+
+- **DNS server** (``DNS_SERVER``) — a host that answers DNS queries. Detected by
+  ``DnsServerSignal`` from observed DNS responses.
+- **Web server** (``WEB_SERVER``) — serves cleartext HTTP, or is HTTPS-only
+  (detected from a TLS ServerHello).
+- **API server** (``API_SERVER``) — a web server whose responses look like an
+  API (JSON content, REST verbs, or ``/api`` paths).
+
+Service Role Detail Tabs
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When a node is classified into a service role, its detail modal gains an extra
+tab populated from a read-only analysis pass:
+
+**DNS tab** — a per-host **DNS query log**: the domains the server answered,
+record type, and response counts, aggregated per ``(server, domain, type)``.
+Servers with abnormally high NXDOMAIN rates are flagged (a signal for DNS
+tunnelling or misconfigured clients). Each row links to the source DNS response
+packet.
+
+**HTTP tab** — a per-host **HTTP endpoint log** recovered by correlating
+cleartext HTTP requests to responses per TCP stream (method + path), with
+status-class counts and content type per endpoint. An info block above the
+table shows the ``Server`` header software, observed content types, and — for
+HTTPS hosts — **TLS details** reconstructed from existing conversation
+enrichment (SNI names, certificate subject/issuer, JA3S). Each endpoint row
+links to its source packet.
+
+.. note::
+   Endpoint recovery is cleartext HTTP/1.x only — HTTPS payloads are encrypted,
+   so HTTPS-only hosts surface TLS metadata but no endpoint table.
+
+Node Label Customization
+------------------------
+
+You can control what text is **tagged onto each node** in the topology graph.
+Open the **Node Label** settings to choose which fields render as label lines
+beneath a node — for example IP address, hostname (auto-tagged from the TLS SNI
+/ ClientHello), MAC address, vendor, or device type. A live preview shows the
+chosen layout, and the configuration applies to every node in the graph.
+
+Hostnames are tagged passively: when a client's name is observed in traffic it
+is attached to the node and available as a label field, with no active probing.
 
 Layout Controls
 ---------------

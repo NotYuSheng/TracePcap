@@ -70,9 +70,9 @@ renumbered) when no data is available.
    * - **Network Diagram — Active Filters**
      - Note of any active filters applied to the topology diagrams below.
    * - **Network Topology (Force-directed)**
-     - Screenshot of the React Flow graph in force-directed layout.
+     - Screenshot of the Sigma.js topology graph in force-directed layout.
    * - **Network Topology (Hierarchical)**
-     - Screenshot of the React Flow graph in ELK hierarchical layout.
+     - Screenshot of the Sigma.js topology graph in ELK hierarchical layout.
    * - **AI Narrative** *(if Story generated)*
      - The LLM-written narrative from Story Mode.
    * - **Deterministic Findings** *(if Story generated)*
