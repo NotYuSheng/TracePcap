@@ -13,6 +13,7 @@ import { ExternalEventsPanel } from '@/components/monitor/ExternalEventsPanel/Ex
 import { NetworkAnnotationsPanel } from '@/components/monitor/NetworkAnnotationsPanel/NetworkAnnotationsPanel';
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { AddSnapshotModal } from '@/components/monitor/AddSnapshotModal/AddSnapshotModal';
+import { ManagePcapsModal } from '@/components/monitor/ManagePcapsModal/ManagePcapsModal';
 import { SnapshotTrafficChart } from '@/components/monitor/SnapshotTrafficChart/SnapshotTrafficChart';
 import { useNetworkDetailData } from './hooks/useNetworkDetailData';
 import { MonitorInfoCard } from './components/MonitorInfoCard';
@@ -31,6 +32,7 @@ export const NetworkDetailPage = () => {
   } = data;
 
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
+  const [showManage, setShowManage] = useState(false);
 
   const navSections: SectionDef[] = [
     { id: 'sec-timeline', label: 'Capture Timeline', icon: 'bi-clock-history' },
@@ -133,8 +135,7 @@ export const NetworkDetailPage = () => {
                 networkId={network.id}
                 snapshots={snapshots}
                 changeEvents={changeEvents}
-                onRemove={data.handleRemoveSnapshot}
-                onAddSnapshot={() => setShowAddSnapshot(true)}
+                onManage={() => setShowManage(true)}
                 onPatchChange={data.handlePatchChange}
                 onSnapshotUpdated={data.handleSnapshotUpdated}
               />
@@ -362,6 +363,14 @@ export const NetworkDetailPage = () => {
           </Card>
         </Col>
       </Row>
+
+      <ManagePcapsModal
+        show={showManage}
+        onHide={() => setShowManage(false)}
+        snapshots={snapshots}
+        onRemove={data.handleRemoveSnapshot}
+        onAddSnapshot={() => { setShowManage(false); setShowAddSnapshot(true); }}
+      />
 
       <AddSnapshotModal
         show={showAddSnapshot}
