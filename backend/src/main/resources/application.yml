@@ -151,6 +151,14 @@ llm:
 
 # Application-specific Configuration
 tracepcap:
+  # Authentication (OIDC/Keycloak). Off by default — the app runs fully open.
+  # Enable + point at a Keycloak realm to gate the API behind a JWT. See docker-compose.prod.yml.
+  auth:
+    enabled: ${TRACEPCAP_AUTH_ENABLED:false}
+    # Public issuer (token `iss`, browser-facing), e.g. http://localhost:8081/realms/tracepcap
+    issuer-uri: ${KEYCLOAK_ISSUER_URI:}
+    # Backend-reachable JWKS URL; blank = discover from issuer-uri
+    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
   analysis:
     batch-size: 1000
     timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:300}

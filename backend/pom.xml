@@ -52,6 +52,14 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Security: OIDC/Keycloak resource server (JWT validation).
+             Activated only when tracepcap.auth.enabled=true; with auth disabled
+             the SecurityFilterChain permits all requests (no behaviour change). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
