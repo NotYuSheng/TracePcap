@@ -22,7 +22,7 @@ API Endpoints Used
 
 .. code-block:: http
 
-   POST /api/files
+   POST /api/v1/files
    Content-Type: multipart/form-data
 
    file=<binary>                        (required)
@@ -35,7 +35,7 @@ Returns JSON with ``id`` (the ``fileId``) and ``status``.
 
 .. code-block:: http
 
-   GET /api/files/{fileId}
+   GET /api/v1/files/{fileId}
 
 Poll until ``status`` is ``COMPLETED`` before adding to a network snapshot.
 
@@ -43,7 +43,7 @@ Poll until ``status`` is ``COMPLETED`` before adding to a network snapshot.
 
 .. code-block:: http
 
-   POST /api/monitor/networks/{networkId}/snapshots
+   POST /api/v1/monitor/networks/{networkId}/snapshots
    Content-Type: application/json
 
    {"fileId": "<fileId>"}

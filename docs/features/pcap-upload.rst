@@ -14,9 +14,9 @@ Supported Formats
 Upload Limit
 ------------
 
-The default maximum file size is **512 MB**, configurable via the
-``MAX_UPLOAD_SIZE_BYTES`` environment variable (see
-:doc:`../configuration/environment-variables`).
+The default maximum file size is **512 MB**. It is derived from the
+``APP_MEMORY_MB`` memory budget (max upload = 25% of it), not set directly —
+see :doc:`../configuration/environment-variables`.
 
 Upload Options
 --------------

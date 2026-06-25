@@ -24,17 +24,26 @@ environment as well.
 Change ``POSTGRES_PASSWORD`` to a strong password and update the backend's
 ``SPRING_DATASOURCE_PASSWORD`` to match.
 
-Add an Authentication Layer
------------------------------
+Enable Authentication
+---------------------
 
-TracePcap has **no built-in user authentication**. For multi-user or
-internet-facing deployments, place an authentication layer in front of nginx:
+The base stack runs with **no login**. For multi-user or internet-facing
+deployments, enable the bundled OIDC/Keycloak authentication via the production
+overlay:
 
-- **OAuth2 / OIDC proxy** — e.g. `oauth2-proxy <https://oauth2-proxy.github.io/oauth2-proxy/>`_
-  in front of nginx.
-- **Basic auth** — configure nginx ``auth_basic`` with an ``.htpasswd`` file.
-- **VPN / firewall** — restrict access to trusted IP ranges at the network
-  level.
+.. code-block:: bash
+
+   PUBLIC_URL=https://app.example.com \
+     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+This gates the API behind a Keycloak JWT and adds a login flow to the frontend.
+**Change the demo credentials** (app login ``analyst`` / ``analyst`` and the
+Keycloak admin ``user`` / ``P@ssw0rd``) before exposing the app. See
+:doc:`../configuration/authentication` for the full walkthrough.
+
+If you prefer an external identity layer instead, you can still front nginx
+with an `oauth2-proxy <https://oauth2-proxy.github.io/oauth2-proxy/>`_,
+nginx ``auth_basic``, or restrict access at the VPN/firewall level.
 
 Configure SSL/TLS
 -----------------
@@ -50,12 +59,13 @@ By default nginx serves HTTP. For production, terminate TLS at the nginx layer:
 Adjust Upload Limits
 ---------------------
 
-Set ``MAX_UPLOAD_SIZE_BYTES`` in ``.env`` appropriate for your storage
-capacity and user needs:
+Upload limits are derived from a single memory budget. Set ``APP_MEMORY_MB`` in
+``.env`` appropriate for your host RAM; the max upload size is 25% of it
+(e.g. ``4096`` → 1 GB upload):
 
 .. code-block:: ini
 
-   MAX_UPLOAD_SIZE_BYTES=1073741824  # 1 GB
+   APP_MEMORY_MB=4096  # ~1 GB max upload
 
 Configure LLM Privacy
 ---------------------

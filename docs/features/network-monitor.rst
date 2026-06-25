@@ -47,8 +47,10 @@ Getting Started
 1. Navigate to **Monitor** in the top navigation bar.
 2. Click **Create Network** and give it a name and optional description.
 3. Open the network card to enter the detail view.
-4. Click **Add Snapshot** and select a PCAP file that has already been
-   analysed (status: *Completed*). Repeat for each capture.
+4. Click **Manage PCAPs** to open the PCAP management modal, then **Add PCAP**
+   and select a file that has already been analysed (status: *Completed*).
+   Repeat for each capture. The same modal lets you **remove** a snapshot from
+   the network later.
 5. Change events appear automatically once two or more snapshots exist.
 
 .. note::
@@ -175,8 +177,24 @@ unreviewed counts update immediately.
 Capture Timeline
 ----------------
 
-The Capture Timeline table lists all snapshots in order. Clicking any row opens
-the **Snapshot Detail** modal, which contains five tabs:
+The Capture Timeline table lists all snapshots in order. A mode toggle in the
+header switches between two views:
+
+- **By PCAP** (default) — one row per snapshot.
+- **By Time** — snapshots are bucketed into a selectable interval
+  (``1m`` / ``5m`` / ``30m`` / ``1h`` / ``1d`` / ``1mo``), aggregating captures,
+  packets, and change counts per bucket. The ``1mo`` interval buckets by
+  calendar month. Each bucket row expands to list the individual PCAPs within
+  the interval, and each PCAP still opens its snapshot detail modal. The By Time
+  view is computed entirely client-side from existing snapshot data — no
+  re-analysis is triggered.
+
+The Changes indicator is rendered as the same badge pill in all three places
+(By PCAP rows, the By Time bucket aggregate, and the nested per-PCAP rows);
+clickable badges show a pointer cursor.
+
+Clicking any snapshot row opens the **Snapshot Detail** modal, which contains
+five tabs:
 
 - **Network Diagram** — topology graph for that snapshot with change highlights
   overlaid. Navigate between snapshots with the prev/next arrows or dropdown;
@@ -560,7 +578,7 @@ The polling runs in the browser — no server-side push is involved.
 REST API Reference
 ------------------
 
-All monitor endpoints are prefixed with ``/api/monitor``.
+All monitor endpoints are prefixed with ``/api/v1/monitor``.
 
 Networks
 ~~~~~~~~
@@ -573,16 +591,16 @@ Networks
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks``
+     - ``/api/v1/monitor/networks``
      - List all networks.
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}``
+     - ``/api/v1/monitor/networks/{networkId}``
      - Get a single network by ID.
    * - ``POST``
-     - ``/api/monitor/networks``
+     - ``/api/v1/monitor/networks``
      - Create a network. Body: ``{ "name": "string", "description": "string" }``.
    * - ``DELETE``
-     - ``/api/monitor/networks/{networkId}``
+     - ``/api/v1/monitor/networks/{networkId}``
      - Delete a network and all its snapshots and events.
 
 Snapshots
@@ -596,16 +614,16 @@ Snapshots
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/snapshots``
+     - ``/api/v1/monitor/networks/{networkId}/snapshots``
      - List snapshots ordered by capture time.
    * - ``POST``
-     - ``/api/monitor/networks/{networkId}/snapshots``
+     - ``/api/v1/monitor/networks/{networkId}/snapshots``
      - Add a snapshot. Body: ``{ "fileId": "uuid", "subnetOverrides": [...]? }``. ``subnetOverrides`` is optional; omit or pass ``null`` to use global definitions. Triggers change detection automatically.
    * - ``PATCH``
-     - ``/api/monitor/networks/{networkId}/snapshots/{snapshotId}``
+     - ``/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}``
      - Update snapshot context, notes, or subnet overrides. Body: ``{ "context": "string?", "notes": "string?", "subnetOverrides": [{ "cidr": "string", "label": "string?", "description": "string?", "inherited": boolean }]? }``. ``subnetOverrides: null`` leaves overrides unchanged; ``[]`` clears all (reverts to global); a non-empty list replaces the existing overrides.
    * - ``DELETE``
-     - ``/api/monitor/networks/{networkId}/snapshots/{snapshotId}``
+     - ``/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}``
      - Remove a snapshot and re-run change detection for affected pairs.
 
 Change Events
@@ -619,10 +637,10 @@ Change Events
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/changes``
+     - ``/api/v1/monitor/networks/{networkId}/changes``
      - List change events. Optional query params: ``changeType``, ``severity``.
    * - ``PATCH``
-     - ``/api/monitor/networks/{networkId}/changes/{eventId}``
+     - ``/api/v1/monitor/networks/{networkId}/changes/{eventId}``
      - Update an event. Body: ``{ "reviewed": boolean, "notes": "string" }`` (both optional).
 
 Baseline Definitions
@@ -636,19 +654,19 @@ Baseline Definitions
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/baseline/definitions``
+     - ``/api/v1/monitor/networks/{networkId}/baseline/definitions``
      - List all baseline definitions for a network.
    * - ``POST``
-     - ``/api/monitor/networks/{networkId}/baseline/definitions``
+     - ``/api/v1/monitor/networks/{networkId}/baseline/definitions``
      - Create a definition. Body: ``{ "entryType": "DEVICE|IP_MAC_BINDING|GATEWAY|PROTOCOL|APP|VPN_FINGERPRINT", "entityKey": "string", "entityValue": "string?", "notes": "string?" }``.
    * - ``DELETE``
-     - ``/api/monitor/networks/{networkId}/baseline/definitions/{definitionId}``
+     - ``/api/v1/monitor/networks/{networkId}/baseline/definitions/{definitionId}``
      - Delete a baseline definition.
 
 Subnet Definitions
 ~~~~~~~~~~~~~~~~~~
 
-Subnets are global (not per-network). All endpoints are prefixed with ``/api/subnets``.
+Subnets are global (not per-network). All endpoints are prefixed with ``/api/v1/subnets``.
 
 .. list-table::
    :header-rows: 1
@@ -658,28 +676,28 @@ Subnets are global (not per-network). All endpoints are prefixed with ``/api/sub
      - Path
      - Description
    * - ``GET``
-     - ``/api/subnets``
+     - ``/api/v1/subnets``
      - List all saved subnets, ordered by CIDR.
    * - ``POST``
-     - ``/api/subnets``
+     - ``/api/v1/subnets``
      - Create or update a subnet by CIDR. Body: ``{ "cidr": "string", "label": "string?", "description": "string?", "confirmed": boolean }``. Sets ``source = MANUAL``.
    * - ``POST``
-     - ``/api/subnets/detected``
+     - ``/api/v1/subnets/detected``
      - Save an auto-detected subnet candidate. Same body; sets ``source = AUTO``.
    * - ``DELETE``
-     - ``/api/subnets/{id}``
+     - ``/api/v1/subnets/{id}``
      - Delete a subnet definition by ID.
    * - ``GET``
-     - ``/api/subnets/detect?fileId={fileId}``
+     - ``/api/v1/subnets/detect?fileId={fileId}``
      - Infer subnet candidates from a single PCAP. Returns candidates without persisting.
    * - ``GET``
-     - ``/api/subnets/detect/network?networkId={networkId}``
+     - ``/api/v1/subnets/detect/network?networkId={networkId}``
      - Infer subnet candidates across all snapshots in a network, with consistency scores.
 
 Node Roles
 ~~~~~~~~~~
 
-Node roles are global. All endpoints are prefixed with ``/api/node-roles``.
+Node roles are global. All endpoints are prefixed with ``/api/v1/node-roles``.
 
 .. list-table::
    :header-rows: 1
@@ -689,16 +707,16 @@ Node roles are global. All endpoints are prefixed with ``/api/node-roles``.
      - Path
      - Description
    * - ``GET``
-     - ``/api/node-roles?entityType={type}&entityKey={key}``
+     - ``/api/v1/node-roles?entityType={type}&entityKey={key}``
      - Get the role for a specific entity. Returns 204 if none exists.
    * - ``PUT``
-     - ``/api/node-roles``
+     - ``/api/v1/node-roles``
      - Create or update a role. Body: ``{ "entityType": "IP|DEVICE", "entityKey": "string", "roleLabel": "string?", "roleDescription": "string?", "confirmedByHuman": boolean }``.
    * - ``DELETE``
-     - ``/api/node-roles?entityType={type}&entityKey={key}``
+     - ``/api/v1/node-roles?entityType={type}&entityKey={key}``
      - Delete a role.
    * - ``POST``
-     - ``/api/node-roles/suggest?entityType={type}&entityKey={key}&fileId={fileId}``
+     - ``/api/v1/node-roles/suggest?entityType={type}&entityKey={key}&fileId={fileId}``
      - Ask the LLM to suggest a role based on traffic signals. Returns an unconfirmed suggestion.
 
 External Events
@@ -712,13 +730,13 @@ External Events
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/external-events``
+     - ``/api/v1/monitor/networks/{networkId}/external-events``
      - List all external events for a network, ordered by event time descending.
    * - ``POST``
-     - ``/api/monitor/networks/{networkId}/external-events``
+     - ``/api/v1/monitor/networks/{networkId}/external-events``
      - Create an event. Body: ``{ "eventTime": "ISO-8601", "title": "string", "description": "string?" }``.
    * - ``DELETE``
-     - ``/api/monitor/networks/{networkId}/external-events/{eventId}``
+     - ``/api/v1/monitor/networks/{networkId}/external-events/{eventId}``
      - Delete an external event.
 
 Analyst Annotations
@@ -732,16 +750,16 @@ Analyst Annotations
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/annotations``
+     - ``/api/v1/monitor/networks/{networkId}/annotations``
      - List annotations, newest first.
    * - ``POST``
-     - ``/api/monitor/networks/{networkId}/annotations``
+     - ``/api/v1/monitor/networks/{networkId}/annotations``
      - Create an annotation. Body: ``{ "body": "string", "snapshotId": "uuid?" }``.
    * - ``PATCH``
-     - ``/api/monitor/networks/{networkId}/annotations/{annotationId}``
+     - ``/api/v1/monitor/networks/{networkId}/annotations/{annotationId}``
      - Update annotation body. Body: ``{ "body": "string" }``.
    * - ``DELETE``
-     - ``/api/monitor/networks/{networkId}/annotations/{annotationId}``
+     - ``/api/v1/monitor/networks/{networkId}/annotations/{annotationId}``
      - Delete an annotation.
 
 Network Insights
@@ -755,10 +773,10 @@ Network Insights
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/insights/latest``
+     - ``/api/v1/monitor/networks/{networkId}/insights/latest``
      - Get the most recently generated insight. Returns 204 if none exists.
    * - ``POST``
-     - ``/api/monitor/networks/{networkId}/insights/generate``
+     - ``/api/v1/monitor/networks/{networkId}/insights/generate``
      - Generate a new insight. Body: ``{ "audience": "TECHNICAL|EXECUTIVE|OT", "focus": "SECURITY|OPERATIONAL|COMPLIANCE" }`` (both optional; defaults to TECHNICAL / SECURITY).
 
 Per-Snapshot Insights
@@ -772,16 +790,16 @@ Per-Snapshot Insights
      - Path
      - Description
    * - ``GET``
-     - ``/api/monitor/networks/{networkId}/snapshots/{snapshotId}/insights/latest``
+     - ``/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insights/latest``
      - Get the latest insight for a snapshot. Returns 204 if none exists.
    * - ``POST``
-     - ``/api/monitor/networks/{networkId}/snapshots/{snapshotId}/insights/generate``
+     - ``/api/v1/monitor/networks/{networkId}/snapshots/{snapshotId}/insights/generate``
      - Generate a snapshot-scoped insight. Same body as network insights.
 
 Entity Notes
 ~~~~~~~~~~~~
 
-Entity notes are global (not per-network). All endpoints are prefixed with ``/api/entity-notes``.
+Entity notes are global (not per-network). All endpoints are prefixed with ``/api/v1/entity-notes``.
 
 .. list-table::
    :header-rows: 1
@@ -791,20 +809,20 @@ Entity notes are global (not per-network). All endpoints are prefixed with ``/ap
      - Path
      - Description
    * - ``GET``
-     - ``/api/entity-notes?entityType={type}&entityKey={key}``
+     - ``/api/v1/entity-notes?entityType={type}&entityKey={key}``
      - Get the note for a specific entity. Returns 204 if none exists.
    * - ``PUT``
-     - ``/api/entity-notes``
+     - ``/api/v1/entity-notes``
      - Create or update a note. Body: ``{ "entityType": "IP|DEVICE|PROTOCOL|APPLICATION", "entityKey": "string", "note": "string" }``.
    * - ``DELETE``
-     - ``/api/entity-notes?entityType={type}&entityKey={key}``
+     - ``/api/v1/entity-notes?entityType={type}&entityKey={key}``
      - Delete a note.
 
 Private IP Overrides
 ~~~~~~~~~~~~~~~~~~~~
 
 Overrides are global (not per-network). All endpoints are prefixed with
-``/api/custom-private-ranges``.
+``/api/v1/custom-private-ranges``.
 
 .. list-table::
    :header-rows: 1
@@ -814,14 +832,14 @@ Overrides are global (not per-network). All endpoints are prefixed with
      - Path
      - Description
    * - ``GET``
-     - ``/api/custom-private-ranges``
+     - ``/api/v1/custom-private-ranges``
      - List all private IP overrides.
    * - ``POST``
-     - ``/api/custom-private-ranges``
+     - ``/api/v1/custom-private-ranges``
      - Create an override. Body: ``{ "cidr": "string", "label": "string?" }``.
        A bare IP (e.g. ``"203.0.113.42"``) is automatically normalised to
        ``/32`` (or ``/128`` for IPv6). Returns 400 if the CIDR is invalid or
        already exists.
    * - ``DELETE``
-     - ``/api/custom-private-ranges/{id}``
+     - ``/api/v1/custom-private-ranges/{id}``
      - Delete an override by ID.

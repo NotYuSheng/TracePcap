@@ -196,6 +196,9 @@ columns include:
 - Category (nDPI) — nDPI traffic category (e.g. ``Social Network``, ``Media``)
 - Wireshark Protocol — ``tsharkProtocol`` from the ``frame.protocols`` stack
 - Risk flags — nDPI risk identifiers (e.g. ``TLS Self Signed Certificate``)
+- IDS Alerts — Suricata signature matches for the conversation, shown as purple
+  badges (only present when Suricata was enabled for the file; see
+  :doc:`ids-threat-detection`)
 - Country (src / dst) — from ipinfo.io or DB-IP MMDB lookup
 - Device type (src / dst) — from the multi-signal device classifier
 - Bytes transferred — sum of ``frame.len`` for all matched packets
@@ -230,6 +233,10 @@ with AND logic — a conversation must satisfy all active filters to be shown.
    * - **Security risks only**
      - Toggle: shows only conversations that have at least one nDPI risk flag
        (the ``flowRisks`` array is non-empty).
+   * - **IDS Alerts** (searchable)
+     - Suricata signature matches. Select one or more alert names to show only
+       conversations that triggered them. Values are populated from the distinct
+       alerts present in the current file. See :doc:`ids-threat-detection`.
    * - **Protocol** (pills)
      - The ``_ws.col.Protocol`` label — Wireshark's display column, representing
        the highest protocol layer its dissectors identified for each packet
@@ -392,8 +399,20 @@ Star-Graph Visualization
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A star-graph SVG shows the traced host (center node, labelled "Host") and up
-to 12 of its peer IPs arranged in a ring. The active traced peer is highlighted
-with a solid blue edge; other peers appear as dashed lines.
+to 12 of its peer IPs arranged in a ring. Each peer is drawn in one of three
+states so that scan patterns are visible at a glance:
+
+- **Responded** (green / solid edge) — the peer sent at least one packet back
+  to the host.
+- **No response** (dimmed / dashed edge) — the host probed the peer but nothing
+  came back. A ring of these around one host is the signature of a scan (e.g.
+  an ARP or port sweep).
+- **Currently traced** (blue) — the peer whose packets are being replayed.
+
+A legend beneath the graph shows the counts of responded vs silent peers. The
+responded flag for each peer comes from a dedicated endpoint
+(``GET /api/v1/tracer/{conversationId}/peers``) that reports, per peer, whether
+any reply from that peer to the host exists in the capture.
 
 An animated dot travels along the active edge on each step advance:
 
