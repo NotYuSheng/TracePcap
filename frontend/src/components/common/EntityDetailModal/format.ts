@@ -30,8 +30,8 @@ export function stringHue(s: string): number {
 export function hashBadgeStyle(s: string) {
   const hue = stringHue(s);
   return {
-    background: `hsl(${hue}, 40%, 88%)`,
-    color: `hsl(${hue}, 50%, 28%)`,
-    border: `1px solid hsl(${hue}, 35%, 72%)`,
+    background: `light-dark(hsl(${hue}, 40%, 88%), hsl(${hue}, 30%, 22%))`,
+    color: `light-dark(hsl(${hue}, 50%, 28%), hsl(${hue}, 65%, 78%))`,
+    border: `1px solid light-dark(hsl(${hue}, 35%, 72%), hsl(${hue}, 28%, 38%))`,
   };
 }
