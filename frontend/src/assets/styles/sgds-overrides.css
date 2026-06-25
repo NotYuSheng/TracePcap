@@ -452,6 +452,43 @@
   color: var(--tp-text);
 }
 
+/* Badges.
+   Bootstrap/SGDS only auto-dim solid badge colors when data-bs-theme="dark"
+   is set, but our dark mode keys off [data-theme='dark']. So solid .badge.bg-*
+   variants would otherwise render at full light-mode saturation and glare
+   against the dark background. Re-color them to muted tones (mirroring the dark
+   alert palette) with a lighter foreground for legibility. The color override
+   also neutralizes the light-mode text="dark" foreground some badges set. */
+[data-theme='dark'] .badge.bg-danger {
+  background-color: #5a2326 !important;
+  color: #f3a6a6 !important;
+}
+
+[data-theme='dark'] .badge.bg-warning {
+  background-color: #4d3a0f !important;
+  color: #f5ca5a !important;
+}
+
+[data-theme='dark'] .badge.bg-info {
+  background-color: #143a52 !important;
+  color: #8fd3f5 !important;
+}
+
+[data-theme='dark'] .badge.bg-success {
+  background-color: #14402a !important;
+  color: #7ee0a8 !important;
+}
+
+[data-theme='dark'] .badge.bg-primary {
+  background-color: #1e3a5a !important;
+  color: #8fbef0 !important;
+}
+
+[data-theme='dark'] .badge.bg-secondary {
+  background-color: var(--tp-bg-subtle) !important;
+  color: var(--tp-text) !important;
+}
+
 /* Misc */
 [data-theme='dark'] hr {
   border-color: var(--tp-border);
