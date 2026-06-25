@@ -24,12 +24,12 @@ type Granularity = number | 'month';
 
 // Time-interval options for the "By Time" view, mirroring the Traffic Overview chart.
 const GRANULARITY_OPTIONS: { label: string; value: Granularity }[] = [
-  { label: '1m',      value: 60 },
-  { label: '5m',      value: 300 },
-  { label: '30m',     value: 1800 },
-  { label: '1h',      value: 3600 },
-  { label: '1d',      value: 86400 },
-  { label: '1 month', value: 'month' },
+  { label: '1m',  value: 60 },
+  { label: '5m',  value: 300 },
+  { label: '30m', value: 1800 },
+  { label: '1h',  value: 3600 },
+  { label: '1d',  value: 86400 },
+  { label: '1mo', value: 'month' },
 ];
 
 interface TimeBucket {
