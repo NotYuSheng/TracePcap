@@ -5,11 +5,16 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { execSync } from 'child_process'
 
-function getAppVersion(): string {
+function getAppVersion(envFallback?: string): string {
   try {
-    return execSync('git describe --tags --always', { encoding: 'utf-8' }).trim();
+    // stdio: silence git's stderr ("fatal: not a git repository") in non-git build contexts.
+    return execSync('git describe --tags --always', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
   } catch {
-    return process.env.VITE_APP_VERSION || 'dev';
+    // Vite's loadEnv populates the `env` object but not process.env, so accept the loaded value.
+    return envFallback || process.env.VITE_APP_VERSION || 'dev';
   }
 }
 
@@ -39,7 +44,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: {
-      __APP_VERSION__: JSON.stringify(getAppVersion()),
+      __APP_VERSION__: JSON.stringify(getAppVersion(env.VITE_APP_VERSION)),
     },
     plugins: [react(), worldMapPlugin],
     resolve: {
