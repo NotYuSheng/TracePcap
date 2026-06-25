@@ -3,6 +3,20 @@ import { defineConfig, loadEnv } from 'vite'
 import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { execSync } from 'child_process'
+
+function getAppVersion(envFallback?: string): string {
+  try {
+    // stdio: silence git's stderr ("fatal: not a git repository") in non-git build contexts.
+    return execSync('git describe --tags --always', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    // Vite's loadEnv populates the `env` object but not process.env, so accept the loaded value.
+    return envFallback || process.env.VITE_APP_VERSION || 'dev';
+  }
+}
 
 const VALID_RESOLUTIONS = ['110m', '50m', '10m'] as const;
 type MapResolution = (typeof VALID_RESOLUTIONS)[number];
@@ -29,6 +43,9 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(getAppVersion(env.VITE_APP_VERSION)),
+    },
     plugins: [react(), worldMapPlugin],
     resolve: {
       alias: {

@@ -41,6 +41,10 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
 
+          # Version string for the frontend footer (e.g. v0.1.1-113-g6e040b4)
+          APP_VERSION=$(git describe --tags --always 2>/dev/null || echo "$SHORT_SHA")
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+
           # Convert repository owner to lowercase for Docker image naming
           REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "REPO_OWNER_LOWER=$REPO_OWNER_LOWER" >> $GITHUB_ENV
@@ -72,6 +76,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_OWNER_LOWER }}/${{ matrix.name }}:${{ env.IMAGE_TAG }}
             ghcr.io/${{ env.REPO_OWNER_LOWER }}/${{ matrix.name }}:${{ env.SHA_TAG }}
+          build-args: |
+            VITE_APP_VERSION=${{ env.APP_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
