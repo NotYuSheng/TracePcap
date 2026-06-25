@@ -62,10 +62,11 @@ function stringHue(s: string): number {
 function hashBadgeStyle(s: string): CSSProperties {
   const hue = stringHue(s);
   return {
+    '--badge-hue': hue,
     background: `hsl(${hue}, 40%, 88%)`,
     color: `hsl(${hue}, 50%, 28%)`,
     border: `1px solid hsl(${hue}, 35%, 72%)`,
-  };
+  } as CSSProperties;
 }
 
 function IpBadgeGroup({

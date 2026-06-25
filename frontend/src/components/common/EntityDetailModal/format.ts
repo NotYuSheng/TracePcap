@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
 
@@ -27,11 +28,12 @@ export function stringHue(s: string): number {
   return Math.abs(h) % 360;
 }
 
-export function hashBadgeStyle(s: string) {
+export function hashBadgeStyle(s: string): CSSProperties {
   const hue = stringHue(s);
   return {
+    '--badge-hue': hue,
     background: `hsl(${hue}, 40%, 88%)`,
     color: `hsl(${hue}, 50%, 28%)`,
     border: `1px solid hsl(${hue}, 35%, 72%)`,
-  };
+  } as CSSProperties;
 }
