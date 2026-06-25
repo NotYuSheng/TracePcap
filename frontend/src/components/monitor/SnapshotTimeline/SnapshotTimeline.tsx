@@ -1,6 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState } from 'react';
-import { Badge, Button, Modal } from '@govtechsg/sgds-react';
+import { Fragment, useMemo, useState } from 'react';
+import { Badge, Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
 import { ScrollableTable } from '@/components/common/ScrollableTable';
@@ -18,6 +18,37 @@ interface SnapshotTimelineProps {
 }
 
 type SortDir = 'asc' | 'desc';
+type ViewMode = 'file' | 'time';
+
+// Time-interval options for the "By Time" view, mirroring the Traffic Overview chart.
+const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
+  { label: '1m',  seconds: 60 },
+  { label: '5m',  seconds: 300 },
+  { label: '30m', seconds: 1800 },
+  { label: '1h',  seconds: 3600 },
+  { label: '1d',  seconds: 86400 },
+];
+
+interface TimeBucket {
+  key: string;
+  start: number; // bucket start (ms); NaN for the "unknown capture time" group
+  snaps: NetworkSnapshot[];
+  packets: number;
+  changes: number;
+  critical: number;
+}
+
+function formatBucketLabel(startMs: number, granularitySec: number): string {
+  if (Number.isNaN(startMs)) return 'Unknown capture time';
+  const start = new Date(startMs);
+  if (granularitySec >= 86400) {
+    return start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  const end = new Date(startMs + granularitySec * 1000);
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+  const dateStr = start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  return `${dateStr}, ${start.toLocaleTimeString('en-GB', timeOpts)}–${end.toLocaleTimeString('en-GB', timeOpts)}`;
+}
 
 function formatCaptureDate(start: string | null): string {
   if (!start) return '—';
@@ -58,6 +89,9 @@ export const SnapshotTimeline = ({
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [viewMode, setViewMode] = useState<ViewMode>('file');
+  const [granularity, setGranularity] = useState(3600);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const handleRemove = async (snapshotId: string) => {
     setRemoving(snapshotId);
@@ -74,23 +108,183 @@ export const SnapshotTimeline = ({
     setPage(1);
   };
 
+  const changeMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setPage(1);
+    setExpanded(new Set());
+  };
+
+  const changeGranularity = (secs: number) => {
+    setGranularity(secs);
+    setPage(1);
+    setExpanded(new Set());
+  };
+
+  const toggleExpand = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const sorted = [...snapshots].sort((a, b) => {
     const diff = getStartMs(a) - getStartMs(b);
     return sortDir === 'asc' ? diff : -diff;
   });
 
-  const totalPages = Math.ceil(sorted.length / pageSize);
+  // Group snapshots into time buckets for the "By Time" view (purely client-side).
+  const buckets = useMemo<TimeBucket[]>(() => {
+    const bucketMs = granularity * 1000;
+    const map = new Map<number, NetworkSnapshot[]>();
+    const noTime: NetworkSnapshot[] = [];
+    for (const snap of snapshots) {
+      if (!snap.startTime) {
+        noTime.push(snap);
+        continue;
+      }
+      const start = Math.floor(getStartMs(snap) / bucketMs) * bucketMs;
+      const arr = map.get(start) ?? [];
+      arr.push(snap);
+      map.set(start, arr);
+    }
+    const toBucket = (start: number, snaps: NetworkSnapshot[]): TimeBucket => ({
+      key: Number.isNaN(start) ? 'unknown' : String(start),
+      start,
+      snaps: [...snaps].sort((a, b) => getStartMs(a) - getStartMs(b)),
+      packets: snaps.reduce((s, x) => s + (x.packetCount ?? 0), 0),
+      changes: snaps.reduce((s, x) => s + x.changeCount, 0),
+      critical: snaps.reduce((s, x) => s + x.criticalCount, 0),
+    });
+    const list = [...map.entries()]
+      .map(([start, snaps]) => toBucket(start, snaps))
+      .sort((a, b) => (sortDir === 'asc' ? a.start - b.start : b.start - a.start));
+    if (noTime.length) list.push(toBucket(NaN, noTime));
+    return list;
+  }, [snapshots, granularity, sortDir]);
+
+  const totalItems = viewMode === 'file' ? sorted.length : buckets.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
+  const paginatedBuckets = buckets.slice((page - 1) * pageSize, page * pageSize);
+
+  const renderSnapshotRow = (snap: NetworkSnapshot) => (
+    <tr
+      key={snap.id}
+      style={{ cursor: 'pointer' }}
+      onClick={() => { setDetailInitialTab('diagram'); setDetailSnap(snap); }}
+    >
+      <td>
+        <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
+      </td>
+      <td>
+        <span className="fw-medium text-break">{snap.fileName}</span>
+      </td>
+      <td>
+        <small className="text-muted">{formatDuration(snap.startTime, snap.endTime)}</small>
+      </td>
+      <td>
+        <small className="text-muted">{snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}</small>
+      </td>
+      <td>
+        {snap.changeCount === 0 ? (
+          <Badge bg="light" text="muted" className="border">No changes</Badge>
+        ) : snap.criticalCount > 0 ? (
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            className="border-0 py-0 px-1"
+            style={{ fontSize: '0.75em' }}
+            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
+          >
+            {snap.criticalCount} critical
+            {snap.changeCount > snap.criticalCount &&
+              `, ${snap.changeCount - snap.criticalCount} more`}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="warning"
+            size="sm"
+            className="border-0 py-0 px-1"
+            style={{ fontSize: '0.75em' }}
+            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
+          >
+            {snap.changeCount} change{snap.changeCount !== 1 ? 's' : ''}
+          </Button>
+        )}
+      </td>
+      <td onClick={e => e.stopPropagation()}>
+        <Button
+          size="sm"
+          variant="outline-danger"
+          onClick={() => setConfirmRemove(snap.id)}
+          disabled={removing !== null}
+          title="Remove snapshot"
+        >
+          <i className="bi bi-trash"></i>
+        </Button>
+      </td>
+    </tr>
+  );
+
+  const renderBucketBadge = (b: TimeBucket) => {
+    if (b.changes === 0) return <Badge bg="light" text="muted" className="border">No changes</Badge>;
+    if (b.critical > 0) {
+      return (
+        <Badge bg="danger">
+          {b.critical} critical
+          {b.changes > b.critical && `, ${b.changes - b.critical} more`}
+        </Badge>
+      );
+    }
+    return <Badge bg="warning" text="dark">{b.changes} change{b.changes !== 1 ? 's' : ''}</Badge>;
+  };
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h6 className="mb-0 text-muted fw-normal">
           {snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}
         </h6>
-        <Button size="sm" variant="outline-secondary" onClick={onAddSnapshot}>
-          <i className="bi bi-plus-lg me-1"></i>Add PCAP
-        </Button>
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          <ButtonGroup size="sm">
+            <Button
+              variant={viewMode === 'file' ? 'primary' : 'outline-primary'}
+              onClick={() => changeMode('file')}
+              title="One row per PCAP file"
+            >
+              By PCAP
+            </Button>
+            <Button
+              variant={viewMode === 'time' ? 'primary' : 'outline-primary'}
+              onClick={() => changeMode('time')}
+              title="Group captures into time intervals"
+            >
+              By Time
+            </Button>
+          </ButtonGroup>
+          {viewMode === 'time' && (
+            <div className="d-flex align-items-center gap-1">
+              <label className="text-muted small mb-0">Interval:</label>
+              <Form.Select
+                size="sm"
+                style={{ width: 'auto' }}
+                value={String(granularity)}
+                onChange={e => changeGranularity(Number(e.target.value))}
+              >
+                {GRANULARITY_OPTIONS.map(({ label, seconds }) => (
+                  <option key={seconds} value={String(seconds)}>{label}</option>
+                ))}
+              </Form.Select>
+            </div>
+          )}
+          <Button size="sm" variant="outline-secondary" onClick={onAddSnapshot}>
+            <i className="bi bi-plus-lg me-1"></i>Add PCAP
+          </Button>
+        </div>
       </div>
 
       {snapshots.length === 0 ? (
@@ -101,91 +295,79 @@ export const SnapshotTimeline = ({
         <>
           <div className="border rounded overflow-hidden">
           <ScrollableTable maxHeight="50vh">
-            <table className="table table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th className="text-muted fw-normal" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={toggleSort}>
-                    Captured{' '}
-                    <i className={`bi bi-arrow-${sortDir === 'asc' ? 'up' : 'down'} ms-1`}></i>
-                  </th>
-                  <th className="text-muted fw-normal">File</th>
-                  <th className="text-muted fw-normal">Duration</th>
-                  <th className="text-muted fw-normal">Packets</th>
-                  <th className="text-muted fw-normal">Changes</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map(snap => {
-                  return (
-                    <tr
-                      key={snap.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => { setDetailInitialTab('diagram'); setDetailSnap(snap); }}
-                    >
-                      <td>
-                        <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
-                      </td>
-                      <td>
-                        <span className="fw-medium text-break">{snap.fileName}</span>
-                      </td>
-                      <td>
-                        <small className="text-muted">{formatDuration(snap.startTime, snap.endTime)}</small>
-                      </td>
-                      <td>
-                        <small className="text-muted">{snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}</small>
-                      </td>
-                      <td>
-                        {snap.changeCount === 0 ? (
-                          <Badge bg="light" text="muted" className="border">No changes</Badge>
-                        ) : snap.criticalCount > 0 ? (
-                          <Button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            className="border-0 py-0 px-1"
-                            style={{ fontSize: '0.75em' }}
-                            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
-                          >
-                            {snap.criticalCount} critical
-                            {snap.changeCount > snap.criticalCount &&
-                              `, ${snap.changeCount - snap.criticalCount} more`}
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="warning"
-                            size="sm"
-                            className="border-0 py-0 px-1"
-                            style={{ fontSize: '0.75em' }}
-                            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
-                          >
-                            {snap.changeCount} change{snap.changeCount !== 1 ? 's' : ''}
-                          </Button>
+            {viewMode === 'file' ? (
+              <table className="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th className="text-muted fw-normal" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={toggleSort}>
+                      Captured{' '}
+                      <i className={`bi bi-arrow-${sortDir === 'asc' ? 'up' : 'down'} ms-1`}></i>
+                    </th>
+                    <th className="text-muted fw-normal">File</th>
+                    <th className="text-muted fw-normal">Duration</th>
+                    <th className="text-muted fw-normal">Packets</th>
+                    <th className="text-muted fw-normal">Changes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(renderSnapshotRow)}
+                </tbody>
+              </table>
+            ) : (
+              <table className="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th className="text-muted fw-normal" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={toggleSort}>
+                      Period{' '}
+                      <i className={`bi bi-arrow-${sortDir === 'asc' ? 'up' : 'down'} ms-1`}></i>
+                    </th>
+                    <th className="text-muted fw-normal">Captures</th>
+                    <th className="text-muted fw-normal">Packets</th>
+                    <th className="text-muted fw-normal">Changes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedBuckets.map(b => {
+                    const isOpen = expanded.has(b.key);
+                    return (
+                      <Fragment key={b.key}>
+                        <tr style={{ cursor: 'pointer' }} onClick={() => toggleExpand(b.key)}>
+                          <td className="fw-medium" style={{ whiteSpace: 'nowrap' }}>
+                            <i className={`bi bi-chevron-${isOpen ? 'down' : 'right'} me-2 text-muted`}></i>
+                            {formatBucketLabel(b.start, granularity)}
+                          </td>
+                          <td>
+                            <small className="text-muted">{b.snaps.length}</small>
+                          </td>
+                          <td>
+                            <small className="text-muted">{b.packets.toLocaleString()}</small>
+                          </td>
+                          <td>{renderBucketBadge(b)}</td>
+                        </tr>
+                        {isOpen && (
+                          <tr>
+                            <td colSpan={4} className="p-0 bg-light">
+                              <table className="table table-sm table-hover align-middle mb-0">
+                                <tbody>
+                                  {b.snaps.map(renderSnapshotRow)}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td onClick={e => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => setConfirmRemove(snap.id)}
-                          disabled={removing !== null}
-                          title="Remove snapshot"
-                        >
-                          <i className="bi bi-trash"></i>
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </ScrollableTable>
           <div className="border-top px-3 py-2">
             <Pagination
               currentPage={page}
               totalPages={totalPages}
-              totalItems={snapshots.length}
+              totalItems={totalItems}
               pageSize={pageSize}
               onPageChange={setPage}
               showPageSizeSelector
