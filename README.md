@@ -288,11 +288,10 @@ To run with login enabled, use the production overlay, which bundles a Keycloak 
 
 ```bash
 PUBLIC_URL=http://localhost:8888 \
-KEYCLOAK_ADMIN=admin KEYCLOAK_ADMIN_PASSWORD='choose-a-strong-password' \
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` are **required** (no insecure default) — the Keycloak admin console is reachable at `${PUBLIC_URL}/admin`.
+The Keycloak admin console is reachable at `${PUBLIC_URL}/admin` — default `user` / `P@ssw0rd`. **Override `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` for any real deployment.**
 
 Set `PUBLIC_URL` to the exact origin you browse to. For any non-`localhost` deployment this must be an **HTTPS** origin (see the secure-context note below); plain-HTTP LAN/Tailscale IPs only work if you terminate TLS in front of nginx. It defaults to `http://localhost:${NGINX_PORT:-8888}`.
 
