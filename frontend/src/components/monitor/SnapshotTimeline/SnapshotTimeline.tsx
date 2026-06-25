@@ -258,22 +258,6 @@ export const SnapshotTimeline = ({
           {snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}
         </h6>
         <div className="d-flex align-items-center gap-2 flex-wrap">
-          <ButtonGroup size="sm">
-            <Button
-              variant={viewMode === 'file' ? 'primary' : 'outline-primary'}
-              onClick={() => changeMode('file')}
-              title="One row per PCAP file"
-            >
-              By PCAP
-            </Button>
-            <Button
-              variant={viewMode === 'time' ? 'primary' : 'outline-primary'}
-              onClick={() => changeMode('time')}
-              title="Group captures into time intervals"
-            >
-              By Time
-            </Button>
-          </ButtonGroup>
           {viewMode === 'time' && (
             <div className="d-flex align-items-center gap-1">
               <label className="text-muted small mb-0">Interval:</label>
@@ -292,6 +276,22 @@ export const SnapshotTimeline = ({
               </Form.Select>
             </div>
           )}
+          <ButtonGroup size="sm">
+            <Button
+              variant={viewMode === 'file' ? 'primary' : 'outline-primary'}
+              onClick={() => changeMode('file')}
+              title="One row per PCAP file"
+            >
+              By PCAP
+            </Button>
+            <Button
+              variant={viewMode === 'time' ? 'primary' : 'outline-primary'}
+              onClick={() => changeMode('time')}
+              title="Group captures into time intervals"
+            >
+              By Time
+            </Button>
+          </ButtonGroup>
           <Button size="sm" variant="outline-secondary" onClick={onAddSnapshot}>
             <i className="bi bi-plus-lg me-1"></i>Add PCAP
           </Button>
