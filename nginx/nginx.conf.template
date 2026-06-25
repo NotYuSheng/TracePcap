@@ -8,6 +8,9 @@ server {
     # Use Docker's internal DNS so backend IP is re-resolved after container restarts
     resolver 127.0.0.11 valid=5s ipv6=off;
     set $backend http://backend:8080;
+    # Keycloak upstream as a variable so nginx starts even when the IdP isn't deployed
+    # (default/auth-off stack never hits the /realms paths below).
+    set $keycloak http://keycloak:8080;
 
     # Gzip compression
     gzip on;
@@ -46,6 +49,29 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Keycloak (OIDC) — proxied same-origin so the browser reaches the identity provider at the
+    # same host:port as the app (no second exposed port, no CORS). Only exercised when auth is
+    # enabled; in the default stack these paths are never requested. MUST precede the static-asset
+    # regex below so Keycloak's own /resources/*.js|css are proxied, not served from the html root.
+    # Anchored to whole path segments ((/|$)) so /js doesn't match /json, /admin not /administration,
+    # etc.; robots.txt is intentionally excluded so the frontend serves its own (and so the default,
+    # Keycloak-less stack doesn't 502 on crawler requests).
+    location ~ ^/(realms|resources|admin|js)(/|$) {
+        proxy_pass $keycloak;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Forwarded-Port $server_port;
+        # CRITICAL: Keycloak sends HSTS by default. Since it's proxied on the SAME origin as the
+        # app (which is plain HTTP), a leaked Strict-Transport-Security header would poison the
+        # whole origin to HTTPS-only in the browser → SSL_ERROR_RX_RECORD_TOO_LONG. Strip it.
+        # (TLS, when used, should be terminated by an outer reverse proxy that sets its own HSTS.)
+        proxy_hide_header Strict-Transport-Security;
     }
 
     # Cache static assets
