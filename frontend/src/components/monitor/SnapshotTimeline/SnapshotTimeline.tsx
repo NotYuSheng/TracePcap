@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type MouseEvent } from 'react';
 import { Badge, Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
@@ -19,14 +19,17 @@ interface SnapshotTimelineProps {
 
 type SortDir = 'asc' | 'desc';
 type ViewMode = 'file' | 'time';
+// Fixed-length intervals are stored as seconds; 'month' is a calendar month (variable length).
+type Granularity = number | 'month';
 
 // Time-interval options for the "By Time" view, mirroring the Traffic Overview chart.
-const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
-  { label: '1m',  seconds: 60 },
-  { label: '5m',  seconds: 300 },
-  { label: '30m', seconds: 1800 },
-  { label: '1h',  seconds: 3600 },
-  { label: '1d',  seconds: 86400 },
+const GRANULARITY_OPTIONS: { label: string; value: Granularity }[] = [
+  { label: '1m',      value: 60 },
+  { label: '5m',      value: 300 },
+  { label: '30m',     value: 1800 },
+  { label: '1h',      value: 3600 },
+  { label: '1d',      value: 86400 },
+  { label: '1 month', value: 'month' },
 ];
 
 interface TimeBucket {
@@ -38,13 +41,26 @@ interface TimeBucket {
   critical: number;
 }
 
-function formatBucketLabel(startMs: number, granularitySec: number): string {
+// Start (ms) of the bucket a given timestamp falls into for the active granularity.
+function bucketStartFor(ms: number, granularity: Granularity): number {
+  if (granularity === 'month') {
+    const d = new Date(ms);
+    return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+  }
+  const bucketMs = granularity * 1000;
+  return Math.floor(ms / bucketMs) * bucketMs;
+}
+
+function formatBucketLabel(startMs: number, granularity: Granularity): string {
   if (Number.isNaN(startMs)) return 'Unknown capture time';
   const start = new Date(startMs);
-  if (granularitySec >= 86400) {
+  if (granularity === 'month') {
+    return start.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }
+  if (granularity >= 86400) {
     return start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   }
-  const end = new Date(startMs + granularitySec * 1000);
+  const end = new Date(startMs + granularity * 1000);
   const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
   const dateStr = start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   return `${dateStr}, ${start.toLocaleTimeString('en-GB', timeOpts)}–${end.toLocaleTimeString('en-GB', timeOpts)}`;
@@ -90,7 +106,7 @@ export const SnapshotTimeline = ({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<ViewMode>('file');
-  const [granularity, setGranularity] = useState(3600);
+  const [granularity, setGranularity] = useState<Granularity>(3600);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const handleRemove = async (snapshotId: string) => {
@@ -114,8 +130,8 @@ export const SnapshotTimeline = ({
     setExpanded(new Set());
   };
 
-  const changeGranularity = (secs: number) => {
-    setGranularity(secs);
+  const changeGranularity = (value: Granularity) => {
+    setGranularity(value);
     setPage(1);
     setExpanded(new Set());
   };
@@ -136,7 +152,6 @@ export const SnapshotTimeline = ({
 
   // Group snapshots into time buckets for the "By Time" view (purely client-side).
   const buckets = useMemo<TimeBucket[]>(() => {
-    const bucketMs = granularity * 1000;
     const map = new Map<number, NetworkSnapshot[]>();
     const noTime: NetworkSnapshot[] = [];
     for (const snap of snapshots) {
@@ -144,7 +159,7 @@ export const SnapshotTimeline = ({
         noTime.push(snap);
         continue;
       }
-      const start = Math.floor(getStartMs(snap) / bucketMs) * bucketMs;
+      const start = bucketStartFor(getStartMs(snap), granularity);
       const arr = map.get(start) ?? [];
       arr.push(snap);
       map.set(start, arr);
@@ -169,6 +184,34 @@ export const SnapshotTimeline = ({
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
   const paginatedBuckets = buckets.slice((page - 1) * pageSize, page * pageSize);
 
+  // Shared "Changes" cell for both views — always the same Badge pill so the By PCAP
+  // rows, the By Time bucket aggregate, and the nested per-PCAP rows look identical.
+  // Pass onClick to make it clickable (per-PCAP rows jump to the changes tab).
+  const renderChangesPill = (
+    changeCount: number,
+    criticalCount: number,
+    onClick?: (e: MouseEvent<HTMLElement>) => void,
+  ) => {
+    if (changeCount === 0) {
+      return <Badge bg="light" text="muted" className="border fw-normal">No changes</Badge>;
+    }
+    const variant = criticalCount > 0 ? 'danger' : 'warning';
+    const label = criticalCount > 0
+      ? `${criticalCount} critical${changeCount > criticalCount ? `, ${changeCount - criticalCount} more` : ''}`
+      : `${changeCount} change${changeCount !== 1 ? 's' : ''}`;
+    return (
+      <Badge
+        bg={variant}
+        text={variant === 'warning' ? 'dark' : undefined}
+        className="fw-normal"
+        style={onClick ? { cursor: 'pointer' } : undefined}
+        onClick={onClick}
+      >
+        {label}
+      </Badge>
+    );
+  };
+
   const renderSnapshotRow = (snap: NetworkSnapshot) => (
     <tr
       key={snap.id}
@@ -188,33 +231,11 @@ export const SnapshotTimeline = ({
         <small className="text-muted">{snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}</small>
       </td>
       <td>
-        {snap.changeCount === 0 ? (
-          <Badge bg="light" text="muted" className="border">No changes</Badge>
-        ) : snap.criticalCount > 0 ? (
-          <Button
-            type="button"
-            variant="danger"
-            size="sm"
-            className="border-0 py-0 px-1"
-            style={{ fontSize: '0.75em' }}
-            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
-          >
-            {snap.criticalCount} critical
-            {snap.changeCount > snap.criticalCount &&
-              `, ${snap.changeCount - snap.criticalCount} more`}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="warning"
-            size="sm"
-            className="border-0 py-0 px-1"
-            style={{ fontSize: '0.75em' }}
-            onClick={e => { e.stopPropagation(); setDetailInitialTab('changes'); setDetailSnap(snap); }}
-          >
-            {snap.changeCount} change{snap.changeCount !== 1 ? 's' : ''}
-          </Button>
-        )}
+        {renderChangesPill(snap.changeCount, snap.criticalCount, e => {
+          e.stopPropagation();
+          setDetailInitialTab('changes');
+          setDetailSnap(snap);
+        })}
       </td>
       <td onClick={e => e.stopPropagation()}>
         <Button
@@ -229,19 +250,6 @@ export const SnapshotTimeline = ({
       </td>
     </tr>
   );
-
-  const renderBucketBadge = (b: TimeBucket) => {
-    if (b.changes === 0) return <Badge bg="light" text="muted" className="border">No changes</Badge>;
-    if (b.critical > 0) {
-      return (
-        <Badge bg="danger">
-          {b.critical} critical
-          {b.changes > b.critical && `, ${b.changes - b.critical} more`}
-        </Badge>
-      );
-    }
-    return <Badge bg="warning" text="dark">{b.changes} change{b.changes !== 1 ? 's' : ''}</Badge>;
-  };
 
   return (
     <div>
@@ -273,10 +281,13 @@ export const SnapshotTimeline = ({
                 size="sm"
                 style={{ width: 'auto' }}
                 value={String(granularity)}
-                onChange={e => changeGranularity(Number(e.target.value))}
+                onChange={e => {
+                  const v = e.target.value;
+                  changeGranularity(v === 'month' ? 'month' : Number(v));
+                }}
               >
-                {GRANULARITY_OPTIONS.map(({ label, seconds }) => (
-                  <option key={seconds} value={String(seconds)}>{label}</option>
+                {GRANULARITY_OPTIONS.map(({ label, value }) => (
+                  <option key={String(value)} value={String(value)}>{label}</option>
                 ))}
               </Form.Select>
             </div>
@@ -343,7 +354,7 @@ export const SnapshotTimeline = ({
                           <td>
                             <small className="text-muted">{b.packets.toLocaleString()}</small>
                           </td>
-                          <td>{renderBucketBadge(b)}</td>
+                          <td>{renderChangesPill(b.changes, b.critical)}</td>
                         </tr>
                         {isOpen && (
                           <tr>
