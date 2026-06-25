@@ -489,6 +489,20 @@
   color: var(--tp-text) !important;
 }
 
+/* Per-entity hash badges (hashBadgeStyle in the drift panels / entity modal).
+   The inline style sets a --badge-hue plus light-mode HSL values that read fine
+   on a light background. In dark mode, recolor from that same hue to muted tones.
+   We target [style*='--badge-hue'] so every current and future consumer stays in
+   sync without a shared class; var(--badge-hue) resolves on the element itself
+   (where it's declared inline), and !important beats the inline declarations.
+   Plain custom properties (no light-dark()) keep this compatible with older
+   browsers. */
+[data-theme='dark'] [style*='--badge-hue'] {
+  background-color: hsl(var(--badge-hue), 30%, 22%) !important;
+  color: hsl(var(--badge-hue), 65%, 78%) !important;
+  border-color: hsl(var(--badge-hue), 28%, 38%) !important;
+}
+
 /* Misc */
 [data-theme='dark'] hr {
   border-color: var(--tp-border);
