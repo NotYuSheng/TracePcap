@@ -25,8 +25,9 @@ Open ``.env`` in your editor and configure at minimum:
 
 .. code-block:: ini
 
-   # Maximum PCAP upload size (bytes). Default: 512 MB.
-   MAX_UPLOAD_SIZE_BYTES=536870912
+   # Memory budget (MB). The max upload size is derived from this (25% of it).
+   # Default 2048 → 512 MB max upload.
+   APP_MEMORY_MB=2048
 
    # Port on which nginx listens. Change if 80 is already in use.
    NGINX_PORT=80

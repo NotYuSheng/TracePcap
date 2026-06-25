@@ -256,7 +256,9 @@ to the node modal:
 - **Web server** (``WEB_SERVER``) — serves cleartext HTTP, or is HTTPS-only
   (detected from a TLS ServerHello).
 - **API server** (``API_SERVER``) — a web server whose responses look like an
-  API (JSON content, REST verbs, or ``/api`` paths).
+  API (JSON content, REST verbs, or ``/api`` paths). An ``API_SERVER`` is a
+  specialisation of the web role and reuses the same **HTTP tab** described
+  below — there is no separate API tab.
 
 Service Role Detail Tabs
 ~~~~~~~~~~~~~~~~~~~~~~~~~

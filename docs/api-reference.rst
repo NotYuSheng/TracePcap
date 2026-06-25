@@ -51,8 +51,10 @@ Key Endpoint Groups
 - **PCAP files** — upload, list, delete, download, and trigger re-analysis.
 - **Conversations** — query, filter, sort, and export conversations.
 - **Extracted files** — list and download extracted file objects.
-- **Security alerts** — nDPI risk flags and Suricata IDS alerts surfaced per
-  conversation (see :doc:`features/ids-threat-detection`).
+- **Security alerts** — nDPI risk flags and Suricata IDS alerts for a file,
+  served file-scoped at ``GET /api/v1/files/{fileId}/security-alerts`` (and
+  surfaced per conversation in the UI; see
+  :doc:`features/ids-threat-detection`).
 - **Signatures** — read and update the custom signature rule set.
 - **Story** — generate and retrieve AI narrative summaries.
 - **Filters** — generate Wireshark/tcpdump filters from natural language.

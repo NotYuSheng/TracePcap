@@ -133,8 +133,9 @@ LLM
      - *(auto)*
      - The context window size (in tokens) configured on your LLM server. Used
        to detect prompt-too-large errors early. If unset, auto-detected from
-       the ``/v1/models`` endpoint; if that fails, a conservative default is
-       used. Example: ``32768`` for a 32k model.
+       the ``/v1/models`` endpoint; if that fails, the configured
+       ``LLM_MAX_TOKENS`` value remains in effect. Example: ``32768`` for a 32k
+       model.
    * - ``LLM_TIMEOUT``
      - ``300``
      - HTTP timeout in seconds for LLM API requests. Local models can be slow —
@@ -210,9 +211,11 @@ rebuild (``docker compose up -d --build``).
      - Set to ``true`` to show the pre-upload analysis options modal.
    * - ``VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT``
      - ``false``
-     - The 500-conversation rendering cap in the Network Topology Diagram.
-       Setting ``false`` disables the cap and loads every conversation, which
-       may cause browser slowdowns or out-of-memory errors on large captures.
+     - Toggles the 500-conversation rendering cap in the Network Topology
+       Diagram. Set ``true`` to **enable** the cap (render at most 500
+       conversations). The shipped ``.env.example`` default is ``false``, which
+       **disables** the cap and loads every conversation — this may cause
+       browser slowdowns or out-of-memory errors on large captures.
    * - ``APP_VERSION``
      - ``dev``
      - Version string rendered in the app footer (passed as the

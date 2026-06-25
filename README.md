@@ -140,7 +140,7 @@ The Network Monitor lets you build a picture of an unknown network from multiple
 
 ### Supported File Formats
 
-PCAP, PCAPNG, CAP (max 512MB default, configurable via `MAX_UPLOAD_SIZE_BYTES`)
+PCAP, PCAPNG, CAP (max 512MB default, derived from `APP_MEMORY_MB`)
 
 ## How Network Monitor Works
 
@@ -271,7 +271,7 @@ docker compose -f docker-compose.offline.yml up -d
 - Change default MinIO credentials in `docker-compose.yml`
 - Update PostgreSQL password
 - Configure reverse proxy with SSL/TLS
-- Adjust `MAX_UPLOAD_SIZE_BYTES` based on your needs
+- Adjust `APP_MEMORY_MB` based on your needs (upload limit is derived from it)
 - Add an authentication layer for multi-user deployments
 
 ## Security

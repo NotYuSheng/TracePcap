@@ -112,6 +112,7 @@ Controller: `ConversationTracerController`
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/tracer/{conversationId}/steps` | Get trace steps for a conversation |
+| `GET` | `/api/v1/tracer/{conversationId}/peers` | List the host's peers, each flagged as responded or silent |
 | `POST` | `/api/v1/tracer/{conversationId}/explain` | Generate LLM explanation for a conversation |
 
 ---
@@ -157,3 +158,14 @@ Controller: `SystemController`
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/system/limits` | Get system resource limits |
+
+---
+
+## Network Monitor & related
+
+The Network Monitor endpoints — networks, snapshots, change events, baseline
+definitions, subnets (`/api/v1/subnets`), node roles (`/api/v1/node-roles`),
+entity notes (`/api/v1/entity-notes`), external events, analyst annotations,
+insights, and private-range overrides (`/api/v1/custom-private-ranges`) — are
+documented with full request/response details in the Sphinx docs:
+[Network Monitor → REST API Reference](../features/network-monitor.rst).
