@@ -28,7 +28,15 @@ export const oidcConfig: AuthProviderProps = {
   scope: 'openid profile email',
   automaticSilentRenew: true,
   userStore: new WebStorageStateStore({ store: window.localStorage }),
-  onSigninCallback: () => {
-    window.history.replaceState({}, document.title, window.location.pathname);
+  onSigninCallback: (user) => {
+    // Return to the deep link captured in `state` at signinRedirect time. The callback lands on the
+    // redirect_uri ("/"), so if the target is a different route we must actually navigate there
+    // (replaceState alone wouldn't re-route the SPA); same-route just strips the ?code/?state params.
+    const target = typeof user?.state === 'string' && user.state.startsWith('/') ? user.state : '/';
+    if (window.location.pathname === target.split('?')[0]) {
+      window.history.replaceState({}, document.title, target);
+    } else {
+      window.location.replace(target);
+    }
   },
 };

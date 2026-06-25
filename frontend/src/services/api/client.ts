@@ -12,9 +12,9 @@ export const apiClient = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   config => {
-    // Prefer the live OIDC access token (set by AuthGate when auth is enabled); otherwise fall back
-    // to a token stashed in localStorage, preserving the original behaviour when auth is off.
-    const token = getAccessToken() ?? localStorage.getItem('authToken');
+    // Prefer the OIDC access token. The legacy localStorage `authToken` fallback applies only when
+    // auth is disabled — otherwise a stale token could revive a bearer after logout / during signin.
+    const token = getAccessToken() ?? (env.AUTH_ENABLED ? null : localStorage.getItem('authToken'));
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

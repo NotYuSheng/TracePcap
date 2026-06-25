@@ -25,8 +25,10 @@ services:
     container_name: tracepcap-keycloak
     command: ["start-dev", "--import-realm"]
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Require explicit admin credentials — the Keycloak admin console is reachable on the same
+      # public origin (/admin), so an admin/admin default would hand over the IdP. Fail fast if unset.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD}
       # Public, browser-facing base URL — determines the token `iss` claim and all KC-generated URLs.
       KC_HOSTNAME: ${PUBLIC_URL:-http://localhost:8888}
       # Trust X-Forwarded-* from the nginx proxy (same-origin reverse proxy in front of Keycloak).

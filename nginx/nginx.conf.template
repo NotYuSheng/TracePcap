@@ -55,7 +55,10 @@ server {
     # same host:port as the app (no second exposed port, no CORS). Only exercised when auth is
     # enabled; in the default stack these paths are never requested. MUST precede the static-asset
     # regex below so Keycloak's own /resources/*.js|css are proxied, not served from the html root.
-    location ~ ^/(realms|resources|admin|js|robots\.txt) {
+    # Anchored to whole path segments ((/|$)) so /js doesn't match /json, /admin not /administration,
+    # etc.; robots.txt is intentionally excluded so the frontend serves its own (and so the default,
+    # Keycloak-less stack doesn't 502 on crawler requests).
+    location ~ ^/(realms|resources|admin|js)(/|$) {
         proxy_pass $keycloak;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;

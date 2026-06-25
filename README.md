@@ -288,10 +288,13 @@ To run with login enabled, use the production overlay, which bundles a Keycloak 
 
 ```bash
 PUBLIC_URL=http://localhost:8888 \
+KEYCLOAK_ADMIN=admin KEYCLOAK_ADMIN_PASSWORD='choose-a-strong-password' \
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Use the host you actually reach the app at — e.g. `http://192.168.1.10:8888` on a LAN or `http://100.x.y.z:8888` over Tailscale. It defaults to `http://localhost:${NGINX_PORT:-8888}`.
+`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` are **required** (no insecure default) — the Keycloak admin console is reachable at `${PUBLIC_URL}/admin`.
+
+Set `PUBLIC_URL` to the exact origin you browse to. For any non-`localhost` deployment this must be an **HTTPS** origin (see the secure-context note below); plain-HTTP LAN/Tailscale IPs only work if you terminate TLS in front of nginx. It defaults to `http://localhost:${NGINX_PORT:-8888}`.
 
 > **⚠️ Requires a secure context (HTTPS or localhost).** OIDC login uses the browser Web Crypto API (PKCE), which browsers expose **only over HTTPS or via `http://localhost`**. Serving the app over plain HTTP on a LAN/VPN IP (e.g. `http://192.168.x.x:8888` or a Tailscale `http://100.x.y.z:8888`) will fail at login with *"Crypto.subtle is available only in secure contexts"*. Put TLS in front and set `PUBLIC_URL` to the HTTPS origin — e.g. a reverse proxy that terminates TLS, or, on a tailnet, `tailscale serve --bg --https=443 http://localhost:8888` (browse to the `https://<machine>.<tailnet>.ts.net` MagicDNS name). For single-admin use, an SSH tunnel to `http://localhost:8888` also works (localhost is a secure context).
 

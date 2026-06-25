@@ -60,11 +60,15 @@ public class AuthEnabledSecurityConfig {
    */
   @Bean
   JwtDecoder jwtDecoder(AuthProperties props) {
+    // Fail closed: an issuer must be configured when auth is enabled, otherwise tokens would be
+    // accepted on signature alone. Always validate the issuer, including the JWKS path.
+    if (!StringUtils.hasText(props.getIssuerUri())) {
+      throw new IllegalStateException(
+          "tracepcap.auth.issuer-uri must be set when authentication is enabled");
+    }
     if (StringUtils.hasText(props.getJwkSetUri())) {
       NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(props.getJwkSetUri()).build();
-      if (StringUtils.hasText(props.getIssuerUri())) {
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(props.getIssuerUri()));
-      }
+      decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(props.getIssuerUri()));
       return decoder;
     }
     return JwtDecoders.fromIssuerLocation(props.getIssuerUri());

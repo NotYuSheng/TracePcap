@@ -26,7 +26,9 @@ function useBackendReady() {
         const res = await fetch('/api/v1/system/limits', {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
-        if (res.ok || (res.status >= 400 && res.status < 500)) {
+        // A 401/403 still proves the backend is reachable (auth-gated, tokenless probe); other 4xx
+        // would indicate a broken contract and should keep the startup gate closed.
+        if (res.ok || res.status === 401 || res.status === 403) {
           if (!cancelled) setReady(true);
           return;
         }

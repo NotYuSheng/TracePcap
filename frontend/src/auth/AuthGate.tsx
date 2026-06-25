@@ -2,7 +2,6 @@ import { type ReactNode, useEffect } from 'react';
 import { useAuth } from 'react-oidc-context';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { Button } from '@govtechsg/sgds-react';
-import { setAccessToken } from './tokenStore';
 
 function FullScreen({ children }: { children: ReactNode }) {
   return (
@@ -17,23 +16,17 @@ function FullScreen({ children }: { children: ReactNode }) {
 
 /**
  * Wraps the app when auth is enabled. Redirects unauthenticated users to Keycloak, shows a loading
- * state during the round-trip, surfaces errors with a retry, and mirrors the access token into the
- * {@link setAccessToken token store} so the axios client can attach it. Renders children only once
- * the user is authenticated.
+ * state during the round-trip, and surfaces errors with a retry. Renders children only once the user
+ * is authenticated. (The axios client reads the token directly from storage — see tokenStore.)
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
 
-  // Sync the axios token bridge synchronously DURING render — not in an effect. Child effects (the
-  // pages' data fetches) run before a parent's effect, so an effect here would leave the first
-  // requests after a full page load without a token (→ 401). Setting it in render guarantees the
-  // token is present before any descendant mounts and fetches. Idempotent, so safe to repeat.
-  setAccessToken(auth.user?.access_token ?? null);
-
-  // Kick off login once the initial state has settled and we're not already mid-flight.
+  // Kick off login once the initial state has settled and we're not already mid-flight. The current
+  // path+query is passed as `state` so onSigninCallback can return the user to their deep link.
   useEffect(() => {
     if (!auth.isLoading && !auth.isAuthenticated && !auth.activeNavigator && !auth.error) {
-      void auth.signinRedirect();
+      void auth.signinRedirect({ state: window.location.pathname + window.location.search });
     }
   }, [auth.isLoading, auth.isAuthenticated, auth.activeNavigator, auth.error, auth]);
 
