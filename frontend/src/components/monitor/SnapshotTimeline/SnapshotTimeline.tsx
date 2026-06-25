@@ -1,6 +1,5 @@
-import { Spinner } from '@components/common/Spinner/Spinner';
 import { Fragment, useMemo, useState, type MouseEvent } from 'react';
-import { Badge, Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, ButtonGroup, Form } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
 import { ScrollableTable } from '@/components/common/ScrollableTable';
@@ -11,8 +10,7 @@ interface SnapshotTimelineProps {
   networkId: string;
   snapshots: NetworkSnapshot[];
   changeEvents: ChangeEvent[];
-  onRemove: (snapshotId: string) => Promise<void>;
-  onAddSnapshot: () => void;
+  onManage: () => void;
   onPatchChange: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
   onSnapshotUpdated: (updated: NetworkSnapshot) => void;
 }
@@ -93,13 +91,10 @@ export const SnapshotTimeline = ({
   networkId,
   snapshots,
   changeEvents,
-  onRemove,
-  onAddSnapshot,
+  onManage,
   onPatchChange,
   onSnapshotUpdated,
 }: SnapshotTimelineProps) => {
-  const [removing, setRemoving] = useState<string | null>(null);
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [detailSnap, setDetailSnap] = useState<NetworkSnapshot | null>(null);
   const [detailInitialTab, setDetailInitialTab] = useState<'diagram' | 'changes' | 'context' | 'insights'>('diagram');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -108,16 +103,6 @@ export const SnapshotTimeline = ({
   const [viewMode, setViewMode] = useState<ViewMode>('file');
   const [granularity, setGranularity] = useState<Granularity>(3600);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const handleRemove = async (snapshotId: string) => {
-    setRemoving(snapshotId);
-    setConfirmRemove(null);
-    try {
-      await onRemove(snapshotId);
-    } finally {
-      setRemoving(null);
-    }
-  };
 
   const toggleSort = () => {
     setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -237,17 +222,6 @@ export const SnapshotTimeline = ({
           setDetailSnap(snap);
         })}
       </td>
-      <td onClick={e => e.stopPropagation()}>
-        <Button
-          size="sm"
-          variant="outline-danger"
-          onClick={() => setConfirmRemove(snap.id)}
-          disabled={removing !== null}
-          title="Remove snapshot"
-        >
-          <i className="bi bi-trash"></i>
-        </Button>
-      </td>
     </tr>
   );
 
@@ -292,15 +266,15 @@ export const SnapshotTimeline = ({
               By Time
             </Button>
           </ButtonGroup>
-          <Button size="sm" variant="outline-secondary" onClick={onAddSnapshot}>
-            <i className="bi bi-plus-lg me-1"></i>Add PCAP
+          <Button size="sm" variant="outline-secondary" onClick={onManage}>
+            <i className="bi bi-collection me-1"></i>Manage PCAPs
           </Button>
         </div>
       </div>
 
       {snapshots.length === 0 ? (
         <div className="text-muted text-center py-4">
-          No PCAPs added yet. Click "Add PCAP" to get started.
+          No PCAPs added yet. Click "Manage PCAPs" to get started.
         </div>
       ) : (
         <>
@@ -318,7 +292,6 @@ export const SnapshotTimeline = ({
                     <th className="text-muted fw-normal">Duration</th>
                     <th className="text-muted fw-normal">Packets</th>
                     <th className="text-muted fw-normal">Changes</th>
-                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -405,36 +378,6 @@ export const SnapshotTimeline = ({
           onHide={() => setDetailSnap(null)}
         />
       )}
-
-      <Modal show={!!confirmRemove} onHide={() => setConfirmRemove(null)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Remove Snapshot</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="mb-0">
-            Are you sure you want to remove{' '}
-            <strong>{snapshots.find(s => s.id === confirmRemove)?.fileName}</strong>?{' '}
-            The original PCAP file will not be deleted.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="outline-secondary"
-            onClick={() => setConfirmRemove(null)}
-            disabled={removing !== null}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="outline-danger"
-            onClick={() => confirmRemove && handleRemove(confirmRemove)}
-            disabled={removing !== null}
-          >
-            {removing ? <Spinner animation="border" size="sm" className="me-1" /> : null}
-            Remove
-          </Button>
-        </Modal.Footer>
-      </Modal>
     </div>
   );
 };
