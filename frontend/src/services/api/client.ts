@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { env } from '@/config/env';
+import { getAccessToken } from '@/auth/tokenStore';
 
 const API_BASE_URL = env.API_BASE_URL;
 
@@ -11,8 +12,9 @@ export const apiClient = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   config => {
-    // Add auth token if available
-    const token = localStorage.getItem('authToken');
+    // Prefer the live OIDC access token (set by AuthGate when auth is enabled); otherwise fall back
+    // to a token stashed in localStorage, preserving the original behaviour when auth is off.
+    const token = getAccessToken() ?? localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

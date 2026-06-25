@@ -50,4 +50,23 @@ export const env = {
     import.meta.env.VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT,
     true,
   ),
+
+  /**
+   * Whether OIDC/Keycloak authentication is enabled. Off by default — the app then renders with no
+   * login flow, exactly as before. When on, {@link OIDC_AUTHORITY} must point at a Keycloak realm.
+   */
+  AUTH_ENABLED: optionalBoolean(import.meta.env.VITE_AUTH_ENABLED, false),
+
+  /**
+   * Explicit OIDC issuer/authority URL. Usually left blank: the authority is then derived at
+   * runtime as `${origin}/realms/${OIDC_REALM}` (Keycloak is proxied same-origin). Set this only to
+   * point at a Keycloak hosted on a different origin.
+   */
+  OIDC_AUTHORITY: requiredString(import.meta.env.VITE_OIDC_AUTHORITY, ''),
+
+  /** Keycloak realm name, used when deriving the authority from the page origin. */
+  OIDC_REALM: requiredString(import.meta.env.VITE_OIDC_REALM, 'tracepcap'),
+
+  /** OIDC public client id registered in the Keycloak realm. */
+  OIDC_CLIENT_ID: requiredString(import.meta.env.VITE_OIDC_CLIENT_ID, 'tracepcap-frontend'),
 } as const;

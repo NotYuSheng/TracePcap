@@ -4,6 +4,9 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
+import { AuthMenu } from '@/auth/AuthMenu';
+import { getAccessToken } from '@/auth/tokenStore';
+import { env } from '@/config/env';
 import { useStore } from '@/store';
 import type { ThemeMode } from '@/store';
 
@@ -16,8 +19,14 @@ function useBackendReady() {
 
     async function check() {
       try {
-        const res = await fetch('/api/v1/system/limits');
-        if (res.ok) {
+        // Carry the OIDC token when present so the probe is an authorized round-trip. Any HTTP
+        // response means the backend is reachable — under auth a tokenless (or not-yet-synced)
+        // probe may return 401, which still proves it's up; real content calls use the axios client.
+        const token = getAccessToken();
+        const res = await fetch('/api/v1/system/limits', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (res.ok || (res.status >= 400 && res.status < 500)) {
           if (!cancelled) setReady(true);
           return;
         }
@@ -141,6 +150,7 @@ export const MainLayout = () => {
                 >
                   <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
                 </Button>
+                {env.AUTH_ENABLED && <AuthMenu />}
               </div>
             </Navbar.Collapse>
           </Container>
