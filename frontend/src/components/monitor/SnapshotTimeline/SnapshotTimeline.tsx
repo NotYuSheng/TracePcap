@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { Badge, Button, ButtonGroup, Form } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
@@ -67,6 +67,7 @@ function formatBucketLabel(startMs: number, granularity: Granularity): string {
 function formatCaptureDate(start: string | null): string {
   if (!start) return '—';
   const ms = parseDateTime(start as unknown as string | number[]);
+  if (Number.isNaN(ms) || ms === 0) return '—';
   return new Date(ms).toLocaleString('en-GB');
 }
 
@@ -140,11 +141,13 @@ export const SnapshotTimeline = ({
     const map = new Map<number, NetworkSnapshot[]>();
     const noTime: NetworkSnapshot[] = [];
     for (const snap of snapshots) {
-      if (!snap.startTime) {
+      const startMs = getStartMs(snap);
+      // Missing or unparseable start times all share the single "unknown" bucket.
+      if (!snap.startTime || Number.isNaN(startMs)) {
         noTime.push(snap);
         continue;
       }
-      const start = bucketStartFor(getStartMs(snap), granularity);
+      const start = bucketStartFor(startMs, granularity);
       const arr = map.get(start) ?? [];
       arr.push(snap);
       map.set(start, arr);
@@ -165,9 +168,14 @@ export const SnapshotTimeline = ({
   }, [snapshots, granularity, sortDir]);
 
   const totalItems = viewMode === 'file' ? sorted.length : buckets.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
   const paginatedBuckets = buckets.slice((page - 1) * pageSize, page * pageSize);
+
+  // Snapshots can be removed elsewhere (the Manage PCAPs modal); keep page in range.
+  useEffect(() => {
+    setPage(prev => Math.min(prev, totalPages));
+  }, [totalPages]);
 
   // Shared "Changes" cell for both views — always the same Badge pill so the By PCAP
   // rows, the By Time bucket aggregate, and the nested per-PCAP rows look identical.
@@ -333,6 +341,15 @@ export const SnapshotTimeline = ({
                           <tr>
                             <td colSpan={4} className="p-0 bg-light">
                               <table className="table table-sm table-hover align-middle mb-0">
+                                <thead>
+                                  <tr>
+                                    <th className="text-muted fw-normal small border-0">Captured</th>
+                                    <th className="text-muted fw-normal small border-0">File</th>
+                                    <th className="text-muted fw-normal small border-0">Duration</th>
+                                    <th className="text-muted fw-normal small border-0">Packets</th>
+                                    <th className="text-muted fw-normal small border-0">Changes</th>
+                                  </tr>
+                                </thead>
                                 <tbody>
                                   {b.snaps.map(renderSnapshotRow)}
                                 </tbody>

@@ -16,6 +16,7 @@ interface ManagePcapsModalProps {
 function formatCaptureDate(start: string | null): string {
   if (!start) return '—';
   const ms = parseDateTime(start as unknown as string | number[]);
+  if (Number.isNaN(ms) || ms === 0) return '—';
   return new Date(ms).toLocaleString('en-GB');
 }
 
@@ -34,6 +35,12 @@ export const ManagePcapsModal = ({
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
+  const handleHide = () => {
+    setRemoving(null);
+    setConfirmRemove(null);
+    onHide();
+  };
+
   const sorted = [...snapshots].sort((a, b) => getStartMs(b) - getStartMs(a));
 
   const handleRemove = async (snapshotId: string) => {
@@ -47,7 +54,7 @@ export const ManagePcapsModal = ({
   };
 
   return (
-    <Modal show={show} onHide={onHide} size="lg" centered>
+    <Modal show={show} onHide={handleHide} size="lg" centered>
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-collection me-2"></i>Manage PCAPs
@@ -125,6 +132,7 @@ export const ManagePcapsModal = ({
                             onClick={() => setConfirmRemove(snap.id)}
                             disabled={removing !== null}
                             title="Remove PCAP"
+                            aria-label={`Remove PCAP ${snap.fileName}`}
                           >
                             <i className="bi bi-trash"></i>
                           </Button>
@@ -144,7 +152,7 @@ export const ManagePcapsModal = ({
         </p>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="outline-secondary" onClick={onHide}>
+        <Button variant="outline-secondary" onClick={handleHide}>
           Done
         </Button>
       </Modal.Footer>
