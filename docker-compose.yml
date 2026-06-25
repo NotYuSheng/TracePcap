@@ -67,6 +67,9 @@ services:
     container_name: tracepcap-backend
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      # Authentication off by default — the app runs fully open (e.g. Lanturn). To enable OIDC,
+      # use docker-compose.prod.yml (bundles Keycloak) or set TRACEPCAP_AUTH_ENABLED + KEYCLOAK_* envs.
+      TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
       DATABASE_URL: jdbc:postgresql://postgres:5432/tracepcap
       DATABASE_USERNAME: tracepcap_user
       DATABASE_PASSWORD: tracepcap_pass
