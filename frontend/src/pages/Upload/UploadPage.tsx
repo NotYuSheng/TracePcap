@@ -7,6 +7,7 @@ import { FileList } from '@components/upload/FileList';
 import { UploadProgress } from '@components/upload/UploadProgress';
 import { useFileUpload } from '@features/upload/hooks/useFileUpload';
 import type { AnalysisOptions } from '@features/upload/services/uploadService';
+import { apiClient } from '@/services/api/client';
 import { env } from '@/config/env';
 
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
@@ -25,9 +26,10 @@ export const UploadPage = () => {
   const acceptedTypes = env.SUPPORTED_FILE_TYPES;
 
   useEffect(() => {
-    fetch('/api/v1/system/limits')
-      .then(r => r.json())
-      .then(data => {
+    // Use the shared apiClient so the auth token is attached when auth is enabled.
+    apiClient
+      .get<{ maxUploadBytes?: number }>('/system/limits')
+      .then(({ data }) => {
         if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes);
       })
       .catch(err => {

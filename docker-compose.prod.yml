@@ -1,0 +1,66 @@
+# Production overlay that adds OIDC authentication via a bundled Keycloak.
+#
+# Usage:
+#   PUBLIC_URL=http://<host-you-browse-to>:8888 \
+#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# This layers on top of the base docker-compose.yml: it adds a Keycloak service (auto-importing the
+# `tracepcap` realm), turns on auth in the backend, and rebuilds the frontend with auth enabled.
+# Everything else (Postgres, MinIO, backend, nginx) is inherited from the base file.
+#
+# Same-origin design: nginx proxies Keycloak (the /realms, /resources, /admin, /js paths) so the
+# browser reaches the identity provider at the SAME host:port it loaded the app from. No second
+# exposed port, no CORS. The frontend derives the OIDC authority from window.location at runtime.
+#
+# PUBLIC_URL must be the exact origin you browse to (scheme + host + port), e.g.
+# http://localhost:8888, http://192.168.1.10:8888, or a Tailscale http://100.x.y.z:8888. It pins
+# Keycloak's token issuer and the backend's issuer check; the browser must load the app via this
+# same origin. Defaults to http://localhost:${NGINX_PORT:-8888}.
+#
+# Keycloak runs in `start-dev` mode (HTTP, no TLS) for offline / reverse-proxy-terminated-TLS use.
+# Default demo login (change for any real deployment): analyst / analyst
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: tracepcap-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      # Demo admin credentials. The Keycloak admin console is reachable on the same public origin
+      # (/admin) — override KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD for any real deployment.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-user}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-P@ssw0rd}
+      # Public, browser-facing base URL — determines the token `iss` claim and all KC-generated URLs.
+      KC_HOSTNAME: ${PUBLIC_URL:-http://localhost:8888}
+      # Trust X-Forwarded-* from the nginx proxy (same-origin reverse proxy in front of Keycloak).
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      TZ: Asia/Singapore
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    networks:
+      - tracepcap-network
+
+  backend:
+    environment:
+      TRACEPCAP_AUTH_ENABLED: "true"
+      # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
+      # Backend-reachable JWKS endpoint (internal docker network). Decouples key fetch from the
+      # public issuer and is fetched lazily, so the backend need not wait for Keycloak to be ready.
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/tracepcap/protocol/openid-connect/certs
+    depends_on:
+      keycloak:
+        condition: service_started
+
+  nginx:
+    build:
+      args:
+        # Enable the OIDC flow in the SPA. The authority is derived from window.location at runtime
+        # (Keycloak is proxied same-origin), so no host needs to be baked into the build.
+        VITE_AUTH_ENABLED: "true"
+        VITE_OIDC_CLIENT_ID: tracepcap-frontend
+        VITE_OIDC_REALM: tracepcap
+    depends_on:
+      - backend
+      - keycloak

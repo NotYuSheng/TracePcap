@@ -277,8 +277,48 @@ docker compose -f docker-compose.offline.yml up -d
 
 - **Local Processing**: All PCAP analysis runs on your server — packet data never leaves your infrastructure
 - **Offline-capable**: GeoIP uses a bundled DB-IP MMDB as fallback; LLM queries use a configurable local endpoint
-- **No Authentication by default**: Add an authentication layer before exposing to multiple users
+- **No Authentication by default**: runs fully open; turn on OIDC/Keycloak auth before exposing to multiple users (see [Authentication](#authentication-oidc--keycloak))
 - **Object Storage**: MinIO provides S3-compatible secure file storage; not exposed outside the Docker network
+
+## Authentication (OIDC / Keycloak)
+
+Authentication is **disabled by default** — the base `docker-compose.yml` runs the app fully open, exactly as before (suitable for single-user / trusted-network deployments like Lanturn).
+
+To run with login enabled, use the production overlay, which bundles a Keycloak identity provider and rebuilds the frontend with the OIDC client. Set `PUBLIC_URL` to the exact origin you browse to (scheme + host + port):
+
+```bash
+PUBLIC_URL=http://localhost:8888 \
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+The Keycloak admin console is reachable at `${PUBLIC_URL}/admin` — default `user` / `P@ssw0rd`. **Override `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` for any real deployment.**
+
+Set `PUBLIC_URL` to the exact origin you browse to. For any non-`localhost` deployment this must be an **HTTPS** origin (see the secure-context note below); plain-HTTP LAN/Tailscale IPs only work if you terminate TLS in front of nginx. It defaults to `http://localhost:${NGINX_PORT:-8888}`.
+
+> **⚠️ Requires a secure context (HTTPS or localhost).** OIDC login uses the browser Web Crypto API (PKCE), which browsers expose **only over HTTPS or via `http://localhost`**. Serving the app over plain HTTP on a LAN/VPN IP (e.g. `http://192.168.x.x:8888` or a Tailscale `http://100.x.y.z:8888`) will fail at login with *"Crypto.subtle is available only in secure contexts"*. Put TLS in front and set `PUBLIC_URL` to the HTTPS origin — e.g. a reverse proxy that terminates TLS, or, on a tailnet, `tailscale serve --bg --https=443 http://localhost:8888` (browse to the `https://<machine>.<tailnet>.ts.net` MagicDNS name). For single-admin use, an SSH tunnel to `http://localhost:8888` also works (localhost is a secure context).
+
+This:
+
+- Starts **Keycloak** (auto-importing the `tracepcap` realm from [`keycloak/realm-export.json`](keycloak/realm-export.json) — a public PKCE SPA client `tracepcap-frontend` and a demo user) and **proxies it through nginx on the same origin as the app**. The browser reaches the identity provider at the same host:port it loaded the app from — no second exposed port, no CORS.
+- Gates the entire backend API behind a valid Keycloak JWT (Spring OAuth2 resource server).
+- Redirects unauthenticated users to the Keycloak login page and adds a user chip + logout button to the header.
+
+**Default demo login:** `analyst` / `analyst` — change this (and the Keycloak admin password) for any real deployment. The Keycloak admin console is proxied at `${PUBLIC_URL}/admin` (`admin` / `admin` by default).
+
+### How it works
+
+| Concern | Where |
+| --- | --- |
+| Master switch | `TRACEPCAP_AUTH_ENABLED` (backend) + `VITE_AUTH_ENABLED` (frontend build arg), both default `false` |
+| Backend security | `com.tracepcap.config.security` — two env-gated `SecurityFilterChain`s: permit-all when off, JWT-required when on |
+| Public origin | `PUBLIC_URL` pins Keycloak's `KC_HOSTNAME` (token issuer) and the backend's `KEYCLOAK_ISSUER_URI`. The browser must load the app via this same origin |
+| Issuer vs. keys | Backend validates the token `iss` against `KEYCLOAK_ISSUER_URI` (public) but fetches signing keys from `KEYCLOAK_JWK_SET_URI` (internal `keycloak:8080`), so the two hostnames need not match in Docker |
+| Same-origin proxy | nginx proxies `/realms`, `/resources`, `/admin`, `/js` to Keycloak (see `nginx/nginx.conf.template`); the SPA derives its OIDC authority from `window.location` at runtime |
+| Frontend | `src/auth/` — `react-oidc-context` provider mounted only when auth is enabled |
+
+Data is **shared across all authenticated users** (no per-user ownership) in this version — so disabling auth never strands data behind a missing user. Per-user scoping and concurrent-edit conflict handling are tracked separately (issues #360, #444).
+
+> The overlay keeps the working runtime profile (it does not switch Spring to the `prod` profile, which expects external log volumes and additional required env vars). It changes only what auth needs: the Keycloak service, the auth env vars, and the frontend build args.
 
 ## Custom Signature Rules
 

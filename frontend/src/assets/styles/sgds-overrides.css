@@ -203,13 +203,22 @@
   --sgds-table-hover-bg: rgb(255 255 255 / 6%);
 }
 
-/* Dropdown */
-[data-theme='dark'] .dropdown-menu {
+/* Dropdown.
+   SGDS hardcodes the background/border as direct properties (not variables) on
+   `.sgds.navbar .dropdown-menu` (specificity 0,3,0), so a dark menu would otherwise stay white
+   with all its (now light) text invisible. The CSS variables can't override a direct property, and
+   a plain `[data-theme='dark'] .dropdown-menu` (0,2,0) loses to the navbar rule — so the second
+   selector below matches/exceeds it (0,4,0) to win for the header profile menu. */
+[data-theme='dark'] .dropdown-menu,
+[data-theme='dark'] .sgds.navbar .dropdown-menu {
   --sgds-dropdown-bg: var(--tp-surface);
   --sgds-dropdown-color: var(--tp-text);
   --sgds-dropdown-border-color: var(--tp-border);
   --sgds-dropdown-link-color: var(--tp-text);
   --sgds-dropdown-link-hover-bg: var(--tp-surface-hover);
+  background-color: var(--tp-surface);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
 }
 
 /* Modal */

@@ -19,7 +19,11 @@ function requiredString(raw: unknown, fallback: string): string {
 
 function optionalBoolean(raw: unknown, fallback: boolean): boolean {
   if (raw === undefined || raw === '') return fallback;
-  return raw !== 'false';
+  if (typeof raw === 'boolean') return raw;
+  const value = String(raw).trim().toLowerCase();
+  if (value === 'true' || value === '1' || value === 'yes' || value === 'on') return true;
+  if (value === 'false' || value === '0' || value === 'no' || value === 'off') return false;
+  return fallback;
 }
 
 function parseFileTypes(raw: string): string[] {
@@ -50,4 +54,23 @@ export const env = {
     import.meta.env.VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT,
     true,
   ),
+
+  /**
+   * Whether OIDC/Keycloak authentication is enabled. Off by default — the app then renders with no
+   * login flow, exactly as before. When on, {@link OIDC_AUTHORITY} must point at a Keycloak realm.
+   */
+  AUTH_ENABLED: optionalBoolean(import.meta.env.VITE_AUTH_ENABLED, false),
+
+  /**
+   * Explicit OIDC issuer/authority URL. Usually left blank: the authority is then derived at
+   * runtime as `${origin}/realms/${OIDC_REALM}` (Keycloak is proxied same-origin). Set this only to
+   * point at a Keycloak hosted on a different origin.
+   */
+  OIDC_AUTHORITY: requiredString(import.meta.env.VITE_OIDC_AUTHORITY, ''),
+
+  /** Keycloak realm name, used when deriving the authority from the page origin. */
+  OIDC_REALM: requiredString(import.meta.env.VITE_OIDC_REALM, 'tracepcap'),
+
+  /** OIDC public client id registered in the Keycloak realm. */
+  OIDC_CLIENT_ID: requiredString(import.meta.env.VITE_OIDC_CLIENT_ID, 'tracepcap-frontend'),
 } as const;
