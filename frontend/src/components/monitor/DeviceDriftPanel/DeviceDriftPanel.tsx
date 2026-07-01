@@ -8,6 +8,7 @@ import { buildDeviceSignals, confidenceLevel, type DeviceSignalInfo } from '@/ut
 import { entityNotesService, type EntityNote } from '@/features/notes/services/entityNotesService';
 import { insightsService } from '@/features/insights/services/insightsService';
 import type { NodeRole } from '@/features/insights/types/insights.types';
+import { staleTooltip } from '@/features/insights/utils/nodeRoleStaleness';
 
 /** Deterministic hue (0–360) from any string. */
 function stringHue(s: string): number {
@@ -386,17 +387,37 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                 )}
                 {!role && !roleEditing && <p className="text-muted small fst-italic mb-0">No role assigned.</p>}
                 {role && !roleEditing && (
-                  <div className={`p-2 rounded small ${role.llmSuggested && !role.confirmedByHuman ? 'bg-warning-subtle border border-warning-subtle' : 'bg-light'}`}>
+                  <div className={`p-2 rounded small ${role.confirmedByHuman && role.staleSince ? 'bg-warning-subtle border border-warning' : role.llmSuggested && !role.confirmedByHuman ? 'bg-warning-subtle border border-warning-subtle' : 'bg-light'}`}>
                     <div className="fw-semibold">
                       {role.roleLabel || <span className="text-muted fst-italic">No label</span>}
                       {role.llmSuggested && !role.confirmedByHuman && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-stars me-1" />AI suggested</span>}
                       {role.confirmedByHuman && <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }} title="Manually labelled by an analyst. Future deviating behaviour can still be flagged."><i className="bi bi-tag me-1" />Manual label</span>}
+                      {role.confirmedByHuman && role.staleSince && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.65rem' }} title={staleTooltip(role)}><i className="bi bi-exclamation-triangle me-1" />Stale</span>}
                     </div>
                     {role.roleDescription && <div className="text-muted mt-1">{role.roleDescription}</div>}
+                    {role.confirmedByHuman && role.staleSince && (
+                      <div className="d-flex flex-column gap-2 p-2 mt-2 rounded small" style={{ background: 'var(--bs-warning-bg-subtle, #fff3cd)', color: 'var(--bs-warning-text-emphasis, #664d03)', border: '1px solid var(--bs-warning-border-subtle, #ffc107)' }}>
+                        <div className="d-flex align-items-start gap-2">
+                          <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
+                          <span>{staleTooltip(role)}</span>
+                        </div>
+                        <div className="d-flex gap-2">
+                          <button className="btn btn-primary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
+                            onClick={() => { setRoleLabelDraft(role?.roleLabel ?? ''); setRoleDescDraft(role?.roleDescription ?? ''); setRoleEditing(true); }}>
+                            <i className="bi bi-pencil me-1" />Update label
+                          </button>
+                          <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
+                            disabled={roleSaving || !selectedMac || !selectedHistory[selectedHistory.length - 1]?.snap.fileId}
+                            onClick={async () => { const fid = selectedHistory[selectedHistory.length - 1]?.snap.fileId; if (!selectedMac || !fid) return; setRoleSaving(true); try { const r = await insightsService.dismissNodeRoleStaleness('DEVICE', selectedMac, fid); setRole(r); } finally { setRoleSaving(false); } }}>
+                            <i className="bi bi-check-lg me-1" />Dismiss — label is still correct
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {role.llmSuggested && !role.confirmedByHuman && (
                       <div className="d-flex gap-2 mt-2">
                         <button className="btn btn-success btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
-                          onClick={async () => { if (!selectedMac || !role) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, role.roleLabel ?? '', role.roleDescription ?? '', true); setRole(r); } finally { setRoleSaving(false); } }}>
+                          onClick={async () => { if (!selectedMac || !role) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, role.roleLabel ?? '', role.roleDescription ?? '', true, selectedHistory[selectedHistory.length - 1]?.snap.fileId || undefined); setRole(r); } finally { setRoleSaving(false); } }}>
                           <i className="bi bi-check-lg me-1" />Accept
                         </button>
                         <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
@@ -413,7 +434,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                     <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Description (optional)" value={roleDescDraft} onChange={e => setRoleDescDraft(e.target.value)} />
                     <div className="d-flex gap-2">
                       <button className="btn btn-primary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving || !roleLabelDraft.trim()}
-                        onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, roleLabelDraft, roleDescDraft, true); setRole(r); setRoleEditing(false); } finally { setRoleSaving(false); } }}>
+                        onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, roleLabelDraft, roleDescDraft, true, selectedHistory[selectedHistory.length - 1]?.snap.fileId || undefined); setRole(r); setRoleEditing(false); } finally { setRoleSaving(false); } }}>
                         {roleSaving ? <><span className="spinner-border spinner-border-sm me-1" />Saving…</> : <><i className="bi bi-floppy me-1" />Save</>}
                       </button>
                       <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving} onClick={() => setRoleEditing(false)}>Cancel</button>

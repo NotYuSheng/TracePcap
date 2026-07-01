@@ -12,6 +12,8 @@ public interface NodeRoleRepository extends JpaRepository<NodeRoleEntity, Long> 
 
   Optional<NodeRoleEntity> findByEntityTypeAndEntityKey(String entityType, String entityKey);
 
+  List<NodeRoleEntity> findByConfirmedByHumanTrue();
+
   void deleteByEntityTypeAndEntityKey(String entityType, String entityKey);
 
   List<NodeRoleEntity> findByEntityTypeInAndEntityKeyIn(

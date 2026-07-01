@@ -79,7 +79,8 @@ public class NetworkChangeEventEntity {
     PROTOCOL_REMOVED,
     APP_ADDED,
     APP_REMOVED,
-    VPN_DRIFT
+    VPN_DRIFT,
+    LABEL_STALE
   }
 
   public enum EntityType {
@@ -87,7 +88,8 @@ public class NetworkChangeEventEntity {
     IP_MAC_BINDING,
     ISP,
     PROTOCOL,
-    APP
+    APP,
+    NODE_ROLE
   }
 
   public enum Severity {

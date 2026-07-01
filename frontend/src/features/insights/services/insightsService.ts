@@ -27,6 +27,7 @@ export const insightsService = {
     roleLabel: string,
     roleDescription: string,
     confirmedByHuman: boolean,
+    fileId?: string,
   ): Promise<NodeRole> =>
     apiClient
       .put<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_UPSERT, {
@@ -35,7 +36,17 @@ export const insightsService = {
         roleLabel,
         roleDescription,
         confirmedByHuman,
+        fileId,
       })
+      .then(r => r.data),
+
+  dismissNodeRoleStaleness: (
+    entityType: string,
+    entityKey: string,
+    fileId: string,
+  ): Promise<NodeRole> =>
+    apiClient
+      .post<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_DISMISS_STALENESS(entityType, entityKey, fileId))
       .then(r => r.data),
 
   suggestNodeRole: async (

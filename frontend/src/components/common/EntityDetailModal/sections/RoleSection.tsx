@@ -1,6 +1,7 @@
 import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { staleTooltip } from '@/features/insights/utils/nodeRoleStaleness';
 import type { useEntityRole } from '../hooks/useEntityRole';
 
 interface RoleSectionProps {
@@ -81,7 +82,13 @@ export function RoleSection({ fileId, role: r }: RoleSectionProps) {
 
       {!r.roleLoading && r.role && !r.roleEditing && (
         <div
-          className={`p-2 rounded small ${r.role.llmSuggested && !r.role.confirmedByHuman ? 'bg-warning-subtle border border-warning-subtle' : 'bg-light'}`}
+          className={`p-2 rounded small ${
+            r.role.confirmedByHuman && r.role.staleSince
+              ? 'bg-warning-subtle border border-warning'
+              : r.role.llmSuggested && !r.role.confirmedByHuman
+                ? 'bg-warning-subtle border border-warning-subtle'
+                : 'bg-light'
+          }`}
         >
           <div className="fw-semibold">
             {r.role.roleLabel || <span className="text-muted fst-italic">No label</span>}
@@ -95,9 +102,45 @@ export function RoleSection({ fileId, role: r }: RoleSectionProps) {
                 <i className="bi bi-tag me-1" />Manual label
               </Badge>
             )}
+            {r.role.confirmedByHuman && r.role.staleSince && (
+              <Badge bg="warning" text="dark" className="ms-2" style={{ fontSize: '0.65rem' }} title={staleTooltip(r.role)}>
+                <i className="bi bi-exclamation-triangle me-1" />Stale
+              </Badge>
+            )}
           </div>
           {r.role.roleDescription && (
             <div className="text-muted mt-1">{r.role.roleDescription}</div>
+          )}
+          {r.role.confirmedByHuman && r.role.staleSince && (
+            <Alert variant="warning" className="d-flex flex-column gap-2 p-2 mt-2 mb-0 small">
+              <div className="d-flex align-items-start gap-2">
+                <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
+                <span title={staleTooltip(r.role)}>{staleTooltip(r.role)}</span>
+              </div>
+              <div className="d-flex gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="py-0"
+                  style={{ fontSize: '0.75rem' }}
+                  onClick={r.openEdit}
+                  disabled={r.roleSaving}
+                >
+                  <i className="bi bi-pencil me-1" />Update label
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  className="py-0"
+                  style={{ fontSize: '0.75rem' }}
+                  onClick={r.dismissStaleness}
+                  disabled={r.roleSaving || !fileId}
+                  title={!fileId ? 'Open from a file context to dismiss' : 'Mark the label as still correct and reset the baseline'}
+                >
+                  <i className="bi bi-check-lg me-1" />Dismiss — label is still correct
+                </Button>
+              </div>
+            </Alert>
           )}
           {r.role.llmSuggested && !r.role.confirmedByHuman && (
             <div className="d-flex gap-2 mt-2">

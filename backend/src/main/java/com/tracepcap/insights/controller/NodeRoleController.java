@@ -51,6 +51,22 @@ public class NodeRoleController {
     return ResponseEntity.noContent().build();
   }
 
+  @PostMapping("/dismiss-staleness")
+  @Operation(
+      summary = "Dismiss a stale-label warning",
+      description =
+          "Clears the staleness flag for a confirmed label and records the current file's node"
+              + " properties as the new drift baseline.")
+  public ResponseEntity<NodeRoleDto> dismissStaleness(
+      @RequestParam String entityType,
+      @RequestParam String entityKey,
+      @RequestParam UUID fileId) {
+    return service
+        .dismissStaleness(entityType, entityKey, fileId)
+        .map(ResponseEntity::ok)
+        .orElse(ResponseEntity.noContent().build());
+  }
+
   @PostMapping("/suggest")
   @Operation(summary = "Suggest a role for an entity based on observed traffic")
   public ResponseEntity<?> suggest(

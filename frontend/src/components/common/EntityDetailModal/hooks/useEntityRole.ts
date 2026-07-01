@@ -65,6 +65,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
         role.roleLabel ?? '',
         role.roleDescription ?? '',
         true,
+        fileId || undefined,
       );
       setRole(updated);
     } catch (err) {
@@ -101,11 +102,25 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
         roleLabelDraft,
         roleDescDraft,
         true,
+        fileId || undefined,
       );
       setRole(updated);
       setRoleEditing(false);
     } catch (err) {
       console.error('Failed to save role:', err);
+    } finally {
+      setRoleSaving(false);
+    }
+  };
+
+  const dismissStaleness = async () => {
+    if (!fileId) return;
+    setRoleSaving(true);
+    try {
+      const updated = await insightsService.dismissNodeRoleStaleness(entityType, entityKey, fileId);
+      setRole(updated);
+    } catch (err) {
+      console.error('Failed to dismiss label staleness:', err);
     } finally {
       setRoleSaving(false);
     }
@@ -130,5 +145,6 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     discard,
     openEdit,
     save,
+    dismissStaleness,
   };
 }

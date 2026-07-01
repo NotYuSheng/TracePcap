@@ -7,6 +7,10 @@ export interface NodeRole {
   confirmedByHuman: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Staleness (#369): when the label was confirmed and, if drifted, since when + what changed. */
+  labeledAt: string | null;
+  staleSince: string | null;
+  staleFields: string[] | null;
 }
 
 export interface NetworkExternalEvent {

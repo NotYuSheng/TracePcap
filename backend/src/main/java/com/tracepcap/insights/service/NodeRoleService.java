@@ -32,6 +32,7 @@ public class NodeRoleService {
   private final HostClassificationRepository hostClassificationRepository;
   private final LlmClient llmClient;
   private final JdbcTemplate jdbc;
+  private final LabelStalenessService labelStalenessService;
 
   public Optional<NodeRoleDto> getRole(String entityType, String entityKey) {
     return nodeRoleRepository
@@ -57,12 +58,27 @@ public class NodeRoleService {
     if (req.isConfirmedByHuman()) {
       entity.setLlmSuggested(false);
     }
-    return toDto(nodeRoleRepository.save(entity));
+    NodeRoleEntity saved = nodeRoleRepository.save(entity);
+    // Capture a fresh drift baseline whenever a human (re)confirms the label with a file context.
+    if (req.isConfirmedByHuman() && req.getFileId() != null) {
+      labelStalenessService.captureBaseline(saved, req.getFileId(), true);
+    }
+    return toDto(saved);
   }
 
   @Transactional
   public void delete(String entityType, String entityKey) {
     nodeRoleRepository.deleteByEntityTypeAndEntityKey(entityType, entityKey);
+  }
+
+  /**
+   * Dismiss a stale-label warning: clears the stale flag and re-baselines drift detection from the
+   * given file context. Returns the refreshed role, or empty if no role exists for the entity.
+   */
+  @Transactional
+  public Optional<NodeRoleDto> dismissStaleness(String entityType, String entityKey, UUID fileId) {
+    labelStalenessService.dismiss(entityType, entityKey, fileId);
+    return getRole(entityType, entityKey);
   }
 
   /**
@@ -236,6 +252,9 @@ public class NodeRoleService {
         .confirmedByHuman(e.isConfirmedByHuman())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
+        .labeledAt(e.getLabeledAt())
+        .staleSince(e.getStaleSince())
+        .staleFields(e.getStaleFields())
         .build();
   }
 }

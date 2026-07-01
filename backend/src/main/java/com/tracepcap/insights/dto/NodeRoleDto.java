@@ -1,6 +1,7 @@
 package com.tracepcap.insights.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,4 +16,9 @@ public class NodeRoleDto {
   private boolean confirmedByHuman;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
+
+  // Staleness (#369): null staleSince = label still considered current.
+  private LocalDateTime labeledAt;
+  private LocalDateTime staleSince;
+  private List<String> staleFields;
 }
