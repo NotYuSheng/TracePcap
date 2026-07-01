@@ -6,6 +6,8 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.insights.dto.LabelDrift;
+import com.tracepcap.insights.service.LabelStalenessService;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
@@ -54,6 +56,7 @@ public class ChangeDetectionService {
   private final NetworkChangeEventRepository changeEventRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
+  private final LabelStalenessService labelStalenessService;
 
   /**
    * Compare two consecutive snapshots and persist NetworkChangeEventEntity records. fromSnapshot
@@ -70,8 +73,36 @@ public class ChangeDetectionService {
     events.addAll(detectIpMacDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectIspAsnChanges(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectProtocolAppDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
+    events.addAll(detectStaleLabels(toFileId, fromSnapshot, toSnapshot));
 
     return changeEventRepository.saveAll(events);
+  }
+
+  // ── Signal 5: Manual label staleness (#369) ─────────────────────────────────
+
+  private List<NetworkChangeEventEntity> detectStaleLabels(
+      UUID toFileId, NetworkSnapshotEntity fromSnapshot, NetworkSnapshotEntity toSnapshot) {
+
+    List<NetworkChangeEventEntity> events = new ArrayList<>();
+    for (LabelDrift drift : labelStalenessService.detectAndMarkDrift(toFileId)) {
+      Map<String, Object> newValue = new HashMap<>();
+      newValue.put("entityType", drift.entityType());
+      newValue.put("roleLabel", orEmpty(drift.roleLabel()));
+      newValue.put("labeledAt", drift.labeledAt() != null ? drift.labeledAt().toString() : "");
+      newValue.put("changes", drift.changedFields());
+      events.add(
+          buildEvent(
+              toSnapshot.getNetwork().getId(),
+              fromSnapshot,
+              toSnapshot,
+              ChangeType.LABEL_STALE,
+              EntityType.NODE_ROLE,
+              drift.entityKey(),
+              null,
+              newValue,
+              Severity.WARNING));
+    }
+    return events;
   }
 
   // ── Signal 1: Device MAC presence ────────────────────────────────────────────

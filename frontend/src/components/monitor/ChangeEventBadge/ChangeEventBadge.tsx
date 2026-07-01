@@ -52,6 +52,11 @@ function describeEvent(event: ChangeEvent): string {
     case 'VPN_DRIFT':
       if (nv['riskType']) return `VPN detected: ${nv['riskType']}`;
       return `VPN signal gone: ${ov['riskType'] ?? event.entityKey}`;
+    case 'LABEL_STALE': {
+      const changes = Array.isArray(nv['changes']) ? (nv['changes'] as string[]).join(', ') : '';
+      const label = nv['roleLabel'] ? ` (${nv['roleLabel']})` : '';
+      return `Label may be stale: ${event.entityKey}${label}${changes ? ` — ${changes}` : ''}`;
+    }
     default:
       return event.entityKey;
   }
