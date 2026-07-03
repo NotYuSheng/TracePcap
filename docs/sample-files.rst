@@ -362,29 +362,36 @@ Label staleness detection (see :doc:`features/network-monitor` → *Label
 Staleness Detection*) warns you when a confirmed label no longer matches how a
 host actually behaves. The File Server makes a clean demonstration:
 
-1. Open the **week 1** snapshot's network diagram (Capture Timeline → click the
-   ``week1_baseline.pcap`` row) and click the ``10.0.2.10`` node. In the **Role**
-   section, confirm the label **File Server (SMB)**. Confirming from the week-1
-   context captures an SMB-only baseline — *before* Carol's Telnet activity.
+1. If you already labelled ``10.0.2.10`` in Step 5, its baseline is set. If not,
+   open it from the **IP Addresses** drift panel — click the ``10.0.2.10`` badge
+   to open its Entity Detail modal, then in the **Role** section confirm the
+   label **File Server (SMB)**.
+
+   .. note::
+      The role section lives in the **drift-panel** detail modal (IP Addresses /
+      Devices), *not* the snapshot network-diagram node modal. The baseline is
+      captured from the latest snapshot — which for this scenario is clean SMB
+      traffic (Telnet stops after the week-7 audit notice), so drift is still
+      detected against the Telnet weeks.
 2. Re-run change detection across the loaded timeline: in **Manage PCAPs**,
    remove any one snapshot and add it back. This recomputes every transition with
    your confirmed label in place. (Change detection re-runs on snapshot add,
    removal, or subnet-override edits — saving a label alone does not trigger it.)
 
 Because Carol begins Telnet to the file server in **week 3**, the File Server's
-properties now differ from its week-1 baseline, and the label is flagged:
+properties differ from its clean baseline, and the label is flagged:
 
 - The **Change Events** feed shows a ``LABEL_STALE`` (WARNING) event —
   *"Label may be stale: 10.0.2.10 (File Server (SMB)) — new protocol (TELNET)"*.
-- The File Server's role card (Entity Detail modal → *Role*, and the Devices
-  drift panel) shows an amber **Stale** badge and a warning banner with
-  **Update label** and **Dismiss — label is still correct** actions.
+- The File Server's role card (in the IP Addresses / Devices drift-panel detail
+  modal) shows an amber **Stale** badge and a warning banner with **Update label**
+  and **Dismiss — label is still correct** actions.
 
-This is the lesson: a label captured early silently becomes misleading as the
-host's behaviour changes — your "File Server (SMB)" is now also accepting
-cleartext Telnet logins. Click **Dismiss — label is still correct** to accept the
-new behaviour as the baseline (the original label date is kept), or **Update
-label** to revise it.
+This is the lesson: a confirmed label silently becomes misleading as the host's
+behaviour changes — your "File Server (SMB)" was also accepting cleartext Telnet
+logins for several weeks. Click **Dismiss — label is still correct** to accept the
+current behaviour as the new baseline (the original label date is kept), or
+**Update label** to revise it.
 
 **Step 7 — Add external events**
 
