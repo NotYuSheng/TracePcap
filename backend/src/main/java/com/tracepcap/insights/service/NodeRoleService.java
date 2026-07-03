@@ -182,7 +182,7 @@ public class NodeRoleService {
 
     if ("IP".equalsIgnoreCase(entityType)) {
       // Look up host classification for this IP in the given file
-      hostClassificationRepository.findByFileIdAndIp(fileId, entityKey)
+      hostClassificationRepository.findFirstByFileIdAndIp(fileId, entityKey)
           .ifPresent(h -> {
             sb.append("Device type: ").append(h.getDeviceType())
               .append(" (confidence: ").append(h.getConfidence()).append("%)\n");
@@ -226,7 +226,7 @@ public class NodeRoleService {
 
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       // MAC-based lookup
-      hostClassificationRepository.findByFileIdAndMacIgnoreCase(fileId, entityKey)
+      hostClassificationRepository.findFirstByFileIdAndMacIgnoreCase(fileId, entityKey)
           .ifPresent(h -> {
             sb.append("IP: ").append(h.getIp()).append("\n");
             sb.append("Device type: ").append(h.getDeviceType())

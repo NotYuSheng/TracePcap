@@ -137,7 +137,7 @@ public class LabelStalenessService {
     if ("IP".equalsIgnoreCase(entityType)) {
       ip = entityKey;
       hostClassificationRepository
-          .findByFileIdAndIp(fileId, entityKey)
+          .findFirstByFileIdAndIp(fileId, entityKey)
           .ifPresent(
               h -> {
                 props.put("observed", true);
@@ -147,7 +147,7 @@ public class LabelStalenessService {
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       props.put("mac", entityKey);
       Optional<com.tracepcap.analysis.entity.HostClassificationEntity> host =
-          hostClassificationRepository.findByFileIdAndMacIgnoreCase(fileId, entityKey);
+          hostClassificationRepository.findFirstByFileIdAndMacIgnoreCase(fileId, entityKey);
       if (host.isPresent()) {
         props.put("observed", true);
         ip = host.get().getIp();
