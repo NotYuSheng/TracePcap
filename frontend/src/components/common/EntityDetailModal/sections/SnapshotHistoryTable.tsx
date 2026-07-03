@@ -52,7 +52,7 @@ export function SnapshotHistoryTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleStale }, idx) => (
+              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale }, idx) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
@@ -70,6 +70,9 @@ export function SnapshotHistoryTable({
                   <Table.DataCell>
                     <div className="d-flex align-items-center gap-1">
                       {roleLabel ? <small>{roleLabel}</small> : <small className="text-muted">—</small>}
+                      {roleLabel && roleOrigin === 'CARRIED_FORWARD' && (
+                        <Badge bg="light" text="secondary" className="border" style={{ fontSize: '0.55rem', fontWeight: 400 }} title="Inherited from an earlier snapshot (carried forward), not set here">carried</Badge>
+                      )}
                       {roleStale && (
                         <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot"><i className="bi bi-exclamation-triangle" /></Badge>
                       )}

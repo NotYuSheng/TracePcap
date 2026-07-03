@@ -52,6 +52,7 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
             apps: [...new Set(conv.data.data.map(c => c.appName).filter(Boolean) as string[])].sort(),
             protocols: [...new Set(conv.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
             roleLabel: role?.roleLabel ?? null,
+            roleOrigin: role?.origin ?? null,
             roleStale: !!role?.staleSince,
           }))
         )

@@ -432,28 +432,28 @@ human-readable name describing what the entity is (e.g. "Water Pump PLC",
 "SCADA Historian", "Edge Router").
 
 Roles are **per-snapshot**: each snapshot carries its own classification for an
-entity, so the label is always tied to the pcap it was observed in. To assign a
-role, open an entity's detail modal — from a **snapshot's network diagram**
-(labels that snapshot in context) or from a **drift panel** (labels the latest,
-"present-day" snapshot) — and use the **Role** section on the Details tab:
+entity, so the label is always tied to the pcap it was observed in. Open an
+entity's detail modal (from a drift panel or a snapshot's network diagram). The
+top **Role** card is a read-only *present-day* summary — an entity's present-day
+identity is simply its role in the latest snapshot, and that is what the drift
+panels and AI insights use. To set or change a role, use the **Snapshot History**
+table below it: each row has an **Edit** (✎) action that opens a per-snapshot
+editor with a label, description, and **Suggest with AI** (which reads that
+snapshot's own traffic).
 
-- **Edit** — type a label and optional description and save.
-- **Suggest with AI** — the LLM analyses the device's traffic signals
-  (manufacturer, device type, observed applications, protocols) and suggests a
-  label. The suggestion is shown with an "AI suggested" badge.
-- **Accept** — keeps the AI suggestion; the label is saved as a
-  **Manual label** (an analyst-assigned label).
-- **Discard** — removes the unconfirmed suggestion.
+.. important::
+   **Editing a snapshot's role applies from that snapshot forward.** It labels
+   that snapshot and **carries forward** to later snapshots (shown with a small
+   *carried* tag); **earlier snapshots are not changed**. So to label the whole
+   timeline, edit the **first** snapshot the entity appears in; editing only the
+   latest snapshot labels just that one. A label that was carried forward is
+   overridden the moment you edit a later snapshot directly.
 
-A label saved by an analyst (typed directly or by accepting a suggestion) carries
-a **Manual label** badge. This records *what the host is* — its identity. It is
-not a guarantee about future behaviour: as new snapshots arrive the Monitor
-carries the label forward and flags it if the node drifts (see `Label Staleness
-Detection`_). Keep time-bounded behavioural observations in **Entity Notes**
-rather than in the label itself.
-
-An entity's **present-day identity** is simply its role in the latest snapshot —
-that is what the drift panels and AI insights use.
+A label saved by an analyst carries a **Manual label** badge. This records *what
+the host is* — its identity. It is not a guarantee about future behaviour: as new
+snapshots arrive the Monitor carries the label forward and flags it if the node
+drifts (see `Label Staleness Detection`_). Keep time-bounded behavioural
+observations in **Entity Notes** rather than in the label itself.
 
 Label Staleness Detection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

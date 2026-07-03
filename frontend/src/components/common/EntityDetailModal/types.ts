@@ -17,8 +17,9 @@ export interface IpSnapshotEntry {
   host: HostClassification | null;
   apps: string[];
   protocols: string[];
-  /** Per-snapshot role label (#369) and whether it was flagged stale in this snapshot. */
+  /** Per-snapshot role label (#369), its origin, and whether it was flagged stale in this snapshot. */
   roleLabel: string | null;
+  roleOrigin: string | null; // MANUAL | AI | CARRIED_FORWARD
   roleStale: boolean;
 }
 

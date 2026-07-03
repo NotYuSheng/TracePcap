@@ -117,8 +117,11 @@ export function RoleEditModal({
             <button type="button" className="btn-close" onClick={onClose} />
           </div>
           <div className="modal-body">
-            <p className="text-muted small">
-              Sets the role for <code>{entityKey}</code> in this snapshot; it carries forward to later snapshots.
+            <p className="text-muted small mb-2">
+              Sets the role for <code>{entityKey}</code> from this snapshot onward — it applies to this
+              snapshot and <strong>carries forward</strong> to later ones. <strong>Earlier snapshots are
+              not changed.</strong> To label the whole timeline, edit the first snapshot the entity
+              appears in.
             </p>
             {loading ? (
               <div className="text-muted small py-2"><Spinner size="sm" className="me-2" />Loading…</div>

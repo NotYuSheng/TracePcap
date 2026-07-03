@@ -76,7 +76,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   // Per-file role label/stale for each history row (#369), keyed by fileId.
-  const [historyRoles, setHistoryRoles] = useState<Record<string, { label: string | null; stale: boolean }>>({});
+  const [historyRoles, setHistoryRoles] = useState<Record<string, { label: string | null; origin: string | null; stale: boolean }>>({});
 
   // Determine entity type and key for notes/history
   const entityType: EntityType = node.data.isL2 ? 'DEVICE' : 'IP';
@@ -139,8 +139,8 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
           entries.map(e =>
             insightsService
               .getNodeRole(entityType, entityKey ?? '', e.fileId)
-              .then(r => [e.fileId, { label: r?.roleLabel ?? null, stale: !!r?.staleSince }] as const)
-              .catch(() => [e.fileId, { label: null, stale: false }] as const),
+              .then(r => [e.fileId, { label: r?.roleLabel ?? null, origin: r?.origin ?? null, stale: !!r?.staleSince }] as const)
+              .catch(() => [e.fileId, { label: null, origin: null, stale: false }] as const),
           ),
         ).then(pairs => setHistoryRoles(Object.fromEntries(pairs)));
       })
@@ -541,6 +541,9 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                               {historyRoles[entry.fileId]?.label ? (
                                 <span className="d-inline-flex align-items-center gap-1">
                                   {historyRoles[entry.fileId].label}
+                                  {historyRoles[entry.fileId].origin === 'CARRIED_FORWARD' && (
+                                    <span className="badge bg-light text-secondary border" style={{ fontSize: '0.55rem', fontWeight: 400 }} title="Inherited from an earlier snapshot (carried forward)">carried</span>
+                                  )}
                                   {historyRoles[entry.fileId].stale && (
                                     <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this file">
                                       <i className="bi bi-exclamation-triangle" />

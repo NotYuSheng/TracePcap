@@ -57,6 +57,7 @@ interface DeviceSnapshotEntry {
   apps: string[];
   protocols: string[];
   roleLabel?: string | null;
+  roleOrigin?: string | null;
   roleStale?: boolean;
 }
 
@@ -170,6 +171,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
           ...entry,
           ...conv,
           roleLabel: role?.roleLabel ?? null,
+          roleOrigin: role?.origin ?? null,
           roleStale: !!role?.staleSince,
         }))
       )
@@ -193,7 +195,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
     const updated = await Promise.all(
       entries.map(async e => {
         const r = await insightsService.getNodeRole('DEVICE', mac, e.snap.fileId).catch(() => null);
-        return { ...e, roleLabel: r?.roleLabel ?? null, roleStale: !!r?.staleSince };
+        return { ...e, roleLabel: r?.roleLabel ?? null, roleOrigin: r?.origin ?? null, roleStale: !!r?.staleSince };
       }),
     );
     setMacHistory(prev => { const next = new Map(prev); next.set(mac, updated); return next; });
@@ -468,7 +470,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {pageRows.map(({ snap, host, protocols, apps, roleLabel, roleStale }, pageIdx) => {
+                        {pageRows.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale }, pageIdx) => {
                           const globalIdx = historyPage * HISTORY_PAGE_SIZE + pageIdx;
                           return (
                             <tr key={`${snap.id}-${globalIdx}`}>
@@ -487,6 +489,9 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                               <td>
                                 <div className="d-inline-flex align-items-center gap-1">
                                   {roleLabel ? <small>{roleLabel}</small> : <small className="text-muted">—</small>}
+                                  {roleLabel && roleOrigin === 'CARRIED_FORWARD' && (
+                                    <Badge bg="light" text="secondary" className="border" style={{ fontSize: '0.55rem', fontWeight: 400 }} title="Inherited from an earlier snapshot (carried forward), not set here">carried</Badge>
+                                  )}
                                   {roleStale && (
                                     <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot">
                                       <i className="bi bi-exclamation-triangle" />
