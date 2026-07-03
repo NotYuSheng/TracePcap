@@ -33,7 +33,9 @@ Overview
 - Subnets can be defined or auto-detected to group IP addresses in the IP
   Addresses drift panel.
 - Devices and IP addresses can be annotated with **role labels** (manually or
-  via AI suggestion) to provide operational context.
+  via AI suggestion) to provide operational context. Confirmed labels are
+  automatically flagged **stale** when the underlying node's behaviour later
+  drifts from what it was at label time.
 - **External Events** log real-world events (maintenance windows, firmware
   upgrades) with timestamps for correlation against network changes.
 - **Analyst Annotations** record free-text notes that feed into AI insight
@@ -60,7 +62,7 @@ Getting Started
 Change Detection Signals
 ------------------------
 
-The engine runs four independent detection passes when comparing two consecutive
+The engine runs five independent detection passes when comparing two consecutive
 snapshots:
 
 Signal 1 — Device (MAC) Drift
@@ -120,6 +122,24 @@ appear or disappear:
 Removed protocols and applications are surfaced as absent entities in the drift
 panels rather than as events.
 
+Signal 5 — Manual Label Staleness
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Watches for behavioural drift on nodes that carry an analyst-confirmed **role
+label** (see `Node Role Annotation`_). When a human confirms a label, the engine
+snapshots the node's key properties at that moment — MAC address, device type,
+dominant protocols, and external organisations contacted — as a **baseline**.
+
+- **LABEL_STALE** (WARNING) — a node with a confirmed label now differs from its
+  baseline on at least one watched field: the MAC changed, a new dominant
+  protocol appeared, or the node started contacting a new external organisation.
+  The payload records the label, the date it was set, and exactly what changed.
+
+Unlike the other four signals, this one only fires for nodes that have a
+confirmed label, and only until the drift is acknowledged. See
+`Label Staleness Detection`_ for the analyst workflow (amber warning,
+*Update label* / *Dismiss*).
+
 Severity Levels
 ---------------
 
@@ -135,7 +155,7 @@ Severity Levels
    * - **WARNING**
      - Notable change worth investigating. Examples: new device on the network,
        MAC address obtained a different IP, VPN fingerprint disappeared, VPN
-       app detected.
+       app detected, a confirmed role label drifted from its baseline.
    * - **INFO**
      - Informational. Examples: new ASN or cloud provider seen, new protocol or
        application appeared.
@@ -162,7 +182,8 @@ The feed can be filtered by:
 
 - **Severity** — CRITICAL, WARNING, INFO, or ALL
 - **Change type** — MAC_ADDED, IP_MAC_DRIFT, ASN_CHANGE, GATEWAY_CHANGE,
-  PROTOCOL_ADDED, APP_ADDED, VPN_DRIFT
+  PROTOCOL_ADDED, APP_ADDED, VPN_DRIFT, LABEL_STALE (only the types present in
+  the current data are listed)
 - **Reviewed status** — Unreviewed (default), Reviewed, or All
 
 The badge count in the filter bar reflects the current filter selection.
@@ -424,12 +445,48 @@ use the **Role** section at the top of the Details tab:
 A label saved by an analyst (typed directly or by accepting a suggestion) carries
 a **Manual label** badge. This records *what the host is* — its identity. It is
 not a guarantee about future behaviour: the Monitor continues to detect and flag
-deviating activity from a labelled host. Keep time-bounded behavioural
-observations in **Entity Notes** rather than in the label itself.
+deviating activity from a labelled host (see `Label Staleness Detection`_). Keep
+time-bounded behavioural observations in **Entity Notes** rather than in the
+label itself.
 
 Role labels are global (not per-network) — assigning a role to an IP or device
 once makes it available wherever that entity appears, including in AI-generated
 insights.
+
+Label Staleness Detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A confirmed label can silently become wrong as the network evolves — a host
+labelled "Printer" six months ago may now run new services or talk to external
+IPs it never contacted before, and an analyst scanning the diagram sees only the
+reassuring old label. Label staleness detection guards against this.
+
+**How it works**
+
+1. When you confirm a label (from a file/snapshot context), the engine captures
+   a **baseline** of the node's key properties at that moment: MAC address,
+   device type, dominant protocols, and external organisations contacted. The
+   date is recorded as the label's *set* time.
+2. On each subsequent snapshot analysis, the node's current properties are
+   compared against the baseline. If the MAC changed, a new dominant protocol
+   appeared, or a new external organisation was contacted, the label is flagged
+   **stale** (and a **LABEL_STALE** change event is raised — see
+   `Signal 5 — Manual Label Staleness`_).
+
+**In the UI**
+
+A stale label shows an amber **Stale** badge on its role card (in the Entity
+Detail modal and the Device drift panel) with a tooltip explaining what changed,
+for example: *"Label set 1 Nov 2025. Since then: MAC changed, new protocol
+(MQTT)."* Two actions are offered:
+
+- **Update label** — opens the editor so you can correct the label; saving
+  re-captures the baseline from the current snapshot.
+- **Dismiss — label is still correct** — clears the warning and records the
+  current snapshot as the new baseline, so only *further* drift re-triggers it.
+
+The label's *set* date is preserved on dismissal (only the drift baseline moves),
+so the tooltip continues to reflect when the analyst originally assigned it.
 
 Entity Notes
 ~~~~~~~~~~~~

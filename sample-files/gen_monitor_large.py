@@ -48,6 +48,15 @@ Policy violations story arc
   Week 7        Violations drop off (audit notice sent); gateway back to primary
   Week 8        Near-baseline; shadow device gone; one lingering personal device
 
+Label staleness (manual-label-driven, not an automatic PCAP signal)
+───────────────────────────────────────────────────────────────────
+  The captures also exercise LABEL_STALE. Confirm a "File Server (SMB)" role on
+  FILESERVER (10.0.2.10) from the week-1 context, then re-run change detection:
+  Carol's week-3 Telnet to the file server drifts its dominant protocols from the
+  SMB-only baseline, flagging the label stale. Staleness needs a human-confirmed
+  label first, so it cannot be produced by the PCAPs alone — see the walkthrough
+  in docs/sample-files.rst.
+
 Output: ./monitor_large/week{1..8}_*.pcap
 Usage:  python3 gen_monitor_large.py
 """

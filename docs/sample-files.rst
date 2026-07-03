@@ -26,7 +26,8 @@ Included Files
    * - ``monitor_large/week1_baseline.pcap`` … ``week8_near_baseline.pcap``
      - Eight weekly captures from the **Office Audit demo scenario**. Used to
        demonstrate the Network Monitor, subnet detection, node role annotation,
-       and AI-generated insights. See below for full details.
+       label staleness detection, and AI-generated insights. See below for full
+       details.
 
 Generating ``demo_all_rules.pcap``
 ------------------------------------
@@ -355,7 +356,37 @@ SMB + Telnet to internal servers, no hostname).
    and the internal-server access. This is the payoff of leaving it unlabelled:
    the suggestion is the AI's blind characterisation, not an echo of your label.
 
-**Step 6 — Add external events**
+**Step 6 — Watch a manual label go stale**
+
+Label staleness detection (see :doc:`features/network-monitor` → *Label
+Staleness Detection*) warns you when a confirmed label no longer matches how a
+host actually behaves. The File Server makes a clean demonstration:
+
+1. Open the **week 1** snapshot's network diagram (Capture Timeline → click the
+   ``week1_baseline.pcap`` row) and click the ``10.0.2.10`` node. In the **Role**
+   section, confirm the label **File Server (SMB)**. Confirming from the week-1
+   context captures an SMB-only baseline — *before* Carol's Telnet activity.
+2. Re-run change detection across the loaded timeline: in **Manage PCAPs**,
+   remove any one snapshot and add it back. This recomputes every transition with
+   your confirmed label in place. (Change detection re-runs on snapshot add,
+   removal, or subnet-override edits — saving a label alone does not trigger it.)
+
+Because Carol begins Telnet to the file server in **week 3**, the File Server's
+properties now differ from its week-1 baseline, and the label is flagged:
+
+- The **Change Events** feed shows a ``LABEL_STALE`` (WARNING) event —
+  *"Label may be stale: 10.0.2.10 (File Server (SMB)) — new protocol (TELNET)"*.
+- The File Server's role card (Entity Detail modal → *Role*, and the Devices
+  drift panel) shows an amber **Stale** badge and a warning banner with
+  **Update label** and **Dismiss — label is still correct** actions.
+
+This is the lesson: a label captured early silently becomes misleading as the
+host's behaviour changes — your "File Server (SMB)" is now also accepting
+cleartext Telnet logins. Click **Dismiss — label is still correct** to accept the
+new behaviour as the baseline (the original label date is kept), or **Update
+label** to revise it.
+
+**Step 7 — Add external events**
 
 In the **External Events** panel, click **Add Event** and log the audit
 milestone that explains the behavioural shift. Each event has three fields:
@@ -375,7 +406,7 @@ To fix a mistake later — for example if you set the wrong date — click the
 **pencil** icon on the event row to edit any field, or the **trash** icon to
 remove it.
 
-**Step 7 — Generate insights**
+**Step 8 — Generate insights**
 
 Click **Generate Insights**. With device roles and the external event in
 context, the LLM should correlate the violation drop-off in week 7 with the
