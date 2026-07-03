@@ -161,8 +161,8 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
             ? apiClient
                 .get<ConversationsResponse>(`/conversations/${entry.snap.fileId}?ip=${entry.host.ip}&pageSize=10000`)
                 .then(r => ({
-                  apps: [...new Set(r.data.data.map(c => c.appName).filter(Boolean) as string[])].sort(),
-                  protocols: [...new Set(r.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
+                  apps: [...new Set((r?.data?.data ?? []).map(c => c.appName).filter(Boolean) as string[])].sort(),
+                  protocols: [...new Set((r?.data?.data ?? []).map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
                 }))
                 .catch(() => ({ apps: entry.apps, protocols: entry.protocols }))
             : Promise.resolve({ apps: entry.apps, protocols: entry.protocols }),

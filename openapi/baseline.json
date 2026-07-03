@@ -6430,7 +6430,17 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "Role found"
+          },
+          "204": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRoleDto"
+                }
+              }
+            },
+            "description": "No role assigned for this entity in this file"
           }
         },
         "summary": "Get the role assigned to an entity in a file",
@@ -6508,7 +6518,17 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "Staleness dismissed; refreshed role returned"
+          },
+          "204": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRoleDto"
+                }
+              }
+            },
+            "description": "No role exists for this entity in this file"
           }
         },
         "summary": "Dismiss a stale-label warning",

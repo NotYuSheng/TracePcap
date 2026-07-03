@@ -5,6 +5,8 @@ import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
 import com.tracepcap.insights.service.InsufficientEvidenceException;
 import com.tracepcap.insights.service.NodeRoleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import java.util.UUID;
@@ -22,6 +24,10 @@ public class NodeRoleController {
 
   @GetMapping
   @Operation(summary = "Get the role assigned to an entity in a file")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Role found"),
+    @ApiResponse(responseCode = "204", description = "No role assigned for this entity in this file")
+  })
   public ResponseEntity<NodeRoleDto> getRole(
       @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
     return service
@@ -59,6 +65,10 @@ public class NodeRoleController {
       description =
           "Clears the staleness flag for a confirmed label and records the current file's node"
               + " properties as the new drift baseline.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Staleness dismissed; refreshed role returned"),
+    @ApiResponse(responseCode = "204", description = "No role exists for this entity in this file")
+  })
   public ResponseEntity<NodeRoleDto> dismissStaleness(
       @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
     return service

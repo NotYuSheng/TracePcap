@@ -1,6 +1,5 @@
 package com.tracepcap.insights.service;
 
-import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
@@ -11,7 +10,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,9 +53,10 @@ public class LabelStalenessService {
    */
   @Transactional
   public List<LabelDrift> carryForwardAndValidate(UUID prevFileId, UUID newFileId) {
+    if (newFileId == null) return List.of();
     // Always clear stale carried rows so a reorder/re-add regenerates cleanly.
     nodeRoleRepository.deleteByFileIdAndOrigin(newFileId, ORIGIN_CARRIED_FORWARD);
-    if (prevFileId == null || newFileId == null) return List.of();
+    if (prevFileId == null) return List.of();
 
     List<NodeRoleEntity> confirmed =
         nodeRoleRepository.findByFileIdAndConfirmedByHumanTrue(prevFileId);
@@ -70,24 +69,35 @@ public class LabelStalenessService {
             .map(r -> r.getEntityType() + "|" + r.getEntityKey())
             .collect(Collectors.toSet());
 
-    // Pre-filter to entities that actually appear in the new file.
-    Set<String> activeIps = new HashSet<>();
-    Set<String> activeMacsLower = new HashSet<>();
-    for (HostClassificationEntity h : hostClassificationRepository.findByFileId(newFileId)) {
-      if (h.getIp() != null) activeIps.add(h.getIp());
-      if (h.getMac() != null) activeMacsLower.add(h.getMac().toLowerCase());
-    }
-
     List<LabelDrift> drifts = new ArrayList<>();
     for (NodeRoleEntity prev : confirmed) {
       if (ownKeys.contains(prev.getEntityType() + "|" + prev.getEntityKey())) continue;
-      if (!isObservedKey(prev, activeIps, activeMacsLower)) continue; // absent in this snapshot
 
+      // computeProperties' own "observed" flag also covers IPs seen only in conversations
+      // (no host_classifications row), which a host-classification-only pre-filter would miss.
       Map<String, Object> observed =
           computeProperties(prev.getEntityType(), prev.getEntityKey(), newFileId);
+      if (!Boolean.TRUE.equals(observed.get("observed"))) continue; // absent in this snapshot
+
       Map<String, Object> baseline = prev.getObservedProperties();
       List<String> changes =
           (baseline == null || baseline.isEmpty()) ? List.of() : diff(baseline, observed);
+
+      // Preserve an unresolved stale marker across snapshots: staleness only clears when the analyst
+      // dismisses or re-labels (which creates a MANUAL row), not just because a later snapshot adds
+      // no *new* drift beyond the previous one.
+      LocalDateTime staleSince = null;
+      List<String> staleFields = null;
+      if (!changes.isEmpty()) {
+        staleSince = prev.getStaleSince() != null ? prev.getStaleSince() : LocalDateTime.now();
+        staleFields = changes;
+        drifts.add(
+            new LabelDrift(
+                prev.getEntityType(), prev.getEntityKey(), prev.getRoleLabel(), changes));
+      } else if (prev.getStaleSince() != null) {
+        staleSince = prev.getStaleSince();
+        staleFields = prev.getStaleFields();
+      }
 
       NodeRoleEntity carried =
           NodeRoleEntity.builder()
@@ -100,27 +110,12 @@ public class LabelStalenessService {
               .llmSuggested(false)
               .confirmedByHuman(true)
               .observedProperties(observed)
+              .staleSince(staleSince)
+              .staleFields(staleFields)
               .build();
-      if (!changes.isEmpty()) {
-        carried.setStaleSince(LocalDateTime.now());
-        carried.setStaleFields(changes);
-        drifts.add(
-            new LabelDrift(
-                prev.getEntityType(), prev.getEntityKey(), prev.getRoleLabel(), changes));
-      }
       nodeRoleRepository.save(carried);
     }
     return drifts;
-  }
-
-  /** True when the role's entity (IP or MAC) is among the file's classified hosts. */
-  private boolean isObservedKey(
-      NodeRoleEntity role, Set<String> activeIps, Set<String> activeMacsLower) {
-    String key = role.getEntityKey();
-    if (key == null) return false;
-    if ("DEVICE".equalsIgnoreCase(role.getEntityType()))
-      return activeMacsLower.contains(key.toLowerCase());
-    return activeIps.contains(key);
   }
 
   // ── Property computation ──────────────────────────────────────────────────────
