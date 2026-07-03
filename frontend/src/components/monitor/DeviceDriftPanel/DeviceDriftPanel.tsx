@@ -8,6 +8,8 @@ import { buildDeviceSignals, confidenceLevel, type DeviceSignalInfo } from '@/ut
 import { entityNotesService, type EntityNote } from '@/features/notes/services/entityNotesService';
 import { insightsService } from '@/features/insights/services/insightsService';
 import type { NodeRole } from '@/features/insights/types/insights.types';
+import { staleTooltip } from '@/features/insights/utils/nodeRoleStaleness';
+import { RoleEditModal } from '@components/common/RoleEditModal';
 
 /** Deterministic hue (0–360) from any string. */
 function stringHue(s: string): number {
@@ -54,6 +56,9 @@ interface DeviceSnapshotEntry {
   host: HostClassification;
   apps: string[];
   protocols: string[];
+  roleLabel?: string | null;
+  roleOrigin?: string | null;
+  roleStale?: boolean;
 }
 
 function formatSnapTime(snap: NetworkSnapshot): string {
@@ -79,15 +84,9 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   const [noteSaving, setNoteSaving] = useState(false);
   const [modalTab, setModalTab] = useState<'details' | 'notes'>('details');
 
-  // Role state
+  // Role state — present-day summary; per-snapshot editing is done via RoleEditModal.
   const [role, setRole] = useState<NodeRole | null>(null);
-  const [roleSuggesting, setRoleSuggesting] = useState(false);
-  const [roleSuggestError, setRoleSuggestError] = useState<string | null>(null);
-  const [roleInfoOpen, setRoleInfoOpen] = useState(false);
-  const [roleEditing, setRoleEditing] = useState(false);
-  const [roleLabelDraft, setRoleLabelDraft] = useState('');
-  const [roleDescDraft, setRoleDescDraft] = useState('');
-  const [roleSaving, setRoleSaving] = useState(false);
+  const [editingRole, setEditingRole] = useState<{ fileId: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!selectedMac) return;
@@ -143,31 +142,38 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
     setNoteText('');
     setSavedNote(null);
     setRole(null);
-    setRoleEditing(false);
-    setRoleSuggestError(null);
-    setRoleInfoOpen(false);
+    setEditingRole(null);
     entityNotesService.getNote('DEVICE', mac).then(note => {
       if (note) { setSavedNote(note); setNoteText(note.note); }
     });
-    insightsService.getNodeRole('DEVICE', mac).then(r => setRole(r ?? null)).catch(() => {});
     const entries = macHistory.get(mac) ?? [];
+    // Present-day role = the latest snapshot in which this device appears.
+    const latestFid = entries[entries.length - 1]?.snap.fileId;
+    if (latestFid) {
+      insightsService.getNodeRole('DEVICE', mac, latestFid).then(r => setRole(r ?? null)).catch(() => {});
+    }
     if (entries.every(e => e.apps.length > 0 || e.protocols.length > 0)) return; // already loaded
     setModalLoading(true);
     Promise.all(
       entries.map(entry =>
-        entry.host.ip
-          ? apiClient
-              .get<ConversationsResponse>(`/conversations/${entry.snap.fileId}?ip=${entry.host.ip}&pageSize=10000`)
-              .then(r => {
-                const convs = r.data.data;
-                return {
-                  ...entry,
-                  apps: [...new Set(convs.map(c => c.appName).filter(Boolean) as string[])].sort(),
-                  protocols: [...new Set(convs.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
-                };
-              })
-              .catch(() => entry)
-          : Promise.resolve(entry)
+        Promise.all([
+          entry.host.ip
+            ? apiClient
+                .get<ConversationsResponse>(`/conversations/${entry.snap.fileId}?ip=${entry.host.ip}&pageSize=10000`)
+                .then(r => ({
+                  apps: [...new Set((r?.data?.data ?? []).map(c => c.appName).filter(Boolean) as string[])].sort(),
+                  protocols: [...new Set((r?.data?.data ?? []).map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
+                }))
+                .catch(() => ({ apps: entry.apps, protocols: entry.protocols }))
+            : Promise.resolve({ apps: entry.apps, protocols: entry.protocols }),
+          insightsService.getNodeRole('DEVICE', mac, entry.snap.fileId).catch(() => null),
+        ]).then(([conv, role]) => ({
+          ...entry,
+          ...conv,
+          roleLabel: role?.roleLabel ?? null,
+          roleOrigin: role?.origin ?? null,
+          roleStale: !!role?.staleSince,
+        }))
       )
     ).then(enriched => {
       setMacHistory(prev => {
@@ -177,6 +183,22 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
       });
       setModalLoading(false);
     });
+  };
+
+  // Refetch the present-day role + per-snapshot roles after an edit in the history table.
+  const reloadDeviceRoles = async (mac: string) => {
+    const entries = macHistory.get(mac) ?? [];
+    const latestFid = entries[entries.length - 1]?.snap.fileId;
+    if (latestFid) {
+      insightsService.getNodeRole('DEVICE', mac, latestFid).then(r => setRole(r ?? null)).catch(() => {});
+    }
+    const updated = await Promise.all(
+      entries.map(async e => {
+        const r = await insightsService.getNodeRole('DEVICE', mac, e.snap.fileId).catch(() => null);
+        return { ...e, roleLabel: r?.roleLabel ?? null, roleOrigin: r?.origin ?? null, roleStale: !!r?.staleSince };
+      }),
+    );
+    setMacHistory(prev => { const next = new Map(prev); next.set(mac, updated); return next; });
   };
 
   const active = Array.from(latestMacs);
@@ -338,86 +360,19 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
             <p className="text-muted">No history available.</p>
           ) : modalTab === 'details' && (
             <>
-              {/* Role section */}
+              {/* Role section — read-only present-day summary; edit per snapshot in the history table below */}
               <div className="mb-4">
-                <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center justify-content-between">
-                  <span>Role</span>
-                  {!roleEditing && (
-                    <div className="d-flex gap-1">
-                      <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
-                        onClick={() => { setRoleLabelDraft(role?.roleLabel ?? ''); setRoleDescDraft(role?.roleDescription ?? ''); setRoleEditing(true); }}>
-                        <i className="bi bi-pencil me-1" />Edit
-                      </button>
-                      <div className="d-flex align-items-center gap-1">
-                        <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
-                          onClick={async () => {
-                            if (!selectedMac) return;
-                            setRoleSuggesting(true);
-                            setRoleSuggestError(null);
-                            try { const r = await insightsService.suggestNodeRole('DEVICE', selectedMac, selectedHistory[selectedHistory.length - 1]?.snap.fileId ?? ''); setRole(r); }
-                            catch (err: unknown) { setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.'); }
-                            finally { setRoleSuggesting(false); }
-                          }}
-                          disabled={roleSuggesting}>
-                          {roleSuggesting ? <><span className="spinner-border spinner-border-sm me-1" />Suggesting…</> : <><i className="bi bi-stars me-1" />Suggest with AI</>}
-                        </button>
-                        <button
-                          className="btn btn-link btn-sm p-0 text-muted"
-                          style={{ fontSize: '0.8rem', lineHeight: 1 }}
-                          onClick={() => setRoleInfoOpen(o => !o)}
-                          title="How does this work?"
-                        >
-                          <i className="bi bi-info-circle" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </h6>
-                {roleInfoOpen && (
-                  <div className="p-2 rounded mb-2 small text-muted" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)', border: '1px solid var(--bs-border-color)' }}>
-                    <strong>How it works:</strong> The AI analyses traffic signals for this device — manufacturer OUI, device type, TTL, observed applications and protocols — and suggests an operational role label. If the signals are too sparse or generic to make a meaningful assessment, it will decline rather than guess.
-                  </div>
-                )}
-                {roleSuggestError && (
-                  <div className="d-flex align-items-start gap-2 p-2 rounded mb-2 small" style={{ background: 'var(--bs-warning-bg-subtle, #fff3cd)', color: 'var(--bs-warning-text-emphasis, #664d03)', border: '1px solid var(--bs-warning-border-subtle, #ffc107)' }}>
-                    <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
-                    <span>{roleSuggestError}</span>
-                  </div>
-                )}
-                {!role && !roleEditing && <p className="text-muted small fst-italic mb-0">No role assigned.</p>}
-                {role && !roleEditing && (
-                  <div className={`p-2 rounded small ${role.llmSuggested && !role.confirmedByHuman ? 'bg-warning-subtle border border-warning-subtle' : 'bg-light'}`}>
+                <h6 className="border-bottom pb-1 mb-2">Role <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· present-day (latest snapshot)</span></h6>
+                {!role && <p className="text-muted small fst-italic mb-0">No role assigned. Set one per snapshot in the history below.</p>}
+                {role && (
+                  <div className={`p-2 rounded small ${role.confirmedByHuman && role.staleSince ? 'bg-warning-subtle border border-warning' : 'bg-light'}`}>
                     <div className="fw-semibold">
                       {role.roleLabel || <span className="text-muted fst-italic">No label</span>}
                       {role.llmSuggested && !role.confirmedByHuman && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-stars me-1" />AI suggested</span>}
-                      {role.confirmedByHuman && <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }} title="Manually labelled by an analyst. Future deviating behaviour can still be flagged."><i className="bi bi-tag me-1" />Manual label</span>}
+                      {role.confirmedByHuman && <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-tag me-1" />Manual label</span>}
+                      {role.confirmedByHuman && role.staleSince && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.65rem' }} title={staleTooltip(role)}><i className="bi bi-exclamation-triangle me-1" />Stale</span>}
                     </div>
                     {role.roleDescription && <div className="text-muted mt-1">{role.roleDescription}</div>}
-                    {role.llmSuggested && !role.confirmedByHuman && (
-                      <div className="d-flex gap-2 mt-2">
-                        <button className="btn btn-success btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
-                          onClick={async () => { if (!selectedMac || !role) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, role.roleLabel ?? '', role.roleDescription ?? '', true); setRole(r); } finally { setRoleSaving(false); } }}>
-                          <i className="bi bi-check-lg me-1" />Accept
-                        </button>
-                        <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
-                          onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { await insightsService.deleteNodeRole('DEVICE', selectedMac); setRole(null); } finally { setRoleSaving(false); } }}>
-                          <i className="bi bi-x-lg me-1" />Discard
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {roleEditing && (
-                  <div>
-                    <input className="form-control form-control-sm mb-2" placeholder="Role label (e.g. Floor Printer)" value={roleLabelDraft} onChange={e => setRoleLabelDraft(e.target.value)} />
-                    <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Description (optional)" value={roleDescDraft} onChange={e => setRoleDescDraft(e.target.value)} />
-                    <div className="d-flex gap-2">
-                      <button className="btn btn-primary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving || !roleLabelDraft.trim()}
-                        onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, roleLabelDraft, roleDescDraft, true); setRole(r); setRoleEditing(false); } finally { setRoleSaving(false); } }}>
-                        {roleSaving ? <><span className="spinner-border spinner-border-sm me-1" />Saving…</> : <><i className="bi bi-floppy me-1" />Save</>}
-                      </button>
-                      <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving} onClick={() => setRoleEditing(false)}>Cancel</button>
-                    </div>
                   </div>
                 )}
               </div>
@@ -510,11 +465,12 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                           <th className="text-muted fw-normal">Snapshot</th>
                           <th className="text-muted fw-normal">IP Address</th>
                           <th className="text-muted fw-normal">Device Type</th>
+                          <th className="text-muted fw-normal">Role</th>
                           <th className="text-muted fw-normal">Protocols / Apps</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pageRows.map(({ snap, host, protocols, apps }, pageIdx) => {
+                        {pageRows.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale }, pageIdx) => {
                           const globalIdx = historyPage * HISTORY_PAGE_SIZE + pageIdx;
                           return (
                             <tr key={`${snap.id}-${globalIdx}`}>
@@ -530,6 +486,22 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                                 )}
                               </td>
                               <td><small className="text-muted">{host.deviceType ?? '—'}</small></td>
+                              <td>
+                                <div className="d-inline-flex align-items-center gap-1">
+                                  {roleLabel ? <small>{roleLabel}</small> : <small className="text-muted">—</small>}
+                                  {roleLabel && roleOrigin === 'CARRIED_FORWARD' && (
+                                    <Badge bg="light" text="secondary" className="border" style={{ fontSize: '0.55rem', fontWeight: 400 }} title="Inherited from an earlier snapshot (carried forward), not set here">carried</Badge>
+                                  )}
+                                  {roleStale && (
+                                    <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot">
+                                      <i className="bi bi-exclamation-triangle" />
+                                    </Badge>
+                                  )}
+                                  <button className="btn btn-link btn-sm p-0 ms-1 text-muted" style={{ fontSize: '0.75rem', lineHeight: 1 }} title="Edit role for this snapshot" onClick={() => setEditingRole({ fileId: snap.fileId, name: snap.fileName })}>
+                                    <i className="bi bi-pencil" />
+                                  </button>
+                                </div>
+                              </td>
                               <td>
                                 {protocols.length === 0 && apps.length === 0 ? (
                                   <small className="text-muted">—</small>
@@ -582,6 +554,17 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
           )}
         </Modal.Body>
       </Modal>
+
+      {editingRole && selectedMac && (
+        <RoleEditModal
+          entityType="DEVICE"
+          entityKey={selectedMac}
+          fileId={editingRole.fileId}
+          snapshotName={editingRole.name}
+          onClose={() => setEditingRole(null)}
+          onSaved={() => reloadDeviceRoles(selectedMac)}
+        />
+      )}
     </>
   );
 };

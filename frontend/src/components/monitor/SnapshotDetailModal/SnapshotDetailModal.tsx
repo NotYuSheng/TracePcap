@@ -382,7 +382,9 @@ export const SnapshotDetailModal = ({
 
   return (
     <>
-    <Modal show onHide={handleHide} centered size="xl" scrollable>
+    {/* enforceFocus off: the node-detail overlay (NodeDetails) renders on top of this
+        modal, and Bootstrap's focus trap would otherwise steal focus from its inputs. */}
+    <Modal show onHide={handleHide} centered size="xl" scrollable enforceFocus={false}>
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-camera-reels me-2" />

@@ -24,6 +24,8 @@ public interface NetworkChangeEventRepository
 
   void deleteByToSnapshotId(UUID toSnapshotId);
 
+  void deleteByToSnapshotIdAndChangeType(UUID toSnapshotId, ChangeType changeType);
+
   void deleteByNetworkId(UUID networkId);
 
   @Query(

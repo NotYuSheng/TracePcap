@@ -51,9 +51,10 @@ export type ChangeType =
   | 'GATEWAY_CHANGE'
   | 'PROTOCOL_ADDED'
   | 'APP_ADDED'
-  | 'VPN_DRIFT';
+  | 'VPN_DRIFT'
+  | 'LABEL_STALE';
 
-export type EntityType = 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP';
+export type EntityType = 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP' | 'NODE_ROLE';
 
 export type Severity = 'INFO' | 'WARNING' | 'CRITICAL';
 

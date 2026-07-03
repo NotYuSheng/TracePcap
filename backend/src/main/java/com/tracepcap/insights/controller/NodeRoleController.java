@@ -1,12 +1,13 @@
 package com.tracepcap.insights.controller;
 
 import com.tracepcap.insights.dto.NodeRoleDto;
+import com.tracepcap.insights.dto.RoleSuggestionDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
-import com.tracepcap.insights.service.InsufficientEvidenceException;
 import com.tracepcap.insights.service.NodeRoleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,18 +22,25 @@ public class NodeRoleController {
   private final NodeRoleService service;
 
   @GetMapping
-  @Operation(summary = "Get the role assigned to an entity")
+  @Operation(summary = "Get the role assigned to an entity in a file")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Role found"),
+    @ApiResponse(responseCode = "204", description = "No role assigned for this entity in this file")
+  })
   public ResponseEntity<NodeRoleDto> getRole(
-      @RequestParam String entityType,
-      @RequestParam String entityKey) {
-    return service.getRole(entityType, entityKey)
+      @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    return service
+        .getRole(fileId, entityType, entityKey)
         .map(ResponseEntity::ok)
         .orElse(ResponseEntity.noContent().build());
   }
 
   @PutMapping
-  @Operation(summary = "Create or update an entity's role")
+  @Operation(summary = "Create or update an entity's role in a file")
   public ResponseEntity<NodeRoleDto> upsert(@RequestBody UpsertNodeRoleRequest req) {
+    if (req.getFileId() == null) {
+      return ResponseEntity.badRequest().build();
+    }
     if (req.getEntityType() == null || req.getEntityType().isBlank()) {
       return ResponseEntity.badRequest().build();
     }
@@ -43,24 +51,54 @@ public class NodeRoleController {
   }
 
   @DeleteMapping
-  @Operation(summary = "Remove an entity's role")
+  @Operation(summary = "Remove an entity's role in a file")
   public ResponseEntity<Void> delete(
-      @RequestParam String entityType,
-      @RequestParam String entityKey) {
-    service.delete(entityType, entityKey);
+      @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    service.delete(fileId, entityType, entityKey);
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/dismiss-staleness")
+  @Operation(
+      summary = "Dismiss a stale-label warning",
+      description =
+          "Clears the staleness flag for a confirmed label and records the current file's node"
+              + " properties as the new drift baseline.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Staleness dismissed; refreshed role returned"),
+    @ApiResponse(responseCode = "204", description = "No role exists for this entity in this file")
+  })
+  public ResponseEntity<NodeRoleDto> dismissStaleness(
+      @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    return service
+        .dismissStaleness(fileId, entityType, entityKey)
+        .map(ResponseEntity::ok)
+        .orElse(ResponseEntity.noContent().build());
   }
 
   @PostMapping("/suggest")
   @Operation(summary = "Suggest a role for an entity based on observed traffic")
-  public ResponseEntity<?> suggest(
-      @RequestParam String entityType,
-      @RequestParam String entityKey,
-      @RequestParam UUID fileId) {
-    try {
-      return ResponseEntity.ok(service.suggestRole(entityType, entityKey, fileId));
-    } catch (InsufficientEvidenceException e) {
-      return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
-    }
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Suggested role"),
+    @ApiResponse(responseCode = "422", description = "Insufficient traffic signals for a suggestion")
+  })
+  public NodeRoleDto suggest(
+      @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
+    return service.suggestRole(entityType, entityKey, fileId);
+  }
+
+  @PostMapping("/suggest-preview")
+  @Operation(
+      summary = "Preview an AI role suggestion without persisting",
+      description =
+          "Generates a fresh label/description from the file's traffic to pre-fill the update-label"
+              + " editor — used to re-classify a drifted label without overwriting the confirmed one.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Suggested label/description (not persisted)"),
+    @ApiResponse(responseCode = "422", description = "Insufficient traffic signals for a suggestion")
+  })
+  public RoleSuggestionDto suggestPreview(
+      @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
+    return service.suggestRolePreview(entityType, entityKey, fileId);
   }
 }

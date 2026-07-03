@@ -6,6 +6,8 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.insights.dto.LabelDrift;
+import com.tracepcap.insights.service.LabelStalenessService;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
@@ -14,6 +16,7 @@ import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.entity.SnapshotSubnetOverrideEntity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
+import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.monitor.repository.SnapshotSubnetOverrideRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -54,6 +57,8 @@ public class ChangeDetectionService {
   private final NetworkChangeEventRepository changeEventRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
+  private final LabelStalenessService labelStalenessService;
+  private final NetworkSnapshotRepository snapshotRepository;
 
   /**
    * Compare two consecutive snapshots and persist NetworkChangeEventEntity records. fromSnapshot
@@ -70,8 +75,65 @@ public class ChangeDetectionService {
     events.addAll(detectIpMacDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectIspAsnChanges(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectProtocolAppDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
+    events.addAll(detectStaleLabels(toFileId, fromSnapshot, toSnapshot));
 
     return changeEventRepository.saveAll(events);
+  }
+
+  // ── Signal 5: Manual label staleness (#369) ─────────────────────────────────
+
+  private List<NetworkChangeEventEntity> detectStaleLabels(
+      UUID toFileId, NetworkSnapshotEntity fromSnapshot, NetworkSnapshotEntity toSnapshot) {
+
+    UUID fromFileId = fromSnapshot != null ? fromSnapshot.getFile().getId() : null;
+    List<NetworkChangeEventEntity> events = new ArrayList<>();
+    for (LabelDrift drift : labelStalenessService.carryForwardAndValidate(fromFileId, toFileId)) {
+      Map<String, Object> newValue = new HashMap<>();
+      newValue.put("entityType", drift.entityType());
+      newValue.put("roleLabel", orEmpty(drift.roleLabel()));
+      newValue.put("changes", drift.changedFields());
+      events.add(
+          buildEvent(
+              toSnapshot.getNetwork().getId(),
+              fromSnapshot,
+              toSnapshot,
+              ChangeType.LABEL_STALE,
+              EntityType.NODE_ROLE,
+              drift.entityKey(),
+              null,
+              newValue,
+              Severity.WARNING));
+    }
+    return events;
+  }
+
+  /**
+   * Propagate a role change on {@code fileId} forward: for each network the file belongs to, carry
+   * the label forward and re-validate every snapshot after it. Lets labelling a snapshot take effect
+   * immediately across the chain, rather than only when the next snapshot is ingested (#369).
+   */
+  public void propagateRoleChange(UUID fileId) {
+    for (NetworkSnapshotEntity snap : snapshotRepository.findByFileId(fileId)) {
+      List<NetworkSnapshotEntity> ordered =
+          snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(snap.getNetwork().getId());
+      int idx = -1;
+      for (int i = 0; i < ordered.size(); i++) {
+        if (ordered.get(i).getId().equals(snap.getId())) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0) continue;
+      for (int i = idx; i + 1 < ordered.size(); i++) {
+        recomputeLabelStale(ordered.get(i), ordered.get(i + 1));
+      }
+    }
+  }
+
+  /** Re-run only the label-staleness signal for one transition, leaving other events untouched. */
+  private void recomputeLabelStale(NetworkSnapshotEntity from, NetworkSnapshotEntity to) {
+    changeEventRepository.deleteByToSnapshotIdAndChangeType(to.getId(), ChangeType.LABEL_STALE);
+    changeEventRepository.saveAll(detectStaleLabels(to.getFile().getId(), from, to));
   }
 
   // ── Signal 1: Device MAC presence ────────────────────────────────────────────
@@ -383,8 +445,9 @@ public class ChangeDetectionService {
     if (fileId == null) return Map.of();
     return hostClassificationRepository.findByFileId(fileId).stream()
         .filter(h -> h.getMac() != null && !h.getMac().isBlank() && h.getIp() != null)
-        .collect(Collectors.toMap(HostClassificationEntity::getMac, HostClassificationEntity::getIp,
-            (a, b) -> a));
+        .collect(
+            Collectors.toMap(
+                HostClassificationEntity::getMac, HostClassificationEntity::getIp, (a, b) -> a));
   }
 
   private Map<String, String> invertMap(Map<String, String> map) {
@@ -420,7 +483,8 @@ public class ChangeDetectionService {
   }
 
   /** Returns the external IP with the highest total bytes for a file (gateway heuristic). */
-  private String topExternalIp(UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<String> customCidrs) {
+  private String topExternalIp(
+      UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<String> customCidrs) {
     if (fileId == null || geoMap.isEmpty()) return null;
     Map<String, Long> ipBytes = new HashMap<>();
     for (ConversationEntity c : conversationRepository.findByFileId(fileId)) {
@@ -428,7 +492,8 @@ public class ChangeDetectionService {
       String src = c.getSrcIp();
       String external = null;
       if (dst != null && !isPrivate(dst, customCidrs) && geoMap.containsKey(dst)) external = dst;
-      else if (src != null && !isPrivate(src, customCidrs) && geoMap.containsKey(src)) external = src;
+      else if (src != null && !isPrivate(src, customCidrs) && geoMap.containsKey(src))
+        external = src;
       if (external != null) {
         ipBytes.merge(external, c.getTotalBytes() != null ? c.getTotalBytes() : 0L, Long::sum);
       }
@@ -475,7 +540,8 @@ public class ChangeDetectionService {
         try {
           int second = Integer.parseInt(parts[1]);
           if (second >= PRIVATE_172_MIN && second <= PRIVATE_172_MAX) return true;
-        } catch (NumberFormatException ignored) { }
+        } catch (NumberFormatException ignored) {
+        }
       }
     }
     return customPrivateRangeService.isInCidrs(ip, customCidrs);

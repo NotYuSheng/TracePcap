@@ -36,7 +36,7 @@ export function EntityDetailModal({
   const note = useEntityNote(entityType, entityKey);
   const { history, historyLoading, historyError } = useEntityHistory(entityType, entityKey);
   const hostClass = useHostClassification(entityType, entityKey, fileId);
-  const { ipSnapHistory, ipHistoryLoading } = useIpSnapshotHistory(entityType, entityKey, snapshots);
+  const { ipSnapHistory, ipHistoryLoading, reload: reloadIpHistory } = useIpSnapshotHistory(entityType, entityKey, snapshots);
 
   // ESC closes — but not if a nested IP modal is open (let the nested one handle it first)
   useEffect(() => {
@@ -126,7 +126,9 @@ export function EntityDetailModal({
             {/* ── DETAILS TAB ──────────────────────────────────────── */}
             {activeTab === 'details' && (
               <div>
-                {showRole && <RoleSection fileId={fileId} role={role} />}
+                {/* Multi-snapshot context: role is edited per-snapshot in the history table below,
+                    so the top card is a read-only present-day summary. */}
+                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
                 {entityType === 'IP' && hostClass && (
                   <HostClassificationSection hostClass={hostClass} />
@@ -161,7 +163,13 @@ export function EntityDetailModal({
                 )}
 
                 {showSnapshotHistory ? (
-                  <SnapshotHistoryTable ipSnapHistory={ipSnapHistory} ipHistoryLoading={ipHistoryLoading} />
+                  <SnapshotHistoryTable
+                    entityType={entityType}
+                    entityKey={entityKey}
+                    ipSnapHistory={ipSnapHistory}
+                    ipHistoryLoading={ipHistoryLoading}
+                    onRoleChanged={() => { reloadIpHistory(); role.reload(); }}
+                  />
                 ) : (
                   <CaptureHistoryTable
                     history={history}

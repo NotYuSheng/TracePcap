@@ -7,6 +7,9 @@ import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { RoleSection } from '@components/common/EntityDetailModal/sections/RoleSection';
+import { useEntityRole } from '@components/common/EntityDetailModal/hooks/useEntityRole';
+import { insightsService } from '@/features/insights/services/insightsService';
 import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
 import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
@@ -72,12 +75,17 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   const [history, setHistory] = useState<EntityHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  // Per-file role label/stale for each history row (#369), keyed by fileId.
+  const [historyRoles, setHistoryRoles] = useState<Record<string, { label: string | null; origin: string | null; stale: boolean }>>({});
 
   // Determine entity type and key for notes/history
   const entityType: EntityType = node.data.isL2 ? 'DEVICE' : 'IP';
   const entityKey = node.data.isL2
     ? (node.data.mac ?? node.data.ip)
     : node.data.ip;
+
+  // Per-file node role (#369): editable in this snapshot's context.
+  const role = useEntityRole(entityType, entityKey ?? '', fileId, !!entityKey);
 
   // ESC closes the modal — but not if a nested IP modal is open (let the nested one handle it first)
   useEffect(() => {
@@ -109,6 +117,13 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
     });
   }, [entityType, entityKey]);
 
+  // Reset history when the entity changes so a reused modal reloads fresh.
+  useEffect(() => {
+    setHistory([]);
+    setHistoryRoles({});
+    setHistoryError(null);
+  }, [entityType, entityKey]);
+
   // Load history when History tab is first opened
   useEffect(() => {
     if (activeTab !== 'history') return;
@@ -117,7 +132,18 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
     setHistoryError(null);
     entityNotesService
       .getHistory(entityType, entityKey)
-      .then(entries => setHistory(entries))
+      .then(entries => {
+        setHistory(entries);
+        // Fetch each file's role label so the history doubles as a role-change trail.
+        Promise.all(
+          entries.map(e =>
+            insightsService
+              .getNodeRole(entityType, entityKey ?? '', e.fileId)
+              .then(r => [e.fileId, { label: r?.roleLabel ?? null, origin: r?.origin ?? null, stale: !!r?.staleSince }] as const)
+              .catch(() => [e.fileId, { label: null, origin: null, stale: false }] as const),
+          ),
+        ).then(pairs => setHistoryRoles(Object.fromEntries(pairs)));
+      })
       .catch(() => setHistoryError('Failed to load history'))
       .finally(() => setHistoryLoading(false));
   }, [activeTab, entityType, entityKey, history.length, historyLoading]);
@@ -271,6 +297,9 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
             {/* ── DETAILS TAB ────────────────────────────────────────── */}
             {activeTab === 'details' && (
               <>
+                {/* Node role (per-file, carried forward + validated across snapshots) */}
+                {entityKey && <RoleSection fileId={fileId} role={role} />}
+
                 {/* Ghost node warning */}
                 {node.data.ghostFlags && node.data.ghostFlags.length > 0 && (
                   <div className="d-flex align-items-start gap-2 rounded p-2 mb-3 small" style={{ background: '#fff3cd', border: '1px solid #ffc10755' }}>
@@ -489,6 +518,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                       <thead className="table-light" style={{ fontSize: '0.8rem' }}>
                         <tr>
                           <th>File</th>
+                          <th>Role</th>
                           <th>Capture Start</th>
                           <th className="text-end">Packets</th>
                           <th className="text-end">Bytes</th>
@@ -505,6 +535,23 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                               {entry.fileName}
                               {entry.fileId === fileId && (
                                 <span className="badge bg-primary ms-2" style={{ fontSize: '0.6rem' }}>current</span>
+                              )}
+                            </td>
+                            <td className="small">
+                              {historyRoles[entry.fileId]?.label ? (
+                                <span className="d-inline-flex align-items-center gap-1">
+                                  {historyRoles[entry.fileId].label}
+                                  {historyRoles[entry.fileId].origin === 'CARRIED_FORWARD' && (
+                                    <span className="badge bg-light text-secondary border" style={{ fontSize: '0.55rem', fontWeight: 400 }} title="Inherited from an earlier snapshot (carried forward)">carried</span>
+                                  )}
+                                  {historyRoles[entry.fileId].stale && (
+                                    <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this file">
+                                      <i className="bi bi-exclamation-triangle" />
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-muted">—</span>
                               )}
                             </td>
                             <td className="small">

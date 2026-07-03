@@ -53,7 +53,8 @@ export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: 
               <li className="mb-2">
                 <Badge bg="warning" text="dark" className="me-1">WARNING</Badge>
                 <code>MAC_ADDED</code> — new device appeared<br />
-                <code>IP_MAC_DRIFT</code> — known MAC moved to a new IP (DHCP drift)
+                <code>IP_MAC_DRIFT</code> — known MAC moved to a new IP (DHCP drift)<br />
+                <code>LABEL_STALE</code> — a confirmed manual label's node has drifted (new MAC / protocol / external org)
               </li>
               <li>
                 <Badge bg="info" text="dark" className="me-1">INFO</Badge>

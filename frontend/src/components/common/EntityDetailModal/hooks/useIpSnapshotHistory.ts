@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/services/api/client';
+import { insightsService } from '@/features/insights/services/insightsService';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import type { HostClassification, IpSnapshotEntry } from '../types';
@@ -11,6 +12,8 @@ import type { HostClassification, IpSnapshotEntry } from '../types';
 export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, snapshots?: NetworkSnapshot[]) {
   const [ipSnapHistory, setIpSnapHistory] = useState<IpSnapshotEntry[]>([]);
   const [ipHistoryLoading, setIpHistoryLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey(k => k + 1);
 
   useEffect(() => {
     // Reset so a previous entity's history can't leak when the modal is reused.
@@ -36,17 +39,22 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
       // Fetch conversations for protocols/apps per seen snapshot
       return Promise.all(
         seen.map(({ snap, host }) =>
-          apiClient
-            .get<{ data: { appName: string | null; tsharkProtocol: string | null }[] }>(
-              `/conversations/${snap.fileId}?ip=${encodeURIComponent(entityKey)}&pageSize=10000`
-            )
-            .then(r => ({
-              snap,
-              host,
-              apps: [...new Set(r.data.data.map(c => c.appName).filter(Boolean) as string[])].sort(),
-              protocols: [...new Set(r.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
-            }))
-            .catch(() => ({ snap, host, apps: [], protocols: [] }))
+          Promise.all([
+            apiClient
+              .get<{ data: { appName: string | null; tsharkProtocol: string | null }[] }>(
+                `/conversations/${snap.fileId}?ip=${encodeURIComponent(entityKey)}&pageSize=10000`
+              )
+              .catch(() => ({ data: { data: [] } })),
+            insightsService.getNodeRole('IP', entityKey, snap.fileId).catch(() => null),
+          ]).then(([conv, role]) => ({
+            snap,
+            host,
+            apps: [...new Set((conv?.data?.data ?? []).map(c => c.appName).filter(Boolean) as string[])].sort(),
+            protocols: [...new Set((conv?.data?.data ?? []).map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
+            roleLabel: role?.roleLabel ?? null,
+            roleOrigin: role?.origin ?? null,
+            roleStale: !!role?.staleSince,
+          }))
         )
       ).then(entries => {
         if (!active) return;
@@ -56,7 +64,7 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
     }).catch(() => { if (active) setIpHistoryLoading(false); });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityType, entityKey, snapshots?.map(s => s.id)?.join(',')]);
+  }, [entityType, entityKey, snapshots?.map(s => s.id)?.join(','), reloadKey]);
 
-  return { ipSnapHistory, ipHistoryLoading };
+  return { ipSnapHistory, ipHistoryLoading, reload };
 }

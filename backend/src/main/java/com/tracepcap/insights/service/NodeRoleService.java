@@ -4,9 +4,12 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.common.exception.InsufficientEvidenceException;
 import com.tracepcap.insights.dto.NodeRoleDto;
+import com.tracepcap.insights.dto.RoleSuggestionDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
 import com.tracepcap.insights.entity.NodeRoleEntity;
+import com.tracepcap.insights.event.NodeRoleChangedEvent;
 import com.tracepcap.insights.repository.NodeRoleRepository;
 import com.tracepcap.story.service.LlmClient;
 import java.util.List;
@@ -16,6 +19,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,10 +36,12 @@ public class NodeRoleService {
   private final HostClassificationRepository hostClassificationRepository;
   private final LlmClient llmClient;
   private final JdbcTemplate jdbc;
+  private final LabelStalenessService labelStalenessService;
+  private final ApplicationEventPublisher eventPublisher;
 
-  public Optional<NodeRoleDto> getRole(String entityType, String entityKey) {
+  public Optional<NodeRoleDto> getRole(UUID fileId, String entityType, String entityKey) {
     return nodeRoleRepository
-        .findByEntityTypeAndEntityKey(entityType, entityKey)
+        .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
         .map(this::toDto);
   }
 
@@ -43,34 +49,104 @@ public class NodeRoleService {
   public NodeRoleDto upsert(UpsertNodeRoleRequest req) {
     NodeRoleEntity entity =
         nodeRoleRepository
-            .findByEntityTypeAndEntityKey(req.getEntityType(), req.getEntityKey())
+            .findByFileIdAndEntityTypeAndEntityKey(
+                req.getFileId(), req.getEntityType(), req.getEntityKey())
             .orElseGet(
                 () ->
                     NodeRoleEntity.builder()
+                        .fileId(req.getFileId())
                         .entityType(req.getEntityType())
                         .entityKey(req.getEntityKey())
                         .build());
     entity.setRoleLabel(req.getRoleLabel());
     entity.setRoleDescription(req.getRoleDescription());
     entity.setConfirmedByHuman(req.isConfirmedByHuman());
+    entity.setOrigin("MANUAL");
     // Once confirmed by a human, keep llmSuggested as-is; only clear it when human explicitly saves
     if (req.isConfirmedByHuman()) {
       entity.setLlmSuggested(false);
     }
-    return toDto(nodeRoleRepository.save(entity));
+    // Record this file's current properties as the drift baseline for the next snapshot.
+    entity.setObservedProperties(
+        labelStalenessService.computeProperties(
+            req.getEntityType(), req.getEntityKey(), req.getFileId()));
+    entity.setStaleSince(null);
+    entity.setStaleFields(null);
+    NodeRoleDto dto = toDto(nodeRoleRepository.save(entity));
+    // Carry this label forward and re-validate the rest of the network chain immediately.
+    eventPublisher.publishEvent(new NodeRoleChangedEvent(req.getFileId()));
+    return dto;
   }
 
   @Transactional
-  public void delete(String entityType, String entityKey) {
-    nodeRoleRepository.deleteByEntityTypeAndEntityKey(entityType, entityKey);
+  public void delete(UUID fileId, String entityType, String entityKey) {
+    nodeRoleRepository.deleteByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey);
+    eventPublisher.publishEvent(new NodeRoleChangedEvent(fileId));
+  }
+
+  /**
+   * Dismiss a stale-label warning for this file's role: clear the stale flag and re-baseline drift
+   * detection against the file's current properties. Returns the refreshed role, or empty if none.
+   */
+  @Transactional
+  public Optional<NodeRoleDto> dismissStaleness(UUID fileId, String entityType, String entityKey) {
+    return nodeRoleRepository
+        .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
+        .map(
+            e -> {
+              e.setStaleSince(null);
+              e.setStaleFields(null);
+              e.setObservedProperties(
+                  labelStalenessService.computeProperties(entityType, entityKey, fileId));
+              NodeRoleDto dto = toDto(nodeRoleRepository.save(e));
+              // Re-baselining shifts the drift baseline, so re-validate the forward chain.
+              eventPublisher.publishEvent(new NodeRoleChangedEvent(fileId));
+              return dto;
+            });
   }
 
   /**
    * Ask the LLM to suggest an operational role for a node, given its host classification signals
-   * and top apps/protocols from the specified file.
+   * and top apps/protocols from the specified file. Persists the suggestion unless the node already
+   * carries a human-confirmed label.
    */
   public NodeRoleDto suggestRole(String entityType, String entityKey, UUID fileId) {
-    // Build context from host classifications and conversations
+    RoleSuggestionDto suggestion = generateSuggestion(entityType, entityKey, fileId);
+
+    NodeRoleEntity entity =
+        nodeRoleRepository
+            .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
+            .orElseGet(
+                () ->
+                    NodeRoleEntity.builder()
+                        .fileId(fileId)
+                        .entityType(entityType)
+                        .entityKey(entityKey)
+                        .build());
+    // Only overwrite if there is no confirmed human role already
+    if (!entity.isConfirmedByHuman()) {
+      entity.setRoleLabel(suggestion.roleLabel());
+      entity.setRoleDescription(suggestion.roleDescription());
+      entity.setLlmSuggested(true);
+      entity.setConfirmedByHuman(false);
+      entity.setOrigin("AI");
+      entity.setObservedProperties(
+          labelStalenessService.computeProperties(entityType, entityKey, fileId));
+      return toDto(nodeRoleRepository.save(entity));
+    }
+    return toDto(entity);
+  }
+
+  /**
+   * Generate an AI role suggestion for a node from the given file's traffic <b>without persisting</b>
+   * it — used to pre-fill the "Update label" editor when re-classifying a drifted/stale label, so a
+   * confirmed label is never overwritten until the analyst accepts (#369).
+   */
+  public RoleSuggestionDto suggestRolePreview(String entityType, String entityKey, UUID fileId) {
+    return generateSuggestion(entityType, entityKey, fileId);
+  }
+
+  private RoleSuggestionDto generateSuggestion(String entityType, String entityKey, UUID fileId) {
     String classificationContext = buildClassificationContext(entityType, entityKey, fileId);
     String systemPrompt = buildSuggestSystemPrompt();
     String userPrompt = buildSuggestUserPrompt(entityType, entityKey, classificationContext);
@@ -89,27 +165,9 @@ public class NodeRoleService {
             "Not enough traffic signals to make a meaningful role assessment for this entity.");
       }
 
-      String roleLabel = roleLabelRaw.toString().trim();
-      String roleDescription = roleDescRaw != null ? roleDescRaw.toString().trim() : "";
-
-      NodeRoleEntity entity =
-          nodeRoleRepository
-              .findByEntityTypeAndEntityKey(entityType, entityKey)
-              .orElseGet(
-                  () ->
-                      NodeRoleEntity.builder()
-                          .entityType(entityType)
-                          .entityKey(entityKey)
-                          .build());
-      // Only overwrite if there is no confirmed human role already
-      if (!entity.isConfirmedByHuman()) {
-        entity.setRoleLabel(roleLabel);
-        entity.setRoleDescription(roleDescription);
-        entity.setLlmSuggested(true);
-        entity.setConfirmedByHuman(false);
-        return toDto(nodeRoleRepository.save(entity));
-      }
-      return toDto(entity);
+      return new RoleSuggestionDto(
+          roleLabelRaw.toString().trim(),
+          roleDescRaw != null ? roleDescRaw.toString().trim() : "");
     } catch (InsufficientEvidenceException e) {
       throw e;
     } catch (Exception e) {
@@ -125,7 +183,7 @@ public class NodeRoleService {
 
     if ("IP".equalsIgnoreCase(entityType)) {
       // Look up host classification for this IP in the given file
-      hostClassificationRepository.findByFileIdAndIp(fileId, entityKey)
+      hostClassificationRepository.findFirstByFileIdAndIpOrderByIdAsc(fileId, entityKey)
           .ifPresent(h -> {
             sb.append("Device type: ").append(h.getDeviceType())
               .append(" (confidence: ").append(h.getConfidence()).append("%)\n");
@@ -169,7 +227,7 @@ public class NodeRoleService {
 
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       // MAC-based lookup
-      hostClassificationRepository.findByFileIdAndMacIgnoreCase(fileId, entityKey)
+      hostClassificationRepository.findFirstByFileIdAndMacIgnoreCaseOrderByIdAsc(fileId, entityKey)
           .ifPresent(h -> {
             sb.append("IP: ").append(h.getIp()).append("\n");
             sb.append("Device type: ").append(h.getDeviceType())
@@ -228,14 +286,18 @@ public class NodeRoleService {
 
   private NodeRoleDto toDto(NodeRoleEntity e) {
     return NodeRoleDto.builder()
+        .fileId(e.getFileId())
         .entityType(e.getEntityType())
         .entityKey(e.getEntityKey())
         .roleLabel(e.getRoleLabel())
         .roleDescription(e.getRoleDescription())
+        .origin(e.getOrigin())
         .llmSuggested(e.isLlmSuggested())
         .confirmedByHuman(e.isConfirmedByHuman())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
+        .staleSince(e.getStaleSince())
+        .staleFields(e.getStaleFields())
         .build();
   }
 }

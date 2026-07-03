@@ -120,11 +120,15 @@ export const SUBNET_ENDPOINTS = {
 };
 
 export const INSIGHTS_ENDPOINTS = {
-  NODE_ROLE: (entityType: string, entityKey: string) =>
-    `/node-roles?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  NODE_ROLE: (fileId: string, entityType: string, entityKey: string) =>
+    `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
   NODE_ROLE_UPSERT: '/node-roles',
-  NODE_ROLE_DELETE: (entityType: string, entityKey: string) =>
-    `/node-roles?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  NODE_ROLE_DELETE: (fileId: string, entityType: string, entityKey: string) =>
+    `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
   NODE_ROLE_SUGGEST: (entityType: string, entityKey: string, fileId: string) =>
     `/node-roles/suggest?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}&fileId=${fileId}`,
+  NODE_ROLE_SUGGEST_PREVIEW: (entityType: string, entityKey: string, fileId: string) =>
+    `/node-roles/suggest-preview?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}&fileId=${fileId}`,
+  NODE_ROLE_DISMISS_STALENESS: (fileId: string, entityType: string, entityKey: string) =>
+    `/node-roles/dismiss-staleness?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
 };

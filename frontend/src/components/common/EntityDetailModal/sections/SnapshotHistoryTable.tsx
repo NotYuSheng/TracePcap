@@ -1,15 +1,30 @@
-import { Badge, Table } from '@govtechsg/sgds-react';
+import { useState } from 'react';
+import { Badge, Button, Table } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { RoleEditModal } from '@components/common/RoleEditModal';
+import type { EntityType } from '@/features/notes/services/entityNotesService';
 import { formatSnapTime, hashBadgeStyle } from '../format';
 import type { IpSnapshotEntry } from '../types';
 
 interface SnapshotHistoryTableProps {
+  entityType: EntityType;
+  entityKey: string;
   ipSnapHistory: IpSnapshotEntry[];
   ipHistoryLoading: boolean;
+  /** Called after a per-snapshot role is saved/dismissed so the parent can refetch. */
+  onRoleChanged?: () => void;
 }
 
-/** Per-snapshot MAC/device/protocol history for an IP (Monitor context). */
-export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: SnapshotHistoryTableProps) {
+/** Per-snapshot MAC/device/protocol/role history for an IP, with per-snapshot role editing (#369). */
+export function SnapshotHistoryTable({
+  entityType,
+  entityKey,
+  ipSnapHistory,
+  ipHistoryLoading,
+  onRoleChanged,
+}: SnapshotHistoryTableProps) {
+  const [editing, setEditing] = useState<{ fileId: string; name: string } | null>(null);
+
   return (
     <div className="mt-4">
       <h6 className="text-muted fw-semibold mb-2">
@@ -31,13 +46,13 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
                 <Table.HeaderCell className="text-muted fw-normal">#</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Snapshot</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">MAC Address</Table.HeaderCell>
-                <Table.HeaderCell className="text-muted fw-normal">Manufacturer</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Device Type</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Role</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Protocols / Apps</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps }, idx) => (
+              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale }, idx) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
@@ -51,8 +66,21 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
                         <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
                       )}
                   </Table.DataCell>
-                  <Table.DataCell><small className="text-muted">{host?.manufacturer ?? '—'}</small></Table.DataCell>
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
+                  <Table.DataCell>
+                    <div className="d-flex align-items-center gap-1">
+                      {roleLabel ? <small>{roleLabel}</small> : <small className="text-muted">—</small>}
+                      {roleLabel && roleOrigin === 'CARRIED_FORWARD' && (
+                        <Badge bg="light" text="secondary" className="border" style={{ fontSize: '0.55rem', fontWeight: 400 }} title="Inherited from an earlier snapshot (carried forward), not set here">carried</Badge>
+                      )}
+                      {roleStale && (
+                        <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot"><i className="bi bi-exclamation-triangle" /></Badge>
+                      )}
+                      <Button variant="link" size="sm" className="p-0 ms-1 text-muted" style={{ fontSize: '0.75rem', lineHeight: 1 }} title="Edit role for this snapshot" onClick={() => setEditing({ fileId: snap.fileId, name: snap.fileName })}>
+                        <i className="bi bi-pencil" />
+                      </Button>
+                    </div>
+                  </Table.DataCell>
                   <Table.DataCell>
                     {protocols.length === 0 && apps.length === 0 ? (
                       <small className="text-muted">—</small>
@@ -72,6 +100,17 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
             </Table.Body>
           </Table>
         </div>
+      )}
+
+      {editing && (
+        <RoleEditModal
+          entityType={entityType}
+          entityKey={entityKey}
+          fileId={editing.fileId}
+          snapshotName={editing.name}
+          onClose={() => setEditing(null)}
+          onSaved={() => onRoleChanged?.()}
+        />
       )}
     </div>
   );

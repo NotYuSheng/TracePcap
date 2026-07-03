@@ -12,9 +12,9 @@ import type { NetworkSnapshot, SubnetOverrideInput } from '@/features/monitor/ty
 export const insightsService = {
   // ── Node Roles ───────────────────────────────────────────────────────────────
 
-  getNodeRole: (entityType: string, entityKey: string): Promise<NodeRole | null> =>
+  getNodeRole: (entityType: string, entityKey: string, fileId: string): Promise<NodeRole | null> =>
     apiClient
-      .get<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE(entityType, entityKey))
+      .get<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE(fileId, entityType, entityKey))
       .then(r => r.data)
       .catch(err => {
         if (err?.response?.status === 204 || err?.response?.status === 404) return null;
@@ -27,6 +27,7 @@ export const insightsService = {
     roleLabel: string,
     roleDescription: string,
     confirmedByHuman: boolean,
+    fileId: string,
   ): Promise<NodeRole> =>
     apiClient
       .put<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_UPSERT, {
@@ -35,7 +36,17 @@ export const insightsService = {
         roleLabel,
         roleDescription,
         confirmedByHuman,
+        fileId,
       })
+      .then(r => r.data),
+
+  dismissNodeRoleStaleness: (
+    entityType: string,
+    entityKey: string,
+    fileId: string,
+  ): Promise<NodeRole> =>
+    apiClient
+      .post<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_DISMISS_STALENESS(fileId, entityType, entityKey))
       .then(r => r.data),
 
   suggestNodeRole: async (
@@ -47,17 +58,37 @@ export const insightsService = {
       const r = await apiClient.post<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_SUGGEST(entityType, entityKey, fileId));
       return r.data;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } };
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
       if (axiosErr?.response?.status === 422) {
-        throw new Error(axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
+        throw new Error(axiosErr.response.data?.message ?? axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
       }
       throw err;
     }
   },
 
-  deleteNodeRole: (entityType: string, entityKey: string): Promise<void> =>
+  /** Generate an AI label/description suggestion without persisting (to pre-fill the editor). */
+  suggestNodeRolePreview: async (
+    entityType: string,
+    entityKey: string,
+    fileId: string,
+  ): Promise<{ roleLabel: string; roleDescription: string }> => {
+    try {
+      const r = await apiClient.post<{ roleLabel: string; roleDescription: string }>(
+        INSIGHTS_ENDPOINTS.NODE_ROLE_SUGGEST_PREVIEW(entityType, entityKey, fileId),
+      );
+      return r.data;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
+      if (axiosErr?.response?.status === 422) {
+        throw new Error(axiosErr.response.data?.message ?? axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
+      }
+      throw err;
+    }
+  },
+
+  deleteNodeRole: (entityType: string, entityKey: string, fileId: string): Promise<void> =>
     apiClient
-      .delete(INSIGHTS_ENDPOINTS.NODE_ROLE_DELETE(entityType, entityKey))
+      .delete(INSIGHTS_ENDPOINTS.NODE_ROLE_DELETE(fileId, entityType, entityKey))
       .then(() => undefined),
 
   // ── External Events ──────────────────────────────────────────────────────────

@@ -428,7 +428,7 @@ public class NetworkIntelligenceService {
     List<DnsQueryLogEntity> rows = dnsQueryLogRepository.findByFileIdAndServerIp(fileId, serverIp);
     DnsCounts c = countDns(rows);
     HostClassificationEntity host =
-        hostClassificationRepository.findByFileIdAndIp(fileId, serverIp).orElse(null);
+        hostClassificationRepository.findFirstByFileIdAndIpOrderByIdAsc(fileId, serverIp).orElse(null);
 
     // General DNS log ordering: most-queried domains first, then alphabetically. Unresolvable rows
     // stay visually distinct via row styling rather than being forced to the top.
@@ -541,7 +541,7 @@ public class NetworkIntelligenceService {
         httpEndpointLogRepository.findByFileIdAndServerIp(fileId, serverIp);
     WebCounts c = countWeb(rows);
     HostClassificationEntity host =
-        hostClassificationRepository.findByFileIdAndIp(fileId, serverIp).orElse(null);
+        hostClassificationRepository.findFirstByFileIdAndIpOrderByIdAsc(fileId, serverIp).orElse(null);
 
     List<WebServerDetailResponse.HttpEndpointDto> endpoints =
         rows.stream()

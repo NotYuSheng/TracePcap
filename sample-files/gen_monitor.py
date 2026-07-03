@@ -21,6 +21,11 @@ Absent-entity panels (no events emitted, shown as greyed badges)
   Absent protocols — Telnet disappears after week 3, FTP after week 5
   Absent apps      — BitTorrent disappears after week 4
 
+Label staleness (manual-label-driven — needs a confirmed role, not a PCAP signal)
+  LABEL_STALE      — confirm a role on a node that later gains a new protocol,
+                     then re-run detection to see the label flagged stale.
+                     See docs/sample-files.rst for the full walkthrough.
+
 Weeks
 ─────
   Week 1 — Stable baseline: A, B, D on LAN; HTTP, Telnet, DNS
