@@ -9,7 +9,7 @@ export function staleTooltip(role: NodeRole): string {
   const changes = (role.staleFields ?? []).join(', ');
   let prefix = 'Label';
   if (role.labeledAt) {
-    const ms = parseDateTime(role.labeledAt as unknown as string | number[]);
+    const ms = parseDateTime(role.labeledAt);
     if (ms) {
       prefix = `Label set ${new Date(ms).toLocaleDateString('en-GB', {
         day: 'numeric',

@@ -1,5 +1,6 @@
 package com.tracepcap.insights.service;
 
+import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,9 +78,22 @@ public class LabelStalenessService {
   @Transactional
   public List<LabelDrift> detectAndMarkDrift(UUID fileId) {
     if (fileId == null) return List.of();
-    List<LabelDrift> drifts = new ArrayList<>();
 
-    for (NodeRoleEntity role : nodeRoleRepository.findByConfirmedByHumanTrue()) {
+    List<NodeRoleEntity> confirmed = nodeRoleRepository.findByConfirmedByHumanTrue();
+    if (confirmed.isEmpty()) return List.of();
+
+    // Pre-filter to roles whose node actually appears in this file, so we only run the
+    // per-node property queries for candidates that could plausibly have drifted.
+    Set<String> activeIps = new HashSet<>();
+    Set<String> activeMacsLower = new HashSet<>();
+    for (HostClassificationEntity h : hostClassificationRepository.findByFileId(fileId)) {
+      if (h.getIp() != null) activeIps.add(h.getIp());
+      if (h.getMac() != null) activeMacsLower.add(h.getMac().toLowerCase());
+    }
+
+    List<LabelDrift> drifts = new ArrayList<>();
+    for (NodeRoleEntity role : confirmed) {
+      if (!isObservedKey(role, activeIps, activeMacsLower)) continue;
       Map<String, Object> baseline = role.getBaselineProperties();
       if (baseline == null || baseline.isEmpty()) continue;
       if (role.getStaleSince() != null) continue; // already flagged — don't re-fire
@@ -102,6 +117,14 @@ public class LabelStalenessService {
               changes));
     }
     return drifts;
+  }
+
+  /** True when the role's entity (IP or MAC) is among the file's classified hosts. */
+  private boolean isObservedKey(NodeRoleEntity role, Set<String> activeIps, Set<String> activeMacsLower) {
+    String key = role.getEntityKey();
+    if (key == null) return false;
+    if ("DEVICE".equalsIgnoreCase(role.getEntityType())) return activeMacsLower.contains(key.toLowerCase());
+    return activeIps.contains(key);
   }
 
   // ── Property computation ──────────────────────────────────────────────────────
@@ -152,12 +175,12 @@ public class LabelStalenessService {
         """
         SELECT tshark_protocol
         FROM conversations
-        WHERE (file_id = ? AND src_ip = ? OR file_id = ? AND dst_ip = ?)
+        WHERE file_id = ? AND (src_ip = ? OR dst_ip = ?)
           AND tshark_protocol IS NOT NULL
         GROUP BY tshark_protocol ORDER BY COUNT(*) DESC LIMIT 5
         """;
     try {
-      return jdbc.query(sql, (rs, i) -> rs.getString(1), fileId, ip, fileId, ip).stream()
+      return jdbc.query(sql, (rs, i) -> rs.getString(1), fileId, ip, ip).stream()
           .filter(p -> p != null && !p.isBlank())
           .map(String::toUpperCase)
           .collect(Collectors.toList());
@@ -167,23 +190,32 @@ public class LabelStalenessService {
     }
   }
 
+  /**
+   * Cap on the number of distinct peers we resolve geo orgs for. A single node in a busy network (or
+   * during a scan) can talk to tens of thousands of peers, which would blow past DB parameter limits
+   * and slow the query — the distinct org set stabilises well before this bound.
+   */
+  private static final int MAX_PEERS_FOR_GEO = 1000;
+
   private List<String> externalOrgs(UUID fileId, String ip) {
     String sql =
         """
-        SELECT DISTINCT peer FROM (
-          SELECT dst_ip AS peer FROM conversations WHERE file_id = ? AND src_ip = ?
-          UNION
-          SELECT src_ip AS peer FROM conversations WHERE file_id = ? AND dst_ip = ?
-        ) t WHERE peer IS NOT NULL
+        SELECT DISTINCT CASE WHEN src_ip = ? THEN dst_ip ELSE src_ip END AS peer
+        FROM conversations
+        WHERE file_id = ? AND (src_ip = ? OR dst_ip = ?)
+        LIMIT ?
         """;
     Set<String> peers;
     try {
-      peers = new LinkedHashSet<>(jdbc.query(sql, (rs, i) -> rs.getString(1), fileId, ip, fileId, ip));
+      peers =
+          new LinkedHashSet<>(
+              jdbc.query(sql, (rs, i) -> rs.getString(1), ip, fileId, ip, ip, MAX_PEERS_FOR_GEO));
     } catch (Exception e) {
       log.debug("Could not load peers for {} in {}: {}", ip, fileId, e.getMessage());
       return List.of();
     }
     peers.remove(ip);
+    peers.remove(null);
     if (peers.isEmpty()) return List.of();
     return geoOrgs(peers);
   }
