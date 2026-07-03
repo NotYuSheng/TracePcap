@@ -407,10 +407,16 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                           <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
                           <span>{staleTooltip(role)}</span>
                         </div>
-                        <div className="d-flex gap-2">
+                        <div className="d-flex flex-wrap gap-2">
                           <button className="btn btn-primary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
                             onClick={() => { setRoleLabelDraft(role?.roleLabel ?? ''); setRoleDescDraft(role?.roleDescription ?? ''); setRoleEditing(true); }}>
                             <i className="bi bi-pencil me-1" />Update label
+                          </button>
+                          <button className="btn btn-outline-primary btn-sm py-0" style={{ fontSize: '0.75rem' }}
+                            disabled={roleSuggesting || roleSaving || !selectedMac || !roleFileId}
+                            title="Ask the AI to re-classify this device from its current traffic and pre-fill the editor"
+                            onClick={async () => { if (!selectedMac || !roleFileId) return; setRoleSuggesting(true); setRoleSuggestError(null); try { const s = await insightsService.suggestNodeRolePreview('DEVICE', selectedMac, roleFileId); setRoleLabelDraft(s.roleLabel ?? ''); setRoleDescDraft(s.roleDescription ?? ''); setRoleEditing(true); } catch (err: unknown) { setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.'); } finally { setRoleSuggesting(false); } }}>
+                            {roleSuggesting ? <><span className="spinner-border spinner-border-sm me-1" />Suggesting…</> : <><i className="bi bi-stars me-1" />Suggest updated label</>}
                           </button>
                           <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
                             disabled={roleSaving || !selectedMac || !roleFileId}

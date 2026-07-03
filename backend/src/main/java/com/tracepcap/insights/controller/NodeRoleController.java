@@ -77,4 +77,19 @@ public class NodeRoleController {
       return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
     }
   }
+
+  @PostMapping("/suggest-preview")
+  @Operation(
+      summary = "Preview an AI role suggestion without persisting",
+      description =
+          "Generates a fresh label/description from the file's traffic to pre-fill the update-label"
+              + " editor — used to re-classify a drifted label without overwriting the confirmed one.")
+  public ResponseEntity<?> suggestPreview(
+      @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
+    try {
+      return ResponseEntity.ok(service.suggestRolePreview(entityType, entityKey, fileId));
+    } catch (InsufficientEvidenceException e) {
+      return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
+    }
+  }
 }

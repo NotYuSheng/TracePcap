@@ -127,6 +127,8 @@ export const INSIGHTS_ENDPOINTS = {
     `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
   NODE_ROLE_SUGGEST: (entityType: string, entityKey: string, fileId: string) =>
     `/node-roles/suggest?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}&fileId=${fileId}`,
+  NODE_ROLE_SUGGEST_PREVIEW: (entityType: string, entityKey: string, fileId: string) =>
+    `/node-roles/suggest-preview?entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}&fileId=${fileId}`,
   NODE_ROLE_DISMISS_STALENESS: (fileId: string, entityType: string, entityKey: string) =>
     `/node-roles/dismiss-staleness?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
 };

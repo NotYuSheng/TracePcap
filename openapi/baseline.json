@@ -6565,6 +6565,55 @@
         ]
       }
     },
+    "/api/v1/node-roles/suggest-preview": {
+      "post": {
+        "description": "Generates a fresh label/description from the file's traffic to pre-fill the update-label editor — used to re-classify a drifted label without overwriting the confirmed one.",
+        "operationId": "suggestPreview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Preview an AI role suggestion without persisting",
+        "tags": [
+          "Node Roles"
+        ]
+      }
+    },
     "/api/v1/signatures": {
       "get": {
         "operationId": "getSignatures",

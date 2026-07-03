@@ -117,7 +117,7 @@ export function RoleSection({ fileId, role: r }: RoleSectionProps) {
                 <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
                 <span title={staleTooltip(r.role)}>{staleTooltip(r.role)}</span>
               </div>
-              <div className="d-flex gap-2">
+              <div className="d-flex flex-wrap gap-2">
                 <Button
                   variant="primary"
                   size="sm"
@@ -128,6 +128,21 @@ export function RoleSection({ fileId, role: r }: RoleSectionProps) {
                 >
                   <i className="bi bi-pencil me-1" />Update label
                 </Button>
+                {fileId && (
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    className="py-0"
+                    style={{ fontSize: '0.75rem' }}
+                    onClick={r.suggestUpdate}
+                    disabled={r.roleSaving || r.roleSuggesting}
+                    title="Ask the AI to re-classify this node from its current traffic and pre-fill the editor"
+                  >
+                    {r.roleSuggesting
+                      ? <><Spinner size="sm" className="me-1" />Suggesting…</>
+                      : <><i className="bi bi-stars me-1" />Suggest updated label</>}
+                  </Button>
+                )}
                 <Button
                   variant="outline-secondary"
                   size="sm"

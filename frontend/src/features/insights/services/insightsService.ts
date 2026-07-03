@@ -66,6 +66,26 @@ export const insightsService = {
     }
   },
 
+  /** Generate an AI label/description suggestion without persisting (to pre-fill the editor). */
+  suggestNodeRolePreview: async (
+    entityType: string,
+    entityKey: string,
+    fileId: string,
+  ): Promise<{ roleLabel: string; roleDescription: string }> => {
+    try {
+      const r = await apiClient.post<{ roleLabel: string; roleDescription: string }>(
+        INSIGHTS_ENDPOINTS.NODE_ROLE_SUGGEST_PREVIEW(entityType, entityKey, fileId),
+      );
+      return r.data;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } };
+      if (axiosErr?.response?.status === 422) {
+        throw new Error(axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
+      }
+      throw err;
+    }
+  },
+
   deleteNodeRole: (entityType: string, entityKey: string, fileId: string): Promise<void> =>
     apiClient
       .delete(INSIGHTS_ENDPOINTS.NODE_ROLE_DELETE(fileId, entityType, entityKey))

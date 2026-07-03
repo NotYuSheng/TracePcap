@@ -126,6 +126,23 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     }
   };
 
+  /** Fetch a fresh AI suggestion from this snapshot's traffic and open the editor pre-filled. */
+  const suggestUpdate = async () => {
+    if (!fileId) return;
+    setRoleSuggesting(true);
+    setRoleSuggestError(null);
+    try {
+      const s = await insightsService.suggestNodeRolePreview(entityType, entityKey, fileId);
+      setRoleLabelDraft(s.roleLabel ?? '');
+      setRoleDescDraft(s.roleDescription ?? '');
+      setRoleEditing(true);
+    } catch (err: unknown) {
+      setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.');
+    } finally {
+      setRoleSuggesting(false);
+    }
+  };
+
   return {
     role,
     roleLoading,
@@ -146,5 +163,6 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     openEdit,
     save,
     dismissStaleness,
+    suggestUpdate,
   };
 }

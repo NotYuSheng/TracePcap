@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.insights.dto.NodeRoleDto;
+import com.tracepcap.insights.dto.RoleSuggestionDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
 import com.tracepcap.insights.entity.NodeRoleEntity;
 import com.tracepcap.insights.event.NodeRoleChangedEvent;
@@ -105,10 +106,46 @@ public class NodeRoleService {
 
   /**
    * Ask the LLM to suggest an operational role for a node, given its host classification signals
-   * and top apps/protocols from the specified file.
+   * and top apps/protocols from the specified file. Persists the suggestion unless the node already
+   * carries a human-confirmed label.
    */
   public NodeRoleDto suggestRole(String entityType, String entityKey, UUID fileId) {
-    // Build context from host classifications and conversations
+    RoleSuggestionDto suggestion = generateSuggestion(entityType, entityKey, fileId);
+
+    NodeRoleEntity entity =
+        nodeRoleRepository
+            .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
+            .orElseGet(
+                () ->
+                    NodeRoleEntity.builder()
+                        .fileId(fileId)
+                        .entityType(entityType)
+                        .entityKey(entityKey)
+                        .build());
+    // Only overwrite if there is no confirmed human role already
+    if (!entity.isConfirmedByHuman()) {
+      entity.setRoleLabel(suggestion.roleLabel());
+      entity.setRoleDescription(suggestion.roleDescription());
+      entity.setLlmSuggested(true);
+      entity.setConfirmedByHuman(false);
+      entity.setOrigin("AI");
+      entity.setObservedProperties(
+          labelStalenessService.computeProperties(entityType, entityKey, fileId));
+      return toDto(nodeRoleRepository.save(entity));
+    }
+    return toDto(entity);
+  }
+
+  /**
+   * Generate an AI role suggestion for a node from the given file's traffic <b>without persisting</b>
+   * it — used to pre-fill the "Update label" editor when re-classifying a drifted/stale label, so a
+   * confirmed label is never overwritten until the analyst accepts (#369).
+   */
+  public RoleSuggestionDto suggestRolePreview(String entityType, String entityKey, UUID fileId) {
+    return generateSuggestion(entityType, entityKey, fileId);
+  }
+
+  private RoleSuggestionDto generateSuggestion(String entityType, String entityKey, UUID fileId) {
     String classificationContext = buildClassificationContext(entityType, entityKey, fileId);
     String systemPrompt = buildSuggestSystemPrompt();
     String userPrompt = buildSuggestUserPrompt(entityType, entityKey, classificationContext);
@@ -127,31 +164,9 @@ public class NodeRoleService {
             "Not enough traffic signals to make a meaningful role assessment for this entity.");
       }
 
-      String roleLabel = roleLabelRaw.toString().trim();
-      String roleDescription = roleDescRaw != null ? roleDescRaw.toString().trim() : "";
-
-      NodeRoleEntity entity =
-          nodeRoleRepository
-              .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
-              .orElseGet(
-                  () ->
-                      NodeRoleEntity.builder()
-                          .fileId(fileId)
-                          .entityType(entityType)
-                          .entityKey(entityKey)
-                          .build());
-      // Only overwrite if there is no confirmed human role already
-      if (!entity.isConfirmedByHuman()) {
-        entity.setRoleLabel(roleLabel);
-        entity.setRoleDescription(roleDescription);
-        entity.setLlmSuggested(true);
-        entity.setConfirmedByHuman(false);
-        entity.setOrigin("AI");
-        entity.setObservedProperties(
-            labelStalenessService.computeProperties(entityType, entityKey, fileId));
-        return toDto(nodeRoleRepository.save(entity));
-      }
-      return toDto(entity);
+      return new RoleSuggestionDto(
+          roleLabelRaw.toString().trim(),
+          roleDescRaw != null ? roleDescRaw.toString().trim() : "");
     } catch (InsufficientEvidenceException e) {
       throw e;
     } catch (Exception e) {
