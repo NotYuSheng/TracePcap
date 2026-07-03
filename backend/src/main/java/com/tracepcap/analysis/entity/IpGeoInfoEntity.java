@@ -4,19 +4,26 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "ip_geo_cache")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class IpGeoInfoEntity {
 
   /** The IP address is the primary key — one row per unique IP, shared across all files. */
+  @EqualsAndHashCode.Include
   @Id
   @Column(length = 45)
   private String ip;
@@ -44,12 +51,10 @@ public class IpGeoInfoEntity {
   private String city;
 
   /** Approximate latitude of the city/location. */
-  @Column
-  private Double lat;
+  @Column private Double lat;
 
   /** Approximate longitude of the city/location. */
-  @Column
-  private Double lon;
+  @Column private Double lon;
 
   /** Source of this geo result: "ipinfo" (live API) or "mmdb" (offline DB-IP database). */
   @Column(name = "geo_source", length = 10, nullable = false)

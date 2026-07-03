@@ -5,19 +5,25 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 /** Entity representing a generated story/narrative for a PCAP file */
 @Entity
 @Table(name = "stories")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class StoryEntity {
 
-  @Id private UUID id;
+  @EqualsAndHashCode.Include @Id private UUID id;
 
   @Column(name = "file_id", nullable = false)
   private UUID fileId;
