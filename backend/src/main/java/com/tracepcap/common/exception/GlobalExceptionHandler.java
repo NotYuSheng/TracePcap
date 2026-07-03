@@ -73,6 +73,23 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
   }
 
+  @ExceptionHandler(InsufficientEvidenceException.class)
+  public ResponseEntity<ErrorResponse> handleInsufficientEvidenceException(
+      InsufficientEvidenceException ex, HttpServletRequest request) {
+    log.warn("Insufficient evidence: {}", ex.getMessage());
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+            .error("Unprocessable Entity")
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
+  }
+
   @ExceptionHandler(StorageException.class)
   public ResponseEntity<ErrorResponse> handleStorageException(
       StorageException ex, HttpServletRequest request) {

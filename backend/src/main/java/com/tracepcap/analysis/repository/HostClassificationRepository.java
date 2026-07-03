@@ -12,12 +12,14 @@ public interface HostClassificationRepository
 
   List<HostClassificationEntity> findByFileId(UUID fileId);
 
-  // findFirst (LIMIT 1): a file can hold >1 classification for the same IP or MAC (e.g. an IP
-  // claimed by two MACs during an ARP spoof), which would make a plain Optional query throw
-  // NonUniqueResultException.
-  java.util.Optional<HostClassificationEntity> findFirstByFileIdAndIp(UUID fileId, String ip);
+  // findFirst + OrderByIdAsc (LIMIT 1, deterministic): a file can hold >1 classification for the
+  // same IP or MAC (e.g. an IP claimed by two MACs during an ARP spoof), which would make a plain
+  // Optional query throw NonUniqueResultException. The explicit order keeps the chosen row stable
+  // so drift snapshots don't flap.
+  java.util.Optional<HostClassificationEntity> findFirstByFileIdAndIpOrderByIdAsc(
+      UUID fileId, String ip);
 
-  java.util.Optional<HostClassificationEntity> findFirstByFileIdAndMacIgnoreCase(
+  java.util.Optional<HostClassificationEntity> findFirstByFileIdAndMacIgnoreCaseOrderByIdAsc(
       UUID fileId, String mac);
 
   long countByFileId(UUID fileId);

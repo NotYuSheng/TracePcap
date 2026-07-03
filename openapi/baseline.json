@@ -2352,6 +2352,17 @@
         },
         "type": "object"
       },
+      "RoleSuggestionDto": {
+        "properties": {
+          "roleDescription": {
+            "type": "string"
+          },
+          "roleLabel": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ServiceServerSummaryDto": {
         "properties": {
           "anomalyRatio": {
@@ -6572,11 +6583,21 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/NodeRoleDto"
                 }
               }
             },
-            "description": "OK"
+            "description": "Suggested role"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRoleDto"
+                }
+              }
+            },
+            "description": "Insufficient traffic signals for a suggestion"
           }
         },
         "summary": "Suggest a role for an entity based on observed traffic",
@@ -6621,11 +6642,21 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/RoleSuggestionDto"
                 }
               }
             },
-            "description": "OK"
+            "description": "Suggested label/description (not persisted)"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleSuggestionDto"
+                }
+              }
+            },
+            "description": "Insufficient traffic signals for a suggestion"
           }
         },
         "summary": "Preview an AI role suggestion without persisting",

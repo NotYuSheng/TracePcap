@@ -1,14 +1,13 @@
 package com.tracepcap.insights.controller;
 
 import com.tracepcap.insights.dto.NodeRoleDto;
+import com.tracepcap.insights.dto.RoleSuggestionDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
-import com.tracepcap.insights.service.InsufficientEvidenceException;
 import com.tracepcap.insights.service.NodeRoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -79,13 +78,13 @@ public class NodeRoleController {
 
   @PostMapping("/suggest")
   @Operation(summary = "Suggest a role for an entity based on observed traffic")
-  public ResponseEntity<?> suggest(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Suggested role"),
+    @ApiResponse(responseCode = "422", description = "Insufficient traffic signals for a suggestion")
+  })
+  public NodeRoleDto suggest(
       @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
-    try {
-      return ResponseEntity.ok(service.suggestRole(entityType, entityKey, fileId));
-    } catch (InsufficientEvidenceException e) {
-      return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
-    }
+    return service.suggestRole(entityType, entityKey, fileId);
   }
 
   @PostMapping("/suggest-preview")
@@ -94,12 +93,12 @@ public class NodeRoleController {
       description =
           "Generates a fresh label/description from the file's traffic to pre-fill the update-label"
               + " editor — used to re-classify a drifted label without overwriting the confirmed one.")
-  public ResponseEntity<?> suggestPreview(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Suggested label/description (not persisted)"),
+    @ApiResponse(responseCode = "422", description = "Insufficient traffic signals for a suggestion")
+  })
+  public RoleSuggestionDto suggestPreview(
       @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
-    try {
-      return ResponseEntity.ok(service.suggestRolePreview(entityType, entityKey, fileId));
-    } catch (InsufficientEvidenceException e) {
-      return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
-    }
+    return service.suggestRolePreview(entityType, entityKey, fileId);
   }
 }

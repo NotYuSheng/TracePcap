@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { insightsService } from '@/features/insights/services/insightsService';
@@ -14,7 +15,6 @@ interface RoleEditModalProps {
   onClose: () => void;
   /** Called after a successful save/dismiss so the parent can refetch. */
   onSaved: () => void;
-  zIndex?: number;
 }
 
 /**
@@ -29,7 +29,6 @@ export function RoleEditModal({
   snapshotName,
   onClose,
   onSaved,
-  zIndex,
 }: RoleEditModalProps) {
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
@@ -100,89 +99,82 @@ export function RoleEditModal({
   };
 
   return (
-    <div
-      className="modal fade show d-block"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: zIndex ?? 1200 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content">
-          <div className="modal-header py-2">
-            <h6 className="modal-title mb-0">
-              Edit role
-              {snapshotName && <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshotName}</span>}
-            </h6>
-            <button type="button" className="btn-close" onClick={onClose} />
-          </div>
-          <div className="modal-body">
-            <p className="text-muted small mb-2">
-              Sets the role for <code>{entityKey}</code> from this snapshot onward — it applies to this
-              snapshot and <strong>carries forward</strong> to later ones. <strong>Earlier snapshots are
-              not changed.</strong> To label the whole timeline, edit the first snapshot the entity
-              appears in.
-            </p>
-            {loading ? (
-              <div className="text-muted small py-2"><Spinner size="sm" className="me-2" />Loading…</div>
-            ) : (
-              <>
-                {stale && (
-                  <Alert variant="warning" className="p-2 mb-2 small">
-                    This label was flagged stale in this snapshot. Update it, or dismiss to accept the current behaviour.
-                  </Alert>
-                )}
-                {error && (
-                  <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
-                    <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
-                  </Alert>
-                )}
-                <label className="form-label small mb-1">Role label</label>
-                <input
-                  className="form-control form-control-sm mb-2"
-                  placeholder="e.g. File Server (SMB)"
-                  value={label}
-                  onChange={e => setLabel(e.target.value)}
-                  autoFocus
-                />
-                <label className="form-label small mb-1">Description (optional)</label>
-                <textarea
-                  className="form-control form-control-sm mb-2"
-                  rows={2}
-                  placeholder="Short description of what this host does"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-                <button
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={suggest}
-                  disabled={suggesting || saving}
-                  title="Ask the AI to classify this node from this snapshot's traffic"
-                >
-                  {suggesting
-                    ? <><Spinner size="sm" className="me-1" />Suggesting…</>
-                    : <><i className="bi bi-stars me-1" />Suggest with AI</>}
-                </button>
-              </>
+    <Modal show onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title style={{ fontSize: '1rem' }}>
+          Edit role
+          {snapshotName && <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>· {snapshotName}</span>}
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="text-muted small mb-2">
+          Sets the role for <code>{entityKey}</code> from this snapshot onward — it applies to this
+          snapshot and <strong>carries forward</strong> to later ones. <strong>Earlier snapshots are
+          not changed.</strong> To label the whole timeline, edit the first snapshot the entity
+          appears in.
+        </p>
+        {loading ? (
+          <div className="text-muted small py-2"><Spinner size="sm" className="me-2" />Loading…</div>
+        ) : (
+          <>
+            {stale && (
+              <Alert variant="warning" className="p-2 mb-2 small">
+                This label was flagged stale in this snapshot. Update it, or dismiss to accept the current behaviour.
+              </Alert>
             )}
-          </div>
-          <div className="modal-footer py-2 d-flex justify-content-between">
-            <div>
-              {stale && hasRole && (
-                <button className="btn btn-outline-secondary btn-sm" onClick={dismiss} disabled={saving}>
-                  <i className="bi bi-check-lg me-1" />Dismiss — still correct
-                </button>
-              )}
-            </div>
-            <div className="d-flex gap-2">
-              <button className="btn btn-outline-secondary btn-sm" onClick={onClose} disabled={saving}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={save} disabled={saving || loading || !label.trim()}>
-                {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
-              </button>
-            </div>
-          </div>
+            {error && (
+              <Alert variant="warning" className="p-2 mb-2 small d-flex align-items-start gap-2">
+                <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" /><span>{error}</span>
+              </Alert>
+            )}
+            <Form.Label className="small mb-1">Role label</Form.Label>
+            <Form.Control
+              size="sm"
+              className="mb-2"
+              placeholder="e.g. File Server (SMB)"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              autoFocus
+            />
+            <Form.Label className="small mb-1">Description (optional)</Form.Label>
+            <Form.Control
+              as="textarea"
+              size="sm"
+              className="mb-2"
+              rows={2}
+              placeholder="Short description of what this host does"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+            />
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={suggest}
+              disabled={suggesting || saving}
+              title="Ask the AI to classify this node from this snapshot's traffic"
+            >
+              {suggesting
+                ? <><Spinner size="sm" className="me-1" />Suggesting…</>
+                : <><i className="bi bi-stars me-1" />Suggest with AI</>}
+            </Button>
+          </>
+        )}
+      </Modal.Body>
+      <Modal.Footer className="d-flex justify-content-between">
+        <div>
+          {stale && hasRole && (
+            <Button variant="outline-secondary" size="sm" onClick={dismiss} disabled={saving}>
+              <i className="bi bi-check-lg me-1" />Dismiss — still correct
+            </Button>
+          )}
         </div>
-      </div>
-    </div>
+        <div className="d-flex gap-2">
+          <Button variant="outline-secondary" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={save} disabled={saving || loading || !label.trim()}>
+            {saving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
+          </Button>
+        </div>
+      </Modal.Footer>
+    </Modal>
   );
 }

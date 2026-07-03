@@ -58,9 +58,9 @@ export const insightsService = {
       const r = await apiClient.post<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_SUGGEST(entityType, entityKey, fileId));
       return r.data;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } };
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
       if (axiosErr?.response?.status === 422) {
-        throw new Error(axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
+        throw new Error(axiosErr.response.data?.message ?? axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
       }
       throw err;
     }
@@ -78,9 +78,9 @@ export const insightsService = {
       );
       return r.data;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } };
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
       if (axiosErr?.response?.status === 422) {
-        throw new Error(axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
+        throw new Error(axiosErr.response.data?.message ?? axiosErr.response.data?.error ?? 'Insufficient evidence for a role suggestion.');
       }
       throw err;
     }
