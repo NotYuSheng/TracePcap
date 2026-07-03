@@ -111,7 +111,9 @@ export function SubnetDiagramModal({ subnet, snapshots, onHide, defaultSnapId }:
 
   return (
     <>
-      <Modal show onHide={onHide} size="xl" centered>
+      {/* enforceFocus off: the nested EntityDetailModal overlay renders on top and
+          Bootstrap's focus trap would otherwise steal focus from its inputs. */}
+      <Modal show onHide={onHide} size="xl" centered enforceFocus={false}>
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="bi bi-diagram-2 me-2" />
