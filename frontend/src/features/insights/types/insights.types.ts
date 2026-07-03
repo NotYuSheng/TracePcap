@@ -1,14 +1,16 @@
 export interface NodeRole {
+  fileId: string;
   entityType: string;
   entityKey: string;
   roleLabel: string | null;
   roleDescription: string | null;
+  /** MANUAL | AI | CARRIED_FORWARD (#369). */
+  origin: string;
   llmSuggested: boolean;
   confirmedByHuman: boolean;
   createdAt: string;
   updatedAt: string;
-  /** Staleness (#369): when the label was confirmed and, if drifted, since when + what changed. */
-  labeledAt: string | null;
+  /** Staleness (#369): set when a carried-forward label drifts from the prior snapshot's baseline. */
   staleSince: string | null;
   staleFields: string[] | null;
 }

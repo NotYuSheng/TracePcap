@@ -71,13 +71,9 @@ public class SnapshotInsightService {
       externalEvents = externalEventRepository.findByNetworkIdOrderByEventTimeDesc(networkId);
     }
 
-    // Batch-load node roles for entities appearing in change events
-    Set<String> entityKeys = changeEvents.stream()
-        .map(NetworkChangeEventEntity::getEntityKey)
-        .collect(Collectors.toSet());
-    List<String> allTypes = List.of("IP", "DEVICE", "APP", "PROTOCOL");
+    // Node roles are per-file (#369): load this snapshot's roles, keyed by entity.
     Map<String, NodeRoleEntity> rolesByKey = nodeRoleRepository
-        .findByEntityTypeInAndEntityKeyIn(allTypes, entityKeys)
+        .findByFileId(snapshot.getFile().getId())
         .stream()
         .collect(Collectors.toMap(NodeRoleEntity::getEntityKey, r -> r, (a, b) -> a));
 

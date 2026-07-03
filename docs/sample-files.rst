@@ -356,42 +356,39 @@ SMB + Telnet to internal servers, no hostname).
    and the internal-server access. This is the payoff of leaving it unlabelled:
    the suggestion is the AI's blind characterisation, not an echo of your label.
 
-**Step 6 — Watch a manual label go stale**
+**Step 6 — Watch a label go stale**
 
-Label staleness detection (see :doc:`features/network-monitor` → *Label
-Staleness Detection*) warns you when a confirmed label no longer matches how a
-host actually behaves. The File Server makes a clean demonstration:
+Roles are **per-snapshot**: a confirmed label is carried forward onto each new
+snapshot and validated against the new pcap (see :doc:`features/network-monitor`
+→ *Label Staleness Detection*). The File Server makes a clean demonstration.
 
-1. If you already labelled ``10.0.2.10`` in Step 5, its baseline is set. If not,
-   open it from the **IP Addresses** drift panel — click the ``10.0.2.10`` badge
-   to open its Entity Detail modal, then in the **Role** section confirm the
-   label **File Server (SMB)**.
+1. Open the **week 2** snapshot's network diagram (Capture Timeline → click the
+   ``week2_personal_laptop_vpn.pcap`` row) and click the ``10.0.2.10`` node. In
+   the **Role** section, confirm **File Server (SMB)**. This captures a week-2
+   baseline — SMB only, before Carol's Telnet.
+2. The label is carried forward and checked when the next snapshot is analysed.
+   Because Carol begins Telnet to the file server in **week 3**, the week-3
+   classification is flagged the moment that transition is computed.
 
    .. note::
-      The role section lives in the **drift-panel** detail modal (IP Addresses /
-      Devices), *not* the snapshot network-diagram node modal. The baseline is
-      captured from the latest snapshot — which for this scenario is clean SMB
-      traffic (Telnet stops after the week-7 audit notice), so drift is still
-      detected against the Telnet weeks.
-2. Re-run change detection across the loaded timeline: in **Manage PCAPs**,
-   remove any one snapshot and add it back. This recomputes every transition with
-   your confirmed label in place. (Change detection re-runs on snapshot add,
-   removal, or subnet-override edits — saving a label alone does not trigger it.)
+      Validation runs when a snapshot is *added* (the natural forward-flow: label
+      as captures arrive, and each new one is auto-checked). In this demo all eight
+      weeks are already loaded, so trigger the week 2 → week 3 check by re-adding
+      week 3 — **Manage PCAPs** → remove ``week3_telnet_bittorrent.pcap`` → add it
+      back.
 
-Because Carol begins Telnet to the file server in **week 3**, the File Server's
-properties differ from its clean baseline, and the label is flagged:
+The label is flagged:
 
 - The **Change Events** feed shows a ``LABEL_STALE`` (WARNING) event —
   *"Label may be stale: 10.0.2.10 (File Server (SMB)) — new protocol (TELNET)"*.
-- The File Server's role card (in the IP Addresses / Devices drift-panel detail
-  modal) shows an amber **Stale** badge and a warning banner with **Update label**
-  and **Dismiss — label is still correct** actions.
+- Opening ``10.0.2.10`` in the week-3 snapshot (or the Devices drift panel) shows
+  an amber **Stale** badge and a warning banner with **Update label** and
+  **Dismiss — label is still correct** actions.
 
 This is the lesson: a confirmed label silently becomes misleading as the host's
 behaviour changes — your "File Server (SMB)" was also accepting cleartext Telnet
-logins for several weeks. Click **Dismiss — label is still correct** to accept the
-current behaviour as the new baseline (the original label date is kept), or
-**Update label** to revise it.
+logins. Click **Dismiss — label is still correct** to accept the current snapshot's
+behaviour as the new baseline, or **Update label** to revise it.
 
 **Step 7 — Add external events**
 

@@ -83,12 +83,12 @@ public class ChangeDetectionService {
   private List<NetworkChangeEventEntity> detectStaleLabels(
       UUID toFileId, NetworkSnapshotEntity fromSnapshot, NetworkSnapshotEntity toSnapshot) {
 
+    UUID fromFileId = fromSnapshot != null ? fromSnapshot.getFile().getId() : null;
     List<NetworkChangeEventEntity> events = new ArrayList<>();
-    for (LabelDrift drift : labelStalenessService.detectAndMarkDrift(toFileId)) {
+    for (LabelDrift drift : labelStalenessService.carryForwardAndValidate(fromFileId, toFileId)) {
       Map<String, Object> newValue = new HashMap<>();
       newValue.put("entityType", drift.entityType());
       newValue.put("roleLabel", orEmpty(drift.roleLabel()));
-      newValue.put("labeledAt", drift.labeledAt() != null ? drift.labeledAt().toString() : "");
       newValue.put("changes", drift.changedFields());
       events.add(
           buildEvent(
@@ -414,8 +414,9 @@ public class ChangeDetectionService {
     if (fileId == null) return Map.of();
     return hostClassificationRepository.findByFileId(fileId).stream()
         .filter(h -> h.getMac() != null && !h.getMac().isBlank() && h.getIp() != null)
-        .collect(Collectors.toMap(HostClassificationEntity::getMac, HostClassificationEntity::getIp,
-            (a, b) -> a));
+        .collect(
+            Collectors.toMap(
+                HostClassificationEntity::getMac, HostClassificationEntity::getIp, (a, b) -> a));
   }
 
   private Map<String, String> invertMap(Map<String, String> map) {
@@ -451,7 +452,8 @@ public class ChangeDetectionService {
   }
 
   /** Returns the external IP with the highest total bytes for a file (gateway heuristic). */
-  private String topExternalIp(UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<String> customCidrs) {
+  private String topExternalIp(
+      UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<String> customCidrs) {
     if (fileId == null || geoMap.isEmpty()) return null;
     Map<String, Long> ipBytes = new HashMap<>();
     for (ConversationEntity c : conversationRepository.findByFileId(fileId)) {
@@ -459,7 +461,8 @@ public class ChangeDetectionService {
       String src = c.getSrcIp();
       String external = null;
       if (dst != null && !isPrivate(dst, customCidrs) && geoMap.containsKey(dst)) external = dst;
-      else if (src != null && !isPrivate(src, customCidrs) && geoMap.containsKey(src)) external = src;
+      else if (src != null && !isPrivate(src, customCidrs) && geoMap.containsKey(src))
+        external = src;
       if (external != null) {
         ipBytes.merge(external, c.getTotalBytes() != null ? c.getTotalBytes() : 0L, Long::sum);
       }
@@ -506,7 +509,8 @@ public class ChangeDetectionService {
         try {
           int second = Integer.parseInt(parts[1]);
           if (second >= PRIVATE_172_MIN && second <= PRIVATE_172_MAX) return true;
-        } catch (NumberFormatException ignored) { }
+        } catch (NumberFormatException ignored) {
+        }
       }
     }
     return customPrivateRangeService.isInCidrs(ip, customCidrs);

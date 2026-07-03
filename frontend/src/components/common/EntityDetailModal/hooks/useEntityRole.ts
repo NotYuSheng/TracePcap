@@ -30,15 +30,15 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     setRoleSuggestError(null);
     setRoleSaving(false);
     setRoleInfoOpen(false);
-    if (!showRole) { setRoleLoading(false); return; }
+    if (!showRole || !fileId) { setRoleLoading(false); return; }
     setRoleLoading(true);
     insightsService
-      .getNodeRole(entityType, entityKey)
+      .getNodeRole(entityType, entityKey, fileId)
       .then(r => { if (active) setRole(r); })
       .catch(err => { console.error('Failed to fetch node role:', err); })
       .finally(() => { if (active) setRoleLoading(false); });
     return () => { active = false; };
-  }, [showRole, entityType, entityKey]);
+  }, [showRole, entityType, entityKey, fileId]);
 
   const suggest = async () => {
     if (!fileId) return;
@@ -65,7 +65,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
         role.roleLabel ?? '',
         role.roleDescription ?? '',
         true,
-        fileId || undefined,
+        fileId,
       );
       setRole(updated);
     } catch (err) {
@@ -78,7 +78,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
   const discard = async () => {
     setRoleSaving(true);
     try {
-      await insightsService.deleteNodeRole(entityType, entityKey);
+      await insightsService.deleteNodeRole(entityType, entityKey, fileId);
       setRole(null);
     } catch (err) {
       console.error('Failed to discard role:', err);
@@ -102,7 +102,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
         roleLabelDraft,
         roleDescDraft,
         true,
-        fileId || undefined,
+        fileId,
       );
       setRole(updated);
       setRoleEditing(false);

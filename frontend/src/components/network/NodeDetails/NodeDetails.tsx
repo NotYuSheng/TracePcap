@@ -7,6 +7,8 @@ import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { RoleSection } from '@components/common/EntityDetailModal/sections/RoleSection';
+import { useEntityRole } from '@components/common/EntityDetailModal/hooks/useEntityRole';
 import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
 import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
@@ -78,6 +80,9 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   const entityKey = node.data.isL2
     ? (node.data.mac ?? node.data.ip)
     : node.data.ip;
+
+  // Per-file node role (#369): editable in this snapshot's context.
+  const role = useEntityRole(entityType, entityKey ?? '', fileId, !!entityKey);
 
   // ESC closes the modal — but not if a nested IP modal is open (let the nested one handle it first)
   useEffect(() => {
@@ -271,6 +276,9 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
             {/* ── DETAILS TAB ────────────────────────────────────────── */}
             {activeTab === 'details' && (
               <>
+                {/* Node role (per-file, carried forward + validated across snapshots) */}
+                {entityKey && <RoleSection fileId={fileId} role={role} />}
+
                 {/* Ghost node warning */}
                 {node.data.ghostFlags && node.data.ghostFlags.length > 0 && (
                   <div className="d-flex align-items-start gap-2 rounded p-2 mb-3 small" style={{ background: '#fff3cd', border: '1px solid #ffc10755' }}>

@@ -2052,12 +2052,15 @@
           "entityType": {
             "type": "string"
           },
-          "labeledAt": {
-            "format": "date-time",
+          "fileId": {
+            "format": "uuid",
             "type": "string"
           },
           "llmSuggested": {
             "type": "boolean"
+          },
+          "origin": {
+            "type": "string"
           },
           "roleDescription": {
             "type": "string"
@@ -6355,6 +6358,15 @@
         "parameters": [
           {
             "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "entityType",
             "required": true,
             "schema": {
@@ -6375,7 +6387,7 @@
             "description": "OK"
           }
         },
-        "summary": "Remove an entity's role",
+        "summary": "Remove an entity's role in a file",
         "tags": [
           "Node Roles"
         ]
@@ -6383,6 +6395,15 @@
       "get": {
         "operationId": "getRole",
         "parameters": [
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
           {
             "in": "query",
             "name": "entityType",
@@ -6412,7 +6433,7 @@
             "description": "OK"
           }
         },
-        "summary": "Get the role assigned to an entity",
+        "summary": "Get the role assigned to an entity in a file",
         "tags": [
           "Node Roles"
         ]
@@ -6441,7 +6462,7 @@
             "description": "OK"
           }
         },
-        "summary": "Create or update an entity's role",
+        "summary": "Create or update an entity's role in a file",
         "tags": [
           "Node Roles"
         ]
@@ -6452,6 +6473,15 @@
         "description": "Clears the staleness flag for a confirmed label and records the current file's node properties as the new drift baseline.",
         "operationId": "dismissStaleness",
         "parameters": [
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
           {
             "in": "query",
             "name": "entityType",
@@ -6465,15 +6495,6 @@
             "name": "entityKey",
             "required": true,
             "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
               "type": "string"
             }
           }

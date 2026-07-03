@@ -76,15 +76,17 @@ public class NetworkInsightService {
     List<NetworkAnnotationEntity> annotations = annotationRepository
         .findTop10ByNetworkIdOrderByCreatedAtDesc(networkId);
 
-    // Collect entity keys that appear in change events to batch-load roles and notes
+    // Collect entity keys that appear in change events to batch-load notes
     Set<String> entityKeys = changeEvents.stream()
         .map(NetworkChangeEventEntity::getEntityKey)
         .collect(Collectors.toSet());
-    // Load roles for entities that appear in change events
-    Map<String, NodeRoleEntity> rolesByKey = nodeRoleRepository
-        .findByEntityTypeInAndEntityKeyIn(List.of("IP", "DEVICE", "APPLICATION", "PROTOCOL"), new ArrayList<>(entityKeys))
-        .stream()
-        .collect(Collectors.toMap(NodeRoleEntity::getEntityKey, r -> r, (a, b) -> a));
+    // Node roles are per-file (#369): the "present-day" identity is the latest snapshot's roles.
+    Map<String, NodeRoleEntity> rolesByKey = snapshots.isEmpty()
+        ? Map.of()
+        : nodeRoleRepository
+            .findByFileId(snapshots.get(snapshots.size() - 1).getFile().getId())
+            .stream()
+            .collect(Collectors.toMap(NodeRoleEntity::getEntityKey, r -> r, (a, b) -> a));
 
     // Load entity notes for all entities that appear in change events
     Map<String, String> entityNotesByKey = entityNoteRepository

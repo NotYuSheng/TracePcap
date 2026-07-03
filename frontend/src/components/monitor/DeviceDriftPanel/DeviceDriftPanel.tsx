@@ -150,8 +150,12 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
     entityNotesService.getNote('DEVICE', mac).then(note => {
       if (note) { setSavedNote(note); setNoteText(note.note); }
     });
-    insightsService.getNodeRole('DEVICE', mac).then(r => setRole(r ?? null)).catch(() => {});
     const entries = macHistory.get(mac) ?? [];
+    // Present-day role = the latest snapshot in which this device appears.
+    const latestFid = entries[entries.length - 1]?.snap.fileId;
+    if (latestFid) {
+      insightsService.getNodeRole('DEVICE', mac, latestFid).then(r => setRole(r ?? null)).catch(() => {});
+    }
     if (entries.every(e => e.apps.length > 0 || e.protocols.length > 0)) return; // already loaded
     setModalLoading(true);
     Promise.all(
@@ -197,6 +201,8 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
 
   const selectedHistory = selectedMac ? (macHistory.get(selectedMac) ?? []) : [];
   const isActive = selectedMac ? latestMacs.has(selectedMac) : false;
+  // Present-day role file = the latest snapshot in which the selected device appears.
+  const roleFileId = selectedHistory[selectedHistory.length - 1]?.snap.fileId;
 
   const q = search.trim().toLowerCase();
   const visibleActive = q ? active.filter(mac => mac.toLowerCase().includes(q)) : active;
@@ -355,7 +361,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                             if (!selectedMac) return;
                             setRoleSuggesting(true);
                             setRoleSuggestError(null);
-                            try { const r = await insightsService.suggestNodeRole('DEVICE', selectedMac, selectedHistory[selectedHistory.length - 1]?.snap.fileId ?? ''); setRole(r); }
+                            try { const r = await insightsService.suggestNodeRole('DEVICE', selectedMac, roleFileId ?? ''); setRole(r); }
                             catch (err: unknown) { setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.'); }
                             finally { setRoleSuggesting(false); }
                           }}
@@ -407,8 +413,8 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                             <i className="bi bi-pencil me-1" />Update label
                           </button>
                           <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }}
-                            disabled={roleSaving || !selectedMac || !selectedHistory[selectedHistory.length - 1]?.snap.fileId}
-                            onClick={async () => { const fid = selectedHistory[selectedHistory.length - 1]?.snap.fileId; if (!selectedMac || !fid) return; setRoleSaving(true); try { const r = await insightsService.dismissNodeRoleStaleness('DEVICE', selectedMac, fid); setRole(r); } finally { setRoleSaving(false); } }}>
+                            disabled={roleSaving || !selectedMac || !roleFileId}
+                            onClick={async () => { if (!selectedMac || !roleFileId) return; setRoleSaving(true); try { const r = await insightsService.dismissNodeRoleStaleness('DEVICE', selectedMac, roleFileId); setRole(r); } finally { setRoleSaving(false); } }}>
                             <i className="bi bi-check-lg me-1" />Dismiss — label is still correct
                           </button>
                         </div>
@@ -417,11 +423,11 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                     {role.llmSuggested && !role.confirmedByHuman && (
                       <div className="d-flex gap-2 mt-2">
                         <button className="btn btn-success btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
-                          onClick={async () => { if (!selectedMac || !role) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, role.roleLabel ?? '', role.roleDescription ?? '', true, selectedHistory[selectedHistory.length - 1]?.snap.fileId || undefined); setRole(r); } finally { setRoleSaving(false); } }}>
+                          onClick={async () => { if (!selectedMac || !role || !roleFileId) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, role.roleLabel ?? '', role.roleDescription ?? '', true, roleFileId); setRole(r); } finally { setRoleSaving(false); } }}>
                           <i className="bi bi-check-lg me-1" />Accept
                         </button>
                         <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving}
-                          onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { await insightsService.deleteNodeRole('DEVICE', selectedMac); setRole(null); } finally { setRoleSaving(false); } }}>
+                          onClick={async () => { if (!selectedMac || !roleFileId) return; setRoleSaving(true); try { await insightsService.deleteNodeRole('DEVICE', selectedMac, roleFileId); setRole(null); } finally { setRoleSaving(false); } }}>
                           <i className="bi bi-x-lg me-1" />Discard
                         </button>
                       </div>
@@ -434,7 +440,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                     <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Description (optional)" value={roleDescDraft} onChange={e => setRoleDescDraft(e.target.value)} />
                     <div className="d-flex gap-2">
                       <button className="btn btn-primary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving || !roleLabelDraft.trim()}
-                        onClick={async () => { if (!selectedMac) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, roleLabelDraft, roleDescDraft, true, selectedHistory[selectedHistory.length - 1]?.snap.fileId || undefined); setRole(r); setRoleEditing(false); } finally { setRoleSaving(false); } }}>
+                        onClick={async () => { if (!selectedMac || !roleFileId) return; setRoleSaving(true); try { const r = await insightsService.upsertNodeRole('DEVICE', selectedMac, roleLabelDraft, roleDescDraft, true, roleFileId); setRole(r); setRoleEditing(false); } finally { setRoleSaving(false); } }}>
                         {roleSaving ? <><span className="spinner-border spinner-border-sm me-1" />Saving…</> : <><i className="bi bi-floppy me-1" />Save</>}
                       </button>
                       <button className="btn btn-outline-secondary btn-sm py-0" style={{ fontSize: '0.75rem' }} disabled={roleSaving} onClick={() => setRoleEditing(false)}>Cancel</button>

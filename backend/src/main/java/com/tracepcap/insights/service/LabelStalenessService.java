@@ -26,9 +26,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Captures a baseline of a node's key properties when a human confirms its role label, and detects
- * when those properties later drift (#369). Drift on MAC, dominant protocols, or external orgs marks
- * the label stale so the analyst can re-confirm or update it.
+ * Per-file node-role property + staleness logic (#369). Roles live per file (a monitor snapshot is
+ * a file). When a new snapshot is added, each confirmed classification on the previous snapshot is
+ * carried forward and validated against the new pcap's observed properties; drift on MAC, dominant
+ * protocols, or external orgs flags the carried label stale.
  *
  * <p>Lives in the insights package and returns plain {@link LabelDrift} descriptors so the monitor
  * change-detection flow can raise events without this service depending on monitor types.
@@ -38,100 +39,95 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class LabelStalenessService {
 
+  public static final String ORIGIN_CARRIED_FORWARD = "CARRIED_FORWARD";
+
   private final NodeRoleRepository nodeRoleRepository;
   private final HostClassificationRepository hostClassificationRepository;
   private final IpGeoInfoRepository ipGeoInfoRepository;
   private final JdbcTemplate jdbc;
 
   /**
-   * Records the current node properties as the drift baseline for a confirmed label.
-   *
-   * @param updateLabeledAt true when the human just (re)set the label; false when merely dismissing
-   *     a stale warning (the original label time is kept, only the baseline is refreshed).
+   * Carries each confirmed classification on {@code prevFileId} forward onto {@code newFileId} and
+   * validates it against the new pcap. Carried rows (origin {@code CARRIED_FORWARD}) for the new
+   * file are regenerated each call; entities the analyst has labelled directly on the new file
+   * (origin {@code MANUAL}/{@code AI}) are left untouched and take precedence. Returns a descriptor
+   * for each carried label that drifted from its baseline.
    */
   @Transactional
-  public void captureBaseline(NodeRoleEntity entity, UUID fileId, boolean updateLabeledAt) {
-    if (fileId == null) return;
-    entity.setBaselineFileId(fileId);
-    entity.setBaselineProperties(computeProperties(entity.getEntityType(), entity.getEntityKey(), fileId));
-    entity.setStaleSince(null);
-    entity.setStaleFields(null);
-    if (updateLabeledAt || entity.getLabeledAt() == null) {
-      entity.setLabeledAt(LocalDateTime.now());
-    }
-    nodeRoleRepository.save(entity);
-  }
+  public List<LabelDrift> carryForwardAndValidate(UUID prevFileId, UUID newFileId) {
+    // Always clear stale carried rows so a reorder/re-add regenerates cleanly.
+    nodeRoleRepository.deleteByFileIdAndOrigin(newFileId, ORIGIN_CARRIED_FORWARD);
+    if (prevFileId == null || newFileId == null) return List.of();
 
-  /** Clears a stale flag and re-baselines from the dismissed-at file context. */
-  @Transactional
-  public void dismiss(String entityType, String entityKey, UUID fileId) {
-    nodeRoleRepository
-        .findByEntityTypeAndEntityKey(entityType, entityKey)
-        .ifPresent(e -> captureBaseline(e, fileId, false));
-  }
-
-  /**
-   * For every confirmed label with a baseline whose node is observed in {@code fileId}, compares
-   * current properties against the baseline. When drift is found and the label is not already stale,
-   * sets {@code staleSince}/{@code staleFields}. Returns a descriptor for each newly-stale label.
-   */
-  @Transactional
-  public List<LabelDrift> detectAndMarkDrift(UUID fileId) {
-    if (fileId == null) return List.of();
-
-    List<NodeRoleEntity> confirmed = nodeRoleRepository.findByConfirmedByHumanTrue();
+    List<NodeRoleEntity> confirmed =
+        nodeRoleRepository.findByFileIdAndConfirmedByHumanTrue(prevFileId);
     if (confirmed.isEmpty()) return List.of();
 
-    // Pre-filter to roles whose node actually appears in this file, so we only run the
-    // per-node property queries for candidates that could plausibly have drifted.
+    // Entities already labelled directly on the new file — don't overwrite them.
+    Set<String> ownKeys =
+        nodeRoleRepository.findByFileId(newFileId).stream()
+            .filter(r -> !ORIGIN_CARRIED_FORWARD.equals(r.getOrigin()))
+            .map(r -> r.getEntityType() + "|" + r.getEntityKey())
+            .collect(Collectors.toSet());
+
+    // Pre-filter to entities that actually appear in the new file.
     Set<String> activeIps = new HashSet<>();
     Set<String> activeMacsLower = new HashSet<>();
-    for (HostClassificationEntity h : hostClassificationRepository.findByFileId(fileId)) {
+    for (HostClassificationEntity h : hostClassificationRepository.findByFileId(newFileId)) {
       if (h.getIp() != null) activeIps.add(h.getIp());
       if (h.getMac() != null) activeMacsLower.add(h.getMac().toLowerCase());
     }
 
     List<LabelDrift> drifts = new ArrayList<>();
-    for (NodeRoleEntity role : confirmed) {
-      if (!isObservedKey(role, activeIps, activeMacsLower)) continue;
-      Map<String, Object> baseline = role.getBaselineProperties();
-      if (baseline == null || baseline.isEmpty()) continue;
-      if (role.getStaleSince() != null) continue; // already flagged — don't re-fire
+    for (NodeRoleEntity prev : confirmed) {
+      if (ownKeys.contains(prev.getEntityType() + "|" + prev.getEntityKey())) continue;
+      if (!isObservedKey(prev, activeIps, activeMacsLower)) continue; // absent in this snapshot
 
-      Map<String, Object> current =
-          computeProperties(role.getEntityType(), role.getEntityKey(), fileId);
-      if (!Boolean.TRUE.equals(current.get("observed"))) continue; // node absent in this snapshot
+      Map<String, Object> observed =
+          computeProperties(prev.getEntityType(), prev.getEntityKey(), newFileId);
+      Map<String, Object> baseline = prev.getObservedProperties();
+      List<String> changes =
+          (baseline == null || baseline.isEmpty()) ? List.of() : diff(baseline, observed);
 
-      List<String> changes = diff(baseline, current);
-      if (changes.isEmpty()) continue;
-
-      role.setStaleSince(LocalDateTime.now());
-      role.setStaleFields(changes);
-      nodeRoleRepository.save(role);
-      drifts.add(
-          new LabelDrift(
-              role.getEntityType(),
-              role.getEntityKey(),
-              role.getRoleLabel(),
-              role.getLabeledAt(),
-              changes));
+      NodeRoleEntity carried =
+          NodeRoleEntity.builder()
+              .fileId(newFileId)
+              .entityType(prev.getEntityType())
+              .entityKey(prev.getEntityKey())
+              .roleLabel(prev.getRoleLabel())
+              .roleDescription(prev.getRoleDescription())
+              .origin(ORIGIN_CARRIED_FORWARD)
+              .llmSuggested(false)
+              .confirmedByHuman(true)
+              .observedProperties(observed)
+              .build();
+      if (!changes.isEmpty()) {
+        carried.setStaleSince(LocalDateTime.now());
+        carried.setStaleFields(changes);
+        drifts.add(
+            new LabelDrift(
+                prev.getEntityType(), prev.getEntityKey(), prev.getRoleLabel(), changes));
+      }
+      nodeRoleRepository.save(carried);
     }
     return drifts;
   }
 
   /** True when the role's entity (IP or MAC) is among the file's classified hosts. */
-  private boolean isObservedKey(NodeRoleEntity role, Set<String> activeIps, Set<String> activeMacsLower) {
+  private boolean isObservedKey(
+      NodeRoleEntity role, Set<String> activeIps, Set<String> activeMacsLower) {
     String key = role.getEntityKey();
     if (key == null) return false;
-    if ("DEVICE".equalsIgnoreCase(role.getEntityType())) return activeMacsLower.contains(key.toLowerCase());
+    if ("DEVICE".equalsIgnoreCase(role.getEntityType()))
+      return activeMacsLower.contains(key.toLowerCase());
     return activeIps.contains(key);
   }
 
   // ── Property computation ──────────────────────────────────────────────────────
 
   /**
-   * Snapshots a node's key properties from a file: MAC, device type, dominant protocols and external
-   * orgs contacted. {@code observed} is true when the node appears in the file at all.
+   * Snapshots a node's key properties from a file: MAC, device type, dominant protocols and
+   * external orgs contacted. {@code observed} is true when the node appears in the file at all.
    */
   Map<String, Object> computeProperties(String entityType, String entityKey, UUID fileId) {
     Map<String, Object> props = new HashMap<>();
@@ -191,9 +187,9 @@ public class LabelStalenessService {
   }
 
   /**
-   * Cap on the number of distinct peers we resolve geo orgs for. A single node in a busy network (or
-   * during a scan) can talk to tens of thousands of peers, which would blow past DB parameter limits
-   * and slow the query — the distinct org set stabilises well before this bound.
+   * Cap on the number of distinct peers we resolve geo orgs for. A single node in a busy network
+   * (or during a scan) can talk to tens of thousands of peers, which would blow past DB parameter
+   * limits and slow the query — the distinct org set stabilises well before this bound.
    */
   private static final int MAX_PEERS_FOR_GEO = 1000;
 
@@ -220,7 +216,9 @@ public class LabelStalenessService {
     return geoOrgs(peers);
   }
 
-  /** Distinct non-blank org names for the geo records of the given IPs (proxy for external orgs). */
+  /**
+   * Distinct non-blank org names for the geo records of the given IPs (proxy for external orgs).
+   */
   private List<String> geoOrgs(Collection<String> ips) {
     return ipGeoInfoRepository.findAllByIpIn(ips).stream()
         .map(IpGeoInfoEntity::getOrg)
@@ -240,14 +238,25 @@ public class LabelStalenessService {
       changes.add("MAC changed (" + baseMac + " → " + curMac + ")");
     }
 
-    List<String> newProtos = added(asList(baseline.get("protocols")), asList(current.get("protocols")));
+    List<String> newProtos =
+        added(asList(baseline.get("protocols")), asList(current.get("protocols")));
     if (!newProtos.isEmpty()) {
-      changes.add("new protocol" + (newProtos.size() > 1 ? "s" : "") + " (" + String.join(", ", newProtos) + ")");
+      changes.add(
+          "new protocol"
+              + (newProtos.size() > 1 ? "s" : "")
+              + " ("
+              + String.join(", ", newProtos)
+              + ")");
     }
 
     List<String> newOrgs = added(asList(baseline.get("orgs")), asList(current.get("orgs")));
     if (!newOrgs.isEmpty()) {
-      changes.add("new external org" + (newOrgs.size() > 1 ? "s" : "") + " (" + String.join(", ", newOrgs) + ")");
+      changes.add(
+          "new external org"
+              + (newOrgs.size() > 1 ? "s" : "")
+              + " ("
+              + String.join(", ", newOrgs)
+              + ")");
     }
 
     return changes;
@@ -255,8 +264,7 @@ public class LabelStalenessService {
 
   /** Elements present in current but not baseline (case-insensitive), preserving current order. */
   private List<String> added(List<String> baseline, List<String> current) {
-    Set<String> baseLower =
-        baseline.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
+    Set<String> baseLower = baseline.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
     return current.stream()
         .filter(c -> !baseLower.contains(c.toLowerCase()))
         .distinct()
@@ -266,7 +274,10 @@ public class LabelStalenessService {
   @SuppressWarnings("unchecked")
   private List<String> asList(Object o) {
     if (o instanceof List<?> list) {
-      return list.stream().filter(x -> x != null).map(Object::toString).collect(Collectors.toList());
+      return list.stream()
+          .filter(x -> x != null)
+          .map(Object::toString)
+          .collect(Collectors.toList());
     }
     return List.of();
   }

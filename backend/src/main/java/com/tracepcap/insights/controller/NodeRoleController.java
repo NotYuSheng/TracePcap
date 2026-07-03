@@ -21,18 +21,21 @@ public class NodeRoleController {
   private final NodeRoleService service;
 
   @GetMapping
-  @Operation(summary = "Get the role assigned to an entity")
+  @Operation(summary = "Get the role assigned to an entity in a file")
   public ResponseEntity<NodeRoleDto> getRole(
-      @RequestParam String entityType,
-      @RequestParam String entityKey) {
-    return service.getRole(entityType, entityKey)
+      @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    return service
+        .getRole(fileId, entityType, entityKey)
         .map(ResponseEntity::ok)
         .orElse(ResponseEntity.noContent().build());
   }
 
   @PutMapping
-  @Operation(summary = "Create or update an entity's role")
+  @Operation(summary = "Create or update an entity's role in a file")
   public ResponseEntity<NodeRoleDto> upsert(@RequestBody UpsertNodeRoleRequest req) {
+    if (req.getFileId() == null) {
+      return ResponseEntity.badRequest().build();
+    }
     if (req.getEntityType() == null || req.getEntityType().isBlank()) {
       return ResponseEntity.badRequest().build();
     }
@@ -43,11 +46,10 @@ public class NodeRoleController {
   }
 
   @DeleteMapping
-  @Operation(summary = "Remove an entity's role")
+  @Operation(summary = "Remove an entity's role in a file")
   public ResponseEntity<Void> delete(
-      @RequestParam String entityType,
-      @RequestParam String entityKey) {
-    service.delete(entityType, entityKey);
+      @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
+    service.delete(fileId, entityType, entityKey);
     return ResponseEntity.noContent().build();
   }
 
@@ -58,11 +60,9 @@ public class NodeRoleController {
           "Clears the staleness flag for a confirmed label and records the current file's node"
               + " properties as the new drift baseline.")
   public ResponseEntity<NodeRoleDto> dismissStaleness(
-      @RequestParam String entityType,
-      @RequestParam String entityKey,
-      @RequestParam UUID fileId) {
+      @RequestParam UUID fileId, @RequestParam String entityType, @RequestParam String entityKey) {
     return service
-        .dismissStaleness(entityType, entityKey, fileId)
+        .dismissStaleness(fileId, entityType, entityKey)
         .map(ResponseEntity::ok)
         .orElse(ResponseEntity.noContent().build());
   }
@@ -70,9 +70,7 @@ public class NodeRoleController {
   @PostMapping("/suggest")
   @Operation(summary = "Suggest a role for an entity based on observed traffic")
   public ResponseEntity<?> suggest(
-      @RequestParam String entityType,
-      @RequestParam String entityKey,
-      @RequestParam UUID fileId) {
+      @RequestParam String entityType, @RequestParam String entityKey, @RequestParam UUID fileId) {
     try {
       return ResponseEntity.ok(service.suggestRole(entityType, entityKey, fileId));
     } catch (InsufficientEvidenceException e) {

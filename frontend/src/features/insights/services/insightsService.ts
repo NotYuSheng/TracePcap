@@ -12,9 +12,9 @@ import type { NetworkSnapshot, SubnetOverrideInput } from '@/features/monitor/ty
 export const insightsService = {
   // ── Node Roles ───────────────────────────────────────────────────────────────
 
-  getNodeRole: (entityType: string, entityKey: string): Promise<NodeRole | null> =>
+  getNodeRole: (entityType: string, entityKey: string, fileId: string): Promise<NodeRole | null> =>
     apiClient
-      .get<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE(entityType, entityKey))
+      .get<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE(fileId, entityType, entityKey))
       .then(r => r.data)
       .catch(err => {
         if (err?.response?.status === 204 || err?.response?.status === 404) return null;
@@ -27,7 +27,7 @@ export const insightsService = {
     roleLabel: string,
     roleDescription: string,
     confirmedByHuman: boolean,
-    fileId?: string,
+    fileId: string,
   ): Promise<NodeRole> =>
     apiClient
       .put<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_UPSERT, {
@@ -46,7 +46,7 @@ export const insightsService = {
     fileId: string,
   ): Promise<NodeRole> =>
     apiClient
-      .post<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_DISMISS_STALENESS(entityType, entityKey, fileId))
+      .post<NodeRole>(INSIGHTS_ENDPOINTS.NODE_ROLE_DISMISS_STALENESS(fileId, entityType, entityKey))
       .then(r => r.data),
 
   suggestNodeRole: async (
@@ -66,9 +66,9 @@ export const insightsService = {
     }
   },
 
-  deleteNodeRole: (entityType: string, entityKey: string): Promise<void> =>
+  deleteNodeRole: (entityType: string, entityKey: string, fileId: string): Promise<void> =>
     apiClient
-      .delete(INSIGHTS_ENDPOINTS.NODE_ROLE_DELETE(entityType, entityKey))
+      .delete(INSIGHTS_ENDPOINTS.NODE_ROLE_DELETE(fileId, entityType, entityKey))
       .then(() => undefined),
 
   // ── External Events ──────────────────────────────────────────────────────────

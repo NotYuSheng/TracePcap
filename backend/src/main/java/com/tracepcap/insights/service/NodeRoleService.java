@@ -34,9 +34,9 @@ public class NodeRoleService {
   private final JdbcTemplate jdbc;
   private final LabelStalenessService labelStalenessService;
 
-  public Optional<NodeRoleDto> getRole(String entityType, String entityKey) {
+  public Optional<NodeRoleDto> getRole(UUID fileId, String entityType, String entityKey) {
     return nodeRoleRepository
-        .findByEntityTypeAndEntityKey(entityType, entityKey)
+        .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
         .map(this::toDto);
   }
 
@@ -44,41 +44,53 @@ public class NodeRoleService {
   public NodeRoleDto upsert(UpsertNodeRoleRequest req) {
     NodeRoleEntity entity =
         nodeRoleRepository
-            .findByEntityTypeAndEntityKey(req.getEntityType(), req.getEntityKey())
+            .findByFileIdAndEntityTypeAndEntityKey(
+                req.getFileId(), req.getEntityType(), req.getEntityKey())
             .orElseGet(
                 () ->
                     NodeRoleEntity.builder()
+                        .fileId(req.getFileId())
                         .entityType(req.getEntityType())
                         .entityKey(req.getEntityKey())
                         .build());
     entity.setRoleLabel(req.getRoleLabel());
     entity.setRoleDescription(req.getRoleDescription());
     entity.setConfirmedByHuman(req.isConfirmedByHuman());
+    entity.setOrigin("MANUAL");
     // Once confirmed by a human, keep llmSuggested as-is; only clear it when human explicitly saves
     if (req.isConfirmedByHuman()) {
       entity.setLlmSuggested(false);
     }
-    NodeRoleEntity saved = nodeRoleRepository.save(entity);
-    // Capture a fresh drift baseline whenever a human (re)confirms the label with a file context.
-    if (req.isConfirmedByHuman() && req.getFileId() != null) {
-      labelStalenessService.captureBaseline(saved, req.getFileId(), true);
-    }
-    return toDto(saved);
+    // Record this file's current properties as the drift baseline for the next snapshot.
+    entity.setObservedProperties(
+        labelStalenessService.computeProperties(
+            req.getEntityType(), req.getEntityKey(), req.getFileId()));
+    entity.setStaleSince(null);
+    entity.setStaleFields(null);
+    return toDto(nodeRoleRepository.save(entity));
   }
 
   @Transactional
-  public void delete(String entityType, String entityKey) {
-    nodeRoleRepository.deleteByEntityTypeAndEntityKey(entityType, entityKey);
+  public void delete(UUID fileId, String entityType, String entityKey) {
+    nodeRoleRepository.deleteByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey);
   }
 
   /**
-   * Dismiss a stale-label warning: clears the stale flag and re-baselines drift detection from the
-   * given file context. Returns the refreshed role, or empty if no role exists for the entity.
+   * Dismiss a stale-label warning for this file's role: clear the stale flag and re-baseline drift
+   * detection against the file's current properties. Returns the refreshed role, or empty if none.
    */
   @Transactional
-  public Optional<NodeRoleDto> dismissStaleness(String entityType, String entityKey, UUID fileId) {
-    labelStalenessService.dismiss(entityType, entityKey, fileId);
-    return getRole(entityType, entityKey);
+  public Optional<NodeRoleDto> dismissStaleness(UUID fileId, String entityType, String entityKey) {
+    return nodeRoleRepository
+        .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
+        .map(
+            e -> {
+              e.setStaleSince(null);
+              e.setStaleFields(null);
+              e.setObservedProperties(
+                  labelStalenessService.computeProperties(entityType, entityKey, fileId));
+              return toDto(nodeRoleRepository.save(e));
+            });
   }
 
   /**
@@ -110,10 +122,11 @@ public class NodeRoleService {
 
       NodeRoleEntity entity =
           nodeRoleRepository
-              .findByEntityTypeAndEntityKey(entityType, entityKey)
+              .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
               .orElseGet(
                   () ->
                       NodeRoleEntity.builder()
+                          .fileId(fileId)
                           .entityType(entityType)
                           .entityKey(entityKey)
                           .build());
@@ -123,6 +136,9 @@ public class NodeRoleService {
         entity.setRoleDescription(roleDescription);
         entity.setLlmSuggested(true);
         entity.setConfirmedByHuman(false);
+        entity.setOrigin("AI");
+        entity.setObservedProperties(
+            labelStalenessService.computeProperties(entityType, entityKey, fileId));
         return toDto(nodeRoleRepository.save(entity));
       }
       return toDto(entity);
@@ -244,15 +260,16 @@ public class NodeRoleService {
 
   private NodeRoleDto toDto(NodeRoleEntity e) {
     return NodeRoleDto.builder()
+        .fileId(e.getFileId())
         .entityType(e.getEntityType())
         .entityKey(e.getEntityKey())
         .roleLabel(e.getRoleLabel())
         .roleDescription(e.getRoleDescription())
+        .origin(e.getOrigin())
         .llmSuggested(e.isLlmSuggested())
         .confirmedByHuman(e.isConfirmedByHuman())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
-        .labeledAt(e.getLabeledAt())
         .staleSince(e.getStaleSince())
         .staleFields(e.getStaleFields())
         .build();
