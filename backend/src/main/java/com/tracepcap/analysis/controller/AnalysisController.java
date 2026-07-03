@@ -44,7 +44,14 @@ public class AnalysisController {
     AnalysisResultEntity analysis = analysisService.getAnalysisResultByFileId(fileId);
 
     if (analysis == null) {
-      // No analysis yet - file is still processing
+      // No analysis record. If the file was reconciled to FAILED (analysis never ran — e.g. queue
+      // overflow or a restart lost the in-memory task), surface the failure instead of polling
+      // forever with 202.
+      if (file.getStatus() == FileEntity.FileStatus.FAILED) {
+        log.error("File {} is FAILED with no analysis record (never ran)", fileId);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+      }
+      // Otherwise the file is still processing
       log.info("Analysis for file {} not started yet, returning 202 Accepted", fileId);
       HttpHeaders headers = new HttpHeaders();
       headers.add("Retry-After", "2"); // Retry after 2 seconds
