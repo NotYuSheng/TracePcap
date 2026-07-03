@@ -361,7 +361,15 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                             if (!selectedMac) return;
                             setRoleSuggesting(true);
                             setRoleSuggestError(null);
-                            try { const r = await insightsService.suggestNodeRole('DEVICE', selectedMac, roleFileId ?? ''); setRole(r); }
+                            try {
+                              // A confirmed label is never silently overwritten — suggest into the editor for review.
+                              if (role?.confirmedByHuman) {
+                                const s = await insightsService.suggestNodeRolePreview('DEVICE', selectedMac, roleFileId ?? '');
+                                setRoleLabelDraft(s.roleLabel ?? ''); setRoleDescDraft(s.roleDescription ?? ''); setRoleEditing(true);
+                              } else {
+                                const r = await insightsService.suggestNodeRole('DEVICE', selectedMac, roleFileId ?? ''); setRole(r);
+                              }
+                            }
                             catch (err: unknown) { setRoleSuggestError(err instanceof Error ? err.message : 'Suggestion failed.'); }
                             finally { setRoleSuggesting(false); }
                           }}

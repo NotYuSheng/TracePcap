@@ -45,8 +45,16 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     setRoleSuggesting(true);
     setRoleSuggestError(null);
     try {
-      const suggested = await insightsService.suggestNodeRole(entityType, entityKey, fileId);
-      setRole(suggested);
+      // A confirmed label is never silently overwritten — suggest into the editor for review.
+      if (role?.confirmedByHuman) {
+        const s = await insightsService.suggestNodeRolePreview(entityType, entityKey, fileId);
+        setRoleLabelDraft(s.roleLabel ?? '');
+        setRoleDescDraft(s.roleDescription ?? '');
+        setRoleEditing(true);
+      } else {
+        const suggested = await insightsService.suggestNodeRole(entityType, entityKey, fileId);
+        setRole(suggested);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Suggestion failed.';
       setRoleSuggestError(msg);
