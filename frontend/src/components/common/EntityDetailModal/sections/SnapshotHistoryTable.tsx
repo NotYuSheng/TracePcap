@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Badge, Button, Form, Table } from '@govtechsg/sgds-react';
+import { Badge, Button, Table } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { insightsService } from '@/features/insights/services/insightsService';
+import { RoleEditModal } from '@components/common/RoleEditModal';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 import { formatSnapTime, hashBadgeStyle } from '../format';
 import type { IpSnapshotEntry } from '../types';
@@ -23,41 +23,7 @@ export function SnapshotHistoryTable({
   ipHistoryLoading,
   onRoleChanged,
 }: SnapshotHistoryTableProps) {
-  const [editingFileId, setEditingFileId] = useState<string | null>(null);
-  const [labelDraft, setLabelDraft] = useState('');
-  const [descDraft, setDescDraft] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const startEdit = (entry: IpSnapshotEntry) => {
-    setEditingFileId(entry.snap.fileId);
-    setLabelDraft(entry.roleLabel ?? '');
-    setDescDraft('');
-  };
-
-  const save = async (fileId: string) => {
-    setSaving(true);
-    try {
-      await insightsService.upsertNodeRole(entityType, entityKey, labelDraft, descDraft, true, fileId);
-      setEditingFileId(null);
-      onRoleChanged?.();
-    } catch (err) {
-      console.error('Failed to save snapshot role:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const dismiss = async (fileId: string) => {
-    setSaving(true);
-    try {
-      await insightsService.dismissNodeRoleStaleness(entityType, entityKey, fileId);
-      onRoleChanged?.();
-    } catch (err) {
-      console.error('Failed to dismiss snapshot staleness:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const [editing, setEditing] = useState<{ fileId: string; name: string } | null>(null);
 
   return (
     <div className="mt-4">
@@ -101,34 +67,16 @@ export function SnapshotHistoryTable({
                       )}
                   </Table.DataCell>
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
-                  <Table.DataCell style={{ minWidth: 180 }}>
-                    {editingFileId === snap.fileId ? (
-                      <div className="d-flex flex-column gap-1">
-                        <Form.Control size="sm" placeholder="Role label" value={labelDraft} onChange={e => setLabelDraft(e.target.value)} autoFocus />
-                        <Form.Control size="sm" placeholder="Description (optional)" value={descDraft} onChange={e => setDescDraft(e.target.value)} />
-                        <div className="d-flex gap-1">
-                          <Button variant="primary" size="sm" className="py-0" style={{ fontSize: '0.7rem' }} disabled={saving || !labelDraft.trim()} onClick={() => save(snap.fileId)}>
-                            {saving ? <Spinner size="sm" /> : 'Save'}
-                          </Button>
-                          <Button variant="outline-secondary" size="sm" className="py-0" style={{ fontSize: '0.7rem' }} disabled={saving} onClick={() => setEditingFileId(null)}>Cancel</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="d-flex align-items-center gap-1">
-                        {roleLabel ? <small>{roleLabel}</small> : <small className="text-muted">—</small>}
-                        {roleStale && (
-                          <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot"><i className="bi bi-exclamation-triangle" /></Badge>
-                        )}
-                        <Button variant="link" size="sm" className="p-0 ms-1 text-muted" style={{ fontSize: '0.75rem', lineHeight: 1 }} title="Edit role for this snapshot" onClick={() => startEdit({ snap, host, protocols, apps, roleLabel, roleStale })}>
-                          <i className="bi bi-pencil" />
-                        </Button>
-                        {roleStale && (
-                          <Button variant="link" size="sm" className="p-0 text-muted" style={{ fontSize: '0.75rem', lineHeight: 1 }} title="Dismiss — label is still correct (re-baseline this snapshot)" disabled={saving} onClick={() => dismiss(snap.fileId)}>
-                            <i className="bi bi-check-lg" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                  <Table.DataCell>
+                    <div className="d-flex align-items-center gap-1">
+                      {roleLabel ? <small>{roleLabel}</small> : <small className="text-muted">—</small>}
+                      {roleStale && (
+                        <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot"><i className="bi bi-exclamation-triangle" /></Badge>
+                      )}
+                      <Button variant="link" size="sm" className="p-0 ms-1 text-muted" style={{ fontSize: '0.75rem', lineHeight: 1 }} title="Edit role for this snapshot" onClick={() => setEditing({ fileId: snap.fileId, name: snap.fileName })}>
+                        <i className="bi bi-pencil" />
+                      </Button>
+                    </div>
                   </Table.DataCell>
                   <Table.DataCell>
                     {protocols.length === 0 && apps.length === 0 ? (
@@ -149,6 +97,17 @@ export function SnapshotHistoryTable({
             </Table.Body>
           </Table>
         </div>
+      )}
+
+      {editing && (
+        <RoleEditModal
+          entityType={entityType}
+          entityKey={entityKey}
+          fileId={editing.fileId}
+          snapshotName={editing.name}
+          onClose={() => setEditing(null)}
+          onSaved={() => onRoleChanged?.()}
+        />
       )}
     </div>
   );
