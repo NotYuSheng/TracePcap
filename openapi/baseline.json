@@ -2052,6 +2052,10 @@
           "entityType": {
             "type": "string"
           },
+          "labeledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "llmSuggested": {
             "type": "boolean"
           },
@@ -2059,6 +2063,16 @@
             "type": "string"
           },
           "roleLabel": {
+            "type": "string"
+          },
+          "staleFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "staleSince": {
+            "format": "date-time",
             "type": "string"
           },
           "updatedAt": {
@@ -2953,6 +2967,10 @@
             "type": "string"
           },
           "entityType": {
+            "type": "string"
+          },
+          "fileId": {
+            "format": "uuid",
             "type": "string"
           },
           "roleDescription": {
@@ -6424,6 +6442,55 @@
           }
         },
         "summary": "Create or update an entity's role",
+        "tags": [
+          "Node Roles"
+        ]
+      }
+    },
+    "/api/v1/node-roles/dismiss-staleness": {
+      "post": {
+        "description": "Clears the staleness flag for a confirmed label and records the current file's node properties as the new drift baseline.",
+        "operationId": "dismissStaleness",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Dismiss a stale-label warning",
         "tags": [
           "Node Roles"
         ]
