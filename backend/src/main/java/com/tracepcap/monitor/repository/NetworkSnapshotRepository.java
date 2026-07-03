@@ -18,6 +18,9 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
 
   Optional<NetworkSnapshotEntity> findByNetworkIdAndFileId(UUID networkId, UUID fileId);
 
+  /** Snapshots referencing a given file — a file may be added to more than one network. */
+  List<NetworkSnapshotEntity> findByFileId(UUID fileId);
+
   long countByNetworkId(UUID networkId);
 
   void deleteByNetworkId(UUID networkId);

@@ -16,6 +16,7 @@ import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.entity.SnapshotSubnetOverrideEntity;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
+import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.monitor.repository.SnapshotSubnetOverrideRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ public class ChangeDetectionService {
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
   private final LabelStalenessService labelStalenessService;
+  private final NetworkSnapshotRepository snapshotRepository;
 
   /**
    * Compare two consecutive snapshots and persist NetworkChangeEventEntity records. fromSnapshot
@@ -103,6 +105,35 @@ public class ChangeDetectionService {
               Severity.WARNING));
     }
     return events;
+  }
+
+  /**
+   * Propagate a role change on {@code fileId} forward: for each network the file belongs to, carry
+   * the label forward and re-validate every snapshot after it. Lets labelling a snapshot take effect
+   * immediately across the chain, rather than only when the next snapshot is ingested (#369).
+   */
+  public void propagateRoleChange(UUID fileId) {
+    for (NetworkSnapshotEntity snap : snapshotRepository.findByFileId(fileId)) {
+      List<NetworkSnapshotEntity> ordered =
+          snapshotRepository.findByNetworkIdOrderBySnapshotOrderAsc(snap.getNetwork().getId());
+      int idx = -1;
+      for (int i = 0; i < ordered.size(); i++) {
+        if (ordered.get(i).getId().equals(snap.getId())) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0) continue;
+      for (int i = idx; i + 1 < ordered.size(); i++) {
+        recomputeLabelStale(ordered.get(i), ordered.get(i + 1));
+      }
+    }
+  }
+
+  /** Re-run only the label-staleness signal for one transition, leaving other events untouched. */
+  private void recomputeLabelStale(NetworkSnapshotEntity from, NetworkSnapshotEntity to) {
+    changeEventRepository.deleteByToSnapshotIdAndChangeType(to.getId(), ChangeType.LABEL_STALE);
+    changeEventRepository.saveAll(detectStaleLabels(to.getFile().getId(), from, to));
   }
 
   // ── Signal 1: Device MAC presence ────────────────────────────────────────────

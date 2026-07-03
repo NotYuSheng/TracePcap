@@ -7,6 +7,7 @@ import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
 import com.tracepcap.insights.entity.NodeRoleEntity;
+import com.tracepcap.insights.event.NodeRoleChangedEvent;
 import com.tracepcap.insights.repository.NodeRoleRepository;
 import com.tracepcap.story.service.LlmClient;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,7 @@ public class NodeRoleService {
   private final LlmClient llmClient;
   private final JdbcTemplate jdbc;
   private final LabelStalenessService labelStalenessService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public Optional<NodeRoleDto> getRole(UUID fileId, String entityType, String entityKey) {
     return nodeRoleRepository
@@ -67,12 +70,16 @@ public class NodeRoleService {
             req.getEntityType(), req.getEntityKey(), req.getFileId()));
     entity.setStaleSince(null);
     entity.setStaleFields(null);
-    return toDto(nodeRoleRepository.save(entity));
+    NodeRoleDto dto = toDto(nodeRoleRepository.save(entity));
+    // Carry this label forward and re-validate the rest of the network chain immediately.
+    eventPublisher.publishEvent(new NodeRoleChangedEvent(req.getFileId()));
+    return dto;
   }
 
   @Transactional
   public void delete(UUID fileId, String entityType, String entityKey) {
     nodeRoleRepository.deleteByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey);
+    eventPublisher.publishEvent(new NodeRoleChangedEvent(fileId));
   }
 
   /**
@@ -89,7 +96,10 @@ public class NodeRoleService {
               e.setStaleFields(null);
               e.setObservedProperties(
                   labelStalenessService.computeProperties(entityType, entityKey, fileId));
-              return toDto(nodeRoleRepository.save(e));
+              NodeRoleDto dto = toDto(nodeRoleRepository.save(e));
+              // Re-baselining shifts the drift baseline, so re-validate the forward chain.
+              eventPublisher.publishEvent(new NodeRoleChangedEvent(fileId));
+              return dto;
             });
   }
 
