@@ -70,24 +70,28 @@ public class AnalysisRecordService {
         .ifPresentOrElse(
             analysis -> {
               // Leave already-completed analyses untouched; only recover in-flight/pending ones.
+              // A long analysis can commit COMPLETED between the stuck-file query and this call —
+              // don't clobber the file back to FAILED in that race.
               if (analysis.getStatus() != AnalysisResultEntity.AnalysisStatus.COMPLETED) {
                 analysis.setStatus(AnalysisResultEntity.AnalysisStatus.FAILED);
                 analysis.setErrorMessage(message);
                 analysisResultRepository.save(analysis);
+                markFileFailed(fileId);
               }
             },
             () ->
                 fileRepository
                     .findById(fileId)
                     .ifPresent(
-                        file ->
-                            analysisResultRepository.save(
-                                AnalysisResultEntity.builder()
-                                    .file(file)
-                                    .status(AnalysisResultEntity.AnalysisStatus.FAILED)
-                                    .errorMessage(message)
-                                    .build())));
-    markFileFailed(fileId);
+                        file -> {
+                          analysisResultRepository.save(
+                              AnalysisResultEntity.builder()
+                                  .file(file)
+                                  .status(AnalysisResultEntity.AnalysisStatus.FAILED)
+                                  .errorMessage(message)
+                                  .build());
+                          markFileFailed(fileId);
+                        }));
   }
 
   private void markFileFailed(UUID fileId) {
