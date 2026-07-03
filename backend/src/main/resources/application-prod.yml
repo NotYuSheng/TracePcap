@@ -30,7 +30,7 @@ spring.datasource:
   username: ${DATABASE_USERNAME}
   password: ${DATABASE_PASSWORD}
   hikari:
-    maximum-pool-size: 20
+    maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
 
 # Production server configuration
 server:
