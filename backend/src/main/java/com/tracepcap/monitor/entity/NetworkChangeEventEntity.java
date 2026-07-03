@@ -6,32 +6,42 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "network_change_events")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class NetworkChangeEventEntity {
 
+  @EqualsAndHashCode.Include
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "network_id", nullable = false)
   private NetworkEntity network;
 
   /** Null when comparing the first snapshot against a manual baseline. */
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "from_snapshot_id")
   private NetworkSnapshotEntity fromSnapshot;
 
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "to_snapshot_id", nullable = false)
   private NetworkSnapshotEntity toSnapshot;

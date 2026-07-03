@@ -5,12 +5,15 @@ import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 /**
- * One aggregated HTTP endpoint row for a web/API-server host in a capture — the web/API equivalent of
- * {@link DnsQueryLogEntity}. Rows are aggregated per {@code (file, serverIp, method, path)}. See
+ * One aggregated HTTP endpoint row for a web/API-server host in a capture — the web/API equivalent
+ * of {@link DnsQueryLogEntity}. Rows are aggregated per {@code (file, serverIp, method, path)}. See
  * {@code WebServerLogExtractor}.
  */
 @Entity
@@ -19,16 +22,21 @@ import lombok.NoArgsConstructor;
     indexes = {
       @Index(name = "idx_http_endpoint_log_file_server", columnList = "file_id, server_ip")
     })
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class HttpEndpointLogEntity {
 
+  @EqualsAndHashCode.Include
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "file_id", nullable = false)
   private FileEntity file;

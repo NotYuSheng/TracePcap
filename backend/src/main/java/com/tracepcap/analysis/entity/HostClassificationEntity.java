@@ -5,23 +5,31 @@ import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(
     name = "host_classifications",
     indexes = {@Index(name = "idx_host_class_file_id", columnList = "file_id")})
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class HostClassificationEntity {
 
+  @EqualsAndHashCode.Include
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "file_id", nullable = false)
   private FileEntity file;

@@ -5,21 +5,27 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /** Entity representing an uploaded PCAP file */
 @Entity
 @Table(name = "files")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileEntity {
 
-  @Id private UUID id;
+  @EqualsAndHashCode.Include @Id private UUID id;
 
   @Column(name = "file_name", nullable = false)
   private String fileName;
