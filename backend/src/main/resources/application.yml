@@ -117,10 +117,14 @@ springdoc:
   show-actuator: false
 
 # Async Configuration
+# Sizing guidance (see docs deployment guide): analysis is Suricata-dominated (~50s/file, #452),
+# so keep max-pool-size at or below the host CPU core count to avoid CPU contention. When the pool
+# and queue are both full the executor applies back-pressure (CallerRunsPolicy) — uploads run the
+# analysis inline and slow down — instead of silently dropping files (#451).
 async:
-  core-pool-size: 5
-  max-pool-size: 10
-  queue-capacity: 100
+  core-pool-size: ${ASYNC_CORE_POOL_SIZE:5}
+  max-pool-size: ${ASYNC_MAX_POOL_SIZE:10}
+  queue-capacity: ${ASYNC_QUEUE_CAPACITY:100}
   thread-name-prefix: async-analysis-
 
 # CORS Configuration
@@ -171,6 +175,13 @@ tracepcap:
     enabled: ${FILE_RETENTION_ENABLED:true}
     retention-hours: ${FILE_RETENTION_HOURS:12}  # Analysis files deleted after this many hours
     monitor-retention-hours: ${MONITOR_FILE_RETENTION_HOURS:0}  # Monitor files: 0 = never expire
+  reconciliation:
+    # Recovers files stuck in PROCESSING (queue overflow, worker crash, or restart) by flipping
+    # them to FAILED once past the timeout, so they surface in the UI instead of polling forever.
+    cron: "0 */5 * * * ?"  # Run every 5 minutes
+    enabled: ${STUCK_FILE_RECONCILIATION_ENABLED:true}
+    # Must exceed the longest expected analysis time so healthy in-flight jobs are never killed.
+    timeout-minutes: ${STUCK_FILE_TIMEOUT_MINUTES:30}
   overview:
     apps-limited: ${OVERVIEW_APPS_LIMITED:true}   # true = cap detected apps list; false = show all
     apps-max: ${OVERVIEW_APPS_MAX:100}            # Max apps shown when apps-limited=true

@@ -46,6 +46,54 @@ File Retention
        (only applies when ``FILE_RETENTION_ENABLED=true``). Monitor Network
        files are exempt from automatic deletion by default.
 
+Analysis Queue & Reconciliation
+-------------------------------
+
+Uploaded files are analyzed asynchronously by an in-memory thread pool. Analysis
+is **Suricata-dominated** (~50 s per file), so throughput is CPU-bound. When the
+pool and its queue are both full the executor applies **back-pressure**: the
+upload request runs the analysis inline and slows down, rather than dropping the
+file. A reconciliation job additionally flips any file left stuck in
+``PROCESSING`` past a timeout to ``FAILED`` (covering crashes and restarts, since
+the queue is in-memory and lost on restart).
+
+**Sizing guidance:** keep ``ASYNC_MAX_POOL_SIZE`` at or below the host CPU core
+count to avoid CPU contention between concurrent Suricata runs. Raise
+``ASYNC_QUEUE_CAPACITY`` to absorb larger bursts before back-pressure kicks in.
+For a 24-core box, ``ASYNC_MAX_POOL_SIZE=20`` (leaving headroom for the JVM, DB,
+and MinIO) with a queue of a few hundred is a reasonable starting point.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 12 48
+
+   * - Variable
+     - Default
+     - Description
+   * - ``ASYNC_CORE_POOL_SIZE``
+     - ``5``
+     - Number of threads kept alive to run analyses. These stay up even when
+       idle.
+   * - ``ASYNC_MAX_POOL_SIZE``
+     - ``10``
+     - Maximum analysis threads. Keep at or below the host CPU core count —
+       analysis is CPU-bound (Suricata), so oversubscribing degrades throughput.
+   * - ``ASYNC_QUEUE_CAPACITY``
+     - ``100``
+     - Files that may wait in the in-memory queue once all threads are busy.
+       Once the queue is also full, uploads apply back-pressure (run analysis
+       inline). This queue is **not** persisted — pending work is lost on
+       restart and recovered as ``FAILED`` by reconciliation.
+   * - ``STUCK_FILE_RECONCILIATION_ENABLED``
+     - ``true``
+     - Set to ``false`` to disable the scheduled job that flips files stuck in
+       ``PROCESSING`` to ``FAILED``.
+   * - ``STUCK_FILE_TIMEOUT_MINUTES``
+     - ``30``
+     - Minutes a file may stay in ``PROCESSING`` before reconciliation marks it
+       ``FAILED``. Must exceed the longest expected analysis time so healthy
+       in-flight jobs are never killed.
+
 Nginx
 -----
 

@@ -1,6 +1,7 @@
 package com.tracepcap.config;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -33,8 +34,12 @@ public class AsyncConfig {
     executor.setMaxPoolSize(maxPoolSize);
     executor.setQueueCapacity(queueCapacity);
     executor.setThreadNamePrefix(threadNamePrefix);
-    executor.setRejectedExecutionHandler(
-        (r, e) -> log.warn("Analysis task rejected, queue is full"));
+    // Back-pressure instead of dropping work: when all threads are busy AND the queue is full, run
+    // the analysis on the calling (upload) thread. This throttles ingestion — uploads slow down —
+    // rather than silently discarding files, which used to leave them stuck in PROCESSING forever
+    // (see #451). Files that still fail to run (e.g. rejected during shutdown) are recovered by the
+    // StuckFileReconciliationService, which flips them to FAILED past a timeout.
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
     executor.initialize();
 
     log.info(

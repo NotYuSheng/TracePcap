@@ -316,10 +316,10 @@ public class AnalysisService {
     } catch (Exception e) {
       log.error("Error analyzing file {}: {}", fileId, e.getMessage(), e);
 
-      // Mark analysis as FAILED in a separate committed transaction so the status persists even
-      // though the outer transaction is being rolled back.
+      // Mark analysis and file as FAILED in a separate committed transaction so the status persists
+      // even though the outer transaction is being rolled back.
       try {
-        analysisRecordService.markFailed(analysis.getId(), e.getMessage());
+        analysisRecordService.markFailed(analysis.getId(), fileId, e.getMessage());
       } catch (Exception markEx) {
         log.error(
             "Failed to mark analysis {} as FAILED: {}", analysis.getId(), markEx.getMessage());

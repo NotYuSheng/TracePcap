@@ -29,6 +29,10 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
   /** Find files by source uploaded before the specified timestamp (for source-specific cleanup) */
   List<FileEntity> findBySourceAndUploadedAtBefore(FileEntity.FileSource source, LocalDateTime timestamp);
 
+  /** Find files in a given status uploaded before the timestamp (for stuck-file reconciliation) */
+  List<FileEntity> findByStatusAndUploadedAtBefore(
+      FileEntity.FileStatus status, LocalDateTime timestamp);
+
   /** Find the most recently uploaded file with the given SHA-256 hash */
   Optional<FileEntity> findFirstByFileHashOrderByUploadedAtDesc(String fileHash);
 }
