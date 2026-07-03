@@ -55,6 +55,8 @@ interface DeviceSnapshotEntry {
   host: HostClassification;
   apps: string[];
   protocols: string[];
+  roleLabel?: string | null;
+  roleStale?: boolean;
 }
 
 function formatSnapTime(snap: NetworkSnapshot): string {
@@ -160,19 +162,23 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
     setModalLoading(true);
     Promise.all(
       entries.map(entry =>
-        entry.host.ip
-          ? apiClient
-              .get<ConversationsResponse>(`/conversations/${entry.snap.fileId}?ip=${entry.host.ip}&pageSize=10000`)
-              .then(r => {
-                const convs = r.data.data;
-                return {
-                  ...entry,
-                  apps: [...new Set(convs.map(c => c.appName).filter(Boolean) as string[])].sort(),
-                  protocols: [...new Set(convs.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
-                };
-              })
-              .catch(() => entry)
-          : Promise.resolve(entry)
+        Promise.all([
+          entry.host.ip
+            ? apiClient
+                .get<ConversationsResponse>(`/conversations/${entry.snap.fileId}?ip=${entry.host.ip}&pageSize=10000`)
+                .then(r => ({
+                  apps: [...new Set(r.data.data.map(c => c.appName).filter(Boolean) as string[])].sort(),
+                  protocols: [...new Set(r.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
+                }))
+                .catch(() => ({ apps: entry.apps, protocols: entry.protocols }))
+            : Promise.resolve({ apps: entry.apps, protocols: entry.protocols }),
+          insightsService.getNodeRole('DEVICE', mac, entry.snap.fileId).catch(() => null),
+        ]).then(([conv, role]) => ({
+          ...entry,
+          ...conv,
+          roleLabel: role?.roleLabel ?? null,
+          roleStale: !!role?.staleSince,
+        }))
       )
     ).then(enriched => {
       setMacHistory(prev => {
@@ -551,11 +557,12 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                           <th className="text-muted fw-normal">Snapshot</th>
                           <th className="text-muted fw-normal">IP Address</th>
                           <th className="text-muted fw-normal">Device Type</th>
+                          <th className="text-muted fw-normal">Role</th>
                           <th className="text-muted fw-normal">Protocols / Apps</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pageRows.map(({ snap, host, protocols, apps }, pageIdx) => {
+                        {pageRows.map(({ snap, host, protocols, apps, roleLabel, roleStale }, pageIdx) => {
                           const globalIdx = historyPage * HISTORY_PAGE_SIZE + pageIdx;
                           return (
                             <tr key={`${snap.id}-${globalIdx}`}>
@@ -571,6 +578,20 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
                                 )}
                               </td>
                               <td><small className="text-muted">{host.deviceType ?? '—'}</small></td>
+                              <td>
+                                {roleLabel ? (
+                                  <span className="d-inline-flex align-items-center gap-1">
+                                    <small>{roleLabel}</small>
+                                    {roleStale && (
+                                      <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot">
+                                        <i className="bi bi-exclamation-triangle" />
+                                      </Badge>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <small className="text-muted">—</small>
+                                )}
+                              </td>
                               <td>
                                 {protocols.length === 0 && apps.length === 0 ? (
                                   <small className="text-muted">—</small>

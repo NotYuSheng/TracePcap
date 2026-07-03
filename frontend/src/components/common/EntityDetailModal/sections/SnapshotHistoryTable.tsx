@@ -33,11 +33,12 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
                 <Table.HeaderCell className="text-muted fw-normal">MAC Address</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Manufacturer</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Device Type</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">Role</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Protocols / Apps</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps }, idx) => (
+              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleStale }, idx) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
@@ -53,6 +54,20 @@ export function SnapshotHistoryTable({ ipSnapHistory, ipHistoryLoading }: Snapsh
                   </Table.DataCell>
                   <Table.DataCell><small className="text-muted">{host?.manufacturer ?? '—'}</small></Table.DataCell>
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
+                  <Table.DataCell>
+                    {roleLabel ? (
+                      <span className="d-inline-flex align-items-center gap-1">
+                        <small>{roleLabel}</small>
+                        {roleStale && (
+                          <Badge bg="warning" text="dark" style={{ fontSize: '0.6rem' }} title="Label flagged stale in this snapshot">
+                            <i className="bi bi-exclamation-triangle" />
+                          </Badge>
+                        )}
+                      </span>
+                    ) : (
+                      <small className="text-muted">—</small>
+                    )}
+                  </Table.DataCell>
                   <Table.DataCell>
                     {protocols.length === 0 && apps.length === 0 ? (
                       <small className="text-muted">—</small>

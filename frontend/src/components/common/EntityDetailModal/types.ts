@@ -17,6 +17,9 @@ export interface IpSnapshotEntry {
   host: HostClassification | null;
   apps: string[];
   protocols: string[];
+  /** Per-snapshot role label (#369) and whether it was flagged stale in this snapshot. */
+  roleLabel: string | null;
+  roleStale: boolean;
 }
 
 export interface EntityStats {

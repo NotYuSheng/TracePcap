@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/services/api/client';
+import { insightsService } from '@/features/insights/services/insightsService';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import type { HostClassification, IpSnapshotEntry } from '../types';
@@ -36,17 +37,21 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
       // Fetch conversations for protocols/apps per seen snapshot
       return Promise.all(
         seen.map(({ snap, host }) =>
-          apiClient
-            .get<{ data: { appName: string | null; tsharkProtocol: string | null }[] }>(
-              `/conversations/${snap.fileId}?ip=${encodeURIComponent(entityKey)}&pageSize=10000`
-            )
-            .then(r => ({
-              snap,
-              host,
-              apps: [...new Set(r.data.data.map(c => c.appName).filter(Boolean) as string[])].sort(),
-              protocols: [...new Set(r.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
-            }))
-            .catch(() => ({ snap, host, apps: [], protocols: [] }))
+          Promise.all([
+            apiClient
+              .get<{ data: { appName: string | null; tsharkProtocol: string | null }[] }>(
+                `/conversations/${snap.fileId}?ip=${encodeURIComponent(entityKey)}&pageSize=10000`
+              )
+              .catch(() => ({ data: { data: [] } })),
+            insightsService.getNodeRole('IP', entityKey, snap.fileId).catch(() => null),
+          ]).then(([conv, role]) => ({
+            snap,
+            host,
+            apps: [...new Set(conv.data.data.map(c => c.appName).filter(Boolean) as string[])].sort(),
+            protocols: [...new Set(conv.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[])].sort(),
+            roleLabel: role?.roleLabel ?? null,
+            roleStale: !!role?.staleSince,
+          }))
         )
       ).then(entries => {
         if (!active) return;
