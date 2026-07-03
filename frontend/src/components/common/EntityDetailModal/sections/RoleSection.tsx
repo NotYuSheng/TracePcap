@@ -7,10 +7,43 @@ import type { useEntityRole } from '../hooks/useEntityRole';
 interface RoleSectionProps {
   fileId: string;
   role: ReturnType<typeof useEntityRole>;
+  /**
+   * Read-only "present-day" summary (no editing). Used in the multi-snapshot drift-panel modal,
+   * where roles are edited per-snapshot in the Snapshot History table below (#369).
+   */
+  readOnly?: boolean;
 }
 
 /** Role panel for IP/DEVICE entities — view, AI-suggest, accept/discard, manual edit. */
-export function RoleSection({ fileId, role: r }: RoleSectionProps) {
+export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
+  if (readOnly) {
+    return (
+      <div className="mb-4">
+        <h6 className="border-bottom pb-1 mb-2">Role <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· present-day (latest snapshot)</span></h6>
+        {r.roleLoading && <div className="text-muted small fst-italic">Loading role…</div>}
+        {!r.roleLoading && !r.role && (
+          <p className="text-muted small fst-italic mb-0">No role assigned. Set one per snapshot in the history below.</p>
+        )}
+        {!r.roleLoading && r.role && (
+          <div className={`p-2 rounded small ${r.role.confirmedByHuman && r.role.staleSince ? 'bg-warning-subtle border border-warning' : 'bg-light'}`}>
+            <div className="fw-semibold">
+              {r.role.roleLabel || <span className="text-muted fst-italic">No label</span>}
+              {r.role.llmSuggested && !r.role.confirmedByHuman && (
+                <Badge bg="warning" text="dark" className="ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-stars me-1" />AI suggested</Badge>
+              )}
+              {r.role.confirmedByHuman && (
+                <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.65rem' }}><i className="bi bi-tag me-1" />Manual label</Badge>
+              )}
+              {r.role.confirmedByHuman && r.role.staleSince && (
+                <Badge bg="warning" text="dark" className="ms-2" style={{ fontSize: '0.65rem' }} title={staleTooltip(r.role)}><i className="bi bi-exclamation-triangle me-1" />Stale</Badge>
+              )}
+            </div>
+            {r.role.roleDescription && <div className="text-muted mt-1">{r.role.roleDescription}</div>}
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="mb-4">
       <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center justify-content-between">

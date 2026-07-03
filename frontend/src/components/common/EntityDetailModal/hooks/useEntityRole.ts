@@ -17,6 +17,8 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
   const [roleLabelDraft, setRoleLabelDraft] = useState('');
   const [roleDescDraft, setRoleDescDraft] = useState('');
   const [roleSaving, setRoleSaving] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey(k => k + 1);
 
   // Load node role on mount for IP/DEVICE
   useEffect(() => {
@@ -38,7 +40,7 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
       .catch(err => { console.error('Failed to fetch node role:', err); })
       .finally(() => { if (active) setRoleLoading(false); });
     return () => { active = false; };
-  }, [showRole, entityType, entityKey, fileId]);
+  }, [showRole, entityType, entityKey, fileId, reloadKey]);
 
   const suggest = async () => {
     if (!fileId) return;
@@ -172,5 +174,6 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     save,
     dismissStaleness,
     suggestUpdate,
+    reload,
   };
 }

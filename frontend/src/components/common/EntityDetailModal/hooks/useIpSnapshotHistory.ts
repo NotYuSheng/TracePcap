@@ -12,6 +12,8 @@ import type { HostClassification, IpSnapshotEntry } from '../types';
 export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, snapshots?: NetworkSnapshot[]) {
   const [ipSnapHistory, setIpSnapHistory] = useState<IpSnapshotEntry[]>([]);
   const [ipHistoryLoading, setIpHistoryLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey(k => k + 1);
 
   useEffect(() => {
     // Reset so a previous entity's history can't leak when the modal is reused.
@@ -61,7 +63,7 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
     }).catch(() => { if (active) setIpHistoryLoading(false); });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityType, entityKey, snapshots?.map(s => s.id)?.join(',')]);
+  }, [entityType, entityKey, snapshots?.map(s => s.id)?.join(','), reloadKey]);
 
-  return { ipSnapHistory, ipHistoryLoading };
+  return { ipSnapHistory, ipHistoryLoading, reload };
 }
