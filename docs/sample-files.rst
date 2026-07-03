@@ -366,16 +366,10 @@ snapshot and validated against the new pcap (see :doc:`features/network-monitor`
    ``week2_personal_laptop_vpn.pcap`` row) and click the ``10.0.2.10`` node. In
    the **Role** section, confirm **File Server (SMB)**. This captures a week-2
    baseline — SMB only, before Carol's Telnet.
-2. The label is carried forward and checked when the next snapshot is analysed.
-   Because Carol begins Telnet to the file server in **week 3**, the week-3
-   classification is flagged the moment that transition is computed.
-
-   .. note::
-      Validation runs when a snapshot is *added* (the natural forward-flow: label
-      as captures arrive, and each new one is auto-checked). In this demo all eight
-      weeks are already loaded, so trigger the week 2 → week 3 check by re-adding
-      week 3 — **Manage PCAPs** → remove ``week3_telnet_bittorrent.pcap`` → add it
-      back.
+2. Saving the label immediately carries it forward onto every later snapshot and
+   re-validates each one. Because Carol begins Telnet to the file server in
+   **week 3**, the week-3 classification is flagged straight away — no need to
+   re-run anything.
 
 The label is flagged:
 

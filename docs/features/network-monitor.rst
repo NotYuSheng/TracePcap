@@ -461,20 +461,21 @@ Label Staleness Detection
 A confirmed label can silently become wrong as the network evolves — a host
 labelled "Printer" months ago may now run new services or talk to external IPs it
 never contacted before, and an analyst scanning the diagram sees only the
-reassuring old label. Label staleness detection guards against this by validating
-labels at ingest.
+reassuring old label. Label staleness detection guards against this by carrying
+labels forward and re-validating them as the network evolves.
 
 **How it works**
 
 1. Confirming a label captures a **baseline** of the node's key properties in
    that snapshot's file: MAC address, device type, dominant protocols, and
    external organisations contacted.
-2. When the **next snapshot is added**, that label is carried forward and the new
-   pcap's properties are compared against the baseline. If the MAC changed, a new
-   dominant protocol appeared, or a new external organisation was contacted, the
-   carried label is flagged **stale** (and a **LABEL_STALE** change event is
-   raised — see `Signal 5 — Label Staleness`_). Because this runs automatically at
-   ingest, there is no manual re-check.
+2. The label is carried forward onto every later snapshot and each is validated
+   against the baseline. If the MAC changed, a new dominant protocol appeared, or
+   a new external organisation was contacted, the carried label is flagged
+   **stale** (and a **LABEL_STALE** change event is raised — see `Signal 5 — Label
+   Staleness`_). This happens both when a new snapshot is **added** and the moment
+   you **label an existing snapshot** (the label propagates down the chain
+   immediately) — there is no manual re-check.
 
 **In the UI**
 
