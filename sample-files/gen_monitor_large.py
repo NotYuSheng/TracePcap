@@ -44,7 +44,9 @@ Policy violations story arc
   Week 3        Carol uses Telnet to file server (cleartext); Bob runs BitTorrent
   Week 4        Bob FTP-exfiltrates to external IP; ISP failover (gateway change)
   Week 5        Shadow device appears (no hostname, unusual OUI); ARP anomaly
-  Week 6        Multiple violations peak — FTP + BitTorrent + Telnet still active
+  Week 6        Multiple violations peak — FTP + BitTorrent + Telnet still active;
+                a branch-B office reusing 10.0.1.0/24 becomes visible (overlapping
+                networks: 10.0.1.10/.11/.12 each claimed by two devices at once)
   Week 7        Violations drop off (audit notice sent); gateway back to primary
   Week 8        Near-baseline; shadow device gone; one lingering personal device
 
@@ -204,6 +206,14 @@ WS_DAVE_MAC     = "ac:de:48:44:44:04";  WS_DAVE_IP      = "10.0.1.13"  # joins w
 LAPTOP_BOB_MAC  = "dc:a6:32:55:55:05";  LAPTOP_BOB_IP   = "10.0.4.20"  # Bob's personal, joins week 2
 MOBILE_EVE_MAC  = "f0:18:98:66:66:06";  MOBILE_EVE_IP   = "10.0.4.30"  # personal mobile, joins week 4
 SHADOW_DEV_MAC  = "b8:27:eb:77:77:07";  SHADOW_DEV_IP   = "10.0.4.50"  # unknown device, joins week 5
+
+# Branch-B office (week 6): a second site whose LAN ALSO uses 10.0.1.0/24 becomes
+# visible at this capture point (e.g. a newly bridged site-to-site link). Its hosts
+# reuse HQ's addresses .10/.11/.12 with different MACs — a genuine OVERLAPPING NETWORK,
+# not a spoof: several distinct IPs each claimed by two devices at once.
+BRANCH_B_A_MAC  = "52:54:00:b0:00:0a";  BRANCH_B_A_IP   = "10.0.1.10"   # collides with WS_ALICE
+BRANCH_B_B_MAC  = "52:54:00:b0:00:0b";  BRANCH_B_B_IP   = "10.0.1.11"   # collides with WS_BOB
+BRANCH_B_C_MAC  = "52:54:00:b0:00:0c";  BRANCH_B_C_IP   = "10.0.1.12"   # collides with WS_CAROL
 
 # External
 GW_PRIMARY      = "203.0.113.1"
@@ -644,7 +654,17 @@ def make_week6():
         arp_reply(LAPTOP_BOB_MAC, LAPTOP_BOB_IP,  GW_MAC, GW_IP,            t=t0 + 0.9),
         arp_reply(MOBILE_EVE_MAC, MOBILE_EVE_IP,  GW_MAC, GW_IP,            t=t0 + 1.0),
         arp_reply(SHADOW_DEV_MAC, SHADOW_DEV_IP,  GW_MAC, GW_IP,            t=t0 + 1.1),
+        # OVERLAPPING NETWORK: branch-B devices announce HQ's 10.0.1.10/.11/.12 with
+        # their own MACs — each of those IPs is now claimed by two devices at once.
+        arp_reply(BRANCH_B_A_MAC, BRANCH_B_A_IP,  GW_MAC, GW_IP,            t=t0 + 1.2),
+        arp_reply(BRANCH_B_B_MAC, BRANCH_B_B_IP,  GW_MAC, GW_IP,            t=t0 + 1.3),
+        arp_reply(BRANCH_B_C_MAC, BRANCH_B_C_IP,  GW_MAC, GW_IP,            t=t0 + 1.4),
     ]
+
+    # Branch-B hosts — real traffic from the colliding addresses (their own MACs)
+    pkts += https_session(BRANCH_B_A_MAC, GW_MAC, BRANCH_B_A_IP, gw, t0=t0 + 90.0)
+    pkts += smb_session(  BRANCH_B_B_MAC, GW_MAC, BRANCH_B_B_IP, FILESERVER_IP, t0=t0 + 92.0)
+    pkts += http_session( BRANCH_B_C_MAC, GW_MAC, BRANCH_B_C_IP, WEBSERVER_IP,  t0=t0 + 94.0)
 
     # Alice — normal
     pkts += http_session(WS_ALICE_MAC, GW_MAC, WS_ALICE_IP, WEBSERVER_IP,  t0=t0 + 2.0)
