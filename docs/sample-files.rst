@@ -183,18 +183,27 @@ Story Arc
        identity. Dave's workstation joins normally. Because that MAC now holds
        **two IPs** (its own ``10.0.4.50`` and Bob's ``10.0.1.11``), opening the
        shadow device in the **Device Snapshot History** shows a
-       "conflict — 2 IPs" badge — the MAC-side mirror of the IP overlap warning.
+       "conflict — 2 IPs" badge — the *malicious* one-MAC-two-IPs case (week 6
+       adds the benign multi-homed counterpart that raises the same badge).
        **Signals: MAC_ADDED (shadow device, Dave), IP_MAC_DRIFT CRITICAL
        (ARP spoof).**
    * - 6
      - ``week6_peak_violations.pcap``
      - Peak violation week. FTP exfiltration, BitTorrent, WireGuard VPN,
        Telnet, and the shadow device are all simultaneously active. Shadow
-       device also uses Telnet to the file server. A **branch-B office** reusing
-       ``10.0.1.0/24`` also becomes visible — ``10.0.1.10``/``.11``/``.12`` are
-       each claimed by two devices at once (overlapping networks).
+       device also uses Telnet to the file server. This week also lands **both**
+       conflict demos. *IP overlap (one IP → two MACs):* a **branch-B office**
+       reusing ``10.0.1.0/24`` becomes visible — ``10.0.1.10``/``.11``/``.12`` are
+       each claimed by two devices at once (overlapping networks). *Device
+       conflict (one MAC → two IPs):* the **file server becomes multi-homed** —
+       ``FILESERVER`` (MAC ``00:aa:bb:cc:dd:10``) now also owns ``10.0.2.11`` for a
+       backup service alongside its ``10.0.2.10``, so its **Device Snapshot
+       History** shows a "conflict — 2 IPs" badge. This is *benign* multi-homing,
+       the deliberate counterpart to week 5's *malicious* spoof (same badge,
+       opposite intent).
        **Signals: no new change events; define a subnet over ``10.0.1.0/24`` to
-       see the "possible overlapping networks" warning on this snapshot.**
+       see the "possible overlapping networks" warning, and open ``FILESERVER`` in
+       the Device Snapshot History to see the "conflict — 2 IPs" badge.**
    * - 7
      - ``week7_violations_drop_gateway_back.pcap``
      - Audit notice issued. FTP stops, BitTorrent stops, WireGuard stops, Telnet

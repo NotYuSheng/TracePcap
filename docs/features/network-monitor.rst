@@ -190,6 +190,42 @@ captures and are not yet parsed).
    Define a subnet over ``10.0.1.0/24`` and the warning appears on the relevant
    snapshot, even after later clean weeks are added. See :doc:`../sample-files`.
 
+Device address conflict (one MAC, multiple IPs)
+-----------------------------------------------
+
+The overlapping-network warning above is the *IP-side* view — one **IP** claimed
+by more than one **MAC**. The **device (MAC) view** surfaces the mirror image:
+one **MAC** that owns more than one **IP** within a single snapshot.
+
+Open a device in its **Device Snapshot History** and any snapshot where that MAC
+answered ARP for two or more addresses carries a **"conflict — N IPs" badge**,
+listing the IPs it held at that capture point.
+
+**How it is detected.** Same authoritative signal as the overlap warning — ARP
+ownership claims (``arp.src.hw_mac`` ↔ ``arp.src.proto_ipv4``), *not* the IP-layer
+``eth.src`` (a routed host's frames carry the gateway's MAC, which would falsely
+attribute every off-subnet IP to the router). Distinct ``proto_ipv4`` values for
+one ``hw_mac`` in a snapshot are recorded as the conflict.
+
+**Benign vs. malicious — same badge, read the context.** Unlike the IP-side
+overlap, one MAC holding several IPs has *legitimate* causes: a multi-homed
+server with a service/alias IP, a router or bridge with a foot in two subnets, or
+a host mid-DHCP-renewal. It can equally be an attacker — an ARP spoofer claiming
+a victim's IP alongside its own. The badge reports the fact; the analyst reads
+intent from the rest of the snapshot. Both appear in the demo:
+
+.. note::
+
+   - **Benign multi-homing** — ``week6_peak_violations.pcap`` makes the file
+     server multi-homed: MAC ``00:aa:bb:cc:dd:10`` owns both ``10.0.2.10`` and a
+     new backup-service alias ``10.0.2.11``. Its Device Snapshot History shows
+     "conflict — 2 IPs".
+   - **Malicious spoof** — ``week5_shadow_device_arp_spoof.pcap`` has the shadow
+     device ``b8:27:eb:77:77:07`` claim both its own ``10.0.4.50`` and Bob's
+     ``10.0.1.11``, raising the identical badge for the opposite reason.
+
+   See :doc:`../sample-files`.
+
 Severity Levels
 ---------------
 
