@@ -70,6 +70,9 @@ function ClassificationInfo() {
       className="bi bi-info-circle ms-1 text-muted"
       style={{ fontSize: '0.75em', cursor: 'help' }}
       title={CLASSIFICATION_HINT}
+      tabIndex={0}
+      role="img"
+      aria-label={CLASSIFICATION_HINT}
     ></i>
   );
 }

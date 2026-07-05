@@ -9,6 +9,7 @@ import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.insights.dto.LabelDrift;
 import com.tracepcap.insights.service.LabelStalenessService;
 import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
+import com.tracepcap.intelligence.entity.IpClassification;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
@@ -598,7 +599,7 @@ public class ChangeDetectionService {
     }
     List<String> globalPrivateCidrs =
         global.stream()
-            .filter(e -> CustomPrivateRangeService.PRIVATE.equals(e.getClassification()))
+            .filter(e -> e.getClassification() == IpClassification.PRIVATE)
             .map(CustomPrivateRangeEntity::getCidr)
             .collect(Collectors.toList());
     return new LocalityRules(globalPrivateCidrs, global);

@@ -2,6 +2,7 @@ package com.tracepcap.intelligence.service;
 
 import com.tracepcap.intelligence.dto.CustomPrivateRangeDto;
 import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
+import com.tracepcap.intelligence.entity.IpClassification;
 import com.tracepcap.intelligence.repository.CustomPrivateRangeRepository;
 import java.net.InetAddress;
 import java.time.LocalDateTime;
@@ -21,9 +22,6 @@ public class CustomPrivateRangeService {
 
   private final CustomPrivateRangeRepository repository;
 
-  public static final String PRIVATE = "PRIVATE";
-  public static final String PUBLIC = "PUBLIC";
-
   private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
   private final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
       new ConcurrentHashMap<>();
@@ -42,7 +40,7 @@ public class CustomPrivateRangeService {
     return CustomPrivateRangeDto.builder()
         .id(e.getId())
         .cidr(e.getCidr())
-        .classification(e.getClassification())
+        .classification(e.getClassification().name())
         .build();
   }
 
@@ -79,7 +77,7 @@ public class CustomPrivateRangeService {
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
     }
-    String classification = normaliseClassification(dto.getClassification());
+    IpClassification classification = parseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity = CustomPrivateRangeEntity.builder()
         .cidr(cidr)
         .classification(classification)
@@ -91,13 +89,13 @@ public class CustomPrivateRangeService {
   }
 
   /** Defaults to PRIVATE for backward compatibility; rejects anything else. */
-  private String normaliseClassification(String raw) {
-    if (raw == null || raw.isBlank()) return PRIVATE;
-    String upper = raw.trim().toUpperCase();
-    if (!upper.equals(PRIVATE) && !upper.equals(PUBLIC)) {
+  private IpClassification parseClassification(String raw) {
+    if (raw == null || raw.isBlank()) return IpClassification.PRIVATE;
+    try {
+      return IpClassification.valueOf(raw.trim().toUpperCase());
+    } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Classification must be PRIVATE or PUBLIC");
     }
-    return upper;
   }
 
   public void delete(Long id) {
@@ -142,7 +140,7 @@ public class CustomPrivateRangeService {
     if (addrBytes == null) return Override.NONE;
     for (CustomPrivateRangeEntity range : ranges) {
       if (inCidrBytes(addrBytes, range.getCidr())) {
-        return PUBLIC.equals(range.getClassification())
+        return range.getClassification() == IpClassification.PUBLIC
             ? Override.FORCE_PUBLIC
             : Override.FORCE_PRIVATE;
       }

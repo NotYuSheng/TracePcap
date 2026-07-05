@@ -993,6 +993,11 @@
             "type": "string"
           },
           "classification": {
+            "default": "PRIVATE",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ],
             "type": "string"
           },
           "id": {
