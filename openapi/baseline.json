@@ -992,12 +992,17 @@
           "cidr": {
             "type": "string"
           },
+          "classification": {
+            "default": "PRIVATE",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ],
+            "type": "string"
+          },
           "id": {
             "format": "int64",
             "type": "integer"
-          },
-          "label": {
-            "type": "string"
           }
         },
         "type": "object"

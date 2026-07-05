@@ -29,7 +29,10 @@ public class CustomPrivateRangeEntity {
   @Column(nullable = false, unique = true)
   private String cidr;
 
-  @Column private String label;
+  /** Whether matching IPs are forced to PRIVATE (internal) or PUBLIC (external). */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private IpClassification classification;
 
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;

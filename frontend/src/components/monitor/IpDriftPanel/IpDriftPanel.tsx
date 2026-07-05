@@ -5,7 +5,7 @@ import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
-import type { CustomPrivateRange } from '@/features/intelligence/types/customPrivateRange.types';
+import type { CustomPrivateRange, IpClassification } from '@/features/intelligence/types/customPrivateRange.types';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 
 interface IpDriftPanelProps {
@@ -34,8 +34,11 @@ function isRfc1918(ip: string): boolean {
 }
 
 function isPrivateIp(ip: string, customRanges: CustomPrivateRange[]): boolean {
-  if (isRfc1918(ip)) return true;
-  return customRanges.some(r => ipInCidr(ip, r.cidr));
+  // A user override wins over the RFC1918 heuristic, in either direction — the first
+  // matching range takes precedence (ranges arrive most-recent-first).
+  const match = customRanges.find(r => ipInCidr(ip, r.cidr));
+  if (match) return match.classification !== 'PUBLIC';
+  return isRfc1918(ip);
 }
 
 function ipToInt(ip: string): number {
@@ -44,6 +47,9 @@ function ipToInt(ip: string): number {
 }
 
 function ipInCidr(ip: string, cidr: string): boolean {
+  // ipToInt is IPv4-only; a colon means IPv6, which would otherwise both parse to 0
+  // and spuriously match. Bail out so IPv6 addresses never match an IPv4 CIDR (or vice versa).
+  if (ip.includes(':') || cidr.includes(':')) return false;
   try {
     const [base, bits] = cidr.split('/');
     const mask = bits ? (0xffffffff << (32 - parseInt(bits))) >>> 0 : 0xffffffff;
@@ -51,6 +57,24 @@ function ipInCidr(ip: string, cidr: string): boolean {
   } catch {
     return false;
   }
+}
+
+const CLASSIFICATION_HINT =
+  'Addresses are sorted automatically by their range (RFC1918 private vs. public). ' +
+  'To override this — force a public address to be treated as internal, or a private ' +
+  'address as external — add the IP or CIDR under “Classification overrides” below.';
+
+function ClassificationInfo() {
+  return (
+    <i
+      className="bi bi-info-circle ms-1 text-muted"
+      style={{ fontSize: '0.75em', cursor: 'help' }}
+      title={CLASSIFICATION_HINT}
+      tabIndex={0}
+      role="img"
+      aria-label={CLASSIFICATION_HINT}
+    ></i>
+  );
 }
 
 function stringHue(s: string): number {
@@ -126,7 +150,7 @@ function PrivateOverridesSection({
 }) {
   const [open, setOpen] = useState(false);
   const [cidr, setCidr] = useState('');
-  const [label, setLabel] = useState('');
+  const [classification, setClassification] = useState<IpClassification>('PRIVATE');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -136,10 +160,10 @@ function PrivateOverridesSection({
     setAdding(true);
     setAddError(null);
     try {
-      const created = await customPrivateRangeService.create(trimmed, label.trim());
+      const created = await customPrivateRangeService.create(trimmed, classification);
       onSaved(created);
       setCidr('');
-      setLabel('');
+      setClassification('PRIVATE');
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: unknown } })?.response?.data;
       setAddError(typeof msg === 'string' ? msg : 'Failed to add range');
@@ -167,8 +191,8 @@ function PrivateOverridesSection({
         onClick={() => setOpen(o => !o)}
       >
         <i className={`bi bi-chevron-${open ? 'up' : 'down'}`}></i>
-        <i className="bi bi-lock ms-1"></i>
-        Private IP overrides
+        <i className="bi bi-sliders ms-1"></i>
+        Classification overrides
         {customRanges.length > 0 && (
           <span className="badge bg-secondary ms-1" style={{ fontSize: '0.7rem' }}>
             {customRanges.length}
@@ -179,7 +203,9 @@ function PrivateOverridesSection({
       {open && (
         <div className="mt-2" style={{ fontSize: '0.82rem' }}>
           <p className="text-muted mb-2" style={{ fontSize: '0.78rem' }}>
-            Add a public IP or CIDR that should be treated as internal (e.g. a public address used by a private terminal).
+            Force an IP or CIDR to be treated as internal or external, overriding the automatic
+            RFC1918 sort (e.g. a public address used by a private terminal, or a private range that
+            is actually reached over the internet).
           </p>
           {customRanges.length > 0 && (
             <table className="table table-sm table-borderless mb-2">
@@ -187,7 +213,15 @@ function PrivateOverridesSection({
                 {customRanges.map(r => (
                   <tr key={r.id}>
                     <td className="font-monospace py-1 ps-0">{r.cidr}</td>
-                    <td className="text-muted py-1">{r.label ?? <em>—</em>}</td>
+                    <td className="py-1">
+                      <span
+                        className={`badge ${r.classification === 'PUBLIC' ? 'bg-primary' : 'bg-secondary'}`}
+                        style={{ fontSize: '0.68rem' }}
+                      >
+                        <i className={`bi bi-${r.classification === 'PUBLIC' ? 'globe' : 'house'} me-1`}></i>
+                        {r.classification === 'PUBLIC' ? 'Public' : 'Private'}
+                      </span>
+                    </td>
                     <td className="text-end py-1 pe-0">
                       <button
                         type="button"
@@ -213,15 +247,16 @@ function PrivateOverridesSection({
               onChange={e => setCidr(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
             />
-            <input
-              type="text"
-              className="form-control form-control-sm"
-              style={{ maxWidth: 160 }}
-              placeholder="Label (optional)"
-              value={label}
-              onChange={e => setLabel(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            />
+            <select
+              className="form-select form-select-sm"
+              style={{ maxWidth: 130 }}
+              value={classification}
+              onChange={e => setClassification(e.target.value as IpClassification)}
+              aria-label="Treat as"
+            >
+              <option value="PRIVATE">Private</option>
+              <option value="PUBLIC">Public</option>
+            </select>
             <Button
               type="button"
               variant="primary"
@@ -390,7 +425,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
           {unmatchedActive.filter(ip => isPrivateIp(ip, customRanges)).length > 0 || unmatchedAbsent.filter(e => isPrivateIp(e.key, customRanges)).length > 0 ? (
             <div className="mb-3">
               <small className="text-muted fw-semibold d-block mb-1">
-                <i className="bi bi-house me-1"></i>Private
+                <i className="bi bi-house me-1"></i>Private<ClassificationInfo />
               </small>
               <IpBadgeGroup
                 items={filterIps(unmatchedActive.filter(ip => isPrivateIp(ip, customRanges)))}
@@ -403,7 +438,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
           {unmatchedActive.filter(ip => !isPrivateIp(ip, customRanges)).length > 0 || unmatchedAbsent.filter(e => !isPrivateIp(e.key, customRanges)).length > 0 ? (
             <div className="mb-3">
               <small className="text-muted fw-semibold d-block mb-1">
-                <i className="bi bi-globe me-1"></i>Public
+                <i className="bi bi-globe me-1"></i>Public<ClassificationInfo />
               </small>
               <IpBadgeGroup
                 items={filterIps(unmatchedActive.filter(ip => !isPrivateIp(ip, customRanges)))}
@@ -419,7 +454,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
           {(privateIps.active.length > 0 || privateIps.absent.length > 0) && (
             <div className="mb-3">
               <small className="text-muted fw-semibold d-block mb-2">
-                <i className="bi bi-house me-1"></i>Private
+                <i className="bi bi-house me-1"></i>Private<ClassificationInfo />
               </small>
               <IpBadgeGroup
                 items={filterIps(privateIps.active)}
@@ -432,7 +467,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
           {(publicIps.active.length > 0 || publicIps.absent.length > 0) && (
             <div className="mb-3">
               <small className="text-muted fw-semibold d-block mb-2">
-                <i className="bi bi-globe me-1"></i>Public
+                <i className="bi bi-globe me-1"></i>Public<ClassificationInfo />
               </small>
               <IpBadgeGroup
                 items={filterIps(publicIps.active)}
