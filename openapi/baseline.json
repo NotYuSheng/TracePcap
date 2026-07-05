@@ -992,6 +992,9 @@
           "cidr": {
             "type": "string"
           },
+          "classification": {
+            "type": "string"
+          },
           "id": {
             "format": "int64",
             "type": "integer"

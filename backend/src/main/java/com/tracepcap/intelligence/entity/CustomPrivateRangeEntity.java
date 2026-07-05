@@ -31,6 +31,10 @@ public class CustomPrivateRangeEntity {
 
   @Column private String label;
 
+  /** Whether matching IPs are forced to "PRIVATE" (internal) or "PUBLIC" (external). */
+  @Column(nullable = false)
+  private String classification;
+
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
 }

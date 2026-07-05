@@ -8,6 +8,7 @@ import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.insights.dto.LabelDrift;
 import com.tracepcap.insights.service.LabelStalenessService;
+import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
@@ -256,8 +257,8 @@ public class ChangeDetectionService {
 
     if (fromFileId == null) return List.of();
 
-    List<String> fromCidrs = effectiveCidrs(fromSnapshot);
-    List<String> toCidrs = effectiveCidrs(toSnapshot);
+    LocalityRules fromCidrs = effectiveCidrs(fromSnapshot);
+    LocalityRules toCidrs = effectiveCidrs(toSnapshot);
     Set<String> fromExternalIps = externalIpsForFile(fromFileId, fromCidrs);
     Set<String> toExternalIps = externalIpsForFile(toFileId, toCidrs);
 
@@ -296,6 +297,7 @@ public class ChangeDetectionService {
     // Gateway heuristic: top-traffic external IP
     String fromGateway = topExternalIp(fromFileId, fromGeo, fromCidrs);
     String toGateway = topExternalIp(toFileId, toGeo, toCidrs);
+    // (rules threaded through so force-public overrides beat RFC1918)
     if (fromGateway != null && toGateway != null && !fromGateway.equals(toGateway)) {
       IpGeoInfoEntity fromGeoEntry = fromGeo.get(fromGateway);
       IpGeoInfoEntity toGeoEntry = toGeo.get(toGateway);
@@ -465,11 +467,11 @@ public class ChangeDetectionService {
     return result;
   }
 
-  private Set<String> externalIpsForFile(UUID fileId, List<String> customCidrs) {
+  private Set<String> externalIpsForFile(UUID fileId, LocalityRules rules) {
     if (fileId == null) return Set.of();
     return conversationRepository.findByFileId(fileId).stream()
         .flatMap(c -> Stream.of(c.getSrcIp(), c.getDstIp()))
-        .filter(ip -> ip != null && !isPrivate(ip, customCidrs))
+        .filter(ip -> ip != null && !isPrivate(ip, rules))
         .collect(Collectors.toSet());
   }
 
@@ -493,15 +495,15 @@ public class ChangeDetectionService {
 
   /** Returns the external IP with the highest total bytes for a file (gateway heuristic). */
   private String topExternalIp(
-      UUID fileId, Map<String, IpGeoInfoEntity> geoMap, List<String> customCidrs) {
+      UUID fileId, Map<String, IpGeoInfoEntity> geoMap, LocalityRules rules) {
     if (fileId == null || geoMap.isEmpty()) return null;
     Map<String, Long> ipBytes = new HashMap<>();
     for (ConversationEntity c : conversationRepository.findByFileId(fileId)) {
       String dst = c.getDstIp();
       String src = c.getSrcIp();
       String external = null;
-      if (dst != null && !isPrivate(dst, customCidrs) && geoMap.containsKey(dst)) external = dst;
-      else if (src != null && !isPrivate(src, customCidrs) && geoMap.containsKey(src))
+      if (dst != null && !isPrivate(dst, rules) && geoMap.containsKey(dst)) external = dst;
+      else if (src != null && !isPrivate(src, rules) && geoMap.containsKey(src))
         external = src;
       if (external != null) {
         ipBytes.merge(external, c.getTotalBytes() != null ? c.getTotalBytes() : 0L, Long::sum);
@@ -537,8 +539,28 @@ public class ChangeDetectionService {
         .collect(Collectors.toSet());
   }
 
-  private boolean isPrivate(String ip, List<String> customCidrs) {
+  /**
+   * Locality inputs for a file's classification: snapshot-scoped private CIDRs plus the global
+   * classification overrides (which can force either PRIVATE or PUBLIC).
+   */
+  private record LocalityRules(
+      List<String> privateCidrs, List<CustomPrivateRangeEntity> globalOverrides) {}
+
+  private boolean isPrivate(String ip, LocalityRules rules) {
     if (ip == null) return true;
+    // A global override wins over the RFC1918 heuristic, in either direction. This is what lets a
+    // private-looking address be forced to PUBLIC (and vice versa for a public address).
+    switch (customPrivateRangeService.overrideFor(ip, rules.globalOverrides())) {
+      case FORCE_PRIVATE -> {
+        return true;
+      }
+      case FORCE_PUBLIC -> {
+        return false;
+      }
+      case NONE -> {
+        // fall through to the range heuristics below
+      }
+    }
     for (String prefix : PRIVATE_PREFIXES) {
       if (ip.startsWith(prefix)) return true;
     }
@@ -553,26 +575,33 @@ public class ChangeDetectionService {
         }
       }
     }
-    return customPrivateRangeService.isInCidrs(ip, customCidrs);
+    return customPrivateRangeService.isInCidrs(ip, rules.privateCidrs());
   }
 
   /**
-   * Returns the effective CIDR list for a snapshot: its own subnet overrides if any are defined,
-   * otherwise falls back to the global custom private ranges.
+   * Returns the locality rules for a snapshot: its own subnet overrides as private CIDRs if any are
+   * defined (otherwise the global private ranges), always paired with the global classification
+   * overrides so force-public rules apply regardless of snapshot scope.
    */
-  private List<String> effectiveCidrs(NetworkSnapshotEntity snapshot) {
+  private LocalityRules effectiveCidrs(NetworkSnapshotEntity snapshot) {
+    List<CustomPrivateRangeEntity> global = customPrivateRangeService.loadRanges();
     if (snapshot != null) {
       List<SnapshotSubnetOverrideEntity> overrides =
           snapshotSubnetOverrideRepository.findBySnapshotId(snapshot.getId());
       if (!overrides.isEmpty()) {
-        return overrides.stream()
-            .map(SnapshotSubnetOverrideEntity::getCidr)
-            .collect(Collectors.toList());
+        List<String> snapshotCidrs =
+            overrides.stream()
+                .map(SnapshotSubnetOverrideEntity::getCidr)
+                .collect(Collectors.toList());
+        return new LocalityRules(snapshotCidrs, global);
       }
     }
-    return customPrivateRangeService.loadRanges().stream()
-        .map(e -> e.getCidr())
-        .collect(Collectors.toList());
+    List<String> globalPrivateCidrs =
+        global.stream()
+            .filter(e -> CustomPrivateRangeService.PRIVATE.equals(e.getClassification()))
+            .map(CustomPrivateRangeEntity::getCidr)
+            .collect(Collectors.toList());
+    return new LocalityRules(globalPrivateCidrs, global);
   }
 
   private static String orEmpty(String s) {

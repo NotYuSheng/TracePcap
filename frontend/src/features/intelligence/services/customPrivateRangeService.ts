@@ -1,5 +1,5 @@
 import { apiClient } from '@/services/api/client';
-import type { CustomPrivateRange } from '../types/customPrivateRange.types';
+import type { CustomPrivateRange, IpClassification } from '../types/customPrivateRange.types';
 
 export const customPrivateRangeService = {
   async list(): Promise<CustomPrivateRange[]> {
@@ -7,8 +7,16 @@ export const customPrivateRangeService = {
     return res.data;
   },
 
-  async create(cidr: string, label: string): Promise<CustomPrivateRange> {
-    const res = await apiClient.post<CustomPrivateRange>('/custom-private-ranges', { cidr, label });
+  async create(
+    cidr: string,
+    label: string,
+    classification: IpClassification = 'PRIVATE',
+  ): Promise<CustomPrivateRange> {
+    const res = await apiClient.post<CustomPrivateRange>('/custom-private-ranges', {
+      cidr,
+      label,
+      classification,
+    });
     return res.data;
   },
 

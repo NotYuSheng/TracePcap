@@ -21,6 +21,9 @@ public class CustomPrivateRangeService {
 
   private final CustomPrivateRangeRepository repository;
 
+  public static final String PRIVATE = "PRIVATE";
+  public static final String PUBLIC = "PUBLIC";
+
   private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
   private final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
       new ConcurrentHashMap<>();
@@ -31,8 +34,17 @@ public class CustomPrivateRangeService {
 
   public List<CustomPrivateRangeDto> list() {
     return repository.findAllByOrderByCreatedAtDesc().stream()
-        .map(e -> CustomPrivateRangeDto.builder().id(e.getId()).cidr(e.getCidr()).label(e.getLabel()).build())
+        .map(CustomPrivateRangeService::toDto)
         .collect(Collectors.toList());
+  }
+
+  private static CustomPrivateRangeDto toDto(CustomPrivateRangeEntity e) {
+    return CustomPrivateRangeDto.builder()
+        .id(e.getId())
+        .cidr(e.getCidr())
+        .label(e.getLabel())
+        .classification(e.getClassification())
+        .build();
   }
 
   public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
@@ -72,14 +84,26 @@ public class CustomPrivateRangeService {
     if (label != null && label.length() > 255) {
       throw new IllegalArgumentException("Label cannot exceed 255 characters");
     }
+    String classification = normaliseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity = CustomPrivateRangeEntity.builder()
         .cidr(cidr)
         .label(label)
+        .classification(classification)
         .createdAt(LocalDateTime.now())
         .build();
     entity = repository.save(entity);
     cidrCache.clear();
-    return CustomPrivateRangeDto.builder().id(entity.getId()).cidr(entity.getCidr()).label(entity.getLabel()).build();
+    return toDto(entity);
+  }
+
+  /** Defaults to PRIVATE for backward compatibility; rejects anything else. */
+  private String normaliseClassification(String raw) {
+    if (raw == null || raw.isBlank()) return PRIVATE;
+    String upper = raw.trim().toUpperCase();
+    if (!upper.equals(PRIVATE) && !upper.equals(PUBLIC)) {
+      throw new IllegalArgumentException("Classification must be PRIVATE or PUBLIC");
+    }
+    return upper;
   }
 
   public void delete(Long id) {
@@ -104,6 +128,32 @@ public class CustomPrivateRangeService {
       if (inCidrBytes(addrBytes, range.getCidr())) return true;
     }
     return false;
+  }
+
+  /** Verdict for an IP against the classification overrides. */
+  public enum Override {
+    FORCE_PRIVATE,
+    FORCE_PUBLIC,
+    NONE
+  }
+
+  /**
+   * Returns the classification override that applies to an IP, or {@link Override#NONE} if no range
+   * matches. When multiple ranges match, the first in the provided list wins (ranges are ordered
+   * most-recent-first), so a newer override takes precedence.
+   */
+  public Override overrideFor(String ip, List<CustomPrivateRangeEntity> ranges) {
+    if (ip == null || ranges.isEmpty()) return Override.NONE;
+    byte[] addrBytes = resolveAddress(ip);
+    if (addrBytes == null) return Override.NONE;
+    for (CustomPrivateRangeEntity range : ranges) {
+      if (inCidrBytes(addrBytes, range.getCidr())) {
+        return PUBLIC.equals(range.getClassification())
+            ? Override.FORCE_PUBLIC
+            : Override.FORCE_PRIVATE;
+      }
+    }
+    return Override.NONE;
   }
 
   /**
