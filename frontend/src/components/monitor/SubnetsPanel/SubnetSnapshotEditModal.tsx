@@ -53,10 +53,17 @@ export function SubnetSnapshotEditModal({ subnetId, networkId, cidr, snapshot, o
       const others: SubnetOverrideInput[] = (snapshot.subnetOverrides ?? [])
         .filter(o => o.cidr !== cidr)
         .map(o => ({ cidr: o.cidr, label: o.label, description: o.description, inherited: o.inherited }));
-      const merged: SubnetOverrideInput[] = [
-        ...others,
-        { cidr, label: label.trim() || null, description: description.trim() || null, inherited: false },
-      ];
+      // Clearing both fields removes the direct override entirely, so the subnet falls back to a
+      // carried-forward label (or the global definition) rather than pinning a blank direct override.
+      const merged: SubnetOverrideInput[] = [...others];
+      if (label.trim() || description.trim()) {
+        merged.push({
+          cidr,
+          label: label.trim() || null,
+          description: description.trim() || null,
+          inherited: false,
+        });
+      }
       await insightsService.patchSnapshot(networkId, snapshot.id, { subnetOverrides: merged });
       onSaved(label.trim() || null);
       onClose();

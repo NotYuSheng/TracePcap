@@ -203,16 +203,13 @@ public class SnapshotService {
       }
       // Subnet labels carry forward transitively, so a change here must cascade to the whole tail
       // (detectChanges above only touches adjacent pairs). Re-carry every transition from here on.
+      // Let failures propagate: carryForward runs in this same (class-level @Transactional)
+      // transaction, so swallowing a RuntimeException would only surface later as an opaque
+      // UnexpectedRollbackException at commit — better to roll back cleanly with the real cause.
       if (idx >= 0) {
         for (int i = idx; i + 1 < ordered.size(); i++) {
-          try {
-            subnetOverrideCarryForwardService.carryForward(
-                ordered.get(i).getId(), ordered.get(i + 1).getId());
-          } catch (Exception e) {
-            log.error(
-                "Subnet carry-forward failed {}->{}: {}",
-                ordered.get(i).getId(), ordered.get(i + 1).getId(), e.getMessage(), e);
-          }
+          subnetOverrideCarryForwardService.carryForward(
+              ordered.get(i).getId(), ordered.get(i + 1).getId());
         }
       }
     }

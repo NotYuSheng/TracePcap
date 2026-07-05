@@ -97,7 +97,7 @@ public class SubnetStalenessService {
 
     long[] range;
     try {
-      range = cidrRange(cidr);
+      range = CidrRange.of(cidr);
     } catch (Exception e) {
       return comp;
     }
@@ -280,21 +280,4 @@ public class SubnetStalenessService {
         .orElse(null);
   }
 
-  /** Inclusive [network, broadcast] integer range for an IPv4 CIDR. */
-  private static long[] cidrRange(String cidr) {
-    String[] parts = cidr.split("/");
-    long base = ipToLong(parts[0]);
-    int prefix = Integer.parseInt(parts[1]);
-    long mask = prefix == 0 ? 0L : (0xFFFFFFFFL << (32 - prefix)) & 0xFFFFFFFFL;
-    long network = base & mask;
-    long broadcast = network | (~mask & 0xFFFFFFFFL);
-    return new long[] {network, broadcast};
-  }
-
-  private static long ipToLong(String ip) {
-    String[] o = ip.split("\\.");
-    long v = 0;
-    for (String part : o) v = (v << 8) | Integer.parseInt(part);
-    return v;
-  }
 }

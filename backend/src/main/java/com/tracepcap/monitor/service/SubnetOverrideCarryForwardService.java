@@ -53,9 +53,10 @@ public class SubnetOverrideCarryForwardService {
             .map(SnapshotSubnetOverrideEntity::getCidr)
             .collect(Collectors.toSet());
 
+    List<SnapshotSubnetOverrideEntity> toSave = new java.util.ArrayList<>();
     for (SnapshotSubnetOverrideEntity src : prev) {
       if (directCidrs.contains(src.getCidr())) continue;
-      overrideRepository.save(
+      toSave.add(
           SnapshotSubnetOverrideEntity.builder()
               .snapshot(newSnapshot)
               .cidr(src.getCidr())
@@ -64,5 +65,6 @@ public class SubnetOverrideCarryForwardService {
               .inherited(true)
               .build());
     }
+    if (!toSave.isEmpty()) overrideRepository.saveAll(toSave);
   }
 }
