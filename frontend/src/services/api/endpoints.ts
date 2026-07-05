@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
 
   // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
+  ENTITY_STATS: (fileId: string) => `/conversations/${fileId}/entity-stats`,
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,
   SECURITY_ALERTS: (fileId: string) => `/files/${fileId}/security-alerts`,
   RISK_TYPES: (fileId: string) => `/conversations/${fileId}/risk-types`,

@@ -1,23 +1,22 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 import type { EntityStats } from '../types';
 
-interface ConvRow {
-  srcIp: string;
-  dstIp: string;
+/** Server-computed aggregate stats for an APPLICATION/PROTOCOL entity (#436). */
+interface EntityStatsApiResponse {
+  conversationCount: number;
   packetCount: number;
   totalBytes: number;
-}
-
-interface ConvApiResponse {
-  data: ConvRow[];
-  total: number;
+  topPeers: { ip: string; bytes: number }[];
 }
 
 /**
  * Aggregate stats (conversation/packet/byte totals + top peer IPs) for
- * APPLICATION/PROTOCOL entities, derived from the conversations API.
+ * APPLICATION/PROTOCOL entities. The backend aggregates across ALL matching
+ * conversations, so the numbers stay internally consistent regardless of
+ * conversation count and the client never fans out page-by-page (#436).
  */
 export function useEntityStats(entityType: EntityType, entityKey: string, fileId: string) {
   const [stats, setStats] = useState<EntityStats | null>(null);
@@ -32,26 +31,20 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
     setStatsError(null);
     if (!fileId || (entityType !== 'APPLICATION' && entityType !== 'PROTOCOL')) return;
     setStatsLoading(true);
-    const param = entityType === 'APPLICATION' ? `apps=${encodeURIComponent(entityKey)}` : `l7Protocols=${encodeURIComponent(entityKey)}`;
+    const param = entityType === 'APPLICATION' ? 'app' : 'l7Protocol';
     apiClient
-      .get<ConvApiResponse>(`/conversations/${fileId}?${param}&pageSize=500&page=1`)
+      .get<EntityStatsApiResponse>(
+        `${API_ENDPOINTS.ENTITY_STATS(fileId)}?${param}=${encodeURIComponent(entityKey)}`
+      )
       .then(res => {
         if (!active) return;
-        const rows = res.data.data;
-        const total = res.data.total;
-        const packets = rows.reduce((s, r) => s + r.packetCount, 0);
-        const bytes = rows.reduce((s, r) => s + r.totalBytes, 0);
-        // Aggregate bytes per peer IP
-        const peerBytes = new Map<string, number>();
-        for (const r of rows) {
-          peerBytes.set(r.srcIp, (peerBytes.get(r.srcIp) ?? 0) + r.totalBytes);
-          peerBytes.set(r.dstIp, (peerBytes.get(r.dstIp) ?? 0) + r.totalBytes);
-        }
-        const topPeers = Array.from(peerBytes.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
-          .map(([ip, b]) => ({ ip, bytes: b }));
-        setStats({ conversationCount: total, packetCount: packets, totalBytes: bytes, topPeers });
+        const d = res.data;
+        setStats({
+          conversationCount: d.conversationCount,
+          packetCount: d.packetCount,
+          totalBytes: d.totalBytes,
+          topPeers: d.topPeers,
+        });
       })
       .catch(() => { if (active) setStatsError('Failed to load details'); })
       .finally(() => { if (active) setStatsLoading(false); });
