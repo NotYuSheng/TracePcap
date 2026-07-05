@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Button, Form } from '@govtechsg/sgds-react';
+import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { SubnetDiagramModal } from '@components/monitor/SubnetDiagramModal/SubnetDiagramModal';
+import { SubnetDetailModal } from '@components/monitor/SubnetsPanel/SubnetDetailModal';
 import { subnetService } from '@/features/subnets/services/subnetService';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
@@ -14,13 +15,6 @@ interface SubnetsPanelProps {
   onDeleted: (id: number) => void;
 }
 
-interface EditState {
-  id: number | null;
-  cidr: string;
-  label: string;
-  description: string;
-}
-
 export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted }: SubnetsPanelProps) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addCidr, setAddCidr] = useState('');
@@ -28,8 +22,7 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
   const [addDesc, setAddDesc] = useState('');
   const [addSaving, setAddSaving] = useState(false);
 
-  const [editState, setEditState] = useState<EditState | null>(null);
-  const [editSaving, setEditSaving] = useState(false);
+  const [detailSubnet, setDetailSubnet] = useState<SubnetDefinition | null>(null);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [diagramSubnet, setDiagramSubnet] = useState<SubnetDefinition | null>(null);
@@ -47,24 +40,12 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
     if (!addCidr.trim()) return;
     setAddSaving(true);
     try {
-      const saved = await subnetService.upsert(addCidr.trim(), addLabel.trim(), addDesc.trim(), true);
+      const saved = await subnetService.upsert(addCidr.trim(), addLabel.trim(), addDesc.trim(), true, networkId);
       onSaved(saved);
       setAddCidr(''); setAddLabel(''); setAddDesc('');
       setShowAddForm(false);
     } finally {
       setAddSaving(false);
-    }
-  };
-
-  const handleEditSave = async () => {
-    if (!editState) return;
-    setEditSaving(true);
-    try {
-      const saved = await subnetService.upsert(editState.cidr.trim(), editState.label.trim(), editState.description.trim(), true);
-      onSaved(saved);
-      setEditState(null);
-    } finally {
-      setEditSaving(false);
     }
   };
 
@@ -134,55 +115,35 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
             </thead>
             <tbody>
               {subnets.map(subnet => (
-                <tr key={subnet.id}>
-                  {editState?.id === subnet.id ? (
-                    <>
-                      <td>
-                        <Form.Control
-                          size="sm"
-                          value={editState.cidr}
-                          onChange={e => setEditState({ ...editState, cidr: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <Form.Control
-                          size="sm"
-                          value={editState.label}
-                          onChange={e => setEditState({ ...editState, label: e.target.value })}
-                          placeholder="e.g. Corporate LAN"
-                        />
-                      </td>
-                      <td>
-                        <Form.Control
-                          size="sm"
-                          value={editState.description}
-                          onChange={e => setEditState({ ...editState, description: e.target.value })}
-                          placeholder="Optional description"
-                        />
-                      </td>
-                      <td></td>
-                      <td>
-                        <div className="d-flex gap-1">
-                          <Button size="sm" variant="primary" onClick={handleEditSave} disabled={editSaving || !editState.cidr.trim()}>
-                            {editSaving ? <Spinner animation="border" size="sm" /> : <i className="bi bi-floppy" />}
-                          </Button>
-                          <Button size="sm" variant="outline-secondary" onClick={() => setEditState(null)} disabled={editSaving}>
-                            <i className="bi bi-x-lg" />
-                          </Button>
+                <tr
+                  key={subnet.id}
+                  onClick={() => setDetailSubnet(subnet)}
+                  style={{ cursor: 'pointer' }}
+                  title="Open subnet details"
+                >
+                      <td className="small font-monospace">{subnet.cidr}</td>
+                      <td className="small">
+                        <div className="d-flex align-items-center gap-1">
+                          {subnet.label || <span className="text-muted fst-italic">—</span>}
+                          {subnet.staleSince && (
+                            <Badge
+                              bg="warning"
+                              text="dark"
+                              style={{ fontSize: '0.6rem' }}
+                              title="Composition drifted since this label was set — open to review"
+                            >
+                              <i className="bi bi-exclamation-triangle me-1" />Stale
+                            </Badge>
+                          )}
                         </div>
                       </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="font-monospace small">{subnet.cidr}</td>
-                      <td className="small">{subnet.label || <span className="text-muted fst-italic">—</span>}</td>
                       <td className="small text-muted">{subnet.description || '—'}</td>
                       <td>
                         <span className={`badge ${subnet.source === 'AUTO' ? 'bg-info text-dark' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>
                           {subnet.source === 'AUTO' ? 'Detected' : 'Manual'}
                         </span>
                       </td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         <div className="d-flex gap-1">
                           {snapshots.length > 0 && (
                             <Button
@@ -196,13 +157,6 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                           )}
                           <Button
                             size="sm"
-                            variant="outline-secondary"
-                            onClick={() => setEditState({ id: subnet.id, cidr: subnet.cidr, label: subnet.label ?? '', description: subnet.description ?? '' })}
-                          >
-                            <i className="bi bi-pencil" />
-                          </Button>
-                          <Button
-                            size="sm"
                             variant="outline-danger"
                             onClick={() => subnet.id !== null && handleDelete(subnet.id)}
                             disabled={deletingId === subnet.id}
@@ -213,8 +167,6 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                           </Button>
                         </div>
                       </td>
-                    </>
-                  )}
                 </tr>
               ))}
             </tbody>
@@ -395,6 +347,15 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
           snapshots={snapshots}
           onHide={() => setDiagramSubnet(null)}
           defaultSnapId={diagramDefaultSnapId}
+        />
+      )}
+
+      {detailSubnet && (
+        <SubnetDetailModal
+          subnet={detailSubnet}
+          networkId={networkId}
+          snapshots={snapshots}
+          onClose={() => setDetailSubnet(null)}
         />
       )}
 

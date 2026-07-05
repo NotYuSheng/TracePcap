@@ -34,6 +34,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/custom-signatures
    features/report-export
    features/network-monitor
+   features/label-staleness
    features/streaming-upload
 
 .. toctree::

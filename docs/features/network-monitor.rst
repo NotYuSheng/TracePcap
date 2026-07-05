@@ -35,7 +35,8 @@ Overview
 - Devices and IP addresses can be annotated with **role labels** (manually or
   via AI suggestion) to provide operational context. Confirmed labels are
   automatically flagged **stale** when the underlying node's behaviour later
-  drifts from what it was at label time.
+  drifts from what it was at label time. Subnet definitions work the same way.
+  See :doc:`label-staleness` for exactly how the flag is raised.
 - **External Events** log real-world events (maintenance windows, firmware
   upgrades) with timestamps for correlation against network changes.
 - **Analyst Annotations** record free-text notes that feed into AI insight

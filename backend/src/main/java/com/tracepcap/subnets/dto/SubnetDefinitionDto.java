@@ -1,6 +1,7 @@
 package com.tracepcap.subnets.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,6 +18,9 @@ public class SubnetDefinitionDto {
   private Double densityScore;     // observed hosts / subnet capacity (0–1)
   private Integer snapshotsSeen;   // cross-snapshot consensus fields
   private Integer totalSnapshots;
+  private LocalDateTime labeledAt; // when the label was last confirmed (staleness baseline time)
+  private LocalDateTime staleSince; // null = not stale
+  private List<String> staleFields; // what drifted since the label baseline
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

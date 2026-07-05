@@ -39,6 +39,7 @@ public class SnapshotService {
   private final NetworkChangeEventRepository changeEventRepository;
   private final SnapshotInsightRepository snapshotInsightRepository;
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
+  private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -198,6 +199,17 @@ public class SnapshotService {
           changeDetectionService.detectChanges(snapshot, successor);
         } catch (Exception e) {
           log.error("Change detection failed snapshot->successor {}: {}", snapshotId, e.getMessage(), e);
+        }
+      }
+      // Subnet labels carry forward transitively, so a change here must cascade to the whole tail
+      // (detectChanges above only touches adjacent pairs). Re-carry every transition from here on.
+      // Let failures propagate: carryForward runs in this same (class-level @Transactional)
+      // transaction, so swallowing a RuntimeException would only surface later as an opaque
+      // UnexpectedRollbackException at commit — better to roll back cleanly with the real cause.
+      if (idx >= 0) {
+        for (int i = idx; i + 1 < ordered.size(); i++) {
+          subnetOverrideCarryForwardService.carryForward(
+              ordered.get(i).getId(), ordered.get(i + 1).getId());
         }
       }
     }

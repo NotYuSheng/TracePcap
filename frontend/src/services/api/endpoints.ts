@@ -118,6 +118,17 @@ export const SUBNET_ENDPOINTS = {
   SUBNET_DETECT: (fileId: string) => `/subnets/detect?fileId=${fileId}`,
   SUBNET_DETECT_NETWORK: (networkId: string) => `/subnets/detect/network?networkId=${networkId}`,
   SUBNET_SAVE_DETECTED: '/subnets/detected',
+  SUBNET_SUGGEST_LABEL: (id: number, networkId?: string, fileId?: string) => {
+    const p = new URLSearchParams();
+    if (networkId) p.set('networkId', networkId);
+    if (fileId) p.set('fileId', fileId);
+    const q = p.toString();
+    return `/subnets/${id}/suggest-label${q ? `?${q}` : ''}`;
+  },
+  SUBNET_HISTORY: (id: number, networkId: string) =>
+    `/subnets/${id}/history?networkId=${networkId}`,
+  SUBNET_DISMISS_STALENESS: (id: number, networkId?: string) =>
+    `/subnets/${id}/dismiss-staleness${networkId ? `?networkId=${networkId}` : ''}`,
 };
 
 export const INSIGHTS_ENDPOINTS = {

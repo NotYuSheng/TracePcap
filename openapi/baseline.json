@@ -493,6 +493,42 @@
         },
         "type": "object"
       },
+      "CompositionHistoryEntry": {
+        "properties": {
+          "deviceTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "memberCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "protocols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "snapshotOrder": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ConversationDetailResponse": {
         "properties": {
           "appName": {
@@ -2712,11 +2748,25 @@
           "label": {
             "type": "string"
           },
+          "labeledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "snapshotsSeen": {
             "format": "int32",
             "type": "integer"
           },
           "source": {
+            "type": "string"
+          },
+          "staleFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "staleSince": {
+            "format": "date-time",
             "type": "string"
           },
           "totalSnapshots": {
@@ -2726,6 +2776,25 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SubnetLabelSuggestionDto": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "memberCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "snapshotCount": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -3057,6 +3126,10 @@
             "type": "string"
           },
           "label": {
+            "type": "string"
+          },
+          "networkId": {
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -7148,6 +7221,153 @@
           }
         },
         "summary": "Delete a subnet definition",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/{id}/dismiss-staleness": {
+      "post": {
+        "operationId": "dismissSubnetStaleness",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetDefinitionDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Mark a stale subnet label as still correct and re-baseline its composition",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/{id}/history": {
+      "get": {
+        "description": "For each snapshot of the given network where the subnet had members, returns the member count and dominant device types + protocols — the basis for staleness detection.",
+        "operationId": "history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CompositionHistoryEntry"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Per-snapshot composition history for a subnet",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/{id}/suggest-label": {
+      "post": {
+        "description": "Collects the subnet's member nodes across recent snapshots and asks the LLM to suggest a concise label naming the subnet plus a description of its purpose and any anomalies. The result is not persisted — the analyst reviews it in the edit form and saves it onto the subnet's own label/description. Optionally scope to a network via networkId.",
+        "operationId": "suggestLabel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetLabelSuggestionDto"
+                }
+              }
+            },
+            "description": "Suggested label + description"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetLabelSuggestionDto"
+                }
+              }
+            },
+            "description": "No member nodes observed — insufficient evidence"
+          }
+        },
+        "summary": "Suggest a label + description for a subnet with AI",
         "tags": [
           "Subnets"
         ]

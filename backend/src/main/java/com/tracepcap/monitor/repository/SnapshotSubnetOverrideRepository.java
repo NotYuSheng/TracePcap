@@ -20,6 +20,13 @@ public interface SnapshotSubnetOverrideRepository
   @Query("DELETE FROM SnapshotSubnetOverrideEntity o WHERE o.snapshot.id = :snapshotId")
   void deleteBySnapshotId(@Param("snapshotId") UUID snapshotId);
 
+  /** Clear only carried (inherited) overrides on a snapshot, leaving analyst-set ones intact. */
+  @Modifying
+  @Query(
+      "DELETE FROM SnapshotSubnetOverrideEntity o "
+          + "WHERE o.snapshot.id = :snapshotId AND o.inherited = true")
+  void deleteBySnapshotIdAndInheritedTrue(@Param("snapshotId") UUID snapshotId);
+
   @Query("SELECT o FROM SnapshotSubnetOverrideEntity o WHERE o.snapshot.id IN :ids")
   List<SnapshotSubnetOverrideEntity> findBySnapshotIdIn(@Param("ids") List<UUID> ids);
 }
