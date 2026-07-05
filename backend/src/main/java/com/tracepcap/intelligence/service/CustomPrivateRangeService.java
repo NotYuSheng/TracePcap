@@ -42,7 +42,6 @@ public class CustomPrivateRangeService {
     return CustomPrivateRangeDto.builder()
         .id(e.getId())
         .cidr(e.getCidr())
-        .label(e.getLabel())
         .classification(e.getClassification())
         .build();
   }
@@ -80,14 +79,9 @@ public class CustomPrivateRangeService {
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
     }
-    String label = dto.getLabel() != null && !dto.getLabel().isBlank() ? dto.getLabel().trim() : null;
-    if (label != null && label.length() > 255) {
-      throw new IllegalArgumentException("Label cannot exceed 255 characters");
-    }
     String classification = normaliseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity = CustomPrivateRangeEntity.builder()
         .cidr(cidr)
-        .label(label)
         .classification(classification)
         .createdAt(LocalDateTime.now())
         .build();

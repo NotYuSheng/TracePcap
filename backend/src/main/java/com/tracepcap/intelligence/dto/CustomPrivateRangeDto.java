@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 public class CustomPrivateRangeDto {
   private Long id;
   private String cidr;
-  private String label;
   /** "PRIVATE" (treat as internal) or "PUBLIC" (treat as external). Defaults to PRIVATE. */
   private String classification;
 }

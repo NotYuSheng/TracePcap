@@ -144,7 +144,6 @@ function PrivateOverridesSection({
 }) {
   const [open, setOpen] = useState(false);
   const [cidr, setCidr] = useState('');
-  const [label, setLabel] = useState('');
   const [classification, setClassification] = useState<IpClassification>('PRIVATE');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -155,10 +154,9 @@ function PrivateOverridesSection({
     setAdding(true);
     setAddError(null);
     try {
-      const created = await customPrivateRangeService.create(trimmed, label.trim(), classification);
+      const created = await customPrivateRangeService.create(trimmed, classification);
       onSaved(created);
       setCidr('');
-      setLabel('');
       setClassification('PRIVATE');
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: unknown } })?.response?.data;
@@ -218,7 +216,6 @@ function PrivateOverridesSection({
                         {r.classification === 'PUBLIC' ? 'Public' : 'Private'}
                       </span>
                     </td>
-                    <td className="text-muted py-1">{r.label ?? <em>—</em>}</td>
                     <td className="text-end py-1 pe-0">
                       <button
                         type="button"
@@ -254,15 +251,6 @@ function PrivateOverridesSection({
               <option value="PRIVATE">Private</option>
               <option value="PUBLIC">Public</option>
             </select>
-            <input
-              type="text"
-              className="form-control form-control-sm"
-              style={{ maxWidth: 160 }}
-              placeholder="Label (optional)"
-              value={label}
-              onChange={e => setLabel(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            />
             <Button
               type="button"
               variant="primary"

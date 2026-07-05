@@ -29,8 +29,6 @@ public class CustomPrivateRangeEntity {
   @Column(nullable = false, unique = true)
   private String cidr;
 
-  @Column private String label;
-
   /** Whether matching IPs are forced to "PRIVATE" (internal) or "PUBLIC" (external). */
   @Column(nullable = false)
   private String classification;

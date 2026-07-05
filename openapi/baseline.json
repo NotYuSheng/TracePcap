@@ -998,9 +998,6 @@
           "id": {
             "format": "int64",
             "type": "integer"
-          },
-          "label": {
-            "type": "string"
           }
         },
         "type": "object"

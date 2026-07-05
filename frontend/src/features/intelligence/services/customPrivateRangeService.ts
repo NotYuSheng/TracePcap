@@ -9,12 +9,10 @@ export const customPrivateRangeService = {
 
   async create(
     cidr: string,
-    label: string,
     classification: IpClassification = 'PRIVATE',
   ): Promise<CustomPrivateRange> {
     const res = await apiClient.post<CustomPrivateRange>('/custom-private-ranges', {
       cidr,
-      label,
       classification,
     });
     return res.data;
