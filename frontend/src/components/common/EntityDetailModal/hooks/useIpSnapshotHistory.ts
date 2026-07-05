@@ -46,7 +46,12 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
               )
               .catch(() => ({ data: { data: [] } })),
             insightsService.getNodeRole('IP', entityKey, snap.fileId).catch(() => null),
-          ]).then(([conv, role]) => ({
+            // Distinct MACs observed for this IP in the snapshot — >1 means an overlap/conflict.
+            apiClient
+              .get<{ ip: string; macs: string[] }[]>(`/files/${snap.fileId}/ip-mac-observations`)
+              .then(r => r.data.find(o => o.ip === entityKey)?.macs ?? [])
+              .catch(() => [] as string[]),
+          ]).then(([conv, role, macs]) => ({
             snap,
             host,
             apps: [...new Set((conv?.data?.data ?? []).map(c => c.appName).filter(Boolean) as string[])].sort(),
@@ -54,6 +59,8 @@ export function useIpSnapshotHistory(entityType: EntityType, entityKey: string, 
             roleLabel: role?.roleLabel ?? null,
             roleOrigin: role?.origin ?? null,
             roleStale: !!role?.staleSince,
+            // Fall back to the single classification MAC if no observations were recorded (pre-#461 files).
+            macs: macs.length > 0 ? macs : host?.mac ? [host.mac] : [],
           }))
         )
       ).then(entries => {

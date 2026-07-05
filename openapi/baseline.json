@@ -1776,6 +1776,20 @@
         },
         "type": "object"
       },
+      "IpMacObservationsResponse": {
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "macs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "IpOrgRuleDto": {
         "properties": {
           "cidr": {
@@ -4872,6 +4886,41 @@
           }
         },
         "summary": "List device-type classifications for all hosts in a file",
+        "tags": [
+          "Host Classifications"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/ip-mac-observations": {
+      "get": {
+        "operationId": "getIpMacObservations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IpMacObservationsResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List distinct source MACs observed per IP in a file",
         "tags": [
           "Host Classifications"
         ]

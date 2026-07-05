@@ -52,7 +52,7 @@ export function SnapshotHistoryTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale }, idx) => (
+              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs }, idx) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
@@ -60,7 +60,18 @@ export function SnapshotHistoryTable({
                     <small className="text-muted text-break" style={{ fontSize: '0.7rem' }}>{snap.fileName}</small>
                   </Table.DataCell>
                   <Table.DataCell>
-                    <code style={{ fontSize: '0.75rem' }}>{host?.mac ?? '—'}</code>
+                    {macs.length === 0 ? (
+                      <code style={{ fontSize: '0.75rem' }}>—</code>
+                    ) : (
+                      <div className="d-flex flex-column gap-1">
+                        {macs.map(m => <code key={m} style={{ fontSize: '0.75rem' }}>{m}</code>)}
+                      </div>
+                    )}
+                    {macs.length > 1 && (
+                      <Badge bg="danger" className="ms-1" style={{ fontSize: '0.6rem' }} title="This IP was claimed by more than one MAC in this snapshot — possible overlapping networks">
+                        <i className="bi bi-diagram-3 me-1" />conflict — {macs.length} MACs
+                      </Badge>
+                    )}
                     {idx > 0 && host?.mac && ipSnapHistory[idx - 1].host?.mac &&
                       host.mac !== ipSnapHistory[idx - 1].host!.mac && (
                         <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>

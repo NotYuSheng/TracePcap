@@ -21,6 +21,8 @@ export interface IpSnapshotEntry {
   roleLabel: string | null;
   roleOrigin: string | null; // MANUAL | AI | CARRIED_FORWARD
   roleStale: boolean;
+  /** All distinct MACs that claimed this IP in the snapshot; >1 ⇒ overlap/conflict (#461). */
+  macs: string[];
 }
 
 export interface EntityStats {
