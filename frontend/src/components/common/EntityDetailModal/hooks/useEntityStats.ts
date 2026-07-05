@@ -29,7 +29,7 @@ export function useEntityStats(entityType: EntityType, entityKey: string, fileId
     setStats(null);
     setStatsLoading(false);
     setStatsError(null);
-    if (!fileId || (entityType !== 'APPLICATION' && entityType !== 'PROTOCOL')) return;
+    if (!fileId || !entityKey?.trim() || (entityType !== 'APPLICATION' && entityType !== 'PROTOCOL')) return;
     setStatsLoading(true);
     const param = entityType === 'APPLICATION' ? 'app' : 'l7Protocol';
     apiClient
