@@ -7,6 +7,8 @@ import com.tracepcap.subnets.service.SubnetLabelSuggestionService;
 import com.tracepcap.subnets.service.SubnetService;
 import com.tracepcap.subnets.service.SubnetStalenessService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
@@ -69,6 +71,10 @@ public class SubnetController {
               + "concise label naming the subnet plus a description of its purpose and any anomalies. "
               + "The result is not persisted — the analyst reviews it in the edit form and saves it "
               + "onto the subnet's own label/description. Optionally scope to a network via networkId.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Suggested label + description"),
+    @ApiResponse(responseCode = "422", description = "No member nodes observed — insufficient evidence")
+  })
   public ResponseEntity<SubnetLabelSuggestionDto> suggestLabel(
       @PathVariable Long id,
       @RequestParam(required = false) UUID networkId,
@@ -95,7 +101,7 @@ public class SubnetController {
 
   @PostMapping("/{id}/dismiss-staleness")
   @Operation(summary = "Mark a stale subnet label as still correct and re-baseline its composition")
-  public ResponseEntity<SubnetDefinitionDto> dismissStaleness(
+  public ResponseEntity<SubnetDefinitionDto> dismissSubnetStaleness(
       @PathVariable Long id, @RequestParam(required = false) UUID networkId) {
     return ResponseEntity.ok(subnetService.dismissStaleness(id, networkId));
   }

@@ -169,7 +169,7 @@ public class SubnetStalenessService {
           },
           (rs, i) -> rs.getString("ip"));
     } catch (Exception e) {
-      log.debug("member IP lookup failed: {}", e.getMessage());
+      log.warn("member IP lookup failed: {}", e.getMessage());
       return List.of();
     }
   }
@@ -194,7 +194,7 @@ public class SubnetStalenessService {
           },
           (rs, i) -> rs.getString("device_type"));
     } catch (Exception e) {
-      log.debug("device-type composition failed: {}", e.getMessage());
+      log.warn("device-type composition failed: {}", e.getMessage());
       return List.of();
     }
   }
@@ -227,7 +227,7 @@ public class SubnetStalenessService {
           .map(String::toUpperCase)
           .collect(Collectors.toList());
     } catch (Exception e) {
-      log.debug("protocol composition failed: {}", e.getMessage());
+      log.warn("protocol composition failed: {}", e.getMessage());
       return List.of();
     }
   }

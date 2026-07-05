@@ -22,6 +22,7 @@ interface SubnetSnapshotHistoryProps {
 export function SubnetSnapshotHistory({ subnetId, cidr, networkId, snapshots }: SubnetSnapshotHistoryProps) {
   const [rows, setRows] = useState<SubnetCompositionHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [editSnap, setEditSnap] = useState<NetworkSnapshot | null>(null);
   // Per-snapshot override for this CIDR, keyed by snapshot id. Seeded from the parent's snapshots and
   // updated locally on save (the parent's prop only refreshes on its next poll). `inherited` marks a
@@ -39,10 +40,11 @@ export function SubnetSnapshotHistory({ subnetId, cidr, networkId, snapshots }: 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError(false);
     subnetService
       .history(subnetId, networkId)
       .then(r => { if (active) setRows(r); })
-      .catch(() => { if (active) setRows([]); })
+      .catch(() => { if (active) { setRows([]); setError(true); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [subnetId, networkId]);
@@ -58,7 +60,12 @@ export function SubnetSnapshotHistory({ subnetId, cidr, networkId, snapshots }: 
       {loading && (
         <div className="text-muted small py-2"><Spinner size="sm" className="me-2" />Loading…</div>
       )}
-      {!loading && rows.length === 0 && (
+      {!loading && error && (
+        <p className="text-danger small mb-0">
+          <i className="bi bi-exclamation-triangle me-1" />Failed to load snapshot history.
+        </p>
+      )}
+      {!loading && !error && rows.length === 0 && (
         <p className="text-muted small fst-italic mb-0">Not seen in any snapshots.</p>
       )}
       {!loading && rows.length > 0 && (

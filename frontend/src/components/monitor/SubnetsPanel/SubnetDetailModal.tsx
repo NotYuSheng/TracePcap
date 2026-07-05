@@ -41,11 +41,12 @@ export function SubnetDetailModal({ subnet, networkId, snapshots, onClose }: Sub
     }
   };
 
-  // Present-day = the latest snapshot's per-snapshot override label for this CIDR (read-only).
+  // Present-day = the latest snapshot's per-snapshot override label for this CIDR, falling back to
+  // the subnet's global label when no per-snapshot override has been set (read-only).
   const presentDayLabel = useMemo(() => {
     const latest = [...snapshots].sort((a, b) => b.snapshotOrder - a.snapshotOrder)[0];
-    return latest?.subnetOverrides?.find(o => o.cidr === subnet.cidr)?.label ?? null;
-  }, [snapshots, subnet.cidr]);
+    return latest?.subnetOverrides?.find(o => o.cidr === subnet.cidr)?.label ?? subnet.label ?? null;
+  }, [snapshots, subnet.cidr, subnet.label]);
 
   return (
     <Modal show onHide={onClose} size="lg" centered>

@@ -6650,7 +6650,7 @@
     "/api/v1/node-roles/dismiss-staleness": {
       "post": {
         "description": "Clears the staleness flag for a confirmed label and records the current file's node properties as the new drift baseline.",
-        "operationId": "dismissStaleness_1",
+        "operationId": "dismissStaleness",
         "parameters": [
           {
             "in": "query",
@@ -7228,7 +7228,7 @@
     },
     "/api/v1/subnets/{id}/dismiss-staleness": {
       "post": {
-        "operationId": "dismissStaleness",
+        "operationId": "dismissSubnetStaleness",
         "parameters": [
           {
             "in": "path",
@@ -7354,7 +7354,17 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "Suggested label + description"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetLabelSuggestionDto"
+                }
+              }
+            },
+            "description": "No member nodes observed — insufficient evidence"
           }
         },
         "summary": "Suggest a label + description for a subnet with AI",

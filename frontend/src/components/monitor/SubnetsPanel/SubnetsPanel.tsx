@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Form } from '@govtechsg/sgds-react';
+import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { SubnetDiagramModal } from '@components/monitor/SubnetDiagramModal/SubnetDiagramModal';
 import { SubnetDetailModal } from '@components/monitor/SubnetsPanel/SubnetDetailModal';
@@ -40,7 +40,7 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
     if (!addCidr.trim()) return;
     setAddSaving(true);
     try {
-      const saved = await subnetService.upsert(addCidr.trim(), addLabel.trim(), addDesc.trim(), true);
+      const saved = await subnetService.upsert(addCidr.trim(), addLabel.trim(), addDesc.trim(), true, networkId);
       onSaved(saved);
       setAddCidr(''); setAddLabel(''); setAddDesc('');
       setShowAddForm(false);
@@ -126,13 +126,14 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                         <div className="d-flex align-items-center gap-1">
                           {subnet.label || <span className="text-muted fst-italic">—</span>}
                           {subnet.staleSince && (
-                            <span
-                              className="badge bg-warning text-dark"
+                            <Badge
+                              bg="warning"
+                              text="dark"
                               style={{ fontSize: '0.6rem' }}
                               title="Composition drifted since this label was set — open to review"
                             >
                               <i className="bi bi-exclamation-triangle me-1" />Stale
-                            </span>
+                            </Badge>
                           )}
                         </div>
                       </td>
