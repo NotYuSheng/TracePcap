@@ -180,7 +180,10 @@ Story Arc
      - An unknown device with a Raspberry Pi OUI (``b8:27:eb``) appears on WiFi
        with no hostname in DNS. It sends a gratuitous ARP claiming Bob's
        workstation IP — then connects to the file server over SMB using that
-       identity. Dave's workstation joins normally.
+       identity. Dave's workstation joins normally. Because that MAC now holds
+       **two IPs** (its own ``10.0.4.50`` and Bob's ``10.0.1.11``), opening the
+       shadow device in the **Device Snapshot History** shows a
+       "conflict — 2 IPs" badge — the MAC-side mirror of the IP overlap warning.
        **Signals: MAC_ADDED (shadow device, Dave), IP_MAC_DRIFT CRITICAL
        (ARP spoof).**
    * - 6

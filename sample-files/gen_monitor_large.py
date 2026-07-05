@@ -43,7 +43,11 @@ Policy violations story arc
   Week 2        Bob's personal laptop joins WiFi; WireGuard VPN tunnel appears
   Week 3        Carol uses Telnet to file server (cleartext); Bob runs BitTorrent
   Week 4        Bob FTP-exfiltrates to external IP; ISP failover (gateway change)
-  Week 5        Shadow device appears (no hostname, unusual OUI); ARP anomaly
+  Week 5        Shadow device appears (no hostname, unusual OUI); ARP spoof —
+                the shadow MAC (b8:27:eb:77:77:07) claims both its own 10.0.4.50
+                and Bob's 10.0.1.11, so it holds TWO IPs at once. In the device
+                (MAC) Snapshot History this shows a "conflict — 2 IPs" badge
+                (the MAC-side mirror of the IP overlap warning).
   Week 6        Multiple violations peak — FTP + BitTorrent + Telnet still active;
                 a branch-B office reusing 10.0.1.0/24 becomes visible (overlapping
                 networks: 10.0.1.10/.11/.12 each claimed by two devices at once)
