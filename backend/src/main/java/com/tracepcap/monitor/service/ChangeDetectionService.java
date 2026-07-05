@@ -59,6 +59,8 @@ public class ChangeDetectionService {
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
   private final LabelStalenessService labelStalenessService;
   private final NetworkSnapshotRepository snapshotRepository;
+  private final com.tracepcap.subnets.service.SubnetStalenessService subnetStalenessService;
+  private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
 
   /**
    * Compare two consecutive snapshots and persist NetworkChangeEventEntity records. fromSnapshot
@@ -76,6 +78,13 @@ public class ChangeDetectionService {
     events.addAll(detectIspAsnChanges(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectProtocolAppDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectStaleLabels(toFileId, fromSnapshot, toSnapshot));
+
+    // Carry subnet labels forward onto this snapshot (inherited overrides), mirroring node roles.
+    subnetOverrideCarryForwardService.carryForward(
+        fromSnapshot != null ? fromSnapshot.getId() : null, toSnapshot.getId());
+
+    // Re-validate subnet-definition composition baselines against this (latest) snapshot.
+    subnetStalenessService.revalidate(toSnapshot.getNetwork().getId());
 
     return changeEventRepository.saveAll(events);
   }

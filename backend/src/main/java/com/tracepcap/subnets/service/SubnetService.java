@@ -25,12 +25,18 @@ public class SubnetService {
   private final SubnetDefinitionRepository subnetRepo;
   private final HostClassificationRepository hostClassRepo;
   private final NetworkSnapshotRepository snapshotRepo;
+  private final SubnetStalenessService stalenessService;
 
   public List<SubnetDefinitionDto> list() {
     return subnetRepo.findAll().stream()
         .sorted(Comparator.comparing(SubnetDefinitionEntity::getCidr))
         .map(this::toDto)
         .collect(Collectors.toList());
+  }
+
+  /** The raw subnet entity by id, for callers that need its CIDR (e.g. history lookups). */
+  public Optional<SubnetDefinitionEntity> find(Long id) {
+    return subnetRepo.findById(id);
   }
 
   @Transactional
@@ -41,10 +47,29 @@ public class SubnetService {
             .findByCidr(cidr)
             .orElseGet(
                 () -> SubnetDefinitionEntity.builder().cidr(cidr).source("MANUAL").build());
+    boolean labelChanged = !java.util.Objects.equals(entity.getLabel(), req.getLabel());
     entity.setLabel(req.getLabel());
     entity.setDescription(req.getDescription());
     entity.setConfirmed(req.isConfirmed());
     if (entity.getId() == null) entity.setSource("MANUAL");
+    // Confirming a (new or changed) label re-baselines the composition and clears any stale flag.
+    if (req.isConfirmed() && (labelChanged || entity.getLabeledAt() == null)) {
+      stalenessService.captureBaseline(entity, req.getNetworkId());
+    }
+    return toDto(subnetRepo.save(entity));
+  }
+
+  /** Dismiss a subnet's stale flag and re-baseline its composition against the latest snapshot. */
+  @Transactional
+  public SubnetDefinitionDto dismissStaleness(Long id, UUID networkId) {
+    SubnetDefinitionEntity entity =
+        subnetRepo
+            .findById(id)
+            .orElseThrow(
+                () ->
+                    new com.tracepcap.common.exception.ResourceNotFoundException(
+                        "Subnet not found: " + id));
+    stalenessService.captureBaseline(entity, networkId);
     return toDto(subnetRepo.save(entity));
   }
 
@@ -250,6 +275,9 @@ public class SubnetService {
         .description(e.getDescription())
         .source(e.getSource())
         .confirmed(e.isConfirmed())
+        .labeledAt(e.getLabeledAt())
+        .staleSince(e.getStaleSince())
+        .staleFields(e.getStaleFields())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
         .build();
