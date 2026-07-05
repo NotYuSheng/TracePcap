@@ -33,11 +33,12 @@ export const ManagePcapsModal = ({
   onAddSnapshot,
 }: ManagePcapsModalProps) => {
   const [removing, setRemoving] = useState<string | null>(null);
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  // The snapshot pending removal — drives the confirmation modal (null = none).
+  const [confirmTarget, setConfirmTarget] = useState<NetworkSnapshot | null>(null);
 
   const handleHide = () => {
     setRemoving(null);
-    setConfirmRemove(null);
+    setConfirmTarget(null);
     onHide();
   };
 
@@ -47,13 +48,14 @@ export const ManagePcapsModal = ({
     setRemoving(snapshotId);
     try {
       await onRemove(snapshotId);
-      setConfirmRemove(null);
+      setConfirmTarget(null);
     } finally {
       setRemoving(null);
     }
   };
 
   return (
+    <>
     <Modal show={show} onHide={handleHide} size="lg" centered>
       <Modal.Header closeButton>
         <Modal.Title>
@@ -101,42 +103,16 @@ export const ManagePcapsModal = ({
                         </small>
                       </td>
                       <td className="text-end">
-                        {confirmRemove === snap.id ? (
-                          <span className="d-inline-flex align-items-center gap-2">
-                            <small className="text-muted">Remove?</small>
-                            <Button
-                              size="sm"
-                              variant="outline-secondary"
-                              onClick={() => setConfirmRemove(null)}
-                              disabled={removing !== null}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => handleRemove(snap.id)}
-                              disabled={removing !== null}
-                            >
-                              {removing === snap.id ? (
-                                <Spinner animation="border" size="sm" />
-                              ) : (
-                                'Remove'
-                              )}
-                            </Button>
-                          </span>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline-danger"
-                            onClick={() => setConfirmRemove(snap.id)}
-                            disabled={removing !== null}
-                            title="Remove PCAP"
-                            aria-label={`Remove PCAP ${snap.fileName}`}
-                          >
-                            <i className="bi bi-trash"></i>
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          onClick={() => setConfirmTarget(snap)}
+                          disabled={removing !== null}
+                          title="Remove PCAP"
+                          aria-label={`Remove PCAP ${snap.fileName}`}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -157,5 +133,38 @@ export const ManagePcapsModal = ({
         </Button>
       </Modal.Footer>
     </Modal>
+
+    <Modal show={confirmTarget !== null} onHide={() => removing === null && setConfirmTarget(null)} centered>
+      <Modal.Header closeButton>
+        <Modal.Title className="h6 mb-0">Remove PCAP?</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="mb-2">
+          Remove <span className="fw-medium text-break">{confirmTarget?.fileName}</span> from this
+          network?
+        </p>
+        <p className="text-muted small mb-0">
+          <i className="bi bi-info-circle me-1"></i>
+          This only detaches it from the network — the original file is not deleted.
+        </p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button
+          variant="outline-secondary"
+          onClick={() => setConfirmTarget(null)}
+          disabled={removing !== null}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          onClick={() => confirmTarget && handleRemove(confirmTarget.id)}
+          disabled={removing !== null}
+        >
+          {removing !== null ? <><Spinner animation="border" size="sm" className="me-1" />Removing…</> : 'Remove'}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+    </>
   );
 };

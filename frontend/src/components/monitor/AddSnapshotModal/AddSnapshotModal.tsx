@@ -238,7 +238,7 @@ export const AddSnapshotModal = ({
             <div className="border rounded mb-3">
               <button
                 type="button"
-                className="btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+                className="btn text-body w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
                 onClick={handleToggleSubnets}
               >
                 <span className="d-flex align-items-center gap-2">

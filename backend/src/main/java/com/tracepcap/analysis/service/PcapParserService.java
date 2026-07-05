@@ -36,7 +36,8 @@ public class PcapParserService {
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info |
     //         tcp.payload | udp.payload | ip.ttl | eth.src |
-    //         arp.src.proto_ipv4 | arp.dst.proto_ipv4 | eth.dst
+    //         arp.src.proto_ipv4 | arp.dst.proto_ipv4 | eth.dst | arp.src.hw_mac |
+    //         frame.number
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -84,6 +85,8 @@ public class PcapParserService {
             "arp.dst.proto_ipv4",
             "-e",
             "eth.dst",
+            "-e",
+            "arp.src.hw_mac",
             "-e",
             "frame.number");
     pb.redirectErrorStream(false);
@@ -160,6 +163,9 @@ public class PcapParserService {
           String arpDstIp = (f.length > 17 && !f[17].isEmpty()) ? firstValue(f[17]) : null;
           String dstMac =
               (f.length > 18 && !f[18].isEmpty()) ? firstValue(f[18]).toLowerCase() : null;
+          // ARP sender hardware address (field 19) — the "I own this IP at this MAC" claim.
+          String arpSrcMac =
+              (f.length > 19 && !f[19].isEmpty()) ? firstValue(f[19]).toLowerCase() : null;
           if (srcIp == null) srcIp = (arpSrcIp != null) ? arpSrcIp : srcMac;
           if (dstIp == null) dstIp = (arpDstIp != null) ? arpDstIp : dstMac;
 
@@ -180,11 +186,18 @@ public class PcapParserService {
           // Record first-seen TTL and MAC for source IP
           if (srcIp != null) {
             if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
-            if (srcMac != null) {
-              hostMacs.putIfAbsent(srcIp, srcMac);
-              // Retain every distinct MAC for this IP (not just the first) for overlap detection.
-              hostMacObservations.computeIfAbsent(srcIp, k -> new java.util.LinkedHashSet<>()).add(srcMac);
-            }
+            if (srcMac != null) hostMacs.putIfAbsent(srcIp, srcMac);
+          }
+
+          // Overlap detection (#461): record the IP↔MAC ownership claim from ARP
+          // (arp.src.proto_ipv4 ↔ arp.src.hw_mac) — NOT the IP-layer eth.src. A routed host's
+          // IP packets carry the gateway's MAC as eth.src, so keying off eth.src would falsely flag
+          // every off-subnet server as "two MACs". ARP is the authoritative "who owns this IP"
+          // statement, so two distinct hw_macs claiming one IP is a genuine same-segment conflict.
+          if (arpSrcIp != null && arpSrcMac != null) {
+            hostMacObservations
+                .computeIfAbsent(arpSrcIp, k -> new java.util.LinkedHashSet<>())
+                .add(arpSrcMac);
           }
 
           // Track conversations for IP traffic
