@@ -187,8 +187,11 @@ Story Arc
      - ``week6_peak_violations.pcap``
      - Peak violation week. FTP exfiltration, BitTorrent, WireGuard VPN,
        Telnet, and the shadow device are all simultaneously active. Shadow
-       device also uses Telnet to the file server.
-       **Signals: no new signals — all violations continue.**
+       device also uses Telnet to the file server. A **branch-B office** reusing
+       ``10.0.1.0/24`` also becomes visible — ``10.0.1.10``/``.11``/``.12`` are
+       each claimed by two devices at once (overlapping networks).
+       **Signals: no new change events; define a subnet over ``10.0.1.0/24`` to
+       see the "possible overlapping networks" warning on this snapshot.**
    * - 7
      - ``week7_violations_drop_gateway_back.pcap``
      - Audit notice issued. FTP stops, BitTorrent stops, WireGuard stops, Telnet

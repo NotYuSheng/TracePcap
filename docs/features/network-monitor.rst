@@ -178,13 +178,17 @@ captures and are not yet parsed).
 .. note::
 
    This requires the capture to actually contain the conflicting frames (the same
-   IP sourced from two MACs). The bundled demo exercises it: in
-   ``sample-files/monitor_large/week5_shadow_device_arp_spoof.pcap`` the shadow
-   device (``b8:27:eb:77:77:07``) claims Bob's workstation IP ``10.0.1.11`` — so
-   that IP is sourced from two MACs (an ARP-spoof scenario, identical at layer 2
-   to an overlap). Define a subnet over ``10.0.1.0/24`` and the warning appears
-   (on the week-5 snapshot), even after later clean weeks are added. See
-   :doc:`../sample-files`.
+   IP sourced from two MACs). The bundled demo exercises it two ways:
+
+   - **Genuine overlap** — ``week6_peak_violations.pcap`` adds a *branch-B office*
+     that reuses HQ's range: ``10.0.1.10``, ``10.0.1.11`` and ``10.0.1.12`` are
+     each claimed by two devices at once (an HQ workstation and a branch-B host).
+   - **ARP spoof** — ``week5_shadow_device_arp_spoof.pcap`` has the shadow device
+     ``b8:27:eb:77:77:07`` claim Bob's IP ``10.0.1.11`` (identical at layer 2 to an
+     overlap).
+
+   Define a subnet over ``10.0.1.0/24`` and the warning appears on the relevant
+   snapshot, even after later clean weeks are added. See :doc:`../sample-files`.
 
 Severity Levels
 ---------------
