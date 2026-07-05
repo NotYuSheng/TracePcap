@@ -201,9 +201,11 @@ Story Arc
        History** shows a "conflict — 2 IPs" badge. This is *benign* multi-homing,
        the deliberate counterpart to week 5's *malicious* spoof (same badge,
        opposite intent).
-       **Signals: no new change events; define a subnet over ``10.0.1.0/24`` to
-       see the "possible overlapping networks" warning, and open ``FILESERVER`` in
-       the Device Snapshot History to see the "conflict — 2 IPs" badge.**
+       **Signals: MAC_ADDED (branch-B hosts; the violation protocols themselves
+       persist from earlier weeks rather than appearing anew). Define a subnet over
+       ``10.0.1.0/24`` to see the "possible overlapping networks" warning, and open
+       ``FILESERVER`` in the Device Snapshot History to see the "conflict — 2 IPs"
+       badge.**
    * - 7
      - ``week7_violations_drop_gateway_back.pcap``
      - Audit notice issued. FTP stops, BitTorrent stops, WireGuard stops, Telnet
