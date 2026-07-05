@@ -1094,6 +1094,29 @@
         },
         "type": "object"
       },
+      "EntityStatsResponse": {
+        "properties": {
+          "conversationCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "packetCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "topPeers": {
+            "items": {
+              "$ref": "#/components/schemas/TopPeer"
+            },
+            "type": "array"
+          },
+          "totalBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ExtractedFileResponse": {
         "properties": {
           "conversationId": {
@@ -2812,6 +2835,18 @@
         },
         "type": "object"
       },
+      "TopPeer": {
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "ip": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TracerExplainResponse": {
         "properties": {
           "conversationId": {
@@ -3516,6 +3551,56 @@
           }
         },
         "summary": "List distinct custom signature rule names for a file",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{fileId}/entity-stats": {
+      "get": {
+        "operationId": "getEntityStats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Application name to aggregate over",
+            "in": "query",
+            "name": "app",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "L7 (tshark) protocol to aggregate over",
+            "in": "query",
+            "name": "l7Protocol",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityStatsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Aggregate stats for an APPLICATION or PROTOCOL entity across all pages",
         "tags": [
           "Conversations"
         ]

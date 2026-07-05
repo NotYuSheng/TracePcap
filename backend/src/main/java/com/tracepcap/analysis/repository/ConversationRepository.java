@@ -310,6 +310,68 @@ public interface ConversationRepository
   List<Object[]> findLongSessionsByFileId(
       @Param("fileId") UUID fileId, @Param("thresholdSeconds") long thresholdSeconds);
 
+  // ---------------------------------------------------------------------------
+  // Entity-stats aggregation (#436) — authoritative totals + top peers across ALL
+  // matching conversations for an APPLICATION or PROTOCOL entity, computed in the
+  // DB so the client never fans out page-by-page for large captures.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Aggregate totals for an APPLICATION entity: [conversation_count, packet_count, total_bytes].
+   */
+  @Query(
+      value =
+          "SELECT COUNT(*), COALESCE(SUM(packet_count), 0), COALESCE(SUM(total_bytes), 0)"
+              + " FROM conversations WHERE file_id = :fileId AND app_name = :appName",
+      nativeQuery = true)
+  List<Object[]> aggregateStatsByApp(@Param("fileId") UUID fileId, @Param("appName") String appName);
+
+  /**
+   * Aggregate totals for a PROTOCOL entity: [conversation_count, packet_count, total_bytes]. The
+   * {@code variants} list matches the pre-/post-normalisation forms expanded by {@link #buildSpec}.
+   */
+  @Query(
+      value =
+          "SELECT COUNT(*), COALESCE(SUM(packet_count), 0), COALESCE(SUM(total_bytes), 0)"
+              + " FROM conversations WHERE file_id = :fileId AND tshark_protocol IN (:variants)",
+      nativeQuery = true)
+  List<Object[]> aggregateStatsByL7Protocol(
+      @Param("fileId") UUID fileId, @Param("variants") List<String> variants);
+
+  /**
+   * Top peer IPs by total bytes for an APPLICATION entity. Each conversation contributes its bytes
+   * to both endpoints, mirroring the previous client-side aggregation. Columns: [ip, bytes].
+   */
+  @Query(
+      value =
+          "SELECT ip, SUM(total_bytes) AS bytes FROM ("
+              + "  SELECT src_ip AS ip, total_bytes FROM conversations"
+              + "    WHERE file_id = :fileId AND app_name = :appName"
+              + "  UNION ALL"
+              + "  SELECT dst_ip AS ip, total_bytes FROM conversations"
+              + "    WHERE file_id = :fileId AND app_name = :appName"
+              + ") t WHERE ip IS NOT NULL GROUP BY ip ORDER BY bytes DESC LIMIT :lim",
+      nativeQuery = true)
+  List<Object[]> findTopPeersByApp(
+      @Param("fileId") UUID fileId, @Param("appName") String appName, @Param("lim") int lim);
+
+  /**
+   * Top peer IPs by total bytes for a PROTOCOL entity. Columns: [ip, bytes]. See {@link
+   * #aggregateStatsByL7Protocol} for the {@code variants} semantics.
+   */
+  @Query(
+      value =
+          "SELECT ip, SUM(total_bytes) AS bytes FROM ("
+              + "  SELECT src_ip AS ip, total_bytes FROM conversations"
+              + "    WHERE file_id = :fileId AND tshark_protocol IN (:variants)"
+              + "  UNION ALL"
+              + "  SELECT dst_ip AS ip, total_bytes FROM conversations"
+              + "    WHERE file_id = :fileId AND tshark_protocol IN (:variants)"
+              + ") t WHERE ip IS NOT NULL GROUP BY ip ORDER BY bytes DESC LIMIT :lim",
+      nativeQuery = true)
+  List<Object[]> findTopPeersByL7Protocol(
+      @Param("fileId") UUID fileId, @Param("variants") List<String> variants, @Param("lim") int lim);
+
   /** Build a JPA Specification from the given filter params plus a mandatory fileId constraint. */
   static Specification<ConversationEntity> buildSpec(UUID fileId, ConversationFilterParams params) {
 
@@ -352,19 +414,7 @@ public interface ConversationRepository
       // each value to its common pre-normalisation variants on the Java side so no DB-side function
       // is applied to the column and any index on tshark_protocol remains usable.
       if (params.getL7Protocols() != null && !params.getL7Protocols().isEmpty()) {
-        List<String> variants =
-            params.getL7Protocols().stream()
-                .filter(p -> p != null && !p.isEmpty())
-                .flatMap(
-                    p -> {
-                      String titleCase =
-                          Character.toUpperCase(p.charAt(0)) + p.substring(1).toLowerCase();
-                      return java.util.stream.Stream.of(
-                          p, titleCase, p.toLowerCase(), "The " + titleCase);
-                    })
-                .distinct()
-                .collect(java.util.stream.Collectors.toList());
-        predicates.add(root.get("tsharkProtocol").in(variants));
+        predicates.add(root.get("tsharkProtocol").in(expandL7ProtocolVariants(params.getL7Protocols())));
       }
 
       // Application multi-value
@@ -490,6 +540,25 @@ public interface ConversationRepository
 
       return cb.and(predicates.toArray(new Predicate[0]));
     };
+  }
+
+  /**
+   * Expands each L7 protocol filter value to its common pre-/post-normalisation variants (as-is,
+   * title-case, lower-case, and "The "-prefixed title-case). Kept in one place so the listing
+   * Specification and the entity-stats aggregation ({@code apps}/{@code l7Protocols} in #436) apply
+   * identical matching. Empty input yields an empty list.
+   */
+  static List<String> expandL7ProtocolVariants(List<String> l7Protocols) {
+    if (l7Protocols == null || l7Protocols.isEmpty()) return List.of();
+    return l7Protocols.stream()
+        .filter(p -> p != null && !p.isEmpty())
+        .flatMap(
+            p -> {
+              String titleCase = Character.toUpperCase(p.charAt(0)) + p.substring(1).toLowerCase();
+              return java.util.stream.Stream.of(p, titleCase, p.toLowerCase(), "The " + titleCase);
+            })
+        .distinct()
+        .collect(java.util.stream.Collectors.toList());
   }
 
   /**

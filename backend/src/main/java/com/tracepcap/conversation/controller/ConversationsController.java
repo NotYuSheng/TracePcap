@@ -3,6 +3,7 @@ package com.tracepcap.conversation.controller;
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
+import com.tracepcap.analysis.dto.EntityStatsResponse;
 import com.tracepcap.analysis.dto.SessionResponse;
 import com.tracepcap.conversation.service.ConversationQueryService;
 import com.tracepcap.analysis.service.SessionReconstructionService;
@@ -148,6 +149,23 @@ public class ConversationsController {
         sortDir);
 
     return ResponseEntity.ok(conversationQueryService.getConversations(fileId, page, pageSize, params));
+  }
+
+  /**
+   * Authoritative aggregate stats (conversation/packet/byte totals + top peer IPs) for a single
+   * APPLICATION or PROTOCOL entity, computed across ALL matching conversations (#436). Exactly one
+   * of {@code app} or {@code l7Protocol} must be supplied.
+   */
+  @GetMapping("/{fileId}/entity-stats")
+  @Operation(summary = "Aggregate stats for an APPLICATION or PROTOCOL entity across all pages")
+  public ResponseEntity<EntityStatsResponse> getEntityStats(
+      @PathVariable UUID fileId,
+      @Parameter(description = "Application name to aggregate over") @RequestParam(required = false)
+          String app,
+      @Parameter(description = "L7 (tshark) protocol to aggregate over")
+          @RequestParam(required = false)
+          String l7Protocol) {
+    return ResponseEntity.ok(conversationQueryService.getEntityStats(fileId, app, l7Protocol));
   }
 
   /** Returns the distinct detected file types found in packets for this file. */

@@ -3,6 +3,7 @@ package com.tracepcap.conversation.service;
 import com.tracepcap.analysis.dto.ConversationDetailResponse;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
+import com.tracepcap.analysis.dto.EntityStatsResponse;
 import com.tracepcap.analysis.dto.PacketResponse;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
@@ -59,6 +60,62 @@ public class ConversationQueryService {
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
       java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
           .withZone(java.time.ZoneId.of("Asia/Singapore"));
+
+  /** Number of top peer IPs returned by the entity-stats endpoint (#436). */
+  private static final int ENTITY_STATS_TOP_PEERS = 10;
+
+  /**
+   * Authoritative aggregate stats for an APPLICATION or PROTOCOL entity across ALL matching
+   * conversations in a file (#436). Computed in the DB so the displayed count/packets/bytes/top-peers
+   * are always internally consistent, regardless of conversation count, with no client fan-out.
+   *
+   * @param fileId the file to aggregate over
+   * @param appName when non-blank, aggregate conversations whose appName equals this value
+   * @param l7Protocol when non-blank (and appName blank), aggregate by L7 protocol (variant-expanded)
+   */
+  @Transactional(readOnly = true)
+  public EntityStatsResponse getEntityStats(UUID fileId, String appName, String l7Protocol) {
+    boolean byApp = appName != null && !appName.isBlank();
+    boolean byProto = !byApp && l7Protocol != null && !l7Protocol.isBlank();
+    if (!byApp && !byProto) {
+      throw new IllegalArgumentException("Either appName or l7Protocol must be provided");
+    }
+
+    List<String> variants =
+        byProto
+            ? ConversationRepository.expandL7ProtocolVariants(List.of(l7Protocol.trim()))
+            : List.of();
+
+    List<Object[]> totalsRows =
+        byApp
+            ? conversationRepository.aggregateStatsByApp(fileId, appName.trim())
+            : conversationRepository.aggregateStatsByL7Protocol(fileId, variants);
+    // COUNT/SUM aggregates always return exactly one row; guard defensively regardless.
+    Object[] totals = totalsRows.isEmpty() ? new Object[] {0L, 0L, 0L} : totalsRows.get(0);
+
+    List<Object[]> peerRows =
+        byApp
+            ? conversationRepository.findTopPeersByApp(fileId, appName.trim(), ENTITY_STATS_TOP_PEERS)
+            : conversationRepository.findTopPeersByL7Protocol(
+                fileId, variants, ENTITY_STATS_TOP_PEERS);
+
+    List<EntityStatsResponse.TopPeer> topPeers =
+        peerRows.stream()
+            .map(
+                r ->
+                    EntityStatsResponse.TopPeer.builder()
+                        .ip((String) r[0])
+                        .bytes(((Number) r[1]).longValue())
+                        .build())
+            .collect(Collectors.toList());
+
+    return EntityStatsResponse.builder()
+        .conversationCount(((Number) totals[0]).longValue())
+        .packetCount(((Number) totals[1]).longValue())
+        .totalBytes(((Number) totals[2]).longValue())
+        .topPeers(topPeers)
+        .build();
+  }
 
   @Transactional(readOnly = true)
   public PagedResponse<ConversationResponse> getConversations(
