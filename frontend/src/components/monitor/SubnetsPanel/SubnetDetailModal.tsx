@@ -68,7 +68,8 @@ export function SubnetDetailModal({ subnet, networkId, snapshots, overlap, onClo
             <div className="d-flex align-items-start gap-2">
               <i className="bi bi-diagram-3-fill mt-1 flex-shrink-0" />
               <div>
-                <strong>Possible overlapping networks.</strong> In the latest snapshot,{' '}
+                <strong>Possible overlapping networks.</strong> In snapshot{' '}
+                <strong>{overlap.snapshotOrder + 1}</strong> ({overlap.snapshotFileName}),{' '}
                 <code className="font-monospace">{overlap.conflictingIp}</code> is claimed by{' '}
                 <strong>{overlap.macs.length}</strong> different MACs — which usually means two
                 separate L2 networks are reusing this range. Labels and composition for this subnet

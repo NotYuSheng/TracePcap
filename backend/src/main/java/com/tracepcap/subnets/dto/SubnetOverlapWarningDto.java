@@ -21,4 +21,10 @@ public class SubnetOverlapWarningDto {
 
   /** The distinct MACs seen claiming {@code conflictingIp} — each a candidate separate device. */
   private List<String> macs;
+
+  /** Snapshot (0-based order) in which the conflict was observed. */
+  private int snapshotOrder;
+
+  /** File name of that snapshot, for display. */
+  private String snapshotFileName;
 }

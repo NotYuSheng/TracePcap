@@ -6,7 +6,6 @@ import com.tracepcap.subnets.dto.SubnetOverlapWarningDto;
 import com.tracepcap.subnets.entity.SubnetDefinitionEntity;
 import com.tracepcap.subnets.repository.SubnetDefinitionRepository;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,10 +22,11 @@ import org.springframework.stereotype.Service;
  * like at layer 2.
  *
  * <p>The signal lives in {@code ip_mac_observations}, which retains every distinct source MAC seen
- * per IP (unlike {@code host_classifications}, which is one MAC per IP). A subnet is flagged only
- * when one of its member IPs shows this conflict in the network's latest snapshot; otherwise nothing
- * is returned. Absence of a warning is not a claim that the CIDR is a single network — only that we
- * have no evidence to the contrary.
+ * per IP (unlike {@code host_classifications}, which is one MAC per IP). A subnet is flagged when one
+ * of its member IPs shows this conflict in <b>any</b> snapshot of the network — overlaps are often
+ * transient (a shadow device that appears then leaves), so a latest-snapshot-only check would miss
+ * them. The warning names the snapshot where the conflict was seen. Absence of a warning is not a
+ * claim that the CIDR is a single network — only that we have no evidence to the contrary.
  */
 @Slf4j
 @Service
@@ -38,40 +38,56 @@ public class SubnetOverlapDetectionService {
   private final JdbcTemplate jdbc;
 
   /**
-   * Overlap warnings for every defined subnet, evaluated against a network's latest snapshot. Only
-   * subnets with a member IP claimed by multiple MACs are returned; a clean subnet yields nothing.
+   * Overlap warnings for every defined subnet, evaluated across <b>all</b> of a network's snapshots.
+   * At most one warning per subnet — the earliest snapshot exhibiting a conflict. Clean subnets
+   * yield nothing.
    */
   public List<SubnetOverlapWarningDto> detect(UUID networkId) {
-    UUID fileId = latestFileId(networkId);
-    if (fileId == null) return List.of();
+    if (networkId == null) return List.of();
 
-    // IP -> distinct MACs, only for IPs with a conflict (>1 MAC) in this file.
-    Map<String, List<String>> conflicts = conflictingIpMacs(fileId);
-    if (conflicts.isEmpty()) return List.of();
+    List<SubnetDefinitionEntity> subnets = subnetRepo.findAll();
+    if (subnets.isEmpty()) return List.of();
 
-    List<SubnetOverlapWarningDto> warnings = new ArrayList<>();
-    for (SubnetDefinitionEntity subnet : subnetRepo.findAll()) {
-      long[] range;
+    // Precompute CIDR integer ranges once.
+    Map<SubnetDefinitionEntity, long[]> ranges = new LinkedHashMap<>();
+    for (SubnetDefinitionEntity s : subnets) {
       try {
-        range = CidrRange.of(subnet.getCidr());
-      } catch (Exception e) {
-        continue;
-      }
-      // The first conflicting IP that falls inside this CIDR is enough to flag it.
-      for (Map.Entry<String, List<String>> e : conflicts.entrySet()) {
-        Long ipInt = ipToLongOrNull(e.getKey());
-        if (ipInt == null || ipInt < range[0] || ipInt > range[1]) continue;
-        warnings.add(
-            SubnetOverlapWarningDto.builder()
-                .subnetId(subnet.getId())
-                .cidr(subnet.getCidr())
-                .conflictingIp(e.getKey())
-                .macs(e.getValue())
-                .build());
-        break;
+        ranges.put(s, CidrRange.of(s.getCidr()));
+      } catch (Exception ignored) {
+        // skip malformed CIDR
       }
     }
-    return warnings;
+
+    Map<Long, SubnetOverlapWarningDto> bySubnet = new LinkedHashMap<>();
+    // Walk snapshots in order so the first conflict found per subnet is the earliest one.
+    for (NetworkSnapshotEntity snap :
+        snapshotRepo.findByNetworkIdWithFileOrderBySnapshotOrderAsc(networkId)) {
+      if (snap.getFile() == null) continue;
+      Map<String, List<String>> conflicts = conflictingIpMacs(snap.getFile().getId());
+      if (conflicts.isEmpty()) continue;
+
+      for (Map.Entry<SubnetDefinitionEntity, long[]> re : ranges.entrySet()) {
+        SubnetDefinitionEntity subnet = re.getKey();
+        if (bySubnet.containsKey(subnet.getId())) continue; // already flagged from an earlier snapshot
+        long[] range = re.getValue();
+        for (Map.Entry<String, List<String>> c : conflicts.entrySet()) {
+          Long ipInt = ipToLongOrNull(c.getKey());
+          if (ipInt == null || ipInt < range[0] || ipInt > range[1]) continue;
+          bySubnet.put(
+              subnet.getId(),
+              SubnetOverlapWarningDto.builder()
+                  .subnetId(subnet.getId())
+                  .cidr(subnet.getCidr())
+                  .conflictingIp(c.getKey())
+                  .macs(c.getValue())
+                  .snapshotOrder(snap.getSnapshotOrder())
+                  .snapshotFileName(snap.getFile().getFileName())
+                  .build());
+          break;
+        }
+      }
+    }
+    return new ArrayList<>(bySubnet.values());
   }
 
   /** IPs in a file observed with more than one distinct MAC → {ip: [macs]}. */
@@ -106,15 +122,6 @@ public class SubnetOverlapDetectionService {
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
-
-  private UUID latestFileId(UUID networkId) {
-    if (networkId == null) return null;
-    return snapshotRepo.findByNetworkIdOrderBySnapshotOrderAsc(networkId).stream()
-        .filter(s -> s.getFile() != null)
-        .max(Comparator.comparingInt(NetworkSnapshotEntity::getSnapshotOrder))
-        .map(s -> s.getFile().getId())
-        .orElse(null);
-  }
 
   private static Long ipToLongOrNull(String ip) {
     try {

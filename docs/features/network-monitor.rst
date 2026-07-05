@@ -161,7 +161,9 @@ detail modal listing the conflicting IP and MACs.
 **How it is detected.** The tell is a single **IP claimed by more than one MAC
 within one capture**. There is no benign reason for two devices to answer for the
 same address at once, so this is a high-confidence, deterministic signal (no LLM,
-no heuristic scoring). It is evaluated against the network's latest snapshot.
+no heuristic scoring). Every snapshot of the network is checked — not just the
+latest — because overlaps are often transient (a shadow device that appears then
+leaves), and the warning names the snapshot in which the conflict was seen.
 
 **Why only this signal.** Two overlapping networks are otherwise
 *indistinguishable* from capture data alone — a bare set of IPs carries nothing
@@ -176,11 +178,13 @@ captures and are not yet parsed).
 .. note::
 
    This requires the capture to actually contain the conflicting frames (the same
-   IP sourced from two MACs). The bundled demo exercises it: week 3 of the Network
-   Monitor sample set (``sample-files/monitor/week3_*.pcap``) has ``192.168.1.10``
-   sourced from two MACs (an ARP-spoof scenario, which is identical at layer 2 to
-   an overlap). Define a subnet over ``192.168.1.0/24`` and add that snapshot to
-   see the warning. See :doc:`../sample-files`.
+   IP sourced from two MACs). The bundled demo exercises it: in
+   ``sample-files/monitor_large/week5_shadow_device_arp_spoof.pcap`` the shadow
+   device (``b8:27:eb:77:77:07``) claims Bob's workstation IP ``10.0.1.11`` — so
+   that IP is sourced from two MACs (an ARP-spoof scenario, identical at layer 2
+   to an overlap). Define a subnet over ``10.0.1.0/24`` and the warning appears
+   (on the week-5 snapshot), even after later clean weeks are added. See
+   :doc:`../sample-files`.
 
 Severity Levels
 ---------------

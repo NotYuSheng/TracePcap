@@ -29,6 +29,8 @@ export interface SubnetOverlapWarning {
   cidr: string;
   conflictingIp: string;
   macs: string[];
+  snapshotOrder: number;
+  snapshotFileName: string;
 }
 
 /** One snapshot's view of a subnet's composition, for the Snapshot History table. */

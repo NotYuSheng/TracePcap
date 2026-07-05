@@ -2818,6 +2818,13 @@
             },
             "type": "array"
           },
+          "snapshotFileName": {
+            "type": "string"
+          },
+          "snapshotOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
           "subnetId": {
             "format": "int64",
             "type": "integer"
