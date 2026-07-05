@@ -55,8 +55,13 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    operations/production-hardening
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Demo & Sample Data
+
+   sample-files
+
+.. toctree::
    :maxdepth: 1
    :caption: Reference
 
    api-reference
-   sample-files

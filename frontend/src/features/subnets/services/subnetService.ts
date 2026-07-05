@@ -4,6 +4,7 @@ import type {
   SubnetDefinition,
   SubnetLabelSuggestion,
   SubnetCompositionHistoryEntry,
+  SubnetOverlapWarning,
 } from '../types/subnet.types';
 
 export const subnetService = {
@@ -57,5 +58,11 @@ export const subnetService = {
   dismissStaleness: (id: number, networkId?: string) =>
     apiClient
       .post<SubnetDefinition>(SUBNET_ENDPOINTS.SUBNET_DISMISS_STALENESS(id, networkId))
+      .then(r => r.data),
+
+  // Subnets flagged as possible overlapping networks (gateway IP answered by >1 MAC).
+  overlaps: (networkId: string) =>
+    apiClient
+      .get<SubnetOverlapWarning[]>(SUBNET_ENDPOINTS.SUBNET_OVERLAPS(networkId))
       .then(r => r.data),
 };

@@ -27,13 +27,17 @@ public class PcapParserService {
     // First-seen TTL and MAC per source IP (used for device classification)
     Map<String, Integer> hostTtls = new HashMap<>();
     Map<String, String> hostMacs = new HashMap<>();
+    // All distinct source MACs seen per IP. Usually one; more than one within a single capture is
+    // the tell for two devices sharing an IP (overlapping networks / ARP conflict) — #461.
+    Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info |
     //         tcp.payload | udp.payload | ip.ttl | eth.src |
-    //         arp.src.proto_ipv4 | arp.dst.proto_ipv4 | eth.dst
+    //         arp.src.proto_ipv4 | arp.dst.proto_ipv4 | eth.dst | arp.src.hw_mac |
+    //         frame.number
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -82,11 +86,13 @@ public class PcapParserService {
             "-e",
             "eth.dst",
             "-e",
+            "arp.src.hw_mac",
+            "-e",
             "frame.number");
     pb.redirectErrorStream(false);
 
     // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
-    // the real tshark frame.number (field 19) so other passes can locate a packet by frame number.
+    // the real tshark frame.number (field 20, the last -e) so other passes can locate a packet by it.
     long packetNumber = 0;
     try {
       Process process = pb.start();
@@ -157,6 +163,9 @@ public class PcapParserService {
           String arpDstIp = (f.length > 17 && !f[17].isEmpty()) ? firstValue(f[17]) : null;
           String dstMac =
               (f.length > 18 && !f[18].isEmpty()) ? firstValue(f[18]).toLowerCase() : null;
+          // ARP sender hardware address (field 19) — the "I own this IP at this MAC" claim.
+          String arpSrcMac =
+              (f.length > 19 && !f[19].isEmpty()) ? firstValue(f[19]).toLowerCase() : null;
           if (srcIp == null) srcIp = (arpSrcIp != null) ? arpSrcIp : srcMac;
           if (dstIp == null) dstIp = (arpDstIp != null) ? arpDstIp : dstMac;
 
@@ -178,6 +187,17 @@ public class PcapParserService {
           if (srcIp != null) {
             if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
             if (srcMac != null) hostMacs.putIfAbsent(srcIp, srcMac);
+          }
+
+          // Overlap detection (#461): record the IP↔MAC ownership claim from ARP
+          // (arp.src.proto_ipv4 ↔ arp.src.hw_mac) — NOT the IP-layer eth.src. A routed host's
+          // IP packets carry the gateway's MAC as eth.src, so keying off eth.src would falsely flag
+          // every off-subnet server as "two MACs". ARP is the authoritative "who owns this IP"
+          // statement, so two distinct hw_macs claiming one IP is a genuine same-segment conflict.
+          if (arpSrcIp != null && arpSrcMac != null) {
+            hostMacObservations
+                .computeIfAbsent(arpSrcIp, k -> new LinkedHashSet<>())
+                .add(arpSrcMac);
           }
 
           // Track conversations for IP traffic
@@ -232,7 +252,7 @@ public class PcapParserService {
             // running counter if the field is somehow absent. frame.number is the last field, so read
             // it from the end — a '|' inside an earlier column (e.g. Info) would shift fixed indices.
             long frameNumber = packetNumber;
-            String rawFrame = f.length > 19 ? f[f.length - 1] : null;
+            String rawFrame = f.length > 20 ? f[f.length - 1] : null;
             if (rawFrame != null && !rawFrame.isEmpty()) {
               try {
                 frameNumber = Long.parseLong(rawFrame.trim());
@@ -276,6 +296,7 @@ public class PcapParserService {
     result.setConversations(new ArrayList<>(conversationMap.values()));
     result.setHostTtls(hostTtls);
     result.setHostMacs(hostMacs);
+    result.setHostMacObservations(hostMacObservations);
 
     log.info(
         "PCAP analysis completed: {} packets, {} bytes, {} conversations",
@@ -368,6 +389,9 @@ public class PcapParserService {
 
     /** First-seen Ethernet source MAC address per source IP address. */
     private Map<String, String> hostMacs = new HashMap<>();
+
+    /** All distinct source MACs seen per source IP (>1 ⇒ possible overlapping networks, #461). */
+    private Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
   }
 
   @lombok.Data

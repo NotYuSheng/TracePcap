@@ -2,8 +2,10 @@ package com.tracepcap.subnets.controller;
 
 import com.tracepcap.subnets.dto.SubnetDefinitionDto;
 import com.tracepcap.subnets.dto.SubnetLabelSuggestionDto;
+import com.tracepcap.subnets.dto.SubnetOverlapWarningDto;
 import com.tracepcap.subnets.dto.UpsertSubnetRequest;
 import com.tracepcap.subnets.service.SubnetLabelSuggestionService;
+import com.tracepcap.subnets.service.SubnetOverlapDetectionService;
 import com.tracepcap.subnets.service.SubnetService;
 import com.tracepcap.subnets.service.SubnetStalenessService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +27,19 @@ public class SubnetController {
   private final SubnetService subnetService;
   private final SubnetLabelSuggestionService subnetLabelSuggestionService;
   private final SubnetStalenessService subnetStalenessService;
+  private final SubnetOverlapDetectionService subnetOverlapDetectionService;
+
+  @GetMapping("/overlaps")
+  @Operation(
+      summary = "Detect possible overlapping networks sharing a CIDR",
+      description =
+          "For a network's latest snapshot, flags any defined subnet whose gateway IP is answered by "
+              + "more than one MAC — the one unambiguous tell that a CIDR is really two different L2 "
+              + "networks (multi-site NAT, VLANs, VPN overlays). Returns only flagged subnets; a clean "
+              + "or gateway-less subnet yields nothing (no claim is made).")
+  public ResponseEntity<List<SubnetOverlapWarningDto>> overlaps(@RequestParam UUID networkId) {
+    return ResponseEntity.ok(subnetOverlapDetectionService.detect(networkId));
+  }
 
   @GetMapping
   @Operation(summary = "List defined subnets")

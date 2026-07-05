@@ -31,7 +31,9 @@ Overview
 - A network diagram overlays change highlights on the topology graph for each
   snapshot, accessible by clicking any row in the Capture Timeline.
 - Subnets can be defined or auto-detected to group IP addresses in the IP
-  Addresses drift panel.
+  Addresses drift panel. A subnet is flagged with a **possible overlapping
+  networks** warning when one of its member IPs is claimed by more than one MAC
+  in a single capture — see `Overlapping-network detection`_ below.
 - Devices and IP addresses can be annotated with **role labels** (manually or
   via AI suggestion) to provide operational context. Confirmed labels are
   automatically flagged **stale** when the underlying node's behaviour later
@@ -140,6 +142,89 @@ against the previous snapshot's baseline (see `Node Role Annotation`_).
 Because validation runs at ingest, this fires automatically the moment a new
 snapshot introduces drift — no manual re-check. See `Label Staleness Detection`_
 for the analyst workflow (amber warning, *Update label* / *Dismiss*).
+
+Overlapping-network detection
+-----------------------------
+
+RFC 1918 private ranges (``10.0.0.0/8``, ``192.168.0.0/16``, ``172.16.0.0/12``)
+are non-unique by design, so a single capture point can observe **two different
+L2 networks that reuse the same range** — for example a multi-site NAT hub where
+two branches both use ``192.168.1.0/24``, a VPN underlay and tunnel on the same
+range, or reused VLAN/VRF addressing. When that happens, a subnet definition
+would blend both networks: one label applies to hosts in both, and composition
+becomes a meaningless mix.
+
+TracePcap flags this with a **possible overlapping networks** warning on the
+subnet — a red badge on the subnet row and an explanatory banner in the subnet
+detail modal listing the conflicting IP and MACs.
+
+**How it is detected.** The tell is a single **IP claimed by more than one MAC
+within one capture**. There is no benign reason for two devices to answer for the
+same address at once, so this is a high-confidence, deterministic signal (no LLM,
+no heuristic scoring). Every snapshot of the network is checked — not just the
+latest — because overlaps are often transient (a shadow device that appears then
+leaves), and the warning names the snapshot in which the conflict was seen.
+
+**Why only this signal.** Two overlapping networks are otherwise
+*indistinguishable* from capture data alone — a bare set of IPs carries nothing
+that partitions it into two networks. The IP↔MAC conflict is the one unambiguous
+tell that survives to the data layer. Accordingly the detector is intentionally
+quiet: it flags only this case and stays silent when there is no conflict.
+**Absence of a warning is not a claim that a CIDR is a single network** — only
+that there is no evidence to the contrary. VLAN tags, which would disambiguate
+more cases, are not currently captured (they are only present on trunk-port
+captures and are not yet parsed).
+
+.. note::
+
+   This requires the capture to actually contain the conflicting frames (the same
+   IP sourced from two MACs). The bundled demo exercises it two ways:
+
+   - **Genuine overlap** — ``week6_peak_violations.pcap`` adds a *branch-B office*
+     that reuses HQ's range: ``10.0.1.10``, ``10.0.1.11`` and ``10.0.1.12`` are
+     each claimed by two devices at once (an HQ workstation and a branch-B host).
+   - **ARP spoof** — ``week5_shadow_device_arp_spoof.pcap`` has the shadow device
+     ``b8:27:eb:77:77:07`` claim Bob's IP ``10.0.1.11`` (identical at layer 2 to an
+     overlap).
+
+   Define a subnet over ``10.0.1.0/24`` and the warning appears on the relevant
+   snapshot, even after later clean weeks are added. See :doc:`../sample-files`.
+
+Device address conflict (one MAC, multiple IPs)
+-----------------------------------------------
+
+The overlapping-network warning above is the *IP-side* view — one **IP** claimed
+by more than one **MAC**. The **device (MAC) view** surfaces the mirror image:
+one **MAC** that owns more than one **IP** within a single snapshot.
+
+Open a device in its **Device Snapshot History** and any snapshot where that MAC
+answered ARP for two or more addresses carries a **"conflict — N IPs" badge**,
+listing the IPs it held at that capture point.
+
+**How it is detected.** Same authoritative signal as the overlap warning — ARP
+ownership claims (``arp.src.hw_mac`` ↔ ``arp.src.proto_ipv4``), *not* the IP-layer
+``eth.src`` (a routed host's frames carry the gateway's MAC, which would falsely
+attribute every off-subnet IP to the router). Distinct ``proto_ipv4`` values for
+one ``hw_mac`` in a snapshot are recorded as the conflict.
+
+**Benign vs. malicious — same badge, read the context.** Unlike the IP-side
+overlap, one MAC holding several IPs has *legitimate* causes: a multi-homed
+server with a service/alias IP, a router or bridge with a foot in two subnets, or
+a host mid-DHCP-renewal. It can equally be an attacker — an ARP spoofer claiming
+a victim's IP alongside its own. The badge reports the fact; the analyst reads
+intent from the rest of the snapshot. Both appear in the demo:
+
+.. note::
+
+   - **Benign multi-homing** — ``week6_peak_violations.pcap`` makes the file
+     server multi-homed: MAC ``00:aa:bb:cc:dd:10`` owns both ``10.0.2.10`` and a
+     new backup-service alias ``10.0.2.11``. Its Device Snapshot History shows
+     "conflict — 2 IPs".
+   - **Malicious spoof** — ``week5_shadow_device_arp_spoof.pcap`` has the shadow
+     device ``b8:27:eb:77:77:07`` claim both its own ``10.0.4.50`` and Bob's
+     ``10.0.1.11``, raising the identical badge for the opposite reason.
+
+   See :doc:`../sample-files`.
 
 Severity Levels
 ---------------

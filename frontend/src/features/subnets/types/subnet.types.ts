@@ -23,6 +23,16 @@ export interface SubnetLabelSuggestion {
   snapshotCount: number;
 }
 
+/** Evidence that a CIDR may span two overlapping networks (a member IP claimed by >1 MAC). */
+export interface SubnetOverlapWarning {
+  subnetId: number;
+  cidr: string;
+  conflictingIp: string;
+  macs: string[];
+  snapshotOrder: number;
+  snapshotFileName: string;
+}
+
 /** One snapshot's view of a subnet's composition, for the Snapshot History table. */
 export interface SubnetCompositionHistoryEntry {
   snapshotId: string;

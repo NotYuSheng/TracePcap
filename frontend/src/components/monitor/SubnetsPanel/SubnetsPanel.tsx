@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { SubnetDiagramModal } from '@components/monitor/SubnetDiagramModal/SubnetDiagramModal';
 import { SubnetDetailModal } from '@components/monitor/SubnetsPanel/SubnetDetailModal';
 import { subnetService } from '@/features/subnets/services/subnetService';
-import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
+import type { SubnetDefinition, SubnetOverlapWarning } from '@/features/subnets/types/subnet.types';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 
 interface SubnetsPanelProps {
@@ -32,6 +32,22 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
   const [detecting, setDetecting] = useState(false);
   const [candidates, setCandidates] = useState<SubnetDefinition[]>([]);
   const [savingCidr, setSavingCidr] = useState<string | null>(null);
+
+  // Overlap warnings keyed by subnet id (gateway IP answered by >1 MAC → possible overlapping nets).
+  const [overlaps, setOverlaps] = useState<Record<number, SubnetOverlapWarning>>({});
+  // Stable signature of the subnet definitions so overlap badges refetch on any add/delete/CIDR
+  // edit — but not on every re-render (a raw `subnets` dep would loop, the array is a new ref each time).
+  const subnetsKey = subnets.map(s => `${s.id}:${s.cidr}`).join(',');
+
+  useEffect(() => {
+    let active = true;
+    if (snapshots.length === 0) { setOverlaps({}); return; }
+    subnetService
+      .overlaps(networkId)
+      .then(ws => { if (active) setOverlaps(Object.fromEntries(ws.map(w => [w.subnetId, w]))); })
+      .catch(() => { if (active) setOverlaps({}); });
+    return () => { active = false; };
+  }, [networkId, snapshots.length, subnetsKey]);
 
   const sortedSnapshots = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
 
@@ -114,7 +130,9 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
               </tr>
             </thead>
             <tbody>
-              {subnets.map(subnet => (
+              {subnets.map(subnet => {
+                const warning = subnet.id !== null ? overlaps[subnet.id] : undefined;
+                return (
                 <tr
                   key={subnet.id}
                   onClick={() => setDetailSubnet(subnet)}
@@ -133,6 +151,15 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                               title="Composition drifted since this label was set — open to review"
                             >
                               <i className="bi bi-exclamation-triangle me-1" />Stale
+                            </Badge>
+                          )}
+                          {warning && (
+                            <Badge
+                              bg="danger"
+                              style={{ fontSize: '0.6rem' }}
+                              title={`${warning.conflictingIp} is claimed by ${warning.macs.length} MACs — this CIDR may be two overlapping networks. Open for details.`}
+                            >
+                              <i className="bi bi-diagram-3 me-1" />Overlap?
                             </Badge>
                           )}
                         </div>
@@ -168,7 +195,8 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                         </div>
                       </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -355,6 +383,7 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
           subnet={detailSubnet}
           networkId={networkId}
           snapshots={snapshots}
+          overlap={detailSubnet.id !== null ? overlaps[detailSubnet.id] ?? null : null}
           onClose={() => setDetailSubnet(null)}
         />
       )}

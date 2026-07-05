@@ -43,8 +43,22 @@ Policy violations story arc
   Week 2        Bob's personal laptop joins WiFi; WireGuard VPN tunnel appears
   Week 3        Carol uses Telnet to file server (cleartext); Bob runs BitTorrent
   Week 4        Bob FTP-exfiltrates to external IP; ISP failover (gateway change)
-  Week 5        Shadow device appears (no hostname, unusual OUI); ARP anomaly
-  Week 6        Multiple violations peak — FTP + BitTorrent + Telnet still active
+  Week 5        Shadow device appears (no hostname, unusual OUI); ARP spoof —
+                the shadow MAC (b8:27:eb:77:77:07) claims both its own 10.0.4.50
+                and Bob's 10.0.1.11, so it holds TWO IPs at once. In the device
+                (MAC) Snapshot History this shows a "conflict — 2 IPs" badge — the
+                MALICIOUS one-MAC-two-IPs case (contrast week 6's benign multi-homed
+                file server, which produces the same badge for a legitimate reason).
+  Week 6        Multiple violations peak — FTP + BitTorrent + Telnet still active.
+                Two conflict demos land this week:
+                  • IP overlap (one IP → two MACs): a branch-B office reusing
+                    10.0.1.0/24 becomes visible (10.0.1.10/.11/.12 each claimed by two
+                    devices at once) — genuine overlapping networks.
+                  • Device conflict (one MAC → two IPs): the file server becomes
+                    multi-homed — FILESERVER_MAC (00:aa:bb:cc:dd:10) now also owns
+                    10.0.2.11 (a backup service) alongside its 10.0.2.10, so its Device
+                    Snapshot History shows a "conflict — 2 IPs" badge. Benign multi-homing
+                    (contrast week 5's malicious spoof, which produces the same badge).
   Week 7        Violations drop off (audit notice sent); gateway back to primary
   Week 8        Near-baseline; shadow device gone; one lingering personal device
 
@@ -192,6 +206,11 @@ def ip_in_subnet(subnet_prefix: str, host_index: int) -> str:
 
 GW_MAC          = "00:aa:bb:cc:dd:01";  GW_IP           = "10.0.1.1"
 FILESERVER_MAC  = "00:aa:bb:cc:dd:10";  FILESERVER_IP   = "10.0.2.10"
+# Service alias: from week 6 the file server is multi-homed — the SAME MAC
+# (00:aa:bb:cc:dd:10) also answers ARP for a second IP for a new backup/replication
+# service. One MAC → two IPs in the same snapshot: benign, and the MAC-side mirror of
+# the branch-B IP overlap. Distinct from week 5's spoof (that's malicious, this isn't).
+FILESERVER_ALIAS_IP = "10.0.2.11"
 MAILSERVER_MAC  = "00:aa:bb:cc:dd:20";  MAILSERVER_IP   = "10.0.2.20"
 WEBSERVER_MAC   = "00:aa:bb:cc:dd:30";  WEBSERVER_IP    = "10.0.2.30"
 PRINTER_A_MAC   = "00:aa:bb:cc:dd:50";  PRINTER_A_IP    = "10.0.3.5"
@@ -204,6 +223,14 @@ WS_DAVE_MAC     = "ac:de:48:44:44:04";  WS_DAVE_IP      = "10.0.1.13"  # joins w
 LAPTOP_BOB_MAC  = "dc:a6:32:55:55:05";  LAPTOP_BOB_IP   = "10.0.4.20"  # Bob's personal, joins week 2
 MOBILE_EVE_MAC  = "f0:18:98:66:66:06";  MOBILE_EVE_IP   = "10.0.4.30"  # personal mobile, joins week 4
 SHADOW_DEV_MAC  = "b8:27:eb:77:77:07";  SHADOW_DEV_IP   = "10.0.4.50"  # unknown device, joins week 5
+
+# Branch-B office (week 6): a second site whose LAN ALSO uses 10.0.1.0/24 becomes
+# visible at this capture point (e.g. a newly bridged site-to-site link). Its hosts
+# reuse HQ's addresses .10/.11/.12 with different MACs — a genuine OVERLAPPING NETWORK,
+# not a spoof: several distinct IPs each claimed by two devices at once.
+BRANCH_B_A_MAC  = "52:54:00:b0:00:0a";  BRANCH_B_A_IP   = "10.0.1.10"   # collides with WS_ALICE
+BRANCH_B_B_MAC  = "52:54:00:b0:00:0b";  BRANCH_B_B_IP   = "10.0.1.11"   # collides with WS_BOB
+BRANCH_B_C_MAC  = "52:54:00:b0:00:0c";  BRANCH_B_C_IP   = "10.0.1.12"   # collides with WS_CAROL
 
 # External
 GW_PRIMARY      = "203.0.113.1"
@@ -644,7 +671,25 @@ def make_week6():
         arp_reply(LAPTOP_BOB_MAC, LAPTOP_BOB_IP,  GW_MAC, GW_IP,            t=t0 + 0.9),
         arp_reply(MOBILE_EVE_MAC, MOBILE_EVE_IP,  GW_MAC, GW_IP,            t=t0 + 1.0),
         arp_reply(SHADOW_DEV_MAC, SHADOW_DEV_IP,  GW_MAC, GW_IP,            t=t0 + 1.1),
+        # OVERLAPPING NETWORK: branch-B devices announce HQ's 10.0.1.10/.11/.12 with
+        # their own MACs — each of those IPs is now claimed by two devices at once.
+        arp_reply(BRANCH_B_A_MAC, BRANCH_B_A_IP,  GW_MAC, GW_IP,            t=t0 + 1.2),
+        arp_reply(BRANCH_B_B_MAC, BRANCH_B_B_IP,  GW_MAC, GW_IP,            t=t0 + 1.3),
+        arp_reply(BRANCH_B_C_MAC, BRANCH_B_C_IP,  GW_MAC, GW_IP,            t=t0 + 1.4),
+        # MULTI-HOMED HOST: the file server (FILESERVER_MAC) now also answers ARP for a
+        # second IP (10.0.2.11) for a new backup service — one MAC, two IPs at once.
+        # In the DEVICE Snapshot History this is a "conflict — 2 IPs" badge; benign
+        # multi-homing (the MAC-side mirror of the branch-B IP overlap above).
+        arp_reply(FILESERVER_MAC, FILESERVER_ALIAS_IP, GW_MAC, GW_IP,       t=t0 + 1.5),
     ]
+
+    # Branch-B hosts — real traffic from the colliding addresses (their own MACs)
+    pkts += https_session(BRANCH_B_A_MAC, GW_MAC, BRANCH_B_A_IP, gw, t0=t0 + 90.0)
+    pkts += smb_session(  BRANCH_B_B_MAC, GW_MAC, BRANCH_B_B_IP, FILESERVER_IP, t0=t0 + 92.0)
+    pkts += http_session( BRANCH_B_C_MAC, GW_MAC, BRANCH_B_C_IP, WEBSERVER_IP,  t0=t0 + 94.0)
+
+    # File server's backup service on its alias IP — same MAC, second IP in traffic too
+    pkts += smb_session(FILESERVER_MAC, GW_MAC, FILESERVER_ALIAS_IP, MAILSERVER_IP, t0=t0 + 96.0)
 
     # Alice — normal
     pkts += http_session(WS_ALICE_MAC, GW_MAC, WS_ALICE_IP, WEBSERVER_IP,  t0=t0 + 2.0)
@@ -862,7 +907,8 @@ Week 1→2:  MAC_ADDED (LAPTOP_BOB on WiFi), VPN_DRIFT new (WireGuard), APP_ADDE
 Week 2→3:  MAC_ADDED (WS_CAROL), PROTOCOL_ADDED (Telnet), APP_ADDED (BitTorrent)
 Week 3→4:  MAC_ADDED (MOBILE_EVE), PROTOCOL_ADDED (FTP), GATEWAY_CHANGE (ISP failover)
 Week 4→5:  MAC_ADDED (WS_DAVE, SHADOW_DEV), IP_MAC_DRIFT CRITICAL (shadow device ARP spoof)
-Week 5→6:  (no new story signals — violations peak and persist)
+Week 5→6:  violations peak and persist; OVERLAP (branch-B reuses 10.0.1.x → IP-with-
+           two-MACs) + DEVICE CONFLICT (file server multi-homed → MAC-with-two-IPs)
 Week 6→7:  GATEWAY_CHANGE (back to primary), VPN_DRIFT gone (WireGuard stops),
            APP_ADDED gone (BitTorrent stops), Telnet gone, MAC absent (SHADOW_DEV)
 Week 7→8:  (near stable — personal devices still present)
