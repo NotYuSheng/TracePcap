@@ -27,6 +27,9 @@ public class PcapParserService {
     // First-seen TTL and MAC per source IP (used for device classification)
     Map<String, Integer> hostTtls = new HashMap<>();
     Map<String, String> hostMacs = new HashMap<>();
+    // All distinct source MACs seen per IP. Usually one; more than one within a single capture is
+    // the tell for two devices sharing an IP (overlapping networks / ARP conflict) — #461.
+    Map<String, java.util.LinkedHashSet<String>> hostMacObservations = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
 
@@ -177,7 +180,11 @@ public class PcapParserService {
           // Record first-seen TTL and MAC for source IP
           if (srcIp != null) {
             if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
-            if (srcMac != null) hostMacs.putIfAbsent(srcIp, srcMac);
+            if (srcMac != null) {
+              hostMacs.putIfAbsent(srcIp, srcMac);
+              // Retain every distinct MAC for this IP (not just the first) for overlap detection.
+              hostMacObservations.computeIfAbsent(srcIp, k -> new java.util.LinkedHashSet<>()).add(srcMac);
+            }
           }
 
           // Track conversations for IP traffic
@@ -276,6 +283,7 @@ public class PcapParserService {
     result.setConversations(new ArrayList<>(conversationMap.values()));
     result.setHostTtls(hostTtls);
     result.setHostMacs(hostMacs);
+    result.setHostMacObservations(hostMacObservations);
 
     log.info(
         "PCAP analysis completed: {} packets, {} bytes, {} conversations",
@@ -368,6 +376,9 @@ public class PcapParserService {
 
     /** First-seen Ethernet source MAC address per source IP address. */
     private Map<String, String> hostMacs = new HashMap<>();
+
+    /** All distinct source MACs seen per source IP (>1 ⇒ possible overlapping networks, #461). */
+    private Map<String, java.util.LinkedHashSet<String>> hostMacObservations = new HashMap<>();
   }
 
   @lombok.Data

@@ -9,6 +9,12 @@ Change signals covered
   MAC_ADDED        — new device joins the network
   IP_MAC_DRIFT     — same MAC gets a new IP (DHCP reassignment)
                    — same IP claimed by a different MAC (ARP spoof, CRITICAL)
+  SUBNET_OVERLAP   — within one capture, an IP is sourced from 2+ MACs, i.e. two
+                     devices share the address. At L2 this is identical to an ARP
+                     spoof, so week 3 (DEV_C sends as DEV_A's IP 192.168.1.10)
+                     doubles as the overlapping-networks demo: define a subnet over
+                     192.168.1.0/24 and the "possible overlapping networks" badge
+                     appears on the week-3 snapshot.
   ASN_CHANGE       — a new external ASN/ISP appears in traffic
   GATEWAY_CHANGE   — top-traffic external IP (gateway heuristic) changes
   PROTOCOL_ADDED   — a new L4/L7 protocol appears

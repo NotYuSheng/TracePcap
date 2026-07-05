@@ -129,6 +129,7 @@ export const SUBNET_ENDPOINTS = {
     `/subnets/${id}/history?networkId=${networkId}`,
   SUBNET_DISMISS_STALENESS: (id: number, networkId?: string) =>
     `/subnets/${id}/dismiss-staleness${networkId ? `?networkId=${networkId}` : ''}`,
+  SUBNET_OVERLAPS: (networkId: string) => `/subnets/overlaps?networkId=${networkId}`,
 };
 
 export const INSIGHTS_ENDPOINTS = {

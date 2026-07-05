@@ -4,13 +4,15 @@ import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { SubnetSnapshotHistory } from '@components/monitor/SubnetsPanel/SubnetSnapshotHistory';
 import { subnetService } from '@/features/subnets/services/subnetService';
-import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
+import type { SubnetDefinition, SubnetOverlapWarning } from '@/features/subnets/types/subnet.types';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 
 interface SubnetDetailModalProps {
   subnet: SubnetDefinition;
   networkId: string;
   snapshots: NetworkSnapshot[];
+  /** Present when this CIDR looks like two overlapping networks (gateway IP with >1 MAC). */
+  overlap?: SubnetOverlapWarning | null;
   onClose: () => void;
 }
 
@@ -20,7 +22,7 @@ interface SubnetDetailModalProps {
  * where the label is set <em>per snapshot</em>. There is no separate global-label editor — the
  * present-day label is simply the latest snapshot's label, mirroring how node roles work.
  */
-export function SubnetDetailModal({ subnet, networkId, snapshots, onClose }: SubnetDetailModalProps) {
+export function SubnetDetailModal({ subnet, networkId, snapshots, overlap, onClose }: SubnetDetailModalProps) {
   const canScan = snapshots.length > 0 && subnet.id !== null;
 
   // Local copy of the stale state so Dismiss can clear the banner without a full reload.
@@ -60,6 +62,25 @@ export function SubnetDetailModal({ subnet, networkId, snapshots, onClose }: Sub
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {/* ── Overlap warning (possible two networks sharing this CIDR) ──── */}
+        {overlap && (
+          <Alert variant="danger" className="p-2 mb-3 small">
+            <div className="d-flex align-items-start gap-2">
+              <i className="bi bi-diagram-3-fill mt-1 flex-shrink-0" />
+              <div>
+                <strong>Possible overlapping networks.</strong> In the latest snapshot,{' '}
+                <code className="font-monospace">{overlap.conflictingIp}</code> is claimed by{' '}
+                <strong>{overlap.macs.length}</strong> different MACs — which usually means two
+                separate L2 networks are reusing this range. Labels and composition for this subnet
+                may be blending both.
+                <ul className="mb-0 mt-1 ps-3 font-monospace">
+                  {overlap.macs.map(m => <li key={m}>{m}</li>)}
+                </ul>
+              </div>
+            </div>
+          </Alert>
+        )}
+
         {/* ── Present-day label (read-only) ─────────────────────────────── */}
         <div className="mb-2">
           <h6 className="border-bottom pb-1 mb-2">

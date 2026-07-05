@@ -31,7 +31,9 @@ Overview
 - A network diagram overlays change highlights on the topology graph for each
   snapshot, accessible by clicking any row in the Capture Timeline.
 - Subnets can be defined or auto-detected to group IP addresses in the IP
-  Addresses drift panel.
+  Addresses drift panel. A subnet is flagged with a **possible overlapping
+  networks** warning when one of its member IPs is claimed by more than one MAC
+  in a single capture — see `Overlapping-network detection`_ below.
 - Devices and IP addresses can be annotated with **role labels** (manually or
   via AI suggestion) to provide operational context. Confirmed labels are
   automatically flagged **stale** when the underlying node's behaviour later
@@ -140,6 +142,45 @@ against the previous snapshot's baseline (see `Node Role Annotation`_).
 Because validation runs at ingest, this fires automatically the moment a new
 snapshot introduces drift — no manual re-check. See `Label Staleness Detection`_
 for the analyst workflow (amber warning, *Update label* / *Dismiss*).
+
+Overlapping-network detection
+-----------------------------
+
+RFC 1918 private ranges (``10.0.0.0/8``, ``192.168.0.0/16``, ``172.16.0.0/12``)
+are non-unique by design, so a single capture point can observe **two different
+L2 networks that reuse the same range** — for example a multi-site NAT hub where
+two branches both use ``192.168.1.0/24``, a VPN underlay and tunnel on the same
+range, or reused VLAN/VRF addressing. When that happens, a subnet definition
+would blend both networks: one label applies to hosts in both, and composition
+becomes a meaningless mix.
+
+TracePcap flags this with a **possible overlapping networks** warning on the
+subnet — a red badge on the subnet row and an explanatory banner in the subnet
+detail modal listing the conflicting IP and MACs.
+
+**How it is detected.** The tell is a single **IP claimed by more than one MAC
+within one capture**. There is no benign reason for two devices to answer for the
+same address at once, so this is a high-confidence, deterministic signal (no LLM,
+no heuristic scoring). It is evaluated against the network's latest snapshot.
+
+**Why only this signal.** Two overlapping networks are otherwise
+*indistinguishable* from capture data alone — a bare set of IPs carries nothing
+that partitions it into two networks. The IP↔MAC conflict is the one unambiguous
+tell that survives to the data layer. Accordingly the detector is intentionally
+quiet: it flags only this case and stays silent when there is no conflict.
+**Absence of a warning is not a claim that a CIDR is a single network** — only
+that there is no evidence to the contrary. VLAN tags, which would disambiguate
+more cases, are not currently captured (they are only present on trunk-port
+captures and are not yet parsed).
+
+.. note::
+
+   This requires the capture to actually contain the conflicting frames (the same
+   IP sourced from two MACs). The bundled demo exercises it: week 3 of the Network
+   Monitor sample set (``sample-files/monitor/week3_*.pcap``) has ``192.168.1.10``
+   sourced from two MACs (an ARP-spoof scenario, which is identical at layer 2 to
+   an overlap). Define a subnet over ``192.168.1.0/24`` and add that snapshot to
+   see the warning. See :doc:`../sample-files`.
 
 Severity Levels
 ---------------

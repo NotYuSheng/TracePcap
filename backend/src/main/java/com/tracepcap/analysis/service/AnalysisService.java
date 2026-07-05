@@ -58,6 +58,7 @@ public class AnalysisService {
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
   private final HostClassificationRepository hostClassificationRepository;
+  private final com.tracepcap.analysis.repository.IpMacObservationRepository ipMacObservationRepository;
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
@@ -151,6 +152,7 @@ public class AnalysisService {
                 serviceLogs.rolesByIp());
         applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
         hostClassificationRepository.saveAll(hostClassifications);
+        persistIpMacObservations(file, parseResult.getHostMacObservations());
         try {
           Set<String> allIps =
               parseResult.getConversations().stream()
@@ -691,6 +693,27 @@ public class AnalysisService {
    * Flags the host classifications named in {@code suspicions}. A new service role adds one {@code
    * if} branch mapping its role to the relevant flag — nothing else changes.
    */
+  /**
+   * Persist the distinct source MACs observed per IP (#461). Only IPs with more than one MAC carry
+   * overlap signal, but we store all pairings so the detector can present the full evidence.
+   */
+  private void persistIpMacObservations(
+      FileEntity file, Map<String, java.util.LinkedHashSet<String>> macsByIp) {
+    if (macsByIp == null || macsByIp.isEmpty()) return;
+    List<com.tracepcap.analysis.entity.IpMacObservationEntity> rows = new ArrayList<>();
+    macsByIp.forEach(
+        (ip, macs) ->
+            macs.forEach(
+                mac ->
+                    rows.add(
+                        com.tracepcap.analysis.entity.IpMacObservationEntity.builder()
+                            .fileId(file.getId())
+                            .ip(ip)
+                            .mac(mac)
+                            .build())));
+    if (!rows.isEmpty()) ipMacObservationRepository.saveAll(rows);
+  }
+
   private void applyServiceLogSuspicions(
       List<HostClassificationEntity> hostClassifications, List<HostServiceSuspicion> suspicions) {
     if (suspicions.isEmpty()) return;

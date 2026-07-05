@@ -2804,6 +2804,27 @@
         },
         "type": "object"
       },
+      "SubnetOverlapWarningDto": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "conflictingIp": {
+            "type": "string"
+          },
+          "macs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subnetId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "SubnetOverrideInput": {
         "properties": {
           "cidr": {
@@ -7201,6 +7222,42 @@
           }
         },
         "summary": "Persist an auto-detected subnet",
+        "tags": [
+          "Subnets"
+        ]
+      }
+    },
+    "/api/v1/subnets/overlaps": {
+      "get": {
+        "description": "For a network's latest snapshot, flags any defined subnet whose gateway IP is answered by more than one MAC — the one unambiguous tell that a CIDR is really two different L2 networks (multi-site NAT, VLANs, VPN overlays). Returns only flagged subnets; a clean or gateway-less subnet yields nothing (no claim is made).",
+        "operationId": "overlaps",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubnetOverlapWarningDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Detect possible overlapping networks sharing a CIDR",
         "tags": [
           "Subnets"
         ]
