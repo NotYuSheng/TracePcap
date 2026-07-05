@@ -72,7 +72,8 @@ export function EntityDetailModal({
   })() : null;
 
   const hasFileStats = !!fileId && (entityType === 'APPLICATION' || entityType === 'PROTOCOL');
-  const showSnapshotHistory = entityType === 'IP' && !!snapshots && snapshots.length > 0;
+  const showSnapshotHistory =
+    (entityType === 'IP' || entityType === 'DEVICE') && !!snapshots && snapshots.length > 0;
 
   return (
     <>

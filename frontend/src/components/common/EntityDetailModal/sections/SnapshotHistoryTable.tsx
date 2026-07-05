@@ -45,38 +45,55 @@ export function SnapshotHistoryTable({
               <Table.Row>
                 <Table.HeaderCell className="text-muted fw-normal">#</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Snapshot</Table.HeaderCell>
-                <Table.HeaderCell className="text-muted fw-normal">MAC Address</Table.HeaderCell>
+                <Table.HeaderCell className="text-muted fw-normal">{entityType === 'DEVICE' ? 'IP(s)' : 'MAC Address'}</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Device Type</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Role</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Protocols / Apps</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs }, idx) => (
+              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs, ips }, idx) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
                     <small className="text-muted d-block">{formatSnapTime(snap)}</small>
                     <small className="text-muted text-break" style={{ fontSize: '0.7rem' }}>{snap.fileName}</small>
                   </Table.DataCell>
-                  <Table.DataCell>
-                    {macs.length === 0 ? (
-                      <code style={{ fontSize: '0.75rem' }}>—</code>
-                    ) : (
-                      <div className="d-flex flex-column gap-1">
-                        {macs.map(m => <code key={m} style={{ fontSize: '0.75rem' }}>{m}</code>)}
-                      </div>
-                    )}
-                    {macs.length > 1 && (
-                      <Badge bg="danger" className="ms-1" style={{ fontSize: '0.6rem' }} title="This IP was claimed by more than one MAC in this snapshot — possible overlapping networks">
-                        <i className="bi bi-diagram-3 me-1" />conflict — {macs.length} MACs
-                      </Badge>
-                    )}
-                    {idx > 0 && host?.mac && ipSnapHistory[idx - 1].host?.mac &&
-                      host.mac !== ipSnapHistory[idx - 1].host!.mac && (
-                        <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
+                  {entityType === 'DEVICE' ? (
+                    <Table.DataCell>
+                      {ips.length === 0 ? (
+                        <code style={{ fontSize: '0.75rem' }}>—</code>
+                      ) : (
+                        <div className="d-flex flex-column gap-1">
+                          {ips.map(ip => <code key={ip} style={{ fontSize: '0.75rem' }}>{ip}</code>)}
+                        </div>
                       )}
-                  </Table.DataCell>
+                      {ips.length > 1 && (
+                        <Badge bg="danger" className="ms-1" style={{ fontSize: '0.6rem' }} title="This MAC claimed more than one IP in this snapshot — a device using multiple addresses (router/NAT, or spoofing)">
+                          <i className="bi bi-diagram-3 me-1" />conflict — {ips.length} IPs
+                        </Badge>
+                      )}
+                    </Table.DataCell>
+                  ) : (
+                    <Table.DataCell>
+                      {macs.length === 0 ? (
+                        <code style={{ fontSize: '0.75rem' }}>—</code>
+                      ) : (
+                        <div className="d-flex flex-column gap-1">
+                          {macs.map(m => <code key={m} style={{ fontSize: '0.75rem' }}>{m}</code>)}
+                        </div>
+                      )}
+                      {macs.length > 1 && (
+                        <Badge bg="danger" className="ms-1" style={{ fontSize: '0.6rem' }} title="This IP was claimed by more than one MAC in this snapshot — possible overlapping networks">
+                          <i className="bi bi-diagram-3 me-1" />conflict — {macs.length} MACs
+                        </Badge>
+                      )}
+                      {idx > 0 && host?.mac && ipSnapHistory[idx - 1].host?.mac &&
+                        host.mac !== ipSnapHistory[idx - 1].host!.mac && (
+                          <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
+                        )}
+                    </Table.DataCell>
+                  )}
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
                   <Table.DataCell>
                     <div className="d-flex align-items-center gap-1">
