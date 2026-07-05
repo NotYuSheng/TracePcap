@@ -35,6 +35,10 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
 
   // Overlap warnings keyed by subnet id (gateway IP answered by >1 MAC → possible overlapping nets).
   const [overlaps, setOverlaps] = useState<Record<number, SubnetOverlapWarning>>({});
+  // Stable signature of the subnet definitions so overlap badges refetch on any add/delete/CIDR
+  // edit — but not on every re-render (a raw `subnets` dep would loop, the array is a new ref each time).
+  const subnetsKey = subnets.map(s => `${s.id}:${s.cidr}`).join(',');
+
   useEffect(() => {
     let active = true;
     if (snapshots.length === 0) { setOverlaps({}); return; }
@@ -43,7 +47,7 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
       .then(ws => { if (active) setOverlaps(Object.fromEntries(ws.map(w => [w.subnetId, w]))); })
       .catch(() => { if (active) setOverlaps({}); });
     return () => { active = false; };
-  }, [networkId, snapshots.length]);
+  }, [networkId, snapshots.length, subnetsKey]);
 
   const sortedSnapshots = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
 
@@ -126,7 +130,9 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
               </tr>
             </thead>
             <tbody>
-              {subnets.map(subnet => (
+              {subnets.map(subnet => {
+                const warning = subnet.id !== null ? overlaps[subnet.id] : undefined;
+                return (
                 <tr
                   key={subnet.id}
                   onClick={() => setDetailSubnet(subnet)}
@@ -147,11 +153,11 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                               <i className="bi bi-exclamation-triangle me-1" />Stale
                             </Badge>
                           )}
-                          {subnet.id !== null && overlaps[subnet.id] && (
+                          {warning && (
                             <Badge
                               bg="danger"
                               style={{ fontSize: '0.6rem' }}
-                              title={`${overlaps[subnet.id].conflictingIp} is claimed by ${overlaps[subnet.id].macs.length} MACs — this CIDR may be two overlapping networks. Open for details.`}
+                              title={`${warning.conflictingIp} is claimed by ${warning.macs.length} MACs — this CIDR may be two overlapping networks. Open for details.`}
                             >
                               <i className="bi bi-diagram-3 me-1" />Overlap?
                             </Badge>
@@ -189,7 +195,8 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                         </div>
                       </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

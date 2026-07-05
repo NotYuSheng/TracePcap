@@ -29,7 +29,7 @@ public class PcapParserService {
     Map<String, String> hostMacs = new HashMap<>();
     // All distinct source MACs seen per IP. Usually one; more than one within a single capture is
     // the tell for two devices sharing an IP (overlapping networks / ARP conflict) — #461.
-    Map<String, java.util.LinkedHashSet<String>> hostMacObservations = new HashMap<>();
+    Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
 
@@ -196,7 +196,7 @@ public class PcapParserService {
           // statement, so two distinct hw_macs claiming one IP is a genuine same-segment conflict.
           if (arpSrcIp != null && arpSrcMac != null) {
             hostMacObservations
-                .computeIfAbsent(arpSrcIp, k -> new java.util.LinkedHashSet<>())
+                .computeIfAbsent(arpSrcIp, k -> new LinkedHashSet<>())
                 .add(arpSrcMac);
           }
 
@@ -391,7 +391,7 @@ public class PcapParserService {
     private Map<String, String> hostMacs = new HashMap<>();
 
     /** All distinct source MACs seen per source IP (>1 ⇒ possible overlapping networks, #461). */
-    private Map<String, java.util.LinkedHashSet<String>> hostMacObservations = new HashMap<>();
+    private Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
   }
 
   @lombok.Data

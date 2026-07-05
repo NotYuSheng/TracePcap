@@ -37,6 +37,6 @@ public class IpMacObservationEntity {
   @Column(nullable = false, length = 45)
   private String ip;
 
-  @Column(nullable = false, length = 17)
+  @Column(nullable = false, length = 50)
   private String mac;
 }

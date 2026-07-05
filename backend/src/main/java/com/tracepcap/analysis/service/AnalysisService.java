@@ -7,9 +7,11 @@ import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
+import com.tracepcap.analysis.entity.IpMacObservationEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.repository.IpMacObservationRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.spi.FileExtractionStage;
 import com.tracepcap.analysis.spi.HostClassifier;
@@ -58,7 +60,7 @@ public class AnalysisService {
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
   private final HostClassificationRepository hostClassificationRepository;
-  private final com.tracepcap.analysis.repository.IpMacObservationRepository ipMacObservationRepository;
+  private final IpMacObservationRepository ipMacObservationRepository;
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
@@ -152,7 +154,12 @@ public class AnalysisService {
                 serviceLogs.rolesByIp());
         applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
         hostClassificationRepository.saveAll(hostClassifications);
-        persistIpMacObservations(file, parseResult.getHostMacObservations());
+        try {
+          persistIpMacObservations(file, parseResult.getHostMacObservations());
+        } catch (Exception e) {
+          // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
+          log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
+        }
         try {
           Set<String> allIps =
               parseResult.getConversations().stream()
@@ -698,15 +705,15 @@ public class AnalysisService {
    * overlap signal, but we store all pairings so the detector can present the full evidence.
    */
   private void persistIpMacObservations(
-      FileEntity file, Map<String, java.util.LinkedHashSet<String>> macsByIp) {
+      FileEntity file, Map<String, LinkedHashSet<String>> macsByIp) {
     if (macsByIp == null || macsByIp.isEmpty()) return;
-    List<com.tracepcap.analysis.entity.IpMacObservationEntity> rows = new ArrayList<>();
+    List<IpMacObservationEntity> rows = new ArrayList<>();
     macsByIp.forEach(
         (ip, macs) ->
             macs.forEach(
                 mac ->
                     rows.add(
-                        com.tracepcap.analysis.entity.IpMacObservationEntity.builder()
+                        IpMacObservationEntity.builder()
                             .fileId(file.getId())
                             .ip(ip)
                             .mac(mac)
