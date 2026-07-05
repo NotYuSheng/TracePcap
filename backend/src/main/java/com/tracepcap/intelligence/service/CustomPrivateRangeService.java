@@ -137,7 +137,7 @@ public class CustomPrivateRangeService {
    * most-recent-first), so a newer override takes precedence.
    */
   public Override overrideFor(String ip, List<CustomPrivateRangeEntity> ranges) {
-    if (ip == null || ranges.isEmpty()) return Override.NONE;
+    if (ip == null || ranges == null || ranges.isEmpty()) return Override.NONE;
     byte[] addrBytes = resolveAddress(ip);
     if (addrBytes == null) return Override.NONE;
     for (CustomPrivateRangeEntity range : ranges) {

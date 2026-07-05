@@ -47,6 +47,9 @@ function ipToInt(ip: string): number {
 }
 
 function ipInCidr(ip: string, cidr: string): boolean {
+  // ipToInt is IPv4-only; a colon means IPv6, which would otherwise both parse to 0
+  // and spuriously match. Bail out so IPv6 addresses never match an IPv4 CIDR (or vice versa).
+  if (ip.includes(':') || cidr.includes(':')) return false;
   try {
     const [base, bits] = cidr.split('/');
     const mask = bits ? (0xffffffff << (32 - parseInt(bits))) >>> 0 : 0xffffffff;
