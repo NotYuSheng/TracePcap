@@ -73,6 +73,10 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/tracepcap
       DATABASE_USERNAME: tracepcap_user
       DATABASE_PASSWORD: tracepcap_pass
+      # HikariCP connection pool. Sized above the base default so concurrent analysis inserts +
+      # request traffic don't starve the pool. Stays well under Postgres max_connections (100). See #393.
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-20}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-5}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin

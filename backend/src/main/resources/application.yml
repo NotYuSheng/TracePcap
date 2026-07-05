@@ -11,8 +11,12 @@ spring:
     password: ${DATABASE_PASSWORD:tracepcap_pass}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
+      # Sized for concurrent analysis (max-concurrent-analyses batched saveAll inserts) plus
+      # request-serving traffic. Env-overridable so the shipped compose deployment can raise it
+      # regardless of active profile (the dev profile is the default even in prod compose). Keep
+      # below Postgres max_connections (default 100). See #393.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
