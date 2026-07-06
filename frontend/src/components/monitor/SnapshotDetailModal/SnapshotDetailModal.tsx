@@ -38,6 +38,8 @@ function labelForChange(changeType: string, oldValue: Record<string, unknown> | 
     case 'PROTOCOL_ADDED': return 'New protocol';
     case 'APP_ADDED':      return 'New app';
     case 'VPN_DRIFT':      return newValue?.['riskType'] ? 'VPN detected' : 'VPN stopped';
+    case 'SECURITY_ALERT_ADDED':   return 'Security alert';
+    case 'SECURITY_ALERT_REMOVED': return 'Security alert cleared';
     default:               return changeType;
   }
 }

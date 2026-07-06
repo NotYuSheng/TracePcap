@@ -79,6 +79,7 @@ public class ChangeDetectionService {
     events.addAll(detectIpMacDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectIspAsnChanges(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectProtocolAppDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
+    events.addAll(detectSecurityDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectStaleLabels(toFileId, fromSnapshot, toSnapshot));
 
     // Carry subnet labels forward onto this snapshot (inherited overrides), mirroring node roles.
@@ -417,6 +418,126 @@ public class ChangeDetectionService {
     }
 
     return events;
+  }
+
+  // ── Signal 6: Security posture drift (IDS / risks / signatures / file types) ──
+
+  /**
+   * Emit change events when the security-relevant signals analysis mode computes per capture appear
+   * or disappear between two snapshots. This is the differential complement to the snapshot Security
+   * tab: the tab shows the absolute posture, this flags what newly appeared (or cleared).
+   *
+   * <p>Signals and severities:
+   *
+   * <ul>
+   *   <li><b>Suricata IDS alerts</b> — added: CRITICAL (a fresh IDS hit is high-signal), removed: INFO.
+   *   <li><b>Custom signatures</b> — added: CRITICAL, removed: INFO.
+   *   <li><b>nDPI flow risks</b> — added: WARNING, removed: INFO. VPN risks are intentionally
+   *       excluded here because {@code detectProtocolAppDrift} already reports them as VPN_DRIFT;
+   *       double-reporting would clutter the feed.
+   *   <li><b>Detected file types</b> — added: INFO only. Removals are noisy (content simply not
+   *       re-transferred) and not actionable, so they are not reported.
+   * </ul>
+   */
+  private List<NetworkChangeEventEntity> detectSecurityDrift(
+      UUID fromFileId,
+      UUID toFileId,
+      NetworkSnapshotEntity fromSnapshot,
+      NetworkSnapshotEntity toSnapshot) {
+
+    if (fromFileId == null) return List.of();
+
+    List<ConversationEntity> fromConvs = conversationRepository.findByFileId(fromFileId);
+    List<ConversationEntity> toConvs = conversationRepository.findByFileId(toFileId);
+
+    List<NetworkChangeEventEntity> events = new ArrayList<>();
+
+    // IDS alerts (Suricata) — added CRITICAL, removed INFO
+    diffSecurity(
+        events, fromSnapshot, toSnapshot,
+        arraySet(fromConvs, ConversationEntity::getSuricataAlerts),
+        arraySet(toConvs, ConversationEntity::getSuricataAlerts),
+        "ids", Severity.CRITICAL, true);
+
+    // Custom signatures — added CRITICAL, removed INFO
+    diffSecurity(
+        events, fromSnapshot, toSnapshot,
+        arraySet(fromConvs, ConversationEntity::getCustomSignatures),
+        arraySet(toConvs, ConversationEntity::getCustomSignatures),
+        "signature", Severity.CRITICAL, true);
+
+    // nDPI flow risks (excluding VPN, handled by VPN_DRIFT) — added WARNING, removed INFO
+    diffSecurity(
+        events, fromSnapshot, toSnapshot,
+        nonVpnRiskSet(fromConvs), nonVpnRiskSet(toConvs),
+        "risk", Severity.WARNING, true);
+
+    // Detected file types — added INFO only (removals not actionable)
+    diffSecurity(
+        events, fromSnapshot, toSnapshot,
+        new java.util.HashSet<>(conversationRepository.findDistinctFileTypesByFileId(fromFileId)),
+        new java.util.HashSet<>(conversationRepository.findDistinctFileTypesByFileId(toFileId)),
+        "fileType", Severity.INFO, false);
+
+    return events;
+  }
+
+  /**
+   * Set-diff two security-signal sets and append ADDED (and, when {@code reportRemoved}, REMOVED)
+   * events. {@code signalKind} tags the {@code newValue}/{@code oldValue} payload so the UI can
+   * label it (e.g. "ids", "risk"). Added events carry {@code addedSeverity}; removed events are
+   * always INFO (a cleared signal is informational, not alarming).
+   */
+  private void diffSecurity(
+      List<NetworkChangeEventEntity> events,
+      NetworkSnapshotEntity fromSnapshot,
+      NetworkSnapshotEntity toSnapshot,
+      Set<String> from,
+      Set<String> to,
+      String signalKind,
+      Severity addedSeverity,
+      boolean reportRemoved) {
+
+    for (String v : to) {
+      if (!from.contains(v)) {
+        events.add(
+            buildEvent(
+                toSnapshot.getNetwork().getId(), fromSnapshot, toSnapshot,
+                ChangeType.SECURITY_ALERT_ADDED, EntityType.SECURITY, v,
+                null, Map.of("signalKind", signalKind, "value", v), addedSeverity));
+      }
+    }
+    if (reportRemoved) {
+      for (String v : from) {
+        if (!to.contains(v)) {
+          events.add(
+              buildEvent(
+                  toSnapshot.getNetwork().getId(), fromSnapshot, toSnapshot,
+                  ChangeType.SECURITY_ALERT_REMOVED, EntityType.SECURITY, v,
+                  Map.of("signalKind", signalKind, "value", v), null, Severity.INFO));
+        }
+      }
+    }
+  }
+
+  /** Flatten a String[] conversation field across conversations into a distinct non-blank set. */
+  private Set<String> arraySet(
+      List<ConversationEntity> convs, java.util.function.Function<ConversationEntity, String[]> field) {
+    return convs.stream()
+        .map(field)
+        .filter(a -> a != null)
+        .flatMap(Arrays::stream)
+        .filter(s -> s != null && !s.isBlank())
+        .collect(Collectors.toSet());
+  }
+
+  /** nDPI flow risks excluding VPN-related ones (those are reported as VPN_DRIFT). */
+  private Set<String> nonVpnRiskSet(List<ConversationEntity> convs) {
+    return convs.stream()
+        .filter(c -> c.getFlowRisks() != null)
+        .flatMap(c -> Arrays.stream(c.getFlowRisks()))
+        .filter(r -> r != null && !r.isBlank() && !r.toUpperCase().contains("VPN"))
+        .collect(Collectors.toSet());
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────

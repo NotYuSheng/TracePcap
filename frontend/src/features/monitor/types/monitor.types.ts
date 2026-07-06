@@ -52,9 +52,12 @@ export type ChangeType =
   | 'PROTOCOL_ADDED'
   | 'APP_ADDED'
   | 'VPN_DRIFT'
+  | 'SECURITY_ALERT_ADDED'
+  | 'SECURITY_ALERT_REMOVED'
   | 'LABEL_STALE';
 
-export type EntityType = 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP' | 'NODE_ROLE';
+export type EntityType =
+  | 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP' | 'SECURITY' | 'NODE_ROLE';
 
 export type Severity = 'INFO' | 'WARNING' | 'CRITICAL';
 
