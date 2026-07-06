@@ -240,16 +240,16 @@ function PrivateOverridesSection({
           <div className="d-flex gap-2 flex-wrap align-items-center">
             <input
               type="text"
-              className="form-control form-control-sm font-monospace"
-              style={{ maxWidth: 180 }}
+              className="form-control form-control-sm font-monospace tp-compact-search"
+              style={{ maxWidth: 160 }}
               placeholder="IP or CIDR"
               value={cidr}
               onChange={e => setCidr(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
             />
             <select
-              className="form-select form-select-sm"
-              style={{ maxWidth: 130 }}
+              className="form-select form-select-sm tp-compact-search"
+              style={{ maxWidth: 120 }}
               value={classification}
               onChange={e => setClassification(e.target.value as IpClassification)}
               aria-label="Treat as"
