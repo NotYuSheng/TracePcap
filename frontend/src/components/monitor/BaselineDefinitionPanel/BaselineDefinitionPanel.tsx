@@ -1,7 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import type {
   BaselineDefinition,
   BaselineEntryType,
@@ -88,6 +89,16 @@ export const BaselineDefinitionPanel = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(definitions.length / PAGE_SIZE);
+  const visibleDefinitions = definitions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Keep the current page in range as entries are added/removed.
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,7 +148,7 @@ export const BaselineDefinitionPanel = ({
               </tr>
             </thead>
             <tbody>
-              {definitions.map(def => (
+              {visibleDefinitions.map(def => (
                 <tr key={def.id}>
                   <td>
                     <Badge bg="light" text="dark" className="border">
@@ -173,6 +184,16 @@ export const BaselineDefinitionPanel = ({
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={definitions.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              showPageSizeSelector={false}
+            />
+          )}
         </div>
       )}
 

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import type { NetworkAnnotation } from '@/features/insights/types/insights.types';
 
 interface NetworkAnnotationsPanelProps {
@@ -98,6 +99,16 @@ export const NetworkAnnotationsPanel = ({
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(annotations.length / PAGE_SIZE);
+  const visibleAnnotations = annotations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Keep the current page in range as annotations are added/removed.
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +136,7 @@ export const NetworkAnnotationsPanel = ({
 
       {annotations.length > 0 && (
         <div className="mb-3">
-          {annotations.map(a => (
+          {visibleAnnotations.map(a => (
             <AnnotationRow
               key={a.id}
               annotation={a}
@@ -133,6 +144,16 @@ export const NetworkAnnotationsPanel = ({
               onDelete={onDelete}
             />
           ))}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={annotations.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              showPageSizeSelector={false}
+            />
+          )}
         </div>
       )}
 
