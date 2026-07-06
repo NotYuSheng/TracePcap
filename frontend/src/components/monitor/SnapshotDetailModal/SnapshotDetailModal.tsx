@@ -590,7 +590,7 @@ export const SnapshotDetailModal = ({
 
         {/* ── Security tab ── */}
         {activeTab === 'security' && (
-          <SnapshotSecurityTab edges={edges} loading={graphLoading} />
+          <SnapshotSecurityTab edges={edges} loading={graphLoading} fileId={diagramSnap.fileId} />
         )}
 
         {/* ── Context & Notes tab ── */}

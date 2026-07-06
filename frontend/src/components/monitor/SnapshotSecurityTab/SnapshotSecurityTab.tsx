@@ -11,11 +11,21 @@ import type { GraphEdge } from '@/features/network/types';
 
 type Severity = 'CRITICAL' | 'WARNING' | 'INFO';
 
+/** The conversation-filter query param each signal maps to (see useConversationFilters). */
+type FilterParam = 'suricataAlerts' | 'riskTypes' | 'customSignatures' | 'fileTypes';
+
+interface Flow {
+  /** Display label "src → dst". */
+  label: string;
+  /** Source IP — used as the `ip` filter when deep-linking a single flow. */
+  src: string;
+}
+
 interface SignalRow {
   /** The signal value, e.g. an IDS signature string or an nDPI risk name. */
   value: string;
-  /** Distinct "src → dst" flow labels that exhibited this signal. */
-  flows: string[];
+  /** Distinct flows that exhibited this signal. */
+  flows: Flow[];
 }
 
 interface SignalSection {
@@ -23,6 +33,8 @@ interface SignalSection {
   title: string;
   icon: string;
   severity: Severity;
+  /** Which conversation-filter param this signal deep-links through. */
+  filterParam: FilterParam;
   /** Explains what this signal means, shown under the section title. */
   blurb: string;
   rows: SignalRow[];
@@ -34,30 +46,47 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   INFO: '#6c757d',
 };
 
-/** Group one signal across all edges: value → sorted distinct flow labels. */
+/** Group one signal across all edges: value → distinct flows (deduped by label). */
 function aggregate(edges: GraphEdge[], pick: (e: GraphEdge) => string[] | undefined): SignalRow[] {
-  const byValue = new Map<string, Set<string>>();
+  const byValue = new Map<string, Map<string, Flow>>();
   for (const e of edges) {
     const values = pick(e);
     if (!values || values.length === 0) continue;
-    const flow = `${e.source} → ${e.target}`;
+    const label = `${e.source} → ${e.target}`;
     for (const v of values) {
       if (!v) continue;
-      if (!byValue.has(v)) byValue.set(v, new Set());
-      byValue.get(v)!.add(flow);
+      if (!byValue.has(v)) byValue.set(v, new Map());
+      byValue.get(v)!.set(label, { label, src: e.source });
     }
   }
   return [...byValue.entries()]
-    .map(([value, flows]) => ({ value, flows: [...flows].sort() }))
+    .map(([value, flows]) => ({
+      value,
+      flows: [...flows.values()].sort((a, b) => a.label.localeCompare(b.label)),
+    }))
     .sort((a, b) => b.flows.length - a.flows.length || a.value.localeCompare(b.value));
 }
 
 interface SnapshotSecurityTabProps {
   edges: GraphEdge[];
   loading: boolean;
+  /** File backing this snapshot; deep-links jump to its analysis-mode conversation view. */
+  fileId: string;
 }
 
-export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps) => {
+export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurityTabProps) => {
+  /**
+   * Build a deep-link into analysis mode's conversation table, pre-filtered to this signal
+   * (and optionally a single source host). The conversation page reads every filter from URL
+   * query params, so this lands the analyst on exactly the offending flows.
+   */
+  const buildUrl = (param: FilterParam, value: string, ip?: string): string => {
+    const qs = new URLSearchParams();
+    qs.set(param, value);
+    if (ip) qs.set('ip', ip);
+    return `/analysis/${fileId}/conversations?${qs.toString()}`;
+  };
+
   const sections = useMemo<SignalSection[]>(() => {
     const defs: Omit<SignalSection, 'rows'>[] = [
       {
@@ -65,6 +94,7 @@ export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps
         title: 'IDS Alerts',
         icon: 'bi-shield-exclamation',
         severity: 'CRITICAL',
+        filterParam: 'suricataAlerts',
         blurb: 'Suricata signature matches against the Emerging Threats ruleset.',
       },
       {
@@ -72,6 +102,7 @@ export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps
         title: 'Flow Risks',
         icon: 'bi-exclamation-triangle',
         severity: 'WARNING',
+        filterParam: 'riskTypes',
         blurb: 'nDPI-detected anomalies — VPNs, self-signed certs, malformed traffic, and more.',
       },
       {
@@ -79,6 +110,7 @@ export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps
         title: 'Custom Signatures',
         icon: 'bi-fingerprint',
         severity: 'WARNING',
+        filterParam: 'customSignatures',
         blurb: 'Matches against your user-defined signatures.',
       },
       {
@@ -86,6 +118,7 @@ export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps
         title: 'Detected File Types',
         icon: 'bi-file-earmark-binary',
         severity: 'INFO',
+        filterParam: 'fileTypes',
         blurb: 'File types carved from transferred content.',
       },
     ];
@@ -118,6 +151,8 @@ export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps
       <p className="text-muted small mb-3">
         Security-relevant signals detected in this capture. This is the absolute posture of the
         snapshot; the <strong>Changes</strong> tab shows what is new versus the previous snapshot.
+        Click a signal to open the matching conversations in analysis mode, or a flow to also
+        filter by that host.
       </p>
       {sections.map(section => (
         <div key={section.key} className="mb-4">
@@ -146,10 +181,29 @@ export const SnapshotSecurityTab = ({ edges, loading }: SnapshotSecurityTabProps
                 <tbody>
                   {section.rows.map(row => (
                     <tr key={row.value}>
-                      <td className="font-monospace" style={{ wordBreak: 'break-word' }}>{row.value}</td>
+                      <td className="font-monospace" style={{ wordBreak: 'break-word' }}>
+                        <a
+                          href={buildUrl(section.filterParam, row.value)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open matching conversations in analysis mode"
+                        >
+                          {row.value}
+                        </a>
+                      </td>
                       <td>
                         {row.flows.map(f => (
-                          <div key={f} className="font-monospace text-muted" style={{ fontSize: '0.76rem' }}>{f}</div>
+                          <div key={f.label} className="font-monospace" style={{ fontSize: '0.76rem' }}>
+                            <a
+                              href={buildUrl(section.filterParam, row.value, f.src)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted"
+                              title={`Open conversations for this signal involving ${f.src}`}
+                            >
+                              {f.label}
+                            </a>
+                          </div>
                         ))}
                       </td>
                     </tr>
