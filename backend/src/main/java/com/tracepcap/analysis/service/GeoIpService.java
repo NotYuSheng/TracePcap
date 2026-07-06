@@ -272,8 +272,9 @@ public class GeoIpService {
   // ── Connectivity check ─────────────────────────────────────────────────────
 
   private boolean isOnline() {
-    // Force-offline suppresses the connectivity probe entirely — no egress ever attempted.
-    if (forceOffline) return false;
+    // Suppress the connectivity probe entirely — no egress ever attempted — when GeoIP is
+    // disabled or force-offline is set.
+    if (!geoEnabled || forceOffline) return false;
     long now = System.currentTimeMillis();
     if (onlineCache != null && (now - onlineCheckedAt) < ONLINE_CHECK_TTL_MS) {
       return onlineCache;
