@@ -99,6 +99,9 @@ services:
       EXTRACTION_MAX_MATCHES_PER_STREAM: ${EXTRACTION_MAX_MATCHES_PER_STREAM:-20}
       EXTRACTION_MAX_STREAM_CONVERSATIONS: ${EXTRACTION_MAX_STREAM_CONVERSATIONS:-50}
       EXTRACTION_MAX_FILE_SIZE_MB: ${EXTRACTION_MAX_FILE_SIZE_MB:-50}
+      # Suppress ipinfo.io runtime egress (the one intentional external call). true = MMDB-only
+      # geo, no probe/lookups — for air-gapped deployments. See .env.example.
+      GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-false}
       # Global Suricata IDS kill-switch. false = skip Suricata for every file (biggest throughput
       # lever, ~94% of per-file analysis cost). See .env.example.
       SURICATA_ENABLED: ${SURICATA_ENABLED:-true}

@@ -206,6 +206,9 @@ tracepcap:
     enabled: ${GEO_ENRICHMENT_ENABLED:true}
     timeout-seconds: ${GEO_TIMEOUT_SECONDS:10}
     mmdb-path: ${GEO_MMDB_PATH:}
+    # When true, suppresses all ipinfo.io egress (connectivity probe + lookups) and resolves
+    # geo exclusively from the bundled MMDB. For air-gapped / egress-monitored deployments.
+    force-offline: ${GEO_FORCE_OFFLINE:false}
   intelligence:
     max-clusters: ${INTELLIGENCE_MAX_CLUSTERS:60}   # Max cluster nodes returned per groupBy request
     max-edges: ${INTELLIGENCE_MAX_EDGES:200}         # Max edges returned per groupBy request
