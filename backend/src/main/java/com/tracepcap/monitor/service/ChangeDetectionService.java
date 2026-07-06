@@ -447,34 +447,34 @@ public class ChangeDetectionService {
 
     if (fromFileId == null) return List.of();
 
-    List<ConversationEntity> fromConvs = conversationRepository.findByFileId(fromFileId);
-    List<ConversationEntity> toConvs = conversationRepository.findByFileId(toFileId);
-
     List<NetworkChangeEventEntity> events = new ArrayList<>();
+
+    // Fetch distinct signal values directly from the DB rather than loading full conversation
+    // entities into memory — the repository already provides purpose-built distinct queries, which
+    // scale to large captures. All sets are null/blank-cleaned before reaching diffSecurity's Map.of.
 
     // IDS alerts (Suricata) — added CRITICAL, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        arraySet(fromConvs, ConversationEntity::getSuricataAlerts),
-        arraySet(toConvs, ConversationEntity::getSuricataAlerts),
+        cleanSet(conversationRepository.findDistinctSuricataAlertsByFileId(fromFileId)),
+        cleanSet(conversationRepository.findDistinctSuricataAlertsByFileId(toFileId)),
         "ids", Severity.CRITICAL, true);
 
     // Custom signatures — added CRITICAL, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        arraySet(fromConvs, ConversationEntity::getCustomSignatures),
-        arraySet(toConvs, ConversationEntity::getCustomSignatures),
+        cleanSet(conversationRepository.findDistinctCustomSignaturesByFileId(fromFileId)),
+        cleanSet(conversationRepository.findDistinctCustomSignaturesByFileId(toFileId)),
         "signature", Severity.CRITICAL, true);
 
     // nDPI flow risks (excluding VPN, handled by VPN_DRIFT) — added WARNING, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        nonVpnRiskSet(fromConvs), nonVpnRiskSet(toConvs),
+        nonVpnRiskSet(conversationRepository.findDistinctRiskTypesByFileId(fromFileId)),
+        nonVpnRiskSet(conversationRepository.findDistinctRiskTypesByFileId(toFileId)),
         "risk", Severity.WARNING, true);
 
-    // Detected file types — added INFO only (removals not actionable). Unlike the other three
-    // signals (cleaned by arraySet/nonVpnRiskSet), this query returns a raw list that may be null
-    // or contain null/blank entries, so clean it before it reaches diffSecurity's Map.of.
+    // Detected file types — added INFO only (removals not actionable)
     diffSecurity(
         events, fromSnapshot, toSnapshot,
         cleanSet(conversationRepository.findDistinctFileTypesByFileId(fromFileId)),
@@ -522,22 +522,10 @@ public class ChangeDetectionService {
     }
   }
 
-  /** Flatten a String[] conversation field across conversations into a distinct non-blank set. */
-  private Set<String> arraySet(
-      List<ConversationEntity> convs, java.util.function.Function<ConversationEntity, String[]> field) {
-    return convs.stream()
-        .map(field)
-        .filter(a -> a != null)
-        .flatMap(Arrays::stream)
-        .filter(s -> s != null && !s.isBlank())
-        .collect(Collectors.toSet());
-  }
-
   /** nDPI flow risks excluding VPN-related ones (those are reported as VPN_DRIFT). */
-  private Set<String> nonVpnRiskSet(List<ConversationEntity> convs) {
-    return convs.stream()
-        .filter(c -> c.getFlowRisks() != null)
-        .flatMap(c -> Arrays.stream(c.getFlowRisks()))
+  private Set<String> nonVpnRiskSet(List<String> risks) {
+    if (risks == null) return Set.of();
+    return risks.stream()
         .filter(r -> r != null && !r.isBlank() && !r.toUpperCase().contains("VPN"))
         .collect(Collectors.toSet());
   }
