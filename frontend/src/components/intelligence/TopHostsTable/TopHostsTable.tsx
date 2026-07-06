@@ -1,6 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState } from 'react';
 import { Badge, Button } from '@govtechsg/sgds-react';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { formatBytes } from '@/utils/formatters';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import type { HostSummary, SortBy } from '@/features/intelligence/services/intelligenceService';
@@ -56,10 +57,11 @@ const SORT_OPTIONS: { value: SortBy; label: string }[] = [
 ];
 
 export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHostsTableProps) => {
-  const [page, setPage] = useState(0);
+  // 1-indexed to match the shared Pagination component.
+  const [page, setPage] = useState(1);
   const pageSize = 20;
   const totalPages = Math.ceil(hosts.length / pageSize);
-  const visible = hosts.slice(page * pageSize, (page + 1) * pageSize);
+  const visible = hosts.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div>
@@ -71,7 +73,7 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
               key={o.value}
               size="sm"
               variant={sortBy === o.value ? 'primary' : 'outline-secondary'}
-              onClick={() => { onSortByChange(o.value); setPage(0); }}
+              onClick={() => { onSortByChange(o.value); setPage(1); }}
               disabled={loading}
             >
               {o.label}
@@ -99,7 +101,7 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
           <tbody>
             {visible.map((host, i) => (
               <tr key={host.ip}>
-                <td className="text-muted">{page * pageSize + i + 1}</td>
+                <td className="text-muted">{(page - 1) * pageSize + i + 1}</td>
                 <td>
                   {host.hostname ? (
                     <>
@@ -171,25 +173,14 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
       </div>
 
       {totalPages > 1 && (
-        <div className="d-flex align-items-center gap-2 mt-2">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            onClick={() => setPage(p => p - 1)}
-            disabled={page === 0}
-          >
-            ‹ Prev
-          </Button>
-          <small className="text-muted">Page {page + 1} / {totalPages}</small>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            onClick={() => setPage(p => p + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            Next ›
-          </Button>
-        </div>
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={hosts.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          showPageSizeSelector={false}
+        />
       )}
     </div>
   );

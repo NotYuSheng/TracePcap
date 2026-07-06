@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { SubnetDiagramModal } from '@components/monitor/SubnetDiagramModal/SubnetDiagramModal';
 import { SubnetDetailModal } from '@components/monitor/SubnetsPanel/SubnetDetailModal';
 import { subnetService } from '@/features/subnets/services/subnetService';
@@ -33,6 +34,10 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
   const [candidates, setCandidates] = useState<SubnetDefinition[]>([]);
   const [savingCidr, setSavingCidr] = useState<string | null>(null);
 
+  const [subnetsPage, setSubnetsPage] = useState(1);
+  const [candidatesPage, setCandidatesPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   // Overlap warnings keyed by subnet id (gateway IP answered by >1 MAC → possible overlapping nets).
   const [overlaps, setOverlaps] = useState<Record<number, SubnetOverlapWarning>>({});
   // Stable signature of the subnet definitions so overlap badges refetch on any add/delete/CIDR
@@ -50,6 +55,19 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
   }, [networkId, snapshots.length, subnetsKey]);
 
   const sortedSnapshots = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
+
+  const subnetsTotalPages = Math.ceil(subnets.length / PAGE_SIZE);
+  const visibleSubnets = subnets.slice((subnetsPage - 1) * PAGE_SIZE, subnetsPage * PAGE_SIZE);
+  const candidatesTotalPages = Math.ceil(candidates.length / PAGE_SIZE);
+  const visibleCandidates = candidates.slice((candidatesPage - 1) * PAGE_SIZE, candidatesPage * PAGE_SIZE);
+
+  // Keep pages in range as subnets/candidates are added or removed.
+  useEffect(() => {
+    if (subnetsPage > subnetsTotalPages && subnetsTotalPages > 0) setSubnetsPage(subnetsTotalPages);
+  }, [subnetsPage, subnetsTotalPages]);
+  useEffect(() => {
+    if (candidatesPage > candidatesTotalPages && candidatesTotalPages > 0) setCandidatesPage(candidatesTotalPages);
+  }, [candidatesPage, candidatesTotalPages]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +148,7 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
               </tr>
             </thead>
             <tbody>
-              {subnets.map(subnet => {
+              {visibleSubnets.map(subnet => {
                 const warning = subnet.id !== null ? overlaps[subnet.id] : undefined;
                 return (
                 <tr
@@ -199,6 +217,16 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
               })}
             </tbody>
           </table>
+          {subnetsTotalPages > 1 && (
+            <Pagination
+              currentPage={subnetsPage}
+              totalPages={subnetsTotalPages}
+              totalItems={subnets.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setSubnetsPage}
+              showPageSizeSelector={false}
+            />
+          )}
         </div>
       )}
 
@@ -227,7 +255,7 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                 </tr>
               </thead>
               <tbody>
-                {candidates.map(c => (
+                {visibleCandidates.map(c => (
                   <tr key={c.cidr}>
                     <td className="font-monospace small">{c.cidr}</td>
                     <td className="small text-muted">{c.hostCount ?? '—'}</td>
@@ -270,6 +298,16 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
               </tbody>
             </table>
           </div>
+          {candidatesTotalPages > 1 && (
+            <Pagination
+              currentPage={candidatesPage}
+              totalPages={candidatesTotalPages}
+              totalItems={candidates.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCandidatesPage}
+              showPageSizeSelector={false}
+            />
+          )}
         </div>
       )}
 

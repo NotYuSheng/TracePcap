@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import type { GraphEdge } from '@/features/network/types';
 
 /**
@@ -65,6 +66,97 @@ function aggregate(edges: GraphEdge[], pick: (e: GraphEdge) => string[] | undefi
       flows: [...flows.values()].sort((a, b) => a.label.localeCompare(b.label)),
     }))
     .sort((a, b) => b.flows.length - a.flows.length || a.value.localeCompare(b.value));
+}
+
+const SECTION_PAGE_SIZE = 10;
+
+/**
+ * One signal section (IDS / risks / signatures / files) with its own pagination — each has an
+ * independent row count, so they page separately.
+ */
+function SignalSectionView({
+  section,
+  buildUrl,
+}: {
+  section: SignalSection;
+  buildUrl: (param: FilterParam, value: string, ip?: string) => string;
+}) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(section.rows.length / SECTION_PAGE_SIZE);
+  const visibleRows = section.rows.slice((page - 1) * SECTION_PAGE_SIZE, page * SECTION_PAGE_SIZE);
+
+  return (
+    <div className="mb-4">
+      <div className="d-flex align-items-center gap-2 mb-1">
+        <i className={`bi ${section.icon}`} style={{ color: SEVERITY_COLOR[section.severity] }} />
+        <span className="fw-semibold">{section.title}</span>
+        <span
+          className="badge rounded-pill"
+          style={{ fontSize: '0.7rem', background: SEVERITY_COLOR[section.severity], color: '#fff' }}
+        >
+          {section.rows.length}
+        </span>
+      </div>
+      <p className="text-muted mb-2" style={{ fontSize: '0.78rem' }}>{section.blurb}</p>
+      {section.rows.length === 0 ? (
+        <p className="text-muted small mb-0 ps-1">None detected.</p>
+      ) : (
+        <>
+          <div className="table-responsive">
+            <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.82rem' }}>
+              <thead className="table-light">
+                <tr>
+                  <th style={{ width: '55%' }}>{section.title === 'Detected File Types' ? 'File type' : 'Signal'}</th>
+                  <th>Flows</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map(row => (
+                  <tr key={row.value}>
+                    <td className="font-monospace" style={{ wordBreak: 'break-word' }}>
+                      <a
+                        href={buildUrl(section.filterParam, row.value)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open matching conversations in analysis mode"
+                      >
+                        {row.value}
+                      </a>
+                    </td>
+                    <td>
+                      {row.flows.map(f => (
+                        <div key={f.label} className="font-monospace" style={{ fontSize: '0.76rem' }}>
+                          <a
+                            href={buildUrl(section.filterParam, row.value, f.src)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted"
+                            title={`Open conversations for this signal involving ${f.src}`}
+                          >
+                            {f.label}
+                          </a>
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={section.rows.length}
+              pageSize={SECTION_PAGE_SIZE}
+              onPageChange={setPage}
+              showPageSizeSelector={false}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 interface SnapshotSecurityTabProps {
@@ -157,64 +249,7 @@ export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurity
         filter by that host.
       </p>
       {sections.map(section => (
-        <div key={section.key} className="mb-4">
-          <div className="d-flex align-items-center gap-2 mb-1">
-            <i className={`bi ${section.icon}`} style={{ color: SEVERITY_COLOR[section.severity] }} />
-            <span className="fw-semibold">{section.title}</span>
-            <span
-              className="badge rounded-pill"
-              style={{ fontSize: '0.7rem', background: SEVERITY_COLOR[section.severity], color: '#fff' }}
-            >
-              {section.rows.length}
-            </span>
-          </div>
-          <p className="text-muted mb-2" style={{ fontSize: '0.78rem' }}>{section.blurb}</p>
-          {section.rows.length === 0 ? (
-            <p className="text-muted small mb-0 ps-1">None detected.</p>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.82rem' }}>
-                <thead className="table-light">
-                  <tr>
-                    <th style={{ width: '55%' }}>{section.title === 'Detected File Types' ? 'File type' : 'Signal'}</th>
-                    <th>Flows</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {section.rows.map(row => (
-                    <tr key={row.value}>
-                      <td className="font-monospace" style={{ wordBreak: 'break-word' }}>
-                        <a
-                          href={buildUrl(section.filterParam, row.value)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Open matching conversations in analysis mode"
-                        >
-                          {row.value}
-                        </a>
-                      </td>
-                      <td>
-                        {row.flows.map(f => (
-                          <div key={f.label} className="font-monospace" style={{ fontSize: '0.76rem' }}>
-                            <a
-                              href={buildUrl(section.filterParam, row.value, f.src)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted"
-                              title={`Open conversations for this signal involving ${f.src}`}
-                            >
-                              {f.label}
-                            </a>
-                          </div>
-                        ))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <SignalSectionView key={section.key} section={section} buildUrl={buildUrl} />
       ))}
     </div>
   );

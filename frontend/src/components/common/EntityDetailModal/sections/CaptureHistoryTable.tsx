@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Table } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { useNavigate } from 'react-router-dom';
 import type { EntityHistoryEntry } from '@/features/notes/services/entityNotesService';
 import { formatBytes, formatNumber } from '../format';
@@ -12,9 +14,14 @@ interface CaptureHistoryTableProps {
   onClose: () => void;
 }
 
+const PAGE_SIZE = 10;
+
 /** Generic capture history: which uploaded files this entity appeared in. */
 export function CaptureHistoryTable({ history, historyLoading, historyError, onClose }: CaptureHistoryTableProps) {
   const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(history.length / PAGE_SIZE);
+  const visible = history.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   return (
     <div className="mt-4">
       <h6 className="text-muted fw-semibold mb-2">
@@ -32,6 +39,7 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
         <p className="text-muted small fst-italic">Not seen in any uploaded files.</p>
       )}
       {!historyLoading && !historyError && history.length > 0 && (
+        <>
         <div className="rounded border overflow-hidden">
           <Table size="sm" hover responsive className="mb-0">
             <Table.Header className="table-light" style={{ fontSize: '0.8rem' }}>
@@ -43,7 +51,7 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {history.map(entry => (
+              {visible.map(entry => (
                 <Table.Row
                   key={entry.fileId}
                   style={{ cursor: 'pointer' }}
@@ -74,6 +82,17 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
             </Table.Body>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={history.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            showPageSizeSelector={false}
+          />
+        )}
+        </>
       )}
     </div>
   );

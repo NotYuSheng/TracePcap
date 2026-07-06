@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { NetworkExternalEvent } from '@/features/insights/types/insights.types';
@@ -30,6 +31,16 @@ export const ExternalEventsPanel = ({ events, onAdd, onUpdate, onDelete }: Exter
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(events.length / PAGE_SIZE);
+  const visibleEvents = events.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Keep the current page in range as events are added/removed.
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -112,7 +123,7 @@ export const ExternalEventsPanel = ({ events, onAdd, onUpdate, onDelete }: Exter
               </tr>
             </thead>
             <tbody>
-              {events.map(ev => (
+              {visibleEvents.map(ev => (
                 <tr key={ev.id}>
                   <td className="text-nowrap small text-muted">
                     {new Date(ev.eventTime).toLocaleString('en-GB')}
@@ -152,6 +163,16 @@ export const ExternalEventsPanel = ({ events, onAdd, onUpdate, onDelete }: Exter
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={events.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              showPageSizeSelector={false}
+            />
+          )}
         </div>
       )}
 
