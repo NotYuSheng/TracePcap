@@ -43,6 +43,13 @@ export const AddSnapshotModal = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Analysis options (mirrors the upload page): nDPI + file extraction on by default,
+  // Suricata IDS off by default because it adds significant processing time.
+  const [showAnalysisOptions, setShowAnalysisOptions] = useState(false);
+  const [enableNdpi, setEnableNdpi] = useState(true);
+  const [enableSuricata, setEnableSuricata] = useState(false);
+  const [enableFileExtraction, setEnableFileExtraction] = useState(true);
+
   // Subnet override state
   const [showSubnets, setShowSubnets] = useState(false);
   const [subnetOverrides, setSubnetOverrides] = useState<SubnetOverrideInput[]>([]);
@@ -58,6 +65,10 @@ export const AddSnapshotModal = ({
     setUploadPhase('idle');
     setUploadCurrent(0);
     setUploadError(null);
+    setShowAnalysisOptions(false);
+    setEnableNdpi(true);
+    setEnableSuricata(false);
+    setEnableFileExtraction(true);
     setShowSubnets(false);
     setSubnetOverrides([]);
     setSubnetOverridesActive(false);
@@ -110,8 +121,10 @@ export const AddSnapshotModal = ({
     setNewLabel('');
   };
 
-  // Warn before discarding unsaved work (selected files or edited subnet overrides).
-  const hasUnsavedChanges = uploadFiles.length > 0 || subnetOverridesActive || newCidr.trim().length > 0 || newLabel.trim().length > 0;
+  // Warn before discarding unsaved work (selected files, edited subnet overrides, or analysis
+  // options changed away from their defaults).
+  const analysisOptionsChanged = !enableNdpi || enableSuricata || !enableFileExtraction;
+  const hasUnsavedChanges = uploadFiles.length > 0 || subnetOverridesActive || analysisOptionsChanged || newCidr.trim().length > 0 || newLabel.trim().length > 0;
 
   const handleClose = () => {
     if (isBusy) return;
@@ -149,9 +162,9 @@ export const AddSnapshotModal = ({
             file,
             p => setUploadProgress(p),
             {
-              enableNdpi: true,
-              enableSuricata: true,
-              enableFileExtraction: true,
+              enableNdpi,
+              enableSuricata,
+              enableFileExtraction,
               source: 'MONITOR',
             },
           );
@@ -231,6 +244,94 @@ export const AddSnapshotModal = ({
                   <p className="mb-1"><strong>Click to browse</strong> or drag &amp; drop</p>
                   <small className="text-muted">.pcap / .pcapng / .cap</small>
                 </>
+              )}
+            </div>
+
+            {/* Analysis options collapsible */}
+            <div className="border rounded mb-3">
+              <button
+                type="button"
+                className="btn text-body w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+                onClick={() => setShowAnalysisOptions(v => !v)}
+              >
+                <span className="d-flex align-items-center gap-2">
+                  <i className="bi bi-sliders text-secondary" />
+                  <span className="fw-semibold small">Analysis options</span>
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>optional</span>
+                  {enableSuricata && (
+                    <Badge bg="warning" text="dark" style={{ fontSize: '0.65rem' }}>
+                      Suricata on
+                    </Badge>
+                  )}
+                </span>
+                <i className={`bi bi-chevron-${showAnalysisOptions ? 'up' : 'down'} text-muted`} style={{ fontSize: '0.75rem' }} />
+              </button>
+
+              {showAnalysisOptions && (
+                <div className="px-3 pb-3 border-top">
+                  <p className="text-muted mb-2 mt-2" style={{ fontSize: '0.8rem' }}>
+                    Choose which stages to run for this snapshot. Disabling stages reduces processing
+                    time. <strong>Suricata IDS is off by default</strong> — enable it for deeper
+                    threat detection at the cost of extra processing time.
+                  </p>
+
+                  <div className="d-flex flex-column gap-2">
+                    <label className="d-flex align-items-start gap-2" style={{ cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        className="form-check-input mt-1 flex-shrink-0"
+                        checked={enableNdpi}
+                        onChange={e => setEnableNdpi(e.target.checked)}
+                      />
+                      <span>
+                        <span className="fw-semibold small d-block">Protocol &amp; application classification</span>
+                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                          Identifies apps, traffic categories, and security risks.
+                        </span>
+                      </span>
+                    </label>
+
+                    <label
+                      className="tp-suricata-option d-flex align-items-start gap-2 p-2 rounded border"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <input
+                        type="checkbox"
+                        className="form-check-input mt-1 flex-shrink-0"
+                        checked={enableSuricata}
+                        onChange={e => setEnableSuricata(e.target.checked)}
+                      />
+                      <span>
+                        <span className="fw-semibold small d-block">
+                          Suricata IDS threat detection
+                          <span className="badge bg-secondary ms-2" style={{ fontSize: '0.6rem' }}>Optional</span>
+                        </span>
+                        <span className="text-muted d-block" style={{ fontSize: '0.78rem' }}>
+                          Flags known malware, exploits, and suspicious activity as IDS alerts.
+                        </span>
+                        <span className="tp-suricata-warning d-block" style={{ fontSize: '0.78rem' }}>
+                          <i className="bi bi-clock-history me-1" />
+                          Significantly increases processing time.
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className="d-flex align-items-start gap-2" style={{ cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        className="form-check-input mt-1 flex-shrink-0"
+                        checked={enableFileExtraction}
+                        onChange={e => setEnableFileExtraction(e.target.checked)}
+                      />
+                      <span>
+                        <span className="fw-semibold small d-block">Embedded file extraction</span>
+                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                          Extracts files transferred over HTTP and raw TCP/UDP streams.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
               )}
             </div>
 

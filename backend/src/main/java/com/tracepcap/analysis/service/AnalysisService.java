@@ -50,6 +50,12 @@ public class AnalysisService {
   @Value("${tracepcap.overview.apps-max:100}")
   private int overviewAppsMax;
 
+  // Global Suricata kill-switch (SURICATA_ENABLED). When false, Suricata is skipped for every file
+  // regardless of the per-file enableSuricata flag. Suricata dominates per-file analysis cost, so
+  // this is the single biggest throughput lever. See application.yml.
+  @Value("${tracepcap.suricata.enabled:true}")
+  private boolean suricataEnabled;
+
   // Flush interval: how many conversations to process before flushing the JPA session.
   // Keeps the Hibernate first-level cache from accumulating unbounded saved entities.
   private static final int JPA_FLUSH_INTERVAL = 50;
@@ -121,14 +127,17 @@ public class AnalysisService {
           ndpiService.enrich(tempFile, parseResult.getConversations());
           tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
         }
-        if (file.isEnableSuricata()) {
+        // Per-file flag AND the global kill-switch must both allow it. SURICATA_ENABLED=false
+        // disables Suricata across the board regardless of the upload-time enableSuricata flag.
+        boolean runSuricata = suricataEnabled && file.isEnableSuricata();
+        if (runSuricata) {
           suricataService.enrich(tempFile, parseResult.getConversations());
         }
         log.info(
             "[{}] [3/7] Enrichment (nDPI={}, Suricata={}): {}ms",
             fileId,
             file.isEnableNdpi(),
-            file.isEnableSuricata(),
+            runSuricata,
             System.currentTimeMillis() - t);
 
         // Stage 4: Signatures, device classification, geo-IP

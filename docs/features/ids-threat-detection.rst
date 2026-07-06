@@ -30,10 +30,15 @@ Enabling Suricata
 
 Suricata detection is selected **per file** at upload time:
 
-- In the **upload analysis-options modal**, tick **"Suricata IDS threat
-  detection"**. (The analysis-options modal is shown when
-  ``VITE_ANALYSIS_OPTIONS=true`` — see :doc:`../configuration/environment-variables`.)
+- In the **upload analysis-options modal** shown after file selection, tick
+  **"Suricata IDS threat detection"**. It is **off by default** because it
+  adds significant processing time.
 - The same toggle applies when merging PCAPs.
+
+A deployment-wide kill-switch, ``SURICATA_ENABLED`` (default ``true``), can
+disable Suricata for **every** upload regardless of the per-file choice — set
+it to ``false`` to skip IDS analysis across the board. See
+:doc:`../configuration/environment-variables`.
 
 .. note::
    Suricata adds meaningful processing time to analysis. Leave it off for quick

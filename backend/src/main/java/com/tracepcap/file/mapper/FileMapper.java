@@ -32,6 +32,9 @@ public class FileMapper {
         .startTime(entity.getStartTime())
         .endTime(entity.getEndTime())
         .source(entity.getSource() != null ? entity.getSource().name() : null)
+        .enableNdpi(entity.isEnableNdpi())
+        .enableSuricata(entity.isEnableSuricata())
+        .enableFileExtraction(entity.isEnableFileExtraction())
         .build();
   }
 }

@@ -27,6 +27,14 @@ public class FileMetadataDto {
 
   private String source;
 
+  // Per-file analysis stage toggles chosen at upload time. Surfaced so the UI can flag files
+  // that ran a partial analysis (e.g. Suricata IDS skipped).
+  private boolean enableNdpi;
+
+  private boolean enableSuricata;
+
+  private boolean enableFileExtraction;
+
   private Integer packetCount;
 
   private Long duration;

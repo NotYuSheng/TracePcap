@@ -85,10 +85,9 @@ to these nDPI-native detections.
 Enabling nDPI
 -------------
 
-By default nDPI analysis runs automatically on every upload. If the
-deployment has ``VITE_ANALYSIS_OPTIONS=true`` set, an **Analysis options**
-modal appears after file selection where the **Protocol & application
-classification** stage can be unchecked to skip nDPI for that upload.
+nDPI analysis is enabled by default. In the **Analysis options** modal shown
+after file selection, the **Protocol & application classification** stage can
+be unchecked to skip nDPI for that upload.
 
 Either way, nDPI results cannot be added after upload — re-upload the file
 if you need nDPI data for a capture that was processed without it.

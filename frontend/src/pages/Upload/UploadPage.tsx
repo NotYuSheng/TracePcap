@@ -18,7 +18,9 @@ export const UploadPage = () => {
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [analysisOptions, setAnalysisOptions] = useState<AnalysisOptions>({
     enableNdpi: true,
-    enableSuricata: true,
+    // Suricata is opt-in: it adds meaningful IDS threat detection but noticeably increases
+    // processing time, so it defaults off and the user ticks the box to enable it per upload.
+    enableSuricata: false,
     enableFileExtraction: true,
   });
   const navigate = useNavigate();
@@ -46,18 +48,11 @@ export const UploadPage = () => {
     }
   }, [uploads, isUploading, navigate]);
 
-  const analysisOptionsEnabled = env.ANALYSIS_OPTIONS_ENABLED;
-
+  // Always prompt before upload so the user makes an explicit Suricata choice (it defaults off
+  // because it adds significant processing time — see the modal copy). The nDPI and file-extraction
+  // toggles remain on by default.
   const handleFileSelect = (files: File[]) => {
-    if (!analysisOptionsEnabled) {
-      uploadFiles(files, {
-        enableNdpi: true,
-        enableSuricata: true,
-        enableFileExtraction: true,
-      });
-    } else {
-      setPendingFiles(files);
-    }
+    setPendingFiles(files);
   };
 
   const handleConfirmUpload = () => {
@@ -103,7 +98,8 @@ export const UploadPage = () => {
             <Modal.Body>
               <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>
                 Select which optional stages to run. Disabling stages reduces analysis time for
-                large captures.
+                large captures. <strong>Suricata IDS is off by default</strong> — enable it below for
+                deeper threat detection at the cost of extra processing time.
               </p>
 
               <div className="d-flex flex-column gap-3">
@@ -125,7 +121,10 @@ export const UploadPage = () => {
                   </div>
                 </label>
 
-                <label className="d-flex align-items-start gap-3" style={{ cursor: 'pointer' }}>
+                <label
+                  className="tp-suricata-option d-flex align-items-start gap-3 p-2 rounded border"
+                  style={{ cursor: 'pointer' }}
+                >
                   <input
                     type="checkbox"
                     className="form-check-input mt-1 flex-shrink-0"
@@ -135,10 +134,22 @@ export const UploadPage = () => {
                     }
                   />
                   <div>
-                    <div className="fw-semibold">Suricata IDS threat detection</div>
+                    <div className="fw-semibold">
+                      Suricata IDS threat detection
+                      <span className="badge bg-secondary ms-2" style={{ fontSize: '0.65rem' }}>
+                        Optional
+                      </span>
+                    </div>
                     <div className="text-muted" style={{ fontSize: '0.82rem' }}>
-                      Flags known threats using Emerging Threats Open signatures (IDS alerts). Loads
-                      a large ruleset, adding ~30–60s per capture.
+                      Matches the capture against the Emerging Threats Open ruleset to flag known
+                      malware, exploits, and suspicious activity as IDS alerts — valuable when you
+                      want a security assessment, not just traffic classification.
+                    </div>
+                    <div className="tp-suricata-warning mt-1" style={{ fontSize: '0.82rem' }}>
+                      <i className="bi bi-clock-history me-1" />
+                      Significantly increases processing time (it dominates analysis cost — roughly
+                      an extra ~30–60s per capture, and more for large files). Leave off for the
+                      fastest results.
                     </div>
                   </div>
                 </label>
