@@ -472,11 +472,13 @@ public class ChangeDetectionService {
         nonVpnRiskSet(fromConvs), nonVpnRiskSet(toConvs),
         "risk", Severity.WARNING, true);
 
-    // Detected file types — added INFO only (removals not actionable)
+    // Detected file types — added INFO only (removals not actionable). Unlike the other three
+    // signals (cleaned by arraySet/nonVpnRiskSet), this query returns a raw list that may be null
+    // or contain null/blank entries, so clean it before it reaches diffSecurity's Map.of.
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        new java.util.HashSet<>(conversationRepository.findDistinctFileTypesByFileId(fromFileId)),
-        new java.util.HashSet<>(conversationRepository.findDistinctFileTypesByFileId(toFileId)),
+        cleanSet(conversationRepository.findDistinctFileTypesByFileId(fromFileId)),
+        cleanSet(conversationRepository.findDistinctFileTypesByFileId(toFileId)),
         "fileType", Severity.INFO, false);
 
     return events;
@@ -538,6 +540,12 @@ public class ChangeDetectionService {
         .flatMap(c -> Arrays.stream(c.getFlowRisks()))
         .filter(r -> r != null && !r.isBlank() && !r.toUpperCase().contains("VPN"))
         .collect(Collectors.toSet());
+  }
+
+  /** Null-safe distinct non-blank set from a (possibly null) list of strings. */
+  private Set<String> cleanSet(List<String> values) {
+    if (values == null) return Set.of();
+    return values.stream().filter(s -> s != null && !s.isBlank()).collect(Collectors.toSet());
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────

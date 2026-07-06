@@ -109,7 +109,9 @@ export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurity
         key: 'sigs',
         title: 'Custom Signatures',
         icon: 'bi-fingerprint',
-        severity: 'WARNING',
+        // CRITICAL to stay consistent with the tab-header badge (SnapshotDetailModal treats
+        // signatures as critical) and the backend detectSecurityDrift severity.
+        severity: 'CRITICAL',
         filterParam: 'customSignatures',
         blurb: 'Matches against your user-defined signatures.',
       },
