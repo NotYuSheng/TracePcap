@@ -262,8 +262,12 @@ export const SnapshotTimeline = ({
       ? <Badge bg="light" text="dark" className="border fw-normal">{count}</Badge>
       : <span className="text-muted small">—</span>;
 
+  // In the bucketed "By Time" view, per-snapshot drift doesn't aggregate meaningfully, so the
+  // Security column there always shows the absolute (total) count — surfaced whenever *either*
+  // security toggle is on, so enabling the default "Security (new)" still yields a Security column.
+  const showBucketSecurity = showCol('securityAbsolute') || showCol('securityDrift');
   // Column count of a "By Time" bucket header row (Period + Captures + Changes always shown).
-  const bucketColSpan = 3 + (showCol('packets') ? 1 : 0) + (showCol('securityAbsolute') ? 1 : 0);
+  const bucketColSpan = 3 + (showCol('packets') ? 1 : 0) + (showBucketSecurity ? 1 : 0);
 
   const renderSnapshotRow = (snap: NetworkSnapshot) => {
     const drift = securityDriftBySnapshot.get(snap.id) ?? 0;
@@ -353,8 +357,9 @@ export const SnapshotTimeline = ({
               <i className="bi bi-layout-three-columns me-1"></i>Columns
             </Dropdown.Toggle>
             <Dropdown.Menu>
+              <div className="dropdown-header small text-muted py-1">Show columns</div>
               {TOGGLEABLE_COLUMNS.map(col => (
-                <div key={col.key} className="dropdown-item-text py-1">
+                <div key={col.key} className="dropdown-item-text py-1 small">
                   <Form.Check
                     type="checkbox"
                     id={`col-${col.key}`}
@@ -411,7 +416,7 @@ export const SnapshotTimeline = ({
                     <th className="text-muted fw-normal">Captures</th>
                     {showCol('packets') && <th className="text-muted fw-normal">Packets</th>}
                     <th className="text-muted fw-normal">Changes</th>
-                    {showCol('securityAbsolute') && <th className="text-muted fw-normal">Security (total)</th>}
+                    {showBucketSecurity && <th className="text-muted fw-normal">Security (total)</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -433,7 +438,7 @@ export const SnapshotTimeline = ({
                             </td>
                           )}
                           <td>{renderChangesPill(b.changes, b.critical)}</td>
-                          {showCol('securityAbsolute') && <td>{renderSecurityAbsolute(b.security)}</td>}
+                          {showBucketSecurity && <td>{renderSecurityAbsolute(b.security)}</td>}
                         </tr>
                         {isOpen && (
                           <tr>
