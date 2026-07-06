@@ -287,7 +287,8 @@ export function ConversationFilterPanel({
                     onChange={e => onFiltersChange({ hasRisks: e.target.checked })}
                   />
                   <label
-                    className="form-check-label small d-inline-flex align-items-center"
+                    className="form-check-label d-inline-flex align-items-center text-nowrap"
+                    style={{ fontSize: '0.8rem' }}
                     htmlFor="hasRisksCheck"
                   >
                     Security risks only
