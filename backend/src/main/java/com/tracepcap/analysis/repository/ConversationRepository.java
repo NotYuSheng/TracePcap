@@ -254,7 +254,9 @@ public interface ConversationRepository
       value =
           "SELECT DISTINCT ip FROM ("
               + "  SELECT src_ip AS ip FROM conversations WHERE file_id = :fileId AND src_ip IS NOT NULL"
-              + "  UNION"
+              // UNION ALL (not UNION): the outer SELECT DISTINCT already dedups, so the inner
+              // set-union's implicit dedup would be redundant work.
+              + "  UNION ALL"
               + "  SELECT dst_ip AS ip FROM conversations WHERE file_id = :fileId AND dst_ip IS NOT NULL"
               + ") ips ORDER BY ip",
       nativeQuery = true)
