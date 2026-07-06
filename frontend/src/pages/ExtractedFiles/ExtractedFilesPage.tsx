@@ -11,6 +11,7 @@ import {
 } from '@features/extractedFiles/services/extractedFilesService';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
@@ -210,12 +211,20 @@ export const ExtractedFilesPage = () => {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [mimeTypeFilter, setMimeTypeFilter] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const allMimeTypes = useMemo(
     () =>
       [...new Set(files.map(f => f.mimeType).filter((m): m is string => m !== null))].sort(),
     [files]
   );
+
+  // Reset to the first page whenever the filter/sort changes the result set, so the current
+  // page can't fall out of range when the list shrinks.
+  useEffect(() => {
+    setPage(1);
+  }, [mimeTypeFilter, sortBy, sortDir, pageSize, fileId]);
 
   useEffect(() => {
     setLoading(true);
@@ -284,6 +293,15 @@ export const ExtractedFilesPage = () => {
       ? files.filter(f => f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))
       : files;
   const sorted = sortFiles(filtered, sortBy, sortDir);
+
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  // Clamp during render so a shrunk list (e.g. after applying a filter) can't leave `page`
+  // out of bounds — and thus the table briefly empty — before the reset effect runs.
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const paginated = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // Keep the pager (and its page-size selector) reachable whenever the unpaged list would
+  // exceed the smallest page-size option, so bumping the size to one page can't strand the user.
+  const showPagination = sorted.length > 10;
 
   return (
     <div>
@@ -487,7 +505,7 @@ export const ExtractedFilesPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map(file => {
+                  {paginated.map(file => {
                     const isSkipped = file.skippedReason != null;
                     return (
                     <tr key={file.id} className={isSkipped ? 'text-muted' : undefined}>
@@ -584,6 +602,18 @@ export const ExtractedFilesPage = () => {
                 </tbody>
               </table>
             </ScrollableTable>
+          )}
+          {showPagination && (
+            <div className="p-2 border-top">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={sorted.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={ps => { setPageSize(ps); setPage(1); }}
+              />
+            </div>
           )}
         </Card.Body>
       </Card>
