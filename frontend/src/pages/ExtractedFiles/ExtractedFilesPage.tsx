@@ -295,7 +295,13 @@ export const ExtractedFilesPage = () => {
   const sorted = sortFiles(filtered, sortBy, sortDir);
 
   const totalPages = Math.ceil(sorted.length / pageSize);
-  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
+  // Clamp during render so a shrunk list (e.g. after applying a filter) can't leave `page`
+  // out of bounds — and thus the table briefly empty — before the reset effect runs.
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const paginated = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // Keep the pager (and its page-size selector) reachable whenever the unpaged list would
+  // exceed the smallest page-size option, so bumping the size to one page can't strand the user.
+  const showPagination = sorted.length > 10;
 
   return (
     <div>
@@ -597,10 +603,10 @@ export const ExtractedFilesPage = () => {
               </table>
             </ScrollableTable>
           )}
-          {totalPages > 1 && (
+          {showPagination && (
             <div className="p-2 border-top">
               <Pagination
-                currentPage={page}
+                currentPage={currentPage}
                 totalPages={totalPages}
                 totalItems={sorted.length}
                 pageSize={pageSize}
