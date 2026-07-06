@@ -29,10 +29,12 @@ Both analysis stages run automatically on every upload by default:
 - **Embedded file extraction** — HTTP object and raw stream extraction from
   TCP/UDP payloads (see :doc:`file-extraction`).
 
-If the deployment has ``VITE_ANALYSIS_OPTIONS=true`` set, an
-**Analysis options** modal appears after file selection, allowing each
-stage to be disabled individually for that upload (useful for reducing
-processing time on large captures).
+An **Analysis options** modal appears after file selection, allowing each
+stage to be enabled or disabled individually for that upload (useful for
+reducing processing time on large captures). Protocol/application
+classification and embedded file extraction are enabled by default;
+**Suricata IDS is off by default** because it adds significant processing
+time.
 
 Duplicate Detection
 -------------------

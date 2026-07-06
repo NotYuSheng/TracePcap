@@ -46,9 +46,6 @@ export const env = {
     requiredString(import.meta.env.VITE_SUPPORTED_FILE_TYPES, '.pcap,.pcapng,.cap'),
   ),
 
-  /** Whether the analysis-options dialog is shown before upload. */
-  ANALYSIS_OPTIONS_ENABLED: optionalBoolean(import.meta.env.VITE_ANALYSIS_OPTIONS, true),
-
   /** Whether the network diagram caps the conversation count. */
   NETWORK_DIAGRAM_CONVERSATION_LIMIT: optionalBoolean(
     import.meta.env.VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT,

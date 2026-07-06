@@ -1241,6 +1241,15 @@
             "format": "int64",
             "type": "integer"
           },
+          "enableFileExtraction": {
+            "type": "boolean"
+          },
+          "enableNdpi": {
+            "type": "boolean"
+          },
+          "enableSuricata": {
+            "type": "boolean"
+          },
           "endTime": {
             "format": "date-time",
             "type": "string"

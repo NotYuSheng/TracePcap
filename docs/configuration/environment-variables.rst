@@ -93,6 +93,12 @@ and MinIO) with a queue of a few hundred is a reasonable starting point.
      - Minutes a file may stay in ``PROCESSING`` before reconciliation marks it
        ``FAILED``. Must exceed the longest expected analysis time so healthy
        in-flight jobs are never killed.
+   * - ``SURICATA_ENABLED``
+     - ``true``
+     - Deployment-wide kill-switch for Suricata IDS enrichment. Set to
+       ``false`` to skip Suricata for **every** file regardless of the per-file
+       upload toggle. Suricata dominates per-file analysis cost, so disabling it
+       is the single biggest throughput lever.
 
 Nginx
 -----
@@ -254,9 +260,6 @@ rebuild (``docker compose up -d --build``).
    * - ``VITE_SUPPORTED_FILE_TYPES``
      - ``.pcap,.pcapng,.cap``
      - Comma-separated list of accepted upload extensions.
-   * - ``VITE_ANALYSIS_OPTIONS``
-     - ``false``
-     - Set to ``true`` to show the pre-upload analysis options modal.
    * - ``VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT``
      - ``false``
      - Toggles the 500-conversation rendering cap in the Network Topology

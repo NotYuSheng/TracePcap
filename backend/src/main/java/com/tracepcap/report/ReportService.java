@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +66,11 @@ public class ReportService {
   // ── date/time format ──────────────────────────────────────────────────────
   private static final DateTimeFormatter DT_FMT =
       DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+
+  // Global Suricata kill-switch — when false, Suricata never ran regardless of the per-file flag,
+  // so the report must reflect the effective state, not just the upload-time choice. See AnalysisService.
+  @Value("${tracepcap.suricata.enabled:true}")
+  private boolean suricataEnabled;
 
   // ── repositories / services ───────────────────────────────────────────────
   private final FileRepository fileRepository;
@@ -262,7 +268,7 @@ public class ReportService {
       {"Upload Time", formatDt(file.getUploadedAt())},
       {"Status", file.getStatus() != null ? file.getStatus().name() : "—"},
       {"nDPI Enrichment", file.isEnableNdpi() ? "Enabled" : "Disabled"},
-      {"Suricata IDS", file.isEnableSuricata() ? "Enabled" : "Disabled"},
+      {"Suricata IDS", (suricataEnabled && file.isEnableSuricata()) ? "Enabled" : "Disabled"},
       {"File Extraction", file.isEnableFileExtraction() ? "Enabled" : "Disabled"},
     };
     doc.add(kvTable(rows));

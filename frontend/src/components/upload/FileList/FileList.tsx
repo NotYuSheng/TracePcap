@@ -2,7 +2,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { isAxiosError } from 'axios';
-import { Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, Modal, Tooltip } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { AlertCircle } from 'lucide-react';
 import { apiClient } from '@/services/api/client';
@@ -19,6 +19,22 @@ interface FileMetadata {
   uploadedAt: string | number[];
   status: string;
   source?: string;
+  enableNdpi?: boolean;
+  enableSuricata?: boolean;
+  enableFileExtraction?: boolean;
+}
+
+/**
+ * Lists the analysis stages that were skipped for a file, or null if the file ran the full
+ * pipeline. Older files predating these flags return them as undefined, which we treat as
+ * "enabled" so they are not mislabelled as partial.
+ */
+function skippedStages(file: FileMetadata): string[] | null {
+  const skipped: string[] = [];
+  if (file.enableNdpi === false) skipped.push('Protocol & application classification (nDPI)');
+  if (file.enableSuricata === false) skipped.push('Suricata IDS threat detection');
+  if (file.enableFileExtraction === false) skipped.push('Embedded file extraction');
+  return skipped.length > 0 ? skipped : null;
 }
 
 export const FileList = () => {
@@ -324,6 +340,24 @@ export const FileList = () => {
                                   Monitor
                                 </Badge>
                               )}
+                              {isCompleted &&
+                                (() => {
+                                  const skipped = skippedStages(file);
+                                  if (!skipped) return null;
+                                  const tip = `Partial analysis — stages skipped at upload:\n• ${skipped.join('\n• ')}`;
+                                  return (
+                                    <Tooltip content={tip} type="hover">
+                                      <Badge
+                                        bg="warning"
+                                        text="dark"
+                                        style={{ fontSize: '0.65rem', cursor: 'help' }}
+                                      >
+                                        <i className="bi bi-exclamation-triangle me-1" />
+                                        Partial
+                                      </Badge>
+                                    </Tooltip>
+                                  );
+                                })()}
                             </div>
                             <small className="text-muted">
                               {formatFileSize(file.fileSize)} •{' '}

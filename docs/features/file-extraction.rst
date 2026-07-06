@@ -7,10 +7,9 @@ documents, binaries, archives, and more — directly from PCAP payloads.
 Enabling Extraction
 -------------------
 
-By default file extraction runs automatically on every upload. If the
-deployment has ``VITE_ANALYSIS_OPTIONS=true`` set, an **Analysis options**
-modal appears after file selection where the **Embedded file extraction**
-stage can be unchecked to skip extraction for that upload.
+File extraction is enabled by default. In the **Analysis options** modal shown
+after file selection, the **Embedded file extraction** stage can be unchecked
+to skip extraction for that upload.
 
 Either way, extraction cannot be added retroactively — re-upload the file
 if you need extracted files for a capture processed without it.

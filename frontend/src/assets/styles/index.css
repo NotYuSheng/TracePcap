@@ -235,6 +235,28 @@ body {
   color: var(--tp-text);
 }
 
+/* Preserve intentional line breaks in tooltip text (e.g. the "Partial analysis" badge lists
+   each skipped stage on its own line). Bootstrap tooltips otherwise collapse newlines. */
+.tooltip-inner {
+  white-space: pre-line;
+  text-align: left;
+}
+
+/* Suricata (opt-in) analysis option card — used in the upload page and the monitor
+   "Add PCAP Snapshot" modal. Theme-aware so it reads in both light and dark mode. */
+.tp-suricata-option {
+  background-color: var(--tp-bg-subtle);
+  border-color: var(--tp-border) !important;
+}
+
+.tp-suricata-warning {
+  color: #b45309; /* amber-700 — reads on light backgrounds */
+}
+
+[data-theme='dark'] .tp-suricata-warning {
+  color: #fbbf24; /* amber-400 — reads on dark backgrounds */
+}
+
 /* Page Styles */
 .home-page,
 .upload-page,
