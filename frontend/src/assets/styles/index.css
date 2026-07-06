@@ -259,3 +259,37 @@ body {
   display: inline-block;
   animation: spin 1s linear infinite;
 }
+
+/* Compact, refined search/filter inputs — single source of truth shared by the
+   conversation filter panel, the network-diagram filter modal (NetworkControls),
+   and the IP classification-override row. Add `tp-compact-search` to an
+   `.input-group` (icon + field + clear button) or directly to a standalone
+   `.form-control` / `.form-select`. Keeps these fields from towering over the
+   compact pill rows around them. */
+.tp-compact-search.input-group > .form-control,
+.tp-compact-search.input-group > .input-group-text,
+.tp-compact-search.input-group > .btn,
+.form-control.tp-compact-search,
+.form-select.tp-compact-search {
+  height: 1.9rem;
+  font-size: 0.8rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.tp-compact-search.input-group > .input-group-text {
+  background-color: var(--tp-bg-subtle, #f0f2f5);
+  border-color: var(--tp-border, #dee2e6);
+  color: var(--tp-text-muted, #6c757d);
+}
+
+.tp-compact-search.input-group > .input-group-text .bi {
+  font-size: 0.8rem;
+}
+
+.tp-compact-search.input-group > .btn {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 0.55rem;
+  line-height: 1;
+}

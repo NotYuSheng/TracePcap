@@ -21,6 +21,7 @@ export function EntityDetailModal({
   badge,
   isActive,
   lastSeenTime,
+  lastSeenFileName,
   onViewConversations,
   snapshots,
   onClose,
@@ -64,11 +65,22 @@ export function EntityDetailModal({
     if (isActive) {
       return <span className="badge bg-success ms-2" style={{ fontSize: '0.7rem' }}>Active</span>;
     }
-    if (lastSeenTime) {
-      const days = Math.floor((Date.now() - new Date(lastSeenTime).getTime()) / 86400000);
-      return <span className="badge bg-secondary ms-2" style={{ fontSize: '0.7rem' }}>Inactive{days > 0 ? ` · ${days}d ago` : ''}</span>;
-    }
-    return <span className="badge bg-secondary ms-2" style={{ fontSize: '0.7rem' }}>Inactive</span>;
+    const parsedTime = lastSeenTime ? new Date(lastSeenTime).getTime() : null;
+    const days = parsedTime !== null && !Number.isNaN(parsedTime)
+      ? Math.floor((Date.now() - parsedTime) / 86400000)
+      : null;
+    const agoText = days != null && days > 0 ? ` · ${days}d ago` : '';
+    const tooltip = lastSeenFileName ? `Last seen in ${lastSeenFileName}` : undefined;
+    return (
+      <span className="badge bg-secondary ms-2 d-inline-flex align-items-center" style={{ fontSize: '0.7rem', gap: '0.5rem' }} title={tooltip}>
+        <span>Inactive{agoText}</span>
+        {lastSeenFileName && (
+          <span className="fw-normal opacity-75 ps-2 border-start border-light border-opacity-50">
+            <i className="bi bi-camera-reels me-1"></i>{lastSeenFileName}
+          </span>
+        )}
+      </span>
+    );
   })() : null;
 
   const hasFileStats = !!fileId && (entityType === 'APPLICATION' || entityType === 'PROTOCOL');

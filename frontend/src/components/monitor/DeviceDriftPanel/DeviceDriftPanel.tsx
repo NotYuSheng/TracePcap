@@ -159,6 +159,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
           fileId={selectedAbsent.lastSeenFileId ?? ''}
           isActive={false}
           lastSeenTime={selectedAbsent.lastSeenStartTime}
+          lastSeenFileName={selectedAbsent.lastSeenFileName}
           snapshots={snapshots}
           onClose={() => setSelectedAbsent(null)}
         />

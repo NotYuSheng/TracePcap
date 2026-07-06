@@ -188,7 +188,7 @@ export function ConversationFilterPanel({
                     body="Matches conversations where the source IP, destination IP, or hostname contains this text (case-insensitive)."
                   />
                 </label>
-                <div className="input-group input-group-sm">
+                <div className="input-group input-group-sm tp-compact-search">
                   <span className="input-group-text">
                     <i className="bi bi-search"></i>
                   </span>
@@ -219,7 +219,7 @@ export function ConversationFilterPanel({
                     body="Filters to conversations where either the source or destination port exactly matches the entered number."
                   />
                 </label>
-                <div className="input-group input-group-sm">
+                <div className="input-group input-group-sm tp-compact-search">
                   <Form.Control
                     type="text"
                     inputMode="numeric"
@@ -255,7 +255,7 @@ export function ConversationFilterPanel({
                     }
                   />
                 </label>
-                <div className="input-group input-group-sm">
+                <div className="input-group input-group-sm tp-compact-search">
                   <span className="input-group-text">
                     <i className="bi bi-search"></i>
                   </span>
@@ -287,7 +287,8 @@ export function ConversationFilterPanel({
                     onChange={e => onFiltersChange({ hasRisks: e.target.checked })}
                   />
                   <label
-                    className="form-check-label small d-inline-flex align-items-center"
+                    className="form-check-label d-inline-flex align-items-center text-nowrap"
+                    style={{ fontSize: '0.8rem' }}
                     htmlFor="hasRisksCheck"
                   >
                     Security risks only

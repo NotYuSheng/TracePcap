@@ -75,3 +75,6 @@
   align-items: center;
   margin-bottom: 0.4rem;
 }
+
+/* Compact search inputs (IP / Port / Payload) use the shared `.tp-compact-search`
+   class — see assets/styles/index.css. */

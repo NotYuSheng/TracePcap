@@ -255,7 +255,7 @@ export function NetworkControls({
                 {/* IP / Hostname */}
                 <div className="col-md-3">
                   <label className="filter-section-label d-block mb-2">IP / Hostname</label>
-                  <div className="input-group input-group-sm">
+                  <div className="input-group input-group-sm tp-compact-search">
                     <span className="input-group-text">
                       <i className="bi bi-search" />
                     </span>
@@ -279,7 +279,7 @@ export function NetworkControls({
                 {/* Port */}
                 <div className="col-md-2">
                   <label className="filter-section-label d-block mb-2">Port</label>
-                  <div className="input-group input-group-sm">
+                  <div className="input-group input-group-sm tp-compact-search">
                     <Form.Control
                       type="text"
                       inputMode="numeric"
@@ -299,7 +299,7 @@ export function NetworkControls({
                 </div>
 
                 {/* Has risks */}
-                <div className="col-md-2 d-flex align-items-end">
+                <div className="col-md-3 d-flex align-items-end">
                   <div className="form-check mb-0">
                     <input
                       type="checkbox"
@@ -308,7 +308,11 @@ export function NetworkControls({
                       checked={hasRisksOnly}
                       onChange={e => onHasRisksOnlyChange(e.target.checked)}
                     />
-                    <label className="form-check-label" htmlFor="ncHasRisks">
+                    <label
+                      className="form-check-label text-nowrap"
+                      style={{ fontSize: '0.8rem' }}
+                      htmlFor="ncHasRisks"
+                    >
                       Security risks only
                     </label>
                   </div>

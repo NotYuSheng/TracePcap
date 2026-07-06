@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Badge, Button, Table } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Pagination } from '@components/common/Pagination';
 import { RoleEditModal } from '@components/common/RoleEditModal';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 import { formatSnapTime, hashBadgeStyle } from '../format';
 import type { IpSnapshotEntry } from '../types';
+
+const HISTORY_PAGE_SIZE = 10;
 
 interface SnapshotHistoryTableProps {
   entityType: EntityType;
@@ -24,6 +27,45 @@ export function SnapshotHistoryTable({
   onRoleChanged,
 }: SnapshotHistoryTableProps) {
   const [editing, setEditing] = useState<{ fileId: string; name: string } | null>(null);
+  // Sort by snapshot capture order (monotonic with date). Latest-first by default.
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+
+  const sortedHistory = useMemo(() =>
+    [...ipSnapHistory].sort((a, b) =>
+      sortDir === 'desc'
+        ? b.snap.snapshotOrder - a.snap.snapshotOrder
+        : a.snap.snapshotOrder - b.snap.snapshotOrder
+    ),
+    [ipSnapHistory, sortDir]
+  );
+  const toggleSort = () => { setSortDir(d => (d === 'desc' ? 'asc' : 'desc')); setPage(1); };
+
+  const totalPages = Math.max(1, Math.ceil(sortedHistory.length / HISTORY_PAGE_SIZE));
+  // Derive the active page during render so a shrunken dataset can't slice out of
+  // range for the one frame before the useEffect below clamps `page`.
+  const activePage = Math.min(page, totalPages);
+  const pagedHistory = sortedHistory.slice((activePage - 1) * HISTORY_PAGE_SIZE, activePage * HISTORY_PAGE_SIZE);
+
+  // Reset to page 1 when the modal is reused for a different entity, so the next
+  // entity doesn't open on a stale page inherited from the previous one.
+  useEffect(() => { setPage(1); }, [entityKey]);
+
+  // Clamp back into range if the data shrinks (e.g. the modal is reused for another entity).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // Chronological order (oldest→newest) for the "MAC changed vs previous snapshot" comparison,
+  // which must stay correct regardless of the display sort direction.
+  const prevMacBySnapId = useMemo(() => {
+    const chronological = [...ipSnapHistory].sort((a, b) => a.snap.snapshotOrder - b.snap.snapshotOrder);
+    const map = new Map<string, string | null | undefined>();
+    chronological.forEach((entry, i) => {
+      map.set(entry.snap.id, i > 0 ? chronological[i - 1].host?.mac : undefined);
+    });
+    return map;
+  }, [ipSnapHistory]);
 
   return (
     <div className="mt-4">
@@ -44,7 +86,16 @@ export function SnapshotHistoryTable({
             <Table.Header className="table-light" style={{ fontSize: '0.8rem' }}>
               <Table.Row>
                 <Table.HeaderCell className="text-muted fw-normal">#</Table.HeaderCell>
-                <Table.HeaderCell className="text-muted fw-normal">Snapshot</Table.HeaderCell>
+                <Table.HeaderCell
+                  className="text-muted fw-normal user-select-none"
+                  style={{ cursor: 'pointer' }}
+                  onClick={toggleSort}
+                  title="Sort by capture date"
+                  aria-sort={sortDir === 'desc' ? 'descending' : 'ascending'}
+                >
+                  Snapshot
+                  <i className={`bi ms-1 ${sortDir === 'desc' ? 'bi-sort-down' : 'bi-sort-up'}`} />
+                </Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">{entityType === 'DEVICE' ? 'IP(s)' : 'MAC Address'}</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Device Type</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Role</Table.HeaderCell>
@@ -52,7 +103,7 @@ export function SnapshotHistoryTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs, ips }, idx) => (
+              {pagedHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs, ips }) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
@@ -88,10 +139,9 @@ export function SnapshotHistoryTable({
                           <i className="bi bi-diagram-3 me-1" />conflict — {macs.length} MACs
                         </Badge>
                       )}
-                      {idx > 0 && host?.mac && ipSnapHistory[idx - 1].host?.mac &&
-                        host.mac !== ipSnapHistory[idx - 1].host!.mac && (
-                          <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
-                        )}
+                      {host?.mac && prevMacBySnapId.get(snap.id) && host.mac !== prevMacBySnapId.get(snap.id) && (
+                        <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
+                      )}
                     </Table.DataCell>
                   )}
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
@@ -127,6 +177,17 @@ export function SnapshotHistoryTable({
               ))}
             </Table.Body>
           </Table>
+        </div>
+      )}
+      {!ipHistoryLoading && sortedHistory.length > HISTORY_PAGE_SIZE && (
+        <div className="mt-2">
+          <Pagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalItems={sortedHistory.length}
+            pageSize={HISTORY_PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
