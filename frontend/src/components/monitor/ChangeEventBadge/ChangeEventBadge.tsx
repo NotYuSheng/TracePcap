@@ -22,6 +22,17 @@ const SEVERITY_ICONS: Record<string, string> = {
   INFO:     'bi-info-circle-fill',
 };
 
+/** Human label for a security-drift signalKind payload value. */
+function securityKindLabel(kind: unknown): string {
+  switch (kind) {
+    case 'ids':       return 'IDS alert';
+    case 'signature': return 'Custom signature';
+    case 'risk':      return 'Flow risk';
+    case 'fileType':  return 'File type';
+    default:          return 'Security signal';
+  }
+}
+
 function describeEvent(event: ChangeEvent): string {
   const nv = event.newValue ?? {};
   const ov = event.oldValue ?? {};
@@ -52,6 +63,10 @@ function describeEvent(event: ChangeEvent): string {
     case 'VPN_DRIFT':
       if (nv['riskType']) return `VPN detected: ${nv['riskType']}`;
       return `VPN signal gone: ${ov['riskType'] ?? event.entityKey}`;
+    case 'SECURITY_ALERT_ADDED':
+      return `${securityKindLabel(nv['signalKind'])} appeared: ${event.entityKey}`;
+    case 'SECURITY_ALERT_REMOVED':
+      return `${securityKindLabel(ov['signalKind'])} cleared: ${event.entityKey}`;
     case 'LABEL_STALE': {
       const changes = Array.isArray(nv['changes']) ? (nv['changes'] as string[]).join(', ') : '';
       const label = nv['roleLabel'] ? ` (${nv['roleLabel']})` : '';

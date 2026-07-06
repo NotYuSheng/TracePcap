@@ -20,6 +20,8 @@ public class NetworkSnapshotDto {
   private Long totalBytes;
   private long changeCount;
   private long criticalCount;
+  /** Distinct absolute security signals present in this snapshot's capture (IDS/risks/sigs/file types). */
+  private long securitySignalCount;
   private String context;
   private String notes;
   private boolean hasInsights;

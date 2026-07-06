@@ -5,6 +5,7 @@ import { subnetService } from '@/features/subnets/services/subnetService';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import type { SubnetOverrideInput } from '@/features/monitor/types/monitor.types';
 import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEventBadge';
+import { SnapshotSecurityTab } from '@/components/monitor/SnapshotSecurityTab/SnapshotSecurityTab';
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { NetworkControls } from '@/components/network/NetworkControls';
@@ -20,7 +21,7 @@ import type { GraphNode } from '@/features/network/types';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
 import { parseDateTime } from '@/utils/dateUtils';
 
-type Tab = 'diagram' | 'changes' | 'context' | 'subnets' | 'insights';
+type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
 const HIGHLIGHT_COLORS: Record<string, string> = {
   CRITICAL: '#e74c3c',
@@ -37,6 +38,8 @@ function labelForChange(changeType: string, oldValue: Record<string, unknown> | 
     case 'PROTOCOL_ADDED': return 'New protocol';
     case 'APP_ADDED':      return 'New app';
     case 'VPN_DRIFT':      return newValue?.['riskType'] ? 'VPN detected' : 'VPN stopped';
+    case 'SECURITY_ALERT_ADDED':   return 'Security alert';
+    case 'SECURITY_ALERT_REMOVED': return 'Security alert cleared';
     default:               return changeType;
   }
 }
@@ -207,6 +210,19 @@ export const SnapshotDetailModal = ({
   const presentCustomSigs  = useMemo(() => { const s = new Set<string>(); edges.forEach(e => e.data.customSignatures?.forEach(sig => s.add(sig))); return [...s].sort(); }, [edges]);
   const presentFileTypes   = useMemo(() => { const s = new Set<string>(); edges.forEach(e => e.data.detectedFileTypes?.forEach(f => s.add(f))); return [...s].sort(); }, [edges]);
   const presentCountries   = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (e.data.srcCountry) s.add(e.data.srcCountry); if (e.data.dstCountry) s.add(e.data.dstCountry); }); return [...s].sort(); }, [edges]);
+
+  // Distinct security signals across all four analysis-mode signal types (for the Security tab badge).
+  // Any Suricata IDS alert or custom signature is treated as high-severity for badge coloring.
+  const securitySignals = useMemo(() => {
+    const ids = new Set<string>(), risks = new Set<string>(), sigs = new Set<string>(), files = new Set<string>();
+    edges.forEach(e => {
+      e.data.suricataAlerts?.forEach(a => ids.add(a));
+      e.data.flowRisks?.forEach(r => risks.add(r));
+      e.data.customSignatures?.forEach(sig => sigs.add(sig));
+      e.data.detectedFileTypes?.forEach(f => files.add(f));
+    });
+    return { count: ids.size + risks.size + sigs.size + files.size, critical: ids.size + sigs.size > 0 };
+  }, [edges]);
 
   // Filter logic
   const { filteredNodes, filteredEdges } = useMemo(() =>
@@ -400,7 +416,7 @@ export const SnapshotDetailModal = ({
       {/* Tabs */}
       <div className="modal-header py-2 border-bottom">
         <ul className="nav nav-pills gap-1">
-          {(['diagram', 'changes', 'context', 'subnets', 'insights'] as Tab[]).map(tab => (
+          {(['diagram', 'changes', 'security', 'context', 'subnets', 'insights'] as Tab[]).map(tab => (
             <li key={tab} className="nav-item">
               <button
                 className={`nav-link py-1 px-3${activeTab === tab ? ' active' : ''}`}
@@ -409,6 +425,7 @@ export const SnapshotDetailModal = ({
               >
                 {tab === 'diagram'  && <i className="bi bi-diagram-3 me-1" />}
                 {tab === 'changes'  && <i className="bi bi-activity me-1" />}
+                {tab === 'security' && <i className="bi bi-shield-lock me-1" />}
                 {tab === 'context'  && <i className="bi bi-pencil-square me-1" />}
                 {tab === 'subnets'  && <i className="bi bi-diagram-2 me-1" />}
                 {tab === 'insights' && <i className="bi bi-stars me-1" />}
@@ -423,6 +440,20 @@ export const SnapshotDetailModal = ({
                         color: '#fff',
                       }}>
                         {snapshotEvents.length}
+                      </span>
+                    )}
+                  </>
+                )}
+                {tab === 'security' && (
+                  <>
+                    Security
+                    {securitySignals.count > 0 && (
+                      <span className="badge rounded-pill ms-1" style={{
+                        fontSize: '0.6rem',
+                        background: securitySignals.critical ? '#dc3545' : '#fd7e14',
+                        color: '#fff',
+                      }}>
+                        {securitySignals.count}
                       </span>
                     )}
                   </>
@@ -555,6 +586,11 @@ export const SnapshotDetailModal = ({
               ))
             )}
           </div>
+        )}
+
+        {/* ── Security tab ── */}
+        {activeTab === 'security' && (
+          <SnapshotSecurityTab edges={edges} loading={graphLoading} fileId={diagramSnap.fileId} />
         )}
 
         {/* ── Context & Notes tab ── */}

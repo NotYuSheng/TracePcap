@@ -42,6 +42,39 @@ public interface ConversationRepository
   List<String> findDistinctFileTypesByFileId(@Param("fileId") UUID fileId);
 
   /**
+   * Batched count of the distinct security-signal values present per file — the union across nDPI
+   * flow risks, custom signatures, Suricata IDS alerts (three array columns on {@code conversations})
+   * and detected file types (from {@code packets}). Mirrors the four signals surfaced in the monitor
+   * Security tab; used to populate the per-snapshot absolute posture count without an N+1 fan-out.
+   *
+   * <p>Returns rows of {@code (file_id, count)}; files with no signals are simply absent.
+   *
+   * <p>Uses {@code UNION ALL} with per-category {@code DISTINCT} (rather than a global {@code UNION})
+   * so each of the four categories is counted independently. This matches the frontend badge, which
+   * sums the four category set sizes — a value shared across two categories (e.g. a file type equal
+   * to a risk name) must count once per category, not be globally de-duplicated.
+   */
+  @Query(
+      value =
+          "SELECT file_id, COUNT(*) AS cnt FROM ("
+              + "  SELECT DISTINCT c.file_id, unnest(c.flow_risks) AS v FROM conversations c"
+              + "    WHERE c.file_id IN (:fileIds) AND c.flow_risks IS NOT NULL"
+              + "  UNION ALL"
+              + "  SELECT DISTINCT c.file_id, unnest(c.custom_signatures) AS v FROM conversations c"
+              + "    WHERE c.file_id IN (:fileIds) AND c.custom_signatures IS NOT NULL"
+              + "  UNION ALL"
+              + "  SELECT DISTINCT c.file_id, unnest(c.suricata_alerts) AS v FROM conversations c"
+              + "    WHERE c.file_id IN (:fileIds) AND c.suricata_alerts IS NOT NULL"
+              + "  UNION ALL"
+              + "  SELECT DISTINCT p.file_id, p.detected_file_type AS v FROM packets p"
+              + "    WHERE p.file_id IN (:fileIds) AND p.detected_file_type IS NOT NULL"
+              + ") sigs"
+              + " WHERE v IS NOT NULL AND btrim(v) <> ''"
+              + " GROUP BY file_id",
+      nativeQuery = true)
+  List<Object[]> countSecuritySignalsByFileIds(@Param("fileIds") List<UUID> fileIds);
+
+  /**
    * Returns only conversations that have at least one nDPI risk flag, custom signature match, or
    * Suricata IDS alert — matching the {@code hasRisks} Specification predicate in {@link #buildSpec}.
    */

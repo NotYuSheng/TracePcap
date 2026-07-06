@@ -90,6 +90,8 @@ public class NetworkChangeEventEntity {
     APP_ADDED,
     APP_REMOVED,
     VPN_DRIFT,
+    SECURITY_ALERT_ADDED,
+    SECURITY_ALERT_REMOVED,
     LABEL_STALE
   }
 
@@ -99,6 +101,7 @@ public class NetworkChangeEventEntity {
     ISP,
     PROTOCOL,
     APP,
+    SECURITY,
     NODE_ROLE
   }
 

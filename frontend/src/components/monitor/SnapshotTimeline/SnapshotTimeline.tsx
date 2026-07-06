@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type MouseEvent } from 'react';
-import { Badge, Button, ButtonGroup, Form } from '@govtechsg/sgds-react';
+import { Badge, Button, ButtonGroup, Dropdown, Form } from '@govtechsg/sgds-react';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import { Pagination } from '@/components/common/Pagination';
 import { ScrollableTable } from '@/components/common/ScrollableTable';
@@ -37,7 +37,22 @@ interface TimeBucket {
   packets: number;
   changes: number;
   critical: number;
+  security: number; // summed absolute security-signal count across the bucket's snapshots
 }
+
+// Toggleable table columns. "Captured/Period", "File/Captures", and "Changes" are always shown.
+type ColumnKey = 'duration' | 'packets' | 'securityDrift' | 'securityAbsolute';
+
+const TOGGLEABLE_COLUMNS: { key: ColumnKey; label: string }[] = [
+  { key: 'duration',         label: 'Duration' },
+  { key: 'packets',          label: 'Packets' },
+  { key: 'securityDrift',    label: 'Security (new)' },
+  { key: 'securityAbsolute', label: 'Security (total)' },
+];
+
+// Duration, Packets, and absolute Security are off by default to keep the default view focused;
+// Security (new) — the drift count — is on, matching the timeline's differential theme.
+const DEFAULT_VISIBLE_COLUMNS: ColumnKey[] = ['securityDrift'];
 
 // Start (ms) of the bucket a given timestamp falls into for the active granularity.
 function bucketStartFor(ms: number, granularity: Granularity): number {
@@ -97,13 +112,33 @@ export const SnapshotTimeline = ({
   onSnapshotUpdated,
 }: SnapshotTimelineProps) => {
   const [detailSnap, setDetailSnap] = useState<NetworkSnapshot | null>(null);
-  const [detailInitialTab, setDetailInitialTab] = useState<'diagram' | 'changes' | 'context' | 'insights'>('diagram');
+  const [detailInitialTab, setDetailInitialTab] = useState<'diagram' | 'changes' | 'security' | 'context' | 'insights'>('diagram');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<ViewMode>('file');
   const [granularity, setGranularity] = useState<Granularity>(3600);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [visibleCols, setVisibleCols] = useState<Set<ColumnKey>>(new Set(DEFAULT_VISIBLE_COLUMNS));
+
+  const showCol = (key: ColumnKey) => visibleCols.has(key);
+  const toggleCol = (key: ColumnKey) =>
+    setVisibleCols(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  // Security-drift (new) count per snapshot: SECURITY_ALERT_* change events landing on it.
+  const securityDriftBySnapshot = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of changeEvents) {
+      if (e.changeType === 'SECURITY_ALERT_ADDED' || e.changeType === 'SECURITY_ALERT_REMOVED') {
+        m.set(e.toSnapshotId, (m.get(e.toSnapshotId) ?? 0) + 1);
+      }
+    }
+    return m;
+  }, [changeEvents]);
 
   const toggleSort = () => {
     setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -159,6 +194,7 @@ export const SnapshotTimeline = ({
       packets: snaps.reduce((s, x) => s + (x.packetCount ?? 0), 0),
       changes: snaps.reduce((s, x) => s + x.changeCount, 0),
       critical: snaps.reduce((s, x) => s + x.criticalCount, 0),
+      security: snaps.reduce((s, x) => s + (x.securitySignalCount ?? 0), 0),
     });
     const list = [...map.entries()]
       .map(([start, snaps]) => toBucket(start, snaps))
@@ -205,33 +241,75 @@ export const SnapshotTimeline = ({
     );
   };
 
-  const renderSnapshotRow = (snap: NetworkSnapshot) => (
-    <tr
-      key={snap.id}
-      style={{ cursor: 'pointer' }}
-      onClick={() => { setDetailInitialTab('diagram'); setDetailSnap(snap); }}
-    >
-      <td>
-        <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
-      </td>
-      <td>
-        <span className="fw-medium text-break">{snap.fileName}</span>
-      </td>
-      <td>
-        <small className="text-muted">{formatDuration(snap.startTime, snap.endTime)}</small>
-      </td>
-      <td>
-        <small className="text-muted">{snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}</small>
-      </td>
-      <td>
-        {renderChangesPill(snap.changeCount, snap.criticalCount, e => {
-          e.stopPropagation();
-          setDetailInitialTab('changes');
-          setDetailSnap(snap);
-        })}
-      </td>
-    </tr>
-  );
+  // "Security (new)" drift pill — count of SECURITY_ALERT_* change events on this snapshot.
+  const renderSecurityDriftPill = (count: number, onClick?: (e: MouseEvent<HTMLElement>) => void) => {
+    if (count === 0) return <span className="text-muted small">—</span>;
+    return (
+      <Badge
+        bg="danger"
+        className="fw-normal"
+        style={onClick ? { cursor: 'pointer' } : undefined}
+        onClick={onClick}
+      >
+        {count} new
+      </Badge>
+    );
+  };
+
+  // "Security (total)" absolute posture — distinct signals present in the capture.
+  const renderSecurityAbsolute = (count: number) =>
+    count > 0
+      ? <Badge bg="light" text="dark" className="border fw-normal">{count}</Badge>
+      : <span className="text-muted small">—</span>;
+
+  // In the bucketed "By Time" view, per-snapshot drift doesn't aggregate meaningfully, so the
+  // Security column there always shows the absolute (total) count — surfaced whenever *either*
+  // security toggle is on, so enabling the default "Security (new)" still yields a Security column.
+  const showBucketSecurity = showCol('securityAbsolute') || showCol('securityDrift');
+  // Column count of a "By Time" bucket header row (Period + Captures + Changes always shown).
+  const bucketColSpan = 3 + (showCol('packets') ? 1 : 0) + (showBucketSecurity ? 1 : 0);
+
+  const renderSnapshotRow = (snap: NetworkSnapshot) => {
+    const drift = securityDriftBySnapshot.get(snap.id) ?? 0;
+    const openSecurity = (e: MouseEvent<HTMLElement>) => {
+      e.stopPropagation();
+      setDetailInitialTab('security');
+      setDetailSnap(snap);
+    };
+    return (
+      <tr
+        key={snap.id}
+        style={{ cursor: 'pointer' }}
+        onClick={() => { setDetailInitialTab('diagram'); setDetailSnap(snap); }}
+      >
+        <td>
+          <small className="text-muted">{formatCaptureDate(snap.startTime)}</small>
+        </td>
+        <td>
+          <span className="fw-medium text-break">{snap.fileName}</span>
+        </td>
+        {showCol('duration') && (
+          <td>
+            <small className="text-muted">{formatDuration(snap.startTime, snap.endTime)}</small>
+          </td>
+        )}
+        {showCol('packets') && (
+          <td>
+            <small className="text-muted">{snap.packetCount != null ? snap.packetCount.toLocaleString() : '—'}</small>
+          </td>
+        )}
+        <td>
+          {renderChangesPill(snap.changeCount, snap.criticalCount, e => {
+            e.stopPropagation();
+            setDetailInitialTab('changes');
+            setDetailSnap(snap);
+          })}
+        </td>
+        {showCol('securityDrift') && <td>{renderSecurityDriftPill(drift, openSecurity)}</td>}
+        {showCol('securityAbsolute') && <td onClick={openSecurity}>{renderSecurityAbsolute(snap.securitySignalCount ?? 0)}</td>}
+      </tr>
+    );
+  };
 
   return (
     <div>
@@ -274,6 +352,25 @@ export const SnapshotTimeline = ({
               By Time
             </Button>
           </ButtonGroup>
+          <Dropdown autoClose="outside">
+            <Dropdown.Toggle size="sm" variant="outline-secondary">
+              <i className="bi bi-layout-three-columns me-1"></i>Columns
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              <div className="dropdown-header small text-muted py-1">Show columns</div>
+              {TOGGLEABLE_COLUMNS.map(col => (
+                <div key={col.key} className="dropdown-item-text py-1 small">
+                  <Form.Check
+                    type="checkbox"
+                    id={`col-${col.key}`}
+                    label={col.label}
+                    checked={showCol(col.key)}
+                    onChange={() => toggleCol(col.key)}
+                  />
+                </div>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
           <Button size="sm" variant="outline-secondary" onClick={onManage}>
             <i className="bi bi-collection me-1"></i>Manage PCAPs
           </Button>
@@ -297,9 +394,11 @@ export const SnapshotTimeline = ({
                       <i className={`bi bi-arrow-${sortDir === 'asc' ? 'up' : 'down'} ms-1`}></i>
                     </th>
                     <th className="text-muted fw-normal">File</th>
-                    <th className="text-muted fw-normal">Duration</th>
-                    <th className="text-muted fw-normal">Packets</th>
+                    {showCol('duration') && <th className="text-muted fw-normal">Duration</th>}
+                    {showCol('packets') && <th className="text-muted fw-normal">Packets</th>}
                     <th className="text-muted fw-normal">Changes</th>
+                    {showCol('securityDrift') && <th className="text-muted fw-normal">Security (new)</th>}
+                    {showCol('securityAbsolute') && <th className="text-muted fw-normal">Security (total)</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -315,8 +414,9 @@ export const SnapshotTimeline = ({
                       <i className={`bi bi-arrow-${sortDir === 'asc' ? 'up' : 'down'} ms-1`}></i>
                     </th>
                     <th className="text-muted fw-normal">Captures</th>
-                    <th className="text-muted fw-normal">Packets</th>
+                    {showCol('packets') && <th className="text-muted fw-normal">Packets</th>}
                     <th className="text-muted fw-normal">Changes</th>
+                    {showBucketSecurity && <th className="text-muted fw-normal">Security (total)</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -332,22 +432,27 @@ export const SnapshotTimeline = ({
                           <td>
                             <small className="text-muted">{b.snaps.length}</small>
                           </td>
-                          <td>
-                            <small className="text-muted">{b.packets.toLocaleString()}</small>
-                          </td>
+                          {showCol('packets') && (
+                            <td>
+                              <small className="text-muted">{b.packets.toLocaleString()}</small>
+                            </td>
+                          )}
                           <td>{renderChangesPill(b.changes, b.critical)}</td>
+                          {showBucketSecurity && <td>{renderSecurityAbsolute(b.security)}</td>}
                         </tr>
                         {isOpen && (
                           <tr>
-                            <td colSpan={4} className="p-0 bg-light">
+                            <td colSpan={bucketColSpan} className="p-0 bg-light">
                               <table className="table table-sm table-hover align-middle mb-0">
                                 <thead>
                                   <tr>
                                     <th className="text-muted fw-normal small border-0">Captured</th>
                                     <th className="text-muted fw-normal small border-0">File</th>
-                                    <th className="text-muted fw-normal small border-0">Duration</th>
-                                    <th className="text-muted fw-normal small border-0">Packets</th>
+                                    {showCol('duration') && <th className="text-muted fw-normal small border-0">Duration</th>}
+                                    {showCol('packets') && <th className="text-muted fw-normal small border-0">Packets</th>}
                                     <th className="text-muted fw-normal small border-0">Changes</th>
+                                    {showCol('securityDrift') && <th className="text-muted fw-normal small border-0">Security (new)</th>}
+                                    {showCol('securityAbsolute') && <th className="text-muted fw-normal small border-0">Security (total)</th>}
                                   </tr>
                                 </thead>
                                 <tbody>

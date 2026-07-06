@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.common.exception.InvalidFileException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
@@ -40,6 +41,7 @@ public class SnapshotService {
   private final SnapshotInsightRepository snapshotInsightRepository;
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
+  private final ConversationRepository conversationRepository;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -59,11 +61,17 @@ public class SnapshotService {
                 o -> o.getSnapshot().getId(),
                 Collectors.mapping(this::toOverrideDto, Collectors.toList())));
 
+    // Batch absolute security-signal counts, keyed by fileId (one query for all snapshots)
+    Map<UUID, Long> securityCounts =
+        securitySignalCounts(
+            snapshots.stream().map(s -> s.getFile().getId()).distinct().collect(Collectors.toList()));
+
     return snapshots.stream()
         .map(s -> toDto(
             s,
             changeCounts.getOrDefault(s.getId(), 0L),
             criticalCounts.getOrDefault(s.getId(), 0L),
+            securityCounts.getOrDefault(s.getFile().getId(), 0L),
             overridesMap.getOrDefault(s.getId(), Collections.emptyList())))
         .collect(Collectors.toList());
   }
@@ -149,7 +157,8 @@ public class SnapshotService {
     long changeCount = changeEventRepository.countByToSnapshotId(snapshot.getId());
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshot.getId());
     List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshot.getId());
-    return toDto(snapshot, changeCount, criticalCount, overrides);
+    return toDto(snapshot, changeCount, criticalCount,
+        securitySignalCount(snapshot.getFile().getId()), overrides);
   }
 
   public NetworkSnapshotDto patchSnapshot(UUID networkId, UUID snapshotId, PatchSnapshotRequest req) {
@@ -217,7 +226,8 @@ public class SnapshotService {
     long changeCount = changeEventRepository.countByToSnapshotId(snapshotId);
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshotId);
     List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshotId);
-    return toDto(snapshot, changeCount, criticalCount, overrides);
+    return toDto(snapshot, changeCount, criticalCount,
+        securitySignalCount(snapshot.getFile().getId()), overrides);
   }
 
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
@@ -281,7 +291,7 @@ public class SnapshotService {
   }
 
   NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount,
-      List<SnapshotSubnetOverrideDto> overrides) {
+      long securitySignalCount, List<SnapshotSubnetOverrideDto> overrides) {
     return NetworkSnapshotDto.builder()
         .id(s.getId())
         .networkId(s.getNetwork().getId())
@@ -294,11 +304,27 @@ public class SnapshotService {
         .totalBytes(s.getFile().getTotalBytes())
         .changeCount(changeCount)
         .criticalCount(criticalCount)
+        .securitySignalCount(securitySignalCount)
         .context(s.getContext())
         .notes(s.getNotes())
         .hasInsights(snapshotInsightRepository.existsBySnapshotId(s.getId()))
         .addedAt(s.getAddedAt())
         .subnetOverrides(overrides)
         .build();
+  }
+
+  /** Absolute distinct security-signal count for a single file (0 if none). */
+  private long securitySignalCount(UUID fileId) {
+    return securitySignalCounts(List.of(fileId)).getOrDefault(fileId, 0L);
+  }
+
+  /** Batched fileId → distinct security-signal count. Files with no signals are absent from the map. */
+  private Map<UUID, Long> securitySignalCounts(List<UUID> fileIds) {
+    if (fileIds.isEmpty()) return Map.of();
+    Map<UUID, Long> result = new java.util.HashMap<>();
+    for (Object[] row : conversationRepository.countSecuritySignalsByFileIds(fileIds)) {
+      result.put((UUID) row[0], ((Number) row[1]).longValue());
+    }
+    return result;
   }
 }

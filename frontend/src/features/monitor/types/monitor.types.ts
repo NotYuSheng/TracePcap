@@ -37,6 +37,8 @@ export interface NetworkSnapshot {
   totalBytes: number | null;
   changeCount: number;
   criticalCount: number;
+  /** Distinct absolute security signals in this capture (IDS/risks/sigs/file types). */
+  securitySignalCount: number;
   context: string | null;
   notes: string | null;
   hasInsights: boolean;
@@ -52,9 +54,12 @@ export type ChangeType =
   | 'PROTOCOL_ADDED'
   | 'APP_ADDED'
   | 'VPN_DRIFT'
+  | 'SECURITY_ALERT_ADDED'
+  | 'SECURITY_ALERT_REMOVED'
   | 'LABEL_STALE';
 
-export type EntityType = 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP' | 'NODE_ROLE';
+export type EntityType =
+  | 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP' | 'SECURITY' | 'NODE_ROLE';
 
 export type Severity = 'INFO' | 'WARNING' | 'CRITICAL';
 

@@ -2094,6 +2094,10 @@
             "format": "int32",
             "type": "integer"
           },
+          "securitySignalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
           "snapshotOrder": {
             "format": "int32",
             "type": "integer"
