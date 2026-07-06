@@ -51,6 +51,14 @@ public class GeoIpService {
   @Value("${tracepcap.geo.mmdb-path:}")
   private String mmdbPathOverride;
 
+  /**
+   * When true, all outbound egress (the connectivity probe and ipinfo.io lookups) is suppressed
+   * and geo is resolved exclusively from the bundled MMDB. For strict air-gapped or
+   * egress-monitored deployments. Default false.
+   */
+  @Value("${tracepcap.geo.force-offline:false}")
+  private boolean forceOffline;
+
   private final IpGeoInfoRepository geoInfoRepository;
   private final ObjectMapper objectMapper;
 
@@ -85,6 +93,10 @@ public class GeoIpService {
     if (!geoEnabled) {
       log.info("GeoIP enrichment disabled via tracepcap.geo.enabled=false");
       return;
+    }
+    if (forceOffline) {
+      log.info("GeoIP force-offline mode enabled (tracepcap.geo.force-offline=true) — "
+          + "no ipinfo.io egress will be attempted; resolving from bundled MMDB only");
     }
     this.dbReader = tryOpenMmdb();
     if (dbReader == null) {
@@ -260,6 +272,9 @@ public class GeoIpService {
   // ── Connectivity check ─────────────────────────────────────────────────────
 
   private boolean isOnline() {
+    // Suppress the connectivity probe entirely — no egress ever attempted — when GeoIP is
+    // disabled or force-offline is set.
+    if (!geoEnabled || forceOffline) return false;
     long now = System.currentTimeMillis();
     if (onlineCache != null && (now - onlineCheckedAt) < ONLINE_CHECK_TTL_MS) {
       return onlineCache;

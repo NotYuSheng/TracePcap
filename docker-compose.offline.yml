@@ -89,6 +89,10 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: tracepcap-files
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # Air-gapped by default: suppress the one intentional runtime egress (ipinfo.io) and
+      # resolve geo from the bundled MMDB only. Override with GEO_FORCE_OFFLINE=false if this
+      # offline stack does have outbound access and you want live ipinfo.io enrichment.
+      GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:1234/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
       LLM_MODEL: ${LLM_MODEL:-gpt-4}

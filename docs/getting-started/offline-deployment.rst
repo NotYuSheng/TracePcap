@@ -14,9 +14,36 @@ the workflow for deploying to a machine that has no internet access.
    custom signatures) are fully offline at all times.
 
    If you want to force MMDB-only lookups even on an internet-connected
-   machine, remove internet access from the container. If the MMDB file is
+   machine, set ``GEO_FORCE_OFFLINE=true`` (see below). If the MMDB file is
    not at the default location, also set the ``GEO_MMDB_PATH`` environment
    variable (or ``tracepcap.geo.mmdb-path`` in ``application.yml``).
+
+Suppressing Runtime Egress (``GEO_FORCE_OFFLINE``)
+--------------------------------------------------
+
+The ipinfo.io geolocation enrichment is the **one intentional runtime
+egress** in TracePcap. By default the backend probes ``ipinfo.io`` (~every
+60s while resolving new external IPs) and uses it when reachable, falling
+back to the bundled MMDB otherwise. The fallback is graceful, but the
+outbound *attempt* still occurs.
+
+For strict air-gapped or egress-monitored deployments, set:
+
+.. code-block:: ini
+
+   GEO_FORCE_OFFLINE=true
+
+When enabled, TracePcap:
+
+- **never** performs the connectivity probe or any ipinfo.io lookup — no
+  outbound ``ipinfo.io`` connection is attempted (verifiable via egress
+  logs / a firewall deny rule), and
+- resolves geo **exclusively** from the bundled DB-IP Lite MMDB
+  (``geo_source = mmdb`` on every result).
+
+This is the recommended setting for the offline compose stack. With it set,
+TracePcap makes **no external network calls at runtime** (aside from a
+locally-hosted LLM server, if configured — see below).
 
 Overview
 --------
