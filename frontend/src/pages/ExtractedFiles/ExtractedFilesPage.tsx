@@ -11,6 +11,7 @@ import {
 } from '@features/extractedFiles/services/extractedFilesService';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { ScrollableTable } from '@components/common/ScrollableTable';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Badge, Button, Card, Modal } from '@govtechsg/sgds-react';
@@ -210,12 +211,20 @@ export const ExtractedFilesPage = () => {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [mimeTypeFilter, setMimeTypeFilter] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const allMimeTypes = useMemo(
     () =>
       [...new Set(files.map(f => f.mimeType).filter((m): m is string => m !== null))].sort(),
     [files]
   );
+
+  // Reset to the first page whenever the filter/sort changes the result set, so the current
+  // page can't fall out of range when the list shrinks.
+  useEffect(() => {
+    setPage(1);
+  }, [mimeTypeFilter, sortBy, sortDir, pageSize, fileId]);
 
   useEffect(() => {
     setLoading(true);
@@ -284,6 +293,9 @@ export const ExtractedFilesPage = () => {
       ? files.filter(f => f.mimeType !== null && mimeTypeFilter.includes(f.mimeType))
       : files;
   const sorted = sortFiles(filtered, sortBy, sortDir);
+
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div>
@@ -487,7 +499,7 @@ export const ExtractedFilesPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map(file => {
+                  {paginated.map(file => {
                     const isSkipped = file.skippedReason != null;
                     return (
                     <tr key={file.id} className={isSkipped ? 'text-muted' : undefined}>
@@ -584,6 +596,18 @@ export const ExtractedFilesPage = () => {
                 </tbody>
               </table>
             </ScrollableTable>
+          )}
+          {totalPages > 1 && (
+            <div className="p-2 border-top">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={sorted.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={ps => { setPageSize(ps); setPage(1); }}
+              />
+            </div>
           )}
         </Card.Body>
       </Card>
