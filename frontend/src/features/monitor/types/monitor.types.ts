@@ -37,6 +37,8 @@ export interface NetworkSnapshot {
   totalBytes: number | null;
   changeCount: number;
   criticalCount: number;
+  /** Distinct absolute security signals in this capture (IDS/risks/sigs/file types). */
+  securitySignalCount: number;
   context: string | null;
   notes: string | null;
   hasInsights: boolean;
