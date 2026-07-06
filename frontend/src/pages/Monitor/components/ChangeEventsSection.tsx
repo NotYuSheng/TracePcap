@@ -4,12 +4,32 @@ import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEv
 import { Pagination } from '@/components/common/Pagination';
 import { HelpPopover } from './HelpPopover';
 import { SEVERITY_FILTERS, useChangeEventFilters } from '../hooks/useChangeEventFilters';
+import type { ReviewedFilter, SeverityFilter } from '../hooks/useChangeEventFilters';
 
 interface ChangeEventsSectionProps {
   changeEvents: ChangeEvent[];
   snapshots: NetworkSnapshot[];
   onPatchChange: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
 }
+
+/** Dropdown labels for non-ALL severities. */
+const SEVERITY_LABELS: Record<Exclude<SeverityFilter, 'ALL'>, string> = {
+  CRITICAL: 'Critical',
+  WARNING: 'Warning',
+  INFO: 'Info',
+};
+
+/** Cycle order + display for the single reviewed toggle button. */
+const NEXT_REVIEWED: Record<ReviewedFilter, ReviewedFilter> = {
+  ALL: 'UNREVIEWED',
+  UNREVIEWED: 'REVIEWED',
+  REVIEWED: 'ALL',
+};
+const REVIEWED_META: Record<ReviewedFilter, { label: string; icon: string }> = {
+  ALL: { label: 'All', icon: 'bi-list-ul' },
+  UNREVIEWED: { label: 'Unreviewed', icon: 'bi-circle' },
+  REVIEWED: { label: 'Reviewed', icon: 'bi-check-circle-fill' },
+};
 
 /** The "Change Events" card: severity/type/reviewed filters, paged event list. */
 export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: ChangeEventsSectionProps) => {
@@ -31,8 +51,8 @@ export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: 
 
   return (
     <Card id="sec-changes" className="mb-4 tp-anchor" style={{ overflow: 'hidden' }}>
-      <Card.Header className="d-flex justify-content-between align-items-center">
-        <h6 className="mb-0">
+      <Card.Header className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h6 className="mb-0 d-flex align-items-center flex-shrink-0">
           <i className="bi bi-activity me-2"></i>Change Events
           {filteredEvents.length > 0 && (
             <Badge bg="secondary" className="ms-2">{filteredEvents.length}</Badge>
@@ -65,28 +85,19 @@ export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: 
             </ul>
           </HelpPopover>
         </h6>
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          {/* Severity pills */}
-          <div className="d-flex gap-1">
+        <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+          {/* Severity select */}
+          <Form.Select
+            size="sm"
+            style={{ width: 'auto' }}
+            value={severityFilter}
+            onChange={e => selectSeverity(e.target.value as SeverityFilter)}
+            title="Filter by severity"
+          >
             {SEVERITY_FILTERS.map(f => (
-              <Button
-                key={f}
-                type="button"
-                size="sm"
-                variant={
-                  severityFilter === f
-                    ? f === 'CRITICAL' ? 'danger'
-                      : f === 'WARNING' ? 'warning'
-                      : f === 'INFO' ? 'info'
-                      : 'primary'
-                    : 'outline-secondary'
-                }
-                onClick={() => selectSeverity(f)}
-              >
-                {f}
-              </Button>
+              <option key={f} value={f}>{f === 'ALL' ? 'All severities' : SEVERITY_LABELS[f]}</option>
             ))}
-          </div>
+          </Form.Select>
           {/* Change type select */}
           {changeTypes.length > 2 && (
             <Form.Select
@@ -94,26 +105,24 @@ export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: 
               style={{ width: 'auto' }}
               value={changeTypeFilter}
               onChange={e => selectChangeType(e.target.value)}
+              title="Filter by change type"
             >
               {changeTypes.map(t => (
                 <option key={t} value={t}>{t === 'ALL' ? 'All types' : t}</option>
               ))}
             </Form.Select>
           )}
-          {/* Reviewed filter */}
-          <div className="d-flex gap-1">
-            {(['ALL', 'UNREVIEWED', 'REVIEWED'] as const).map(r => (
-              <Button
-                key={r}
-                type="button"
-                size="sm"
-                variant={reviewedFilter === r ? 'secondary' : 'outline-secondary'}
-                onClick={() => selectReviewed(r)}
-              >
-                {r === 'ALL' ? 'All' : r === 'UNREVIEWED' ? 'Unreviewed' : 'Reviewed'}
-              </Button>
-            ))}
-          </div>
+          {/* Reviewed filter — single button cycling All → Unreviewed → Reviewed */}
+          <Button
+            type="button"
+            size="sm"
+            variant={reviewedFilter === 'ALL' ? 'outline-secondary' : 'secondary'}
+            onClick={() => selectReviewed(NEXT_REVIEWED[reviewedFilter])}
+            title="Click to cycle: All → Unreviewed → Reviewed"
+          >
+            <i className={`bi ${REVIEWED_META[reviewedFilter].icon} me-1`}></i>
+            {REVIEWED_META[reviewedFilter].label}
+          </Button>
         </div>
       </Card.Header>
 

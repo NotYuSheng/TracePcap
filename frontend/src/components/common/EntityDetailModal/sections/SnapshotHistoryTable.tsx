@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge, Button, Table } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Pagination } from '@components/common/Pagination';
 import { RoleEditModal } from '@components/common/RoleEditModal';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 import { formatSnapTime, hashBadgeStyle } from '../format';
 import type { IpSnapshotEntry } from '../types';
+
+const HISTORY_PAGE_SIZE = 10;
 
 interface SnapshotHistoryTableProps {
   entityType: EntityType;
@@ -24,6 +27,32 @@ export function SnapshotHistoryTable({
   onRoleChanged,
 }: SnapshotHistoryTableProps) {
   const [editing, setEditing] = useState<{ fileId: string; name: string } | null>(null);
+  // Sort by snapshot capture order (monotonic with date). Latest-first by default.
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+
+  const sortedHistory = [...ipSnapHistory].sort((a, b) =>
+    sortDir === 'desc'
+      ? b.snap.snapshotOrder - a.snap.snapshotOrder
+      : a.snap.snapshotOrder - b.snap.snapshotOrder
+  );
+  const toggleSort = () => { setSortDir(d => (d === 'desc' ? 'asc' : 'desc')); setPage(1); };
+
+  const totalPages = Math.max(1, Math.ceil(sortedHistory.length / HISTORY_PAGE_SIZE));
+  const pagedHistory = sortedHistory.slice((page - 1) * HISTORY_PAGE_SIZE, page * HISTORY_PAGE_SIZE);
+
+  // Clamp back into range if the data shrinks (e.g. the modal is reused for another entity).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // Chronological order (oldest→newest) for the "MAC changed vs previous snapshot" comparison,
+  // which must stay correct regardless of the display sort direction.
+  const chronological = [...ipSnapHistory].sort((a, b) => a.snap.snapshotOrder - b.snap.snapshotOrder);
+  const prevMacBySnapId = new Map<string, string | null | undefined>();
+  chronological.forEach((entry, i) => {
+    prevMacBySnapId.set(entry.snap.id, i > 0 ? chronological[i - 1].host?.mac : undefined);
+  });
 
   return (
     <div className="mt-4">
@@ -44,7 +73,16 @@ export function SnapshotHistoryTable({
             <Table.Header className="table-light" style={{ fontSize: '0.8rem' }}>
               <Table.Row>
                 <Table.HeaderCell className="text-muted fw-normal">#</Table.HeaderCell>
-                <Table.HeaderCell className="text-muted fw-normal">Snapshot</Table.HeaderCell>
+                <Table.HeaderCell
+                  className="text-muted fw-normal user-select-none"
+                  style={{ cursor: 'pointer' }}
+                  onClick={toggleSort}
+                  title="Sort by capture date"
+                  aria-sort={sortDir === 'desc' ? 'descending' : 'ascending'}
+                >
+                  Snapshot
+                  <i className={`bi ms-1 ${sortDir === 'desc' ? 'bi-sort-down' : 'bi-sort-up'}`} />
+                </Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">{entityType === 'DEVICE' ? 'IP(s)' : 'MAC Address'}</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Device Type</Table.HeaderCell>
                 <Table.HeaderCell className="text-muted fw-normal">Role</Table.HeaderCell>
@@ -52,7 +90,7 @@ export function SnapshotHistoryTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {ipSnapHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs, ips }, idx) => (
+              {pagedHistory.map(({ snap, host, protocols, apps, roleLabel, roleOrigin, roleStale, macs, ips }) => (
                 <Table.Row key={snap.id}>
                   <Table.DataCell><small className="text-muted">{snap.snapshotOrder + 1}</small></Table.DataCell>
                   <Table.DataCell>
@@ -88,10 +126,12 @@ export function SnapshotHistoryTable({
                           <i className="bi bi-diagram-3 me-1" />conflict — {macs.length} MACs
                         </Badge>
                       )}
-                      {idx > 0 && host?.mac && ipSnapHistory[idx - 1].host?.mac &&
-                        host.mac !== ipSnapHistory[idx - 1].host!.mac && (
+                      {(() => {
+                        const prevMac = prevMacBySnapId.get(snap.id);
+                        return host?.mac && prevMac && host.mac !== prevMac ? (
                           <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
-                        )}
+                        ) : null;
+                      })()}
                     </Table.DataCell>
                   )}
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
@@ -127,6 +167,17 @@ export function SnapshotHistoryTable({
               ))}
             </Table.Body>
           </Table>
+        </div>
+      )}
+      {!ipHistoryLoading && sortedHistory.length > HISTORY_PAGE_SIZE && (
+        <div className="mt-2">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={sortedHistory.length}
+            pageSize={HISTORY_PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

@@ -498,6 +498,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
           fileId={selectedAbsent.lastSeenFileId ?? ''}
           isActive={false}
           lastSeenTime={selectedAbsent.lastSeenStartTime}
+          lastSeenFileName={selectedAbsent.lastSeenFileName}
           snapshots={snapshots}
           onClose={() => setSelectedAbsent(null)}
         />

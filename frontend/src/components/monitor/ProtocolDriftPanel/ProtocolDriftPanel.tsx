@@ -89,7 +89,7 @@ function BadgeGroup({
   );
 }
 
-type SelectedEntity = { key: string; entityType: EntityType; fileId: string; isActive: boolean; lastSeenTime?: string | null } | null;
+type SelectedEntity = { key: string; entityType: EntityType; fileId: string; isActive: boolean; lastSeenTime?: string | null; lastSeenFileName?: string | null } | null;
 
 export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity>(null);
@@ -198,7 +198,7 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
           <BadgeGroup
             items={filterItems(apps.active)}
             absentItems={filterAbsent(apps.absent)}
-            onAbsentClick={e => setSelectedEntity({ key: e.key, entityType: 'APPLICATION', fileId: e.lastSeenFileId ?? latestFileId, isActive: false, lastSeenTime: e.lastSeenStartTime })}
+            onAbsentClick={e => setSelectedEntity({ key: e.key, entityType: 'APPLICATION', fileId: e.lastSeenFileId ?? latestFileId, isActive: false, lastSeenTime: e.lastSeenStartTime, lastSeenFileName: e.lastSeenFileName })}
             onActiveClick={name => setSelectedEntity({ key: name, entityType: 'APPLICATION', fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
           />
         </div>
@@ -209,7 +209,7 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
           <BadgeGroup
             items={filterItems(protocols.active)}
             absentItems={filterAbsent(protocols.absent)}
-            onAbsentClick={e => setSelectedEntity({ key: e.key, entityType: 'PROTOCOL', fileId: e.lastSeenFileId ?? latestFileId, isActive: false, lastSeenTime: e.lastSeenStartTime })}
+            onAbsentClick={e => setSelectedEntity({ key: e.key, entityType: 'PROTOCOL', fileId: e.lastSeenFileId ?? latestFileId, isActive: false, lastSeenTime: e.lastSeenStartTime, lastSeenFileName: e.lastSeenFileName })}
             onActiveClick={name => setSelectedEntity({ key: name, entityType: 'PROTOCOL', fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
           />
         </div>
@@ -228,6 +228,7 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
           fileId={selectedEntity.fileId}
           isActive={selectedEntity.isActive}
           lastSeenTime={selectedEntity.lastSeenTime}
+          lastSeenFileName={selectedEntity.lastSeenFileName}
           onClose={() => setSelectedEntity(null)}
         />
       )}

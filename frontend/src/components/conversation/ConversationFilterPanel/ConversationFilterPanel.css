@@ -75,3 +75,32 @@
   align-items: center;
   margin-bottom: 0.4rem;
 }
+
+/* Compact, refined text search inputs (IP / Port / Payload) so they don't
+   tower over the tight pill rows below them. */
+.filter-panel-body .input-group-sm > .form-control,
+.filter-panel-body .input-group-sm > .input-group-text,
+.filter-panel-body .input-group-sm > .btn {
+  height: 1.9rem;
+  font-size: 0.8rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.filter-panel-body .input-group-sm > .input-group-text {
+  background-color: var(--tp-bg-subtle, #f0f2f5);
+  border-color: var(--tp-border, #dee2e6);
+  color: var(--tp-text-muted, #6c757d);
+}
+
+.filter-panel-body .input-group-sm > .input-group-text .bi {
+  font-size: 0.8rem;
+}
+
+/* Clear (×) button: mute it so it reads as a control, not a primary action. */
+.filter-panel-body .input-group-sm > .btn {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 0.55rem;
+  line-height: 1;
+}

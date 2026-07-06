@@ -48,6 +48,8 @@ export interface EntityDetailModalProps {
   isActive?: boolean;
   /** ISO timestamp of last seen time — used to compute "inactive X days ago" */
   lastSeenTime?: string | null;
+  /** File name of the snapshot the entity was last seen in (Monitor context) */
+  lastSeenFileName?: string | null;
   /** Called when "View conversations" is clicked */
   onViewConversations?: () => void;
   /** Monitor snapshots — when provided for IP type, shows per-snapshot MAC/device history */
