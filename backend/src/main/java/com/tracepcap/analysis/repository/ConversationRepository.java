@@ -246,6 +246,37 @@ public interface ConversationRepository
   List<String> findDistinctRiskTypesByFileId(@Param("fileId") UUID fileId);
 
   /**
+   * Distinct IP addresses (both source and destination) seen in a file's conversations. Computed
+   * server-side so callers that only need the IP set — e.g. the monitor IP-drift panel — never pull
+   * the full conversation rows (which previously truncated at a fixed pageSize cap).
+   */
+  @Query(
+      value =
+          "SELECT DISTINCT ip FROM ("
+              + "  SELECT src_ip AS ip FROM conversations WHERE file_id = :fileId AND src_ip IS NOT NULL"
+              // UNION ALL (not UNION): the outer SELECT DISTINCT already dedups, so the inner
+              // set-union's implicit dedup would be redundant work.
+              + "  UNION ALL"
+              + "  SELECT dst_ip AS ip FROM conversations WHERE file_id = :fileId AND dst_ip IS NOT NULL"
+              + ") ips ORDER BY ip",
+      nativeQuery = true)
+  List<String> findDistinctIpsByFileId(@Param("fileId") UUID fileId);
+
+  /** Distinct application names present in a file's conversations. */
+  @Query(
+      "SELECT DISTINCT c.appName FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId AND c.appName IS NOT NULL AND c.appName <> ''"
+          + " ORDER BY c.appName")
+  List<String> findDistinctAppNamesByFileId(@Param("fileId") UUID fileId);
+
+  /** Distinct L7 (tshark) protocol names present in a file's conversations. */
+  @Query(
+      "SELECT DISTINCT c.tsharkProtocol FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId AND c.tsharkProtocol IS NOT NULL AND c.tsharkProtocol <> ''"
+          + " ORDER BY c.tsharkProtocol")
+  List<String> findDistinctProtocolsByFileId(@Param("fileId") UUID fileId);
+
+  /**
    * For each distinct risk type in the file, returns aggregate stats: [risk_type,
    * conversation_count, total_bytes, distinct_src_ips, distinct_dst_ips]. Used to build risk-type
    * cluster summaries for the story prompt.

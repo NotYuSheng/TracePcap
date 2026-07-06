@@ -22,6 +22,9 @@ export const API_ENDPOINTS = {
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,
   SECURITY_ALERTS: (fileId: string) => `/files/${fileId}/security-alerts`,
   RISK_TYPES: (fileId: string) => `/conversations/${fileId}/risk-types`,
+  DISTINCT_IPS: (fileId: string) => `/conversations/${fileId}/distinct-ips`,
+  DISTINCT_APPS: (fileId: string) => `/conversations/${fileId}/distinct-apps`,
+  DISTINCT_PROTOCOLS: (fileId: string) => `/conversations/${fileId}/distinct-protocols`,
 
   // Timeline (Not yet implemented in backend)
   TIMELINE_DATA: (fileId: string) => `/timeline/${fileId}`,

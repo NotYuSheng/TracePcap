@@ -205,6 +205,31 @@ public class ConversationsController {
     return ResponseEntity.ok(conversationQueryService.getDistinctCountries(fileId));
   }
 
+  /**
+   * Returns the distinct IP addresses (src and dst) seen in this file's conversations. Computed
+   * server-side so the monitor IP-drift panel no longer pulls every conversation row (which
+   * truncated at a fixed pageSize cap) just to derive the address set.
+   */
+  @GetMapping("/{fileId}/distinct-ips")
+  @Operation(summary = "List distinct IP addresses (src and dst) for a file")
+  public ResponseEntity<List<String>> getDistinctIps(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(conversationQueryService.getDistinctIps(fileId));
+  }
+
+  /** Returns the distinct application names present in this file's conversations. */
+  @GetMapping("/{fileId}/distinct-apps")
+  @Operation(summary = "List distinct application names for a file")
+  public ResponseEntity<List<String>> getDistinctApps(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(conversationQueryService.getDistinctApps(fileId));
+  }
+
+  /** Returns the distinct L7 (tshark) protocol names present in this file's conversations. */
+  @GetMapping("/{fileId}/distinct-protocols")
+  @Operation(summary = "List distinct L7 protocol names for a file")
+  public ResponseEntity<List<String>> getDistinctProtocols(@PathVariable UUID fileId) {
+    return ResponseEntity.ok(conversationQueryService.getDistinctProtocols(fileId));
+  }
+
   /** Export all matching conversations as CSV (no pagination, same filters as listing) */
   @GetMapping("/{fileId}/export")
   @Operation(summary = "Export filtered conversations as CSV")
