@@ -1,12 +1,13 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { isAxiosError } from 'axios';
 import { Badge, Button, Card, Form, Modal, Tooltip } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { AlertCircle } from 'lucide-react';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { parseDateTime } from '@/utils/dateUtils';
 import './FileList.css';
 
@@ -45,6 +46,10 @@ export const FileList = () => {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
   const [hideMonitor, setHideMonitor] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -118,22 +123,37 @@ export const FileList = () => {
     }
   };
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     try {
       const res = await apiClient.get(API_ENDPOINTS.FILES_LIST, {
-        params: { sort: 'uploadedAt,desc', pageSize: 100 },
+        params: {
+          sort: 'uploadedAt,desc',
+          page,
+          pageSize,
+          // ANALYSIS is the only non-monitor source, so "hide monitor" == list ANALYSIS only.
+          // Omitting `source` lists everything (monitor files included).
+          ...(hideMonitor ? { source: 'ANALYSIS' } : {}),
+        },
       });
       setFiles(res.data.data ?? []);
+      setTotalItems(res.data.total ?? 0);
+      setTotalPages(res.data.totalPages ?? 0);
     } catch (err) {
       console.error('Failed to fetch files:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, hideMonitor]);
 
   useEffect(() => {
     fetchFiles();
-  }, []);
+  }, [fetchFiles]);
+
+  // Toggling the monitor filter or changing page size resets to the first page so the
+  // current page can't fall out of range against the new (filtered) result set.
+  useEffect(() => {
+    setPage(1);
+  }, [hideMonitor, pageSize]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -160,15 +180,16 @@ export const FileList = () => {
     if (!pendingDeleteFile) return;
     try {
       await apiClient.delete(API_ENDPOINTS.FILE_DELETE(pendingDeleteFile.fileId));
-      setFiles(prev => prev.filter(f => f.fileId !== pendingDeleteFile.fileId));
     } catch (err) {
-      if (isAxiosError(err) && err.response?.status === 404) {
-        setFiles(prev => prev.filter(f => f.fileId !== pendingDeleteFile.fileId));
-      } else {
+      // A 404 means it's already gone — treat as success and refresh either way.
+      if (!(isAxiosError(err) && err.response?.status === 404)) {
         console.error('Failed to delete file:', err);
       }
     }
     setPendingDeleteFile(null);
+    // If this was the last row on the last page, step back a page; otherwise refetch in place.
+    if (files.length === 1 && page > 1) setPage(p => p - 1);
+    else fetchFiles();
   };
 
   return (
@@ -263,7 +284,7 @@ export const FileList = () => {
                 onClick={() => setConfirmDeleteAll(true)}
               >
                 <i className="bi bi-trash me-1"></i>
-                Delete all
+                Delete page
               </Button>
             </div>
           )}
@@ -275,34 +296,29 @@ export const FileList = () => {
               Loading files…
             </div>
           ) : files.length === 0 ? (
-            <div className="text-center text-muted py-4">
-              <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
-            </div>
-          ) : (() => {
-            const displayedFiles = files.filter(f => !hideMonitor || f.source !== 'MONITOR');
-            if (displayedFiles.length === 0) {
-              return (
-                <div className="text-center text-muted py-4">
-                  <p className="mb-0">
-                    No uploads here. All PCAP files are monitor-sourced and hidden.{' '}
-                    <button
-                      type="button"
-                      className="btn btn-link p-0 align-baseline text-muted"
-                      style={{ fontSize: 'inherit' }}
-                      onClick={() => setHideMonitor(false)}
-                    >
-                      Show monitor files
-                    </button>
-                  </p>
-                </div>
-              );
-            }
-            return (
-              <div
-                className="list-group list-group-flush"
-                style={{ maxHeight: '13.5rem', overflowY: 'auto' }}
-              >
-                {displayedFiles.map(file => {
+            hideMonitor ? (
+              <div className="text-center text-muted py-4">
+                <p className="mb-0">
+                  No uploads here.{' '}
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 align-baseline text-muted"
+                    style={{ fontSize: 'inherit' }}
+                    onClick={() => setHideMonitor(false)}
+                  >
+                    Show monitor files
+                  </button>
+                  {' '}or upload a PCAP file to get started!
+                </p>
+              </div>
+            ) : (
+              <div className="text-center text-muted py-4">
+                <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
+              </div>
+            )
+          ) : (
+              <div className="list-group list-group-flush">
+                {files.map(file => {
                   const isSelected = selectedForCompare.has(file.fileId);
                   const isCompleted = file.status.toLowerCase() === 'completed';
                   return (
@@ -401,8 +417,21 @@ export const FileList = () => {
                   );
                 })}
               </div>
-            );
-          })()}
+          )}
+          {/* Show whenever the total exceeds the smallest page-size option, so the page-size
+              selector stays reachable even when the current size collapses to a single page. */}
+          {totalItems > 10 && (
+            <div className="p-2 border-top">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
+          )}
         </Card.Body>
         <Card.Footer className="text-muted small">
           <AlertCircle size={14} className="me-1" />
@@ -529,11 +558,17 @@ export const FileList = () => {
       {/* Delete all confirmation modal */}
       <Modal show={confirmDeleteAll} onHide={() => setConfirmDeleteAll(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Delete All</Modal.Title>
+          <Modal.Title>Delete Page</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Are you sure you want to delete all <strong>{files.length}</strong> uploaded files?
+            Are you sure you want to delete the <strong>{files.length}</strong> file
+            {files.length !== 1 ? 's' : ''} on this page?
+            {totalItems > files.length && (
+              <span className="d-block text-muted small mt-1">
+                Only this page is affected — {totalItems - files.length} more remain on other pages.
+              </span>
+            )}
           </p>
         </Modal.Body>
         <Modal.Footer>
@@ -548,19 +583,16 @@ export const FileList = () => {
             type="button"
             variant="danger"
             onClick={async () => {
-              const results = await Promise.allSettled(
+              await Promise.allSettled(
                 files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.fileId)))
               );
-              const deletedIds = new Set(
-                results
-                  .map((r, i) => (r.status === 'fulfilled' ? files[i].fileId : null))
-                  .filter(Boolean)
-              );
-              setFiles(prev => prev.filter(f => !deletedIds.has(f.fileId)));
               setConfirmDeleteAll(false);
+              // Refetch: step back a page if we just emptied a non-first page.
+              if (page > 1) setPage(p => p - 1);
+              else fetchFiles();
             }}
           >
-            Delete all
+            Delete page
           </Button>
         </Modal.Footer>
       </Modal>
