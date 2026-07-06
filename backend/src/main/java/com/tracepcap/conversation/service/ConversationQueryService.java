@@ -157,6 +157,24 @@ public class ConversationQueryService {
     return conversationRepository.findDistinctSuricataAlertsByFileId(fileId);
   }
 
+  /** Returns distinct IP addresses (src and dst) seen in this file's conversations. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctIps(UUID fileId) {
+    return conversationRepository.findDistinctIpsByFileId(fileId);
+  }
+
+  /** Returns distinct application names present in this file's conversations. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctApps(UUID fileId) {
+    return conversationRepository.findDistinctAppNamesByFileId(fileId);
+  }
+
+  /** Returns distinct L7 (tshark) protocol names present in this file's conversations. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctProtocols(UUID fileId) {
+    return conversationRepository.findDistinctProtocolsByFileId(fileId);
+  }
+
   /**
    * Returns distinct country codes seen in this file's conversations, as "CC|Country name" strings
    * (e.g. "US|United States"). Only countries with a non-null country code are returned.

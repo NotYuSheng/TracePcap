@@ -2,6 +2,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type {
   NetworkSnapshot,
   AbsentEntity,
@@ -33,15 +34,6 @@ type EntityGroup = {
   active: string[];
   absent: AbsentEntity[];
 };
-
-interface ConversationSummary {
-  appName: string | null;
-  tsharkProtocol: string | null;
-}
-
-interface ConversationsResponse {
-  data: ConversationSummary[];
-}
 
 function BadgeGroup({
   items,
@@ -108,12 +100,16 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
     setLoading(true);
     Promise.all(
       sorted.map(snap =>
-        apiClient
-          .get<ConversationsResponse>(`/conversations/${snap.fileId}?pageSize=10000`)
-          .then(r => ({
+        // Distinct apps/protocols are computed server-side, so we no longer pull every conversation
+        // row (which truncated at the backend's pageSize cap on busy snapshots).
+        Promise.all([
+          apiClient.get<string[]>(API_ENDPOINTS.DISTINCT_APPS(snap.fileId)).then(r => r.data),
+          apiClient.get<string[]>(API_ENDPOINTS.DISTINCT_PROTOCOLS(snap.fileId)).then(r => r.data),
+        ])
+          .then(([apps, protos]) => ({
             snap,
-            apps: new Set(r.data.data.map(c => c.appName).filter(Boolean) as string[]),
-            protos: new Set(r.data.data.map(c => c.tsharkProtocol).filter(Boolean) as string[]),
+            apps: new Set(apps),
+            protos: new Set(protos),
           }))
           .catch(() => ({ snap, apps: new Set<string>(), protos: new Set<string>() }))
       )

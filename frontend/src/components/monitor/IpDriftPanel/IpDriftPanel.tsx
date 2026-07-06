@@ -2,6 +2,7 @@ import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
@@ -19,15 +20,6 @@ type EntityGroup = {
   active: string[];
   absent: AbsentEntity[];
 };
-
-interface ConversationSummary {
-  srcIp: string;
-  dstIp: string;
-}
-
-interface ConversationsResponse {
-  data: ConversationSummary[];
-}
 
 function isRfc1918(ip: string): boolean {
   return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
@@ -298,15 +290,10 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
     Promise.all(
       sorted.map(snap =>
         apiClient
-          .get<ConversationsResponse>(`/conversations/${snap.fileId}?pageSize=10000`)
-          .then(r => {
-            const ips = new Set<string>();
-            for (const c of r.data.data) {
-              if (c.srcIp) ips.add(c.srcIp);
-              if (c.dstIp) ips.add(c.dstIp);
-            }
-            return { snap, ips };
-          })
+          // Distinct IPs are computed server-side, so we no longer pull every conversation row
+          // (which truncated at the backend's pageSize cap and dropped IPs on busy snapshots).
+          .get<string[]>(API_ENDPOINTS.DISTINCT_IPS(snap.fileId))
+          .then(r => ({ snap, ips: new Set(r.data) }))
           .catch(() => ({ snap, ips: new Set<string>() }))
       )
     ).then(results => {
