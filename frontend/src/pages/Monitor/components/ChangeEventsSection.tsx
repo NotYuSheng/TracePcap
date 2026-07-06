@@ -12,8 +12,9 @@ interface ChangeEventsSectionProps {
   onPatchChange: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
 }
 
-/** Dropdown labels for non-ALL severities. */
-const SEVERITY_LABELS: Record<Exclude<SeverityFilter, 'ALL'>, string> = {
+/** Dropdown labels for severities. */
+const SEVERITY_LABELS: Record<SeverityFilter, string> = {
+  ALL: 'All severities',
   CRITICAL: 'Critical',
   WARNING: 'Warning',
   INFO: 'Info',
@@ -95,7 +96,7 @@ export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: 
             title="Filter by severity"
           >
             {SEVERITY_FILTERS.map(f => (
-              <option key={f} value={f}>{f === 'ALL' ? 'All severities' : SEVERITY_LABELS[f]}</option>
+              <option key={f} value={f}>{SEVERITY_LABELS[f]}</option>
             ))}
           </Form.Select>
           {/* Change type select */}

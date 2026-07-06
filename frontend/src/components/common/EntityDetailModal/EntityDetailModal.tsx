@@ -65,8 +65,9 @@ export function EntityDetailModal({
     if (isActive) {
       return <span className="badge bg-success ms-2" style={{ fontSize: '0.7rem' }}>Active</span>;
     }
-    const days = lastSeenTime
-      ? Math.floor((Date.now() - new Date(lastSeenTime).getTime()) / 86400000)
+    const parsedTime = lastSeenTime ? new Date(lastSeenTime).getTime() : null;
+    const days = parsedTime !== null && !Number.isNaN(parsedTime)
+      ? Math.floor((Date.now() - parsedTime) / 86400000)
       : null;
     const agoText = days != null && days > 0 ? ` · ${days}d ago` : '';
     const tooltip = lastSeenFileName ? `Last seen in ${lastSeenFileName}` : undefined;

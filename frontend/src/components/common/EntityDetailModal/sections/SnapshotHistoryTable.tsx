@@ -47,6 +47,10 @@ export function SnapshotHistoryTable({
   const activePage = Math.min(page, totalPages);
   const pagedHistory = sortedHistory.slice((activePage - 1) * HISTORY_PAGE_SIZE, activePage * HISTORY_PAGE_SIZE);
 
+  // Reset to page 1 when the modal is reused for a different entity, so the next
+  // entity doesn't open on a stale page inherited from the previous one.
+  useEffect(() => { setPage(1); }, [entityKey]);
+
   // Clamp back into range if the data shrinks (e.g. the modal is reused for another entity).
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
