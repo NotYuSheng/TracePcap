@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Badge, Button, Table } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { Pagination } from '@components/common/Pagination';
@@ -31,15 +31,21 @@ export function SnapshotHistoryTable({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
 
-  const sortedHistory = [...ipSnapHistory].sort((a, b) =>
-    sortDir === 'desc'
-      ? b.snap.snapshotOrder - a.snap.snapshotOrder
-      : a.snap.snapshotOrder - b.snap.snapshotOrder
+  const sortedHistory = useMemo(() =>
+    [...ipSnapHistory].sort((a, b) =>
+      sortDir === 'desc'
+        ? b.snap.snapshotOrder - a.snap.snapshotOrder
+        : a.snap.snapshotOrder - b.snap.snapshotOrder
+    ),
+    [ipSnapHistory, sortDir]
   );
   const toggleSort = () => { setSortDir(d => (d === 'desc' ? 'asc' : 'desc')); setPage(1); };
 
   const totalPages = Math.max(1, Math.ceil(sortedHistory.length / HISTORY_PAGE_SIZE));
-  const pagedHistory = sortedHistory.slice((page - 1) * HISTORY_PAGE_SIZE, page * HISTORY_PAGE_SIZE);
+  // Derive the active page during render so a shrunken dataset can't slice out of
+  // range for the one frame before the useEffect below clamps `page`.
+  const activePage = Math.min(page, totalPages);
+  const pagedHistory = sortedHistory.slice((activePage - 1) * HISTORY_PAGE_SIZE, activePage * HISTORY_PAGE_SIZE);
 
   // Clamp back into range if the data shrinks (e.g. the modal is reused for another entity).
   useEffect(() => {
@@ -48,11 +54,14 @@ export function SnapshotHistoryTable({
 
   // Chronological order (oldest→newest) for the "MAC changed vs previous snapshot" comparison,
   // which must stay correct regardless of the display sort direction.
-  const chronological = [...ipSnapHistory].sort((a, b) => a.snap.snapshotOrder - b.snap.snapshotOrder);
-  const prevMacBySnapId = new Map<string, string | null | undefined>();
-  chronological.forEach((entry, i) => {
-    prevMacBySnapId.set(entry.snap.id, i > 0 ? chronological[i - 1].host?.mac : undefined);
-  });
+  const prevMacBySnapId = useMemo(() => {
+    const chronological = [...ipSnapHistory].sort((a, b) => a.snap.snapshotOrder - b.snap.snapshotOrder);
+    const map = new Map<string, string | null | undefined>();
+    chronological.forEach((entry, i) => {
+      map.set(entry.snap.id, i > 0 ? chronological[i - 1].host?.mac : undefined);
+    });
+    return map;
+  }, [ipSnapHistory]);
 
   return (
     <div className="mt-4">
@@ -126,12 +135,9 @@ export function SnapshotHistoryTable({
                           <i className="bi bi-diagram-3 me-1" />conflict — {macs.length} MACs
                         </Badge>
                       )}
-                      {(() => {
-                        const prevMac = prevMacBySnapId.get(snap.id);
-                        return host?.mac && prevMac && host.mac !== prevMac ? (
-                          <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
-                        ) : null;
-                      })()}
+                      {host?.mac && prevMacBySnapId.get(snap.id) && host.mac !== prevMacBySnapId.get(snap.id) && (
+                        <Badge bg="warning" text="dark" className="ms-1" style={{ fontSize: '0.65rem' }}>changed</Badge>
+                      )}
                     </Table.DataCell>
                   )}
                   <Table.DataCell><small className="text-muted">{host?.deviceType ?? '—'}</small></Table.DataCell>
@@ -172,7 +178,7 @@ export function SnapshotHistoryTable({
       {!ipHistoryLoading && sortedHistory.length > HISTORY_PAGE_SIZE && (
         <div className="mt-2">
           <Pagination
-            currentPage={page}
+            currentPage={activePage}
             totalPages={totalPages}
             totalItems={sortedHistory.length}
             pageSize={HISTORY_PAGE_SIZE}
