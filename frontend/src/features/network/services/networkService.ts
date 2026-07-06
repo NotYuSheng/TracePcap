@@ -240,6 +240,7 @@ function createEdge(conversation: Conversation, srcIp: string, dstIp: string): G
       category: conversation.category,
       flowRisks,
       customSignatures: conversation.customSignatures ?? [],
+      suricataAlerts: conversation.suricataAlerts ?? [],
       detectedFileTypes: conversation.detectedFileTypes ?? [],
       srcCountry: conversation.srcGeo?.countryCode,
       dstCountry: conversation.dstGeo?.countryCode,

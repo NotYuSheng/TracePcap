@@ -105,6 +105,7 @@ export interface EdgeData {
   category?: string;
   flowRisks?: string[];
   customSignatures?: string[];
+  suricataAlerts?: string[];
   detectedFileTypes?: string[];
   srcCountry?: string;
   dstCountry?: string;
