@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import type { GraphEdge } from '@/features/network/types';
 
@@ -84,6 +84,11 @@ function SignalSectionView({
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(section.rows.length / SECTION_PAGE_SIZE);
   const visibleRows = section.rows.slice((page - 1) * SECTION_PAGE_SIZE, page * SECTION_PAGE_SIZE);
+
+  // Keep the current page in range as the section rows change (e.g. edges refetch).
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
 
   return (
     <div className="mb-4">

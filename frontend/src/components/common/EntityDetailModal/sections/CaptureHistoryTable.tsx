@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Table } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -22,6 +22,12 @@ export function CaptureHistoryTable({ history, historyLoading, historyError, onC
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(history.length / PAGE_SIZE);
   const visible = history.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Keep the current page in range as the history data changes (e.g. entity switch/refetch).
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
+
   return (
     <div className="mt-4">
       <h6 className="text-muted fw-semibold mb-2">

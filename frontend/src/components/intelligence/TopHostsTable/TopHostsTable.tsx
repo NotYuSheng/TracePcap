@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Button } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { formatBytes } from '@/utils/formatters';
@@ -62,6 +62,11 @@ export const TopHostsTable = ({ hosts, loading, sortBy, onSortByChange }: TopHos
   const pageSize = 20;
   const totalPages = Math.ceil(hosts.length / pageSize);
   const visible = hosts.slice((page - 1) * pageSize, page * pageSize);
+
+  // Keep the current page in range as the hosts list changes (e.g. re-sort/refetch).
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
 
   return (
     <div>
