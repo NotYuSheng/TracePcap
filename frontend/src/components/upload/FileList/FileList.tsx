@@ -45,6 +45,7 @@ export const FileList = () => {
   const [pendingDeleteFile, setPendingDeleteFile] = useState<FileMetadata | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
+  const [selectedFileNames, setSelectedFileNames] = useState<Map<string, string>>(new Map());
   const [hideMonitor, setHideMonitor] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -69,28 +70,40 @@ export const FileList = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [showInfo]);
 
-  const toggleCompareSelect = (fileId: string) =>
+  // Remember the filename of every file the user has selected, so cross-page selections survive
+  // even though `files` only holds the current page (server-side pagination).
+  const toggleCompareSelect = (fileId: string, fileName?: string) => {
     setSelectedForCompare(prev => {
       const next = new Set(prev);
       next.has(fileId) ? next.delete(fileId) : next.add(fileId);
       return next;
     });
+    if (fileName) {
+      setSelectedFileNames(prev => {
+        const next = new Map(prev);
+        if (!next.has(fileId)) next.set(fileId, fileName);
+        return next;
+      });
+    }
+  };
 
   const buildAutoMergeName = (selectedIds: Set<string>): string => {
     const MAX_PART = 20;
     const MAX_SHOWN = 3;
-    const selected = files.filter(f => selectedIds.has(f.fileId));
-    const parts = selected.slice(0, MAX_SHOWN).map(f => {
-      const base = f.fileName.replace(/\.[^.]+$/, '');
+    // Use the accumulated name map (not `files`, which is only the current page) so off-page
+    // selections still contribute to the generated name.
+    const names = [...selectedIds].map(id => selectedFileNames.get(id)).filter((n): n is string => !!n);
+    const parts = names.slice(0, MAX_SHOWN).map(fileName => {
+      const base = fileName.replace(/\.[^.]+$/, '');
       return base.length > MAX_PART ? base.slice(0, MAX_PART) : base;
     });
-    const suffix = selected.length > MAX_SHOWN ? `+${selected.length - MAX_SHOWN}_more` : '';
+    const suffix = names.length > MAX_SHOWN ? `+${names.length - MAX_SHOWN}_more` : '';
     return `merged_${parts.join('+')}${suffix}`;
   };
 
-  const handleRowClick = (fileId: string, status: string) => {
+  const handleRowClick = (fileId: string, status: string, fileName: string) => {
     if (status.toLowerCase() !== 'completed') return;
-    toggleCompareSelect(fileId);
+    toggleCompareSelect(fileId, fileName);
   };
 
   const handleMultiSelectAction = async (action: MultiSelectAction) => {
@@ -111,6 +124,7 @@ export const FileList = () => {
       });
       const newFileId: string = res.data.fileId;
       setSelectedForCompare(new Set());
+      setSelectedFileNames(new Map());
       navigate(`/analysis/${newFileId}`);
     } catch (err) {
       const message =
@@ -149,12 +163,6 @@ export const FileList = () => {
     fetchFiles();
   }, [fetchFiles]);
 
-  // Toggling the monitor filter or changing page size resets to the first page so the
-  // current page can't fall out of range against the new (filtered) result set.
-  useEffect(() => {
-    setPage(1);
-  }, [hideMonitor, pageSize]);
-
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -187,8 +195,9 @@ export const FileList = () => {
       }
     }
     setPendingDeleteFile(null);
-    // If this was the last row on the last page, step back a page; otherwise refetch in place.
-    if (files.length === 1 && page > 1) setPage(p => p - 1);
+    // If we just emptied the last page, step back; on earlier pages the rows below shift up to
+    // fill the gap, so refetch in place instead of kicking the user backwards.
+    if (files.length === 1 && page === totalPages && page > 1) setPage(p => p - 1);
     else fetchFiles();
   };
 
@@ -247,6 +256,8 @@ export const FileList = () => {
                 size="sm"
                 onClick={() => setHideMonitor(v => {
                   const next = !v;
+                  // New filter → back to page 1 so the current page can't fall out of range.
+                  setPage(1);
                   if (next) {
                     setSelectedForCompare(prev => {
                       const monitorIds = new Set(files.filter(f => f.source === 'MONITOR').map(f => f.fileId));
@@ -333,12 +344,12 @@ export const FileList = () => {
                       role={isCompleted ? 'checkbox' : undefined}
                       aria-checked={isCompleted ? isSelected : undefined}
                       tabIndex={isCompleted ? 0 : -1}
-                      onClick={() => handleRowClick(file.fileId, file.status)}
+                      onClick={() => handleRowClick(file.fileId, file.status, file.fileName)}
                       onKeyDown={e => {
                         if (!isCompleted) return;
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          handleRowClick(file.fileId, file.status);
+                          handleRowClick(file.fileId, file.status, file.fileName);
                         }
                       }}
                     >
@@ -428,7 +439,7 @@ export const FileList = () => {
                 totalItems={totalItems}
                 pageSize={pageSize}
                 onPageChange={setPage}
-                onPageSizeChange={setPageSize}
+                onPageSizeChange={size => { setPageSize(size); setPage(1); }}
               />
             </div>
           )}
@@ -587,8 +598,8 @@ export const FileList = () => {
                 files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.fileId)))
               );
               setConfirmDeleteAll(false);
-              // Refetch: step back a page if we just emptied a non-first page.
-              if (page > 1) setPage(p => p - 1);
+              // Only step back if we emptied the last page; earlier pages backfill from below.
+              if (page === totalPages && page > 1) setPage(p => p - 1);
               else fetchFiles();
             }}
           >
