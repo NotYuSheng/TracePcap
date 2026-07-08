@@ -5,6 +5,7 @@ import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { NODE_TYPE_CONFIG, getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { RoleSection } from '@components/common/EntityDetailModal/sections/RoleSection';
@@ -63,6 +64,9 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   const navigate = useNavigate();
   const [classificationPopupOpen, setClassificationPopupOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('details');
+  const [peersPage, setPeersPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PAGE_SIZE = 10;
   const [nestedIp, setNestedIp] = useState<string | null>(null);
 
   // Notes state
@@ -186,6 +190,20 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   });
 
   const peers = Array.from(peerMap.entries()).sort((a, b) => b[1].bytes - a[1].bytes);
+  const PEERS_PAGE_SIZE = 15;
+  const peersTotalPages = Math.ceil(peers.length / PEERS_PAGE_SIZE);
+  const peersPageClamped = Math.min(peersPage, Math.max(1, peersTotalPages));
+  const visiblePeers = peers.slice(
+    (peersPageClamped - 1) * PEERS_PAGE_SIZE,
+    peersPageClamped * PEERS_PAGE_SIZE,
+  );
+
+  const historyTotalPages = Math.ceil(history.length / HISTORY_PAGE_SIZE);
+  const historyPageClamped = Math.min(historyPage, Math.max(1, historyTotalPages));
+  const visibleHistory = history.slice(
+    (historyPageClamped - 1) * HISTORY_PAGE_SIZE,
+    historyPageClamped * HISTORY_PAGE_SIZE,
+  );
 
   const typeInfo = NODE_TYPE_CONFIG[node.data.nodeType] ?? NODE_TYPE_CONFIG['unknown'];
 
@@ -451,7 +469,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         </tr>
                       </thead>
                       <tbody>
-                        {peers.map(([ip, info]) => (
+                        {visiblePeers.map(([ip, info]) => (
                           <tr
                             key={ip}
                             className="node-details-peer-row"
@@ -490,6 +508,16 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                       </tbody>
                     </table>
                   </div>
+                  {peersTotalPages > 1 && (
+                    <Pagination
+                      currentPage={peersPageClamped}
+                      totalPages={peersTotalPages}
+                      totalItems={peers.length}
+                      pageSize={PEERS_PAGE_SIZE}
+                      onPageChange={setPeersPage}
+                      showPageSizeSelector={false}
+                    />
+                  )}
                 </div>
               </>
             )}
@@ -526,7 +554,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         </tr>
                       </thead>
                       <tbody>
-                        {history.map(entry => (
+                        {visibleHistory.map(entry => (
                           <tr
                             key={entry.fileId}
                             className={entry.fileId === fileId ? 'table-active' : ''}
@@ -581,6 +609,16 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         ))}
                       </tbody>
                     </table>
+                    {historyTotalPages > 1 && (
+                      <Pagination
+                        currentPage={historyPageClamped}
+                        totalPages={historyTotalPages}
+                        totalItems={history.length}
+                        pageSize={HISTORY_PAGE_SIZE}
+                        onPageChange={setHistoryPage}
+                        showPageSizeSelector={false}
+                      />
+                    )}
                   </div>
                 )}
               </div>

@@ -5,6 +5,7 @@ import { subnetService } from '@/features/subnets/services/subnetService';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import type { SubnetOverrideInput } from '@/features/monitor/types/monitor.types';
 import { ChangeEventBadge } from '@/components/monitor/ChangeEventBadge/ChangeEventBadge';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { SnapshotSecurityTab } from '@/components/monitor/SnapshotSecurityTab/SnapshotSecurityTab';
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
@@ -123,6 +124,8 @@ export const SnapshotDetailModal = ({
   onHide,
 }: SnapshotDetailModalProps) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'diagram');
+  const [changesPage, setChangesPage] = useState(1);
+  const CHANGES_PAGE_SIZE = 15;
 
   // Diagram tab state
   const sorted = useMemo(() => [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder), [snapshots]);
@@ -575,16 +578,36 @@ export const SnapshotDetailModal = ({
                   ? 'This is the baseline snapshot — no changes are compared against it.'
                   : 'No change events detected for this snapshot.'}
               </p>
-            ) : (
-              snapshotEvents.map(event => (
-                <ChangeEventBadge
-                  key={event.id}
-                  event={event}
-                  snapshots={snapshots}
-                  onPatch={onPatchChange}
-                />
-              ))
-            )}
+            ) : (() => {
+              const totalPages = Math.ceil(snapshotEvents.length / CHANGES_PAGE_SIZE);
+              const currentPage = Math.min(changesPage, Math.max(1, totalPages));
+              const visible = snapshotEvents.slice(
+                (currentPage - 1) * CHANGES_PAGE_SIZE,
+                currentPage * CHANGES_PAGE_SIZE,
+              );
+              return (
+                <>
+                  {visible.map(event => (
+                    <ChangeEventBadge
+                      key={event.id}
+                      event={event}
+                      snapshots={snapshots}
+                      onPatch={onPatchChange}
+                    />
+                  ))}
+                  {totalPages > 1 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={snapshotEvents.length}
+                      pageSize={CHANGES_PAGE_SIZE}
+                      onPageChange={setChangesPage}
+                      showPageSizeSelector={false}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 

@@ -8,6 +8,7 @@ import type {
   AbsentEntity,
 } from '@/features/monitor/types/monitor.types';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import type { EntityType } from '@/features/notes/services/entityNotesService';
 
 function stringHue(s: string): number {
@@ -35,6 +36,8 @@ type EntityGroup = {
   absent: AbsentEntity[];
 };
 
+const BADGE_GROUP_PAGE_SIZE = 50;
+
 function BadgeGroup({
   items,
   absentItems,
@@ -46,38 +49,60 @@ function BadgeGroup({
   onAbsentClick: (e: AbsentEntity) => void;
   onActiveClick: (name: string) => void;
 }) {
+  const [page, setPage] = useState(1);
   if (items.length === 0 && absentItems.length === 0) return null;
+
+  // Paginate active-then-absent badges so a large group can't render hundreds at once.
+  const combined: Array<{ active: true; name: string } | { active: false; entity: AbsentEntity }> = [
+    ...items.map(name => ({ active: true as const, name })),
+    ...absentItems.map(entity => ({ active: false as const, entity })),
+  ];
+  const totalPages = Math.ceil(combined.length / BADGE_GROUP_PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const pageItems = combined.slice((currentPage - 1) * BADGE_GROUP_PAGE_SIZE, currentPage * BADGE_GROUP_PAGE_SIZE);
+
   return (
-    <div className="d-flex flex-wrap gap-2">
-      {items.map(name => (
-        <Button
-          key={name}
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="border-0 py-0 px-1"
-          style={{ fontSize: '0.75em', ...hashBadgeStyle(name) }}
-          onClick={() => onActiveClick(name)}
-          title="Click for details & notes"
-        >
-          {name}
-        </Button>
-      ))}
-      {absentItems.map(entity => (
-        <Button
-          key={entity.key}
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="text-decoration-line-through border-0 py-0 px-1"
-          style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(entity.key) }}
-          onClick={() => onAbsentClick(entity)}
-          title={`Last seen in ${entity.lastSeenFileName}`}
-        >
-          {entity.key}
-        </Button>
-      ))}
-    </div>
+    <>
+      <div className="d-flex flex-wrap gap-2">
+        {pageItems.map(item => item.active ? (
+          <Button
+            key={item.name}
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="border-0 py-0 px-1"
+            style={{ fontSize: '0.75em', ...hashBadgeStyle(item.name) }}
+            onClick={() => onActiveClick(item.name)}
+            title="Click for details & notes"
+          >
+            {item.name}
+          </Button>
+        ) : (
+          <Button
+            key={item.entity.key}
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="text-decoration-line-through border-0 py-0 px-1"
+            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(item.entity.key) }}
+            onClick={() => onAbsentClick(item.entity)}
+            title={`Last seen in ${item.entity.lastSeenFileName}`}
+          >
+            {item.entity.key}
+          </Button>
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={combined.length}
+          pageSize={BADGE_GROUP_PAGE_SIZE}
+          onPageChange={setPage}
+          showPageSizeSelector={false}
+        />
+      )}
+    </>
   );
 }
 

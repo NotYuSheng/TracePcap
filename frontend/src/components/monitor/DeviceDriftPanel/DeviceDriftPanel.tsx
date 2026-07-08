@@ -4,6 +4,7 @@ import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { Pagination } from '@components/common/Pagination/Pagination';
 
 /** Deterministic hue (0–360) from any string. */
 function stringHue(s: string): number {
@@ -43,6 +44,8 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   const [absentMacs, setAbsentMacs] = useState<AbsentEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const BADGE_PAGE_SIZE = 50;
 
   const sorted = [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder);
   const latestSnap = sorted[sorted.length - 1];
@@ -103,6 +106,16 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
   const visibleActive = q ? activeMacs.filter(mac => mac.toLowerCase().includes(q)) : activeMacs;
   const visibleAbsent = q ? absentMacs.filter(e => e.key.toLowerCase().includes(q)) : absentMacs;
 
+  // One paginated stream over active-then-absent badges, so a large device set doesn't render
+  // hundreds of badges at once. Clamp in render so the search shrinking the list can't strand us.
+  const combined: Array<{ active: true; mac: string } | { active: false; entity: AbsentEntity }> = [
+    ...visibleActive.map(mac => ({ active: true as const, mac })),
+    ...visibleAbsent.map(entity => ({ active: false as const, entity })),
+  ];
+  const totalPages = Math.ceil(combined.length / BADGE_PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const pageItems = combined.slice((currentPage - 1) * BADGE_PAGE_SIZE, currentPage * BADGE_PAGE_SIZE);
+
   return (
     <>
       <div className="mb-3">
@@ -111,39 +124,48 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
           className="form-control form-control-sm"
           placeholder="Search MAC addresses…"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
         />
       </div>
       <div className="d-flex flex-wrap gap-2">
-        {visibleActive.map(mac => (
+        {pageItems.map(item => item.active ? (
           <Button
-            key={mac}
+            key={item.mac}
             type="button"
             variant="secondary"
             size="sm"
             className="border-0 py-0 px-1"
-            style={{ fontSize: '0.75em', ...hashBadgeStyle(mac) }}
-            onClick={() => setSelectedMac({ mac, fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
+            style={{ fontSize: '0.75em', ...hashBadgeStyle(item.mac) }}
+            onClick={() => setSelectedMac({ mac: item.mac, fileId: latestFileId, isActive: true, lastSeenTime: latestStartTime })}
             title="View device history"
           >
-            {mac}
+            {item.mac}
           </Button>
-        ))}
-        {visibleAbsent.map(entity => (
+        ) : (
           <Button
-            key={entity.key}
+            key={item.entity.key}
             type="button"
             variant="secondary"
             size="sm"
             className="text-decoration-line-through border-0 py-0 px-1"
-            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(entity.key) }}
-            onClick={() => setSelectedAbsent(entity)}
-            title={`Last seen in ${entity.lastSeenFileName}`}
+            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(item.entity.key) }}
+            onClick={() => setSelectedAbsent(item.entity)}
+            title={`Last seen in ${item.entity.lastSeenFileName}`}
           >
-            {entity.key}
+            {item.entity.key}
           </Button>
         ))}
       </div>
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={combined.length}
+          pageSize={BADGE_PAGE_SIZE}
+          onPageChange={setPage}
+          showPageSizeSelector={false}
+        />
+      )}
       {absentMacs.length > 0 && (
         <small className="text-muted d-block mt-2">
           <i className="bi bi-info-circle me-1"></i>
