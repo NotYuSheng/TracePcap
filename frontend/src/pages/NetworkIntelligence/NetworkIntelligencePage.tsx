@@ -9,11 +9,14 @@ import {
   type ClusterGraphResponse,
   type IntelClusterFilters,
   type ClusterNode,
+  type HostSummary,
+  type SortBy,
 } from '@/features/intelligence/services/intelligenceService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { ipOrgRuleService } from '@/features/intelligence/services/ipOrgRuleService';
 import { SummaryStatsBar } from '@components/intelligence/SummaryStatsBar/SummaryStatsBar';
 import { ClusterGraph } from '@components/intelligence/ClusterGraph/ClusterGraph';
+import { TopHostsTable } from '@components/intelligence/TopHostsTable/TopHostsTable';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { toggleSet } from '@/features/network/constants';
 
@@ -30,6 +33,11 @@ export const NetworkIntelligencePage = () => {
   const [clusterData, setClusterData] = useState<ClusterGraphResponse | null>(null);
   const [clusterLoading, setClusterLoading] = useState(false);
   const [clusterError, setClusterError] = useState<string | null>(null);
+
+  // Top-hosts table (file-wide, up to 100 by the chosen metric; the table paginates client-side).
+  const [topHosts, setTopHosts] = useState<HostSummary[]>([]);
+  const [topHostsLoading, setTopHostsLoading] = useState(false);
+  const [topHostsSortBy, setTopHostsSortBy] = useState<SortBy>('bytes');
 
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -76,6 +84,19 @@ export const NetworkIntelligencePage = () => {
     }).catch(() => {});
     return () => { active = false; };
   }, [fileId]);
+
+  // Load the top hosts, re-fetching when the sort metric changes (sorting is server-side).
+  useEffect(() => {
+    if (!fileId) return;
+    let active = true;
+    setTopHostsLoading(true);
+    intelligenceService
+      .getTopHosts(fileId, topHostsSortBy, 100)
+      .then(res => { if (active) setTopHosts(res.hosts); })
+      .catch(() => { if (active) setTopHosts([]); })
+      .finally(() => { if (active) setTopHostsLoading(false); });
+    return () => { active = false; };
+  }, [fileId, topHostsSortBy]);
 
   // ── Derive present-values from AnalysisData ───────────────────────────────
   const presentEdgeLegendKeys = useMemo(() => {
@@ -279,6 +300,18 @@ export const NetworkIntelligencePage = () => {
             activeFilterCount={activeFilterCount}
             selectedCluster={selectedCluster}
             onSelectedClusterChange={setSelectedCluster}
+          />
+        </Card.Body>
+      </Card>
+
+      {/* Top hosts table */}
+      <Card className="mb-4">
+        <Card.Body>
+          <TopHostsTable
+            hosts={topHosts}
+            loading={topHostsLoading}
+            sortBy={topHostsSortBy}
+            onSortByChange={setTopHostsSortBy}
           />
         </Card.Body>
       </Card>
