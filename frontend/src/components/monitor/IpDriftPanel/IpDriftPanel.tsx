@@ -8,6 +8,7 @@ import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
 import type { CustomPrivateRange, IpClassification } from '@/features/intelligence/types/customPrivateRange.types';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { Pagination } from '@components/common/Pagination/Pagination';
 
 interface IpDriftPanelProps {
   snapshots: NetworkSnapshot[];
@@ -85,6 +86,8 @@ function hashBadgeStyle(s: string): CSSProperties {
   } as CSSProperties;
 }
 
+const BADGE_GROUP_PAGE_SIZE = 50;
+
 function IpBadgeGroup({
   items,
   absentItems,
@@ -96,38 +99,63 @@ function IpBadgeGroup({
   onAbsentClick: (e: AbsentEntity) => void;
   onActiveClick: (ip: string) => void;
 }) {
+  const [page, setPage] = useState(1);
+  // Reset to page 1 when the filtered set changes (e.g. the parent's search box) so a
+  // cleared/narrowed search can't leave us on a now-out-of-range page.
+  useEffect(() => { setPage(1); }, [items.length, absentItems.length]);
   if (items.length === 0 && absentItems.length === 0) return null;
+
+  // Paginate active-then-absent badges so a large group can't render hundreds at once.
+  const combined: Array<{ active: true; ip: string } | { active: false; entity: AbsentEntity }> = [
+    ...items.map(ip => ({ active: true as const, ip })),
+    ...absentItems.map(entity => ({ active: false as const, entity })),
+  ];
+  const totalPages = Math.ceil(combined.length / BADGE_GROUP_PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const pageItems = combined.slice((currentPage - 1) * BADGE_GROUP_PAGE_SIZE, currentPage * BADGE_GROUP_PAGE_SIZE);
+
   return (
-    <div className="d-flex flex-wrap gap-2">
-      {items.map(ip => (
-        <Button
-          key={ip}
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="border-0 py-0 px-1"
-          style={{ fontSize: '0.75em', ...hashBadgeStyle(ip) }}
-          onClick={() => onActiveClick(ip)}
-          title="Click for details & notes"
-        >
-          {ip}
-        </Button>
-      ))}
-      {absentItems.map(entity => (
-        <Button
-          key={entity.key}
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="text-decoration-line-through border-0 py-0 px-1"
-          style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(entity.key) }}
-          onClick={() => onAbsentClick(entity)}
-          title={`Last seen in ${entity.lastSeenFileName}`}
-        >
-          {entity.key}
-        </Button>
-      ))}
-    </div>
+    <>
+      <div className="d-flex flex-wrap gap-2">
+        {pageItems.map(item => item.active ? (
+          <Button
+            key={item.ip}
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="border-0 py-0 px-1"
+            style={{ fontSize: '0.75em', ...hashBadgeStyle(item.ip) }}
+            onClick={() => onActiveClick(item.ip)}
+            title="Click for details & notes"
+          >
+            {item.ip}
+          </Button>
+        ) : (
+          <Button
+            key={item.entity.key}
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="text-decoration-line-through border-0 py-0 px-1"
+            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(item.entity.key) }}
+            onClick={() => onAbsentClick(item.entity)}
+            title={`Last seen in ${item.entity.lastSeenFileName}`}
+          >
+            {item.entity.key}
+          </Button>
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={combined.length}
+          pageSize={BADGE_GROUP_PAGE_SIZE}
+          onPageChange={setPage}
+          showPageSizeSelector={false}
+        />
+      )}
+    </>
   );
 }
 

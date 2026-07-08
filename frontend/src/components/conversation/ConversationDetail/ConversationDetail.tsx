@@ -15,6 +15,7 @@ import {
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
 import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
@@ -171,17 +172,39 @@ export const ConversationDetail = ({
   const [extractedCount, setExtractedCount] = useState<number | null>(null);
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
   const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
+  const [packetPage, setPacketPage] = useState(1);
+  const [packetPageSize, setPacketPageSize] = useState(50);
   const highlightRowRef = useRef<HTMLTableRowElement>(null);
 
-  // When deep-linked to a specific packet, switch to the Packets tab and scroll it into view.
+  const allPackets = conversation.packets ?? [];
+  const packetTotalPages = Math.ceil(allPackets.length / packetPageSize);
+  const packetPageClamped = Math.min(packetPage, Math.max(1, packetTotalPages));
+  const visiblePackets = allPackets.slice(
+    (packetPageClamped - 1) * packetPageSize,
+    packetPageClamped * packetPageSize,
+  );
+
+  // Switching conversations: reset the packet page and collapse any expanded hex row so the new
+  // conversation starts at page 1. Declared before the highlight effect so a deep-link's page jump
+  // still wins when both run on a conversation change.
+  useEffect(() => {
+    setPacketPage(1);
+    setExpandedPacketId(null);
+  }, [conversation.id]);
+
+  // When deep-linked to a specific packet, switch to the Packets tab, jump to the page that
+  // contains it, and scroll it into view.
   useEffect(() => {
     if (highlightPacketNumber == null) return;
     setActiveTab('packets');
+    const idx = allPackets.findIndex(p => p.packetNumber === highlightPacketNumber);
+    if (idx >= 0) setPacketPage(Math.floor(idx / packetPageSize) + 1);
     const t = setTimeout(() => {
       highlightRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
     return () => clearTimeout(t);
-  }, [highlightPacketNumber, conversation.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightPacketNumber, conversation.id, packetPageSize]);
 
   const openDevicePopup = (
     cls: HostClassification,
@@ -555,8 +578,8 @@ export const ConversationDetail = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {conversation.packets && conversation.packets.length > 0 ? (
-                    conversation.packets.map((packet, index) => (
+                  {allPackets.length > 0 ? (
+                    visiblePackets.map((packet, index) => (
                       <>
                         <tr
                           key={packet.id}
@@ -570,7 +593,7 @@ export const ConversationDetail = ({
                           }}
                           className={expandedPacketId === packet.id ? 'table-active' : undefined}
                         >
-                          <td className="text-muted">{index + 1}</td>
+                          <td className="text-muted">{(packetPageClamped - 1) * packetPageSize + index + 1}</td>
                           <td className={getDirectionClass(packet)}>
                             <strong>{getDirectionIndicator(packet)}</strong>
                           </td>
@@ -662,6 +685,18 @@ export const ConversationDetail = ({
                 </tbody>
               </table>
             </div>
+            {allPackets.length > 10 && (
+              <div className="p-2 border-top">
+                <Pagination
+                  currentPage={packetPageClamped}
+                  totalPages={packetTotalPages}
+                  totalItems={allPackets.length}
+                  pageSize={packetPageSize}
+                  onPageChange={setPacketPage}
+                  onPageSizeChange={size => { setPacketPageSize(size); setPacketPage(1); }}
+                />
+              </div>
+            )}
           </Card.Body>
         )}
 
