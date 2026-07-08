@@ -3,7 +3,9 @@
   justify-content: space-between;
   align-items: center;
   margin-top: 0;
-  padding: 1rem 0;
+  /* Horizontal padding so the info text and nav don't hug the edges when the pager is dropped
+     directly into a bordered container (e.g. the monitor Subnets panel). */
+  padding: 0.75rem 1rem;
   gap: 1rem;
   flex-wrap: wrap;
 }
