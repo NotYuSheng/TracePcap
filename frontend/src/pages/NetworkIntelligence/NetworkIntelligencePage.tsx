@@ -38,6 +38,7 @@ export const NetworkIntelligencePage = () => {
   const [topHosts, setTopHosts] = useState<HostSummary[]>([]);
   const [topHostsLoading, setTopHostsLoading] = useState(false);
   const [topHostsSortBy, setTopHostsSortBy] = useState<SortBy>('bytes');
+  const [topHostsError, setTopHostsError] = useState<string | null>(null);
 
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -90,10 +91,16 @@ export const NetworkIntelligencePage = () => {
     if (!fileId) return;
     let active = true;
     setTopHostsLoading(true);
+    setTopHostsError(null);
     intelligenceService
       .getTopHosts(fileId, topHostsSortBy, 100)
       .then(res => { if (active) setTopHosts(res.hosts); })
-      .catch(() => { if (active) setTopHosts([]); })
+      .catch(err => {
+        if (active) {
+          setTopHosts([]);
+          setTopHostsError(err instanceof Error ? err.message : 'Failed to load top hosts');
+        }
+      })
       .finally(() => { if (active) setTopHostsLoading(false); });
     return () => { active = false; };
   }, [fileId, topHostsSortBy]);
@@ -307,6 +314,12 @@ export const NetworkIntelligencePage = () => {
       {/* Top hosts table */}
       <Card className="mb-4">
         <Card.Body>
+          {topHostsError && (
+            <Alert variant="warning" className="py-2 mb-3">
+              <i className="bi bi-exclamation-triangle me-2" />
+              {topHostsError}
+            </Alert>
+          )}
           <TopHostsTable
             hosts={topHosts}
             loading={topHostsLoading}
