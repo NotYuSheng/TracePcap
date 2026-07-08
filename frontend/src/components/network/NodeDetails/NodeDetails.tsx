@@ -121,11 +121,15 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
     });
   }, [entityType, entityKey]);
 
-  // Reset history when the entity changes so a reused modal reloads fresh.
+  // Reset history when the entity changes so a reused modal reloads fresh. Also reset the peers
+  // and history page counters — NodeDetails isn't remounted between node selections, so without
+  // this a user on page 3 of one node lands on page 3 of the next node's (shorter) data.
   useEffect(() => {
     setHistory([]);
     setHistoryRoles({});
     setHistoryError(null);
+    setPeersPage(1);
+    setHistoryPage(1);
   }, [entityType, entityKey]);
 
   // Load history when History tab is first opened

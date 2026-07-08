@@ -100,6 +100,9 @@ function IpBadgeGroup({
   onActiveClick: (ip: string) => void;
 }) {
   const [page, setPage] = useState(1);
+  // Reset to page 1 when the filtered set changes (e.g. the parent's search box) so a
+  // cleared/narrowed search can't leave us on a now-out-of-range page.
+  useEffect(() => { setPage(1); }, [items.length, absentItems.length]);
   if (items.length === 0 && absentItems.length === 0) return null;
 
   // Paginate active-then-absent badges so a large group can't render hundreds at once.

@@ -184,6 +184,14 @@ export const ConversationDetail = ({
     packetPageClamped * packetPageSize,
   );
 
+  // Switching conversations: reset the packet page and collapse any expanded hex row so the new
+  // conversation starts at page 1. Declared before the highlight effect so a deep-link's page jump
+  // still wins when both run on a conversation change.
+  useEffect(() => {
+    setPacketPage(1);
+    setExpandedPacketId(null);
+  }, [conversation.id]);
+
   // When deep-linked to a specific packet, switch to the Packets tab, jump to the page that
   // contains it, and scroll it into view.
   useEffect(() => {
