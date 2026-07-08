@@ -1,12 +1,13 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { isAxiosError } from 'axios';
 import { Badge, Button, Card, Form, Modal, Tooltip } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { AlertCircle } from 'lucide-react';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { parseDateTime } from '@/utils/dateUtils';
 import './FileList.css';
 
@@ -44,7 +45,12 @@ export const FileList = () => {
   const [pendingDeleteFile, setPendingDeleteFile] = useState<FileMetadata | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
+  const [selectedFileNames, setSelectedFileNames] = useState<Map<string, string>>(new Map());
   const [hideMonitor, setHideMonitor] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -64,28 +70,40 @@ export const FileList = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [showInfo]);
 
-  const toggleCompareSelect = (fileId: string) =>
+  // Remember the filename of every file the user has selected, so cross-page selections survive
+  // even though `files` only holds the current page (server-side pagination).
+  const toggleCompareSelect = (fileId: string, fileName?: string) => {
     setSelectedForCompare(prev => {
       const next = new Set(prev);
       next.has(fileId) ? next.delete(fileId) : next.add(fileId);
       return next;
     });
+    if (fileName) {
+      setSelectedFileNames(prev => {
+        const next = new Map(prev);
+        if (!next.has(fileId)) next.set(fileId, fileName);
+        return next;
+      });
+    }
+  };
 
   const buildAutoMergeName = (selectedIds: Set<string>): string => {
     const MAX_PART = 20;
     const MAX_SHOWN = 3;
-    const selected = files.filter(f => selectedIds.has(f.fileId));
-    const parts = selected.slice(0, MAX_SHOWN).map(f => {
-      const base = f.fileName.replace(/\.[^.]+$/, '');
+    // Use the accumulated name map (not `files`, which is only the current page) so off-page
+    // selections still contribute to the generated name.
+    const names = [...selectedIds].map(id => selectedFileNames.get(id)).filter((n): n is string => !!n);
+    const parts = names.slice(0, MAX_SHOWN).map(fileName => {
+      const base = fileName.replace(/\.[^.]+$/, '');
       return base.length > MAX_PART ? base.slice(0, MAX_PART) : base;
     });
-    const suffix = selected.length > MAX_SHOWN ? `+${selected.length - MAX_SHOWN}_more` : '';
+    const suffix = names.length > MAX_SHOWN ? `+${names.length - MAX_SHOWN}_more` : '';
     return `merged_${parts.join('+')}${suffix}`;
   };
 
-  const handleRowClick = (fileId: string, status: string) => {
+  const handleRowClick = (fileId: string, status: string, fileName: string) => {
     if (status.toLowerCase() !== 'completed') return;
-    toggleCompareSelect(fileId);
+    toggleCompareSelect(fileId, fileName);
   };
 
   const handleMultiSelectAction = async (action: MultiSelectAction) => {
@@ -106,6 +124,7 @@ export const FileList = () => {
       });
       const newFileId: string = res.data.fileId;
       setSelectedForCompare(new Set());
+      setSelectedFileNames(new Map());
       navigate(`/analysis/${newFileId}`);
     } catch (err) {
       const message =
@@ -118,22 +137,31 @@ export const FileList = () => {
     }
   };
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     try {
       const res = await apiClient.get(API_ENDPOINTS.FILES_LIST, {
-        params: { sort: 'uploadedAt,desc', pageSize: 100 },
+        params: {
+          sort: 'uploadedAt,desc',
+          page,
+          pageSize,
+          // ANALYSIS is the only non-monitor source, so "hide monitor" == list ANALYSIS only.
+          // Omitting `source` lists everything (monitor files included).
+          ...(hideMonitor ? { source: 'ANALYSIS' } : {}),
+        },
       });
       setFiles(res.data.data ?? []);
+      setTotalItems(res.data.total ?? 0);
+      setTotalPages(res.data.totalPages ?? 0);
     } catch (err) {
       console.error('Failed to fetch files:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, hideMonitor]);
 
   useEffect(() => {
     fetchFiles();
-  }, []);
+  }, [fetchFiles]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -160,15 +188,17 @@ export const FileList = () => {
     if (!pendingDeleteFile) return;
     try {
       await apiClient.delete(API_ENDPOINTS.FILE_DELETE(pendingDeleteFile.fileId));
-      setFiles(prev => prev.filter(f => f.fileId !== pendingDeleteFile.fileId));
     } catch (err) {
-      if (isAxiosError(err) && err.response?.status === 404) {
-        setFiles(prev => prev.filter(f => f.fileId !== pendingDeleteFile.fileId));
-      } else {
+      // A 404 means it's already gone — treat as success and refresh either way.
+      if (!(isAxiosError(err) && err.response?.status === 404)) {
         console.error('Failed to delete file:', err);
       }
     }
     setPendingDeleteFile(null);
+    // If we just emptied the last page, step back; on earlier pages the rows below shift up to
+    // fill the gap, so refetch in place instead of kicking the user backwards.
+    if (files.length === 1 && page === totalPages && page > 1) setPage(p => p - 1);
+    else fetchFiles();
   };
 
   return (
@@ -226,6 +256,8 @@ export const FileList = () => {
                 size="sm"
                 onClick={() => setHideMonitor(v => {
                   const next = !v;
+                  // New filter → back to page 1 so the current page can't fall out of range.
+                  setPage(1);
                   if (next) {
                     setSelectedForCompare(prev => {
                       const monitorIds = new Set(files.filter(f => f.source === 'MONITOR').map(f => f.fileId));
@@ -263,7 +295,7 @@ export const FileList = () => {
                 onClick={() => setConfirmDeleteAll(true)}
               >
                 <i className="bi bi-trash me-1"></i>
-                Delete all
+                Delete page
               </Button>
             </div>
           )}
@@ -275,34 +307,29 @@ export const FileList = () => {
               Loading files…
             </div>
           ) : files.length === 0 ? (
-            <div className="text-center text-muted py-4">
-              <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
-            </div>
-          ) : (() => {
-            const displayedFiles = files.filter(f => !hideMonitor || f.source !== 'MONITOR');
-            if (displayedFiles.length === 0) {
-              return (
-                <div className="text-center text-muted py-4">
-                  <p className="mb-0">
-                    No uploads here. All PCAP files are monitor-sourced and hidden.{' '}
-                    <button
-                      type="button"
-                      className="btn btn-link p-0 align-baseline text-muted"
-                      style={{ fontSize: 'inherit' }}
-                      onClick={() => setHideMonitor(false)}
-                    >
-                      Show monitor files
-                    </button>
-                  </p>
-                </div>
-              );
-            }
-            return (
-              <div
-                className="list-group list-group-flush"
-                style={{ maxHeight: '13.5rem', overflowY: 'auto' }}
-              >
-                {displayedFiles.map(file => {
+            hideMonitor ? (
+              <div className="text-center text-muted py-4">
+                <p className="mb-0">
+                  No uploads here.{' '}
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 align-baseline text-muted"
+                    style={{ fontSize: 'inherit' }}
+                    onClick={() => setHideMonitor(false)}
+                  >
+                    Show monitor files
+                  </button>
+                  {' '}or upload a PCAP file to get started!
+                </p>
+              </div>
+            ) : (
+              <div className="text-center text-muted py-4">
+                <p className="mb-0">No uploads yet. Upload a PCAP file to get started!</p>
+              </div>
+            )
+          ) : (
+              <div className="list-group list-group-flush">
+                {files.map(file => {
                   const isSelected = selectedForCompare.has(file.fileId);
                   const isCompleted = file.status.toLowerCase() === 'completed';
                   return (
@@ -317,12 +344,12 @@ export const FileList = () => {
                       role={isCompleted ? 'checkbox' : undefined}
                       aria-checked={isCompleted ? isSelected : undefined}
                       tabIndex={isCompleted ? 0 : -1}
-                      onClick={() => handleRowClick(file.fileId, file.status)}
+                      onClick={() => handleRowClick(file.fileId, file.status, file.fileName)}
                       onKeyDown={e => {
                         if (!isCompleted) return;
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          handleRowClick(file.fileId, file.status);
+                          handleRowClick(file.fileId, file.status, file.fileName);
                         }
                       }}
                     >
@@ -401,8 +428,21 @@ export const FileList = () => {
                   );
                 })}
               </div>
-            );
-          })()}
+          )}
+          {/* Show whenever the total exceeds the smallest page-size option, so the page-size
+              selector stays reachable even when the current size collapses to a single page. */}
+          {totalItems > 10 && (
+            <div className="p-2 border-top">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={size => { setPageSize(size); setPage(1); }}
+              />
+            </div>
+          )}
         </Card.Body>
         <Card.Footer className="text-muted small">
           <AlertCircle size={14} className="me-1" />
@@ -529,11 +569,17 @@ export const FileList = () => {
       {/* Delete all confirmation modal */}
       <Modal show={confirmDeleteAll} onHide={() => setConfirmDeleteAll(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Delete All</Modal.Title>
+          <Modal.Title>Delete Page</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Are you sure you want to delete all <strong>{files.length}</strong> uploaded files?
+            Are you sure you want to delete the <strong>{files.length}</strong> file
+            {files.length !== 1 ? 's' : ''} on this page?
+            {totalItems > files.length && (
+              <span className="d-block text-muted small mt-1">
+                Only this page is affected — {totalItems - files.length} more remain on other pages.
+              </span>
+            )}
           </p>
         </Modal.Body>
         <Modal.Footer>
@@ -548,19 +594,16 @@ export const FileList = () => {
             type="button"
             variant="danger"
             onClick={async () => {
-              const results = await Promise.allSettled(
+              await Promise.allSettled(
                 files.map(f => apiClient.delete(API_ENDPOINTS.FILE_DELETE(f.fileId)))
               );
-              const deletedIds = new Set(
-                results
-                  .map((r, i) => (r.status === 'fulfilled' ? files[i].fileId : null))
-                  .filter(Boolean)
-              );
-              setFiles(prev => prev.filter(f => !deletedIds.has(f.fileId)));
               setConfirmDeleteAll(false);
+              // Only step back if we emptied the last page; earlier pages backfill from below.
+              if (page === totalPages && page > 1) setPage(p => p - 1);
+              else fetchFiles();
             }}
           >
-            Delete all
+            Delete page
           </Button>
         </Modal.Footer>
       </Modal>
