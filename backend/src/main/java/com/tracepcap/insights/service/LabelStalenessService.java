@@ -3,7 +3,7 @@ package com.tracepcap.insights.service;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.insights.dto.LabelDrift;
+import com.tracepcap.monitor.spi.LabelStalenessCheck;
 import com.tracepcap.insights.entity.NodeRoleEntity;
 import com.tracepcap.insights.repository.NodeRoleRepository;
 import java.time.LocalDateTime;
@@ -29,13 +29,14 @@ import org.springframework.transaction.annotation.Transactional;
  * carried forward and validated against the new pcap's observed properties; drift on MAC, dominant
  * protocols, or external orgs flags the carried label stale.
  *
- * <p>Lives in the insights package and returns plain {@link LabelDrift} descriptors so the monitor
- * change-detection flow can raise events without this service depending on monitor types.
+ * <p>Implements monitor's {@link LabelStalenessCheck} port (#512 slice 3): the monitor
+ * change-detection flow calls the port, and the dependency points insights → monitor — never the
+ * reverse — keeping the two modules acyclic.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class LabelStalenessService {
+public class LabelStalenessService implements LabelStalenessCheck {
 
   public static final String ORIGIN_CARRIED_FORWARD = "CARRIED_FORWARD";
 
@@ -52,7 +53,8 @@ public class LabelStalenessService {
    * for each carried label that drifted from its baseline.
    */
   @Transactional
-  public List<LabelDrift> carryForwardAndValidate(UUID prevFileId, UUID newFileId) {
+  @Override
+  public List<Drift> carryForwardAndValidate(UUID prevFileId, UUID newFileId) {
     if (newFileId == null) return List.of();
     // Always clear stale carried rows so a reorder/re-add regenerates cleanly.
     nodeRoleRepository.deleteByFileIdAndOrigin(newFileId, ORIGIN_CARRIED_FORWARD);
@@ -69,7 +71,7 @@ public class LabelStalenessService {
             .map(r -> r.getEntityType() + "|" + r.getEntityKey())
             .collect(Collectors.toSet());
 
-    List<LabelDrift> drifts = new ArrayList<>();
+    List<Drift> drifts = new ArrayList<>();
     for (NodeRoleEntity prev : confirmed) {
       if (ownKeys.contains(prev.getEntityType() + "|" + prev.getEntityKey())) continue;
 
@@ -92,7 +94,7 @@ public class LabelStalenessService {
         staleSince = prev.getStaleSince() != null ? prev.getStaleSince() : LocalDateTime.now();
         staleFields = changes;
         drifts.add(
-            new LabelDrift(
+            new Drift(
                 prev.getEntityType(), prev.getEntityKey(), prev.getRoleLabel(), changes));
       } else if (prev.getStaleSince() != null) {
         staleSince = prev.getStaleSince();

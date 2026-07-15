@@ -9,7 +9,7 @@ import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.dto.RoleSuggestionDto;
 import com.tracepcap.insights.dto.UpsertNodeRoleRequest;
 import com.tracepcap.insights.entity.NodeRoleEntity;
-import com.tracepcap.insights.event.NodeRoleChangedEvent;
+import com.tracepcap.common.event.NodeRoleChangedEvent;
 import com.tracepcap.insights.repository.NodeRoleRepository;
 import com.tracepcap.story.service.LlmClient;
 import java.util.List;

@@ -46,11 +46,10 @@ Current baseline
      - 755
      - Cross-module reaches into ``analysis`` repositories/entities.
    * - ``no_module_cycles``
-     - 71
-     - Dependencies participating in ``monitor ↔ insights`` and ``monitor ↔ subnets``.
-       (``analysis ↔ file`` was broken in slice 1; fixing it surfaced ``monitor ↔ subnets``,
-       which ArchUnit's cycle enumeration had not reported until the graph changed — expect the
-       roster to shift as cycles are eliminated.)
+     - **0**
+     - All cycles eliminated. ``analysis ↔ file`` fell in slice 1 (listener moved to its
+       consumer); ``monitor ↔ insights`` and ``monitor ↔ subnets`` fell in slice 3
+       (``monitor.spi`` ports + the ``NodeRoleChangedEvent`` moved to ``common.event``).
    * - ``raw_capture_access_is_confined_to_extract_stage``
      - 6
      - All in ``FilterService`` (validates LLM-generated filters against the pcap) — the one

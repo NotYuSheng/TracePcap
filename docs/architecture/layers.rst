@@ -382,15 +382,14 @@ Measured against the model above; frozen in the ArchUnit baseline where enforcea
 is a refactor target, not a shrug.
 
 * **755 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
-  entities (rule 2). **Two cycles**: ``monitor ↔ insights`` (the decoupling event
-  ``NodeRoleChangedEvent`` already exists, unevenly applied) and ``monitor ↔ subnets``
-  (``ChangeDetectionService:64`` reaches into ``SubnetStalenessService`` via a fully-qualified
-  inline reference — invisible to import greps, caught by bytecode analysis). Rule 1 holds at
-  **zero** violations. A third cycle, ``analysis ↔ file``, was broken in slice 1 by moving
-  ``FileUploadEventListener`` into ``analysis`` — the publisher owns the event, the consumer owns
-  the listener. Notably, fixing it is what *surfaced* ``monitor ↔ subnets``: ArchUnit's cycle
-  enumeration reported it only once the graph changed, a reminder that the frozen cycle store
-  understates until the last cycle is gone.
+  entities (rule 2). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
+  eliminated across slices 1 and 3: ``analysis ↔ file`` (listener moved to its consumer),
+  ``monitor ↔ insights`` and ``monitor ↔ subnets`` (a ``monitor.spi`` port package —
+  ``LabelStalenessCheck``, ``SnapshotRevalidationHook``, ``InsightPresence`` — implemented by
+  ``insights``/``subnets``, plus ``NodeRoleChangedEvent`` relocated to ``common.event`` as shared
+  vocabulary, since publisher and consumer sit on opposite sides of the Scan/Adjudicate loop).
+  Lesson kept for posterity: ArchUnit's cycle enumeration understates until the last cycle is
+  gone — ``monitor ↔ subnets`` only surfaced after ``analysis ↔ file`` was fixed.
 * **``HostnameResolverService`` adjudicates at write time** — picks a winner by source priority
   and discards competing claims, erasing the very conflicts the identity scanners need (#511's
   spoofing case is undetectable today). Contrast ``IpMacObservationEntity``, which does it

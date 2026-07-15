@@ -6,8 +6,8 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.insights.dto.LabelDrift;
-import com.tracepcap.insights.service.LabelStalenessService;
+import com.tracepcap.monitor.spi.LabelStalenessCheck;
+import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
 import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
 import com.tracepcap.intelligence.entity.IpClassification;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
@@ -59,9 +59,9 @@ public class ChangeDetectionService {
   private final NetworkChangeEventRepository changeEventRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
-  private final LabelStalenessService labelStalenessService;
+  private final LabelStalenessCheck labelStalenessCheck;
   private final NetworkSnapshotRepository snapshotRepository;
-  private final com.tracepcap.subnets.service.SubnetStalenessService subnetStalenessService;
+  private final List<SnapshotRevalidationHook> revalidationHooks;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
 
   /**
@@ -86,8 +86,11 @@ public class ChangeDetectionService {
     subnetOverrideCarryForwardService.carryForward(
         fromSnapshot != null ? fromSnapshot.getId() : null, toSnapshot.getId());
 
-    // Re-validate subnet-definition composition baselines against this (latest) snapshot.
-    subnetStalenessService.revalidate(toSnapshot.getNetwork().getId());
+    // Feature-module baselines (subnet compositions today) re-validate against this snapshot
+    // through the SnapshotRevalidationHook port — implementors depend on monitor, not vice versa.
+    for (SnapshotRevalidationHook hook : revalidationHooks) {
+      hook.revalidate(toSnapshot.getNetwork().getId());
+    }
 
     return changeEventRepository.saveAll(events);
   }
@@ -99,7 +102,7 @@ public class ChangeDetectionService {
 
     UUID fromFileId = fromSnapshot != null ? fromSnapshot.getFile().getId() : null;
     List<NetworkChangeEventEntity> events = new ArrayList<>();
-    for (LabelDrift drift : labelStalenessService.carryForwardAndValidate(fromFileId, toFileId)) {
+    for (LabelStalenessCheck.Drift drift : labelStalenessCheck.carryForwardAndValidate(fromFileId, toFileId)) {
       Map<String, Object> newValue = new HashMap<>();
       newValue.put("entityType", drift.entityType());
       newValue.put("roleLabel", orEmpty(drift.roleLabel()));
