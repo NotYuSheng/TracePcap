@@ -88,6 +88,35 @@ class LayerDependencyTest {
    * anyway so a regression is reported as "analysis reached upward" rather than as an anonymous
    * slice violation, and so the store documents that this boundary is clean.
    */
+  /**
+   * Stage rule 4 (docs/architecture/layers.rst): raw-capture access is confined to Ingest
+   * byte-plumbing ({@code file} — mergecap), Extract eager or lazy ({@code analysis},
+   * {@code hostlog}, {@code extraction}), and evidence export ({@code conversation} — raw-frame
+   * download). Everything else reads the database; a scanner needing raw data means a missing
+   * extractor, not a licence to shell out.
+   *
+   * <p>{@code ProcessBuilder} is the enforceable proxy for external-tool invocation (tshark,
+   * ndpiReader, suricata, mergecap — all go through it). Known grey case, frozen rather than
+   * blessed: {@code FilterService} validates LLM-generated display filters against the pcap.
+   */
+  @ArchTest
+  static final ArchRule raw_capture_access_is_confined_to_extract_stage =
+      freeze(
+          ArchRuleDefinition.noClasses()
+              .that()
+              .resideOutsideOfPackages(
+                  "com.tracepcap.analysis..",
+                  "com.tracepcap.hostlog..",
+                  "com.tracepcap.extraction..",
+                  "com.tracepcap.file..",
+                  "com.tracepcap.conversation..")
+              .should()
+              .dependOnClassesThat()
+              .haveFullyQualifiedName("java.lang.ProcessBuilder")
+              .because(
+                  "only Ingest plumbing, Extract (eager or lazy), and evidence export may touch"
+                      + " the capture (#512 stage rule 4); everything downstream reads the DB"));
+
   @ArchTest
   static final ArchRule analysis_does_not_depend_on_feature_modules =
       freeze(

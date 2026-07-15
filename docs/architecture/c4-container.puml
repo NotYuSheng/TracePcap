@@ -1,6 +1,6 @@
 @startuml c4-container
 ' TracePcap — C4 Container diagram (#512)
-' Grouped by pipeline layer (L1–L7); see docs/architecture/layers.rst
+' Grouped by pipeline stage; see docs/architecture/layers.rst
 ' Render: plantuml docs/architecture/c4-container.puml
 
 skinparam backgroundColor #FFFFFF
@@ -25,58 +25,56 @@ skinparam note {
   FontSize 10
 }
 
-title TracePcap — Containers and Backend Layers\nData flows top to bottom, L1 → L7.  D = deterministic, L = LLM-driven, H = human-annotated.
+title TracePcap — Containers and Pipeline Stages\npackets → facts → insights → conclusions → narrative.  D = deterministic, L = LLM-driven, H = human-annotated.
 
 actor "Analyst" as user
 rectangle "Frontend\n[React + TypeScript, nginx]" as fe #E6F0FA
 
 package "Backend — Spring Boot" as be {
 
-  rectangle "**L1 · Ingest**\n\nfile [D]  ·  cleanup [D]" as l1 #EDF7ED
-  rectangle "**L2–L3 · Parse & Enrich**\n\nanalysis [D] — 7-stage pipeline, owns analysis.spi\nhostlog [D]  ·  signatures [D+H]" as l23 #EDF7ED
-  rectangle "**L4 · Classify**\n\nhostclassification [D] — 7 signals\nsubnets [D+L+H]  ·  reconciliation [D]\ninsights [D+L+H] — annotation reference" as l4 #FFF6E5
-  rectangle "**L5 · Detect**\n\nmonitor [D] — 13 change types\nstory·detectors [D] — 8 detectors\nintelligence [D]  ·  timeline [D]" as l5 #FFF6E5
-  rectangle "**L6 · Narrate**\n\nstory·narrative [L]  ·  tracer [L]\nfilter [L]  ·  notes [H]" as l6 #F3E8FF
-  rectangle "**L7 · Present**\n\nreport [D]  ·  conversation [D]  ·  extraction [D]" as l7 #EDF7ED
-  rectangle "common  ·  config\n(depended on by all, depends on nothing)" as common #E2E8F0
+  rectangle "**Ingest**\n\nfile [D] — upload, MinIO, mergecap\ncleanup [D]" as s_ingest #EDF7ED
+  rectangle "**Extract** — observations with witnesses\nMEASURED / REPORTED / INFERRED, append-only + run manifest\n\nanalysis [D] — wire + reference extractors, owns analysis.spi\nhostlog [D]  ·  extraction [D] (lazy: carving, session reconstruction)" as s_extract #EDF7ED
+  rectangle "**Scan** — additive; reads facts, never the pcap\n\nhostclassification [D] — 7 signals\nstory·detectors [D] — 8 detectors\nmonitor [D+H] — cross-snapshot, 13 change types\nsubnets [D+L+H]  ·  signatures [D+H]  ·  reconciliation [D]" as s_scan #FFF6E5
+  rectangle "**Adjudicate** — exclusive; one voice per question\nhuman annotations ranked first; contested is a legal outcome\n\ninsights [D+L+H] — node roles, staleness\n(ScoreBoard prototype lives inside hostclassification)" as s_adj #FDE8E8
+  rectangle "**Narrate** — evidence citations, offline LLM only\n\nstory·narrative [L]  ·  tracer [L]  ·  filter [L]" as s_narrate #F3E8FF
+  rectangle "**Present** — read surface + views (no judgment)\n\nconversation [D]  ·  timeline [D]  ·  intelligence [D]  ·  report [D]" as s_present #EDF7ED
+  rectangle "annotation envelope: origin · llmSuggested · confirmedByHuman · staleSince\nnotes [H]  ·  common  ·  config" as s_env #E2E8F0
 }
 
 database "PostgreSQL\n[Flyway]" as db
 database "MinIO\n[object storage]" as minio
 rectangle "LLM\n[local inference server\nLLM_BASE_URL]" as llm #F3E8FF
-rectangle "External tools\n[tshark, ndpiReader, Suricata]" as tools #E2E8F0
+rectangle "External tools\n[tshark, ndpiReader, Suricata,\nmergecap]" as tools #E2E8F0
 
 user -down-> fe
-fe -down-> l7 : REST /api/v1
+fe -down-> s_present : REST /api/v1
 
-l1 -down-> l23
-l23 -down-> l4
-l4 -down-> l5
-l5 -down-> l6
-l6 -down-> l7
+s_ingest -down-> s_extract : capture
+s_extract -down-> s_scan : facts
+s_scan -down-> s_adj : insights
+s_adj -down-> s_narrate : conclusions
+s_narrate -down-> s_present : narrative
 
-l23 -right-> tools : subprocess
-l1 -left-> minio : stores PCAP
-l6 -right-> llm : offline-capable only
-l7 -right-> db : JPA
+s_ingest -left-> minio : stores PCAP
+s_extract -right-> tools : subprocess\n(only Extract + Ingest\nmay touch the capture)
+s_narrate -right-> llm : offline-capable only
+s_present -right-> db : JPA (reads)
 
-note right of l23
-  <b>Ports owned by analysis</b> (analysis.spi)
-  HostClassifier → hostclassification
-  SignatureApplier → signatures
-  HostServiceLogExtractor → hostlog
-  FileExtractionStage → extraction
+s_adj .up.> s_scan : adjudications re-enter as INFERRED\nunless human-confirmed (loop rule)
 
-  Direction is always feature → analysis (#416).
-  <b>Holds today: 0 violations.</b>
+note right of s_adj
+  <b>Human authority enters here.</b>
+  confirmedByHuman ranks first;
+  measurement beats testimony;
+  staleness = re-adjudication.
 end note
 
-note right of l4
+note right of s_scan
   <b>Known drift (#512) — frozen baseline</b>
-  755 class deps bypass analysis.spi and reach
-  into analysis repositories/entities.
+  755 class deps bypass analysis.spi.
   Cycles: monitor ↔ insights, analysis ↔ file (71).
-  The ArchUnit store may only shrink.
+  Frontend still scans/adjudicates (nodeType,
+  getNodeColor). Store may only shrink.
 end note
 
 @enduml

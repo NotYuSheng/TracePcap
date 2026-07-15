@@ -48,6 +48,10 @@ Current baseline
    * - ``no_module_cycles``
      - 71
      - Dependencies participating in ``monitor ↔ insights`` and ``analysis ↔ file``.
+   * - ``raw_capture_access_is_confined_to_extract_stage``
+     - 6
+     - All in ``FilterService`` (validates LLM-generated filters against the pcap) — the one
+       grey case in stage rule 4, frozen rather than blessed.
    * - ``analysis_does_not_depend_on_feature_modules``
      - **0**
      - #416's invariant — clean, and frozen to keep it that way.
