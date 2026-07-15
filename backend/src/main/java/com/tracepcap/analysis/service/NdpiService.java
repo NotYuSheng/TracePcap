@@ -1,6 +1,7 @@
 package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.spi.ExtractionManifest;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -107,15 +108,24 @@ public class NdpiService {
   // ---------------------------------------------------------------------------
 
   /**
+   * How an {@link #enrich} run ended, for the extraction manifest (#512 slice 2). Distinguishes
+   * "nDPI ran and couldn't identify a flow" (COMPLETED — appName stays null meaningfully) from
+   * "nDPI never ran / died" (FAILED — null appNames are a coverage gap, not a finding).
+   */
+  public record Outcome(ExtractionManifest.Status status, String detail) {}
+
+  /**
    * Enrich each ConversationInfo with the app name and security risk flags detected by nDPI. Runs
    * {@code ndpiReader} exactly once and populates both fields in a single pass. Conversations nDPI
    * cannot identify are left with appName == null and an empty risks list.
    */
-  public void enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
-    if (conversations.isEmpty()) return;
+  public Outcome enrich(File pcapFile, List<PcapParserService.ConversationInfo> conversations) {
+    if (conversations.isEmpty())
+      return new Outcome(ExtractionManifest.Status.COMPLETED, "no conversations to enrich");
 
-    Map<String, FlowData> flowMap = runNdpi(pcapFile);
-    if (flowMap.isEmpty()) return;
+    NdpiRun run = runNdpi(pcapFile);
+    Map<String, FlowData> flowMap = run.flows();
+    if (flowMap.isEmpty()) return run.outcome();
 
     for (PcapParserService.ConversationInfo conv : conversations) {
       FlowData data = resolve(flowMap, conv);
@@ -155,6 +165,7 @@ public class NdpiService {
         conversations.size(),
         enrichedTlsCert,
         conversations.size());
+    return run.outcome();
   }
 
   // ---------------------------------------------------------------------------
@@ -174,11 +185,14 @@ public class NdpiService {
       LocalDateTime tlsNotBefore,
       LocalDateTime tlsNotAfter) {}
 
+  /** The parsed flows plus how the run ended — empty flows with FAILED is not the same as empty with COMPLETED. */
+  private record NdpiRun(Map<String, FlowData> flows, Outcome outcome) {}
+
   /**
    * Runs {@code ndpiReader -i <file> -v 2} and returns a map of flow key → FlowData. Each FlowData
    * contains the detected app name (may be null) and list of risk names.
    */
-  private Map<String, FlowData> runNdpi(File pcapFile) {
+  private NdpiRun runNdpi(File pcapFile) {
     Map<String, FlowData> result = new HashMap<>();
 
     ProcessBuilder pb =
@@ -209,19 +223,34 @@ public class NdpiService {
           parseFlowLine(line, result);
         }
       }
-      process.waitFor();
+      int exit = process.waitFor();
       log.debug("nDPI parsed {} distinct flows", result.size());
+      if (exit != 0) {
+        log.warn("ndpiReader exited with code {}; results may be partial", exit);
+        return new NdpiRun(
+            result,
+            new Outcome(
+                ExtractionManifest.Status.FAILED, "ndpiReader exited with code " + exit));
+      }
+      return new NdpiRun(
+          result,
+          new Outcome(
+              ExtractionManifest.Status.COMPLETED, result.size() + " flows identified"));
 
     } catch (Exception e) {
       if (isNotFoundError(e)) {
         log.warn(
             "ndpiReader not found — skipping app/risk identification. Install libndpi-bin to enable.");
-      } else {
-        log.warn("nDPI analysis failed", e);
+        return new NdpiRun(
+            result,
+            new Outcome(
+                ExtractionManifest.Status.SKIPPED,
+                "ndpiReader not installed (install libndpi-bin)"));
       }
+      log.warn("nDPI analysis failed", e);
+      return new NdpiRun(
+          result, new Outcome(ExtractionManifest.Status.FAILED, "nDPI analysis failed: " + e.getMessage()));
     }
-
-    return result;
   }
 
   /**

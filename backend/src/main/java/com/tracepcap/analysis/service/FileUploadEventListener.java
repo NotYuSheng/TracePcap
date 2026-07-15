@@ -1,13 +1,18 @@
-package com.tracepcap.file.event;
+package com.tracepcap.analysis.service;
 
-import com.tracepcap.analysis.service.AsyncAnalysisService;
+import com.tracepcap.file.event.FileUploadedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/** Listener for file upload events */
+/**
+ * Bridges Ingest to Extract: reacts to the {@code file} module's upload event by scheduling
+ * analysis. Lives in {@code analysis} — the publisher owns the event, the consumer owns the
+ * listener — so {@code file} needs no knowledge of {@code analysis} (#512, breaks the
+ * {@code analysis ↔ file} cycle).
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

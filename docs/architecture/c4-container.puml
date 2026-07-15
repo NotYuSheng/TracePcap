@@ -1,0 +1,81 @@
+@startuml c4-container
+' TracePcap — C4 Container diagram (#512)
+' Grouped by pipeline stage; see docs/architecture/layers.rst
+' Render: plantuml docs/architecture/c4-container.puml
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 12
+skinparam ranksep 22
+skinparam ArrowColor #4A5568
+skinparam ArrowFontSize 10
+skinparam rectangle {
+  BorderColor #2D3748
+  FontColor #1A202C
+}
+skinparam database {
+  BorderColor #2D3748
+  BackgroundColor #EDF2F7
+}
+skinparam note {
+  BackgroundColor #FFFDF0
+  BorderColor #D6BE7A
+  FontSize 10
+}
+
+title TracePcap — Containers and Pipeline Stages\npackets → facts → insights → conclusions → narrative.  D = deterministic, L = LLM-driven, H = human-annotated.
+
+actor "Analyst" as user
+rectangle "Frontend\n[React + TypeScript, nginx]" as fe #E6F0FA
+
+package "Backend — Spring Boot" as be {
+
+  rectangle "**Ingest**\n\nfile [D] — upload, MinIO, mergecap\ncleanup [D]" as s_ingest #EDF7ED
+  rectangle "**Extract** — observations with witnesses\nMEASURED / REPORTED / INFERRED, append-only + run manifest\n\nanalysis [D] — wire + reference extractors, owns analysis.spi\nhostlog [D]  ·  extraction [D] (lazy: carving, session reconstruction)" as s_extract #EDF7ED
+  rectangle "**Scan** — additive; reads facts, never the pcap\n\nhostclassification [D] — 7 signals\nstory·detectors [D] — 8 detectors\nmonitor [D+H] — cross-snapshot, 13 change types\nsubnets [D+L+H]  ·  signatures [D+H]  ·  reconciliation [D]" as s_scan #FFF6E5
+  rectangle "**Adjudicate** — exclusive; one voice per question\nhuman annotations ranked first; contested is a legal outcome\n\ninsights [D+L+H] — node roles, staleness\n(ScoreBoard prototype lives inside hostclassification)" as s_adj #FDE8E8
+  rectangle "**Narrate** — evidence citations, offline LLM only\n\nstory·narrative [L]  ·  tracer [L]  ·  filter [L]" as s_narrate #F3E8FF
+  rectangle "**Present** — read surface + views (no judgment)\n\nconversation [D]  ·  timeline [D]  ·  intelligence [D]  ·  report [D]" as s_present #EDF7ED
+  rectangle "annotation envelope: origin · llmSuggested · confirmedByHuman · staleSince\nnotes [H]  ·  common  ·  config" as s_env #E2E8F0
+}
+
+database "PostgreSQL\n[Flyway]" as db
+database "MinIO\n[object storage]" as minio
+rectangle "LLM\n[local inference server\nLLM_BASE_URL]" as llm #F3E8FF
+rectangle "External tools\n[tshark, ndpiReader, Suricata,\nmergecap]" as tools #E2E8F0
+
+user -down-> fe
+fe -down-> s_present : REST /api/v1
+
+s_ingest -down-> s_extract : capture
+s_extract -down-> s_scan : facts
+s_scan -down-> s_adj : insights
+s_adj -down-> s_narrate : conclusions
+s_narrate -down-> s_present : narrative
+
+s_ingest -left-> minio : stores PCAP
+s_extract -right-> tools : subprocess\n(only Ingest, Extract, and\nevidence export touch the capture)
+s_narrate -right-> llm : offline-capable only
+s_present -right-> db : JPA (reads)
+
+s_adj .up.> s_scan : adjudications re-enter as INFERRED\nunless human-confirmed (loop rule)
+
+note right of s_adj
+  <b>Human authority enters here.</b>
+  confirmedByHuman ranks first;
+  measurement beats testimony;
+  staleness = re-adjudication.
+end note
+
+note right of s_scan
+  <b>Known drift (#512) — frozen baseline</b>
+  755 class deps bypass analysis.spi.
+  Cycles: monitor ↔ insights, monitor ↔ subnets
+  (analysis ↔ file broken in slice 1).
+  Frontend still scans/adjudicates (nodeType,
+  getNodeColor). Store may only shrink.
+end note
+
+@enduml
