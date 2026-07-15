@@ -1,0 +1,82 @@
+@startuml c4-container
+' TracePcap — C4 Container diagram (#512)
+' Grouped by pipeline layer (L1–L7); see docs/architecture/layers.rst
+' Render: plantuml docs/architecture/c4-container.puml
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 12
+skinparam ranksep 22
+skinparam ArrowColor #4A5568
+skinparam ArrowFontSize 10
+skinparam rectangle {
+  BorderColor #2D3748
+  FontColor #1A202C
+}
+skinparam database {
+  BorderColor #2D3748
+  BackgroundColor #EDF2F7
+}
+skinparam note {
+  BackgroundColor #FFFDF0
+  BorderColor #D6BE7A
+  FontSize 10
+}
+
+title TracePcap — Containers and Backend Layers\nData flows top to bottom, L1 → L7.  D = deterministic, L = LLM-driven, H = human-annotated.
+
+actor "Analyst" as user
+rectangle "Frontend\n[React + TypeScript, nginx]" as fe #E6F0FA
+
+package "Backend — Spring Boot" as be {
+
+  rectangle "**L1 · Ingest**\n\nfile [D]  ·  cleanup [D]" as l1 #EDF7ED
+  rectangle "**L2–L3 · Parse & Enrich**\n\nanalysis [D] — 7-stage pipeline, owns analysis.spi\nhostlog [D]  ·  signatures [D+H]" as l23 #EDF7ED
+  rectangle "**L4 · Classify**\n\nhostclassification [D] — 7 signals\nsubnets [D+L+H]  ·  reconciliation [D]\ninsights [D+L+H] — annotation reference" as l4 #FFF6E5
+  rectangle "**L5 · Detect**\n\nmonitor [D] — 13 change types\nstory·detectors [D] — 8 detectors\nintelligence [D]  ·  timeline [D]" as l5 #FFF6E5
+  rectangle "**L6 · Narrate**\n\nstory·narrative [L]  ·  tracer [L]\nfilter [L]  ·  notes [H]" as l6 #F3E8FF
+  rectangle "**L7 · Present**\n\nreport [D]  ·  conversation [D]  ·  extraction [D]" as l7 #EDF7ED
+  rectangle "common  ·  config\n(depended on by all, depends on nothing)" as common #E2E8F0
+}
+
+database "PostgreSQL\n[Flyway]" as db
+database "MinIO\n[object storage]" as minio
+rectangle "LLM\n[local inference server\nLLM_BASE_URL]" as llm #F3E8FF
+rectangle "External tools\n[tshark, ndpiReader, Suricata]" as tools #E2E8F0
+
+user -down-> fe
+fe -down-> l7 : REST /api/v1
+
+l1 -down-> l23
+l23 -down-> l4
+l4 -down-> l5
+l5 -down-> l6
+l6 -down-> l7
+
+l23 -right-> tools : subprocess
+l1 -left-> minio : stores PCAP
+l6 -right-> llm : offline-capable only
+l7 -right-> db : JPA
+
+note right of l23
+  <b>Ports owned by analysis</b> (analysis.spi)
+  HostClassifier → hostclassification
+  SignatureApplier → signatures
+  HostServiceLogExtractor → hostlog
+  FileExtractionStage → extraction
+
+  Direction is always feature → analysis (#416).
+  <b>Holds today: 0 violations.</b>
+end note
+
+note right of l4
+  <b>Known drift (#512) — frozen baseline</b>
+  755 class deps bypass analysis.spi and reach
+  into analysis repositories/entities.
+  Cycles: monitor ↔ insights, analysis ↔ file (71).
+  The ArchUnit store may only shrink.
+end note
+
+@enduml

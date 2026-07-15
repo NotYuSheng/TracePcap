@@ -15,6 +15,13 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
 
 .. toctree::
    :maxdepth: 2
+   :caption: Architecture
+
+   architecture/layers
+   architecture/enforcement
+
+.. toctree::
+   :maxdepth: 2
    :caption: Features
 
    features/pcap-upload
