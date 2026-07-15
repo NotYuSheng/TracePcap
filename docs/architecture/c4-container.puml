@@ -56,7 +56,7 @@ s_adj -down-> s_narrate : conclusions
 s_narrate -down-> s_present : narrative
 
 s_ingest -left-> minio : stores PCAP
-s_extract -right-> tools : subprocess\n(only Extract + Ingest\nmay touch the capture)
+s_extract -right-> tools : subprocess\n(only Ingest, Extract, and\nevidence export touch the capture)
 s_narrate -right-> llm : offline-capable only
 s_present -right-> db : JPA (reads)
 
