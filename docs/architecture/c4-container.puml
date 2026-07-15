@@ -72,7 +72,8 @@ end note
 note right of s_scan
   <b>Known drift (#512) — frozen baseline</b>
   755 class deps bypass analysis.spi.
-  Cycles: monitor ↔ insights, analysis ↔ file (71).
+  Cycles: monitor ↔ insights, monitor ↔ subnets
+  (analysis ↔ file broken in slice 1).
   Frontend still scans/adjudicates (nodeType,
   getNodeColor). Store may only shrink.
 end note
