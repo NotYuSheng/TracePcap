@@ -15,4 +15,5 @@ CREATE TABLE extraction_runs (
     CONSTRAINT uq_extraction_runs_file_extractor UNIQUE (file_id, extractor)
 );
 
-CREATE INDEX idx_extraction_runs_file ON extraction_runs (file_id);
+-- No separate file_id index: the unique constraint's (file_id, extractor) b-tree already serves
+-- prefix lookups on file_id.

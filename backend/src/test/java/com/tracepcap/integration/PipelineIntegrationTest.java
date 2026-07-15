@@ -67,6 +67,7 @@ class PipelineIntegrationTest {
   }
 
   @Autowired private TestRestTemplate rest;
+  @Autowired private com.tracepcap.analysis.service.ExtractionRunService extractionRunService;
 
   @Test
   void filesList_returnsPagedResponseEnvelope() {
@@ -157,6 +158,38 @@ class PipelineIntegrationTest {
     ResponseEntity<JsonNode> meta = rest.getForEntity("/api/v1/files/" + fileId, JsonNode.class);
     assertThat(meta.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(meta.getBody().get("fileName").asText()).contains("ftp");
+  }
+
+  @Test
+  void extractionRunRecord_twiceForSameFileAndExtractor_updatesInPlace() {
+    // Re-analysis records the same (file, extractor) again. The naive delete-then-insert dies on
+    // the unique constraint (IDENTITY ids flush the INSERT before the queued DELETE), and the
+    // recorder's catch would swallow it — so assert the second write actually lands.
+    ResponseEntity<JsonNode> upload = uploadFixture("ftp.pcap");
+    JsonNode body = upload.getBody();
+    UUID fileId =
+        UUID.fromString(
+            upload.getStatusCode() == HttpStatus.CREATED
+                ? body.get("fileId").asText()
+                : body.get("existingFileId").asText());
+
+    extractionRunService.record(
+        fileId,
+        com.tracepcap.analysis.spi.ExtractionManifest.NDPI,
+        com.tracepcap.analysis.spi.ExtractionManifest.Status.FAILED,
+        "first run: crashed");
+    extractionRunService.record(
+        fileId,
+        com.tracepcap.analysis.spi.ExtractionManifest.NDPI,
+        com.tracepcap.analysis.spi.ExtractionManifest.Status.COMPLETED,
+        "second run: 12 flows identified");
+
+    var run =
+        extractionRunService.runFor(fileId, com.tracepcap.analysis.spi.ExtractionManifest.NDPI);
+    assertThat(run).isPresent();
+    assertThat(run.get().status())
+        .isEqualTo(com.tracepcap.analysis.spi.ExtractionManifest.Status.COMPLETED);
+    assertThat(run.get().detail()).isEqualTo("second run: 12 flows identified");
   }
 
   @Test

@@ -42,21 +42,24 @@ public class ExtractionRunService implements ExtractionManifest {
                     e.getDetail()));
   }
 
-  /** Replaces this file+extractor's row (re-analysis overwrites the previous run's record). */
+  /**
+   * Replaces this file+extractor's row (re-analysis overwrites the previous run's record).
+   * Updates in place rather than delete-then-insert: with IDENTITY ids Hibernate flushes the
+   * INSERT immediately while the DELETE stays queued, which would trip the unique constraint on
+   * every re-analysis.
+   */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void record(UUID fileId, String extractor, Status status, String detail) {
     try {
-      repository
-          .findByFileIdAndExtractor(fileId, extractor)
-          .ifPresent(existing -> repository.deleteById(existing.getId()));
-      repository.save(
-          ExtractionRunEntity.builder()
-              .fileId(fileId)
-              .extractor(extractor)
-              .version(VERSION)
-              .status(status.name())
-              .detail(detail)
-              .build());
+      ExtractionRunEntity entity =
+          repository
+              .findByFileIdAndExtractor(fileId, extractor)
+              .orElseGet(
+                  () -> ExtractionRunEntity.builder().fileId(fileId).extractor(extractor).build());
+      entity.setVersion(VERSION);
+      entity.setStatus(status.name());
+      entity.setDetail(detail);
+      repository.save(entity);
     } catch (Exception e) {
       log.warn(
           "Failed to record extraction run {}={} for file {}: {}",

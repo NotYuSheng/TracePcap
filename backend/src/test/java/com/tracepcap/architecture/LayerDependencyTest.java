@@ -81,14 +81,6 @@ class LayerDependencyTest {
               .beFreeOfCycles());
 
   /**
-   * The layering direction #416 established: the ingest pipeline owns ports, feature modules
-   * implement them. {@code analysis} must never depend on the modules above it.
-   *
-   * <p>This rule currently has <b>zero</b> violations — #416's core invariant held. It is frozen
-   * anyway so a regression is reported as "analysis reached upward" rather than as an anonymous
-   * slice violation, and so the store documents that this boundary is clean.
-   */
-  /**
    * Stage rule 4 (docs/architecture/layers.rst): raw-capture access is confined to Ingest
    * byte-plumbing ({@code file} — mergecap), Extract eager or lazy ({@code analysis},
    * {@code hostlog}, {@code extraction}), and evidence export ({@code conversation} — raw-frame
@@ -117,6 +109,14 @@ class LayerDependencyTest {
                   "only Ingest plumbing, Extract (eager or lazy), and evidence export may touch"
                       + " the capture (#512 stage rule 4); everything downstream reads the DB"));
 
+  /**
+   * The layering direction #416 established: the ingest pipeline owns ports, feature modules
+   * implement them. {@code analysis} must never depend on the modules above it.
+   *
+   * <p>This rule currently has <b>zero</b> violations — #416's core invariant held. It is frozen
+   * anyway so a regression is reported as "analysis reached upward" rather than as an anonymous
+   * slice violation, and so the store documents that this boundary is clean.
+   */
   @ArchTest
   static final ArchRule analysis_does_not_depend_on_feature_modules =
       freeze(
