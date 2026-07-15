@@ -397,9 +397,12 @@ is a refactor target, not a shrug.
   right.
 * **``WebServerLogExtractor`` mixes stages** — extraction (endpoint logging) and scanning (the
   api/web role decision that #496 flags as broken) in one pass.
-* **No run manifest.** ``UnknownAppDetector`` cannot distinguish "nDPI didn't run" from "nDPI
-  couldn't identify" — a missing ``ndpiReader`` binary reports as *"100% of Traffic Has Unknown
-  Application, HIGH"* (#501).
+* **Run manifest exists for nDPI only** (slice 2): ``extraction_runs`` records
+  COMPLETED/FAILED/SKIPPED per file, served through the ``ExtractionManifest`` SPI port, and
+  ``UnknownAppDetector`` now reports a skipped/failed run as a ``COVERAGE_GAP`` finding instead
+  of *"100% of Traffic Has Unknown Application, HIGH"* (#501). Remaining extractors (tshark
+  enrichment, Suricata when it runs, hostname resolution, service logs) are not yet
+  instrumented — their absent rows mean "unknown provenance", same as pre-manifest files.
 * **The frontend scans and adjudicates.** ``networkService.ts`` computes ``nodeType`` from
   ports/nDPI (scanning) and ``getNodeColor`` resolves the nodeType-vs-deviceType conflict by
   display precedence (adjudicating) — client-side, on a truncated node set. #496/#499 are the

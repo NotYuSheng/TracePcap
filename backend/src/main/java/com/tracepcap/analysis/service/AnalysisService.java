@@ -13,6 +13,7 @@ import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpMacObservationRepository;
 import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.ExtractionManifest;
 import com.tracepcap.analysis.spi.FileExtractionStage;
 import com.tracepcap.analysis.spi.HostClassifier;
 import com.tracepcap.analysis.spi.SignatureApplier;
@@ -80,6 +81,7 @@ public class AnalysisService {
   private final GeoIpService geoIpService;
   private final FileExtractionStage fileExtractionStage;
   private final AnalysisRecordService analysisRecordService;
+  private final ExtractionRunService extractionRunService;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -124,14 +126,29 @@ public class AnalysisService {
         // Stage 3: nDPI + tshark enrichment
         t = System.currentTimeMillis();
         if (file.isEnableNdpi()) {
-          ndpiService.enrich(tempFile, parseResult.getConversations());
+          NdpiService.Outcome ndpiOutcome =
+              ndpiService.enrich(tempFile, parseResult.getConversations());
+          extractionRunService.record(
+              fileId, ExtractionManifest.NDPI, ndpiOutcome.status(), ndpiOutcome.detail());
           tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
+        } else {
+          extractionRunService.record(
+              fileId,
+              ExtractionManifest.NDPI,
+              ExtractionManifest.Status.SKIPPED,
+              "nDPI disabled for this file");
         }
         // Per-file flag AND the global kill-switch must both allow it. SURICATA_ENABLED=false
         // disables Suricata across the board regardless of the upload-time enableSuricata flag.
         boolean runSuricata = suricataEnabled && file.isEnableSuricata();
         if (runSuricata) {
           suricataService.enrich(tempFile, parseResult.getConversations());
+        } else {
+          extractionRunService.record(
+              fileId,
+              ExtractionManifest.SURICATA,
+              ExtractionManifest.Status.SKIPPED,
+              suricataEnabled ? "Suricata disabled for this file" : "SURICATA_ENABLED=false");
         }
         log.info(
             "[{}] [3/7] Enrichment (nDPI={}, Suricata={}): {}ms",

@@ -1422,7 +1422,8 @@
               "FAN_OUT",
               "LONG_SESSION",
               "UNKNOWN_APP",
-              "PORT_PROTOCOL_MISMATCH"
+              "PORT_PROTOCOL_MISMATCH",
+              "COVERAGE_GAP"
             ],
             "type": "string"
           }
