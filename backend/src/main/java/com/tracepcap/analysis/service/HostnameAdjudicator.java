@@ -4,7 +4,9 @@ import com.tracepcap.analysis.service.HostnameResolverService.Claim;
 import com.tracepcap.analysis.service.HostnameResolverService.ResolvedHostname;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +37,7 @@ public class HostnameAdjudicator {
   /** The per-IP winners, preserving the old first-seen-wins tie behaviour. */
   public Map<String, ResolvedHostname> adjudicate(Collection<Claim> claims) {
     Map<String, ResolvedHostname> winners = new LinkedHashMap<>();
-    Map<String, Boolean> contested = new LinkedHashMap<>();
+    Set<String> contested = new LinkedHashSet<>();
 
     for (Claim claim : claims) {
       ResolvedHostname existing = winners.get(claim.ip());
@@ -44,7 +46,7 @@ public class HostnameAdjudicator {
         continue;
       }
       if (!existing.hostname().equalsIgnoreCase(claim.hostname())) {
-        contested.put(claim.ip(), Boolean.TRUE);
+        contested.add(claim.ip());
       }
       if (SOURCE_PRIORITY.getOrDefault(existing.source(), Integer.MAX_VALUE)
           <= SOURCE_PRIORITY.getOrDefault(claim.source(), Integer.MAX_VALUE)) {
@@ -58,7 +60,7 @@ public class HostnameAdjudicator {
           "Hostname adjudication: {} of {} IP(s) contested (multiple distinct names claimed): {}",
           contested.size(),
           winners.size(),
-          contested.keySet().stream().limit(5).toList());
+          contested.stream().limit(5).toList());
     }
     return winners;
   }

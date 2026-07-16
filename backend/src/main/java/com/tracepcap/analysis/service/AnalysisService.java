@@ -168,7 +168,16 @@ public class AnalysisService {
         // resolver used to apply at write time, so downstream behaviour is unchanged.
         List<HostnameResolverService.Claim> hostnameClaims =
             hostnameResolverService.resolve(tempFile);
-        hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
+        try {
+          hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
+        } catch (Exception e) {
+          // Best-effort: the writer's REQUIRES_NEW tx rolled back alone; analysis continues.
+          log.warn(
+              "Failed to persist {} hostname claim(s) for file {}: {}",
+              hostnameClaims.size(),
+              fileId,
+              e.getMessage());
+        }
         Map<String, HostnameResolverService.ResolvedHostname> hostnames =
             hostnameAdjudicator.adjudicate(hostnameClaims);
         // Per-host service activity logs (DNS today; web servers etc. later). Each extractor runs
