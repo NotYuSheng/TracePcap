@@ -45,9 +45,7 @@ interface NetworkGraphProps {
 // ---------------------------------------------------------------------------
 
 const DARK_BG = '#0f1117';
-/** Contested-identity ring (#512 slice 5b) — amber, matches the NodeDetails bg-warning badge. */
-const CONTESTED_COLOR = '#f59e0b';
-/** Dashed ring for contested identities (#512 slice 5b) — amber, distinct from highlight colors. */
+/** Dashed ring for contested identities (#512 slice 5b) — amber, matches NodeDetails' bg-warning badge. */
 const CONTESTED_COLOR = '#f59e0b';
 const DARK_SURFACE = '#1e2130';
 const LIGHT_BG = '#f6f8fa';
