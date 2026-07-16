@@ -6,7 +6,7 @@ import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.entity.FileEntity.FileStatus;
 import com.tracepcap.file.repository.FileRepository;
-import com.tracepcap.insights.repository.SnapshotInsightRepository;
+import com.tracepcap.monitor.spi.InsightPresence;
 import com.tracepcap.monitor.dto.NetworkSnapshotDto;
 import com.tracepcap.monitor.dto.PatchSnapshotRequest;
 import com.tracepcap.monitor.dto.SnapshotSubnetOverrideDto;
@@ -38,7 +38,7 @@ public class SnapshotService {
   private final FileRepository fileRepository;
   private final ChangeDetectionService changeDetectionService;
   private final NetworkChangeEventRepository changeEventRepository;
-  private final SnapshotInsightRepository snapshotInsightRepository;
+  private final InsightPresence insightPresence;
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
   private final ConversationRepository conversationRepository;
@@ -307,7 +307,7 @@ public class SnapshotService {
         .securitySignalCount(securitySignalCount)
         .context(s.getContext())
         .notes(s.getNotes())
-        .hasInsights(snapshotInsightRepository.existsBySnapshotId(s.getId()))
+        .hasInsights(insightPresence.snapshotHasInsights(s.getId()))
         .addedAt(s.getAddedAt())
         .subnetOverrides(overrides)
         .build();

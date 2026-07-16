@@ -6,8 +6,8 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.insights.dto.LabelDrift;
-import com.tracepcap.insights.service.LabelStalenessService;
+import com.tracepcap.monitor.spi.LabelStalenessCheck;
+import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
 import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
 import com.tracepcap.intelligence.entity.IpClassification;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
@@ -59,9 +59,9 @@ public class ChangeDetectionService {
   private final NetworkChangeEventRepository changeEventRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
-  private final LabelStalenessService labelStalenessService;
+  private final LabelStalenessCheck labelStalenessCheck;
   private final NetworkSnapshotRepository snapshotRepository;
-  private final com.tracepcap.subnets.service.SubnetStalenessService subnetStalenessService;
+  private final List<SnapshotRevalidationHook> revalidationHooks;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
 
   /**
@@ -86,8 +86,25 @@ public class ChangeDetectionService {
     subnetOverrideCarryForwardService.carryForward(
         fromSnapshot != null ? fromSnapshot.getId() : null, toSnapshot.getId());
 
-    // Re-validate subnet-definition composition baselines against this (latest) snapshot.
-    subnetStalenessService.revalidate(toSnapshot.getNetwork().getId());
+    // Feature-module baselines (subnet compositions today) re-validate against this snapshot
+    // through the SnapshotRevalidationHook port — implementors depend on monitor, not vice versa.
+    // Revalidation is advisory; snapshot ingestion is core. The catch enforces the port's
+    // degrade-gracefully contract at the seam rather than trusting implementors' discipline.
+    // Caveat: a hook that joins this transaction and throws through its own @Transactional proxy
+    // has already marked the tx rollback-only — the catch keeps detection's control flow (and the
+    // log readable) but cannot un-doom the commit in that case.
+    for (SnapshotRevalidationHook hook : revalidationHooks) {
+      try {
+        hook.revalidate(toSnapshot.getNetwork().getId());
+      } catch (Exception e) {
+        log.error(
+            "Revalidation hook {} failed for network {}: {}",
+            hook.getClass().getSimpleName(),
+            toSnapshot.getNetwork().getId(),
+            e.getMessage(),
+            e);
+      }
+    }
 
     return changeEventRepository.saveAll(events);
   }
@@ -99,7 +116,7 @@ public class ChangeDetectionService {
 
     UUID fromFileId = fromSnapshot != null ? fromSnapshot.getFile().getId() : null;
     List<NetworkChangeEventEntity> events = new ArrayList<>();
-    for (LabelDrift drift : labelStalenessService.carryForwardAndValidate(fromFileId, toFileId)) {
+    for (LabelStalenessCheck.Drift drift : labelStalenessCheck.carryForwardAndValidate(fromFileId, toFileId)) {
       Map<String, Object> newValue = new HashMap<>();
       newValue.put("entityType", drift.entityType());
       newValue.put("roleLabel", orEmpty(drift.roleLabel()));

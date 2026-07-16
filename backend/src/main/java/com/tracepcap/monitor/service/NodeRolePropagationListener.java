@@ -1,6 +1,6 @@
 package com.tracepcap.monitor.service;
 
-import com.tracepcap.insights.event.NodeRoleChangedEvent;
+import com.tracepcap.common.event.NodeRoleChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

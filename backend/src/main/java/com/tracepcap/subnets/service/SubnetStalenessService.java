@@ -2,6 +2,7 @@ package com.tracepcap.subnets.service;
 
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
+import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
 import com.tracepcap.subnets.entity.SubnetDefinitionEntity;
 import com.tracepcap.subnets.repository.SubnetDefinitionRepository;
 import java.time.LocalDateTime;
@@ -30,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SubnetStalenessService {
+public class SubnetStalenessService implements SnapshotRevalidationHook {
 
   /** Distinct device types / protocols to keep as the subnet's dominant signature. */
   private static final int TOP_DEVICE_TYPES = 6;
@@ -130,9 +131,11 @@ public class SubnetStalenessService {
 
   /**
    * Re-validate every labelled subnet against the latest snapshot of a network: recompute each
-   * subnet's composition and, if it has drifted from the baseline, flag it stale. Called after a
-   * snapshot is added/reordered. No-op for subnets without a baseline.
+   * subnet's composition and, if it has drifted from the baseline, flag it stale. Called by
+   * monitor change detection through the {@code SnapshotRevalidationHook} port after a snapshot is
+   * added/reordered (#512 slice 3). No-op for subnets without a baseline.
    */
+  @Override
   @Transactional
   public void revalidate(UUID networkId) {
     UUID fileId = latestFileId(networkId);
