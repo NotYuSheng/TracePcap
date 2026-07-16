@@ -201,6 +201,8 @@ public class DeviceClassifierService implements HostClassifier {
       }
       String deviceType = board.winner(DeviceTypes.UNKNOWN);
       int confidence = board.confidence(CONFIDENCE_MARGIN_FOR_FULL);
+      java.util.Map.Entry<String, Integer> runnerUp = board.runnerUp();
+      Integer winnerScore = board.scores().get(deviceType);
 
       results.add(
           HostClassificationEntity.builder()
@@ -212,6 +214,9 @@ public class DeviceClassifierService implements HostClassifier {
               .deviceType(deviceType)
               .confidence(confidence)
               .serviceRoles(joinRoles(roles))
+              .winnerScore(winnerScore)
+              .runnerUpType(runnerUp != null ? runnerUp.getKey() : null)
+              .runnerUpScore(runnerUp != null ? runnerUp.getValue() : null)
               .build());
     }
 
