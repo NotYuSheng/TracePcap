@@ -424,32 +424,37 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                       </dd>
 
                       {/* Adjudicated identity (#512 slice 5b) — one voice, or an explicit contest */}
-                      {node.data.identityLabel && (
-                        <>
-                          <dt className="col-5 text-muted">Identity</dt>
-                          <dd className="col-7 mb-1">
-                            <span
-                              className={`badge ${node.data.identityContested ? 'bg-warning text-dark' : node.data.identityBasis === 'HUMAN' ? 'bg-primary' : 'bg-secondary'}`}
-                              title={
-                                node.data.identityContested
-                                  ? `Contested — candidates: ${(node.data.identityCandidates ?? []).map(c => `${c.label} (${c.score})`).join(' vs ')}`
-                                  : node.data.identityBasis === 'HUMAN'
-                                    ? 'Confirmed by analyst'
-                                    : `Adjudicated from classification (confidence ${node.data.identityConfidence}%)`
-                              }
-                            >
-                              {node.data.identityBasis === 'HUMAN' ? '✓ ' : ''}
-                              {node.data.identityLabel}
-                              {node.data.identityContested ? ' ⚠ contested' : ''}
-                            </span>
-                            {node.data.identityContested && node.data.identityCandidates && (
-                              <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
-                                {node.data.identityCandidates.map(c => `${c.label} (${c.score})`).join(' vs ')}
-                              </div>
-                            )}
-                          </dd>
-                        </>
-                      )}
+                      {node.data.identityLabel && (() => {
+                        const candidatesText = (node.data.identityCandidates ?? [])
+                          .map(c => `${c.label} (${c.score})`)
+                          .join(' vs ');
+                        return (
+                          <>
+                            <dt className="col-5 text-muted">Identity</dt>
+                            <dd className="col-7 mb-1">
+                              <span
+                                className={`badge ${node.data.identityContested ? 'bg-warning text-dark' : node.data.identityBasis === 'HUMAN' ? 'bg-primary' : 'bg-secondary'}`}
+                                title={
+                                  node.data.identityContested
+                                    ? `Contested — candidates: ${candidatesText}`
+                                    : node.data.identityBasis === 'HUMAN'
+                                      ? 'Confirmed by analyst'
+                                      : `Adjudicated from classification (confidence ${node.data.identityConfidence}%)`
+                                }
+                              >
+                                {node.data.identityBasis === 'HUMAN' ? '✓ ' : ''}
+                                {node.data.identityLabel}
+                                {node.data.identityContested ? ' ⚠ contested' : ''}
+                              </span>
+                              {node.data.identityContested && candidatesText && (
+                                <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
+                                  {candidatesText}
+                                </div>
+                              )}
+                            </dd>
+                          </>
+                        );
+                      })()}
                     </dl>
                   </div>
 

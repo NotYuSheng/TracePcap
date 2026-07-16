@@ -45,6 +45,8 @@ interface NetworkGraphProps {
 // ---------------------------------------------------------------------------
 
 const DARK_BG = '#0f1117';
+/** Dashed ring for contested identities (#512 slice 5b) — amber, distinct from highlight colors. */
+const CONTESTED_COLOR = '#f59e0b';
 const DARK_SURFACE = '#1e2130';
 const LIGHT_BG = '#f6f8fa';
 
@@ -202,7 +204,7 @@ function drawNodeLabel(
     ctx.beginPath();
     ctx.setLineDash([size * 0.35, size * 0.25]);
     ctx.arc(x, y, size + size * 0.3, 0, Math.PI * 2);
-    ctx.strokeStyle = '#f59e0b';
+    ctx.strokeStyle = CONTESTED_COLOR;
     ctx.lineWidth = Math.max(1.5, size * 0.1);
     ctx.stroke();
     ctx.setLineDash([]);
