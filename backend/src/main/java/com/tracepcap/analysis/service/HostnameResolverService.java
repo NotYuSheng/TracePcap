@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -27,8 +29,10 @@ import org.springframework.stereotype.Service;
  * </ul>
  *
  * <p>A single host may be named by several sources; the most authoritative for the host's own
- * identity wins (see {@link #SOURCE_PRIORITY}). Runs as a single read-only tshark pass and never
- * throws — on any failure it returns whatever was resolved so far (possibly empty).
+ * identity wins — but winner-picking no longer happens here (#512 slice 4): this extractor
+ * records every claim it sees, conflict-preserving, and {@link HostnameAdjudicator} picks the
+ * display winner from the persisted claims. Runs as a single read-only tshark pass and never
+ * throws — on any failure it returns whatever was collected so far (possibly empty).
  */
 @Slf4j
 @Service
@@ -40,22 +44,22 @@ public class HostnameResolverService {
   public static final String SOURCE_DHCP = "dhcp";
   public static final String SOURCE_MANUAL = "manual";
 
-  /** Lower value = more authoritative for a host's own identity; the lowest wins per IP. */
-  private static final Map<String, Integer> SOURCE_PRIORITY =
-      Map.of(SOURCE_MANUAL, 0, SOURCE_DHCP, 1, SOURCE_MDNS, 2, SOURCE_NBNS, 3, SOURCE_REVERSE_DNS, 4);
-
   private static final int HOSTNAME_MAX_LENGTH = 255;
 
   /** A discovered hostname together with how it was found. */
   public record ResolvedHostname(String hostname, String source) {}
 
+  /** One raw claim: {@code source} asserted that {@code ip} is named {@code hostname}. */
+  public record Claim(String ip, String hostname, String source) {}
+
   /**
    * Scans the capture and returns a map of IP → resolved hostname for every host whose name could
    * be derived from DHCP, mDNS, NBNS or reverse DNS.
    */
-  public Map<String, ResolvedHostname> resolve(File pcapFile) {
+  public List<Claim> resolve(File pcapFile) {
     // Concurrent: the stdout reader (background thread) writes while the main thread reads size().
-    Map<String, ResolvedHostname> result = new ConcurrentHashMap<>();
+    // Keyed by (ip, hostname, source) to dedupe repeats while preserving distinct claims.
+    Map<Claim, Boolean> result = new ConcurrentHashMap<>();
 
     // Fields (pipe-separated, first occurrence only):
     //   0 _ws.col.Protocol  1 ip.src  2 dhcp.option.hostname
@@ -165,13 +169,13 @@ public class HostnameResolverService {
       if (ioExecutor != null) ioExecutor.shutdownNow();
     }
 
-    log.info("Resolved {} host name(s) from DHCP/mDNS/NBNS/reverse-DNS", result.size());
-    return result;
+    log.info("Collected {} hostname claim(s) from DHCP/mDNS/NBNS/reverse-DNS", result.size());
+    return new ArrayList<>(result.keySet());
   }
 
   // ── Row parsing ─────────────────────────────────────────────────────────────
 
-  private void parseRow(String[] f, Map<String, ResolvedHostname> result) {
+  private void parseRow(String[] f, Map<Claim, Boolean> result) {
     if (f.length < 11) return;
     String proto = f[0].toUpperCase();
 
@@ -197,20 +201,12 @@ public class HostnameResolverService {
     }
   }
 
-  /** Records ip → (hostname, source), keeping the most authoritative source already seen. */
-  private void record(
-      Map<String, ResolvedHostname> result, String ip, String rawHostname, String source) {
+  /** Records one claim verbatim. No winner-picking here — that is the adjudicator's job. */
+  private void record(Map<Claim, Boolean> result, String ip, String rawHostname, String source) {
     if (!isUsableIp(ip)) return;
     String hostname = cleanHostname(rawHostname);
     if (hostname == null) return;
-
-    ResolvedHostname existing = result.get(ip);
-    if (existing != null
-        && SOURCE_PRIORITY.getOrDefault(existing.source(), Integer.MAX_VALUE)
-            <= SOURCE_PRIORITY.getOrDefault(source, Integer.MAX_VALUE)) {
-      return; // keep the equal-or-better source already recorded
-    }
-    result.put(ip, new ResolvedHostname(hostname, source));
+    result.putIfAbsent(new Claim(ip, hostname, source), Boolean.TRUE);
   }
 
   // ── Field helpers ────────────────────────────────────────────────────────────
