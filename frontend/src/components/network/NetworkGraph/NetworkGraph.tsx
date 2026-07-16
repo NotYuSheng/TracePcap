@@ -130,10 +130,17 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
         value = node.data.mac;
         break;
       case 'deviceType':
-        value =
-          node.data.deviceType && node.data.deviceType !== 'UNKNOWN'
-            ? deviceTypeLabel(node.data.deviceType)
-            : undefined;
+        // Adjudicated identity is the display authority (#512 slice 5b): a human-confirmed
+        // label replaces the machine type; a contested identity is marked as a question.
+        if (node.data.identityBasis === 'HUMAN' && node.data.identityLabel) {
+          value = node.data.identityLabel;
+        } else {
+          value =
+            node.data.deviceType && node.data.deviceType !== 'UNKNOWN'
+              ? deviceTypeLabel(node.data.deviceType)
+              : undefined;
+          if (value && node.data.identityContested) value += ' (contested)';
+        }
         break;
       case 'manufacturer':
         value = node.data.manufacturer;
@@ -157,11 +164,13 @@ function drawNodeLabel(
   dtMap: Map<string, string>,
   linesMap: Map<string, string[]>,
   hlMap?: Map<string, NodeHighlight>,
+  contestedMap?: Map<string, boolean>,
 ): void {
   const { x, y, size, label, color: accentColor } = data;
   const nodeType = ntMap.get(label ?? '') ?? 'unknown';
   const deviceType = dtMap.get(label ?? '') ?? '';
   const highlight = label ? hlMap?.get(label) : undefined;
+  const contested = label ? contestedMap?.get(label) ?? false : false;
 
   // Outer glow ring for highlighted (changed) nodes
   if (highlight) {
@@ -186,6 +195,18 @@ function drawNodeLabel(
   ctx.strokeStyle = highlight ? highlight.color : accentColor;
   ctx.lineWidth = highlight ? Math.max(2, size * 0.12) : Math.max(1, size * 0.07);
   ctx.stroke();
+
+  // Contested-identity ring (#512 slice 5b, #498): dashed amber outside the accent ring —
+  // the adjudicator found competing answers, so the node must read as a question, not a fact.
+  if (contested) {
+    ctx.beginPath();
+    ctx.setLineDash([size * 0.35, size * 0.25]);
+    ctx.arc(x, y, size + size * 0.3, 0, Math.PI * 2);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = Math.max(1.5, size * 0.1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   // Bootstrap Icon — reflects the same logic as getNodeColor/getNodeIcon
   const cp = getNodeIcon(nodeType, deviceType);
@@ -292,6 +313,7 @@ function buildGraph(
       label: n.label,
       nodeType,
       deviceType: n.data.deviceType ?? '',
+      identityContested: !!n.data.identityContested,
       isCluster: !!n.data.isCluster,
       clusterId: n.data.clusterId,
       memberCount: n.data.memberCount ?? 0,
@@ -408,6 +430,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   const graphRef = useRef<Graph | null>(null);
   const nodeTypeByLabel = useRef<Map<string, string>>(new Map());
   const deviceTypeByLabel = useRef<Map<string, string>>(new Map());
+  const contestedByLabel = useRef<Map<string, boolean>>(new Map());
   // Per-node text lines (keyed by the node's label), derived from the user's label config.
   const nodeLinesByLabel = useRef<Map<string, string[]>>(new Map());
   const nodeLabelConfig = useStore(s => s.nodeLabelConfig);
@@ -508,10 +531,10 @@ export const NetworkGraph = memo(function NetworkGraph({
       minEdgeThickness: 0.5,
       zIndex: true,
       defaultDrawNodeLabel: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current);
       },
       defaultDrawNodeHover: (ctx, data) => {
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current);
       },
       nodeReducer: (node, data) => {
         const res = { ...data };
@@ -611,11 +634,13 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigma.on('beforeRender', () => {
       nodeTypeByLabel.current.clear();
       deviceTypeByLabel.current.clear();
+      contestedByLabel.current.clear();
       graph.forEachNode((_node, attrs) => {
         const label = attrs['label'] as string ?? '';
         if (!label) return;
         nodeTypeByLabel.current.set(label, attrs['nodeType'] as string ?? 'unknown');
         deviceTypeByLabel.current.set(label, attrs['deviceType'] as string ?? '');
+        if (attrs['identityContested']) contestedByLabel.current.set(label, true);
       });
     });
 

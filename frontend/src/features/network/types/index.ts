@@ -53,6 +53,13 @@ export interface NodeData {
   serviceRoles?: string[];
   /** Confidence score 0–100 from the classifier. */
   deviceConfidence?: number;
+  /** Adjudicated identity (#512 slice 5b) — the display authority where present. */
+  identityLabel?: string;
+  identityBasis?: 'HUMAN' | 'MACHINE';
+  identityConfidence?: number;
+  /** True when machine candidates were too close to call; render the contest, not the winner. */
+  identityContested?: boolean;
+  identityCandidates?: { label: string; source: string; score: number }[];
   /** Manufacturer from OUI lookup. */
   manufacturer?: string;
   /** TTL observed for this host. */

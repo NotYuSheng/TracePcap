@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
 
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
+  HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,
 
   // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,

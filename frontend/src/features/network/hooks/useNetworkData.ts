@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { networkService } from '../services/networkService';
 import type { GraphNode, GraphEdge, NetworkStats } from '../types';
-import type { Conversation, HostClassification } from '@/types';
+import type { Conversation, HostClassification, HostIdentity } from '@/types';
 import type { AnalysisSummary } from '@/types';
 import { env } from '@/config/env';
 
@@ -41,6 +41,7 @@ export function useNetworkData(
   // Raw data cached after the initial fetch — transform re-runs without re-fetching
   const conversationsRef = useRef<Conversation[]>([]);
   const hostClassificationsRef = useRef<HostClassification[] | undefined>(undefined);
+  const hostIdentitiesRef = useRef<HostIdentity[] | undefined>(undefined);
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -62,14 +63,16 @@ export function useNetworkData(
     conversations: Conversation[],
     hostClassifications: HostClassification[] | undefined,
     summary: AnalysisSummary | undefined,
-    limit: number
+    limit: number,
+    hostIdentities?: HostIdentity[]
   ) => {
     const graphData = networkService.buildNetworkGraph(
       conversations,
       summary,
       maxConversations,
       hostClassifications,
-      limit
+      limit,
+      hostIdentities
     );
     setNodes(graphData.nodes);
     setEdges(graphData.edges);
@@ -126,10 +129,20 @@ export function useNetworkData(
         // If the endpoint isn't available (e.g. older analysis), silently skip
       }
 
+      // Adjudicated identities (#512 slice 5) — best-effort: files analysed before the
+      // adjudicator existed simply have none, and the display falls back to raw classification.
+      let hostIdentities: HostIdentity[] | undefined;
+      try {
+        hostIdentities = await conversationService.getHostIdentities(fileId);
+      } catch {
+        // endpoint unavailable → fall back silently
+      }
+
       conversationsRef.current = conversations;
       hostClassificationsRef.current = hostClassifications;
+      hostIdentitiesRef.current = hostIdentities;
 
-      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes);
+      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes, hostIdentities);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load network data';
       setError(errorMessage);
@@ -152,7 +165,8 @@ export function useNetworkData(
       conversationsRef.current,
       hostClassificationsRef.current,
       analysisSummary,
-      maxNodes
+      maxNodes,
+      hostIdentitiesRef.current
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxNodes, analysisSummary]);
