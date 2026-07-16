@@ -21,6 +21,7 @@ import com.tracepcap.analysis.spi.ServiceLogRoles;
 import com.tracepcap.analysis.spi.HostServiceLogExtractor;
 import com.tracepcap.analysis.spi.HostServiceLogResult;
 import com.tracepcap.analysis.spi.HostServiceSuspicion;
+import com.tracepcap.common.event.AnalysisCompletedEvent;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
@@ -83,6 +84,7 @@ public class AnalysisService {
   private final AnalysisRecordService analysisRecordService;
   private final ExtractionRunService extractionRunService;
   private final HostnameAdjudicator hostnameAdjudicator;
+  private final org.springframework.context.ApplicationEventPublisher eventPublisher;
   private final HostnameClaimWriter hostnameClaimWriter;
 
   @Transactional
@@ -354,6 +356,10 @@ public class AnalysisService {
         file.setEndTime(parseResult.getEndTime());
         file.setDuration(analysis.getDurationMs());
         fileRepository.save(file);
+
+        // AFTER_COMMIT listeners (identity adjudication in insights) fire once this tx lands —
+        // the pipeline never learns who is listening (#512 slice 5).
+        eventPublisher.publishEvent(new AnalysisCompletedEvent(fileId));
 
         log.info(
             "[{}] Analysis complete: total {}ms",

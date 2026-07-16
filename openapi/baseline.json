@@ -1562,6 +1562,36 @@
         },
         "type": "object"
       },
+      "HostIdentityDto": {
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "additionalProperties": {
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contested": {
+            "type": "boolean"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "primaryLabel": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "HostSummaryDto": {
         "properties": {
           "conversationCount": {
@@ -5010,6 +5040,41 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/host-identities": {
+      "get": {
+        "operationId": "getHostIdentities",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HostIdentityDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Adjudicated identity per host for a file (winner-or-contested)",
+        "tags": [
+          "Host Identities"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/ip-mac-observations": {
       "get": {
         "operationId": "getIpMacObservations",
@@ -7996,6 +8061,10 @@
     {
       "description": "Packet-level conversation trace with AI explanations",
       "name": "Conversation Tracer"
+    },
+    {
+      "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",
+      "name": "Host Identities"
     }
   ]
 }

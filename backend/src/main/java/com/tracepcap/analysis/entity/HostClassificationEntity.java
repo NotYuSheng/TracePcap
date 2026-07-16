@@ -89,4 +89,15 @@ public class HostClassificationEntity {
    */
   @Column(name = "service_roles", columnDefinition = "text")
   private String serviceRoles;
+
+  /** The winner's raw vote score (same unit as runnerUpScore); null pre-migration/override. */
+  @Column(name = "winner_score")
+  private Integer winnerScore;
+
+  /** Second-highest-scoring type from the classification vote; null on walkover/override. */
+  @Column(name = "runner_up_type", length = 50)
+  private String runnerUpType;
+
+  @Column(name = "runner_up_score")
+  private Integer runnerUpScore;
 }

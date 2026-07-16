@@ -41,6 +41,20 @@ public class ScoreBoard {
         .orElse(fallback);
   }
 
+  /**
+   * The second-highest-scoring type and its score, or {@code null} when fewer than two types
+   * scored above zero. Persisted with the winner so adjudication (#512 slice 5) can see how close
+   * second place was — a walkover and a knife-edge are different answers.
+   */
+  public Map.Entry<String, Integer> runnerUp() {
+    return scores.entrySet().stream()
+        .filter(e -> e.getValue() > 0)
+        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+        .skip(1)
+        .findFirst()
+        .orElse(null);
+  }
+
   /** Reasons that voted for the given type, in the order they fired (defensive copy). */
   public List<String> reasonsFor(String deviceType) {
     return List.copyOf(reasons.getOrDefault(deviceType, List.of()));

@@ -410,7 +410,13 @@ is a refactor target, not a shrug.
   display precedence (adjudicating) — client-side, on a truncated node set. #496/#499 are the
   predictable symptoms. The fix direction: these decisions move behind the API; Present consumes
   adjudications.
-* **No adjudicators exist** outside ``ScoreBoard``'s embedded prototype; conclusions ship to the
-  UI un-reconciled (#499), and confidence is buried in a click-through popup (#498).
+* **The first real adjudicator exists** (slice 5): ``HostIdentityService`` in ``insights`` answers
+  "what is this host?" with one voice — human-confirmed node-role labels ranked first, then the
+  classification vote (whose runner-up is now persisted so a knife-edge is distinguishable from a
+  walkover), with an explicit **contested** outcome listing candidates. Re-adjudication fires on
+  ``AnalysisCompletedEvent`` and ``NodeRoleChangedEvent`` (staleness IS re-adjudication, live).
+  Served at ``GET /files/{fileId}/host-identities``. Remaining gap: the frontend still computes
+  its own ``nodeType``/``getNodeColor`` precedence instead of consuming this (#499/#498 close
+  fully when it does — the next slice).
 * **``FilterService`` reads the pcap** to validate LLM-generated filters — the one grey case in
   rule 4, baselined rather than blessed.
