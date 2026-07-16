@@ -1,6 +1,6 @@
 package com.tracepcap.subnets.service;
 
-import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.subnets.dto.SubnetDefinitionDto;
 import com.tracepcap.subnets.dto.UpsertSubnetRequest;
@@ -23,7 +23,7 @@ public class SubnetService {
   private static final int MAX_PREFIX = 29;
 
   private final SubnetDefinitionRepository subnetRepo;
-  private final HostClassificationRepository hostClassRepo;
+  private final HostClassificationLookup hostClassificationLookup;
   private final NetworkSnapshotRepository snapshotRepo;
   private final SubnetStalenessService stalenessService;
 
@@ -97,8 +97,8 @@ public class SubnetService {
    */
   public List<SubnetDefinitionDto> detectFromFile(UUID fileId) {
     List<Long> ipInts =
-        hostClassRepo.findByFileId(fileId).stream()
-            .map(h -> h.getIp())
+        hostClassificationLookup.classifiedHosts(fileId).stream()
+            .map(h -> h.ip())
             .filter(ip -> isPrivate(ip))
             .map(ip -> parseIp(ip))
             .filter(v -> v != null && v >= 0)
@@ -135,8 +135,8 @@ public class SubnetService {
     // Re-run density scoring on the union of all IPs for final hostCount/densityScore
     List<Long> allIps =
         fileIds.stream()
-            .flatMap(fid -> hostClassRepo.findByFileId(fid).stream())
-            .map(h -> h.getIp())
+            .flatMap(fid -> hostClassificationLookup.classifiedHosts(fid).stream())
+            .map(h -> h.ip())
             .filter(ip -> isPrivate(ip))
             .map(ip -> parseIp(ip))
             .filter(v -> v != null && v >= 0)

@@ -1,8 +1,8 @@
 package com.tracepcap.timeline.service;
 
 import com.tracepcap.timeline.dto.TimelineDataDto;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TimelineService {
 
   private final FileRepository fileRepository;
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
   private final com.tracepcap.config.AnalysisProperties analysisProperties;
 
   /**
@@ -44,7 +44,7 @@ public class TimelineService {
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
     // Get all conversations (which represent traffic flows)
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    List<ConversationFacts> conversations = conversationLookup.conversationFacts(fileId);
 
     if (conversations.isEmpty()) {
       log.warn("No conversations found for file {}", fileId);
@@ -59,12 +59,12 @@ public class TimelineService {
       // Fallback to conversation times
       startTime =
           conversations.stream()
-              .map(ConversationEntity::getStartTime)
+              .map(ConversationFacts::startTime)
               .min(LocalDateTime::compareTo)
               .orElse(LocalDateTime.now());
       endTime =
           conversations.stream()
-              .map(ConversationEntity::getEndTime)
+              .map(ConversationFacts::endTime)
               .max(LocalDateTime::compareTo)
               .orElse(LocalDateTime.now());
     }
@@ -105,14 +105,14 @@ public class TimelineService {
         .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
     // Get conversations
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    List<ConversationFacts> conversations = conversationLookup.conversationFacts(fileId);
 
     // Filter conversations that overlap with the requested time range
-    List<ConversationEntity> filteredConversations =
+    List<ConversationFacts> filteredConversations =
         conversations.stream()
             .filter(
                 conv ->
-                    !conv.getEndTime().isBefore(startTime) && !conv.getStartTime().isAfter(endTime))
+                    !conv.endTime().isBefore(startTime) && !conv.startTime().isAfter(endTime))
             .collect(Collectors.toList());
 
     // Calculate optimal interval respecting maxDataPoints limit
@@ -132,7 +132,7 @@ public class TimelineService {
    * @return List of timeline data points
    */
   private List<TimelineDataDto> generateTimelineBins(
-      List<ConversationEntity> conversations,
+      List<ConversationFacts> conversations,
       LocalDateTime startTime,
       LocalDateTime endTime,
       Integer intervalSecs) {
@@ -152,8 +152,8 @@ public class TimelineService {
     }
 
     // Distribute conversations into bins - O(M) complexity
-    for (ConversationEntity conv : conversations) {
-      LocalDateTime convStart = conv.getStartTime();
+    for (ConversationFacts conv : conversations) {
+      LocalDateTime convStart = conv.startTime();
 
       // Calculate bin index directly instead of looping through all bins - O(1)
       long secondsFromStart = ChronoUnit.SECONDS.between(startTime, convStart);
@@ -175,12 +175,12 @@ public class TimelineService {
       TimelineBinData bin = bins.get(binStart);
 
       if (bin != null) {
-        bin.packetCount += conv.getPacketCount();
-        bin.bytes += conv.getTotalBytes();
+        bin.packetCount += conv.packetCount();
+        bin.bytes += conv.totalBytes();
 
         // Aggregate by protocol
-        String protocol = conv.getProtocol();
-        bin.protocols.merge(protocol, conv.getPacketCount(), Long::sum);
+        String protocol = conv.protocol();
+        bin.protocols.merge(protocol, conv.packetCount(), Long::sum);
       }
     }
 
