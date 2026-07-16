@@ -88,8 +88,22 @@ public class ChangeDetectionService {
 
     // Feature-module baselines (subnet compositions today) re-validate against this snapshot
     // through the SnapshotRevalidationHook port — implementors depend on monitor, not vice versa.
+    // Revalidation is advisory; snapshot ingestion is core. The catch enforces the port's
+    // degrade-gracefully contract at the seam rather than trusting implementors' discipline.
+    // Caveat: a hook that joins this transaction and throws through its own @Transactional proxy
+    // has already marked the tx rollback-only — the catch keeps detection's control flow (and the
+    // log readable) but cannot un-doom the commit in that case.
     for (SnapshotRevalidationHook hook : revalidationHooks) {
-      hook.revalidate(toSnapshot.getNetwork().getId());
+      try {
+        hook.revalidate(toSnapshot.getNetwork().getId());
+      } catch (Exception e) {
+        log.error(
+            "Revalidation hook {} failed for network {}: {}",
+            hook.getClass().getSimpleName(),
+            toSnapshot.getNetwork().getId(),
+            e.getMessage(),
+            e);
+      }
     }
 
     return changeEventRepository.saveAll(events);
