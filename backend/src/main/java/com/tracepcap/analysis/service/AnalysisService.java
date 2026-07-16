@@ -83,7 +83,7 @@ public class AnalysisService {
   private final AnalysisRecordService analysisRecordService;
   private final ExtractionRunService extractionRunService;
   private final HostnameAdjudicator hostnameAdjudicator;
-  private final com.tracepcap.analysis.repository.HostnameClaimRepository hostnameClaimRepository;
+  private final HostnameClaimWriter hostnameClaimWriter;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -168,7 +168,7 @@ public class AnalysisService {
         // resolver used to apply at write time, so downstream behaviour is unchanged.
         List<HostnameResolverService.Claim> hostnameClaims =
             hostnameResolverService.resolve(tempFile);
-        persistHostnameClaims(fileId, hostnameClaims);
+        hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
         Map<String, HostnameResolverService.ResolvedHostname> hostnames =
             hostnameAdjudicator.adjudicate(hostnameClaims);
         // Per-host service activity logs (DNS today; web servers etc. later). Each extractor runs
@@ -737,28 +737,6 @@ public class AnalysisService {
    * Persist the distinct source MACs observed per IP (#461). Only IPs with more than one MAC carry
    * overlap signal, but we store all pairings so the detector can present the full evidence.
    */
-  /** Regenerates this file's claims (re-analysis re-derives the same observations). Best-effort. */
-  private void persistHostnameClaims(
-      UUID fileId, List<HostnameResolverService.Claim> claims) {
-    try {
-      hostnameClaimRepository.deleteByFileId(fileId);
-      if (claims.isEmpty()) return;
-      hostnameClaimRepository.saveAll(
-          claims.stream()
-              .map(
-                  c ->
-                      com.tracepcap.analysis.entity.HostnameClaimEntity.builder()
-                          .fileId(fileId)
-                          .ip(c.ip())
-                          .hostname(c.hostname())
-                          .source(c.source())
-                          .build())
-              .toList());
-    } catch (Exception e) {
-      log.warn("Failed to persist {} hostname claim(s) for file {}: {}", claims.size(), fileId, e.getMessage());
-    }
-  }
-
   private void persistIpMacObservations(
       FileEntity file, Map<String, LinkedHashSet<String>> macsByIp) {
     if (macsByIp == null || macsByIp.isEmpty()) return;
