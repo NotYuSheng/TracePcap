@@ -2,6 +2,7 @@ package com.tracepcap.subnets.service;
 
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
+import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
 import com.tracepcap.subnets.entity.SubnetDefinitionEntity;
 import com.tracepcap.subnets.repository.SubnetDefinitionRepository;
 import java.time.LocalDateTime;
@@ -30,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SubnetStalenessService implements com.tracepcap.monitor.spi.SnapshotRevalidationHook {
+public class SubnetStalenessService implements SnapshotRevalidationHook {
 
   /** Distinct device types / protocols to keep as the subnet's dominant signature. */
   private static final int TOP_DEVICE_TYPES = 6;
