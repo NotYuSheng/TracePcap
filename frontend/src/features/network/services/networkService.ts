@@ -1,4 +1,4 @@
-import type { Conversation, AnalysisSummary, HostClassification } from '@/types';
+import type { Conversation, AnalysisSummary, HostClassification, HostIdentity } from '@/types';
 import type {
   GraphNode,
   GraphEdge,
@@ -372,7 +372,8 @@ export function buildNetworkGraph(
   analysisSummary?: AnalysisSummary,
   maxConversations: number = 500,
   hostClassifications?: HostClassification[],
-  maxNodes: number = 50
+  maxNodes: number = 50,
+  hostIdentities?: HostIdentity[]
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const edges: GraphEdge[] = [];
@@ -530,6 +531,14 @@ export function buildNetworkGraph(
     }
   });
 
+  // Adjudicated identities (#512 slice 5b): the display authority where present. A HUMAN basis
+  // replaces machine-derived labels outright; contested identities are rendered as contests
+  // rather than asserted winners. Files analysed before the adjudicator have no identities and
+  // fall back to raw classification display unchanged.
+  const identityMap = hostIdentities
+    ? new Map(hostIdentities.map(i => [i.ip, i]))
+    : undefined;
+
   // Apply backend device classifications (deviceType, confidence, manufacturer)
   if (hostClassifications) {
     const classMap = new Map(hostClassifications.map(c => [c.ip, c]));
@@ -550,6 +559,21 @@ export function buildNetworkGraph(
           if (nodeMap[ip].label === ip) nodeMap[ip].label = c.hostname;
         }
       }
+    });
+  }
+
+  if (identityMap) {
+    Object.keys(nodeMap).forEach(ip => {
+      const identity = identityMap.get(ip);
+      if (!identity) return;
+      const d = nodeMap[ip].data;
+      d.identityLabel = identity.primaryLabel;
+      d.identityBasis = identity.basis;
+      d.identityConfidence = identity.confidence;
+      d.identityContested = identity.contested;
+      d.identityCandidates = identity.candidates ?? undefined;
+      // A human-confirmed label outranks every machine-derived display value.
+      if (identity.basis === 'HUMAN') d.deviceType = undefined;
     });
   }
 

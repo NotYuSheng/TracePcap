@@ -9,6 +9,7 @@ import type {
   PaginatedResponse,
   Packet,
   HostClassification,
+  HostIdentity,
 } from '@/types';
 import type { ConversationFilters } from '../types';
 
@@ -369,6 +370,12 @@ export const conversationService = {
     const response = await apiClient.get<HostClassification[]>(
       API_ENDPOINTS.HOST_CLASSIFICATIONS(fileId)
     );
+    return response.data;
+  },
+
+  /** Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). */
+  getHostIdentities: async (fileId: string): Promise<HostIdentity[]> => {
+    const response = await apiClient.get<HostIdentity[]>(API_ENDPOINTS.HOST_IDENTITIES(fileId));
     return response.data;
   },
 

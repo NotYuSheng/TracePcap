@@ -430,6 +430,20 @@ export interface HostClassification {
   serviceRoles?: string[];
 }
 
+/** Adjudicated identity of one host (#512 slice 5) — one answer, or an explicit contest. */
+export interface HostIdentity {
+  ip: string;
+  /** The one answer to "what is this host?" — a device type, or the analyst's label verbatim. */
+  primaryLabel: string;
+  /** HUMAN (confirmed node-role label) or MACHINE (classification vote). */
+  basis: 'HUMAN' | 'MACHINE';
+  confidence: number;
+  /** True when machine candidates were too close to call; render the contest, not the winner. */
+  contested: boolean;
+  /** Competing candidates when contested. */
+  candidates?: { label: string; source: string; score: number }[] | null;
+}
+
 /** How a host's name was discovered from passive traffic. */
 export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'dhcp' | 'manual';
 
