@@ -18,5 +18,6 @@ public interface HostClassificationLookup {
       String runnerUpType,
       Integer runnerUpScore) {}
 
+  /** Never contains null elements — the adapter maps each persisted row to a fresh record. */
   List<ClassifiedHost> classifiedHosts(UUID fileId);
 }

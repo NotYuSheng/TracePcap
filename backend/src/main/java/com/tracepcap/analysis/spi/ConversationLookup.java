@@ -12,6 +12,11 @@ import java.util.UUID;
  */
 public interface ConversationLookup {
 
+  /**
+   * One conversation's measured facts. Contract: the returned list never contains null elements;
+   * {@code startTime} and {@code endTime} are never null (rows without a start time are excluded
+   * at the adapter; a missing end time collapses to the start time).
+   */
   record ConversationFacts(
       String protocol,
       LocalDateTime startTime,
