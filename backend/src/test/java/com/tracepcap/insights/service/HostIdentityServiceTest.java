@@ -6,7 +6,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup.ClassifiedHost;
 import com.tracepcap.insights.entity.HostIdentityEntity;
@@ -30,7 +29,7 @@ class HostIdentityServiceTest {
   private final NodeRoleRepository roleRepo = mock(NodeRoleRepository.class);
   private final HostIdentityRepository identityRepo = mock(HostIdentityRepository.class);
   private final HostIdentityService service =
-      new HostIdentityService(lookup, roleRepo, identityRepo, new ObjectMapper());
+      new HostIdentityService(lookup, roleRepo, identityRepo);
 
   private List<HostIdentityEntity> adjudicated() {
     @SuppressWarnings("unchecked")
@@ -69,7 +68,9 @@ class HostIdentityServiceTest {
     HostIdentityEntity id = adjudicated().get(0);
     assertThat(id.isContested()).isTrue();
     assertThat(id.getBasis()).isEqualTo(HostIdentityEntity.BASIS_MACHINE);
-    assertThat(id.getCandidates()).contains("WEB_SERVER").contains("IOT");
+    assertThat(id.getCandidates()).hasSize(2);
+    assertThat(id.getCandidates().get(0)).containsEntry("label", "WEB_SERVER");
+    assertThat(id.getCandidates().get(1)).containsEntry("label", "IOT");
   }
 
   @Test

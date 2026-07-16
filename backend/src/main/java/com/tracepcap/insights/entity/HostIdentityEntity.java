@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -58,10 +60,10 @@ public class HostIdentityEntity {
   @Column(nullable = false)
   private boolean contested;
 
-  /** JSON array [{label, source, score}] of the competing candidates when contested. */
+  /** Competing candidates [{label, source, score}] when contested; Hibernate maps the JSON. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(columnDefinition = "jsonb")
-  private String candidates;
+  private List<Map<String, Object>> candidates;
 
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;

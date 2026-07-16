@@ -1,6 +1,5 @@
 package com.tracepcap.insights.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup.ClassifiedHost;
 import com.tracepcap.insights.entity.HostIdentityEntity;
@@ -46,7 +45,6 @@ public class HostIdentityService {
   private final HostClassificationLookup hostClassificationLookup;
   private final NodeRoleRepository nodeRoleRepository;
   private final HostIdentityRepository hostIdentityRepository;
-  private final ObjectMapper objectMapper;
 
   @Transactional
   public void adjudicateFile(UUID fileId) {
@@ -94,6 +92,8 @@ public class HostIdentityService {
   }
 
   private HostIdentityEntity fromMachine(UUID fileId, ClassifiedHost host) {
+    // Invariant: contested ⇒ runnerUpType != null (checked below) and deviceType is non-null by
+    // schema, so the Map.of calls in candidates() cannot see nulls.
     boolean contested =
         host.confidence() < CONTESTED_BELOW
             && host.runnerUpType() != null
@@ -105,21 +105,16 @@ public class HostIdentityService {
         .basis(HostIdentityEntity.BASIS_MACHINE)
         .confidence(host.confidence())
         .contested(contested)
-        .candidates(contested ? candidatesJson(host) : null)
+        .candidates(contested ? candidates(host) : null)
         .updatedAt(LocalDateTime.now())
         .build();
   }
 
-  private String candidatesJson(ClassifiedHost host) {
-    try {
-      return objectMapper.writeValueAsString(
-          List.of(
-              Map.of("label", host.deviceType(), "source", "classification", "score",
-                  host.winnerScore() == null ? 0 : host.winnerScore()),
-              Map.of("label", host.runnerUpType(), "source", "classification", "score",
-                  host.runnerUpScore() == null ? 0 : host.runnerUpScore())));
-    } catch (Exception e) {
-      return null;
-    }
+  private List<Map<String, Object>> candidates(ClassifiedHost host) {
+    return List.of(
+        Map.of("label", host.deviceType(), "source", "classification", "score",
+            host.winnerScore() == null ? 0 : host.winnerScore()),
+        Map.of("label", host.runnerUpType(), "source", "classification", "score",
+            host.runnerUpScore() == null ? 0 : host.runnerUpScore()));
   }
 }

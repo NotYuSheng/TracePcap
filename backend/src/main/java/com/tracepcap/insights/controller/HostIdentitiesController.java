@@ -1,13 +1,10 @@
 package com.tracepcap.insights.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.insights.dto.HostIdentityDto;
 import com.tracepcap.insights.repository.HostIdentityRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class HostIdentitiesController {
 
   private final HostIdentityRepository hostIdentityRepository;
-  private final ObjectMapper objectMapper;
 
   @GetMapping("/{fileId}/host-identities")
   @Operation(summary = "Adjudicated identity per host for a file (winner-or-contested)")
@@ -39,18 +35,9 @@ public class HostIdentitiesController {
                         .basis(e.getBasis())
                         .confidence(e.getConfidence())
                         .contested(e.isContested())
-                        .candidates(parseCandidates(e.getCandidates()))
+                        .candidates(e.getCandidates())
                         .build())
             .toList();
     return ResponseEntity.ok(result);
-  }
-
-  private List<Map<String, Object>> parseCandidates(String json) {
-    if (json == null) return null;
-    try {
-      return objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (Exception e) {
-      return null;
-    }
   }
 }
