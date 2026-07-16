@@ -390,10 +390,13 @@ is a refactor target, not a shrug.
   vocabulary, since publisher and consumer sit on opposite sides of the Scan/Adjudicate loop).
   Lesson kept for posterity: ArchUnit's cycle enumeration understates until the last cycle is
   gone — ``monitor ↔ subnets`` only surfaced after ``analysis ↔ file`` was fixed.
-* **``HostnameResolverService`` adjudicates at write time** — picks a winner by source priority
-  and discards competing claims, erasing the very conflicts the identity scanners need (#511's
-  spoofing case is undetectable today). Contrast ``IpMacObservationEntity``, which does it
-  right.
+* **Hostname claims are now conflict-preserving** (slice 4): ``HostnameResolverService`` records
+  every claim into ``hostname_claims`` (V33), and ``HostnameAdjudicator`` picks the display winner
+  with the old semantics — same winners, but losing claims survive, so #511's identity-conflict
+  scanners finally have evidence to read. The adjudicator is hosted in ``analysis`` until a
+  dedicated Adjudicate module exists (``analysis`` must not depend on feature modules — frozen
+  rule). Contested IPs are counted and logged; surfacing them as findings and UI state is #511's
+  work.
 * **``WebServerLogExtractor`` mixes stages** — extraction (endpoint logging) and scanning (the
   api/web role decision that #496 flags as broken) in one pass.
 * **Run manifest exists for nDPI only** (slice 2): ``extraction_runs`` records

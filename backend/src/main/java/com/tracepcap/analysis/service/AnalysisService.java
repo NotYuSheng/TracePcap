@@ -82,6 +82,8 @@ public class AnalysisService {
   private final FileExtractionStage fileExtractionStage;
   private final AnalysisRecordService analysisRecordService;
   private final ExtractionRunService extractionRunService;
+  private final HostnameAdjudicator hostnameAdjudicator;
+  private final HostnameClaimWriter hostnameClaimWriter;
 
   @Transactional
   public void analyzeFile(UUID fileId) {
@@ -161,9 +163,23 @@ public class AnalysisService {
         t = System.currentTimeMillis();
         Map<String, String> deviceOverrides =
             signatureApplier.applySignatures(parseResult.getConversations());
-        // resolve() degrades gracefully and never throws — it returns a (possibly empty) map.
-        Map<String, HostnameResolverService.ResolvedHostname> hostnames =
+        // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
+        // (#512 slice 4); the adjudicator picks display winners with the same semantics the
+        // resolver used to apply at write time, so downstream behaviour is unchanged.
+        List<HostnameResolverService.Claim> hostnameClaims =
             hostnameResolverService.resolve(tempFile);
+        try {
+          hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
+        } catch (Exception e) {
+          // Best-effort: the writer's REQUIRES_NEW tx rolled back alone; analysis continues.
+          log.warn(
+              "Failed to persist {} hostname claim(s) for file {}: {}",
+              hostnameClaims.size(),
+              fileId,
+              e.getMessage());
+        }
+        Map<String, HostnameResolverService.ResolvedHostname> hostnames =
+            hostnameAdjudicator.adjudicate(hostnameClaims);
         // Per-host service activity logs (DNS today; web servers etc. later). Each extractor runs
         // one tshark pass, persists its own rows, and reports which hosts serve its role + any
         // suspicious ones. Runs before classification so a host's roles can drive its device type
