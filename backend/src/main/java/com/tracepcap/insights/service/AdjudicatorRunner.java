@@ -10,13 +10,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Runs every {@link Adjudicator} on the classpath when the facts they answer from change.
@@ -36,10 +36,30 @@ import org.springframework.transaction.event.TransactionalEventListener;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class AdjudicatorRunner {
 
   private final List<Adjudicator> adjudicators;
+
+  /**
+   * Each adjudicator runs in its own transaction.
+   *
+   * <p>Not decoration. A single {@code @Transactional} around the loop would put every adjudicator
+   * in one transaction, so a DB failure in one — a constraint violation, say — marks it
+   * rollback-only, and every other adjudicator's work is discarded at commit <em>despite</em> the
+   * catch below. The catch would run, the log would say "isolated", and the answers would still be
+   * gone. Same trap as the REQUIRES_NEW proxy boundary in #515: catching an exception does not
+   * un-poison a transaction it already marked.
+   *
+   * <p>A TransactionTemplate rather than a self-injected proxy: the boundary is visible at the call
+   * site instead of depending on which bean reference the call happens to go through.
+   */
+  private final TransactionTemplate perAdjudicator;
+
+  public AdjudicatorRunner(List<Adjudicator> adjudicators, PlatformTransactionManager txManager) {
+    this.adjudicators = adjudicators;
+    this.perAdjudicator = new TransactionTemplate(txManager);
+    this.perAdjudicator.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  }
 
   /**
    * Fails startup when two modules claim the same question.
@@ -78,14 +98,12 @@ public class AdjudicatorRunner {
 
   /** New facts landed: every question is worth re-answering. */
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void onAnalysisCompleted(AnalysisCompletedEvent event) {
     runAll(event.fileId(), "analysis completion");
   }
 
   /** A human annotated something: their input ranks first, so conclusions may change. */
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void onNodeRoleChanged(NodeRoleChangedEvent event) {
     runAll(event.fileId(), "node-role change");
   }
@@ -93,7 +111,8 @@ public class AdjudicatorRunner {
   private void runAll(UUID fileId, String trigger) {
     for (Adjudicator adjudicator : adjudicators) {
       try {
-        adjudicator.adjudicate(fileId);
+        // Its own transaction: a rollback here cannot reach a peer's committed answer.
+        perAdjudicator.executeWithoutResult(status -> adjudicator.adjudicate(fileId));
       } catch (Exception e) {
         // One question failing must not cost the others their answers. The whole exception, not
         // getMessage(): an NPE's message is null.

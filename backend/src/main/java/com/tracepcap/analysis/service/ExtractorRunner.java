@@ -59,6 +59,13 @@ public class ExtractorRunner {
           continue;
         }
         Extractor.Outcome outcome = extractor.extract(target);
+        if (outcome == null) {
+          // The port says "never null", but Extractor is a public SPI and a third-party module can
+          // break that. Say what happened rather than NPE into the catch below and report a
+          // FAILED row that blames a NullPointerException instead of the contract breach.
+          log.warn("[{}] extractor {} returned no outcome", file.getId(), extractor.name());
+          outcome = Extractor.Outcome.failed("extractor returned null (contract: never null)");
+        }
         record(extractor, file.getId(), outcome);
         log.debug(
             "[{}] extractor {} -> {} ({}ms)",

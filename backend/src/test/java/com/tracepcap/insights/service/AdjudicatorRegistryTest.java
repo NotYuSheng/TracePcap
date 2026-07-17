@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 /**
  * <b>The playbook's definition of done, for Adjudicate</b> (#512): an adjudicator is added by
@@ -24,6 +26,28 @@ import org.junit.jupiter.api.Test;
  * these tests check discovery <em>and</em> that a second claimant is refused.
  */
 class AdjudicatorRegistryTest {
+
+  /**
+   * A transaction manager that does nothing, so these tests exercise the registry rather than
+   * Spring's transaction machinery. The <em>real</em> guarantee — that each adjudicator runs in its
+   * own transaction, so one rolling back cannot discard a peer's committed answer — is a
+   * transactional property and belongs in an integration test with a real database, not here. This
+   * stub exists so the unit tests can construct the runner, and claims nothing about isolation.
+   */
+  private static final PlatformTransactionManager NO_OP_TX =
+      new PlatformTransactionManager() {
+        @Override
+        public org.springframework.transaction.TransactionStatus getTransaction(
+            org.springframework.transaction.TransactionDefinition definition) {
+          return new SimpleTransactionStatus();
+        }
+
+        @Override
+        public void commit(org.springframework.transaction.TransactionStatus status) {}
+
+        @Override
+        public void rollback(org.springframework.transaction.TransactionStatus status) {}
+      };
 
   /** An adjudicator that exists to prove discovery works. One class; nothing registers it. */
   static class ProbeAdjudicator implements Adjudicator {
@@ -49,7 +73,7 @@ class AdjudicatorRegistryTest {
   @Test
   void anAdjudicatorDeclaredNowhereButItsOwnFileIsAskedWhenFactsChange() {
     ProbeAdjudicator probe = new ProbeAdjudicator();
-    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(probe));
+    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(probe), NO_OP_TX);
     UUID fileId = UUID.randomUUID();
 
     runner.onAnalysisCompleted(new AnalysisCompletedEvent(fileId));
@@ -65,7 +89,7 @@ class AdjudicatorRegistryTest {
   @Test
   void twoAdjudicatorsClaimingOneQuestionRefuseToStart() {
     AdjudicatorRunner runner =
-        new AdjudicatorRunner(List.of(new ProbeAdjudicator(), new ProbeAdjudicator()));
+        new AdjudicatorRunner(List.of(new ProbeAdjudicator(), new ProbeAdjudicator()), NO_OP_TX);
 
     assertThatThrownBy(runner::validate)
         .isInstanceOf(IllegalStateException.class)
@@ -83,7 +107,7 @@ class AdjudicatorRegistryTest {
             return "some-other-question";
           }
         };
-    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(new ProbeAdjudicator(), other));
+    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(new ProbeAdjudicator(), other), NO_OP_TX);
 
     runner.validate(); // must not throw
 
@@ -94,7 +118,7 @@ class AdjudicatorRegistryTest {
   @Test
   void anAnnotationChangeReAsksTheQuestion() {
     ProbeAdjudicator probe = new ProbeAdjudicator();
-    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(probe));
+    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(probe), NO_OP_TX);
     UUID fileId = UUID.randomUUID();
 
     runner.onNodeRoleChanged(new com.tracepcap.common.event.NodeRoleChangedEvent(fileId));
@@ -118,7 +142,7 @@ class AdjudicatorRegistryTest {
           }
         };
     ProbeAdjudicator survivor = new ProbeAdjudicator();
-    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(boom, survivor));
+    AdjudicatorRunner runner = new AdjudicatorRunner(List.of(boom, survivor), NO_OP_TX);
     UUID fileId = UUID.randomUUID();
 
     runner.onAnalysisCompleted(new AnalysisCompletedEvent(fileId));

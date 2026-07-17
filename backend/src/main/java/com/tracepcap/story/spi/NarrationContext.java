@@ -22,7 +22,11 @@ public interface NarrationContext {
   /** The file being narrated. */
   UUID fileId();
 
-  /** The capture's totals — packets, bytes, duration. All MEASURED. */
+  /**
+   * The capture's totals — packets, bytes, duration. All MEASURED.
+   *
+   * <p>Never null: a file with no analysis summary never reaches Narrate.
+   */
   CaptureSummary summary();
 
   /**
@@ -40,8 +44,10 @@ public interface NarrationContext {
    * Whole-capture aggregates: protocol mix, top external ASNs, TLS anomaly counts, beacon
    * candidates.
    *
-   * <p>Read the nullable fields as the honest signals they are — {@code unknownAppPct} is null when
-   * nDPI did not complete, meaning the share is <em>unknowable</em>, not zero and not 100% (#501).
+   * <p>Never null — aggregation degrades to a fallback rather than returning nothing. Its
+   * <em>fields</em> are another matter: read the nullable ones as the honest signals they are.
+   * {@code unknownAppPct} is null when nDPI did not complete, meaning the share is
+   * <em>unknowable</em> — not zero, and not 100% (#501).
    */
   StoryAggregates aggregates();
 
