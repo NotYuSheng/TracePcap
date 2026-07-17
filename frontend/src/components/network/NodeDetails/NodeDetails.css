@@ -92,10 +92,10 @@
  * theme-aware .text-muted on top — in dark mode the text lightened, the background did not, and
  * the words vanished into the panel.
  *
- * Light is the base rather than the dark-mode override, because report capture renders this subtree
- * with data-theme="light" to guarantee white PDFs (see captureNetworkDiagrams.ts). The dark rules
- * are skipped inside any [data-theme="light"] ancestor, so a capture stays light whatever the
- * user's OS theme — without the page itself having to change.
+ * Keyed on [data-theme='dark'], which MainLayout sets on <html> from the theme store — NOT on a
+ * prefers-color-scheme media query. The store resolves the OS preference *and* the manual toggle,
+ * so a media query would leave anyone who overrides their OS theme reading pale-on-pale, which is
+ * the bug this fixes.
  */
 .ghost-callout {
   background: #fff3cd;
@@ -111,19 +111,17 @@
   color: #664d03;
 }
 
-@media (prefers-color-scheme: dark) {
-  .ghost-callout:not([data-theme='light'] *) {
-    /* Tinted rather than filled: a solid amber block would shout louder than the finding warrants. */
-    background: rgba(255, 193, 7, 0.12);
-    border-color: rgba(255, 193, 7, 0.35);
-    color: #ffe69c;
-  }
+[data-theme='dark'] .ghost-callout {
+  /* Tinted rather than filled: a solid amber block would shout louder than the finding warrants. */
+  background: rgba(255, 193, 7, 0.12);
+  border-color: rgba(255, 193, 7, 0.35);
+  color: #ffe69c;
+}
 
-  .ghost-callout-title:not([data-theme='light'] *) {
-    color: #ffda6a;
-  }
+[data-theme='dark'] .ghost-callout-title {
+  color: #ffda6a;
+}
 
-  .ghost-callout-detail:not([data-theme='light'] *) {
-    color: #ffe69c;
-  }
+[data-theme='dark'] .ghost-callout-detail {
+  color: #ffe69c;
 }

@@ -13,12 +13,29 @@
  *   when re-fetched (CORS / wrong origin).  Skipping font embedding lets the
  *   capture succeed; labels and colours are preserved.
  *
- * Why visible container + overlay:
- *   Both html-to-image and html2canvas respect CSS opacity.  Using opacity:0
- *   produces a fully transparent PNG.  Instead the container sits at z-index
- *   9999 (fully opaque, fully painted) while a solid white overlay at z-index
- *   10000 hides it from the user.  html-to-image targets the container element
- *   directly and ignores the overlay above it.
+ * Why visible container + scrim (and not any of the obvious alternatives):
+ *   html-to-image captures what the browser actually painted, so the container
+ *   must be on-screen, opaque and laid out.  Every way of hiding it breaks the
+ *   capture, each differently — all three have been tried:
+ *     - opacity:0                -> transparent PNG (html-to-image respects opacity)
+ *     - display/visibility:hidden -> no layout, so an empty box
+ *     - off-screen positioning    -> not painted, so a blank white image
+ *   So it stays visible at z-index 9999 and a scrim at 10000 covers it.
+ *
+ * Why the scrim is dark, not white:
+ *   It used to be solid #fff, which is what users saw as a flash on Download
+ *   Report — a white sheet over a dark app, replaced a beat later by the caller's
+ *   dark progress modal (z-index 10001): "white background, then opaque".  The
+ *   scrim now matches that modal's own rgba(0,0,0,0.55), so whichever paints
+ *   first the screen simply dims once and stays dimmed until the PDF is ready.
+ *
+ * Why forceLight rather than a CSS override:
+ *   The PDF wants white diagrams whatever the user's theme.  NetworkGraph picks its
+ *   colours in JavaScript (theme store + matchMedia), so no CSS on an ancestor reaches
+ *   them — the old code set data-theme="light" on <html> and it never worked: the
+ *   diagram captured in the user's theme regardless, and the only thing the override
+ *   achieved was strobing the whole app light/dark through two sequential captures.
+ *   The component takes an explicit forceLight prop instead.
  */
 
 import { createElement } from 'react';
@@ -39,23 +56,22 @@ async function captureLayout(
   return new Promise((resolve, reject) => {
     const id = `__nr-capture-${++captureSeq}`;
 
-    // Solid white overlay — hides the container from the user while it renders.
+    // Scrim that hides the capture container from the user.
+    //
+    // It has to exist: the container underneath must stay painted for html-to-image to see it.
+    // It used to be solid WHITE, which is what users reported as "white background, then opaque" —
+    // a white sheet dropped over a dark app, then replaced by the progress modal's dark scrim a
+    // beat later. Matching the modal's own scrim makes the two indistinguishable: whichever paints
+    // first, the screen dims once and stays dimmed until the report is ready.
     const overlay = document.createElement('div');
     overlay.style.cssText =
-      'position:fixed;inset:0;z-index:10000;background:#fff;pointer-events:none';
+      'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.55);pointer-events:none';
 
-    // Capture container — on-screen, fully opaque so the capture library gets
-    // real pixels.  Covered by the overlay above.
-    //
-    // data-theme="light" is set HERE, on the container, not on <html>. Forcing it
-    // document-wide made the whole app flash to light and back for the duration of
-    // each capture — and there are two captures per report, each lasting a full
-    // Sigma layout, so a user in dark mode watched their screen strobe. Scoping it
-    // to the subtree keeps the PDF's white background without touching what the
-    // user is looking at.
+    // Capture container — on-screen and fully painted, because html-to-image captures what the
+    // browser actually rendered. It cannot be hidden: opacity:0 yields a transparent PNG, and
+    // display/visibility/off-screen stop it being laid out or painted. It is covered, not hidden.
     const container = document.createElement('div');
     container.id = id;
-    container.setAttribute('data-theme', 'light');
     container.style.cssText = [
       'position:fixed',
       'top:0',
@@ -83,7 +99,6 @@ async function captureLayout(
       container.remove();
       overlay.remove();
       styleEl.remove();
-      // No theme to restore: the override lived on the container, which just went away.
     };
 
     const handleLayoutComplete = () => {
@@ -126,6 +141,9 @@ async function captureLayout(
         edges,
         layoutType,
         onLayoutComplete: handleLayoutComplete,
+        // The PDF is white whatever the user's theme; the component picks its colours in JS, so
+        // this has to be a prop.
+        forceLight: true,
       })
     );
 

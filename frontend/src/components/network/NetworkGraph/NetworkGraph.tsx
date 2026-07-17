@@ -38,6 +38,15 @@ interface NetworkGraphProps {
   activeFilterCount?: number;
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
+  /**
+   * Render light regardless of the user's theme — for PDF capture, which always wants white
+   * diagrams (see captureNetworkDiagrams.ts).
+   *
+   * <p>A prop rather than a CSS override because this component picks its colours in JavaScript,
+   * from the theme store and matchMedia. No amount of CSS on an ancestor reaches them: the capture
+   * used to set data-theme="light" on <html> and it never worked — it only made the page strobe.
+   */
+  forceLight?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -399,6 +408,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  forceLight = false,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -411,7 +421,8 @@ export const NetworkGraph = memo(function NetworkGraph({
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [themeMode]);
-  const darkMode = themeMode === 'dark' || (themeMode === 'system' && sysDark);
+  const darkMode =
+    !forceLight && (themeMode === 'dark' || (themeMode === 'system' && sysDark));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerReady, setContainerReady] = useState(false);
