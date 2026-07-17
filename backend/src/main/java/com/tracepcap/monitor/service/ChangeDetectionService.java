@@ -2,7 +2,7 @@ package com.tracepcap.monitor.service;
 
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
-import com.tracepcap.analysis.spi.ConversationLookup.FindingFacet;
+import com.tracepcap.analysis.spi.ConversationLookup.Facet;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.analysis.spi.GeoOrgLookup.IpAttribution;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
@@ -474,29 +474,29 @@ public class ChangeDetectionService {
     // IDS alerts (Suricata) — added CRITICAL, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        cleanSet(conversationLookup.distinctFindings(fromFileId, FindingFacet.SURICATA_ALERT)),
-        cleanSet(conversationLookup.distinctFindings(toFileId, FindingFacet.SURICATA_ALERT)),
+        cleanSet(conversationLookup.distinctValues(fromFileId, Facet.SURICATA_ALERT)),
+        cleanSet(conversationLookup.distinctValues(toFileId, Facet.SURICATA_ALERT)),
         "ids", Severity.CRITICAL, true);
 
     // Custom signatures — added CRITICAL, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        cleanSet(conversationLookup.distinctFindings(fromFileId, FindingFacet.CUSTOM_SIGNATURE)),
-        cleanSet(conversationLookup.distinctFindings(toFileId, FindingFacet.CUSTOM_SIGNATURE)),
+        cleanSet(conversationLookup.distinctValues(fromFileId, Facet.CUSTOM_SIGNATURE)),
+        cleanSet(conversationLookup.distinctValues(toFileId, Facet.CUSTOM_SIGNATURE)),
         "signature", Severity.CRITICAL, true);
 
     // nDPI flow risks (excluding VPN, handled by VPN_DRIFT) — added WARNING, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        nonVpnRiskSet(conversationLookup.distinctFindings(fromFileId, FindingFacet.RISK_TYPE)),
-        nonVpnRiskSet(conversationLookup.distinctFindings(toFileId, FindingFacet.RISK_TYPE)),
+        nonVpnRiskSet(conversationLookup.distinctValues(fromFileId, Facet.RISK_TYPE)),
+        nonVpnRiskSet(conversationLookup.distinctValues(toFileId, Facet.RISK_TYPE)),
         "risk", Severity.WARNING, true);
 
     // Detected file types — added INFO only (removals not actionable)
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        cleanSet(conversationLookup.distinctFindings(fromFileId, FindingFacet.FILE_TYPE)),
-        cleanSet(conversationLookup.distinctFindings(toFileId, FindingFacet.FILE_TYPE)),
+        cleanSet(conversationLookup.distinctValues(fromFileId, Facet.FILE_TYPE)),
+        cleanSet(conversationLookup.distinctValues(toFileId, Facet.FILE_TYPE)),
         "fileType", Severity.INFO, false);
 
     return events;

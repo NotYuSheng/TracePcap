@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 /** Serves {@link ConversationLookup} from the analysis module's own repository. */
@@ -36,6 +39,43 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public ConversationPage conversationPage(
+      UUID fileId, int page, int pageSize, ConversationFilterParams filter) {
+    Page<ConversationEntity> dbPage =
+        repository.findAll(
+            ConversationRepository.buildSpec(fileId, filter),
+            PageRequest.of(page - 1, pageSize, sortOf(filter)));
+    return new ConversationPage(
+        dbPage.getContent().stream().map(ConversationLookupAdapter::toFacts).toList(),
+        dbPage.getTotalElements());
+  }
+
+  /**
+   * Maps the API's sort field onto a column. This lives here because it is schema knowledge: "bytes"
+   * is what the API calls it, {@code totalBytes} is what the entity calls it, and a feature module
+   * knowing the second is reaching through the seam with a string.
+   */
+  private static Sort sortOf(ConversationFilterParams params) {
+    if (params == null || params.getSortBy() == null || params.getSortBy().isBlank()) {
+      return Sort.unsorted();
+    }
+    String field =
+        switch (params.getSortBy()) {
+          case "packets" -> "packetCount";
+          case "bytes" -> "totalBytes";
+          // Duration is computed, not stored; startTime is the closest stored proxy.
+          case "duration" -> "startTime";
+          case "srcIp", "dstIp", "startTime", "endTime", "protocol" -> params.getSortBy();
+          // Unknown field: unsorted beats an InvalidDataAccessApiUsageException from a bad property.
+          default -> null;
+        };
+    if (field == null) return Sort.unsorted();
+    Sort.Direction dir =
+        "desc".equalsIgnoreCase(params.getSortDir()) ? Sort.Direction.DESC : Sort.Direction.ASC;
+    return Sort.by(dir, field);
+  }
+
+  @Override
   public Optional<ConversationFacts> conversationFactsById(UUID conversationId) {
     return repository.findById(conversationId).map(ConversationLookupAdapter::toFacts);
   }
@@ -58,13 +98,16 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
-  public List<String> distinctFindings(UUID fileId, FindingFacet facet) {
+  public List<String> distinctValues(UUID fileId, Facet facet) {
     List<String> raw =
         switch (facet) {
           case SURICATA_ALERT -> repository.findDistinctSuricataAlertsByFileId(fileId);
           case CUSTOM_SIGNATURE -> repository.findDistinctCustomSignaturesByFileId(fileId);
           case RISK_TYPE -> repository.findDistinctRiskTypesByFileId(fileId);
           case FILE_TYPE -> repository.findDistinctFileTypesByFileId(fileId);
+          case APP_NAME -> repository.findDistinctAppNamesByFileId(fileId);
+          case IP -> repository.findDistinctIpsByFileId(fileId);
+          case PROTOCOL -> repository.findDistinctProtocolsByFileId(fileId);
         };
     // The port promises no nulls or blanks; the native DISTINCT queries can yield both.
     return raw.stream().filter(v -> v != null && !v.isBlank()).toList();

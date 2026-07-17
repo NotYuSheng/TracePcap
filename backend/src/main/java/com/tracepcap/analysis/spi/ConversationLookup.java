@@ -113,6 +113,25 @@ public interface ConversationLookup {
    */
   List<ConversationFacts> conversationFacts(UUID fileId, ConversationFilterParams filter);
 
+  /** One page of conversations plus the unpaged total, so a caller can report "N of M". */
+  record ConversationPage(List<ConversationFacts> content, long totalElements) {}
+
+  /**
+   * One page of the conversations matching {@code filter}, sorted by the filter's own
+   * {@code sortBy}/{@code sortDir}.
+   *
+   * <p>{@code page} is <b>1-indexed</b>, matching the REST convention rather than Spring's 0-indexed
+   * {@code Pageable} — callers on this side of the seam should not have to know which one they're
+   * talking to.
+   *
+   * <p>Sorting is resolved here rather than by the caller. {@code sortBy} names a field of the
+   * <em>API</em> ("bytes", "packets", "duration"); mapping those onto columns is schema knowledge,
+   * and a feature module doing that mapping itself is reaching through the seam with a string
+   * instead of a type. An unrecognised {@code sortBy} yields an unsorted page rather than an error.
+   */
+  ConversationPage conversationPage(
+      UUID fileId, int page, int pageSize, ConversationFilterParams filter);
+
   /**
    * One conversation by its own id, or empty when no such conversation exists.
    *
@@ -138,29 +157,41 @@ public interface ConversationLookup {
   List<ConversationFacts> conversationFactsByIds(Collection<UUID> conversationIds);
 
   /**
-   * The distinct values of one finding facet across a whole file — the vocabulary the file exhibits,
-   * not the per-conversation detail.
+   * The distinct values of one facet across a whole file — the vocabulary the file exhibits, not the
+   * per-conversation detail.
    *
    * <p>Separate from {@link #conversationFacts} because the question differs and so does the cost:
    * comparing two snapshots asks "which alert types appeared or disappeared", which the database
    * answers with a DISTINCT over an array column. Deriving it by loading every conversation and
    * folding in Java would pull thousands of rows to build a set of a dozen strings.
    *
-   * <p>Values are never null or blank. All of these are <b>INFERRED</b> — tools' conclusions — so an
-   * empty result means "nothing concluded", which is not the same as "nothing there"; ask {@link
-   * ExtractionManifest} to tell those apart.
+   * <p>Values are never null or blank.
    */
-  List<String> distinctFindings(UUID fileId, FindingFacet facet);
+  List<String> distinctValues(UUID fileId, Facet facet);
 
-  /** The finding vocabularies a file can be asked for. */
-  enum FindingFacet {
-    /** Suricata rule names that fired. */
+  /**
+   * The vocabularies a file can be asked for — the distinct values of one column across every
+   * conversation. Used to populate filter dropdowns and to diff one snapshot against another.
+   *
+   * <p>Grades differ within this enum, which is why it is named for the shape of the question rather
+   * than for findings: {@link #IP} and {@link #PROTOCOL} are MEASURED, while the rest are INFERRED —
+   * a tool's conclusion. For the inferred ones, an empty result means "nothing concluded", which is
+   * not the same as "nothing there"; ask {@link ExtractionManifest} to tell those apart.
+   */
+  enum Facet {
+    /** Suricata rule names that fired. INFERRED. */
     SURICATA_ALERT,
-    /** User-defined signature names that matched. */
+    /** User-defined signature names that matched. INFERRED. */
     CUSTOM_SIGNATURE,
-    /** nDPI flow-risk labels. */
+    /** nDPI flow-risk labels. INFERRED. */
     RISK_TYPE,
-    /** File types carvers detected in packet payloads. */
-    FILE_TYPE
+    /** File types carvers detected in packet payloads. INFERRED. */
+    FILE_TYPE,
+    /** nDPI application names. INFERRED. */
+    APP_NAME,
+    /** Every IP seen as either endpoint. MEASURED. */
+    IP,
+    /** Transport protocols observed. MEASURED. */
+    PROTOCOL
   }
 }
