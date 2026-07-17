@@ -417,7 +417,7 @@ is a refactor target, not a shrug.
   #496); ``nodeType`` is a projection of the adjudicated host identity through one label map, so
   the two taxonomies that both contained "Web Server" (#499) become one — the adjudicator decides,
   the graph renders. Legacy files with classifications but no identities backfill lazily on first
-  read of ``GET /host-identities`` (idempotent).
+  read of ``GET /files/{fileId}/host-identities`` (idempotent).
 * **The first real adjudicator exists** (slice 5): ``HostIdentityService`` in ``insights`` answers
   "what is this host?" with one voice — human-confirmed node-role labels ranked first, then the
   classification vote (whose runner-up is now persisted so a knife-edge is distinguishable from a

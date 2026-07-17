@@ -316,14 +316,12 @@ export function buildNetworkGraph(
       nodeMap[src.ip] = createNode(src.ip, src.hostname, src.mac);
     }
     updateNodeStats(nodeMap[src.ip], conv, 'sent', protocol);
-    applyRoleFromInitiator(nodeMap[src.ip], conv);
 
     // Create or update destination node
     if (!nodeMap[dst.ip]) {
       nodeMap[dst.ip] = createNode(dst.ip, dst.hostname, dst.mac);
     }
     updateNodeStats(nodeMap[dst.ip], conv, 'received', protocol);
-    applyRoleFromInitiator(nodeMap[dst.ip], conv);
 
     // Track well-known port usage for both endpoints.
     // A node sending FROM a well-known port (e.g. DNS response from :53) is
@@ -372,6 +370,17 @@ export function buildNetworkGraph(
     ghostProtoAsSrc[src.ip].add(protocol);
     if (!ghostProtoAsDst[dst.ip]) ghostProtoAsDst[dst.ip] = new Set();
     ghostProtoAsDst[dst.ip].add(protocol);
+  });
+
+  // Roles are derived over EVERY conversation, not just the displayed subset. role comes from who
+  // opened the connection (a MEASURED fact, #496), so it must be independent of the packet-count
+  // cap that decides what fits on screen — otherwise Present is still adjudicating on a truncated
+  // view, which is exactly what #521 removed everywhere else. A node whose only flows were capped
+  // out has no entry in nodeMap and is skipped: it is not on the diagram to label.
+  conversations.forEach(conv => {
+    const [s0, d0] = conv.endpoints;
+    if (nodeMap[s0.ip]) applyRoleFromInitiator(nodeMap[s0.ip], conv);
+    if (nodeMap[d0.ip]) applyRoleFromInitiator(nodeMap[d0.ip], conv);
   });
 
   // Node type comes from the backend's adjudicated host identity (see applyIdentities below).

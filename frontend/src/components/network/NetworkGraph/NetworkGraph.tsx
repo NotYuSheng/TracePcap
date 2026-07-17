@@ -8,7 +8,7 @@ import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
-import { deviceTypeColor, deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
+import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
 import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
 import './NetworkGraph.css';
@@ -928,7 +928,16 @@ export const NetworkGraph = memo(function NetworkGraph({
             nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && n.data.deviceType === dt))
           .map(dt => (
             <div key={dt} className="ng-legend-item">
-              <i className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`} style={{ color: deviceTypeColor(dt) }} />
+              {/*
+                Swatch matches what the node actually renders. Generic nodes (client/unknown) now
+                take their colour from NODE_TYPE_CONFIG[nodeType], not from deviceTypeColor — so
+                using the device colour here would advertise a colour no node shows (#521 review).
+                The device icon still distinguishes IoT from Mobile; the colour follows the node.
+              */}
+              <i
+                className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`}
+                style={{ color: NODE_TYPE_CONFIG['client'].color }}
+              />
               <span className="ng-legend-label">{deviceTypeLabel(dt)}</span>
             </div>
           ))}

@@ -39,10 +39,14 @@ public class HostIdentitiesController {
       try {
         hostIdentityService.adjudicateFile(fileId);
       } catch (DataIntegrityViolationException raced) {
-        // Two concurrent first-reads of the same legacy file both found it empty and both ran the
-        // delete-and-regenerate. One committed; this one lost the unique (file_id, ip) race. That
-        // is fine — the winner's rows are what we wanted, and the read below returns them. Swallow
-        // it rather than 500 a request whose result already exists.
+        // Most likely a concurrent first-read of the same legacy file: both found it empty, both ran
+        // delete-and-regenerate, and this one lost the unique (file_id, ip) race. That is fine — the
+        // winner's rows are what we wanted. But this exception can also mean a genuine persistence
+        // defect, which must NOT be swallowed into a 200-with-nothing. So only tolerate it when the
+        // rows are actually there now; otherwise it was a real failure, and it propagates.
+        if (hostIdentityRepository.findByFileId(fileId).isEmpty()) {
+          throw raced;
+        }
         log.debug("Concurrent backfill for file {} lost the race; reading the winner's rows", fileId);
       }
     }
