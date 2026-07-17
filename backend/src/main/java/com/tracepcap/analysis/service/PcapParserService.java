@@ -88,7 +88,13 @@ public class PcapParserService {
             "-e",
             "arp.src.hw_mac",
             "-e",
-            "frame.number");
+            "frame.number",
+            // Appended, not inserted: every field below is read by positional index, so a new
+            // field in the middle would silently shift them all. (#496)
+            "-e",
+            "tcp.flags.syn",
+            "-e",
+            "tcp.flags.ack");
     pb.redirectErrorStream(false);
 
     // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
@@ -238,6 +244,21 @@ public class PcapParserService {
             conv.setPacketCount(conv.getPacketCount() + 1);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
+
+            // Who opened this connection (#496). SYN without ACK is the opening packet; SYN+ACK is
+            // the answer to it, so the ACK bit is what tells the two apart. The first one wins: a
+            // retransmitted SYN must not flip the initiator, and it cannot legitimately change.
+            //
+            // Absent for UDP/ICMP/ARP, and for TCP flows the capture joined mid-stream. That stays
+            // null. Falling back to "lower port wins" is exactly the guess this replaces — a server
+            // on :4434 is a server, whatever its port number says.
+            if (conv.getInitiatorIp() == null
+                && f.length > 22
+                && "1".equals(f[21])
+                && !"1".equals(f[22])) {
+              conv.setInitiatorIp(fSrcIp);
+              conv.setInitiatorPort(fSrcPort);
+            }
 
             // Extract payload hex from tcp.payload (index 12) or udp.payload (index 13).
             // tshark outputs byte arrays as colon-separated hex pairs (e.g. "48:54:54:50").
@@ -400,6 +421,23 @@ public class PcapParserService {
     private Integer srcPort;
     private String dstIp;
     private Integer dstPort;
+
+    /**
+     * The endpoint that opened the connection — the one that sent SYN without ACK (#496).
+     *
+     * <p><b>Not the same as {@link #srcIp}.</b> Conversation keys are normalised so that A→B and
+     * B→A share one bucket, which means srcIp is "whichever endpoint sorted first", not "who
+     * started it". Direction used to be lost entirely at this point, which is why the frontend
+     * resorted to guessing a host's role from port numbers — and why a server on a high port
+     * (:4434) was called a client.
+     *
+     * <p><b>Null means unknown, never "nobody initiated".</b> UDP, ICMP and ARP have no handshake;
+     * a capture can also begin mid-flow and miss the SYN. Guessing from ports to fill the gap is
+     * the bug, not the fallback.
+     */
+    private String initiatorIp;
+
+    private Integer initiatorPort;
     private String protocol;
     private String appName;
     private String tsharkProtocol;

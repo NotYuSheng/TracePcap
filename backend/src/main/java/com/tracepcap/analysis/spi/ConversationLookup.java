@@ -40,13 +40,24 @@ public interface ConversationLookup {
   /**
    * What the traffic exhibited. Every field is a {@code NOT NULL} column except the ports, which are
    * absent for protocols that have none (ICMP, ARP) — about a quarter of rows in practice, so
-   * consumers must expect them.
+   * consumers must expect them — and the initiator pair.
+   *
+   * <p><b>{@code srcIp} is not "the client".</b> Conversation keys are normalised so A→B and B→A
+   * share one row, so srcIp is whichever endpoint sorted first. To ask who opened the connection,
+   * use {@code initiatorIp}: the endpoint that sent SYN without ACK (#496).
+   *
+   * <p>{@code initiatorIp} is null when <em>unknown</em> — UDP, ICMP and ARP have no handshake, and
+   * a capture can begin mid-flow and miss the SYN. Null never means "nobody initiated", and it must
+   * not be backfilled by guessing from port numbers: a server on :4434 is still a server, and
+   * treating the lower port as the listener is exactly the bug this field replaces.
    */
   record FlowIdentity(
       String srcIp,
       Integer srcPort,
       String dstIp,
       Integer dstPort,
+      String initiatorIp,
+      Integer initiatorPort,
       String protocol,
       long packetCount,
       long totalBytes,

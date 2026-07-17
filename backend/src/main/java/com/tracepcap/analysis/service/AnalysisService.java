@@ -232,6 +232,8 @@ public class AnalysisService {
                   .dstIp(convInfo.getDstIp())
                   .dstPort(convInfo.getDstPort())
                   .protocol(convInfo.getProtocol())
+                  .initiatorIp(convInfo.getInitiatorIp())
+                  .initiatorPort(convInfo.getInitiatorPort())
                   .appName(convInfo.getAppName())
                   .tsharkProtocol(convInfo.getTsharkProtocol())
                   .category(convInfo.getCategory())

@@ -284,6 +284,8 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getSrcPort(),
             e.getDstIp(),
             e.getDstPort(),
+            e.getInitiatorIp(),
+            e.getInitiatorPort(),
             e.getProtocol(),
             e.getPacketCount() == null ? 0 : e.getPacketCount(),
             e.getTotalBytes() == null ? 0 : e.getTotalBytes(),
