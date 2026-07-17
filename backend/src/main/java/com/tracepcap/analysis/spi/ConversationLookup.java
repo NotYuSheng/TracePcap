@@ -230,8 +230,8 @@ public interface ConversationLookup {
   long conversationCount(UUID fileId);
 
   /**
-   * How many conversations carry at least one nDPI risk, custom-signature match, or Suricata alert
-   * — the same predicate as {@link #atRiskConversations}.
+   * How many conversations carry at least one nDPI flow risk — the same predicate as {@link
+   * #atRiskConversations}, and like it, nDPI risks only.
    */
   long atRiskConversationCount(UUID fileId);
 
@@ -242,11 +242,16 @@ public interface ConversationLookup {
   List<ConversationFacts> topConversationsByBytes(UUID fileId, int limit);
 
   /**
-   * Up to {@code limit} conversations carrying at least one nDPI risk, custom-signature match, or
-   * Suricata alert.
+   * Up to {@code limit} conversations carrying at least one <b>nDPI flow risk</b>, most risks first.
    *
-   * <p><b>INFERRED</b>, all of it: this is what the tools concluded, and "at risk" inherits their
-   * error modes. A conversation absent from this list is one nothing flagged — not one that is safe.
+   * <p>nDPI risks only — <em>not</em> custom-signature matches or Suricata alerts, despite the name.
+   * A conversation flagged by Suricata alone does not appear here. That is the query's long-standing
+   * behaviour rather than a decision made in this port, and it is stated plainly because an earlier
+   * draft of this javadoc claimed all three sources; a reviewer read that, believed it, and filed a
+   * bug against the report for "omitting" alerts the query never selected.
+   *
+   * <p><b>INFERRED</b>: this is what nDPI concluded, and "at risk" inherits its error modes. A
+   * conversation absent from this list is one nDPI did not flag — not one that is safe.
    */
   List<ConversationFacts> atRiskConversations(UUID fileId, int limit);
 
