@@ -52,6 +52,17 @@ export interface ConversationGeoInfo {
 export interface Conversation {
   id: string;
   endpoints: [NetworkEndpoint, NetworkEndpoint];
+  /**
+   * The endpoint that opened the connection — sent SYN without ACK (#496). MEASURED.
+   *
+   * <p>Not `endpoints[0]`: A→B and B→A are normalised into one conversation, so the first endpoint
+   * is whichever sorted first, not who started it.
+   *
+   * Undefined means **unknown**, never "nobody initiated" — UDP/ICMP/ARP have no handshake, and a
+   * capture can join mid-flow. Do not fill the gap by guessing from port numbers: that was #496.
+   */
+  initiatorIp?: string;
+  initiatorPort?: number;
   protocol: Protocol;
   appName?: string;
   tsharkProtocol?: string;

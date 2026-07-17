@@ -247,15 +247,17 @@ function drawNodeLabel(
 // For these, deviceType provides a more meaningful colour signal.
 const GENERIC_NODE_TYPES = new Set(['client', 'unknown']);
 
+/**
+ * The node's colour, from its adjudicated nodeType.
+ *
+ * <p>This used to adjudicate: nodeType-wins-else-deviceType-else-fallback, resolving two competing
+ * classifications by display precedence — in the browser, with no confidence and no contested
+ * state (#521, #499). But nodeType is now a projection of the backend's host-identity adjudication
+ * (see networkService's applyIdentities), so it already *is* the one answer. There is nothing left
+ * to resolve; the colour just follows it.
+ */
 function getNodeColor(node: GraphNode): string {
-  const { nodeType, deviceType } = node.data;
-  // Specific service nodeTypes always take priority (DNS server, web server, etc.)
-  if (!GENERIC_NODE_TYPES.has(nodeType) && NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]) {
-    return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG].color;
-  }
-  // For generic types (client / unknown), prefer the hardware device classification
-  if (deviceType && deviceType !== 'UNKNOWN') return deviceTypeColor(deviceType);
-  // Fall back to the nodeType color (client=blue, unknown=grey)
+  const { nodeType } = node.data;
   return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]?.color ?? '#95a5a6';
 }
 

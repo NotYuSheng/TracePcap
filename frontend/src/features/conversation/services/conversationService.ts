@@ -20,6 +20,9 @@ interface ConversationApiResponse {
   srcPort: number | null;
   dstIp: string;
   dstPort: number | null;
+  /** Who sent SYN without ACK (#496). Null when unknown — no handshake, or capture joined mid-flow. */
+  initiatorIp?: string | null;
+  initiatorPort?: number | null;
   protocol: string;
   appName?: string | null;
   tsharkProtocol?: string | null;
@@ -53,6 +56,9 @@ interface PacketApiResponse {
   srcPort: number | null;
   dstIp: string;
   dstPort: number | null;
+  /** Who sent SYN without ACK (#496). Null when unknown — no handshake, or capture joined mid-flow. */
+  initiatorIp?: string | null;
+  initiatorPort?: number | null;
   protocol: string;
   packetSize: number;
   info: string | null;
@@ -100,6 +106,8 @@ function transformConversation(
   return {
     id: apiData.conversationId,
     endpoints: [srcEndpoint, dstEndpoint],
+    initiatorIp: apiData.initiatorIp ?? undefined,
+    initiatorPort: apiData.initiatorPort ?? undefined,
     protocol: getProtocol(apiData.protocol),
     appName: apiData.appName ?? undefined,
     tsharkProtocol: apiData.tsharkProtocol ?? undefined,
