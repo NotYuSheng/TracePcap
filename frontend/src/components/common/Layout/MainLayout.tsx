@@ -167,7 +167,7 @@ export const MainLayout = () => {
               <small>TracePcap &copy; 2026 - Network Traffic Analysis and Visualization Tool</small>
               <br />
               <small className="text-muted opacity-75">
-                {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''}
+                {__APP_VERSION__}
               </small>
             </Col>
           </Row>

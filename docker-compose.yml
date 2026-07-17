@@ -132,7 +132,10 @@ services:
         VITE_API_BASE_URL: /api/v1
         VITE_SUPPORTED_FILE_TYPES: ${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}
         VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT: ${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}
-        VITE_APP_VERSION: ${APP_VERSION:-dev}
+        # The default below is rewritten on every merge to main by
+        # .github/workflows/app-version.yml — it is the version local builds bake in.
+        # Export APP_VERSION to override (CI passes the live `git describe` for GHCR images).
+        VITE_APP_VERSION: ${APP_VERSION:-v0.1.1-150-g494ed72}
     container_name: tracepcap-nginx
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this

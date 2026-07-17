@@ -5,17 +5,28 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { execSync } from 'child_process'
 
+// The VITE_APP_VERSION build arg is the primary source: the Docker build context excludes
+// .git, so the git call below only ever resolves on a bare-metal build.
 function getAppVersion(envFallback?: string): string {
+  // Vite's loadEnv populates the `env` object but not process.env, so accept the loaded value.
+  const supplied = (envFallback || process.env.VITE_APP_VERSION || '').trim();
+  if (supplied) return supplied;
+
   try {
     // stdio: silence git's stderr ("fatal: not a git repository") in non-git build contexts.
-    return execSync('git describe --tags --always', {
+    const described = execSync('git describe --tags --always', {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
+    if (described) return described;
   } catch {
-    // Vite's loadEnv populates the `env` object but not process.env, so accept the loaded value.
-    return envFallback || process.env.VITE_APP_VERSION || 'dev';
+    // Fall through to the error below — an unidentifiable build must not ship.
   }
+
+  throw new Error(
+    'Cannot resolve app version: VITE_APP_VERSION was not supplied and `git describe` is ' +
+      'unavailable. Pass the VITE_APP_VERSION build arg (see docker-compose.yml).'
+  );
 }
 
 const VALID_RESOLUTIONS = ['110m', '50m', '10m'] as const;

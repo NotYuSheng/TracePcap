@@ -16,7 +16,8 @@ COPY frontend ./
 ARG VITE_API_BASE_URL=/api/v1
 ARG VITE_SUPPORTED_FILE_TYPES=.pcap,.pcapng,.cap
 ARG VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false
-ARG VITE_APP_VERSION=dev
+# No default: an unsupplied version must fail the build, not bake in an untraceable one.
+ARG VITE_APP_VERSION
 # OIDC/Keycloak auth (off by default; enabled via docker-compose.prod.yml)
 ARG VITE_AUTH_ENABLED=false
 ARG VITE_OIDC_AUTHORITY=
