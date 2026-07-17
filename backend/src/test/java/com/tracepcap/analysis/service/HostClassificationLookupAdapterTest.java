@@ -82,4 +82,40 @@ class HostClassificationLookupAdapterTest {
         .thenReturn(Optional.empty());
     assertThat(adapter.hostFactsByIp(FILE, "10.0.0.9")).isEmpty();
   }
+
+  /**
+   * The capture-dependent fields are the ones consumers must guard; ip/deviceType/confidence are
+   * NOT NULL columns and are not. Pinning that split here keeps the record's javadoc honest — a
+   * consumer building prompt text is entitled to skip the null check on deviceType.
+   */
+  @Test
+  void capturesThatRevealLittleStillYieldIpDeviceTypeAndConfidence() {
+    HostClassificationEntity bare =
+        HostClassificationEntity.builder()
+            .ip("10.0.0.7")
+            .deviceType("UNKNOWN") // NOT NULL: a host always classifies as something
+            .confidence(0)
+            .mac(null)
+            .manufacturer(null)
+            .hostname(null)
+            .hostnameSource(null)
+            .ttl(null)
+            .serviceRoles(null)
+            .build();
+    when(repository.findByFileId(FILE)).thenReturn(List.of(bare));
+
+    assertThat(adapter.hostFacts(FILE))
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.ip()).isEqualTo("10.0.0.7");
+              assertThat(h.deviceType()).isEqualTo("UNKNOWN");
+              assertThat(h.confidence()).isZero();
+              assertThat(h.serviceRoles()).isEmpty();
+              assertThat(h.mac()).isNull();
+              assertThat(h.manufacturer()).isNull();
+              assertThat(h.hostname()).isNull();
+              assertThat(h.ttl()).isNull();
+            });
+  }
 }

@@ -34,9 +34,18 @@ public interface HostClassificationLookup {
   /**
    * Descriptive facts observed about one host in one file.
    *
-   * <p>{@code ip} and {@code serviceRoles} are never null. {@code serviceRoles} is already split
-   * from its stored comma-joined form and is immutable; every other field may be null when the
-   * capture did not reveal it.
+   * <p>Nullability mirrors the schema rather than being uniform, because consumers building display
+   * text or prompt context need to know which fields need a guard:
+   *
+   * <ul>
+   *   <li><b>Never null:</b> {@code ip}, {@code deviceType}, {@code confidence} — all {@code NOT
+   *       NULL} columns. A host always classifies as <em>something</em> (worst case {@code UNKNOWN}
+   *       at low confidence), so there is no "no device type" state to guard against.
+   *   <li><b>Never null, may be empty:</b> {@code serviceRoles} — already split from its stored
+   *       comma-joined form, and immutable.
+   *   <li><b>Nullable:</b> {@code mac}, {@code manufacturer}, {@code hostname}, {@code
+   *       hostnameSource}, {@code ttl} — the capture may simply not reveal these.
+   * </ul>
    */
   record HostFacts(
       String ip,
