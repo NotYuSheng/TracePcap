@@ -3,7 +3,7 @@ package com.tracepcap.insights.service;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.common.exception.InsufficientEvidenceException;
 import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.dto.RoleSuggestionDto;
@@ -33,7 +33,7 @@ public class NodeRoleService {
       new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
 
   private final NodeRoleRepository nodeRoleRepository;
-  private final HostClassificationRepository hostClassificationRepository;
+  private final HostClassificationLookup hostClassificationLookup;
   private final LlmClient llmClient;
   private final JdbcTemplate jdbc;
   private final LabelStalenessService labelStalenessService;
@@ -183,13 +183,13 @@ public class NodeRoleService {
 
     if ("IP".equalsIgnoreCase(entityType)) {
       // Look up host classification for this IP in the given file
-      hostClassificationRepository.findFirstByFileIdAndIpOrderByIdAsc(fileId, entityKey)
+      hostClassificationLookup.hostFactsByIp(fileId, entityKey)
           .ifPresent(h -> {
-            sb.append("Device type: ").append(h.getDeviceType())
-              .append(" (confidence: ").append(h.getConfidence()).append("%)\n");
-            if (h.getManufacturer() != null) sb.append("Manufacturer: ").append(h.getManufacturer()).append("\n");
-            if (h.getTtl() != null) sb.append("TTL: ").append(h.getTtl()).append("\n");
-            if (h.getMac() != null) sb.append("MAC: ").append(h.getMac()).append("\n");
+            sb.append("Device type: ").append(h.deviceType())
+              .append(" (confidence: ").append(h.confidence()).append("%)\n");
+            if (h.manufacturer() != null) sb.append("Manufacturer: ").append(h.manufacturer()).append("\n");
+            if (h.ttl() != null) sb.append("TTL: ").append(h.ttl()).append("\n");
+            if (h.mac() != null) sb.append("MAC: ").append(h.mac()).append("\n");
           });
 
       // Top apps and protocols from conversations
@@ -227,13 +227,13 @@ public class NodeRoleService {
 
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       // MAC-based lookup
-      hostClassificationRepository.findFirstByFileIdAndMacIgnoreCaseOrderByIdAsc(fileId, entityKey)
+      hostClassificationLookup.hostFactsByMac(fileId, entityKey)
           .ifPresent(h -> {
-            sb.append("IP: ").append(h.getIp()).append("\n");
-            sb.append("Device type: ").append(h.getDeviceType())
-              .append(" (confidence: ").append(h.getConfidence()).append("%)\n");
-            if (h.getManufacturer() != null) sb.append("Manufacturer: ").append(h.getManufacturer()).append("\n");
-            if (h.getTtl() != null) sb.append("TTL: ").append(h.getTtl()).append("\n");
+            sb.append("IP: ").append(h.ip()).append("\n");
+            sb.append("Device type: ").append(h.deviceType())
+              .append(" (confidence: ").append(h.confidence()).append("%)\n");
+            if (h.manufacturer() != null) sb.append("Manufacturer: ").append(h.manufacturer()).append("\n");
+            if (h.ttl() != null) sb.append("TTL: ").append(h.ttl()).append("\n");
           });
     }
 

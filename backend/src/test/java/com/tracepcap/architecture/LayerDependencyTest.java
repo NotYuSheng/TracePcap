@@ -40,6 +40,16 @@ class LayerDependencyTest {
    *
    * <p>{@code analysis}' own classes are exempt — the rule governs crossing the boundary, not
    * working inside it.
+   *
+   * <p><b>Accepted, not pending:</b> the frozen violations on {@code
+   * DeviceClassifierService.classify} are not a bypass and should not be "fixed" by rewriting that
+   * class. It <em>implements</em> the {@link com.tracepcap.analysis.spi.HostClassifier} port, whose
+   * own signature returns {@code HostClassificationEntity} — so the class touches the entity because
+   * the seam hands it over, which is the contract working as designed. This rule matches on package
+   * names and cannot tell "reached around the port" from "used the type the port gave you". Removing
+   * these 27 requires changing what {@code HostClassifier} returns (the entity conceptually belongs
+   * to {@code hostclassification} but physically lives in {@code analysis.entity} for JPA's sake) —
+   * a schema-shaped change, tracked separately, not part of the seam migration.
    */
   @ArchTest
   static final ArchRule modules_use_analysis_spi_not_its_internals =

@@ -381,8 +381,9 @@ Known divergence
 Measured against the model above; frozen in the ArchUnit baseline where enforceable. Each entry
 is a refactor target, not a shrug.
 
-* **755 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
-  entities (rule 2). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
+* **687 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
+  entities (rule 2) — down from 757 as the seam migration proceeds slice by slice (757 → 738 in
+  slice 6a, → 687 in slice 6b). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
   eliminated across slices 1 and 3: ``analysis ↔ file`` (listener moved to its consumer),
   ``monitor ↔ insights`` and ``monitor ↔ subnets`` (a ``monitor.spi`` port package —
   ``LabelStalenessCheck``, ``SnapshotRevalidationHook``, ``InsightPresence`` — implemented by
@@ -418,5 +419,24 @@ is a refactor target, not a shrug.
   Served at ``GET /files/{fileId}/host-identities``. Remaining gap: the frontend still computes
   its own ``nodeType``/``getNodeColor`` precedence instead of consuming this (#499/#498 close
   fully when it does — the next slice).
+* **``insights`` is fully behind the seam** (slice 6b): 34 → **zero**. ``NodeRoleService`` and
+  ``LabelStalenessService`` read hosts through ``HostClassificationLookup`` and external orgs
+  through the new ``GeoOrgLookup``; ``HostClassificationsController`` reads through the port and
+  the new ``IpMacObservationLookup``. Three ports rather than one on purpose — the shapes are
+  genuinely different questions (a host's description, an IP's claimants, a peer set's orgs), and
+  widening one port to serve all three is how a seam decays back into a repository. Note the split
+  *within* ``HostClassificationLookup``: ``ClassifiedHost`` carries the contest (winner + runner-up)
+  for adjudication, ``HostFacts`` carries the description for display and prompt context. Logic the
+  consumers used to duplicate — splitting the comma-joined ``service_roles`` column, grouping
+  observations by IP, filtering blank orgs — now lives in the adapters, which is what makes the
+  port's javadoc a promise rather than a suggestion.
+* **``hostclassification``'s 27 remaining violations are accepted, not pending.** They are all
+  ``DeviceClassifierService.classify``, which *implements* the ``HostClassifier`` port — a port
+  whose own signature returns ``HostClassificationEntity``. The class touches the entity because
+  the seam hands it over; that is the contract working. The rule matches package names and cannot
+  distinguish "reached around the port" from "used the type the port gave you". Clearing them means
+  changing what ``HostClassifier`` returns — the entity conceptually belongs to
+  ``hostclassification`` but physically lives in ``analysis.entity`` for JPA's sake — which is a
+  schema-shaped change, not seam work. Do not "fix" these by rewriting the classifier.
 * **``FilterService`` reads the pcap** to validate LLM-generated filters — the one grey case in
   rule 4, baselined rather than blessed.
