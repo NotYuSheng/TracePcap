@@ -21,6 +21,7 @@ import {
   type EntityType,
 } from '@/features/notes/services/entityNotesService';
 import './NodeDetails.css';
+import { Alert } from '@components/common/Alert';
 
 interface NodeDetailsProps {
   node: GraphNode;
@@ -324,11 +325,14 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
 
                 {/* Ghost node warning */}
                 {node.data.ghostFlags && node.data.ghostFlags.length > 0 && (
-                  <div className="ghost-callout d-flex align-items-start gap-2 rounded p-2 mb-3 small">
-                    <i className="bi bi-slash-circle text-warning mt-1 flex-shrink-0" />
+                  <Alert
+                    variant="warning"
+                    className="d-flex align-items-start gap-2 p-2 mb-3 small"
+                  >
+                    <i className="bi bi-slash-circle mt-1 flex-shrink-0" />
                     <div>
-                      <span className="ghost-callout-title fw-semibold">Phantom node</span>
-                      <span className="ghost-callout-detail ms-2">
+                      <span className="fw-semibold">Phantom node</span>
+                      <span className="ms-2">
                         {node.data.ghostFlags.includes('arp-no-reply') && 'ARP request target — never replied.'}
                         {node.data.ghostFlags.includes('ttl-exceeded') && 'Traceroute intermediate hop — only appeared via ICMP TTL-exceeded replies.'}
                         {node.data.ghostFlags.includes('icmp-unreachable') && !node.data.ghostFlags.includes('arp-no-reply') && !node.data.ghostFlags.includes('ttl-exceeded') && 'ICMP probe target — never responded.'}
@@ -351,7 +355,7 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         })}
                       </div>
                     </div>
-                  </div>
+                  </Alert>
                 )}
 
                 {/* Identity */}
