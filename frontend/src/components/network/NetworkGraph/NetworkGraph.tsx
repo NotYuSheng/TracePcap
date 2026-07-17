@@ -613,7 +613,12 @@ export const NetworkGraph = memo(function NetworkGraph({
           labelCtx.save();
           // Sigma sizes its canvases for the device pixel ratio; graphToViewport returns CSS
           // pixels, so match that transform or the lines land in the wrong place on HiDPI.
-          const dpr = labelCanvas.width / labelCanvas.clientWidth || 1;
+          //
+          // Guard clientWidth rather than trusting `|| 1`: that catches 0/0 (NaN, falsy) but NOT
+          // n/0, which is Infinity — truthy, so it sails past the fallback and setTransform then
+          // silently draws nothing. A zero-width layout pass is reachable here, since the capture
+          // container is mounted and measured before the graph has laid out.
+          const dpr = labelCanvas.clientWidth > 0 ? labelCanvas.width / labelCanvas.clientWidth : 1;
           labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
           labelCtx.globalCompositeOperation = 'destination-over'; // behind the labels already drawn
           graph.forEachEdge((_edge, attrs, source, target) => {
