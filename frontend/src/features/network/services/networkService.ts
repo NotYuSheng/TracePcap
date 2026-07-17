@@ -184,7 +184,10 @@ function applyRoleFromInitiator(node: GraphNode, conv: Conversation) {
   const isInitiator = conv.initiatorIp === node.data.ip;
   const roleHere: 'client' | 'server' = isInitiator ? 'client' : 'server';
 
-  if (!node.data.role) {
+  // 'unknown' is the initial value AND a truthy string, so a bare `!role` check would skip the
+  // first assignment and mark every node 'both' on its second flow — which would defeat the whole
+  // point of reading the fact. Treat 'unknown' as "not yet set".
+  if (!node.data.role || node.data.role === 'unknown') {
     node.data.role = roleHere;
   } else if (node.data.role !== roleHere) {
     node.data.role = 'both';
@@ -383,9 +386,10 @@ export function buildNetworkGraph(
   Object.keys(nodeMap).forEach(ip => {
     const d = nodeMap[ip].data;
     if (d.isL2) return; // L2-only nodes keep their pre-assigned type
+    const domPort = dominantServerPort(serverPorts[ip] ?? {});
     d.nodeTypeEvidence = {
-      dominantPort: dominantServerPort(serverPorts[ip] ?? {}),
-      connectionCount: 0,
+      dominantPort: domPort,
+      connectionCount: domPort ? (serverPorts[ip]?.[domPort] ?? 0) : 0,
       distinctPeers: peerSets[ip]?.size ?? 0,
       ndpiApps: Array.from(ndpiAppSets[ip] ?? new Set<string>()),
     };
