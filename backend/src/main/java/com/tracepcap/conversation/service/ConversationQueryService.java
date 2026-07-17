@@ -5,12 +5,13 @@ import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.dto.EntityStatsResponse;
 import com.tracepcap.analysis.dto.PacketResponse;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.PacketEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.service.GeoIpService;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.ConversationLookup.Facet;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
+import com.tracepcap.analysis.spi.PacketLookup;
+import com.tracepcap.analysis.spi.PacketLookup.PacketFacts;
 import com.tracepcap.common.dto.PagedResponse;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
@@ -50,9 +51,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ConversationQueryService {
 
-  private final ConversationRepository conversationRepository;
-  private final PacketRepository packetRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final ConversationLookup conversationLookup;
+  private final PacketLookup packetLookup;
+  private final GeoOrgLookup geoOrgLookup;
+
   private final FileRepository fileRepository;
   private final GeoIpService geoIpService;
   private final StorageService storageService;
@@ -81,38 +83,21 @@ public class ConversationQueryService {
       throw new IllegalArgumentException("Either appName or l7Protocol must be provided");
     }
 
-    List<String> variants =
-        byProto
-            ? ConversationRepository.expandL7ProtocolVariants(List.of(l7Protocol.trim()))
-            : List.of();
-
-    List<Object[]> totalsRows =
+    ConversationLookup.EntityStats stats =
         byApp
-            ? conversationRepository.aggregateStatsByApp(fileId, appName.trim())
-            : conversationRepository.aggregateStatsByL7Protocol(fileId, variants);
-    // COUNT/SUM aggregates always return exactly one row; guard defensively regardless.
-    Object[] totals = totalsRows.isEmpty() ? new Object[] {0L, 0L, 0L} : totalsRows.get(0);
-
-    List<Object[]> peerRows =
-        byApp
-            ? conversationRepository.findTopPeersByApp(fileId, appName.trim(), ENTITY_STATS_TOP_PEERS)
-            : conversationRepository.findTopPeersByL7Protocol(
-                fileId, variants, ENTITY_STATS_TOP_PEERS);
+            ? conversationLookup.statsForApp(fileId, appName.trim(), ENTITY_STATS_TOP_PEERS)
+            : conversationLookup.statsForL7Protocol(
+                fileId, l7Protocol.trim(), ENTITY_STATS_TOP_PEERS);
 
     List<EntityStatsResponse.TopPeer> topPeers =
-        peerRows.stream()
-            .map(
-                r ->
-                    EntityStatsResponse.TopPeer.builder()
-                        .ip((String) r[0])
-                        .bytes(((Number) r[1]).longValue())
-                        .build())
+        stats.topPeers().stream()
+            .map(p -> EntityStatsResponse.TopPeer.builder().ip(p.ip()).bytes(p.bytes()).build())
             .collect(Collectors.toList());
 
     return EntityStatsResponse.builder()
-        .conversationCount(((Number) totals[0]).longValue())
-        .packetCount(((Number) totals[1]).longValue())
-        .totalBytes(((Number) totals[2]).longValue())
+        .conversationCount(stats.conversationCount())
+        .packetCount(stats.packetCount())
+        .totalBytes(stats.totalBytes())
         .topPeers(topPeers)
         .build();
   }
@@ -121,21 +106,18 @@ public class ConversationQueryService {
   public PagedResponse<ConversationResponse> getConversations(
       UUID fileId, int page, int pageSize, ConversationFilterParams params) {
 
-    Sort sort = buildSort(params);
-    PageRequest pageable = PageRequest.of(page - 1, pageSize, sort);
-    Specification<ConversationEntity> spec = ConversationRepository.buildSpec(fileId, params);
+    ConversationLookup.ConversationPage dbPage =
+        conversationLookup.conversationPage(fileId, page, pageSize, params);
 
-    Page<ConversationEntity> dbPage = conversationRepository.findAll(spec, pageable);
+    List<ConversationResponse> content = mapConversationsWithFileTypes(dbPage.content());
 
-    List<ConversationResponse> content = mapConversationsWithFileTypes(dbPage.getContent());
-
-    return PagedResponse.of(content, dbPage.getTotalElements(), page, pageSize);
+    return PagedResponse.of(content, dbPage.totalElements(), page, pageSize);
   }
 
   /** Returns distinct detected file types found in packets for the given file. */
   @Transactional(readOnly = true)
   public List<String> getDistinctFileTypes(UUID fileId) {
-    return conversationRepository.findDistinctFileTypesByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.FILE_TYPE);
   }
 
   /**
@@ -143,36 +125,36 @@ public class ConversationQueryService {
    */
   @Transactional(readOnly = true)
   public List<String> getDistinctRiskTypes(UUID fileId) {
-    return conversationRepository.findDistinctRiskTypesByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.RISK_TYPE);
   }
 
   @Transactional(readOnly = true)
   public List<String> getDistinctCustomSignatures(UUID fileId) {
-    return conversationRepository.findDistinctCustomSignaturesByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
   }
 
   /** Returns distinct Suricata IDS alert strings present in this file's conversations. */
   @Transactional(readOnly = true)
   public List<String> getDistinctSuricataAlerts(UUID fileId) {
-    return conversationRepository.findDistinctSuricataAlertsByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.SURICATA_ALERT);
   }
 
   /** Returns distinct IP addresses (src and dst) seen in this file's conversations. */
   @Transactional(readOnly = true)
   public List<String> getDistinctIps(UUID fileId) {
-    return conversationRepository.findDistinctIpsByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.IP);
   }
 
   /** Returns distinct application names present in this file's conversations. */
   @Transactional(readOnly = true)
   public List<String> getDistinctApps(UUID fileId) {
-    return conversationRepository.findDistinctAppNamesByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.APP_NAME);
   }
 
   /** Returns distinct L7 (tshark) protocol names present in this file's conversations. */
   @Transactional(readOnly = true)
   public List<String> getDistinctProtocols(UUID fileId) {
-    return conversationRepository.findDistinctProtocolsByFileId(fileId);
+    return conversationLookup.distinctValues(fileId, Facet.PROTOCOL);
   }
 
   /**
@@ -181,8 +163,8 @@ public class ConversationQueryService {
    */
   @Transactional(readOnly = true)
   public List<String> getDistinctCountries(UUID fileId) {
-    return ipGeoInfoRepository.findDistinctCountriesByFileId(fileId).stream()
-        .map(row -> row[0] + "|" + row[1])
+    return geoOrgLookup.distinctCountriesInFile(fileId).stream()
+        .map(c -> c.code() + "|" + c.name())
         .collect(Collectors.toList());
   }
 
@@ -192,12 +174,21 @@ public class ConversationQueryService {
    */
   @Transactional(readOnly = true)
   public String getConversationPcapFilename(UUID conversationId) {
-    ConversationEntity conv =
-        conversationRepository
-            .findById(conversationId)
+    ConversationFacts conv =
+        conversationLookup
+            .conversationFactsById(conversationId)
             .orElseThrow(
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
-    return buildConversationPcapFilename(conv);
+    // The conversation carries its fileId; the name lives on the file record, which this service
+    // already owns a repository for (see getBulkPcapFilename).
+    String base =
+        fileRepository
+            .findById(conv.fileId())
+            .map(FileEntity::getFileName)
+            .filter(n -> n != null)
+            .map(n -> n.replaceAll("\\.[^.]+$", ""))
+            .orElse("capture");
+    return "tracepcap_" + base + "_" + PCAP_FILENAME_TS.format(java.time.Instant.now()) + ".pcap";
   }
 
   /** Returns a descriptive filename for a bulk (filtered) PCAP export. */
@@ -213,15 +204,6 @@ public class ConversationQueryService {
     return "tracepcap_" + base + "_" + ts + ".pcap";
   }
 
-  private static String buildConversationPcapFilename(ConversationEntity conv) {
-    String base =
-        conv.getFile() != null && conv.getFile().getFileName() != null
-            ? conv.getFile().getFileName().replaceAll("\\.[^.]+$", "")
-            : "capture";
-    String ts = PCAP_FILENAME_TS.format(java.time.Instant.now());
-    return "tracepcap_" + base + "_" + ts + ".pcap";
-  }
-
   /**
    * Exports a single conversation as a PCAP file. Uses the exact frame numbers stored in the
    * database to filter packets, which is reliable regardless of capture format or tunnelling.
@@ -231,19 +213,22 @@ public class ConversationQueryService {
   public void exportConversationAsPcap(UUID conversationId, java.io.OutputStream out)
       throws IOException {
 
-    ConversationEntity conv =
-        conversationRepository
-            .findById(conversationId)
+    ConversationFacts conv =
+        conversationLookup
+            .conversationFactsById(conversationId)
             .orElseThrow(
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
-    if (conv.getFile() == null || conv.getFile().getMinioPath() == null) {
+    // minioPath belongs to the file record, not the conversation — ask the file module for it.
+    String minioPath =
+        fileRepository.findById(conv.fileId()).map(FileEntity::getMinioPath).orElse(null);
+    if (minioPath == null) {
       throw new IOException("PCAP file path not found for conversation: " + conversationId);
     }
 
     List<Long> frameNumbers =
-        packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId).stream()
-            .map(PacketEntity::getPacketNumber)
+        packetLookup.packetsInConversation(conversationId).stream()
+            .map(PacketFacts::packetNumber)
             .collect(Collectors.toList());
 
     if (frameNumbers.isEmpty()) {
@@ -257,7 +242,7 @@ public class ConversationQueryService {
       tempInput = File.createTempFile("pcap-in-", ".pcap");
       tempOutput = File.createTempFile("pcap-out-", ".pcap");
 
-      storageService.downloadFileToLocal(conv.getFile().getMinioPath(), tempInput);
+      storageService.downloadFileToLocal(minioPath, tempInput);
 
       // Use compact set syntax to avoid exceeding OS arg-length limits on large conversations
       String filter =
@@ -307,11 +292,7 @@ public class ConversationQueryService {
   public List<ConversationResponse> getConversationsForExport(
       UUID fileId, ConversationFilterParams params) {
 
-    Sort sort = buildSort(params);
-    Specification<ConversationEntity> spec = ConversationRepository.buildSpec(fileId, params);
-    List<ConversationEntity> entities = conversationRepository.findAll(spec, sort);
-
-    return mapConversationsWithFileTypes(entities);
+    return mapConversationsWithFileTypes(conversationLookup.conversationFacts(fileId, params));
   }
 
   /**
@@ -339,10 +320,7 @@ public class ConversationQueryService {
             .map(ConversationResponse::getConversationId)
             .collect(Collectors.toList());
 
-    List<Long> frameNumbers =
-        conversationIds.isEmpty()
-            ? List.of()
-            : packetRepository.findPacketNumbersByConversationIds(conversationIds);
+    List<Long> frameNumbers = packetLookup.frameNumbersInConversations(conversationIds);
 
     File tempInput = null;
     File tempOutput = null;
@@ -405,9 +383,9 @@ public class ConversationQueryService {
   }
 
   private List<ConversationResponse> mapConversationsWithFileTypes(
-      List<ConversationEntity> conversations) {
+      List<ConversationFacts> conversations) {
     if (conversations.isEmpty()) return List.of();
-    List<UUID> convIds = conversations.stream().map(ConversationEntity::getId).toList();
+    List<UUID> convIds = conversations.stream().map(ConversationFacts::id).toList();
     Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
     Map<String, GeoIpService.GeoResult> geoMap = buildGeoMap(conversations);
     return conversations.stream()
@@ -432,10 +410,10 @@ public class ConversationQueryService {
     return Sort.by(dir, field);
   }
 
-  private Map<String, GeoIpService.GeoResult> buildGeoMap(List<ConversationEntity> conversations) {
+  private Map<String, GeoIpService.GeoResult> buildGeoMap(List<ConversationFacts> conversations) {
     Set<String> ips =
         conversations.stream()
-            .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+            .flatMap(c -> java.util.stream.Stream.of(c.flow().srcIp(), c.flow().dstIp()))
             .filter(ip -> ip != null && !ip.isBlank())
             .collect(Collectors.toSet());
     try {
@@ -448,52 +426,46 @@ public class ConversationQueryService {
 
   private Map<UUID, List<String>> buildFileTypeMap(List<UUID> ids) {
     if (ids.isEmpty()) return java.util.Collections.emptyMap();
-    return packetRepository.findFileTypesByConversationIds(ids).stream()
-        .collect(
-            Collectors.groupingBy(
-                row -> (UUID) row[0],
-                Collectors.mapping(
-                    row -> (String) row[1],
-                    Collectors.collectingAndThen(Collectors.toSet(), List::copyOf))));
+    return packetLookup.detectedFileTypesByConversation(ids);
   }
 
   private ConversationResponse toConversationResponse(
-      ConversationEntity conv,
+      ConversationFacts conv,
       Map<UUID, List<String>> fileTypeMap,
       Map<String, GeoIpService.GeoResult> geoMap) {
     Duration duration =
-        (conv.getStartTime() != null && conv.getEndTime() != null)
-            ? Duration.between(conv.getStartTime(), conv.getEndTime())
+        (conv.flow().startTime() != null && conv.flow().endTime() != null)
+            ? Duration.between(conv.flow().startTime(), conv.flow().endTime())
             : Duration.ZERO;
     return ConversationResponse.builder()
-        .conversationId(conv.getId())
-        .srcIp(conv.getSrcIp())
-        .srcPort(conv.getSrcPort())
-        .dstIp(conv.getDstIp())
-        .dstPort(conv.getDstPort())
-        .protocol(conv.getProtocol())
-        .appName(conv.getAppName())
-        .tsharkProtocol(conv.getTsharkProtocol())
-        .category(conv.getCategory())
-        .hostname(conv.getHostname())
-        .ja3Client(conv.getJa3Client())
-        .ja3Server(conv.getJa3Server())
-        .tlsIssuer(conv.getTlsIssuer())
-        .tlsSubject(conv.getTlsSubject())
-        .tlsNotBefore(conv.getTlsNotBefore())
-        .tlsNotAfter(conv.getTlsNotAfter())
-        .flowRisks(toList(conv.getFlowRisks()))
-        .customSignatures(toList(conv.getCustomSignatures()))
-        .suricataAlerts(toList(conv.getSuricataAlerts()))
-        .httpUserAgents(toList(conv.getHttpUserAgents()))
-        .detectedFileTypes(fileTypeMap.getOrDefault(conv.getId(), List.of()))
-        .packetCount(conv.getPacketCount())
-        .totalBytes(conv.getTotalBytes())
-        .startTime(conv.getStartTime())
-        .endTime(conv.getEndTime())
+        .conversationId(conv.id())
+        .srcIp(conv.flow().srcIp())
+        .srcPort(conv.flow().srcPort())
+        .dstIp(conv.flow().dstIp())
+        .dstPort(conv.flow().dstPort())
+        .protocol(conv.flow().protocol())
+        .appName(conv.findings().appName())
+        .tsharkProtocol(conv.findings().tsharkProtocol())
+        .category(conv.findings().category())
+        .hostname(conv.tls().hostname())
+        .ja3Client(conv.tls().ja3Client())
+        .ja3Server(conv.tls().ja3Server())
+        .tlsIssuer(conv.tls().tlsIssuer())
+        .tlsSubject(conv.tls().tlsSubject())
+        .tlsNotBefore(conv.tls().tlsNotBefore())
+        .tlsNotAfter(conv.tls().tlsNotAfter())
+        .flowRisks(conv.findings().flowRisks())
+        .customSignatures(conv.findings().customSignatures())
+        .suricataAlerts(conv.findings().suricataAlerts())
+        .httpUserAgents(conv.findings().httpUserAgents())
+        .detectedFileTypes(fileTypeMap.getOrDefault(conv.id(), List.of()))
+        .packetCount(conv.flow().packetCount())
+        .totalBytes(conv.flow().totalBytes())
+        .startTime(conv.flow().startTime())
+        .endTime(conv.flow().endTime())
         .durationMs(duration.toMillis())
-        .srcGeo(toGeoInfo(geoMap.get(conv.getSrcIp())))
-        .dstGeo(toGeoInfo(geoMap.get(conv.getDstIp())))
+        .srcGeo(toGeoInfo(geoMap.get(conv.flow().srcIp())))
+        .dstGeo(toGeoInfo(geoMap.get(conv.flow().dstIp())))
         .build();
   }
 
@@ -510,79 +482,76 @@ public class ConversationQueryService {
 
   @Transactional(readOnly = true)
   public ConversationDetailResponse getConversationDetail(UUID conversationId) {
-    ConversationEntity conversation =
-        conversationRepository
-            .findById(conversationId)
+    ConversationFacts conversation =
+        conversationLookup
+            .conversationFactsById(conversationId)
             .orElseThrow(
                 () -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
-    List<PacketEntity> packets =
-        packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
+    List<PacketFacts> packets =
+        packetLookup.packetsInConversation(conversationId);
 
     Duration duration =
-        (conversation.getStartTime() != null && conversation.getEndTime() != null)
-            ? Duration.between(conversation.getStartTime(), conversation.getEndTime())
+        (conversation.flow().startTime() != null && conversation.flow().endTime() != null)
+            ? Duration.between(conversation.flow().startTime(), conversation.flow().endTime())
             : Duration.ZERO;
 
     List<PacketResponse> packetResponses =
         packets.stream().map(this::toPacketResponse).collect(Collectors.toList());
 
     Set<String> detailIps = new HashSet<>();
-    if (conversation.getSrcIp() != null) detailIps.add(conversation.getSrcIp());
-    if (conversation.getDstIp() != null) detailIps.add(conversation.getDstIp());
+    if (conversation.flow().srcIp() != null) detailIps.add(conversation.flow().srcIp());
+    if (conversation.flow().dstIp() != null) detailIps.add(conversation.flow().dstIp());
     Map<String, GeoIpService.GeoResult> geoMap = geoIpService.lookupExternal(detailIps);
 
     return ConversationDetailResponse.builder()
-        .conversationId(conversation.getId())
-        .srcIp(conversation.getSrcIp())
-        .srcPort(conversation.getSrcPort())
-        .dstIp(conversation.getDstIp())
-        .dstPort(conversation.getDstPort())
-        .protocol(conversation.getProtocol())
-        .appName(conversation.getAppName())
-        .tsharkProtocol(conversation.getTsharkProtocol())
-        .category(conversation.getCategory())
-        .hostname(conversation.getHostname())
-        .ja3Client(conversation.getJa3Client())
-        .ja3Server(conversation.getJa3Server())
-        .tlsIssuer(conversation.getTlsIssuer())
-        .tlsSubject(conversation.getTlsSubject())
-        .tlsNotBefore(conversation.getTlsNotBefore())
-        .tlsNotAfter(conversation.getTlsNotAfter())
-        .flowRisks(toList(conversation.getFlowRisks()))
-        .customSignatures(toList(conversation.getCustomSignatures()))
-        .suricataAlerts(toList(conversation.getSuricataAlerts()))
-        .httpUserAgents(toList(conversation.getHttpUserAgents()))
-        .packetCount(conversation.getPacketCount())
-        .totalBytes(conversation.getTotalBytes())
-        .startTime(conversation.getStartTime())
-        .endTime(conversation.getEndTime())
+        .conversationId(conversation.id())
+        .srcIp(conversation.flow().srcIp())
+        .srcPort(conversation.flow().srcPort())
+        .dstIp(conversation.flow().dstIp())
+        .dstPort(conversation.flow().dstPort())
+        .protocol(conversation.flow().protocol())
+        .appName(conversation.findings().appName())
+        .tsharkProtocol(conversation.findings().tsharkProtocol())
+        .category(conversation.findings().category())
+        .hostname(conversation.tls().hostname())
+        .ja3Client(conversation.tls().ja3Client())
+        .ja3Server(conversation.tls().ja3Server())
+        .tlsIssuer(conversation.tls().tlsIssuer())
+        .tlsSubject(conversation.tls().tlsSubject())
+        .tlsNotBefore(conversation.tls().tlsNotBefore())
+        .tlsNotAfter(conversation.tls().tlsNotAfter())
+        .flowRisks(conversation.findings().flowRisks())
+        .customSignatures(conversation.findings().customSignatures())
+        .suricataAlerts(conversation.findings().suricataAlerts())
+        .httpUserAgents(conversation.findings().httpUserAgents())
+        .packetCount(conversation.flow().packetCount())
+        .totalBytes(conversation.flow().totalBytes())
+        .startTime(conversation.flow().startTime())
+        .endTime(conversation.flow().endTime())
         .durationMs(duration.toMillis())
-        .srcGeo(toGeoInfo(geoMap.get(conversation.getSrcIp())))
-        .dstGeo(toGeoInfo(geoMap.get(conversation.getDstIp())))
+        .srcGeo(toGeoInfo(geoMap.get(conversation.flow().srcIp())))
+        .dstGeo(toGeoInfo(geoMap.get(conversation.flow().dstIp())))
         .packets(packetResponses)
         .build();
   }
 
-  private PacketResponse toPacketResponse(PacketEntity p) {
+  private PacketResponse toPacketResponse(PacketFacts p) {
     return PacketResponse.builder()
-        .id(p.getId())
-        .packetNumber(p.getPacketNumber())
-        .timestamp(p.getTimestamp())
-        .srcIp(p.getSrcIp())
-        .srcPort(p.getSrcPort())
-        .dstIp(p.getDstIp())
-        .dstPort(p.getDstPort())
-        .protocol(p.getProtocol())
-        .packetSize(p.getPacketSize())
-        .info(p.getInfo())
-        .payload(p.getPayload())
-        .detectedFileType(p.getDetectedFileType())
+        .id(p.id())
+        .packetNumber(p.packetNumber())
+        .timestamp(p.timestamp())
+        .srcIp(p.srcIp())
+        .srcPort(p.srcPort())
+        .dstIp(p.dstIp())
+        .dstPort(p.dstPort())
+        .protocol(p.protocol())
+        .packetSize(p.packetSize())
+        .info(p.info())
+        .payload(p.payload())
+        .detectedFileType(p.detectedFileType())
         .build();
   }
 
   /** Converts a nullable String array to an immutable list; returns empty list for null. */
-  private static List<String> toList(String[] arr) {
-    return arr != null ? Arrays.asList(arr) : List.of();
-  }
 }

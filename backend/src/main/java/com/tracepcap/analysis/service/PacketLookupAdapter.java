@@ -5,6 +5,7 @@ import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.spi.PacketLookup;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +34,18 @@ public class PacketLookupAdapter implements PacketLookup {
   }
 
   @Override
+  public Map<UUID, List<String>> detectedFileTypesByConversation(Collection<UUID> conversationIds) {
+    if (conversationIds == null || conversationIds.isEmpty()) return Map.of();
+    return repository.findFileTypesByConversationIds(List.copyOf(conversationIds)).stream()
+        .collect(
+            Collectors.groupingBy(
+                row -> (UUID) row[0],
+                Collectors.mapping(
+                    row -> (String) row[1],
+                    Collectors.collectingAndThen(Collectors.toSet(), List::copyOf))));
+  }
+
+  @Override
   public Set<UUID> conversationIdsWithDetectedFiles(Collection<UUID> conversationIds) {
     if (conversationIds == null || conversationIds.isEmpty()) return Set.of();
     // The query projects (conversationId, detectedFileType); only the id is part of the question
@@ -40,6 +53,13 @@ public class PacketLookupAdapter implements PacketLookup {
     return repository.findFileTypesByConversationIds(List.copyOf(conversationIds)).stream()
         .map(row -> (UUID) row[0])
         .collect(Collectors.toUnmodifiableSet());
+  }
+
+  @Override
+  public List<Long> frameNumbersInConversations(Collection<UUID> conversationIds) {
+    if (conversationIds == null || conversationIds.isEmpty()) return List.of();
+    // The query carries ORDER BY packetNumber ASC, which the port promises.
+    return repository.findPacketNumbersByConversationIds(List.copyOf(conversationIds));
   }
 
   @Override

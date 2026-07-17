@@ -102,8 +102,11 @@ public interface ConversationLookup {
   List<ConversationFacts> conversationFacts(UUID fileId);
 
   /**
-   * The conversations in a file matching {@code filter}, or all of them when {@code filter} is null
-   * or has no active criteria.
+   * Every conversation in a file matching {@code filter}, sorted by the filter's own {@code
+   * sortBy}/{@code sortDir}. A null filter means "all of them, unsorted".
+   *
+   * <p>Unpaged on purpose — this is the CSV-export shape, where the caller genuinely wants the whole
+   * result set. For anything a user scrolls, use {@link #conversationPage}.
    *
    * <p>Takes the filter rather than a query: {@link ConversationFilterParams} already sits on the
    * seam, so a consumer can say <em>what</em> it wants without knowing <em>how</em> the rows are
@@ -168,6 +171,35 @@ public interface ConversationLookup {
    * <p>Values are never null or blank.
    */
   List<String> distinctValues(UUID fileId, Facet facet);
+
+  /** One peer and the bytes exchanged with it. */
+  record PeerBytes(String ip, long bytes) {}
+
+  /**
+   * Traffic totals for one application or L7 protocol within a file, plus its heaviest peers.
+   *
+   * <p>Counts are zero and {@code topPeers} empty when nothing matched — never null.
+   */
+  record EntityStats(
+      long conversationCount, long packetCount, long totalBytes, List<PeerBytes> topPeers) {}
+
+  /**
+   * Totals and top peers for a single nDPI application name.
+   *
+   * <p>Aggregated in the database, and typed here rather than returned as the {@code Object[]} rows
+   * JPA projections yield: a caller doing {@code ((Number) row[2]).longValue()} is coupled to the
+   * SELECT list's column order, which is about as brittle as coupling gets.
+   */
+  EntityStats statsForApp(UUID fileId, String appName, int topPeerLimit);
+
+  /**
+   * Totals and top peers for a single L7 protocol.
+   *
+   * <p>Matching handles the protocol's stored spelling variants ("TLS", "Tls", "tls", "The Tls" —
+   * nDPI and tshark disagree on casing). That expansion is storage trivia and stays behind the seam;
+   * callers pass the protocol as the user names it.
+   */
+  EntityStats statsForL7Protocol(UUID fileId, String l7Protocol, int topPeerLimit);
 
   /**
    * The vocabularies a file can be asked for — the distinct values of one column across every

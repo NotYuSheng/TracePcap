@@ -34,7 +34,7 @@ public class ConversationLookupAdapter implements ConversationLookup {
     List<ConversationEntity> rows =
         filter == null
             ? repository.findByFileId(fileId)
-            : repository.findAll(ConversationRepository.buildSpec(fileId, filter));
+            : repository.findAll(ConversationRepository.buildSpec(fileId, filter), sortOf(filter));
     return rows.stream().map(ConversationLookupAdapter::toFacts).toList();
   }
 
@@ -111,6 +111,42 @@ public class ConversationLookupAdapter implements ConversationLookup {
         };
     // The port promises no nulls or blanks; the native DISTINCT queries can yield both.
     return raw.stream().filter(v -> v != null && !v.isBlank()).toList();
+  }
+
+  @Override
+  public EntityStats statsForApp(UUID fileId, String appName, int topPeerLimit) {
+    return stats(
+        repository.aggregateStatsByApp(fileId, appName),
+        repository.findTopPeersByApp(fileId, appName, topPeerLimit));
+  }
+
+  @Override
+  public EntityStats statsForL7Protocol(UUID fileId, String l7Protocol, int topPeerLimit) {
+    // The stored spelling varies ("TLS"/"Tls"/"tls"/"The Tls"); expanding it is storage trivia.
+    List<String> variants = ConversationRepository.expandL7ProtocolVariants(List.of(l7Protocol));
+    return stats(
+        repository.aggregateStatsByL7Protocol(fileId, variants),
+        repository.findTopPeersByL7Protocol(fileId, variants, topPeerLimit));
+  }
+
+  /**
+   * Turns the two JPA {@code Object[]} projections into typed records. The column-order knowledge
+   * ({@code totals[2]} is bytes) stops here rather than travelling to every caller.
+   */
+  private static EntityStats stats(List<Object[]> totalsRows, List<Object[]> peerRows) {
+    // COUNT/SUM always returns one row, but an empty list would NPE below — guard regardless.
+    Object[] totals = totalsRows.isEmpty() ? new Object[] {0L, 0L, 0L} : totalsRows.get(0);
+    List<PeerBytes> peers =
+        peerRows.stream()
+            .map(r -> new PeerBytes((String) r[0], ((Number) r[1]).longValue()))
+            .toList();
+    return new EntityStats(
+        asLong(totals[0]), asLong(totals[1]), asLong(totals[2]), peers);
+  }
+
+  /** SUM over no rows yields null, not zero — the port promises a number. */
+  private static long asLong(Object value) {
+    return value == null ? 0L : ((Number) value).longValue();
   }
 
   private static ConversationFacts toFacts(ConversationEntity e) {

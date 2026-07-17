@@ -3,6 +3,7 @@ package com.tracepcap.analysis.spi;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -61,6 +62,15 @@ public interface PacketLookup {
   List<UUID> conversationIdsWithReplyFromPeer(UUID fileId, String hostIp);
 
   /**
+   * The file types carvers detected in each of the given conversations, keyed by conversation id.
+   *
+   * <p>Conversations where nothing was detected are absent from the map rather than mapped to an
+   * empty list. Types are distinct within a conversation — the same format appearing in twenty
+   * packets is one answer, not twenty. An empty or null input yields an empty map.
+   */
+  Map<UUID, List<String>> detectedFileTypesByConversation(Collection<UUID> conversationIds);
+
+  /**
    * Of the given conversations, those carrying at least one packet whose payload a carver
    * recognised as a file — the set worth reassembling streams for.
    *
@@ -69,6 +79,15 @@ public interface PacketLookup {
    * empty set.
    */
   Set<UUID> conversationIdsWithDetectedFiles(Collection<UUID> conversationIds);
+
+  /**
+   * The frame numbers of every packet in the given conversations, ascending.
+   *
+   * <p>Numbers only: the caller builds a {@code frame.number in {...}} display filter from them, and
+   * loading whole packets to read one field each would be waste. An empty or null input yields an
+   * empty list.
+   */
+  List<Long> frameNumbersInConversations(Collection<UUID> conversationIds);
 
   /**
    * The conversation containing a given frame number in a file, so a UI can open and highlight it.

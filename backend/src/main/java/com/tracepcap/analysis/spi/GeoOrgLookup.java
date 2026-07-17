@@ -73,4 +73,16 @@ public interface GeoOrgLookup {
    * absent rather than mapped to an empty value; an empty input yields an empty map.
    */
   Map<String, IpPlace> placesFor(Collection<String> ips);
+
+  /** A country as the geo database names it. */
+  record Country(String code, String name) {}
+
+  /**
+   * The distinct countries any endpoint in a file resolves to, ordered by name — for populating a
+   * country filter.
+   *
+   * <p>Countries with no code are omitted: a filter entry nothing can match is noise. Typed rather
+   * than the {@code Object[]} the projection yields, so callers don't index into a SELECT list.
+   */
+  List<Country> distinctCountriesInFile(java.util.UUID fileId);
 }

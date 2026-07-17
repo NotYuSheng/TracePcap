@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -59,5 +60,12 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
               g.getGeoSource()));
     }
     return Map.copyOf(byIp);
+  }
+
+  @Override
+  public List<Country> distinctCountriesInFile(UUID fileId) {
+    return repository.findDistinctCountriesByFileId(fileId).stream()
+        .map(row -> new Country((String) row[0], (String) row[1]))
+        .toList();
   }
 }
