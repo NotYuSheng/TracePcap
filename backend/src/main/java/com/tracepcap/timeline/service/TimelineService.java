@@ -59,12 +59,12 @@ public class TimelineService {
       // Fallback to conversation times
       startTime =
           conversations.stream()
-              .map(ConversationFacts::startTime)
+              .map(c -> c.flow().startTime())
               .min(LocalDateTime::compareTo)
               .orElse(LocalDateTime.now());
       endTime =
           conversations.stream()
-              .map(ConversationFacts::endTime)
+              .map(c -> c.flow().endTime())
               .max(LocalDateTime::compareTo)
               .orElse(LocalDateTime.now());
     }
@@ -112,7 +112,7 @@ public class TimelineService {
         conversations.stream()
             .filter(
                 conv ->
-                    !conv.endTime().isBefore(startTime) && !conv.startTime().isAfter(endTime))
+                    !conv.flow().endTime().isBefore(startTime) && !conv.flow().startTime().isAfter(endTime))
             .collect(Collectors.toList());
 
     // Calculate optimal interval respecting maxDataPoints limit
@@ -153,7 +153,7 @@ public class TimelineService {
 
     // Distribute conversations into bins - O(M) complexity
     for (ConversationFacts conv : conversations) {
-      LocalDateTime convStart = conv.startTime();
+      LocalDateTime convStart = conv.flow().startTime();
 
       // Calculate bin index directly instead of looping through all bins - O(1)
       long secondsFromStart = ChronoUnit.SECONDS.between(startTime, convStart);
@@ -175,12 +175,12 @@ public class TimelineService {
       TimelineBinData bin = bins.get(binStart);
 
       if (bin != null) {
-        bin.packetCount += conv.packetCount();
-        bin.bytes += conv.totalBytes();
+        bin.packetCount += conv.flow().packetCount();
+        bin.bytes += conv.flow().totalBytes();
 
         // Aggregate by protocol
-        String protocol = conv.protocol();
-        bin.protocols.merge(protocol, conv.packetCount(), Long::sum);
+        String protocol = conv.flow().protocol();
+        bin.protocols.merge(protocol, conv.flow().packetCount(), Long::sum);
       }
     }
 

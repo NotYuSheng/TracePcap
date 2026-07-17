@@ -1,17 +1,17 @@
 package com.tracepcap.intelligence.service;
 
 import com.tracepcap.analysis.dto.ConversationFilterParams;
-import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.hostlog.entity.HttpEndpointLogEntity;
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.hostlog.repository.DnsQueryLogRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
 import com.tracepcap.hostlog.repository.HttpEndpointLogRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
+import com.tracepcap.analysis.spi.GeoOrgLookup.IpPlace;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.analysis.spi.PacketLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.analysis.spi.ServiceLogRoles;
 import com.tracepcap.analysis.service.GeoIpService;
 import com.tracepcap.intelligence.dto.*;
@@ -28,12 +28,12 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class NetworkIntelligenceService {
 
-  private final ConversationRepository conversationRepository;
-  private final HostClassificationRepository hostClassificationRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final ConversationLookup conversationLookup;
+  private final HostClassificationLookup hostClassificationLookup;
+  private final GeoOrgLookup geoOrgLookup;
+  private final PacketLookup packetLookup;
   private final DnsQueryLogRepository dnsQueryLogRepository;
   private final HttpEndpointLogRepository httpEndpointLogRepository;
-  private final PacketRepository packetRepository;
   private final IpOrgRuleService ipOrgRuleService;
   private final GeoIpService geoIpService;
 
@@ -62,9 +62,9 @@ public class NetworkIntelligenceService {
 
   public ClusterGraphResponse computeClusters(UUID fileId, String groupBy, ConversationFilterParams filterParams, List<String> networkLabels) {
     log.info("Computing {} clusters for file {}", groupBy, fileId);
-    List<ConversationEntity> conversations = (filterParams != null && hasActiveFilters(filterParams))
-        ? conversationRepository.findAll(ConversationRepository.buildSpec(fileId, filterParams))
-        : conversationRepository.findByFileId(fileId);
+    List<ConversationFacts> conversations =
+        conversationLookup.conversationFacts(
+            fileId, (filterParams != null && hasActiveFilters(filterParams)) ? filterParams : null);
 
     // Network label filter: keep only IPs that fall within any CIDR belonging to the
     // selected labels. A conversation is kept if BOTH endpoints are labelled IPs, or if
@@ -83,37 +83,37 @@ public class NetworkIntelligenceService {
         Map<String, Boolean> matchCache = new HashMap<>();
         conversations = conversations.stream()
             .filter(c -> {
-              boolean srcMatch = matchCache.computeIfAbsent(c.getSrcIp(), ip -> ipOrgRuleService.matchIp(ip, rules) != null);
-              boolean dstMatch = matchCache.computeIfAbsent(c.getDstIp(), ip -> ipOrgRuleService.matchIp(ip, rules) != null);
+              boolean srcMatch = matchCache.computeIfAbsent(c.flow().srcIp(), ip -> ipOrgRuleService.matchIp(ip, rules) != null);
+              boolean dstMatch = matchCache.computeIfAbsent(c.flow().dstIp(), ip -> ipOrgRuleService.matchIp(ip, rules) != null);
               return srcMatch || dstMatch;
             })
             .collect(Collectors.toList());
         // Track which IPs are actually inside a label CIDR
-        for (ConversationEntity c : conversations) {
-          if (Boolean.TRUE.equals(matchCache.get(c.getSrcIp()))) labelledIps.add(c.getSrcIp());
-          if (Boolean.TRUE.equals(matchCache.get(c.getDstIp()))) labelledIps.add(c.getDstIp());
+        for (ConversationFacts c : conversations) {
+          if (Boolean.TRUE.equals(matchCache.get(c.flow().srcIp()))) labelledIps.add(c.flow().srcIp());
+          if (Boolean.TRUE.equals(matchCache.get(c.flow().dstIp()))) labelledIps.add(c.flow().dstIp());
         }
       }
     }
 
     Set<String> allIps = new HashSet<>();
-    for (ConversationEntity c : conversations) {
-      allIps.add(c.getSrcIp());
-      allIps.add(c.getDstIp());
+    for (ConversationFacts c : conversations) {
+      allIps.add(c.flow().srcIp());
+      allIps.add(c.flow().dstIp());
     }
 
-    Map<String, IpGeoInfoEntity> geoByIp = new HashMap<>();
-    Map<String, HostClassificationEntity> deviceByIp = new HashMap<>();
+    Map<String, IpPlace> geoByIp = new HashMap<>();
+    Map<String, HostFacts> deviceByIp = new HashMap<>();
     Map<String, String> clusterLabels = new HashMap<>();
 
     if ("asn".equals(groupBy) || "country".equals(groupBy) || "city".equals(groupBy)) {
       // Ensure all IPs are enriched and cached (handles misses and incomplete entries).
       // lookupExternal is idempotent: it reads the cache first and only queries the MMDB for misses.
       geoIpService.lookupExternal(allIps);
-      ipGeoInfoRepository.findAllByIpIn(allIps).forEach(g -> geoByIp.put(g.getIp(), g));
+      geoByIp.putAll(geoOrgLookup.placesFor(allIps));
     }
     if ("deviceType".equals(groupBy)) {
-      hostClassificationRepository.findByFileId(fileId).forEach(h -> deviceByIp.put(h.getIp(), h));
+      hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.put(h.ip(), h));
     }
     List<IpOrgRuleEntity> orgRules = "customOrg".equals(groupBy)
         ? ipOrgRuleService.loadRules()
@@ -132,23 +132,23 @@ public class NetworkIntelligenceService {
     Map<String, ClusterAcc> clusters = new LinkedHashMap<>();
     Map<String, EdgeAcc> edges = new LinkedHashMap<>();
 
-    for (ConversationEntity conv : conversations) {
-      String srcKey = ipToCluster.get(conv.getSrcIp());
-      String dstKey = ipToCluster.get(conv.getDstIp());
-      boolean hasRisk = conv.getFlowRisks() != null && conv.getFlowRisks().length > 0;
+    for (ConversationFacts conv : conversations) {
+      String srcKey = ipToCluster.get(conv.flow().srcIp());
+      String dstKey = ipToCluster.get(conv.flow().dstIp());
+      boolean hasRisk = !conv.findings().flowRisks().isEmpty();
 
       ClusterAcc srcAcc = clusters.computeIfAbsent(srcKey, k -> new ClusterAcc());
-      srcAcc.ips.add(conv.getSrcIp());
+      srcAcc.ips.add(conv.flow().srcIp());
 
       ClusterAcc dstAcc = clusters.computeIfAbsent(dstKey, k -> new ClusterAcc());
-      dstAcc.ips.add(conv.getDstIp());
+      dstAcc.ips.add(conv.flow().dstIp());
 
       if (srcKey.equals(dstKey)) {
         // Intra-cluster conversation — count once
-        String srcIp = conv.getSrcIp(), dstIp = conv.getDstIp();
-        long bytes = conv.getTotalBytes();
+        String srcIp = conv.flow().srcIp(), dstIp = conv.flow().dstIp();
+        long bytes = conv.flow().totalBytes();
         srcAcc.totalBytes += bytes;
-        srcAcc.totalPackets += conv.getPacketCount();
+        srcAcc.totalPackets += conv.flow().packetCount();
         srcAcc.conversationCount++;
         srcAcc.ipBytes.merge(srcIp, bytes, Long::sum);
         srcAcc.ipBytes.merge(dstIp, bytes, Long::sum);
@@ -160,18 +160,18 @@ public class NetworkIntelligenceService {
           srcAcc.riskCount++;
           srcAcc.ipRisks.merge(srcIp, 1L, Long::sum);
           srcAcc.ipRisks.merge(dstIp, 1L, Long::sum);
-          if (conv.getFlowRisks() != null) {
-            for (String rt : conv.getFlowRisks()) srcAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
+          {
+            for (String rt : conv.findings().flowRisks()) srcAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
           }
         }
-        srcAcc.protocolCounts.merge(conv.getProtocol(), 1L, Long::sum);
+        srcAcc.protocolCounts.merge(conv.flow().protocol(), 1L, Long::sum);
       } else {
         // Inter-cluster conversation — count for both clusters
-        long bytes = conv.getTotalBytes();
-        long pkts = conv.getPacketCount();
-        String proto = conv.getProtocol();
+        long bytes = conv.flow().totalBytes();
+        long pkts = conv.flow().packetCount();
+        String proto = conv.flow().protocol();
 
-        String srcIp = conv.getSrcIp(), dstIp = conv.getDstIp();
+        String srcIp = conv.flow().srcIp(), dstIp = conv.flow().dstIp();
         srcAcc.totalBytes += bytes;
         srcAcc.totalPackets += pkts;
         srcAcc.conversationCount++;
@@ -181,8 +181,8 @@ public class NetworkIntelligenceService {
         if (hasRisk) {
           srcAcc.riskCount++;
           srcAcc.ipRisks.merge(srcIp, 1L, Long::sum);
-          if (conv.getFlowRisks() != null) {
-            for (String rt : conv.getFlowRisks()) srcAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
+          {
+            for (String rt : conv.findings().flowRisks()) srcAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
           }
         }
         srcAcc.protocolCounts.merge(proto, 1L, Long::sum);
@@ -196,8 +196,8 @@ public class NetworkIntelligenceService {
         if (hasRisk) {
           dstAcc.riskCount++;
           dstAcc.ipRisks.merge(dstIp, 1L, Long::sum);
-          if (conv.getFlowRisks() != null) {
-            for (String rt : conv.getFlowRisks()) dstAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
+          {
+            for (String rt : conv.findings().flowRisks()) dstAcc.riskTypeCounts.merge(rt, 1L, Long::sum);
           }
         }
         dstAcc.protocolCounts.merge(proto, 1L, Long::sum);
@@ -235,12 +235,12 @@ public class NetworkIntelligenceService {
           String geoSource = null;
           if ("city".equals(groupBy) || "country".equals(groupBy)) {
             for (String ip : acc.ips) {
-              IpGeoInfoEntity geo = geoByIp.get(ip);
-              if (geo != null && geo.getGeoSource() != null) {
-                geoSource = geo.getGeoSource();
-                if ("city".equals(groupBy) && geo.getLat() != null && geo.getLon() != null) {
-                  lat = geo.getLat();
-                  lon = geo.getLon();
+              IpPlace geo = geoByIp.get(ip);
+              if (geo != null && geo.geoSource() != null) {
+                geoSource = geo.geoSource();
+                if ("city".equals(groupBy) && geo.lat() != null && geo.lon() != null) {
+                  lat = geo.lat();
+                  lon = geo.lon();
                 }
                 break;
               }
@@ -312,24 +312,24 @@ public class NetworkIntelligenceService {
 
   public TopHostsResponse computeTopHosts(UUID fileId, String sortBy, int limit) {
     log.info("Computing top hosts for file {} (sortBy={}, limit={})", fileId, sortBy, limit);
-    List<ConversationEntity> conversations = conversationRepository.findByFileId(fileId);
+    List<ConversationFacts> conversations = conversationLookup.conversationFacts(fileId);
 
     // Aggregate per-IP stats
     Map<String, HostAcc> hostMap = new LinkedHashMap<>();
-    for (ConversationEntity conv : conversations) {
-      boolean hasRisk = conv.getFlowRisks() != null && conv.getFlowRisks().length > 0;
+    for (ConversationFacts conv : conversations) {
+      boolean hasRisk = !conv.findings().flowRisks().isEmpty();
 
-      HostAcc srcAcc = hostMap.computeIfAbsent(conv.getSrcIp(), k -> new HostAcc());
-      srcAcc.totalBytes += conv.getTotalBytes();
-      srcAcc.packetCount += conv.getPacketCount();
+      HostAcc srcAcc = hostMap.computeIfAbsent(conv.flow().srcIp(), k -> new HostAcc());
+      srcAcc.totalBytes += conv.flow().totalBytes();
+      srcAcc.packetCount += conv.flow().packetCount();
       srcAcc.conversationCount++;
       if (hasRisk) srcAcc.riskCount++;
       srcAcc.clientConversations++;
-      if (conv.getHostname() != null) srcAcc.hostname = conv.getHostname();
+      if (conv.tls().hostname() != null) srcAcc.hostname = conv.tls().hostname();
 
-      HostAcc dstAcc = hostMap.computeIfAbsent(conv.getDstIp(), k -> new HostAcc());
-      dstAcc.totalBytes += conv.getTotalBytes();
-      dstAcc.packetCount += conv.getPacketCount();
+      HostAcc dstAcc = hostMap.computeIfAbsent(conv.flow().dstIp(), k -> new HostAcc());
+      dstAcc.totalBytes += conv.flow().totalBytes();
+      dstAcc.packetCount += conv.flow().packetCount();
       dstAcc.conversationCount++;
       if (hasRisk) dstAcc.riskCount++;
       dstAcc.serverConversations++;
@@ -337,10 +337,10 @@ public class NetworkIntelligenceService {
 
     // Enrich with geo and device type
     Set<String> ips = hostMap.keySet();
-    Map<String, IpGeoInfoEntity> geoByIp = new HashMap<>();
-    ipGeoInfoRepository.findAllByIpIn(ips).forEach(g -> geoByIp.put(g.getIp(), g));
-    Map<String, HostClassificationEntity> deviceByIp = new HashMap<>();
-    hostClassificationRepository.findByFileId(fileId).forEach(h -> deviceByIp.put(h.getIp(), h));
+    Map<String, IpPlace> geoByIp = new HashMap<>();
+    geoByIp.putAll(geoOrgLookup.placesFor(ips));
+    Map<String, HostFacts> deviceByIp = new HashMap<>();
+    hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.put(h.ip(), h));
 
     // Sort and limit
     Comparator<Map.Entry<String, HostAcc>> comparator = switch (sortBy) {
@@ -356,17 +356,17 @@ public class NetworkIntelligenceService {
         .map(e -> {
           String ip = e.getKey();
           HostAcc acc = e.getValue();
-          IpGeoInfoEntity geo = geoByIp.get(ip);
-          HostClassificationEntity device = deviceByIp.get(ip);
+          IpPlace geo = geoByIp.get(ip);
+          HostFacts device = deviceByIp.get(ip);
           String role = acc.clientConversations > acc.serverConversations * 2 ? "client"
               : acc.serverConversations > acc.clientConversations * 2 ? "server"
               : "both";
           // Prefer the host's own discovered name (DHCP/mDNS/NBNS/reverse DNS) over the
           // nDPI SNI, which records the server a client connected to rather than the host itself.
-          boolean useDeviceHostname = device != null && device.getHostname() != null;
-          String hostname = useDeviceHostname ? device.getHostname() : acc.hostname;
+          boolean useDeviceHostname = device != null && device.hostname() != null;
+          String hostname = useDeviceHostname ? device.hostname() : acc.hostname;
           // Only attach a discovery-source badge when the passively-discovered name is the one shown.
-          String hostnameSource = useDeviceHostname ? device.getHostnameSource() : null;
+          String hostnameSource = useDeviceHostname ? device.hostnameSource() : null;
           return HostSummaryDto.builder()
               .ip(ip)
               .hostname(hostname)
@@ -375,11 +375,11 @@ public class NetworkIntelligenceService {
               .packetCount(acc.packetCount)
               .conversationCount(acc.conversationCount)
               .riskCount(acc.riskCount)
-              .deviceType(device != null ? device.getDeviceType() : null)
-              .country(geo != null ? geo.getCountryCode() : null)
-              .org(geo != null ? geo.getOrg() : null)
+              .deviceType(device != null ? device.deviceType() : null)
+              .country(geo != null ? geo.countryCode() : null)
+              .org(geo != null ? geo.org() : null)
               .role(role)
-              .geoSource(geo != null ? geo.getGeoSource() : null)
+              .geoSource(geo != null ? geo.geoSource() : null)
               .build();
         })
         .collect(Collectors.toList());
@@ -399,18 +399,18 @@ public class NetworkIntelligenceService {
 
     Map<String, List<DnsQueryLogEntity>> byServer =
         rows.stream().collect(Collectors.groupingBy(DnsQueryLogEntity::getServerIp));
-    Map<String, HostClassificationEntity> hostByIp = new HashMap<>();
-    hostClassificationRepository.findByFileId(fileId).forEach(h -> hostByIp.put(h.getIp(), h));
+    Map<String, HostFacts> hostByIp = new HashMap<>();
+    hostClassificationLookup.hostFacts(fileId).forEach(h -> hostByIp.put(h.ip(), h));
 
     return byServer.entrySet().stream()
         .map(
             e -> {
               String ip = e.getKey();
               DnsCounts c = countDns(e.getValue());
-              HostClassificationEntity host = hostByIp.get(ip);
+              HostFacts host = hostByIp.get(ip);
               return ServiceServerSummaryDto.builder()
                   .serverIp(ip)
-                  .hostname(host != null ? host.getHostname() : null)
+                  .hostname(host != null ? host.hostname() : null)
                   .role("dns")
                   .totalRequests(c.total())
                   .okCount(c.resolved)
@@ -427,8 +427,8 @@ public class NetworkIntelligenceService {
   public DnsQueryLogResponse computeDnsQueryLog(UUID fileId, String serverIp) {
     List<DnsQueryLogEntity> rows = dnsQueryLogRepository.findByFileIdAndServerIp(fileId, serverIp);
     DnsCounts c = countDns(rows);
-    HostClassificationEntity host =
-        hostClassificationRepository.findFirstByFileIdAndIpOrderByIdAsc(fileId, serverIp).orElse(null);
+    HostFacts host =
+        hostClassificationLookup.hostFactsByIp(fileId, serverIp).orElse(null);
 
     // General DNS log ordering: most-queried domains first, then alphabetically. Unresolvable rows
     // stay visually distinct via row styling rather than being forced to the top.
@@ -453,7 +453,7 @@ public class NetworkIntelligenceService {
 
     return DnsQueryLogResponse.builder()
         .serverIp(serverIp)
-        .hostname(host != null ? host.getHostname() : null)
+        .hostname(host != null ? host.hostname() : null)
         .resolvedCount(c.resolved)
         .failedCount(c.failed)
         .nxdomainRatio(c.nxdomainRatio())
@@ -505,8 +505,8 @@ public class NetworkIntelligenceService {
    * responses and the 4xx-enumeration verdict. Sorted most-active first.
    */
   public List<ServiceServerSummaryDto> computeWebServers(UUID fileId) {
-    List<HostClassificationEntity> webHosts =
-        hostClassificationRepository.findByFileId(fileId).stream()
+    List<HostFacts> webHosts =
+        hostClassificationLookup.hostFacts(fileId).stream()
             .filter(h -> hasRole(h, ServiceLogRoles.API)
                 || hasRole(h, ServiceLogRoles.WEB))
             .toList();
@@ -519,10 +519,10 @@ public class NetworkIntelligenceService {
     return webHosts.stream()
         .map(
             host -> {
-              WebCounts c = countWeb(byServer.getOrDefault(host.getIp(), List.of()));
+              WebCounts c = countWeb(byServer.getOrDefault(host.ip(), List.of()));
               return ServiceServerSummaryDto.builder()
-                  .serverIp(host.getIp())
-                  .hostname(host.getHostname())
+                  .serverIp(host.ip())
+                  .hostname(host.hostname())
                   .role(hasRole(host, ServiceLogRoles.API) ? ServiceLogRoles.API : ServiceLogRoles.WEB)
                   .totalRequests(c.total())
                   .okCount(c.success)
@@ -540,8 +540,8 @@ public class NetworkIntelligenceService {
     List<HttpEndpointLogEntity> rows =
         httpEndpointLogRepository.findByFileIdAndServerIp(fileId, serverIp);
     WebCounts c = countWeb(rows);
-    HostClassificationEntity host =
-        hostClassificationRepository.findFirstByFileIdAndIpOrderByIdAsc(fileId, serverIp).orElse(null);
+    HostFacts host =
+        hostClassificationLookup.hostFactsByIp(fileId, serverIp).orElse(null);
 
     List<WebServerDetailResponse.HttpEndpointDto> endpoints =
         rows.stream()
@@ -577,7 +577,7 @@ public class NetworkIntelligenceService {
 
     return WebServerDetailResponse.builder()
         .serverIp(serverIp)
-        .hostname(host != null ? host.getHostname() : null)
+        .hostname(host != null ? host.hostname() : null)
         .api(host != null && hasRole(host, ServiceLogRoles.API))
         .totalRequests(c.total())
         .successCount(c.success)
@@ -594,30 +594,30 @@ public class NetworkIntelligenceService {
 
   /** Reconstructs TLS metadata for a server from the existing conversation enrichment; null if none. */
   private WebServerDetailResponse.TlsInfo buildTlsInfo(UUID fileId, String serverIp) {
-    List<ConversationEntity> all = conversationRepository.findByFileIdAndIp(fileId, serverIp);
+    List<ConversationFacts> all = conversationLookup.conversationFactsForIp(fileId, serverIp);
     if (all.isEmpty()) return null;
     // The host is the TLS server when it's the connection destination (the authoritative direction).
     // If a capture stored the flow reversed (e.g. the client SYN wasn't captured) the host can appear
     // as the source, so fall back to all of its conversations rather than silently dropping the cert.
-    List<ConversationEntity> serverSide =
-        all.stream().filter(c -> serverIp.equals(c.getDstIp())).toList();
-    List<ConversationEntity> convs = serverSide.isEmpty() ? all : serverSide;
+    List<ConversationFacts> serverSide =
+        all.stream().filter(c -> serverIp.equals(c.flow().dstIp())).toList();
+    List<ConversationFacts> convs = serverSide.isEmpty() ? all : serverSide;
 
     List<String> sniNames =
-        convs.stream().map(ConversationEntity::getHostname).filter(h -> h != null).distinct().sorted().toList();
-    ConversationEntity cert =
-        convs.stream().filter(c -> c.getTlsSubject() != null || c.getTlsIssuer() != null).findFirst().orElse(null);
+        convs.stream().map((java.util.function.Function<ConversationFacts,String>) f -> f.tls().hostname()).filter(h -> h != null).distinct().sorted().toList();
+    ConversationFacts cert =
+        convs.stream().filter(c -> c.tls().tlsSubject() != null || c.tls().tlsIssuer() != null).findFirst().orElse(null);
     String ja3s =
-        convs.stream().map(ConversationEntity::getJa3Server).filter(j -> j != null).findFirst().orElse(null);
+        convs.stream().map((java.util.function.Function<ConversationFacts,String>) f -> f.tls().ja3Server()).filter(j -> j != null).findFirst().orElse(null);
 
     if (cert == null && ja3s == null && sniNames.isEmpty()) return null;
     return WebServerDetailResponse.TlsInfo.builder()
-        .subject(cert != null ? cert.getTlsSubject() : null)
-        .issuer(cert != null ? cert.getTlsIssuer() : null)
+        .subject(cert != null ? cert.tls().tlsSubject() : null)
+        .issuer(cert != null ? cert.tls().tlsIssuer() : null)
         .ja3s(ja3s)
         .sniNames(sniNames)
-        .notBefore(cert != null ? cert.getTlsNotBefore() : null)
-        .notAfter(cert != null ? cert.getTlsNotAfter() : null)
+        .notBefore(cert != null ? cert.tls().tlsNotBefore() : null)
+        .notAfter(cert != null ? cert.tls().tlsNotAfter() : null)
         .build();
   }
 
@@ -650,25 +650,20 @@ public class NetworkIntelligenceService {
 
   /** Resolves a frame number to the conversation that contains it, so the UI can open + highlight it. */
   public PacketLocationResponse locatePacket(UUID fileId, long packetNumber) {
-    return packetRepository
-        .findFirstByFile_IdAndPacketNumber(fileId, packetNumber)
-        .filter(p -> p.getConversation() != null)
+    return packetLookup
+        .conversationIdForFrame(fileId, packetNumber)
         .map(
-            p ->
+            conversationId ->
                 PacketLocationResponse.builder()
-                    .conversationId(p.getConversation().getId())
+                    .conversationId(conversationId)
                     .packetNumber(packetNumber)
                     .build())
         .orElse(null);
   }
 
-  private boolean hasRole(HostClassificationEntity host, String role) {
-    String roles = host.getServiceRoles();
-    if (roles == null || roles.isBlank()) return false;
-    for (String r : roles.split(",")) {
-      if (r.trim().equals(role)) return true;
-    }
-    return false;
+  private boolean hasRole(HostFacts host, String role) {
+    // The port splits the stored comma-joined column for us; no re-parsing here.
+    return host.serviceRoles().contains(role);
   }
 
   // ── Filter helpers ────────────────────────────────────────────────────────
@@ -692,37 +687,37 @@ public class NetworkIntelligenceService {
   // ── Clustering logic ──────────────────────────────────────────────────────
 
   private String getClusterKey(String ip, String groupBy,
-      Map<String, IpGeoInfoEntity> geoByIp,
-      Map<String, HostClassificationEntity> deviceByIp,
+      Map<String, IpPlace> geoByIp,
+      Map<String, HostFacts> deviceByIp,
       List<IpOrgRuleEntity> orgRules) {
     return switch (groupBy) {
       case "asn" -> {
-        IpGeoInfoEntity geo = geoByIp.get(ip);
-        if (geo != null && geo.getAsn() != null && !geo.getAsn().isBlank()) {
-          yield "asn:" + geo.getAsn();
+        IpPlace geo = geoByIp.get(ip);
+        if (geo != null && geo.asn() != null && !geo.asn().isBlank()) {
+          yield "asn:" + geo.asn();
         }
         yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
       }
       case "country" -> {
-        IpGeoInfoEntity geo = geoByIp.get(ip);
-        if (geo != null && geo.getCountryCode() != null && !geo.getCountryCode().isBlank()) {
-          yield "country:" + geo.getCountryCode();
+        IpPlace geo = geoByIp.get(ip);
+        if (geo != null && geo.countryCode() != null && !geo.countryCode().isBlank()) {
+          yield "country:" + geo.countryCode();
         }
         yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
       }
       case "city" -> {
-        IpGeoInfoEntity geo = geoByIp.get(ip);
-        if (geo != null && geo.getCity() != null && !geo.getCity().isBlank()) {
-          String cc = geo.getCountryCode() != null ? geo.getCountryCode() : "XX";
-          yield "city:" + cc + ":" + geo.getCity();
+        IpPlace geo = geoByIp.get(ip);
+        if (geo != null && geo.city() != null && !geo.city().isBlank()) {
+          String cc = geo.countryCode() != null ? geo.countryCode() : "XX";
+          yield "city:" + cc + ":" + geo.city();
         }
         yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
       }
       case "subnet24" -> "subnet24:" + subnetPrefix(ip, 3);
       case "subnet16" -> "subnet16:" + subnetPrefix(ip, 2);
       case "deviceType" -> {
-        HostClassificationEntity dev = deviceByIp.get(ip);
-        yield "device:" + (dev != null ? dev.getDeviceType() : "UNKNOWN");
+        HostFacts dev = deviceByIp.get(ip);
+        yield "device:" + (dev != null ? dev.deviceType() : "UNKNOWN");
       }
       case "customOrg" -> {
         String label = ipOrgRuleService.matchIp(ip, orgRules);
@@ -735,24 +730,24 @@ public class NetworkIntelligenceService {
   }
 
   private String buildLabel(String ip, String key, String groupBy,
-      Map<String, IpGeoInfoEntity> geoByIp,
-      Map<String, HostClassificationEntity> deviceByIp,
+      Map<String, IpPlace> geoByIp,
+      Map<String, HostFacts> deviceByIp,
       List<IpOrgRuleEntity> orgRules) {
     return switch (groupBy) {
       case "asn" -> {
         if (key.equals("cluster:internal")) yield "Internal Network";
         if (key.equals("cluster:unknown")) yield "Unknown (No ASN)";
-        IpGeoInfoEntity geo = geoByIp.get(ip);
+        IpPlace geo = geoByIp.get(ip);
         String asn = key.substring("asn:".length());
-        String org = geo != null && geo.getOrg() != null ? geo.getOrg() : asn;
+        String org = geo != null && geo.org() != null ? geo.org() : asn;
         yield org + " (" + asn + ")";
       }
       case "country" -> {
         if (key.equals("cluster:internal")) yield "Internal Network";
         if (key.equals("cluster:unknown")) yield "Unknown Country";
-        IpGeoInfoEntity geo = geoByIp.get(ip);
+        IpPlace geo = geoByIp.get(ip);
         String code = key.substring("country:".length());
-        String name = geo != null && geo.getCountry() != null ? geo.getCountry() : code;
+        String name = geo != null && geo.country() != null ? geo.country() : code;
         yield name + " (" + code + ")";
       }
       case "city" -> {
@@ -762,8 +757,8 @@ public class NetworkIntelligenceService {
         String[] parts = key.split(":", 3);
         String cityName = parts.length == 3 ? parts[2] : key;
         String cc = parts.length >= 2 ? parts[1] : "";
-        IpGeoInfoEntity geo = geoByIp.get(ip);
-        String country = (geo != null && geo.getCountry() != null) ? geo.getCountry() : cc;
+        IpPlace geo = geoByIp.get(ip);
+        String country = (geo != null && geo.country() != null) ? geo.country() : cc;
         yield cityName + ", " + country;
       }
       case "subnet24" -> {

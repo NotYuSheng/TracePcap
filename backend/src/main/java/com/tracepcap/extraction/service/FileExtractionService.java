@@ -1,8 +1,9 @@
 package com.tracepcap.extraction.service;
 
 import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.PacketLookup;
 import com.tracepcap.analysis.spi.FileExtractionStage;
 import com.tracepcap.extraction.entity.ExtractedFileEntity;
 import com.tracepcap.extraction.repository.ExtractedFileRepository;
@@ -159,8 +160,8 @@ public class FileExtractionService implements FileExtractionStage {
   @PersistenceContext private EntityManager entityManager;
 
   private final ExtractedFileRepository extractedFileRepository;
-  private final ConversationRepository conversationRepository;
-  private final PacketRepository packetRepository;
+  private final ConversationLookup conversationLookup;
+  private final PacketLookup packetLookup;
   private final StorageService storageService;
   private final ExtractionLimits limits;
 
@@ -198,10 +199,7 @@ public class FileExtractionService implements FileExtractionStage {
     file.setExtractionConversationLimitSkippedIds(null);
 
     // Load all conversations once — shared by both extraction strategies
-    List<ConversationEntity> allConvs =
-        (savedConversationIds == null || savedConversationIds.isEmpty())
-            ? List.of()
-            : conversationRepository.findAllById(savedConversationIds);
+    List<ConversationFacts> allConvs = conversationLookup.conversationFactsByIds(savedConversationIds);
 
     try {
       extractHttpObjects(file, tempPcapFile, allConvs);
@@ -223,7 +221,7 @@ public class FileExtractionService implements FileExtractionStage {
   // -------------------------------------------------------------------------
 
   private void extractHttpObjects(
-      FileEntity file, File tempPcapFile, List<ConversationEntity> convs) throws Exception {
+      FileEntity file, File tempPcapFile, List<ConversationFacts> convs) throws Exception {
     File tmpDir = Files.createTempDirectory("tshark-http-").toFile();
     try {
       ProcessBuilder pb =
@@ -290,7 +288,7 @@ public class FileExtractionService implements FileExtractionStage {
    * @return map from tshark-exported filename → conversation UUID
    */
   private Map<String, UUID> buildHttpFilenameConvMap(
-      File pcapFile, List<ConversationEntity> convs) {
+      File pcapFile, List<ConversationFacts> convs) {
     Map<String, UUID> result = new HashMap<>();
     // Must track counts in pcap order — LinkedHashMap preserves insertion order
     Map<String, Integer> basenameCount = new LinkedHashMap<>();
@@ -345,9 +343,9 @@ public class FileExtractionService implements FileExtractionStage {
           if (srcIp == null || dstIp == null) continue;
           Integer sp = parsePort(srcPort);
           Integer dp = parsePort(dstPort);
-          ConversationEntity conv = findConvByEndpoints(convs, srcIp, sp, dstIp, dp);
+          ConversationFacts conv = findConvByEndpoints(convs, srcIp, sp, dstIp, dp);
           if (conv != null) {
-            result.put(filename, conv.getId());
+            result.put(filename, conv.id());
           }
         }
       }
@@ -434,23 +432,23 @@ public class FileExtractionService implements FileExtractionStage {
   }
 
   /** Finds a conversation matching the given endpoint pair (bidirectional). */
-  private static ConversationEntity findConvByEndpoints(
-      List<ConversationEntity> convs,
+  private static ConversationFacts findConvByEndpoints(
+      List<ConversationFacts> convs,
       String srcIp,
       Integer srcPort,
       String dstIp,
       Integer dstPort) {
-    for (ConversationEntity c : convs) {
+    for (ConversationFacts c : convs) {
       boolean fwd =
-          eq(c.getSrcIp(), srcIp)
-              && eq(c.getDstIp(), dstIp)
-              && eq(c.getSrcPort(), srcPort)
-              && eq(c.getDstPort(), dstPort);
+          eq(c.flow().srcIp(), srcIp)
+              && eq(c.flow().dstIp(), dstIp)
+              && eq(c.flow().srcPort(), srcPort)
+              && eq(c.flow().dstPort(), dstPort);
       boolean rev =
-          eq(c.getSrcIp(), dstIp)
-              && eq(c.getDstIp(), srcIp)
-              && eq(c.getSrcPort(), dstPort)
-              && eq(c.getDstPort(), srcPort);
+          eq(c.flow().srcIp(), dstIp)
+              && eq(c.flow().dstIp(), srcIp)
+              && eq(c.flow().srcPort(), dstPort)
+              && eq(c.flow().dstPort(), srcPort);
       if (fwd || rev) return c;
     }
     return null;
@@ -472,31 +470,29 @@ public class FileExtractionService implements FileExtractionStage {
    * per-stream match cap and how many streams were skipped by the conversation cap.
    */
   private void extractFromRawStreams(
-      FileEntity file, File tempPcapFile, List<ConversationEntity> allConvs) {
+      FileEntity file, File tempPcapFile, List<ConversationFacts> allConvs) {
 
     if (allConvs.isEmpty()) return;
 
-    List<UUID> allIds = allConvs.stream().map(ConversationEntity::getId).toList();
+    List<UUID> allIds = allConvs.stream().map(ConversationFacts::id).toList();
 
     // Which conversations had packets with a detected file type?
-    List<Object[]> hits = packetRepository.findFileTypesByConversationIds(allIds);
-    Set<UUID> convIdsWithFiles =
-        hits.stream().map(row -> (UUID) row[0]).collect(Collectors.toSet());
+    Set<UUID> convIdsWithFiles = packetLookup.conversationIdsWithDetectedFiles(allIds);
 
     if (convIdsWithFiles.isEmpty()) return;
 
-    List<ConversationEntity> eligible =
+    List<ConversationFacts> eligible =
         allConvs.stream()
-            .filter(c -> convIdsWithFiles.contains(c.getId()))
+            .filter(c -> convIdsWithFiles.contains(c.id()))
             .filter(
                 c -> {
-                  String tp = c.getTsharkProtocol();
+                  String tp = c.findings().tsharkProtocol();
                   return tp == null || !tp.toUpperCase().contains("HTTP");
                 })
             .toList();
 
     if (eligible.size() > limits.getMaxStreamConversations()) {
-      List<ConversationEntity> skipped =
+      List<ConversationFacts> skipped =
           eligible.subList(limits.getMaxStreamConversations(), eligible.size());
       log.warn(
           "PCAP {} has {} non-HTTP streams with file-type hits — scanning only the first {} "
@@ -508,7 +504,7 @@ public class FileExtractionService implements FileExtractionStage {
       file.setExtractionConversationLimitSkippedIds(joinConvIds(skipped));
     }
 
-    List<ConversationEntity> candidates =
+    List<ConversationFacts> candidates =
         eligible.stream().limit(limits.getMaxStreamConversations()).toList();
 
     if (candidates.isEmpty()) return;
@@ -516,17 +512,17 @@ public class FileExtractionService implements FileExtractionStage {
     // Single tshark pass to resolve stream indices for all candidate conversations at once.
     Map<String, StreamInfo> streamIndexMap = buildStreamIndexMap(tempPcapFile);
 
-    Map<ConversationEntity, StreamInfo> convStreamMap = new LinkedHashMap<>();
-    for (ConversationEntity conv : candidates) {
+    Map<ConversationFacts, StreamInfo> convStreamMap = new LinkedHashMap<>();
+    for (ConversationFacts conv : candidates) {
       StreamInfo info =
           streamIndexMap.get(
-              streamKey(conv.getSrcIp(), conv.getSrcPort(), conv.getDstIp(), conv.getDstPort()));
+              streamKey(conv.flow().srcIp(), conv.flow().srcPort(), conv.flow().dstIp(), conv.flow().dstPort()));
       if (info == null) {
         info =
             streamIndexMap.get(
                 streamKey(
-                    conv.getDstIp(), conv.getDstPort(),
-                    conv.getSrcIp(), conv.getSrcPort()));
+                    conv.flow().dstIp(), conv.flow().dstPort(),
+                    conv.flow().srcIp(), conv.flow().srcPort()));
       }
       if (info != null) convStreamMap.put(conv, info);
     }
@@ -541,9 +537,9 @@ public class FileExtractionService implements FileExtractionStage {
     // Single tshark pass to read all required streams at once.
     Map<String, byte[]> streamData = readAllStreams(tempPcapFile, tcpIds, udpIds);
 
-    List<ConversationEntity> matchCapped = new ArrayList<>();
-    for (Map.Entry<ConversationEntity, StreamInfo> entry : convStreamMap.entrySet()) {
-      ConversationEntity conv = entry.getKey();
+    List<ConversationFacts> matchCapped = new ArrayList<>();
+    for (Map.Entry<ConversationFacts, StreamInfo> entry : convStreamMap.entrySet()) {
+      ConversationFacts conv = entry.getKey();
       StreamInfo info = entry.getValue();
       byte[] streamBytes = streamData.get(info.transport() + ":" + info.index());
       if (streamBytes == null || streamBytes.length == 0) continue;
@@ -551,7 +547,7 @@ public class FileExtractionService implements FileExtractionStage {
         if (processMagicMatches(file, conv, streamBytes)) matchCapped.add(conv);
       } catch (Exception e) {
         log.debug(
-            "Stream extraction skipped for conversation {}: {}", conv.getId(), e.getMessage());
+            "Stream extraction skipped for conversation {}: {}", conv.id(), e.getMessage());
       }
     }
     if (!matchCapped.isEmpty()) {
@@ -565,14 +561,14 @@ public class FileExtractionService implements FileExtractionStage {
    * @return {@code true} if the per-stream match cap was reached (more files may exist)
    */
   private boolean processMagicMatches(
-      FileEntity file, ConversationEntity conv, byte[] streamBytes) {
+      FileEntity file, ConversationFacts conv, byte[] streamBytes) {
     List<MagicMatch> segments = findMagicMatches(streamBytes);
     boolean capReached = segments.size() >= limits.getMaxMatchesPerStream();
     if (capReached) {
       log.warn(
           "Raw stream for conversation {} hit the {}-file extraction cap — additional embedded "
               + "files may exist (raise EXTRACTION_MAX_MATCHES_PER_STREAM to extract more)",
-          conv.getId(),
+          conv.id(),
           limits.getMaxMatchesPerStream());
     }
     for (MagicMatch seg : segments) {
@@ -581,14 +577,14 @@ public class FileExtractionService implements FileExtractionStage {
       if (end <= start) continue;
       long segSize = (long) end - start;
       String ext = seg.ext();
-      String name = "stream-" + conv.getId().toString().substring(0, 8) + "-" + start + "." + ext;
+      String name = "stream-" + conv.id().toString().substring(0, 8) + "-" + start + "." + ext;
       if (segSize > limits.maxFileSizeBytes()) {
         log.warn(
             "Skipping magic-byte extracted file {} ({} bytes) — exceeds {} MB limit",
             name,
             segSize,
             limits.getMaxFileSizeMb());
-        recordSkippedFile(file, conv.getId(), name, segSize, "magic_bytes");
+        recordSkippedFile(file, conv.id(), name, segSize, "magic_bytes");
         continue;
       }
       byte[] fileData = Arrays.copyOfRange(streamBytes, start, end);
@@ -597,16 +593,16 @@ public class FileExtractionService implements FileExtractionStage {
       if (extractedFileRepository.existsByFileIdAndSha256(file.getId(), sha256)) continue;
 
       String mime = detectMime(fileData);
-      storeExtractedFile(file, conv.getId(), fileData, name, mime, sha256, "magic_bytes");
+      storeExtractedFile(file, conv.id(), fileData, name, mime, sha256, "magic_bytes");
     }
     return capReached;
   }
 
   /** Joins conversation IDs into a comma-separated string, capped to limit DB/UI bloat. */
-  private static String joinConvIds(List<ConversationEntity> convs) {
+  private static String joinConvIds(List<ConversationFacts> convs) {
     return convs.stream()
         .limit(MAX_RECORDED_CONV_IDS)
-        .map(c -> c.getId().toString())
+        .map(c -> c.id().toString())
         .collect(Collectors.joining(","));
   }
 

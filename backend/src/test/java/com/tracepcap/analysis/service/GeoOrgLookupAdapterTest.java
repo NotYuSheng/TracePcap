@@ -60,4 +60,49 @@ class GeoOrgLookupAdapterTest {
     when(repository.findAllByIpIn(anyCollection())).thenReturn(List.of());
     assertThat(adapter.orgsFor(Set.of("10.0.0.1"))).isEmpty();
   }
+
+  /**
+   * Snapshot comparison (#512 slice 6c) needs ASN and country, not just the org name — but an IP the
+   * cache has never seen must stay absent rather than arrive as an all-null attribution, or the
+   * change detector would read "unknown" as "changed" and invent a gateway event.
+   */
+  @Test
+  void attributionOmitsIpsWithNoGeoRecord() {
+    when(repository.findAllByIpIn(anyCollection()))
+        .thenReturn(List.of(geoFull("1.1.1.1", "AS13335", "Cloudflare, Inc.", "US")));
+
+    var attribution = adapter.attributionFor(Set.of("1.1.1.1", "203.0.113.9"));
+
+    assertThat(attribution).containsOnlyKeys("1.1.1.1");
+    assertThat(attribution.get("1.1.1.1"))
+        .satisfies(
+            a -> {
+              assertThat(a.asn()).isEqualTo("AS13335");
+              assertThat(a.org()).isEqualTo("Cloudflare, Inc.");
+              assertThat(a.countryCode()).isEqualTo("US");
+            });
+  }
+
+  @Test
+  void attributionKeepsPartialRecordsRatherThanDroppingThem() {
+    // A cached IP with no org is still known to exist — dropping it would look like a lookup miss.
+    when(repository.findAllByIpIn(anyCollection()))
+        .thenReturn(List.of(geoFull("203.0.113.1", null, null, null)));
+
+    assertThat(adapter.attributionFor(Set.of("203.0.113.1")))
+        .containsOnlyKeys("203.0.113.1")
+        .extractingByKey("203.0.113.1")
+        .satisfies(a -> assertThat(a.org()).isNull());
+  }
+
+  @Test
+  void emptyAttributionInputShortCircuits() {
+    assertThat(adapter.attributionFor(Set.of())).isEmpty();
+    assertThat(adapter.attributionFor(null)).isEmpty();
+    verify(repository, never()).findAllByIpIn(anyCollection());
+  }
+
+  private static IpGeoInfoEntity geoFull(String ip, String asn, String org, String cc) {
+    return IpGeoInfoEntity.builder().ip(ip).asn(asn).org(org).countryCode(cc).build();
+  }
 }

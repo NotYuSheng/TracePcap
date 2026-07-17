@@ -4,7 +4,10 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +25,47 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
         .map(IpGeoInfoEntity::getOrg)
         .filter(o -> o != null && !o.isBlank())
         .distinct()
+        .toList();
+  }
+
+  @Override
+  public Map<String, IpAttribution> attributionFor(Collection<String> ips) {
+    if (ips == null || ips.isEmpty()) return Map.of();
+    Map<String, IpAttribution> byIp = new LinkedHashMap<>();
+    for (IpGeoInfoEntity g : repository.findAllByIpIn(ips)) {
+      // First record wins on a duplicate IP — the cache is keyed by IP, so this is belt-and-braces,
+      // but putIfAbsent keeps the choice deterministic rather than last-write-wins.
+      byIp.putIfAbsent(
+          g.getIp(), new IpAttribution(g.getIp(), g.getAsn(), g.getOrg(), g.getCountryCode()));
+    }
+    return Map.copyOf(byIp);
+  }
+
+  @Override
+  public Map<String, IpPlace> placesFor(Collection<String> ips) {
+    if (ips == null || ips.isEmpty()) return Map.of();
+    Map<String, IpPlace> byIp = new LinkedHashMap<>();
+    for (IpGeoInfoEntity g : repository.findAllByIpIn(ips)) {
+      byIp.putIfAbsent(
+          g.getIp(),
+          new IpPlace(
+              g.getIp(),
+              g.getAsn(),
+              g.getOrg(),
+              g.getCountryCode(),
+              g.getCountry(),
+              g.getCity(),
+              g.getLat(),
+              g.getLon(),
+              g.getGeoSource()));
+    }
+    return Map.copyOf(byIp);
+  }
+
+  @Override
+  public List<Country> distinctCountriesInFile(UUID fileId) {
+    return repository.findDistinctCountriesByFileId(fileId).stream()
+        .map(row -> new Country((String) row[0], (String) row[1]))
         .toList();
   }
 }

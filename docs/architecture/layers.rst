@@ -381,9 +381,9 @@ Known divergence
 Measured against the model above; frozen in the ArchUnit baseline where enforceable. Each entry
 is a refactor target, not a shrug.
 
-* **687 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
+* **529 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
   entities (rule 2) — down from 757 as the seam migration proceeds slice by slice (757 → 738 in
-  slice 6a, → 687 in slice 6b). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
+  slice 6a, → 687 in 6b, → 529 in 6c). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
   eliminated across slices 1 and 3: ``analysis ↔ file`` (listener moved to its consumer),
   ``monitor ↔ insights`` and ``monitor ↔ subnets`` (a ``monitor.spi`` port package —
   ``LabelStalenessCheck``, ``SnapshotRevalidationHook``, ``InsightPresence`` — implemented by
@@ -438,5 +438,25 @@ is a refactor target, not a shrug.
   changing what ``HostClassifier`` returns — the entity conceptually belongs to
   ``hostclassification`` but physically lives in ``analysis.entity`` for JPA's sake — which is a
   schema-shaped change, not seam work. Do not "fix" these by rewriting the classifier.
+* **The conversation fact base is behind the seam** (slice 6c): 687 → 529. ``tracer`` 56 → 0,
+  ``monitor`` 66 → 3, ``extraction`` 49 → 10. Consumers read ~24 distinct fields off
+  ``ConversationEntity``, so ``ConversationFacts`` carries **three nested groups rather than 24 flat
+  fields** — and the grouping is the fact grades, which fell out of measuring what each module reads
+  rather than being imposed: ``FlowIdentity`` (MEASURED — endpoints, bytes, times; read by
+  everyone), ``TlsFacts`` (REPORTED — cert subject, JA3, SNI; the fields a host can forge), and
+  ``Findings`` (INFERRED — nDPI app, Suricata alerts, risks). One record and one query, though:
+  three ports would mean three round-trips over the same row. ``PacketLookup`` *is* separate,
+  because the grain differs — folding packets into a conversation would drag thousands of rows
+  behind every timeline bin.
+* **Two structural reaches that field-level porting cannot close**, both now handled:
+
+  - ``ConversationRepository.buildSpec`` returns ``Specification<ConversationEntity>`` — the entity
+    sits in the *caller's signature*, so ``intelligence``/``conversation``/``story`` were coupled to
+    it by type, not by field access. The port takes ``ConversationFilterParams`` (already on the
+    seam) and keeps the 168-line Specification inside ``analysis``: callers say what they want, not
+    how rows are selected.
+  - ``ExtractedFileEntity`` holds a JPA ``@ManyToOne`` to ``ConversationEntity``. The FK crosses the
+    module boundary *at the schema level*, so no read port removes it — same class as
+    ``DeviceClassifierService``, structural rather than lazy. ``extraction``'s residual is this.
 * **``FilterService`` reads the pcap** to validate LLM-generated filters — the one grey case in
   rule 4, baselined rather than blessed.
