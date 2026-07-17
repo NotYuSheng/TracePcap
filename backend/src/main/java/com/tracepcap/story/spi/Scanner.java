@@ -1,5 +1,6 @@
 package com.tracepcap.story.spi;
 
+import com.tracepcap.common.stage.Tier;
 import com.tracepcap.story.dto.Finding;
 import java.util.List;
 

@@ -1,11 +1,12 @@
-package com.tracepcap.story.spi;
+package com.tracepcap.common.stage;
 
 /**
  * How a module reaches its answer (#512).
  *
- * <p>Determinism is not a stage — every stage holds all three tiers. A module declares its own tier
- * rather than being told, because the tier is a property of how it works, and only the module knows
- * that.
+ * <p>Determinism is not a stage — every stage holds all three tiers, which is why this lives in
+ * {@code common.stage} rather than with any one of them: an extractor and a scanner answer to the
+ * same three words. A module declares its own tier rather than being told, because the tier is a
+ * property of how it works, and only the module knows that.
  *
  * <p>The point of naming it is honesty about cost and trust: a reader deserves to know whether a
  * finding came from arithmetic, from a language model's guess, or from a person. It also makes the

@@ -1,5 +1,10 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.spi.ExtractionManifest;
+import com.tracepcap.analysis.spi.ExtractionTarget;
+import com.tracepcap.analysis.spi.Extractor;
+import com.tracepcap.common.stage.Tier;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -37,7 +42,47 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class TsharkEnrichmentService {
+public class TsharkEnrichmentService implements Extractor {
+
+  @Override
+  public String name() {
+    return ExtractionManifest.TSHARK_ENRICHMENT;
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public String manifestKey() {
+    return ExtractionManifest.TSHARK_ENRICHMENT;
+  }
+
+  /**
+   * Runs after nDPI (order 10): this reads fields nDPI populates. See Extractor#order() for why an
+   * integer is a poor way to say that.
+   */
+  @Override
+  public int order() {
+    return 20;
+  }
+
+  /**
+   * Tied to the nDPI toggle, which is how the pipeline has always gated it — the two ran inside one
+   * if-block. Preserved rather than "fixed": decoupling them is a behaviour change for users who
+   * turned nDPI off, and belongs in its own slice.
+   */
+  @Override
+  public boolean enabledFor(ExtractionTarget target) {
+    return target.file().isEnableNdpi();
+  }
+
+  @Override
+  public Outcome extract(ExtractionTarget target) {
+    enrich(target.capture(), target.conversations());
+    return Outcome.completed("tshark enrichment ran");
+  }
 
   private static final String TSHARK_BINARY = "tshark";
 
