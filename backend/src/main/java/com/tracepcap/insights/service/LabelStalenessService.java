@@ -1,14 +1,12 @@
 package com.tracepcap.insights.service;
 
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.monitor.spi.LabelStalenessCheck;
 import com.tracepcap.insights.entity.NodeRoleEntity;
 import com.tracepcap.insights.repository.NodeRoleRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,8 +39,8 @@ public class LabelStalenessService implements LabelStalenessCheck {
   public static final String ORIGIN_CARRIED_FORWARD = "CARRIED_FORWARD";
 
   private final NodeRoleRepository nodeRoleRepository;
-  private final HostClassificationRepository hostClassificationRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final HostClassificationLookup hostClassificationLookup;
+  private final GeoOrgLookup geoOrgLookup;
   private final JdbcTemplate jdbc;
 
   /**
@@ -133,22 +131,22 @@ public class LabelStalenessService implements LabelStalenessCheck {
     String ip = null;
     if ("IP".equalsIgnoreCase(entityType)) {
       ip = entityKey;
-      hostClassificationRepository
-          .findFirstByFileIdAndIpOrderByIdAsc(fileId, entityKey)
+      hostClassificationLookup
+          .hostFactsByIp(fileId, entityKey)
           .ifPresent(
               h -> {
                 props.put("observed", true);
-                if (h.getMac() != null) props.put("mac", h.getMac());
-                if (h.getDeviceType() != null) props.put("deviceType", h.getDeviceType());
+                if (h.mac() != null) props.put("mac", h.mac());
+                if (h.deviceType() != null) props.put("deviceType", h.deviceType());
               });
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       props.put("mac", entityKey);
-      Optional<com.tracepcap.analysis.entity.HostClassificationEntity> host =
-          hostClassificationRepository.findFirstByFileIdAndMacIgnoreCaseOrderByIdAsc(fileId, entityKey);
+      Optional<HostClassificationLookup.HostFacts> host =
+          hostClassificationLookup.hostFactsByMac(fileId, entityKey);
       if (host.isPresent()) {
         props.put("observed", true);
-        ip = host.get().getIp();
-        if (host.get().getDeviceType() != null) props.put("deviceType", host.get().getDeviceType());
+        ip = host.get().ip();
+        if (host.get().deviceType() != null) props.put("deviceType", host.get().deviceType());
       }
     }
 
@@ -210,18 +208,7 @@ public class LabelStalenessService implements LabelStalenessCheck {
     peers.remove(ip);
     peers.remove(null);
     if (peers.isEmpty()) return List.of();
-    return geoOrgs(peers);
-  }
-
-  /**
-   * Distinct non-blank org names for the geo records of the given IPs (proxy for external orgs).
-   */
-  private List<String> geoOrgs(Collection<String> ips) {
-    return ipGeoInfoRepository.findAllByIpIn(ips).stream()
-        .map(IpGeoInfoEntity::getOrg)
-        .filter(o -> o != null && !o.isBlank())
-        .distinct()
-        .collect(Collectors.toList());
+    return geoOrgLookup.orgsFor(peers);
   }
 
   // ── Diffing ───────────────────────────────────────────────────────────────────
