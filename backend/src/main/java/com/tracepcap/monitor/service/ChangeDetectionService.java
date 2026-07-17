@@ -613,13 +613,20 @@ public class ChangeDetectionService {
     return geoOrgLookup.attributionFor(ips);
   }
 
-  /** Builds a map of "asn|org" → the first attribution seen with that ASN. */
-  private Map<String, IpAttribution> asnMap(Map<String, IpAttribution> geoMap) {
+  /**
+   * Builds a map of ASN → the first attribution seen with it.
+   *
+   * <p>Keyed on the ASN alone, deliberately. The key was once {@code asn|org}, which made an ASN's
+   * identity depend on its org name — so an org enriched from unknown to known (or a lookup that
+   * came back empty this time) presented as a brand-new ASN and raised a spurious ASN_CHANGE. The
+   * {@link IpAttribution} contract is that a null field means "unknown", never "changed"; keying on
+   * a field that may be absent breaks that. The org still travels on the event for display.
+   */
+  Map<String, IpAttribution> asnMap(Map<String, IpAttribution> geoMap) {
     Map<String, IpAttribution> result = new HashMap<>();
     for (IpAttribution geo : geoMap.values()) {
       if (geo.asn() != null && !geo.asn().isBlank()) {
-        String key = geo.asn() + "|" + orEmpty(geo.org());
-        result.putIfAbsent(key, geo);
+        result.putIfAbsent(geo.asn(), geo);
       }
     }
     return result;
