@@ -590,6 +590,49 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     sigmaRef.current = sigma;
 
+    // ── Edge overdraw for PDF capture ─────────────────────────────────────────
+    //
+    // Sigma draws edges on a WebGL canvas, and a WebGL canvas cannot be read back from
+    // JavaScript — toDataURL and gl.readPixels both return empty while the edges are plainly
+    // visible on screen, because the pixels only ever exist inside the compositor. So every
+    // capture library produces the same edgeless diagram; this is not an html-to-image problem
+    // and no amount of swapping libraries fixes it (#526).
+    //
+    // The 2D `labels` layer IS readable — it is the only reason nodes and text reach the PDF at
+    // all (they come from drawNodeLabel's overdraw, not from Sigma's WebGL node layer). So for
+    // capture we redraw the edges onto that same 2D layer, underneath the labels.
+    //
+    // Capture-only, deliberately: the interactive renderer keeps its WebGL edges, which is what
+    // makes a 700-edge graph pan smoothly. Doing this always would put every edge through the 2D
+    // context on every frame.
+    if (forceLight) {
+      const labelCanvas = sigma.getCanvases()['labels'];
+      const labelCtx = labelCanvas?.getContext('2d');
+      if (labelCtx) {
+        sigma.on('afterRender', () => {
+          labelCtx.save();
+          // Sigma sizes its canvases for the device pixel ratio; graphToViewport returns CSS
+          // pixels, so match that transform or the lines land in the wrong place on HiDPI.
+          const dpr = labelCanvas.width / labelCanvas.clientWidth || 1;
+          labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          labelCtx.globalCompositeOperation = 'destination-over'; // behind the labels already drawn
+          graph.forEachEdge((_edge, attrs, source, target) => {
+            if (attrs['hidden']) return;
+            const s = sigma.graphToViewport(graph.getNodeAttributes(source) as { x: number; y: number });
+            const t = sigma.graphToViewport(graph.getNodeAttributes(target) as { x: number; y: number });
+            labelCtx.beginPath();
+            labelCtx.moveTo(s.x, s.y);
+            labelCtx.lineTo(t.x, t.y);
+            labelCtx.strokeStyle = (attrs['color'] as string) ?? '#999';
+            labelCtx.lineWidth = Math.max(0.6, (attrs['size'] as number) ?? 1);
+            labelCtx.globalAlpha = 0.75;
+            labelCtx.stroke();
+          });
+          labelCtx.restore();
+        });
+      }
+    }
+
     // ── Node dragging ──────────────────────────────────────────────────────────
     // Track which node is being dragged. These are plain vars (not refs) because
     // they're local to this effect closure and reset on every rebuild.
