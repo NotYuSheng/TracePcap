@@ -460,8 +460,39 @@ is a refactor target, not a shrug.
   - ``ExtractedFileEntity`` holds a JPA ``@ManyToOne`` to ``ConversationEntity``. The FK crosses the
     module boundary *at the schema level*, so no read port removes it — same class as
     ``DeviceClassifierService``, structural rather than lazy. ``extraction``'s residual is this.
-* **The Scan stage is a registry** (slice 6d) — *the first slice that builds the playbook rather
-  than clearing the way for it.* ``FindingsService`` held eight detector fields and eight call
+* **All four stages are registries** — Extract, Scan, Adjudicate and Narrate each discover their
+  own modules, so adding capability is adding one class. Each has a probe module in its tests: one
+  class, registered nowhere, touching nothing in ``main``, asserted on by its *output* rather than
+  by bean counts. Verified live on real captures::
+
+     Extract     3 extractors  (3 DETERMINISTIC)
+     Scan        8 scanners    (8 DETERMINISTIC)
+     Adjudicate  1 adjudicator (1 DETERMINISTIC) — questions: host-identity
+     Narrate     1 narrator    (1 DETERMINISTIC)
+
+  The contracts differ per stage, because the stages differ:
+
+  - **Extract writes.** ``ExtractionTarget`` carries the *mutable* working set; extractors fill in
+    conversations before persistence. The module owns its own enable conditions (Suricata's global
+    kill-switch moved out of ``AnalysisService`` onto ``SuricataService``), and the manifest row is
+    automatic — an extractor cannot forget, and forgetting is the #501 conflation. ``tshark`` gained
+    a manifest row it never had, for free.
+  - **Scan reads.** ``ScanContext`` carries *immutable* facts, memoised so eight scanners asking for
+    the conversation list read the database once. Additive: a new scanner never conflicts.
+  - **Adjudicate is exclusive.** One voice per question — so discovery alone would be the wrong
+    contract. ``AdjudicatorRunner`` refuses to start when two modules claim one question, because
+    picking by bean order would make the answer change with an unrelated refactor. The
+    ``AFTER_COMMIT``/``REQUIRES_NEW`` plumbing that every adjudicator used to copy is written once.
+  - **Narrate reads conclusions.** A narrator that judges is a scanner nobody can inspect. Its
+    output reaches the UI: ``CoverageNarrator`` is DETERMINISTIC and states what the capture could
+    *not* tell us — the section a language model should never write — in front of the LLM's prose.
+    Before the registry every section came from one LLM call, because there was only one way in.
+
+  ``Tier`` lives in ``common.stage``: every stage holds all three tiers, and an extractor and a
+  scanner answer to the same three words. The D/L/H taxonomy is something the code knows, not a
+  table in this document.
+* **Scan was the first stage to get its registry** (slice 6d) — *the first slice that built the
+  playbook rather than clearing the way for it.* ``FindingsService`` held eight detector fields and eight call
   lines; a ninth detector meant editing it, which is the "edit a core to add capability" this whole
   architecture exists to prevent. It now injects ``List<Scanner>`` and names nobody.
 

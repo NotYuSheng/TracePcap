@@ -1,5 +1,11 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.spi.ExtractionManifest;
+import com.tracepcap.analysis.spi.ExtractionTarget;
+import com.tracepcap.analysis.spi.Extractor;
+import com.tracepcap.common.stage.Tier;
+import org.springframework.beans.factory.annotation.Value;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.analysis.entity.ConversationEntity;
@@ -39,7 +45,47 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class SuricataService {
+public class SuricataService implements Extractor {
+
+  /**
+   * Global kill-switch. Lived in AnalysisService as a field the pipeline checked before calling
+   * this service; it belongs here, because "when do I run" is the module's business and a runner
+   * that knew about it would be a core to edit (#512).
+   */
+  @Value("${tracepcap.suricata.enabled:true}")
+  private boolean suricataEnabled;
+
+  @Override
+  public String name() {
+    return ExtractionManifest.SURICATA;
+  }
+
+  @Override
+  public Tier tier() {
+    // Suricata's rules are a third party's judgment about traffic — deterministic to run, heuristic
+    // in what they conclude. The facts it writes are INFERRED; the tool itself is not an LLM.
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public String manifestKey() {
+    return ExtractionManifest.SURICATA;
+  }
+
+  /**
+   * Both gates, and the module owns both: the per-file toggle chosen at upload, and the deployment
+   * kill-switch. SURICATA_ENABLED=false disables it across the board regardless of the upload flag.
+   */
+  @Override
+  public boolean enabledFor(ExtractionTarget target) {
+    return suricataEnabled && target.file().isEnableSuricata();
+  }
+
+  @Override
+  public Outcome extract(ExtractionTarget target) {
+    enrich(target.capture(), target.conversations());
+    return Outcome.completed("suricata ran");
+  }
 
   private static final String SURICATA_BINARY = "suricata";
 

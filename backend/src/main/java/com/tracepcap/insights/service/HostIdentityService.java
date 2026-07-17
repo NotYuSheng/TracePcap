@@ -1,6 +1,8 @@
 package com.tracepcap.insights.service;
 
 import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.common.stage.Adjudicator;
+import com.tracepcap.common.stage.Tier;
 import com.tracepcap.analysis.spi.HostClassificationLookup.ClassifiedHost;
 import com.tracepcap.insights.entity.HostIdentityEntity;
 import com.tracepcap.insights.entity.NodeRoleEntity;
@@ -37,7 +39,25 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class HostIdentityService {
+public class HostIdentityService implements Adjudicator {
+
+  @Override
+  public String question() {
+    return "host-identity";
+  }
+
+  @Override
+  public Tier tier() {
+    // Weighted votes and a margin threshold — arithmetic, not a language model. The *inputs* are
+    // INFERRED (a classifier's guess) and REPORTED (what a host said); the adjudication itself is
+    // deterministic, and a human-confirmed label short-circuits it entirely.
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public void adjudicate(UUID fileId) {
+    adjudicateFile(fileId);
+  }
 
   /** Below this margin-based confidence, a surviving runner-up makes the identity contested. */
   static final int CONTESTED_BELOW = 50;

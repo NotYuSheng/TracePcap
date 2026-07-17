@@ -55,9 +55,6 @@ public class AnalysisService {
   // Global Suricata kill-switch (SURICATA_ENABLED). When false, Suricata is skipped for every file
   // regardless of the per-file enableSuricata flag. Suricata dominates per-file analysis cost, so
   // this is the single biggest throughput lever. See application.yml.
-  @Value("${tracepcap.suricata.enabled:true}")
-  private boolean suricataEnabled;
-
   // Flush interval: how many conversations to process before flushing the JPA session.
   // Keeps the Hibernate first-level cache from accumulating unbounded saved entities.
   private static final int JPA_FLUSH_INTERVAL = 50;
@@ -72,9 +69,8 @@ public class AnalysisService {
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
-  private final NdpiService ndpiService;
-  private final TsharkEnrichmentService tsharkEnrichmentService;
-  private final SuricataService suricataService;
+  // No extractor fields: the runner discovers every Extractor. Adding one touches nothing here.
+  private final ExtractorRunner extractorRunner;
   private final SignatureApplier signatureApplier;
   private final HostClassifier hostClassifier;
   private final HostnameResolverService hostnameResolverService;
@@ -127,39 +123,15 @@ public class AnalysisService {
             parseResult.getPacketCount(),
             parseResult.getConversations().size());
 
-        // Stage 3: nDPI + tshark enrichment
+        // Stage 3: Extract — every Extractor on the classpath, in turn.
+        //
+        // This block used to name each extractor, hold its enable flag, and record its manifest row
+        // by hand; adding one meant editing this method. It now names none of them: the runner
+        // discovers every Extractor, each decides for itself whether it applies to this capture,
+        // and the manifest row is automatic (#512).
         t = System.currentTimeMillis();
-        if (file.isEnableNdpi()) {
-          NdpiService.Outcome ndpiOutcome =
-              ndpiService.enrich(tempFile, parseResult.getConversations());
-          extractionRunService.record(
-              fileId, ExtractionManifest.NDPI, ndpiOutcome.status(), ndpiOutcome.detail());
-          tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
-        } else {
-          extractionRunService.record(
-              fileId,
-              ExtractionManifest.NDPI,
-              ExtractionManifest.Status.SKIPPED,
-              "nDPI disabled for this file");
-        }
-        // Per-file flag AND the global kill-switch must both allow it. SURICATA_ENABLED=false
-        // disables Suricata across the board regardless of the upload-time enableSuricata flag.
-        boolean runSuricata = suricataEnabled && file.isEnableSuricata();
-        if (runSuricata) {
-          suricataService.enrich(tempFile, parseResult.getConversations());
-        } else {
-          extractionRunService.record(
-              fileId,
-              ExtractionManifest.SURICATA,
-              ExtractionManifest.Status.SKIPPED,
-              suricataEnabled ? "Suricata disabled for this file" : "SURICATA_ENABLED=false");
-        }
-        log.info(
-            "[{}] [3/7] Enrichment (nDPI={}, Suricata={}): {}ms",
-            fileId,
-            file.isEnableNdpi(),
-            runSuricata,
-            System.currentTimeMillis() - t);
+        extractorRunner.runAll(file, tempFile, parseResult.getConversations());
+        log.info("[{}] [3/7] Extract: {}ms", fileId, System.currentTimeMillis() - t);
 
         // Stage 4: Signatures, device classification, geo-IP
         t = System.currentTimeMillis();

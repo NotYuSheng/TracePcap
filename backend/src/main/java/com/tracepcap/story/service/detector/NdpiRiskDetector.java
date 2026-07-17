@@ -7,7 +7,7 @@ import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
 import com.tracepcap.story.spi.ScanContext;
 import com.tracepcap.story.spi.Scanner;
-import com.tracepcap.story.spi.Tier;
+import com.tracepcap.common.stage.Tier;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

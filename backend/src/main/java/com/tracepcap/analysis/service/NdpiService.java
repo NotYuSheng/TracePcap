@@ -2,6 +2,9 @@ package com.tracepcap.analysis.service;
 
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.spi.ExtractionManifest;
+import com.tracepcap.analysis.spi.ExtractionTarget;
+import com.tracepcap.analysis.spi.Extractor;
+import com.tracepcap.common.stage.Tier;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -37,7 +40,39 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class NdpiService {
+public class NdpiService implements Extractor {
+
+  @Override
+  public String name() {
+    return ExtractionManifest.NDPI;
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public String manifestKey() {
+    return ExtractionManifest.NDPI;
+  }
+
+  /** Runs first: tshark enrichment reads fields this populates. See Extractor#order(). */
+  @Override
+  public int order() {
+    return 10;
+  }
+
+  /** Per-file toggle, chosen at upload. The runner does not know this flag exists. */
+  @Override
+  public boolean enabledFor(ExtractionTarget target) {
+    return target.file().isEnableNdpi();
+  }
+
+  @Override
+  public Outcome extract(ExtractionTarget target) {
+    return enrich(target.capture(), target.conversations());
+  }
 
   private static final String NDPI_BINARY = "ndpiReader";
 
@@ -108,14 +143,13 @@ public class NdpiService {
   // ---------------------------------------------------------------------------
 
   /**
-   * How an {@link #enrich} run ended, for the extraction manifest (#512 slice 2). Distinguishes
-   * "nDPI ran and couldn't identify a flow" (COMPLETED — appName stays null meaningfully) from
-   * "nDPI never ran / died" (FAILED — null appNames are a coverage gap, not a finding).
-   */
-  public record Outcome(ExtractionManifest.Status status, String detail) {}
-
-  /**
-   * Enrich each ConversationInfo with the app name and security risk flags detected by nDPI. Runs
+   * Enrich each ConversationInfo with the app name and security risk flags detected by nDPI.
+   *
+   * <p>The returned {@link Outcome} distinguishes "nDPI ran and couldn't identify a flow"
+   * (COMPLETED — appName stays null meaningfully) from "nDPI never ran / died" (FAILED — null
+   * appNames are a coverage gap, not a finding). That distinction is #501.
+   *
+   * <p>Runs
    * {@code ndpiReader} exactly once and populates both fields in a single pass. Conversations nDPI
    * cannot identify are left with appName == null and an empty risks list.
    */
