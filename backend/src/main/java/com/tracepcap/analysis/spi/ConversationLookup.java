@@ -123,4 +123,31 @@ public interface ConversationLookup {
    * than the input; an empty or null input yields an empty list rather than loading everything.
    */
   List<ConversationFacts> conversationFactsByIds(Collection<UUID> conversationIds);
+
+  /**
+   * The distinct values of one finding facet across a whole file — the vocabulary the file exhibits,
+   * not the per-conversation detail.
+   *
+   * <p>Separate from {@link #conversationFacts} because the question differs and so does the cost:
+   * comparing two snapshots asks "which alert types appeared or disappeared", which the database
+   * answers with a DISTINCT over an array column. Deriving it by loading every conversation and
+   * folding in Java would pull thousands of rows to build a set of a dozen strings.
+   *
+   * <p>Values are never null or blank. All of these are <b>INFERRED</b> — tools' conclusions — so an
+   * empty result means "nothing concluded", which is not the same as "nothing there"; ask {@link
+   * ExtractionManifest} to tell those apart.
+   */
+  List<String> distinctFindings(UUID fileId, FindingFacet facet);
+
+  /** The finding vocabularies a file can be asked for. */
+  enum FindingFacet {
+    /** Suricata rule names that fired. */
+    SURICATA_ALERT,
+    /** User-defined signature names that matched. */
+    CUSTOM_SIGNATURE,
+    /** nDPI flow-risk labels. */
+    RISK_TYPE,
+    /** File types carvers detected in packet payloads. */
+    FILE_TYPE
+  }
 }

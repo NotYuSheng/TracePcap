@@ -45,6 +45,19 @@ public class ConversationLookupAdapter implements ConversationLookup {
         .toList();
   }
 
+  @Override
+  public List<String> distinctFindings(UUID fileId, FindingFacet facet) {
+    List<String> raw =
+        switch (facet) {
+          case SURICATA_ALERT -> repository.findDistinctSuricataAlertsByFileId(fileId);
+          case CUSTOM_SIGNATURE -> repository.findDistinctCustomSignaturesByFileId(fileId);
+          case RISK_TYPE -> repository.findDistinctRiskTypesByFileId(fileId);
+          case FILE_TYPE -> repository.findDistinctFileTypesByFileId(fileId);
+        };
+    // The port promises no nulls or blanks; the native DISTINCT queries can yield both.
+    return raw.stream().filter(v -> v != null && !v.isBlank()).toList();
+  }
+
   private static ConversationFacts toFacts(ConversationEntity e) {
     return new ConversationFacts(
         e.getId(),

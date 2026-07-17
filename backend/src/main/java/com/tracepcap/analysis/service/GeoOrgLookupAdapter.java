@@ -4,7 +4,9 @@ import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -23,5 +25,18 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
         .filter(o -> o != null && !o.isBlank())
         .distinct()
         .toList();
+  }
+
+  @Override
+  public Map<String, IpAttribution> attributionFor(Collection<String> ips) {
+    if (ips == null || ips.isEmpty()) return Map.of();
+    Map<String, IpAttribution> byIp = new LinkedHashMap<>();
+    for (IpGeoInfoEntity g : repository.findAllByIpIn(ips)) {
+      // First record wins on a duplicate IP — the cache is keyed by IP, so this is belt-and-braces,
+      // but putIfAbsent keeps the choice deterministic rather than last-write-wins.
+      byIp.putIfAbsent(
+          g.getIp(), new IpAttribution(g.getIp(), g.getAsn(), g.getOrg(), g.getCountryCode()));
+    }
+    return Map.copyOf(byIp);
   }
 }
