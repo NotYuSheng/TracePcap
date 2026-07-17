@@ -38,6 +38,15 @@ interface NetworkGraphProps {
   activeFilterCount?: number;
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
+  /**
+   * Render light regardless of the user's theme — for PDF capture, which always wants white
+   * diagrams (see captureNetworkDiagrams.ts).
+   *
+   * <p>A prop rather than a CSS override because this component picks its colours in JavaScript,
+   * from the theme store and matchMedia. No amount of CSS on an ancestor reaches them: the capture
+   * used to set data-theme="light" on <html> and it never worked — it only made the page strobe.
+   */
+  forceLight?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -399,6 +408,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  forceLight = false,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -411,7 +421,8 @@ export const NetworkGraph = memo(function NetworkGraph({
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [themeMode]);
-  const darkMode = themeMode === 'dark' || (themeMode === 'system' && sysDark);
+  const darkMode =
+    !forceLight && (themeMode === 'dark' || (themeMode === 'system' && sysDark));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerReady, setContainerReady] = useState(false);
@@ -578,6 +589,54 @@ export const NetworkGraph = memo(function NetworkGraph({
     });
 
     sigmaRef.current = sigma;
+
+    // ── Edge overdraw for PDF capture ─────────────────────────────────────────
+    //
+    // Sigma draws edges on a WebGL canvas, and a WebGL canvas cannot be read back from
+    // JavaScript — toDataURL and gl.readPixels both return empty while the edges are plainly
+    // visible on screen, because the pixels only ever exist inside the compositor. So every
+    // capture library produces the same edgeless diagram; this is not an html-to-image problem
+    // and no amount of swapping libraries fixes it (#526).
+    //
+    // The 2D `labels` layer IS readable — it is the only reason nodes and text reach the PDF at
+    // all (they come from drawNodeLabel's overdraw, not from Sigma's WebGL node layer). So for
+    // capture we redraw the edges onto that same 2D layer, underneath the labels.
+    //
+    // Capture-only, deliberately: the interactive renderer keeps its WebGL edges, which is what
+    // makes a 700-edge graph pan smoothly. Doing this always would put every edge through the 2D
+    // context on every frame.
+    if (forceLight) {
+      const labelCanvas = sigma.getCanvases()['labels'];
+      const labelCtx = labelCanvas?.getContext('2d');
+      if (labelCtx) {
+        sigma.on('afterRender', () => {
+          labelCtx.save();
+          // Sigma sizes its canvases for the device pixel ratio; graphToViewport returns CSS
+          // pixels, so match that transform or the lines land in the wrong place on HiDPI.
+          //
+          // Guard clientWidth rather than trusting `|| 1`: that catches 0/0 (NaN, falsy) but NOT
+          // n/0, which is Infinity — truthy, so it sails past the fallback and setTransform then
+          // silently draws nothing. A zero-width layout pass is reachable here, since the capture
+          // container is mounted and measured before the graph has laid out.
+          const dpr = labelCanvas.clientWidth > 0 ? labelCanvas.width / labelCanvas.clientWidth : 1;
+          labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          labelCtx.globalCompositeOperation = 'destination-over'; // behind the labels already drawn
+          graph.forEachEdge((_edge, attrs, source, target) => {
+            if (attrs['hidden']) return;
+            const s = sigma.graphToViewport(graph.getNodeAttributes(source) as { x: number; y: number });
+            const t = sigma.graphToViewport(graph.getNodeAttributes(target) as { x: number; y: number });
+            labelCtx.beginPath();
+            labelCtx.moveTo(s.x, s.y);
+            labelCtx.lineTo(t.x, t.y);
+            labelCtx.strokeStyle = (attrs['color'] as string) ?? '#999';
+            labelCtx.lineWidth = Math.max(0.6, (attrs['size'] as number) ?? 1);
+            labelCtx.globalAlpha = 0.75;
+            labelCtx.stroke();
+          });
+          labelCtx.restore();
+        });
+      }
+    }
 
     // ── Node dragging ──────────────────────────────────────────────────────────
     // Track which node is being dragged. These are plain vars (not refs) because
@@ -760,7 +819,17 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, []);
 
   return (
-    <div className="network-graph-wrapper" style={{ background: darkMode ? DARK_BG : LIGHT_BG }}>
+    <div
+      className="network-graph-wrapper"
+      /*
+       * Publishes the graph's own resolved theme for its CSS children (the legend, tooltips).
+       * They cannot read `darkMode` — it is JS state — and they must not read the page's theme
+       * either: under forceLight the page stays dark while this canvas renders light for the PDF.
+       * The canvas is the thing they sit on, so the canvas is what they follow.
+       */
+      data-graph-theme={darkMode ? 'dark' : 'light'}
+      style={{ background: darkMode ? DARK_BG : LIGHT_BG }}
+    >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
       <div className="network-graph-canvas" ref={containerRef} />
 

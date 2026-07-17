@@ -1,0 +1,29 @@
+/*
+ * Highlighted packet row — the frame a "locate packet" link jumped to.
+ *
+ * The colours live here rather than inline because they have to change with the theme, and an
+ * inline style cannot. The bug this replaces: a hardcoded #fff3cd row with Bootstrap's theme-aware
+ * .text-muted cells on top — in dark mode the text lightened, the row did not, and the cells the
+ * highlight was meant to draw attention to became the hardest ones to read.
+ *
+ * Keyed on [data-theme='dark'], which MainLayout sets on <html> from the theme store — NOT on a
+ * prefers-color-scheme media query, which would ignore the manual theme toggle.
+ */
+.packet-row-highlighted {
+  background-color: #fff3cd;
+  box-shadow: inset 3px 0 0 #ffc107;
+}
+
+.packet-row-highlighted > td {
+  /* Beats Bootstrap's .text-muted on the cells, which would otherwise stay pale. */
+  color: #664d03 !important;
+}
+
+[data-theme='dark'] .packet-row-highlighted {
+  /* Tinted rather than filled: the row still has to read as a table row. */
+  background-color: rgba(255, 193, 7, 0.14);
+}
+
+[data-theme='dark'] .packet-row-highlighted > td {
+  color: #ffe69c !important;
+}

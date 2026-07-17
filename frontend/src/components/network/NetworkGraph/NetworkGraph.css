@@ -121,12 +121,27 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  background: rgba(13, 17, 23, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px 12px;
   backdrop-filter: blur(6px);
   pointer-events: none;
+
+  /*
+   * Follows the graph canvas's theme, not the page's — [data-graph-theme] is set by
+   * NetworkGraph from the same `darkMode` the canvas uses. Two reasons it cannot be either
+   * a hardcoded colour or the page theme:
+   *   - it was hardcoded dark, so in light mode a dark box floated on a white canvas;
+   *   - PDF capture renders the graph light (forceLight) while the page stays dark, and the
+   *     legend has to come with it or the exported diagram carries a dark box.
+   * Light is the default so a wrapper without the attribute still reads correctly.
+   */
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(13, 17, 23, 0.12);
+}
+
+[data-graph-theme='dark'] .ng-legend {
+  background: rgba(13, 17, 23, 0.72);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .ng-legend-item {
@@ -145,8 +160,12 @@
 
 .ng-legend-label {
   font-size: 11px;
-  color: rgba(201, 209, 217, 0.8);
+  color: rgba(31, 35, 40, 0.85);
   white-space: nowrap;
+}
+
+[data-graph-theme='dark'] .ng-legend-label {
+  color: rgba(201, 209, 217, 0.8);
 }
 
 /* ── Hidden neighbor tooltip ───────────────────────────────── */
