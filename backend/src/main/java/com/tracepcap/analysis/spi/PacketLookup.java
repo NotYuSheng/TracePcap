@@ -3,6 +3,7 @@ package com.tracepcap.analysis.spi;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -68,4 +69,13 @@ public interface PacketLookup {
    * empty set.
    */
   Set<UUID> conversationIdsWithDetectedFiles(Collection<UUID> conversationIds);
+
+  /**
+   * The conversation containing a given frame number in a file, so a UI can open and highlight it.
+   *
+   * <p>Empty when no such frame exists, or when the frame belongs to no conversation (a stray packet
+   * that never got associated). Returns the id alone — the caller is navigating, and asking for the
+   * whole conversation to read one field would be a wasted load.
+   */
+  Optional<UUID> conversationIdForFrame(UUID fileId, long packetNumber);
 }

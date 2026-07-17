@@ -5,6 +5,7 @@ import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.spi.PacketLookup;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -39,6 +40,14 @@ public class PacketLookupAdapter implements PacketLookup {
     return repository.findFileTypesByConversationIds(List.copyOf(conversationIds)).stream()
         .map(row -> (UUID) row[0])
         .collect(Collectors.toUnmodifiableSet());
+  }
+
+  @Override
+  public Optional<UUID> conversationIdForFrame(UUID fileId, long packetNumber) {
+    return repository
+        .findFirstByFile_IdAndPacketNumber(fileId, packetNumber)
+        .map(PacketEntity::getConversation)
+        .map(c -> c.getId());
   }
 
   private static PacketFacts toFacts(PacketEntity p) {
