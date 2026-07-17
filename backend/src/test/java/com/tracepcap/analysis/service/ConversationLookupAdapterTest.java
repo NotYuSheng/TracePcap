@@ -13,6 +13,7 @@ import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.file.entity.FileEntity;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -101,7 +102,7 @@ class ConversationLookupAdapterTest {
   @Test
   void missingConversationIsEmptyOptional() {
     UUID id = UUID.randomUUID();
-    when(repository.findById(id)).thenReturn(java.util.Optional.empty());
+    when(repository.findById(id)).thenReturn(Optional.empty());
     assertThat(adapter.conversationFactsById(id)).isEmpty();
   }
 }
