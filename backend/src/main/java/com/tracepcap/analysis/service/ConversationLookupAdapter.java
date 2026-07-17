@@ -108,6 +108,7 @@ public class ConversationLookupAdapter implements ConversationLookup {
           case APP_NAME -> repository.findDistinctAppNamesByFileId(fileId);
           case IP -> repository.findDistinctIpsByFileId(fileId);
           case PROTOCOL -> repository.findDistinctProtocolsByFileId(fileId);
+          case HTTP_USER_AGENT -> repository.findDistinctHttpUserAgentsByFileId(fileId);
         };
     // The port promises no nulls or blanks; the native DISTINCT queries can yield both.
     return raw.stream().filter(v -> v != null && !v.isBlank()).toList();
@@ -147,6 +148,57 @@ public class ConversationLookupAdapter implements ConversationLookup {
   /** SUM over no rows yields null, not zero — the port promises a number. */
   private static long asLong(Object value) {
     return value == null ? 0L : ((Number) value).longValue();
+  }
+
+  @Override
+  public List<NamedTotals> breakdown(UUID fileId, Breakdown breakdown) {
+    List<Object[]> rows =
+        switch (breakdown) {
+          case APPLICATION -> repository.findApplicationStatsByFileId(fileId);
+          case L7_PROTOCOL -> repository.findL7ProtocolStatsByFileId(fileId);
+          case CATEGORY -> repository.findCategoryDistributionByFileId(fileId);
+        };
+    // CATEGORY projects (name, packets); the other two project (name, packets, bytes).
+    return rows.stream()
+        .filter(r -> r[0] != null)
+        .map(
+            r ->
+                new NamedTotals(
+                    (String) r[0], asLong(r[1]), r.length > 2 ? asLong(r[2]) : 0L))
+        .toList();
+  }
+
+  @Override
+  public long conversationCount(UUID fileId) {
+    return repository.countByFileId(fileId);
+  }
+
+  @Override
+  public long atRiskConversationCount(UUID fileId) {
+    return repository.countAtRiskByFileId(fileId);
+  }
+
+  @Override
+  public List<ConversationFacts> topConversationsByBytes(UUID fileId, int limit) {
+    return repository
+        .findTopByFileIdOrderByTotalBytesDesc(fileId, PageRequest.of(0, limit))
+        .stream()
+        .map(ConversationLookupAdapter::toFacts)
+        .toList();
+  }
+
+  @Override
+  public List<ConversationFacts> atRiskConversations(UUID fileId, int limit) {
+    return repository.findAtRiskByFileIdLimited(fileId, limit).stream()
+        .map(ConversationLookupAdapter::toFacts)
+        .toList();
+  }
+
+  @Override
+  public List<ConversationFacts> tlsConversations(UUID fileId, int limit) {
+    return repository.findConversationsWithTlsByFileId(fileId, PageRequest.of(0, limit)).stream()
+        .map(ConversationLookupAdapter::toFacts)
+        .toList();
   }
 
   private static ConversationFacts toFacts(ConversationEntity e) {

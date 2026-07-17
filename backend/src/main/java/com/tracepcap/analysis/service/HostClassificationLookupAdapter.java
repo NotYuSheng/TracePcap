@@ -51,6 +51,11 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
         .map(HostClassificationLookupAdapter::toFacts);
   }
 
+  @Override
+  public long hostCount(UUID fileId) {
+    return repository.countByFileId(fileId);
+  }
+
   private static HostFacts toFacts(HostClassificationEntity e) {
     return new HostFacts(
         e.getIp(),

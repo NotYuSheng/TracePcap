@@ -202,6 +202,58 @@ public interface ConversationLookup {
   EntityStats statsForL7Protocol(UUID fileId, String l7Protocol, int topPeerLimit);
 
   /**
+   * Traffic attributed to one named thing — an app, an L7 protocol, a category.
+   *
+   * <p>{@code packetCount} is always populated; {@code totalBytes} is zero for breakdowns that only
+   * count packets (see {@link Breakdown#CATEGORY}).
+   */
+  record NamedTotals(String name, long packetCount, long totalBytes) {}
+
+  /** The ways a file's traffic can be broken down, each aggregated in the database. */
+  enum Breakdown {
+    /** By nDPI application name, heaviest first. Carries bytes. */
+    APPLICATION,
+    /** By tshark L7 protocol, heaviest first. Carries bytes. */
+    L7_PROTOCOL,
+    /** By nDPI category, most packets first. Packets only — {@code totalBytes} is 0. */
+    CATEGORY
+  }
+
+  /**
+   * A file's traffic grouped by {@code breakdown}, ordered heaviest first, aggregated in the
+   * database. Rows with no name are omitted — an unnamed slice is not a breakdown a reader can act
+   * on.
+   */
+  List<NamedTotals> breakdown(UUID fileId, Breakdown breakdown);
+
+  /** How many conversations the file holds. */
+  long conversationCount(UUID fileId);
+
+  /**
+   * How many conversations carry at least one nDPI risk, custom-signature match, or Suricata alert
+   * — the same predicate as {@link #atRiskConversations}.
+   */
+  long atRiskConversationCount(UUID fileId);
+
+  /**
+   * The {@code limit} heaviest conversations in the file, by bytes descending — the "who talked
+   * most" table.
+   */
+  List<ConversationFacts> topConversationsByBytes(UUID fileId, int limit);
+
+  /**
+   * Up to {@code limit} conversations carrying at least one nDPI risk, custom-signature match, or
+   * Suricata alert.
+   *
+   * <p><b>INFERRED</b>, all of it: this is what the tools concluded, and "at risk" inherits their
+   * error modes. A conversation absent from this list is one nothing flagged — not one that is safe.
+   */
+  List<ConversationFacts> atRiskConversations(UUID fileId, int limit);
+
+  /** Up to {@code limit} conversations that carried a TLS certificate. */
+  List<ConversationFacts> tlsConversations(UUID fileId, int limit);
+
+  /**
    * The vocabularies a file can be asked for — the distinct values of one column across every
    * conversation. Used to populate filter dropdowns and to diff one snapshot against another.
    *
@@ -224,6 +276,8 @@ public interface ConversationLookup {
     /** Every IP seen as either endpoint. MEASURED. */
     IP,
     /** Transport protocols observed. MEASURED. */
-    PROTOCOL
+    PROTOCOL,
+    /** HTTP User-Agent strings clients sent. REPORTED — a client says what it likes. */
+    HTTP_USER_AGENT
   }
 }

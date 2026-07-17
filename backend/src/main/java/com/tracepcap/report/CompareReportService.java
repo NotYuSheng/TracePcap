@@ -13,11 +13,11 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
+import com.tracepcap.analysis.spi.AnalysisSummaryLookup;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
 import java.awt.Color;
@@ -51,9 +51,9 @@ public class CompareReportService {
       DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
 
   private final FileRepository fileRepository;
-  private final AnalysisResultRepository analysisResultRepository;
-  private final ConversationRepository conversationRepository;
-  private final HostClassificationRepository hostClassificationRepository;
+  private final AnalysisSummaryLookup analysisSummaryLookup;
+  private final ConversationLookup conversationLookup;
+  private final HostClassificationLookup hostClassificationLookup;
 
   // ══════════════════════════════════════════════════════════════════════════
   // Public entry point
@@ -83,15 +83,14 @@ public class CompareReportService {
       addComparisonOverview(document, fileIds, labels, sec++);
 
       // Combined security findings across all files
-      List<ConversationEntity> allRisky = fileIds.stream()
-          .flatMap(id -> conversationRepository
-              .findAtRiskByFileIdLimited(id, SECURITY_FINDINGS_LIMIT).stream())
+      List<ConversationFacts> allRisky = fileIds.stream()
+          .flatMap(id -> conversationLookup.atRiskConversations(id, SECURITY_FINDINGS_LIMIT).stream())
           .sorted((a, b) -> {
-            int ra = a.getFlowRisks() != null ? a.getFlowRisks().length : 0;
-            int rb = b.getFlowRisks() != null ? b.getFlowRisks().length : 0;
+            int ra = a.findings().flowRisks().size();
+            int rb = b.findings().flowRisks().size();
             if (rb != ra) return Integer.compare(rb, ra);
-            long ba = a.getTotalBytes() != null ? a.getTotalBytes() : 0;
-            long bb = b.getTotalBytes() != null ? b.getTotalBytes() : 0;
+            long ba = a.flow().totalBytes();
+            long bb = b.flow().totalBytes();
             return Long.compare(bb, ba);
           })
           .limit(SECURITY_FINDINGS_LIMIT)
@@ -172,15 +171,13 @@ public class CompareReportService {
       UUID id    = fileIds.get(i);
       String lbl = (labels != null && i < labels.size()) ? labels.get(i) : id.toString();
 
-      long totalConvs = conversationRepository.countByFileId(id);
-      long riskCount  = conversationRepository.countAtRiskByFileId(id);
-      long hostCount  = hostClassificationRepository.countByFileId(id);
+      long totalConvs = conversationLookup.conversationCount(id);
+      long riskCount  = conversationLookup.atRiskConversationCount(id);
+      long hostCount  = hostClassificationLookup.hostCount(id);
 
-      var analysis = analysisResultRepository.findByFileId(id).orElse(null);
-      String packets  = analysis != null && analysis.getPacketCount() != null
-          ? String.valueOf(analysis.getPacketCount()) : "—";
-      String data     = analysis != null && analysis.getTotalBytes() != null
-          ? formatBytes(analysis.getTotalBytes()) : "—";
+      var analysis = analysisSummaryLookup.summaryFor(id).orElse(null);
+      String packets  = analysis != null ? String.valueOf(analysis.packetCount()) : "—";
+      String data     = analysis != null ? formatBytes(analysis.totalBytes()) : "—";
       String riskPct  = totalConvs > 0
           ? String.format("%.1f%%", riskCount * 100.0 / totalConvs) : "—";
 
@@ -203,7 +200,7 @@ public class CompareReportService {
 
   private void addSecurityFindings(
       Document doc,
-      List<ConversationEntity> convs,
+      List<ConversationFacts> convs,
       List<UUID> fileIds,
       List<String> labels,
       int sec)
@@ -218,28 +215,25 @@ public class CompareReportService {
 
     Font f = cellFont();
     for (int i = 0; i < convs.size(); i++) {
-      ConversationEntity c = convs.get(i);
-      Color bg = c.getFlowRisks() != null && c.getFlowRisks().length > 0 ? C_RISK_BG
+      ConversationFacts c = convs.get(i);
+      Color bg = !c.findings().flowRisks().isEmpty() ? C_RISK_BG
           : (i % 2 == 0 ? Color.WHITE : C_ROW_ALT);
 
       // Resolve which file label this conversation belongs to
       String fileLabel = "—";
-      if (c.getFile() != null) {
-        UUID cFileId = c.getFile().getId();
-        int idx = fileIds.indexOf(cFileId);
-        if (idx >= 0 && labels != null && idx < labels.size()) {
-          fileLabel = labels.get(idx);
-        }
+      int idx = fileIds.indexOf(c.fileId());
+      if (idx >= 0 && labels != null && idx < labels.size()) {
+        fileLabel = labels.get(idx);
       }
 
-      String risks = c.getFlowRisks() != null ? String.join(", ", c.getFlowRisks()) : "—";
+      String risks = c.findings().flowRisks().isEmpty() ? "—" : String.join(", ", c.findings().flowRisks());
       addRow(table, bg, f,
           fileLabel,
-          endpoint(c.getSrcIp(), c.getSrcPort()),
-          endpoint(c.getDstIp(), c.getDstPort()),
-          nvl(c.getProtocol()),
-          nvl(c.getAppName()),
-          c.getTotalBytes() != null ? formatBytes(c.getTotalBytes()) : "—",
+          endpoint(c.flow().srcIp(), c.flow().srcPort()),
+          endpoint(c.flow().dstIp(), c.flow().dstPort()),
+          nvl(c.flow().protocol()),
+          nvl(c.findings().appName()),
+          formatBytes(c.flow().totalBytes()),
           risks.isBlank() ? "—" : risks);
     }
     doc.add(table);
