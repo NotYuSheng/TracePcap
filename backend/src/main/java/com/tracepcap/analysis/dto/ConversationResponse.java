@@ -32,6 +32,18 @@ public class ConversationResponse {
   private Integer srcPort;
   private String dstIp;
   private Integer dstPort;
+
+  /**
+   * The endpoint that opened the connection — sent SYN without ACK (#496).
+   *
+   * <p>Not {@code srcIp}, which is only "whichever endpoint sorted first" once A→B and B→A are
+   * normalised into one conversation. Null means <em>unknown</em> (no handshake, or the capture
+   * joined mid-flow), never "nobody initiated" — and must not be inferred from port numbers.
+   */
+  private String initiatorIp;
+
+  private Integer initiatorPort;
+
   private String protocol;
   private String appName;
   private String tsharkProtocol;

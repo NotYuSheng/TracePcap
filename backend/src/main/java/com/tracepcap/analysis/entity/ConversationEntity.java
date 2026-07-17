@@ -53,6 +53,19 @@ public class ConversationEntity {
   @Column(name = "dst_port")
   private Integer dstPort;
 
+  /**
+   * The endpoint that opened the connection — sent SYN without ACK (#496).
+   *
+   * <p>Not {@code srcIp}: conversation keys are normalised so A→B and B→A share a row, so srcIp is
+   * whichever endpoint sorted first, not who started it. Null means <em>unknown</em> (no handshake
+   * in this protocol, or the capture joined mid-flow), never "nobody initiated". MEASURED.
+   */
+  @Column(name = "initiator_ip", length = 45)
+  private String initiatorIp;
+
+  @Column(name = "initiator_port")
+  private Integer initiatorPort;
+
   @Column(nullable = false, length = PROTOCOL_MAX_LENGTH)
   private String protocol;
 

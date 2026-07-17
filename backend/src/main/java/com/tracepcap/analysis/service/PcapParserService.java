@@ -88,7 +88,15 @@ public class PcapParserService {
             "-e",
             "arp.src.hw_mac",
             "-e",
-            "frame.number");
+            "frame.number",
+            // The three trailing fields (frame.number, then these two) are read from the END of the
+            // parsed row, not by fixed index — see the parse loop. Appending here is safe *because*
+            // of that; an earlier version read frame.number as the last field, and appending moved
+            // it, corrupting packet numbers until the reads were switched to tail-relative. (#496)
+            "-e",
+            "tcp.flags.syn",
+            "-e",
+            "tcp.flags.ack");
     pb.redirectErrorStream(false);
 
     // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
@@ -239,6 +247,24 @@ public class PcapParserService {
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
 
+            // Who opened this connection (#496). SYN without ACK is the opening packet; SYN+ACK is
+            // the answer to it, so the ACK bit is what tells the two apart. The first one wins: a
+            // retransmitted SYN must not flip the initiator, and it cannot legitimately change.
+            //
+            // Absent for UDP/ICMP/ARP, and for TCP flows the capture joined mid-stream. That stays
+            // null. Falling back to "lower port wins" is exactly the guess this replaces — a server
+            // on :4434 is a server, whatever its port number says.
+            // SYN without ACK — the two trailing fields, read from the end for the same reason
+            // frame.number is (an Info-column '|' must not shift them). Guarded on length so a row
+            // that somehow lacks the flag columns skips this rather than indexing out of bounds.
+            if (conv.getInitiatorIp() == null
+                && f.length >= 3
+                && "1".equals(f[f.length - 2])
+                && !"1".equals(f[f.length - 1])) {
+              conv.setInitiatorIp(fSrcIp);
+              conv.setInitiatorPort(fSrcPort);
+            }
+
             // Extract payload hex from tcp.payload (index 12) or udp.payload (index 13).
             // tshark outputs byte arrays as colon-separated hex pairs (e.g. "48:54:54:50").
             String tsharkPayload = null;
@@ -248,11 +274,12 @@ public class PcapParserService {
               tsharkPayload = f[13]; // udp.payload
             }
             String payloadHex = TsharkHexUtil.toHex(tsharkPayload, PacketEntity.PAYLOAD_BYTE_LIMIT);
-            // Stored packet number = tshark frame.number (absolute, file-wide); fall back to the
-            // running counter if the field is somehow absent. frame.number is the last field, so read
-            // it from the end — a '|' inside an earlier column (e.g. Info) would shift fixed indices.
+            // The three trailing fields, in order, are frame.number, tcp.flags.syn, tcp.flags.ack.
+            // Read them from the END, not by fixed index: a '|' inside an earlier column (Info) would
+            // shift every fixed index, and appending syn/ack already moved frame.number off the last
+            // slot once — reading from the tail is what keeps that from silently corrupting data.
             long frameNumber = packetNumber;
-            String rawFrame = f.length > 20 ? f[f.length - 1] : null;
+            String rawFrame = f.length >= 3 ? f[f.length - 3] : null;
             if (rawFrame != null && !rawFrame.isEmpty()) {
               try {
                 frameNumber = Long.parseLong(rawFrame.trim());
@@ -400,6 +427,23 @@ public class PcapParserService {
     private Integer srcPort;
     private String dstIp;
     private Integer dstPort;
+
+    /**
+     * The endpoint that opened the connection — the one that sent SYN without ACK (#496).
+     *
+     * <p><b>Not the same as {@link #srcIp}.</b> Conversation keys are normalised so that A→B and
+     * B→A share one bucket, which means srcIp is "whichever endpoint sorted first", not "who
+     * started it". Direction used to be lost entirely at this point, which is why the frontend
+     * resorted to guessing a host's role from port numbers — and why a server on a high port
+     * (:4434) was called a client.
+     *
+     * <p><b>Null means unknown, never "nobody initiated".</b> UDP, ICMP and ARP have no handshake;
+     * a capture can also begin mid-flow and miss the SYN. Guessing from ports to fill the gap is
+     * the bug, not the fallback.
+     */
+    private String initiatorIp;
+
+    private Integer initiatorPort;
     private String protocol;
     private String appName;
     private String tsharkProtocol;
