@@ -20,6 +20,7 @@ import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
 import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
 import type { DeviceClassificationInfo } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
+import './ConversationDetail.css';
 
 interface ConversationDetailProps {
   conversation: Conversation;
@@ -585,13 +586,13 @@ export const ConversationDetail = ({
                           key={packet.id}
                           ref={packet.packetNumber === highlightPacketNumber ? highlightRowRef : undefined}
                           onClick={() => togglePacket(packet.id)}
-                          style={{
-                            cursor: packet.payload ? 'pointer' : 'default',
-                            ...(packet.packetNumber === highlightPacketNumber
-                              ? { backgroundColor: '#fff3cd', boxShadow: 'inset 3px 0 0 #ffc107' }
-                              : {}),
-                          }}
-                          className={expandedPacketId === packet.id ? 'table-active' : undefined}
+                          style={{ cursor: packet.payload ? 'pointer' : 'default' }}
+                          className={[
+                            packet.packetNumber === highlightPacketNumber ? 'packet-row-highlighted' : '',
+                            expandedPacketId === packet.id ? 'table-active' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ') || undefined}
                         >
                           <td className="text-muted">{(packetPageClamped - 1) * packetPageSize + index + 1}</td>
                           <td className={getDirectionClass(packet)}>

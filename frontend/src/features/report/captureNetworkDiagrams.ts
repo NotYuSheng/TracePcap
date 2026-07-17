@@ -36,12 +36,6 @@ async function captureLayout(
   edges: GraphEdge[],
   layoutType: 'circular' | 'hierarchicalTd'
 ): Promise<string> {
-  // Force light mode on the html element for the duration of the capture so
-  // the PDF diagram is always rendered on a white background regardless of
-  // the user's current theme setting.
-  const prevTheme = document.documentElement.getAttribute('data-theme');
-  document.documentElement.setAttribute('data-theme', 'light');
-
   return new Promise((resolve, reject) => {
     const id = `__nr-capture-${++captureSeq}`;
 
@@ -52,8 +46,16 @@ async function captureLayout(
 
     // Capture container — on-screen, fully opaque so the capture library gets
     // real pixels.  Covered by the overlay above.
+    //
+    // data-theme="light" is set HERE, on the container, not on <html>. Forcing it
+    // document-wide made the whole app flash to light and back for the duration of
+    // each capture — and there are two captures per report, each lasting a full
+    // Sigma layout, so a user in dark mode watched their screen strobe. Scoping it
+    // to the subtree keeps the PDF's white background without touching what the
+    // user is looking at.
     const container = document.createElement('div');
     container.id = id;
+    container.setAttribute('data-theme', 'light');
     container.style.cssText = [
       'position:fixed',
       'top:0',
@@ -81,12 +83,7 @@ async function captureLayout(
       container.remove();
       overlay.remove();
       styleEl.remove();
-      // Restore the user's original theme after capture completes.
-      if (prevTheme) {
-        document.documentElement.setAttribute('data-theme', prevTheme);
-      } else {
-        document.documentElement.removeAttribute('data-theme');
-      }
+      // No theme to restore: the override lived on the container, which just went away.
     };
 
     const handleLayoutComplete = () => {

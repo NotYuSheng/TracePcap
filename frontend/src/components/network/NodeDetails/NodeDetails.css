@@ -83,3 +83,47 @@
 .node-details-peer-icon {
   font-size: 0.7rem;
 }
+
+/*
+ * Phantom-node callout.
+ *
+ * The colours live here rather than inline because they have to change with the theme, and an
+ * inline style cannot. The bug this replaces: a hardcoded #fff3cd background with Bootstrap's
+ * theme-aware .text-muted on top — in dark mode the text lightened, the background did not, and
+ * the words vanished into the panel.
+ *
+ * Light is the base rather than the dark-mode override, because report capture renders this subtree
+ * with data-theme="light" to guarantee white PDFs (see captureNetworkDiagrams.ts). The dark rules
+ * are skipped inside any [data-theme="light"] ancestor, so a capture stays light whatever the
+ * user's OS theme — without the page itself having to change.
+ */
+.ghost-callout {
+  background: #fff3cd;
+  border: 1px solid #ffc10755;
+  color: #664d03;
+}
+
+.ghost-callout-title {
+  color: #997404;
+}
+
+.ghost-callout-detail {
+  color: #664d03;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ghost-callout:not([data-theme='light'] *) {
+    /* Tinted rather than filled: a solid amber block would shout louder than the finding warrants. */
+    background: rgba(255, 193, 7, 0.12);
+    border-color: rgba(255, 193, 7, 0.35);
+    color: #ffe69c;
+  }
+
+  .ghost-callout-title:not([data-theme='light'] *) {
+    color: #ffda6a;
+  }
+
+  .ghost-callout-detail:not([data-theme='light'] *) {
+    color: #ffe69c;
+  }
+}
