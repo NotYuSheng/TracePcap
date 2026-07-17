@@ -580,6 +580,13 @@
             },
             "type": "array"
           },
+          "initiatorIp": {
+            "type": "string"
+          },
+          "initiatorPort": {
+            "format": "int32",
+            "type": "integer"
+          },
           "ja3Client": {
             "type": "string"
           },
@@ -759,6 +766,13 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "initiatorIp": {
+            "type": "string"
+          },
+          "initiatorPort": {
+            "format": "int32",
+            "type": "integer"
           },
           "ja3Client": {
             "type": "string"
