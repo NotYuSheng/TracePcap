@@ -771,7 +771,17 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, []);
 
   return (
-    <div className="network-graph-wrapper" style={{ background: darkMode ? DARK_BG : LIGHT_BG }}>
+    <div
+      className="network-graph-wrapper"
+      /*
+       * Publishes the graph's own resolved theme for its CSS children (the legend, tooltips).
+       * They cannot read `darkMode` — it is JS state — and they must not read the page's theme
+       * either: under forceLight the page stays dark while this canvas renders light for the PDF.
+       * The canvas is the thing they sit on, so the canvas is what they follow.
+       */
+      data-graph-theme={darkMode ? 'dark' : 'light'}
+      style={{ background: darkMode ? DARK_BG : LIGHT_BG }}
+    >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
       <div className="network-graph-canvas" ref={containerRef} />
 
