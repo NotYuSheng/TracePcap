@@ -408,19 +408,23 @@ is a refactor target, not a shrug.
   of *"100% of Traffic Has Unknown Application, HIGH"* (#501). Remaining extractors (tshark
   enrichment, Suricata when it runs, hostname resolution, service logs) are not yet
   instrumented — their absent rows mean "unknown provenance", same as pre-manifest files.
-* **The frontend scans and adjudicates.** ``networkService.ts`` computes ``nodeType`` from
-  ports/nDPI (scanning) and ``getNodeColor`` resolves the nodeType-vs-deviceType conflict by
-  display precedence (adjudicating) — client-side, on a truncated node set. #496/#499 are the
-  predictable symptoms. The fix direction: these decisions move behind the API; Present consumes
-  adjudications.
+* **Present no longer scans or adjudicates** (#521, resolved). ``networkService.ts`` used to
+  compute ``nodeType`` from ports/nDPI (scanning) and ``getNodeColor`` resolved the
+  nodeType-vs-deviceType conflict by display precedence (adjudicating) — client-side, on a
+  truncated 50-node set, so a host could classify differently depending on what else fit on screen.
+  All four functions (``determineRole``, ``finalizeNodeRole``, ``classifyNodeType``,
+  ``getNodeColor``'s precedence) are deleted. ``role`` reads ``initiatorIp`` (the MEASURED SYN fact,
+  #496); ``nodeType`` is a projection of the adjudicated host identity through one label map, so
+  the two taxonomies that both contained "Web Server" (#499) become one — the adjudicator decides,
+  the graph renders. Legacy files with classifications but no identities backfill lazily on first
+  read of ``GET /files/{fileId}/host-identities`` (idempotent).
 * **The first real adjudicator exists** (slice 5): ``HostIdentityService`` in ``insights`` answers
   "what is this host?" with one voice — human-confirmed node-role labels ranked first, then the
   classification vote (whose runner-up is now persisted so a knife-edge is distinguishable from a
   walkover), with an explicit **contested** outcome listing candidates. Re-adjudication fires on
   ``AnalysisCompletedEvent`` and ``NodeRoleChangedEvent`` (staleness IS re-adjudication, live).
-  Served at ``GET /files/{fileId}/host-identities``. Remaining gap: the frontend still computes
-  its own ``nodeType``/``getNodeColor`` precedence instead of consuming this (#499/#498 close
-  fully when it does — the next slice).
+  Served at ``GET /files/{fileId}/host-identities``, and — as of #521 — this is what the graph
+  renders: the frontend consumes the adjudication instead of computing its own (closing #499).
 * **``insights`` is fully behind the seam** (slice 6b): 34 → **zero**. ``NodeRoleService`` and
   ``LabelStalenessService`` read hosts through ``HostClassificationLookup`` and external orgs
   through the new ``GeoOrgLookup``; ``HostClassificationsController`` reads through the port and

@@ -8,82 +8,6 @@ import type {
   NodeType,
 } from '../types';
 
-/**
- * Determine node role based on port number
- * Ports < 1024 are typically server ports (well-known ports)
- * Ports >= 1024 are typically client ports (ephemeral ports)
- */
-function determineRole(port: number): 'client' | 'server' {
-  return port < 1024 ? 'server' : 'client';
-}
-
-/**
- * Maps nDPI appName values (uppercased) to node types.
- * Used as the primary classifier — more accurate than port-based guessing,
- * especially for encrypted flows (TLS/QUIC) and non-standard ports.
- *
- * Stored as an ordered array of [appName, NodeType] pairs so that priority
- * is explicit and not dependent on object key iteration order.
- * More-specific entries (e.g. FTP_CONTROL) should come before broader ones.
- */
-const NDPI_APP_ENTRIES: [string, NodeType][] = [
-  ['DNS',           'dns-server'],
-  ['HTTP',          'web-server'],
-  ['TLS',           'web-server'],
-  ['QUIC',          'web-server'],
-  ['SSH',           'ssh-server'],
-  ['FTP_CONTROL',   'ftp-server'],
-  ['FTP_DATA',      'ftp-server'],
-  ['SMTP',          'mail-server'],
-  ['SMTPTLS',       'mail-server'],
-  ['IMAP',          'mail-server'],
-  ['POP',           'mail-server'],
-  ['DHCP',          'dhcp-server'],
-  ['NTP',           'ntp-server'],
-  ['MYSQL',         'database-server'],
-  ['POSTGRESQL',    'database-server'],
-  ['REDIS',         'database-server'],
-  ['MONGODB',       'database-server'],
-  ['ELASTICSEARCH', 'database-server'],
-];
-
-/**
- * Maps well-known port/protocol combinations to node types.
- * Key format: "<port>/<PROTOCOL>"
- * Used as a fallback when nDPI appName is unavailable.
- */
-const PORT_SERVICE_MAP: Record<string, NodeType> = {
-  '53/UDP': 'dns-server',
-  '53/TCP': 'dns-server',
-  '80/TCP': 'web-server',
-  '443/TCP': 'web-server',
-  '8080/TCP': 'web-server',
-  '8443/TCP': 'web-server',
-  '22/TCP': 'ssh-server',
-  '21/TCP': 'ftp-server',
-  '20/TCP': 'ftp-server',
-  '25/TCP': 'mail-server',
-  '587/TCP': 'mail-server',
-  '465/TCP': 'mail-server',
-  '110/TCP': 'mail-server',
-  '143/TCP': 'mail-server',
-  '993/TCP': 'mail-server',
-  '995/TCP': 'mail-server',
-  '67/UDP': 'dhcp-server',
-  '68/UDP': 'dhcp-server',
-  '123/UDP': 'ntp-server',
-  '3306/TCP': 'database-server',
-  '5432/TCP': 'database-server',
-  '1433/TCP': 'database-server',
-  '1521/TCP': 'database-server',
-  '27017/TCP': 'database-server',
-  '6379/TCP': 'database-server',
-  '9200/TCP': 'database-server',
-};
-
-/** Minimum distinct peers before a non-server node is classified as a router/gateway */
-const ROUTER_PEER_THRESHOLD = 10;
-
 /** MAC address regex — identifies nodes that have no IP and are addressed by MAC only */
 const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
@@ -104,59 +28,21 @@ function isMacAddress(id: string): boolean {
  * serverPorts: { "53/UDP": 42, "80/TCP": 1 } — counts of connections received on each port.
  * ndpiApps: set of distinct nDPI appName strings seen on inbound edges.
  */
-function classifyNodeType(
-  node: GraphNode,
-  serverPorts: Record<string, number>,
-  distinctPeers: number,
-  ndpiApps: Set<string>
-): void {
-  // L2-only nodes (identified by MAC address) keep their pre-assigned type
-  if (node.data.isL2) return;
-
-  // --- Primary: nDPI appName ---
-  // Iterate NDPI_APP_ENTRIES in declared priority order (explicit, not key-order dependent).
-  let matchedNdpiApp: string | null = null;
-  let matchedNodeType: NodeType | null = null;
-  for (const [app, type] of NDPI_APP_ENTRIES) {
-    if (ndpiApps.has(app)) {
-      matchedNdpiApp = app;
-      matchedNodeType = type;
-      break;
-    }
-  }
-  if (matchedNdpiApp && matchedNodeType) {
-    node.data.nodeType = matchedNodeType;
-    node.data.nodeTypeEvidence = {
-      dominantPort: null,
-      connectionCount: 0,
-      distinctPeers,
-      ndpiApps: Array.from(ndpiApps),
-    };
-    return;
-  }
-
-  // --- Fallback: well-known port ---
-  let dominantPort: string | null = null;
-  let maxCount = 0;
-
+/**
+ * The port a node most often served on — the busiest of its well-known ports. Evidence only: it is
+ * shown in the details panel as one input the backend weighed, not used here to decide anything.
+ * Deciding what a host *is* moved to the adjudicator (#521); this is a fact, not a judgment.
+ */
+function dominantServerPort(serverPorts: Record<string, number>): string | null {
+  let best: string | null = null;
+  let max = 0;
   for (const [portProto, count] of Object.entries(serverPorts)) {
-    if (count > maxCount) {
-      maxCount = count;
-      dominantPort = portProto;
+    if (count > max) {
+      max = count;
+      best = portProto;
     }
   }
-
-  if (dominantPort && PORT_SERVICE_MAP[dominantPort]) {
-    node.data.nodeType = PORT_SERVICE_MAP[dominantPort];
-  } else if (distinctPeers >= ROUTER_PEER_THRESHOLD && node.data.role !== 'server') {
-    node.data.nodeType = 'router';
-  } else if (node.data.role === 'client' || node.data.role === 'unknown') {
-    node.data.nodeType = 'client';
-  } else {
-    node.data.nodeType = 'unknown';
-  }
-
-  node.data.nodeTypeEvidence = { dominantPort, connectionCount: maxCount, distinctPeers };
+  return best;
 }
 
 /**
@@ -278,23 +164,33 @@ function calculateNetworkStats(nodeMap: NodeMap, edges: GraphEdge[]): NetworkSta
 /**
  * Determine final node role based on observed behavior
  */
-function finalizeNodeRole(node: GraphNode, srcPort: number, dstPort: number) {
+/**
+ * Records what one conversation says about a node's role, using who opened it (#496).
+ *
+ * <p>This replaces a pair of functions that guessed from port numbers — "< 1024 means server",
+ * then ORed 'server' across *both* endpoints, so a host talking from :51000 to a router's :80 was
+ * itself marked a server. The guess existed because the real signal was destroyed at parse time;
+ * now the backend records who sent SYN without ACK, so we can just read it.
+ *
+ * <p>Roles accumulate across flows rather than being overwritten: a host that opens some
+ * connections and answers others is genuinely 'both', and the last conversation parsed should not
+ * decide. A node whose flows carry no initiator (UDP, ARP, a capture that joined mid-stream) keeps
+ * whatever it had — unknown is the honest answer, and guessing is what this removes.
+ */
+function applyRoleFromInitiator(node: GraphNode, conv: Conversation) {
   if (node.data.isL2) return;
-  const srcRole = determineRole(srcPort);
-  const dstRole = determineRole(dstPort);
+  if (!conv.initiatorIp) return; // unknown — say nothing rather than guess
 
-  if (node.data.packetsSent > 0 && node.data.packetsReceived > 0) {
-    // Node both sends and receives - could be 'both'
-    // If it acts as server more often (lower ports), mark as server
-    if (srcRole === 'server' || dstRole === 'server') {
-      node.data.role = 'server';
-    } else {
-      node.data.role = 'client';
-    }
-  } else if (node.data.packetsSent > 0) {
-    node.data.role = srcRole;
-  } else if (node.data.packetsReceived > 0) {
-    node.data.role = dstRole;
+  const isInitiator = conv.initiatorIp === node.data.ip;
+  const roleHere: 'client' | 'server' = isInitiator ? 'client' : 'server';
+
+  // 'unknown' is the initial value AND a truthy string, so a bare `!role` check would skip the
+  // first assignment and mark every node 'both' on its second flow — which would defeat the whole
+  // point of reading the fact. Treat 'unknown' as "not yet set".
+  if (!node.data.role || node.data.role === 'unknown') {
+    node.data.role = roleHere;
+  } else if (node.data.role !== roleHere) {
+    node.data.role = 'both';
   }
 }
 
@@ -420,14 +316,12 @@ export function buildNetworkGraph(
       nodeMap[src.ip] = createNode(src.ip, src.hostname, src.mac);
     }
     updateNodeStats(nodeMap[src.ip], conv, 'sent', protocol);
-    finalizeNodeRole(nodeMap[src.ip], src.port, dst.port);
 
     // Create or update destination node
     if (!nodeMap[dst.ip]) {
       nodeMap[dst.ip] = createNode(dst.ip, dst.hostname, dst.mac);
     }
     updateNodeStats(nodeMap[dst.ip], conv, 'received', protocol);
-    finalizeNodeRole(nodeMap[dst.ip], src.port, dst.port);
 
     // Track well-known port usage for both endpoints.
     // A node sending FROM a well-known port (e.g. DNS response from :53) is
@@ -478,14 +372,36 @@ export function buildNetworkGraph(
     ghostProtoAsDst[dst.ip].add(protocol);
   });
 
-  // Classify node types based on accumulated nDPI app / port / peer data
+  // Roles are derived over EVERY conversation, not just the displayed subset. role comes from who
+  // opened the connection (a MEASURED fact, #496), so it must be independent of the packet-count
+  // cap that decides what fits on screen — otherwise Present is still adjudicating on a truncated
+  // view, which is exactly what #521 removed everywhere else. A node whose only flows were capped
+  // out has no entry in nodeMap and is skipped: it is not on the diagram to label.
+  conversations.forEach(conv => {
+    const [s0, d0] = conv.endpoints;
+    if (nodeMap[s0.ip]) applyRoleFromInitiator(nodeMap[s0.ip], conv);
+    if (nodeMap[d0.ip]) applyRoleFromInitiator(nodeMap[d0.ip], conv);
+  });
+
+  // Node type comes from the backend's adjudicated host identity (see applyIdentities below).
+  // It used to be judged here — nDPI app, then well-known port, then peer fan-out — which made
+  // this a Scan-stage classifier running in the browser over a *truncated* node set, so a host
+  // could classify differently depending on what else fit on screen (#521). The evidence it used
+  // is the same evidence the backend already weighs, with a confidence and a contested outcome
+  // this code could not express.
+  //
+  // serverPorts / peerSets / ndpiAppSets are still accumulated: they populate nodeTypeEvidence,
+  // which the details panel shows as *why*, and they are facts, not judgments.
   Object.keys(nodeMap).forEach(ip => {
-    classifyNodeType(
-      nodeMap[ip],
-      serverPorts[ip] || {},
-      peerSets[ip]?.size || 0,
-      ndpiAppSets[ip] ?? new Set()
-    );
+    const d = nodeMap[ip].data;
+    if (d.isL2) return; // L2-only nodes keep their pre-assigned type
+    const domPort = dominantServerPort(serverPorts[ip] ?? {});
+    d.nodeTypeEvidence = {
+      dominantPort: domPort,
+      connectionCount: domPort ? (serverPorts[ip]?.[domPort] ?? 0) : 0,
+      distinctPeers: peerSets[ip]?.size ?? 0,
+      ndpiApps: Array.from(ndpiAppSets[ip] ?? new Set<string>()),
+    };
   });
 
   // Compute ghost/phantom node flags for each node in the map
@@ -562,6 +478,34 @@ export function buildNetworkGraph(
     });
   }
 
+
+/**
+ * Projects the backend's adjudicated identity label onto a {@link NodeType} for rendering (#499).
+ *
+ * <p>These are two vocabularies for the same question — the adjudicator says `WEB_SERVER`, the
+ * graph's config keys on `web-server` — and having them diverge is #499's "two taxonomies, both
+ * containing Web Server, disagreeing on colour". The fix is not a third taxonomy: it is to make one
+ * a projection of the other, so the adjudicator decides and the graph only renders.
+ *
+ * Unmapped or absent labels fall through to `unknown`, which is the honest answer for a host the
+ * adjudicator did not classify (or a file analysed before the adjudicator existed).
+ */
+const IDENTITY_LABEL_TO_NODE_TYPE: Record<string, NodeType> = {
+  WEB_SERVER: 'web-server',
+  API_SERVER: 'web-server',
+  DNS_SERVER: 'dns-server',
+  ROUTER: 'router',
+  SERVER: 'database-server',
+  IOT: 'client',
+  MOBILE: 'client',
+  LAPTOP_DESKTOP: 'client',
+};
+
+function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
+  if (!label) return 'unknown';
+  return IDENTITY_LABEL_TO_NODE_TYPE[label] ?? 'unknown';
+}
+
   if (identityMap) {
     Object.keys(nodeMap).forEach(ip => {
       const identity = identityMap.get(ip);
@@ -572,6 +516,10 @@ export function buildNetworkGraph(
       d.identityConfidence = identity.confidence;
       d.identityContested = identity.contested;
       d.identityCandidates = identity.candidates ?? undefined;
+      // The adjudicated identity IS what this host is — so it drives the rendered nodeType, rather
+      // than the browser judging it a second time from ports and nDPI apps (#521). Present renders
+      // the conclusion; it does not reach its own.
+      d.nodeType = nodeTypeFromIdentityLabel(identity.primaryLabel);
       // A human-confirmed label outranks every machine-derived display value.
       if (identity.basis === 'HUMAN') d.deviceType = undefined;
     });

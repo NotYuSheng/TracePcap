@@ -8,7 +8,7 @@ import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
-import { deviceTypeColor, deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
+import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
 import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
 import './NetworkGraph.css';
@@ -247,15 +247,17 @@ function drawNodeLabel(
 // For these, deviceType provides a more meaningful colour signal.
 const GENERIC_NODE_TYPES = new Set(['client', 'unknown']);
 
+/**
+ * The node's colour, from its adjudicated nodeType.
+ *
+ * <p>This used to adjudicate: nodeType-wins-else-deviceType-else-fallback, resolving two competing
+ * classifications by display precedence — in the browser, with no confidence and no contested
+ * state (#521, #499). But nodeType is now a projection of the backend's host-identity adjudication
+ * (see networkService's applyIdentities), so it already *is* the one answer. There is nothing left
+ * to resolve; the colour just follows it.
+ */
 function getNodeColor(node: GraphNode): string {
-  const { nodeType, deviceType } = node.data;
-  // Specific service nodeTypes always take priority (DNS server, web server, etc.)
-  if (!GENERIC_NODE_TYPES.has(nodeType) && NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]) {
-    return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG].color;
-  }
-  // For generic types (client / unknown), prefer the hardware device classification
-  if (deviceType && deviceType !== 'UNKNOWN') return deviceTypeColor(deviceType);
-  // Fall back to the nodeType color (client=blue, unknown=grey)
+  const { nodeType } = node.data;
   return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]?.color ?? '#95a5a6';
 }
 
@@ -926,7 +928,16 @@ export const NetworkGraph = memo(function NetworkGraph({
             nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && n.data.deviceType === dt))
           .map(dt => (
             <div key={dt} className="ng-legend-item">
-              <i className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`} style={{ color: deviceTypeColor(dt) }} />
+              {/*
+                Swatch matches what the node actually renders. Generic nodes (client/unknown) now
+                take their colour from NODE_TYPE_CONFIG[nodeType], not from deviceTypeColor — so
+                using the device colour here would advertise a colour no node shows (#521 review).
+                The device icon still distinguishes IoT from Mobile; the colour follows the node.
+              */}
+              <i
+                className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`}
+                style={{ color: NODE_TYPE_CONFIG['client'].color }}
+              />
               <span className="ng-legend-label">{deviceTypeLabel(dt)}</span>
             </div>
           ))}
