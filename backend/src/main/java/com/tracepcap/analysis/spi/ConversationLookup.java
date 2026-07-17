@@ -202,6 +202,150 @@ public interface ConversationLookup {
   EntityStats statsForL7Protocol(UUID fileId, String l7Protocol, int topPeerLimit);
 
   /**
+   * Traffic attributed to one named thing — an app, an L7 protocol, a category.
+   *
+   * <p>{@code packetCount} is always populated; {@code totalBytes} is zero for breakdowns that only
+   * count packets (see {@link Breakdown#CATEGORY}).
+   */
+  record NamedTotals(String name, long packetCount, long totalBytes) {}
+
+  /** The ways a file's traffic can be broken down, each aggregated in the database. */
+  enum Breakdown {
+    /** By nDPI application name, heaviest first. Carries bytes. */
+    APPLICATION,
+    /** By tshark L7 protocol, heaviest first. Carries bytes. */
+    L7_PROTOCOL,
+    /** By nDPI category, most packets first. Packets only — {@code totalBytes} is 0. */
+    CATEGORY
+  }
+
+  /**
+   * A file's traffic grouped by {@code breakdown}, ordered heaviest first, aggregated in the
+   * database. Rows with no name are omitted — an unnamed slice is not a breakdown a reader can act
+   * on.
+   */
+  List<NamedTotals> breakdown(UUID fileId, Breakdown breakdown);
+
+  /** How many conversations the file holds. */
+  long conversationCount(UUID fileId);
+
+  /**
+   * How many conversations carry at least one nDPI flow risk — the same predicate as {@link
+   * #atRiskConversations}, and like it, nDPI risks only.
+   */
+  long atRiskConversationCount(UUID fileId);
+
+  /**
+   * The {@code limit} heaviest conversations in the file, by bytes descending — the "who talked
+   * most" table.
+   */
+  List<ConversationFacts> topConversationsByBytes(UUID fileId, int limit);
+
+  /**
+   * Up to {@code limit} conversations carrying at least one <b>nDPI flow risk</b>, most risks first.
+   *
+   * <p>nDPI risks only — <em>not</em> custom-signature matches or Suricata alerts, despite the name.
+   * A conversation flagged by Suricata alone does not appear here. That is the query's long-standing
+   * behaviour rather than a decision made in this port, and it is stated plainly because an earlier
+   * draft of this javadoc claimed all three sources; a reviewer read that, believed it, and filed a
+   * bug against the report for "omitting" alerts the query never selected.
+   *
+   * <p><b>INFERRED</b>: this is what nDPI concluded, and "at risk" inherits its error modes. A
+   * conversation absent from this list is one nDPI did not flag — not one that is safe.
+   */
+  List<ConversationFacts> atRiskConversations(UUID fileId, int limit);
+
+  /** Up to {@code limit} conversations that carried a TLS certificate. */
+  List<ConversationFacts> tlsConversations(UUID fileId, int limit);
+
+  /** Every conversation in the file that carried a TLS certificate. */
+  List<ConversationFacts> tlsConversations(UUID fileId);
+
+  /** Total packets across the file's conversations — summed in the database. */
+  long sumPackets(UUID fileId);
+
+  /** How many of a protocol's conversations carry a risk flag. */
+  record ProtocolRisk(String protocol, long total, long atRisk) {}
+
+  /**
+   * Per-protocol conversation counts alongside how many were flagged, busiest first — the "which
+   * protocols carry the trouble" matrix.
+   */
+  List<ProtocolRisk> protocolRiskMatrix(UUID fileId);
+
+  /** Total bytes across the file's conversations — summed in the database. */
+  long sumBytes(UUID fileId);
+
+  /** One host and how widely it reached: distinct destinations, and flows in total. */
+  record HostFanOut(String srcIp, long distinctDestinations, long totalFlows) {}
+
+  /**
+   * Hosts that reached more than a handful of distinct destinations — the candidate set for the
+   * scanning / lateral-movement shape.
+   *
+   * <p>Aggregated in the database. A scanner could fold this out of {@link #conversationFacts}, but
+   * COUNT(DISTINCT) over a table is the database's job, and doing it in Java would mean holding
+   * every conversation to produce a handful of rows.
+   *
+   * <p>The cut-off is the query's, not the caller's: this returns <em>candidates</em>, and deciding
+   * which of them is actually interesting — and at what severity — is the scanner's judgment to make.
+   */
+  List<HostFanOut> fanOutCandidates(UUID fileId);
+
+  /** One host's outbound volume. */
+  record HostVolume(String srcIp, long totalBytes, long flowCount) {}
+
+  /** The heaviest senders in the file, bytes descending, capped at a sane number for a summary. */
+  List<HostVolume> topSenders(UUID fileId);
+
+  /**
+   * How many conversations nDPI could not name.
+   *
+   * <p>Ambiguous on its own — a zero could mean "everything was identified" or "nDPI never ran".
+   * Pair it with {@link ExtractionManifest} before drawing a conclusion; #501 is the bug that
+   * conflation causes.
+   */
+  long unidentifiedAppCount(UUID fileId);
+
+  /** How widely one nDPI risk label appears across a file. {@code riskType} is never null or blank. */
+  record RiskTypeStats(
+      String riskType,
+      long conversationCount,
+      long totalBytes,
+      long distinctSourceIps,
+      long distinctDestinationIps) {}
+
+  /**
+   * Each nDPI risk label in the file with its spread — how many conversations carry it, and across
+   * how many distinct hosts.
+   *
+   * <p>Aggregated in the database, unnesting the risk array. Nothing constrains the array's
+   * <em>elements</em>, so a null or blank label is storable; such rows are dropped here rather than
+   * handed on, because "a risk with no name" is not a finding any consumer can render. <b>INFERRED</b>:
+   * these are nDPI's conclusions, with nDPI's error modes.
+   */
+  List<RiskTypeStats> riskTypeStats(UUID fileId);
+
+  /** One unusually long-lived flow. */
+  record LongSession(
+      String srcIp,
+      String dstIp,
+      Integer dstPort,
+      String protocol,
+      String appName,
+      long durationMs,
+      long totalBytes,
+      long packetCount) {}
+
+  /**
+   * Flows lasting at least {@code minSeconds}, longest first.
+   *
+   * <p>Duration is computed in the database from the stored start/end times, which is why this is
+   * not folded out of {@link #conversationFacts}: filtering on a computed value is what SQL is for.
+   */
+  List<LongSession> longSessions(UUID fileId, long minSeconds);
+
+  /**
    * The vocabularies a file can be asked for — the distinct values of one column across every
    * conversation. Used to populate filter dropdowns and to diff one snapshot against another.
    *
@@ -224,6 +368,8 @@ public interface ConversationLookup {
     /** Every IP seen as either endpoint. MEASURED. */
     IP,
     /** Transport protocols observed. MEASURED. */
-    PROTOCOL
+    PROTOCOL,
+    /** HTTP User-Agent strings clients sent. REPORTED — a client says what it likes. */
+    HTTP_USER_AGENT
   }
 }

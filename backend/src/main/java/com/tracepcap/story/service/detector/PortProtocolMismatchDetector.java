@@ -1,15 +1,18 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.story.spi.Tier;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
-public class PortProtocolMismatchDetector {
+public class PortProtocolMismatchDetector implements Scanner {
 
   // app_name (nDPI) → expected destination ports
   private static final Map<String, Set<Integer>> EXPECTED_PORTS =
@@ -24,33 +27,45 @@ public class PortProtocolMismatchDetector {
           "RDP", Set.of(3389),
           "TELNET", Set.of(23));
 
-  public List<Finding> detect(List<ConversationEntity> conversations) {
+  @Override
+  public String name() {
+    return "port-protocol-mismatch";
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public List<Finding> scan(ScanContext context) {
+    List<ConversationFacts> conversations = context.conversations();
     // Group mismatches by (appName, dstPort)
     record MismatchKey(String app, int port) {}
-    Map<MismatchKey, List<ConversationEntity>> mismatches = new LinkedHashMap<>();
+    Map<MismatchKey, List<ConversationFacts>> mismatches = new LinkedHashMap<>();
 
-    for (ConversationEntity conv : conversations) {
-      if (conv.getAppName() == null || conv.getDstPort() == null) continue;
-      String app = conv.getAppName().toUpperCase();
+    for (ConversationFacts conv : conversations) {
+      if (conv.findings().appName() == null || conv.flow().dstPort() == null) continue;
+      String app = conv.findings().appName().toUpperCase();
       Set<Integer> expected = EXPECTED_PORTS.get(app);
       if (expected == null) continue;
-      int port = conv.getDstPort();
+      int port = conv.flow().dstPort();
       if (!expected.contains(port)) {
         mismatches.computeIfAbsent(new MismatchKey(app, port), k -> new ArrayList<>()).add(conv);
       }
     }
 
     List<Finding> findings = new ArrayList<>();
-    for (Map.Entry<MismatchKey, List<ConversationEntity>> e : mismatches.entrySet()) {
+    for (Map.Entry<MismatchKey, List<ConversationFacts>> e : mismatches.entrySet()) {
       MismatchKey key = e.getKey();
-      List<ConversationEntity> convs = e.getValue();
+      List<ConversationFacts> convs = e.getValue();
       List<String> affectedIps =
           convs.stream()
-              .map(ConversationEntity::getSrcIp)
+              .map(c -> c.flow().srcIp())
               .distinct()
               .limit(5)
               .collect(Collectors.toList());
-      long totalBytes = convs.stream().mapToLong(ConversationEntity::getTotalBytes).sum();
+      long totalBytes = convs.stream().mapToLong(c -> c.flow().totalBytes()).sum();
 
       Map<String, Object> metrics = new LinkedHashMap<>();
       metrics.put("conversationCount", convs.size());

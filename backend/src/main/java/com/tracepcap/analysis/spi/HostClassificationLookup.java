@@ -75,4 +75,10 @@ public interface HostClassificationLookup {
 
   /** As {@link #hostFactsByIp}, keyed by MAC. The match is case-insensitive. */
   Optional<HostFacts> hostFactsByMac(UUID fileId, String mac);
+
+  /**
+   * How many hosts the file holds — counted in the database, for callers that want the number rather
+   * than the hosts.
+   */
+  long hostCount(UUID fileId);
 }

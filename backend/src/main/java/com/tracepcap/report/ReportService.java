@@ -13,15 +13,18 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.spi.AnalysisSummaryLookup;
+import com.tracepcap.analysis.spi.AnalysisSummaryLookup.CaptureSummary;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.Breakdown;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.ConversationLookup.Facet;
+import com.tracepcap.analysis.spi.ConversationLookup.NamedTotals;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.extraction.entity.ExtractedFileEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.extraction.repository.ExtractedFileRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
@@ -74,11 +77,11 @@ public class ReportService {
 
   // ── repositories / services ───────────────────────────────────────────────
   private final FileRepository fileRepository;
-  private final AnalysisResultRepository analysisResultRepository;
-  private final ConversationRepository conversationRepository;
-  private final HostClassificationRepository hostClassificationRepository;
+  private final AnalysisSummaryLookup analysisSummaryLookup;
+  private final ConversationLookup conversationLookup;
+  private final HostClassificationLookup hostClassificationLookup;
   private final ExtractedFileRepository extractedFileRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final GeoOrgLookup geoOrgLookup;
   private final StoryService storyService;
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -92,35 +95,33 @@ public class ReportService {
             .findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
-    AnalysisResultEntity analysis = analysisResultRepository.findByFileId(fileId).orElse(null);
+    CaptureSummary analysis = analysisSummaryLookup.summaryFor(fileId).orElse(null);
 
-    List<HostClassificationEntity> hosts = hostClassificationRepository.findByFileId(fileId);
+    List<HostFacts> hosts = hostClassificationLookup.hostFacts(fileId);
 
-    List<ConversationEntity> topConversations =
-        conversationRepository.findTopByFileIdOrderByTotalBytesDesc(
-            fileId, PageRequest.of(0, TOP_CONVERSATIONS_LIMIT));
-    List<ConversationEntity> riskyConversations =
-        conversationRepository.findAtRiskByFileIdLimited(fileId, SECURITY_FINDINGS_LIMIT);
-    List<ConversationEntity> tlsConversations =
-        conversationRepository.findConversationsWithTlsByFileId(
-            fileId, PageRequest.of(0, TLS_LIMIT));
+    List<ConversationFacts> topConversations =
+        conversationLookup.topConversationsByBytes(fileId, TOP_CONVERSATIONS_LIMIT);
+    List<ConversationFacts> riskyConversations =
+        conversationLookup.atRiskConversations(fileId, SECURITY_FINDINGS_LIMIT);
+    List<ConversationFacts> tlsConversations =
+        conversationLookup.tlsConversations(fileId, TLS_LIMIT);
 
     List<ExtractedFileEntity> extractedFiles =
         extractedFileRepository.findByFileIdOrderByCreatedAtAsc(fileId);
 
-    List<Object[]> appStats = conversationRepository.findApplicationStatsByFileId(fileId);
-    List<Object[]> l7Stats = conversationRepository.findL7ProtocolStatsByFileId(fileId);
-    List<Object[]> categoryStats = conversationRepository.findCategoryDistributionByFileId(fileId);
+    List<NamedTotals> appStats = conversationLookup.breakdown(fileId, Breakdown.APPLICATION);
+    List<NamedTotals> l7Stats = conversationLookup.breakdown(fileId, Breakdown.L7_PROTOCOL);
+    List<NamedTotals> categoryStats = conversationLookup.breakdown(fileId, Breakdown.CATEGORY);
 
-    List<String> fileTypes = conversationRepository.findDistinctFileTypesByFileId(fileId);
-    List<String> httpUserAgents = conversationRepository.findDistinctHttpUserAgentsByFileId(fileId);
-    List<String> riskTypes = conversationRepository.findDistinctRiskTypesByFileId(fileId);
-    List<String> customSigs = conversationRepository.findDistinctCustomSignaturesByFileId(fileId);
+    List<String> fileTypes = conversationLookup.distinctValues(fileId, Facet.FILE_TYPE);
+    List<String> httpUserAgents = conversationLookup.distinctValues(fileId, Facet.HTTP_USER_AGENT);
+    List<String> riskTypes = conversationLookup.distinctValues(fileId, Facet.RISK_TYPE);
+    List<String> customSigs = conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
 
-    List<Object[]> geoCountries = ipGeoInfoRepository.findDistinctCountriesByFileId(fileId);
+    List<GeoOrgLookup.Country> geoCountries = geoOrgLookup.distinctCountriesInFile(fileId);
 
-    long totalConversations = conversationRepository.countByFileId(fileId);
-    long riskCount = conversationRepository.countAtRiskByFileId(fileId);
+    long totalConversations = conversationLookup.conversationCount(fileId);
+    long riskCount = conversationLookup.atRiskConversationCount(fileId);
 
     StoryResponse story = storyService.getStoryByFileId(fileId).orElse(null);
 
@@ -160,8 +161,8 @@ public class ReportService {
         addStoryNotGenerated(document, sec++);
       }
 
-      if (analysis != null && analysis.getProtocolStats() != null) {
-        addProtocolDistribution(document, analysis.getProtocolStats(), sec++);
+      if (analysis != null && analysis.protocolStats() != null) {
+        addProtocolDistribution(document, analysis.protocolStats(), sec++);
       }
 
       if (!categoryStats.isEmpty()) {
@@ -281,7 +282,7 @@ public class ReportService {
   private void addExecutiveSummary(
       Document doc,
       FileEntity file,
-      AnalysisResultEntity analysis,
+      CaptureSummary analysis,
       int hostCount,
       long totalConversations,
       long riskCount,
@@ -292,20 +293,16 @@ public class ReportService {
     addSectionHeader(doc, sec + ". Executive Summary");
 
     String packets =
-        analysis != null && analysis.getPacketCount() != null
-            ? String.valueOf(analysis.getPacketCount())
-            : "—";
+        analysis != null ? String.valueOf(analysis.packetCount()) : "—";
     String totalBytes =
-        analysis != null && analysis.getTotalBytes() != null
-            ? formatBytes(analysis.getTotalBytes())
-            : "—";
+        analysis != null ? formatBytes(analysis.totalBytes()) : "—";
     String duration =
-        analysis != null && analysis.getDurationMs() != null
-            ? formatDuration(analysis.getDurationMs())
+        analysis != null && analysis.durationMs() != null
+            ? formatDuration(analysis.durationMs())
             : "—";
     String timeRange =
-        analysis != null && analysis.getStartTime() != null && analysis.getEndTime() != null
-            ? formatDt(analysis.getStartTime()) + "  →  " + formatDt(analysis.getEndTime())
+        analysis != null && analysis.startTime() != null && analysis.endTime() != null
+            ? formatDt(analysis.startTime()) + "  →  " + formatDt(analysis.endTime())
             : "—";
 
     String[][] rows = {
@@ -365,7 +362,7 @@ public class ReportService {
   // Section: Category Distribution
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addCategoryDistribution(Document doc, List<Object[]> categoryStats, int sec)
+  private void addCategoryDistribution(Document doc, List<NamedTotals> categoryStats, int sec)
       throws Exception {
     addSectionHeader(doc, sec + ". Traffic Category Distribution");
 
@@ -377,9 +374,9 @@ public class ReportService {
 
     Font f = cellFont();
     for (int i = 0; i < categoryStats.size(); i++) {
-      Object[] row = categoryStats.get(i);
+      NamedTotals row = categoryStats.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f, nvl((String) row[0]), String.valueOf(((Number) row[1]).longValue()));
+      addRow(table, bg, f, nvl(row.name()), String.valueOf(row.packetCount()));
     }
     doc.add(table);
   }
@@ -388,7 +385,7 @@ public class ReportService {
   // Section: Applications Detected
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addApplicationsDetected(Document doc, List<Object[]> appStats, int sec)
+  private void addApplicationsDetected(Document doc, List<NamedTotals> appStats, int sec)
       throws Exception {
     addSectionHeader(doc, sec + ". Applications Detected (" + appStats.size() + ")");
 
@@ -400,15 +397,15 @@ public class ReportService {
 
     Font f = cellFont();
     for (int i = 0; i < appStats.size(); i++) {
-      Object[] row = appStats.get(i);
+      NamedTotals row = appStats.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       addRow(
           table,
           bg,
           f,
-          nvl((String) row[0]),
-          String.valueOf(((Number) row[1]).longValue()),
-          formatBytes(((Number) row[2]).longValue()));
+          nvl(row.name()),
+          String.valueOf(row.packetCount()),
+          formatBytes(row.totalBytes()));
     }
     doc.add(table);
   }
@@ -417,7 +414,7 @@ public class ReportService {
   // Section: L7 Protocols
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addL7Protocols(Document doc, List<Object[]> l7Stats, int sec) throws Exception {
+  private void addL7Protocols(Document doc, List<NamedTotals> l7Stats, int sec) throws Exception {
     addSectionHeader(doc, sec + ". Detected L7 Protocols (" + l7Stats.size() + ")");
 
     PdfPTable table = new PdfPTable(new float[] {4, 2, 2});
@@ -428,15 +425,15 @@ public class ReportService {
 
     Font f = cellFont();
     for (int i = 0; i < l7Stats.size(); i++) {
-      Object[] row = l7Stats.get(i);
+      NamedTotals row = l7Stats.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       addRow(
           table,
           bg,
           f,
-          nvl((String) row[0]),
-          String.valueOf(((Number) row[1]).longValue()),
-          formatBytes(((Number) row[2]).longValue()));
+          nvl(row.name()),
+          String.valueOf(row.packetCount()),
+          formatBytes(row.totalBytes()));
     }
     doc.add(table);
   }
@@ -445,7 +442,7 @@ public class ReportService {
   // Section: Host Inventory (with supporting evidence)
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addHostInventory(Document doc, List<HostClassificationEntity> hosts, int sec)
+  private void addHostInventory(Document doc, List<HostFacts> hosts, int sec)
       throws Exception {
     addSectionHeader(doc, sec + ". Host Inventory (" + hosts.size() + " hosts)");
 
@@ -465,18 +462,18 @@ public class ReportService {
 
     Font f = cellFont();
     for (int i = 0; i < hosts.size(); i++) {
-      HostClassificationEntity h = hosts.get(i);
+      HostFacts h = hosts.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       addRow(
           table,
           bg,
           f,
-          nvl(h.getIp()),
-          nvl(h.getMac()),
-          nvl(h.getManufacturer()),
-          nvl(h.getDeviceType()),
-          ttlFingerprint(h.getTtl()),
-          h.getConfidence() + "%",
+          nvl(h.ip()),
+          nvl(h.mac()),
+          nvl(h.manufacturer()),
+          nvl(h.deviceType()),
+          ttlFingerprint(h.ttl()),
+          h.confidence() + "%",
           buildHostEvidence(h));
     }
     doc.add(table);
@@ -502,24 +499,24 @@ public class ReportService {
     return "TTL " + ttl + " → Linux/Unix/iOS";
   }
 
-  private String buildHostEvidence(HostClassificationEntity h) {
+  private String buildHostEvidence(HostFacts h) {
     StringBuilder sb = new StringBuilder();
 
-    if (h.getManufacturer() != null) {
-      sb.append("MAC vendor: ").append(h.getManufacturer());
-      String hint = vendorDeviceHint(h.getManufacturer());
+    if (h.manufacturer() != null) {
+      sb.append("MAC vendor: ").append(h.manufacturer());
+      String hint = vendorDeviceHint(h.manufacturer());
       if (hint != null) sb.append(" (→ ").append(hint).append(")");
-    } else if (h.getMac() != null) {
+    } else if (h.mac() != null) {
       sb.append("MAC present, vendor unknown");
     } else {
       sb.append("No MAC data");
     }
 
-    if (h.getTtl() != null) {
-      sb.append("; TTL ").append(h.getTtl()).append(" → ").append(ttlOs(h.getTtl()));
+    if (h.ttl() != null) {
+      sb.append("; TTL ").append(h.ttl()).append(" → ").append(ttlOs(h.ttl()));
     }
 
-    if (h.getConfidence() == 100) {
+    if (h.confidence() == 100) {
       sb.append("; YAML rule override (confidence 100%)");
     }
     return sb.toString();
@@ -557,7 +554,7 @@ public class ReportService {
   // Section: Geo Summary
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addGeoSummary(Document doc, List<Object[]> geoCountries, int sec) throws Exception {
+  private void addGeoSummary(Document doc, List<GeoOrgLookup.Country> geoCountries, int sec) throws Exception {
     addSectionHeader(
         doc, sec + ". Geographic Distribution (" + geoCountries.size() + " countries)");
 
@@ -570,9 +567,9 @@ public class ReportService {
 
     Font f = cellFont();
     for (int i = 0; i < geoCountries.size(); i++) {
-      Object[] row = geoCountries.get(i);
+      GeoOrgLookup.Country row = geoCountries.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
-      addRow(table, bg, f, nvl((String) row[0]), nvl((String) row[1]));
+      addRow(table, bg, f, nvl(row.code()), nvl(row.name()));
     }
     doc.add(table);
   }
@@ -618,7 +615,7 @@ public class ReportService {
   // Section: Security Findings
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addSecurityFindings(Document doc, List<ConversationEntity> risky, int sec)
+  private void addSecurityFindings(Document doc, List<ConversationFacts> risky, int sec)
       throws Exception {
     addSectionHeader(doc, sec + ". Security Findings (" + risky.size() + " at-risk conversations)");
 
@@ -630,19 +627,19 @@ public class ReportService {
         table, "Source", "Destination", "Protocol", "Application", "Bytes", "Risk Flags");
 
     Font f = cellFont();
-    for (ConversationEntity c : risky) {
-      String src = endpoint(c.getSrcIp(), c.getSrcPort());
-      String dst = endpoint(c.getDstIp(), c.getDstPort());
-      String risks = joinRisks(c.getFlowRisks(), c.getCustomSignatures());
+    for (ConversationFacts c : risky) {
+      String src = endpoint(c.flow().srcIp(), c.flow().srcPort());
+      String dst = endpoint(c.flow().dstIp(), c.flow().dstPort());
+      String risks = joinRisks(c.findings().flowRisks(), c.findings().customSignatures());
       addRow(
           table,
           C_RISK_BG,
           f,
           src,
           dst,
-          nvl(c.getProtocol()),
-          nvl(c.getAppName()),
-          c.getTotalBytes() != null ? formatBytes(c.getTotalBytes()) : "—",
+          nvl(c.flow().protocol()),
+          nvl(c.findings().appName()),
+          formatBytes(c.flow().totalBytes()),
           risks);
     }
     doc.add(table);
@@ -652,7 +649,7 @@ public class ReportService {
   // Section: TLS Analysis
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addTlsAnalysis(Document doc, List<ConversationEntity> tlsConvs, int sec)
+  private void addTlsAnalysis(Document doc, List<ConversationFacts> tlsConvs, int sec)
       throws Exception {
     addSectionHeader(
         doc, sec + ". TLS / HTTPS Analysis (" + tlsConvs.size() + " encrypted conversations)");
@@ -674,20 +671,20 @@ public class ReportService {
 
     Font f = new Font(Font.HELVETICA, 7, Font.NORMAL, C_TEXT);
     for (int i = 0; i < tlsConvs.size(); i++) {
-      ConversationEntity c = tlsConvs.get(i);
+      ConversationFacts c = tlsConvs.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       addRow(
           table,
           bg,
           f,
-          endpoint(c.getSrcIp(), c.getSrcPort()),
-          endpoint(c.getDstIp(), c.getDstPort()),
-          nvl(c.getHostname()),
-          truncate(c.getJa3Client(), 10),
-          truncate(c.getJa3Server(), 10),
-          truncate(c.getTlsSubject(), 30),
-          formatDt(c.getTlsNotBefore()),
-          formatDt(c.getTlsNotAfter()));
+          endpoint(c.flow().srcIp(), c.flow().srcPort()),
+          endpoint(c.flow().dstIp(), c.flow().dstPort()),
+          nvl(c.tls().hostname()),
+          truncate(c.tls().ja3Client(), 10),
+          truncate(c.tls().ja3Server(), 10),
+          truncate(c.tls().tlsSubject(), 30),
+          formatDt(c.tls().tlsNotBefore()),
+          formatDt(c.tls().tlsNotAfter()));
     }
     doc.add(table);
   }
@@ -705,7 +702,7 @@ public class ReportService {
   // Section: Top Conversations
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void addTopConversations(Document doc, List<ConversationEntity> convs, int sec)
+  private void addTopConversations(Document doc, List<ConversationFacts> convs, int sec)
       throws Exception {
     addSectionHeader(doc, sec + ". Top Conversations by Traffic (top " + convs.size() + ")");
 
@@ -726,23 +723,23 @@ public class ReportService {
 
     Font f = cellFont();
     for (int i = 0; i < convs.size(); i++) {
-      ConversationEntity c = convs.get(i);
+      ConversationFacts c = convs.get(i);
       Color bg = i % 2 == 0 ? Color.WHITE : C_ROW_ALT;
       long ms =
-          (c.getStartTime() != null && c.getEndTime() != null)
-              ? java.time.Duration.between(c.getStartTime(), c.getEndTime()).toMillis()
+          (c.flow().startTime() != null && c.flow().endTime() != null)
+              ? java.time.Duration.between(c.flow().startTime(), c.flow().endTime()).toMillis()
               : 0;
       addRow(
           table,
           bg,
           f,
-          endpoint(c.getSrcIp(), c.getSrcPort()),
-          endpoint(c.getDstIp(), c.getDstPort()),
-          nvl(c.getProtocol()),
-          nvl(c.getAppName()),
-          nvl(c.getHostname()),
-          c.getPacketCount() != null ? String.valueOf(c.getPacketCount()) : "—",
-          c.getTotalBytes() != null ? formatBytes(c.getTotalBytes()) : "—",
+          endpoint(c.flow().srcIp(), c.flow().srcPort()),
+          endpoint(c.flow().dstIp(), c.flow().dstPort()),
+          nvl(c.flow().protocol()),
+          nvl(c.findings().appName()),
+          nvl(c.tls().hostname()),
+          String.valueOf(c.flow().packetCount()),
+          formatBytes(c.flow().totalBytes()),
           formatDuration(ms));
     }
     doc.add(table);
@@ -1373,14 +1370,11 @@ public class ReportService {
     return s.length() > maxLen ? s.substring(0, maxLen - 1) + "…" : s;
   }
 
-  private static String joinRisks(String[] flowRisks, String[] customSigs) {
+  /** Both lists come from the port and are never null (see ConversationLookup.Findings). */
+  private static String joinRisks(List<String> flowRisks, List<String> customSigs) {
     StringBuilder sb = new StringBuilder();
-    if (flowRisks != null) {
-      for (String r : flowRisks) sb.append(r).append(" ");
-    }
-    if (customSigs != null) {
-      for (String s : customSigs) sb.append("[SIG] ").append(s).append(" ");
-    }
+    for (String r : flowRisks) sb.append(r).append(" ");
+    for (String s : customSigs) sb.append("[SIG] ").append(s).append(" ");
     String result = sb.toString().trim();
     return result.isBlank() ? "—" : result;
   }

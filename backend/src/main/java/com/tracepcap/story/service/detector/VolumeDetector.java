@@ -1,30 +1,45 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.HostVolume;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.story.spi.Tier;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class VolumeDetector {
+public class VolumeDetector implements Scanner {
 
   private static final long EXFIL_BYTES_THRESHOLD = 10 * 1024 * 1024; // 10 MB
   private static final double ASYMMETRY_RATIO_THRESHOLD = 10.0;
 
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
 
-  public List<Finding> detect(UUID fileId, long totalBytes) {
-    List<Object[]> rows = conversationRepository.findTopSendersByFileId(fileId);
+  @Override
+  public String name() {
+    return "volume";
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public List<Finding> scan(ScanContext context) {
+    long totalBytes = context.totalBytes();
     List<Finding> findings = new ArrayList<>();
 
-    for (Object[] row : rows) {
-      String srcIp = String.valueOf(row[0]);
-      long senderBytes = ((Number) row[1]).longValue();
-      long flowCount = ((Number) row[2]).longValue();
+    for (HostVolume sender : conversationLookup.topSenders(context.fileId())) {
+      String srcIp = sender.srcIp();
+      long senderBytes = sender.totalBytes();
+      long flowCount = sender.flowCount();
 
       if (totalBytes <= 0) continue;
       double pct = (senderBytes * 100.0) / totalBytes;

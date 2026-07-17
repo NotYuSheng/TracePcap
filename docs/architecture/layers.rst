@@ -381,9 +381,11 @@ Known divergence
 Measured against the model above; frozen in the ArchUnit baseline where enforceable. Each entry
 is a refactor target, not a shrug.
 
-* **529 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
-  entities (rule 2) — down from 757 as the seam migration proceeds slice by slice (757 → 738 in
-  slice 6a, → 687 in 6b, → 529 in 6c). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
+* **66 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
+  entities (rule 2) — down from 757 (757 → 738 in slice 6a, → 687 in 6b, → 529 in 6c, → 66 in 6d).
+  Approaching the documented residual: 27 are ``DeviceClassifierService`` (accepted, see below), 10
+  are ``extraction``'s cross-module FK, 26 are ``InvestigationService``. Rule 1 holds at **zero**
+  violations. **Module cycles: zero** — three were
   eliminated across slices 1 and 3: ``analysis ↔ file`` (listener moved to its consumer),
   ``monitor ↔ insights`` and ``monitor ↔ subnets`` (a ``monitor.spi`` port package —
   ``LabelStalenessCheck``, ``SnapshotRevalidationHook``, ``InsightPresence`` — implemented by
@@ -458,5 +460,32 @@ is a refactor target, not a shrug.
   - ``ExtractedFileEntity`` holds a JPA ``@ManyToOne`` to ``ConversationEntity``. The FK crosses the
     module boundary *at the schema level*, so no read port removes it — same class as
     ``DeviceClassifierService``, structural rather than lazy. ``extraction``'s residual is this.
+* **The Scan stage is a registry** (slice 6d) — *the first slice that builds the playbook rather
+  than clearing the way for it.* ``FindingsService`` held eight detector fields and eight call
+  lines; a ninth detector meant editing it, which is the "edit a core to add capability" this whole
+  architecture exists to prevent. It now injects ``List<Scanner>`` and names nobody.
+
+  The blocker was signature drift: the eight detectors had **five different** ``detect(..)``
+  signatures between them, so there was no common interface to list-inject — which is *why* no
+  registry existed. ``ScanContext`` collapses them into one, memoising its reads so eight scanners
+  asking for the conversation list read the database once.
+
+  ``story.spi`` now holds the three types the playbook is built on:
+
+  - ``Scanner`` — ``name()``, ``tier()``, ``scan(ScanContext)``. Every implementation is discovered.
+  - ``Tier`` — ``DETERMINISTIC`` / ``LLM`` / ``HUMAN_ASSISTED``, declared by the module itself. The
+    D/L/H taxonomy stops being a table in this document and becomes something the code knows.
+  - ``ScanContext`` — the facts a scanner may read. Growing it as a new scanner needs a new fact is
+    the seam working; a scanner taking a bespoke parameter is not.
+
+  Discovery is Spring ``List<T>`` injection, the pattern ``SnapshotRevalidationHook`` already uses
+  (slice 3) — zero new machinery, and reversible: ``Scanner`` is the contract, and how instances are
+  found can change without touching a scanner.
+
+  **The definition of done, and how it is enforced**: ``ScannerRegistryTest`` declares a probe
+  scanner in a test file, registered nowhere, touching nothing in ``main`` — then asserts on the
+  *finding that comes back through* ``FindingsService``. Its first version checked bean counts
+  instead, and passed against a ``FindingsService`` whose scanner list had been emptied; that is
+  precisely the failure it exists to catch, so it observes output now.
 * **``FilterService`` reads the pcap** to validate LLM-generated filters — the one grey case in
   rule 4, baselined rather than blessed.
