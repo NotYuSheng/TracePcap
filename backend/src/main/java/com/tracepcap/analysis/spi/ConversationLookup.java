@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.spi;
 
+import com.tracepcap.analysis.dto.ConversationFilterParams;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -99,6 +100,18 @@ public interface ConversationLookup {
 
   /** Every conversation in the file. Never contains null elements. */
   List<ConversationFacts> conversationFacts(UUID fileId);
+
+  /**
+   * The conversations in a file matching {@code filter}, or all of them when {@code filter} is null
+   * or has no active criteria.
+   *
+   * <p>Takes the filter rather than a query: {@link ConversationFilterParams} already sits on the
+   * seam, so a consumer can say <em>what</em> it wants without knowing <em>how</em> the rows are
+   * selected. The JPA {@code Specification} that implements this stays inside {@code analysis} —
+   * exposing it would put {@code ConversationEntity} in the caller's signature and re-open the seam
+   * through the type system, which is exactly how the filtered paths bypassed it before.
+   */
+  List<ConversationFacts> conversationFacts(UUID fileId, ConversationFilterParams filter);
 
   /**
    * One conversation by its own id, or empty when no such conversation exists.

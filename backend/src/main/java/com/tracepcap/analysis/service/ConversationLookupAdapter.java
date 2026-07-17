@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.spi.ConversationLookup;
@@ -21,6 +22,17 @@ public class ConversationLookupAdapter implements ConversationLookup {
   @Override
   public List<ConversationFacts> conversationFacts(UUID fileId) {
     return repository.findByFileId(fileId).stream().map(ConversationLookupAdapter::toFacts).toList();
+  }
+
+  @Override
+  public List<ConversationFacts> conversationFacts(UUID fileId, ConversationFilterParams filter) {
+    // The Specification stays on this side of the seam: returning it would put ConversationEntity
+    // in the caller's signature, which is how the filtered paths bypassed the port before.
+    List<ConversationEntity> rows =
+        filter == null
+            ? repository.findByFileId(fileId)
+            : repository.findAll(ConversationRepository.buildSpec(fileId, filter));
+    return rows.stream().map(ConversationLookupAdapter::toFacts).toList();
   }
 
   @Override

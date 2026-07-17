@@ -12,11 +12,18 @@ import java.util.Map;
  * range. It is not measured, it is not testimony from the host, and it goes stale as ranges are
  * reassigned. Consumers should weigh it accordingly.
  *
- * <p>The port stays narrower than the underlying row on purpose. The geo cache also stores city,
- * region and coordinates; no module has needed those across the seam, and exposing them "just in
- * case" is how a port becomes a repository. {@link #orgsFor} answers the common question directly;
- * {@link #attributionFor} exists for consumers that must compare ASN or country between snapshots.
- * Add fields when a consumer actually needs them, not before.
+ * <p>Three shapes, widening only as a consumer has actually needed them:
+ *
+ * <ul>
+ *   <li>{@link #orgsFor} — just the names. "Whose infrastructure did this host talk to?"
+ *   <li>{@link #attributionFor} — ASN, org, country. Enough to tell a real gateway change from
+ *       noise when comparing two snapshots.
+ *   <li>{@link #placesFor} — adds city and coordinates, for consumers that group hosts
+ *       geographically. Widest, and deliberately the last resort.
+ * </ul>
+ *
+ * Three methods rather than one full record, because the narrow answers stay cheap to reason about:
+ * a caller comparing ASNs has no business holding a latitude.
  */
 public interface GeoOrgLookup {
 
@@ -41,4 +48,29 @@ public interface GeoOrgLookup {
    * map.
    */
   Map<String, IpAttribution> attributionFor(Collection<String> ips);
+
+  /**
+   * Where an IP is believed to be, for consumers that group hosts geographically.
+   *
+   * <p>{@code geoSource} names which database answered (the online lookup or the bundled offline
+   * MMDB) — it is provenance, not location, and consumers surface it so a user can judge the claim.
+   * Every other field may be null, and coordinates are a coarse range centroid: they locate the
+   * <em>registration</em>, never the device.
+   */
+  record IpPlace(
+      String ip,
+      String asn,
+      String org,
+      String countryCode,
+      String country,
+      String city,
+      Double lat,
+      Double lon,
+      String geoSource) {}
+
+  /**
+   * Places for each of the given IPs that has a geo record, keyed by IP. IPs with no record are
+   * absent rather than mapped to an empty value; an empty input yields an empty map.
+   */
+  Map<String, IpPlace> placesFor(Collection<String> ips);
 }

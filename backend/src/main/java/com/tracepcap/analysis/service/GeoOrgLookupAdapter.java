@@ -39,4 +39,25 @@ public class GeoOrgLookupAdapter implements GeoOrgLookup {
     }
     return Map.copyOf(byIp);
   }
+
+  @Override
+  public Map<String, IpPlace> placesFor(Collection<String> ips) {
+    if (ips == null || ips.isEmpty()) return Map.of();
+    Map<String, IpPlace> byIp = new LinkedHashMap<>();
+    for (IpGeoInfoEntity g : repository.findAllByIpIn(ips)) {
+      byIp.putIfAbsent(
+          g.getIp(),
+          new IpPlace(
+              g.getIp(),
+              g.getAsn(),
+              g.getOrg(),
+              g.getCountryCode(),
+              g.getCountry(),
+              g.getCity(),
+              g.getLat(),
+              g.getLon(),
+              g.getGeoSource()));
+    }
+    return Map.copyOf(byIp);
+  }
 }
