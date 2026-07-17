@@ -1,22 +1,38 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ExtractionManifest;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.story.spi.Tier;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class UnknownAppDetector {
+public class UnknownAppDetector implements Scanner {
 
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
   private final ExtractionManifest extractionManifest;
 
-  public List<Finding> detect(UUID fileId, long totalConversations) {
+  @Override
+  public String name() {
+    return "unknown-app";
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public List<Finding> scan(ScanContext context) {
+    UUID fileId = context.fileId();
+    long totalConversations = context.totalConversations();
     if (totalConversations == 0) return List.of();
 
     // app_name IS NULL means "nDPI couldn't identify it" only if nDPI actually ran. When the
@@ -30,7 +46,7 @@ public class UnknownAppDetector {
       return List.of(coverageGap(ndpiRun.get()));
     }
 
-    long unknown = conversationRepository.countUnknownAppByFileId(fileId);
+    long unknown = conversationLookup.unidentifiedAppCount(fileId);
     double pct = (unknown * 100.0) / totalConversations;
 
     if (pct < 5.0) return List.of();

@@ -3,9 +3,10 @@ package com.tracepcap.story.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.timeline.dto.TimelineDataDto;
-import com.tracepcap.analysis.entity.AnalysisResultEntity;
-import com.tracepcap.analysis.repository.AnalysisResultRepository;
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.AnalysisSummaryLookup;
+import com.tracepcap.analysis.spi.AnalysisSummaryLookup.CaptureSummary;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.Breakdown;
 import com.tracepcap.timeline.service.TimelineService;
 import com.tracepcap.common.exception.ContextLengthExceededException;
 import com.tracepcap.common.exception.LlmException;
@@ -32,8 +33,8 @@ public class StoryService {
 
   private final StoryRepository storyRepository;
   private final FileRepository fileRepository;
-  private final AnalysisResultRepository analysisResultRepository;
-  private final ConversationRepository conversationRepository;
+  private final AnalysisSummaryLookup analysisSummaryLookup;
+  private final ConversationLookup conversationLookup;
   private final LlmClient llmClient;
   private final LlmConfig llmConfig;
   private final ObjectMapper objectMapper;
@@ -73,9 +74,9 @@ public class StoryService {
             .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
 
     // Get analysis results
-    AnalysisResultEntity analysis =
-        analysisResultRepository
-            .findByFileId(fileId)
+    CaptureSummary analysis =
+        analysisSummaryLookup
+            .summaryFor(fileId)
             .orElseThrow(
                 () -> new ResourceNotFoundException("Analysis not found for file: " + fileId));
 
@@ -88,11 +89,11 @@ public class StoryService {
       // skip all prompt-building phases and send it directly to the LLM.
       if (customPrompt != null && !customPrompt.isBlank()) {
         log.info("Using user-supplied custom prompt for file: {}", fileId);
-        long totalConvsCustom = conversationRepository.countByFileId(fileId);
+        long totalConvsCustom = conversationLookup.conversationCount(fileId);
         StoryAggregates aggregates = storyAggregatesService.compute(
             fileId, List.of(), totalConvsCustom);
         List<Finding> findings = findingsService.detectAll(
-            fileId, totalConvsCustom, analysis.getTotalBytes());
+            fileId, totalConvsCustom, analysis.totalBytes());
 
         // Re-run Phase 1 so investigation steps are preserved in the response.
         // The custom prompt already encodes the narrative context, but structured
@@ -133,11 +134,11 @@ public class StoryService {
         return storyResponse;
       }
 
-      long totalConversations = conversationRepository.countByFileId(fileId);
+      long totalConversations = conversationLookup.conversationCount(fileId);
 
       // Run all deterministic detectors
       List<Finding> findings =
-          findingsService.detectAll(fileId, totalConversations, analysis.getTotalBytes());
+          findingsService.detectAll(fileId, totalConversations, analysis.totalBytes());
       log.info("Detected {} findings for file: {}", findings.size(), fileId);
 
       // Pre-compute aggregates over the full dataset for the aggregates panel and prompt context
@@ -378,12 +379,12 @@ public class StoryService {
   private static final int DEFAULT_MAX_RISK_MATRIX = 15;
 
   private String buildBasePromptContext(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      FileEntity file, CaptureSummary analysis, String additionalContext,
       StoryAggregates agg, List<Finding> findings,
       Integer maxFindingsOverride, Integer maxRiskMatrixOverride) {
 
     UUID fileId = file.getId();
-    List<Object[]> categoryRows = conversationRepository.findCategoryDistributionByFileId(fileId);
+    List<ConversationLookup.NamedTotals> categoryRows = conversationLookup.breakdown(fileId, Breakdown.CATEGORY);
 
     StringBuilder prompt = new StringBuilder();
     prompt.append(
@@ -395,19 +396,19 @@ public class StoryService {
     prompt.append("\n");
 
     prompt.append("## Traffic Summary\n");
-    prompt.append(String.format("- Total Packets: %d\n", analysis.getPacketCount()));
-    prompt.append(String.format("- Total Bytes: %d\n", analysis.getTotalBytes()));
-    prompt.append(String.format("- Duration: %d ms\n", analysis.getDurationMs()));
-    prompt.append(String.format("- Start Time: %s\n", analysis.getStartTime()));
-    prompt.append(String.format("- End Time: %s\n", analysis.getEndTime()));
+    prompt.append(String.format("- Total Packets: %d\n", analysis.packetCount()));
+    prompt.append(String.format("- Total Bytes: %d\n", analysis.totalBytes()));
+    prompt.append(String.format("- Duration: %d ms\n", analysis.durationMs()));
+    prompt.append(String.format("- Start Time: %s\n", analysis.startTime()));
+    prompt.append(String.format("- End Time: %s\n", analysis.endTime()));
     long totalConversations =
         agg.getCoverage() != null ? agg.getCoverage().getTotalConversations() : 0;
     prompt.append(String.format("- Total Conversations: %d\n\n", totalConversations));
 
-    if (analysis.getProtocolStats() != null && !analysis.getProtocolStats().isEmpty()) {
+    if (analysis.protocolStats() != null && !analysis.protocolStats().isEmpty()) {
       prompt.append("## Protocol Breakdown\n");
       analysis
-          .getProtocolStats()
+          .protocolStats()
           .forEach(
               (protocol, statsObj) -> {
                 if (statsObj instanceof Map) {
@@ -430,8 +431,8 @@ public class StoryService {
 
     if (!categoryRows.isEmpty()) {
       prompt.append("## Traffic Category Breakdown\n");
-      for (Object[] row : categoryRows) {
-        prompt.append(String.format("- %s: %s packets\n", row[0], row[1]));
+      for (ConversationLookup.NamedTotals row : categoryRows) {
+        prompt.append(String.format("- %s: %s packets\n", row.name(), row.packetCount()));
       }
       prompt.append("\n");
     }
@@ -595,7 +596,7 @@ public class StoryService {
 
   /** Build hypothesis user prompt for Phase 1 */
   private String buildHypothesisUserPrompt(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      FileEntity file, CaptureSummary analysis, String additionalContext,
       StoryAggregates aggregates, List<Finding> findings, List<TimelineDataDto> timelineBins,
       Integer maxFindings, Integer maxRiskMatrix) {
 
@@ -613,7 +614,7 @@ public class StoryService {
 
   /** Build the full narrative user prompt for Phase 2 */
   private String buildNarrativeUserPrompt(
-      FileEntity file, AnalysisResultEntity analysis, String additionalContext,
+      FileEntity file, CaptureSummary analysis, String additionalContext,
       StoryAggregates aggregates, List<Finding> findings,
       List<TimelineDataDto> timelineBins, List<InvestigationStep> investigationSteps,
       Integer maxFindings, Integer maxRiskMatrix) {

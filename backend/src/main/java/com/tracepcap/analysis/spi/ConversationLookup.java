@@ -253,6 +253,91 @@ public interface ConversationLookup {
   /** Up to {@code limit} conversations that carried a TLS certificate. */
   List<ConversationFacts> tlsConversations(UUID fileId, int limit);
 
+  /** Every conversation in the file that carried a TLS certificate. */
+  List<ConversationFacts> tlsConversations(UUID fileId);
+
+  /** Total packets across the file's conversations — summed in the database. */
+  long sumPackets(UUID fileId);
+
+  /** How many of a protocol's conversations carry a risk flag. */
+  record ProtocolRisk(String protocol, long total, long atRisk) {}
+
+  /**
+   * Per-protocol conversation counts alongside how many were flagged, busiest first — the "which
+   * protocols carry the trouble" matrix.
+   */
+  List<ProtocolRisk> protocolRiskMatrix(UUID fileId);
+
+  /** Total bytes across the file's conversations — summed in the database. */
+  long sumBytes(UUID fileId);
+
+  /** One host and how widely it reached: distinct destinations, and flows in total. */
+  record HostFanOut(String srcIp, long distinctDestinations, long totalFlows) {}
+
+  /**
+   * Hosts that reached more than a handful of distinct destinations — the candidate set for the
+   * scanning / lateral-movement shape.
+   *
+   * <p>Aggregated in the database. A scanner could fold this out of {@link #conversationFacts}, but
+   * COUNT(DISTINCT) over a table is the database's job, and doing it in Java would mean holding
+   * every conversation to produce a handful of rows.
+   *
+   * <p>The cut-off is the query's, not the caller's: this returns <em>candidates</em>, and deciding
+   * which of them is actually interesting — and at what severity — is the scanner's judgment to make.
+   */
+  List<HostFanOut> fanOutCandidates(UUID fileId);
+
+  /** One host's outbound volume. */
+  record HostVolume(String srcIp, long totalBytes, long flowCount) {}
+
+  /** The heaviest senders in the file, bytes descending, capped at a sane number for a summary. */
+  List<HostVolume> topSenders(UUID fileId);
+
+  /**
+   * How many conversations nDPI could not name.
+   *
+   * <p>Ambiguous on its own — a zero could mean "everything was identified" or "nDPI never ran".
+   * Pair it with {@link ExtractionManifest} before drawing a conclusion; #501 is the bug that
+   * conflation causes.
+   */
+  long unidentifiedAppCount(UUID fileId);
+
+  /** How widely one nDPI risk label appears across a file. */
+  record RiskTypeStats(
+      String riskType,
+      long conversationCount,
+      long totalBytes,
+      long distinctSourceIps,
+      long distinctDestinationIps) {}
+
+  /**
+   * Each nDPI risk label in the file with its spread — how many conversations carry it, and across
+   * how many distinct hosts.
+   *
+   * <p>Aggregated in the database, unnesting the risk array. <b>INFERRED</b>: these are nDPI's
+   * conclusions, with nDPI's error modes.
+   */
+  List<RiskTypeStats> riskTypeStats(UUID fileId);
+
+  /** One unusually long-lived flow. */
+  record LongSession(
+      String srcIp,
+      String dstIp,
+      Integer dstPort,
+      String protocol,
+      String appName,
+      long durationMs,
+      long totalBytes,
+      long packetCount) {}
+
+  /**
+   * Flows lasting at least {@code minSeconds}, longest first.
+   *
+   * <p>Duration is computed in the database from the stored start/end times, which is why this is
+   * not folded out of {@link #conversationFacts}: filtering on a computed value is what SQL is for.
+   */
+  List<LongSession> longSessions(UUID fileId, long minSeconds);
+
   /**
    * The vocabularies a file can be asked for — the distinct values of one column across every
    * conversation. Used to populate filter dropdowns and to diff one snapshot against another.

@@ -1,9 +1,12 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.story.spi.Tier;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -12,23 +15,36 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class BeaconDetector {
+public class BeaconDetector implements Scanner {
 
-  private final ConversationRepository conversationRepository;
+  @Override
+  public String name() {
+    return "beacon";
+  }
 
-  public List<Finding> detect(UUID fileId) {
-    List<Object[]> rows = conversationRepository.findFlowsForBeaconDetection(fileId);
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
 
+  @Override
+  public List<Finding> scan(ScanContext context) {
     record FlowKey(String src, String dst, String port, String proto) {}
+    // Grouped from the context's shared conversation list rather than a bespoke query: the list is
+    // loaded once for the whole scan run either way, so a second read would buy nothing.
     Map<FlowKey, List<LocalDateTime>> groups = new HashMap<>();
-    for (Object[] row : rows) {
-      String src = String.valueOf(row[0]);
-      String dst = row[1] != null ? String.valueOf(row[1]) : "";
-      String port = row[2] != null ? String.valueOf(row[2]) : "";
-      String proto = String.valueOf(row[3]);
-      FlowKey key = new FlowKey(src, dst, port, proto);
-      groups.computeIfAbsent(key, k -> new ArrayList<>()).add((LocalDateTime) row[5]);
+    for (ConversationFacts c : context.conversations()) {
+      FlowKey key =
+          new FlowKey(
+              c.flow().srcIp(),
+              c.flow().dstIp() != null ? c.flow().dstIp() : "",
+              c.flow().dstPort() != null ? String.valueOf(c.flow().dstPort()) : "",
+              c.flow().protocol());
+      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(c.flow().startTime());
     }
+    // The old query pre-sorted by start time; grouping in Java must sort explicitly, since the
+    // interval maths below is meaningless on unordered timestamps.
+    groups.values().forEach(java.util.Collections::sort);
 
     List<Finding> findings = new ArrayList<>();
     for (Map.Entry<FlowKey, List<LocalDateTime>> e : groups.entrySet()) {

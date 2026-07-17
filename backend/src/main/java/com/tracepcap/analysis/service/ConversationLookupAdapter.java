@@ -201,6 +201,76 @@ public class ConversationLookupAdapter implements ConversationLookup {
         .toList();
   }
 
+  @Override
+  public List<HostFanOut> fanOutCandidates(UUID fileId) {
+    return repository.findFanOutCandidatesByFileId(fileId).stream()
+        .map(r -> new HostFanOut((String) r[0], asLong(r[1]), asLong(r[2])))
+        .toList();
+  }
+
+  @Override
+  public List<HostVolume> topSenders(UUID fileId) {
+    return repository.findTopSendersByFileId(fileId).stream()
+        .map(r -> new HostVolume((String) r[0], asLong(r[1]), asLong(r[2])))
+        .toList();
+  }
+
+  @Override
+  public long unidentifiedAppCount(UUID fileId) {
+    return repository.countUnknownAppByFileId(fileId);
+  }
+
+  @Override
+  public List<RiskTypeStats> riskTypeStats(UUID fileId) {
+    return repository.findRiskTypeStatsByFileId(fileId).stream()
+        .map(
+            r ->
+                new RiskTypeStats(
+                    (String) r[0], asLong(r[1]), asLong(r[2]), asLong(r[3]), asLong(r[4])))
+        .toList();
+  }
+
+  @Override
+  public List<LongSession> longSessions(UUID fileId, long minSeconds) {
+    return repository.findLongSessionsByFileId(fileId, minSeconds).stream()
+        .map(
+            r ->
+                new LongSession(
+                    (String) r[0],
+                    (String) r[1],
+                    r[2] == null ? null : ((Number) r[2]).intValue(),
+                    (String) r[3],
+                    (String) r[4],
+                    asLong(r[5]),
+                    asLong(r[6]),
+                    asLong(r[7])))
+        .toList();
+  }
+
+  @Override
+  public List<ConversationFacts> tlsConversations(UUID fileId) {
+    return repository.findTlsConversationsByFileId(fileId).stream()
+        .map(ConversationLookupAdapter::toFacts)
+        .toList();
+  }
+
+  @Override
+  public long sumPackets(UUID fileId) {
+    return repository.sumPacketsByFileId(fileId);
+  }
+
+  @Override
+  public long sumBytes(UUID fileId) {
+    return repository.sumTotalBytesByFileId(fileId);
+  }
+
+  @Override
+  public List<ProtocolRisk> protocolRiskMatrix(UUID fileId) {
+    return repository.findProtocolRiskMatrixByFileId(fileId).stream()
+        .map(r -> new ProtocolRisk((String) r[0], asLong(r[1]), asLong(r[2])))
+        .toList();
+  }
+
   private static ConversationFacts toFacts(ConversationEntity e) {
     return new ConversationFacts(
         e.getId(),

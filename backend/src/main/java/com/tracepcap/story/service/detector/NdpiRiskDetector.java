@@ -1,16 +1,20 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.RiskTypeStats;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.story.spi.Tier;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class NdpiRiskDetector {
+public class NdpiRiskDetector implements Scanner {
 
   private static final Set<String> CRITICAL_RISKS =
       Set.of(
@@ -25,17 +29,27 @@ public class NdpiRiskDetector {
           "self_signed_certificate", "obsolete_tls_version",
           "weak_tls_cipher", "tls_certificate_about_to_expire");
 
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
 
-  public List<Finding> detect(UUID fileId) {
-    List<Object[]> rows = conversationRepository.findRiskTypeStatsByFileId(fileId);
+  @Override
+  public String name() {
+    return "ndpi-risk";
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public List<Finding> scan(ScanContext context) {
     List<Finding> findings = new ArrayList<>();
-    for (Object[] row : rows) {
-      String riskType = String.valueOf(row[0]);
-      long convCount = ((Number) row[1]).longValue();
-      long bytes = ((Number) row[2]).longValue();
-      long srcIps = ((Number) row[3]).longValue();
-      long dstIps = ((Number) row[4]).longValue();
+    for (RiskTypeStats row : conversationLookup.riskTypeStats(context.fileId())) {
+      String riskType = row.riskType();
+      long convCount = row.conversationCount();
+      long bytes = row.totalBytes();
+      long srcIps = row.distinctSourceIps();
+      long dstIps = row.distinctDestinationIps();
 
       Severity severity = classifySeverity(riskType);
       Map<String, Object> metrics = new LinkedHashMap<>();

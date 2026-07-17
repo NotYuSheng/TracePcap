@@ -1,25 +1,40 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.story.spi.Tier;
 import com.tracepcap.story.service.TlsAnomalyUtil;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TlsAnomalyDetector {
+public class TlsAnomalyDetector implements Scanner {
 
-  public List<Finding> detect(List<ConversationEntity> tlsConversations) {
+  @Override
+  public String name() {
+    return "tls-anomaly";
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public List<Finding> scan(ScanContext context) {
+    List<ConversationFacts> tlsConversations = context.tlsConversations();
     List<Finding> findings = new ArrayList<>();
 
-    List<ConversationEntity> selfSigned =
+    List<ConversationFacts> selfSigned =
         tlsConversations.stream().filter(TlsAnomalyUtil::isSelfSigned).collect(Collectors.toList());
-    List<ConversationEntity> expired =
+    List<ConversationFacts> expired =
         tlsConversations.stream().filter(TlsAnomalyUtil::isExpired).collect(Collectors.toList());
-    List<ConversationEntity> unknownCa =
+    List<ConversationFacts> unknownCa =
         tlsConversations.stream()
             .filter(c -> !TlsAnomalyUtil.isSelfSigned(c) && TlsAnomalyUtil.isUnknownCa(c))
             .collect(Collectors.toList());
@@ -27,7 +42,7 @@ public class TlsAnomalyDetector {
     if (!selfSigned.isEmpty()) {
       List<String> ips =
           selfSigned.stream()
-              .map(ConversationEntity::getDstIp)
+              .map(c -> c.flow().dstIp())
               .filter(Objects::nonNull)
               .distinct()
               .limit(5)
@@ -52,7 +67,7 @@ public class TlsAnomalyDetector {
     if (!expired.isEmpty()) {
       List<String> ips =
           expired.stream()
-              .map(ConversationEntity::getDstIp)
+              .map(c -> c.flow().dstIp())
               .filter(Objects::nonNull)
               .distinct()
               .limit(5)
@@ -77,7 +92,7 @@ public class TlsAnomalyDetector {
     if (!unknownCa.isEmpty()) {
       List<String> ips =
           unknownCa.stream()
-              .map(ConversationEntity::getDstIp)
+              .map(c -> c.flow().dstIp())
               .filter(Objects::nonNull)
               .distinct()
               .limit(5)

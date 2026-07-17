@@ -1,9 +1,9 @@
 package com.tracepcap.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.story.dto.StoryAggregates;
 import com.tracepcap.story.dto.StoryAggregates.AsnEntry;
 import com.tracepcap.story.dto.StoryAggregates.BeaconCandidate;
@@ -31,14 +31,14 @@ public class StoryAggregatesService {
   private static final Set<String> PRIVATE_PREFIXES =
       Set.of("10.", "127.", "169.254.", "::1", "fc", "fd", "fe80");
 
-  private final ConversationRepository conversationRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final ConversationLookup conversationLookup;
+  private final GeoOrgLookup geoOrgLookup;
 
   public StoryAggregates compute(
-      UUID fileId, List<ConversationEntity> shownConversations, long totalConversations) {
+      UUID fileId, List<ConversationFacts> shownConversations, long totalConversations) {
     try {
-      long totalPackets = conversationRepository.sumPacketsByFileId(fileId);
-      long totalBytes = conversationRepository.sumTotalBytesByFileId(fileId);
+      long totalPackets = conversationLookup.sumPackets(fileId);
+      long totalBytes = conversationLookup.sumBytes(fileId);
 
       return StoryAggregates.builder()
           .coverage(
@@ -69,9 +69,9 @@ public class StoryAggregatesService {
   // ── Coverage ──────────────────────────────────────────────────────────────
 
   private Coverage computeCoverage(
-      List<ConversationEntity> shown, long totalConversations, long totalPackets, long totalBytes) {
-    long shownPackets = shown.stream().mapToLong(ConversationEntity::getPacketCount).sum();
-    long shownBytes = shown.stream().mapToLong(ConversationEntity::getTotalBytes).sum();
+      List<ConversationFacts> shown, long totalConversations, long totalPackets, long totalBytes) {
+    long shownPackets = shown.stream().mapToLong(c -> c.flow().packetCount()).sum();
+    long shownBytes = shown.stream().mapToLong(c -> c.flow().totalBytes()).sum();
     double bytesCoveragePct =
         totalBytes > 0 ? Math.round(shownBytes * 1000.0 / totalBytes) / 10.0 : 0.0;
     return Coverage.builder()
@@ -87,15 +87,15 @@ public class StoryAggregatesService {
 
   private List<AsnEntry> computeTopAsns(UUID fileId, long totalBytes) {
     // Fetch all conversations to get dst IPs and their byte counts
-    List<ConversationEntity> all = conversationRepository.findByFileId(fileId);
+    List<ConversationFacts> all = conversationLookup.conversationFacts(fileId);
 
     // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();
     Map<String, Long> ipFlows = new HashMap<>();
     Map<String, Boolean> privateCache = new HashMap<>();
-    for (ConversationEntity c : all) {
-      String dst = c.getDstIp();
-      String src = c.getSrcIp();
+    for (ConversationFacts c : all) {
+      String dst = c.flow().dstIp();
+      String src = c.flow().srcIp();
       // Prefer dstIp as the "remote" endpoint; fall back to srcIp if dst is private/null
       String ip = null;
       if (dst != null && !privateCache.computeIfAbsent(dst, StoryAggregatesService::isPrivate)) {
@@ -105,7 +105,7 @@ public class StoryAggregatesService {
         ip = src;
       }
       if (ip != null) {
-        ipBytes.merge(ip, c.getTotalBytes(), Long::sum);
+        ipBytes.merge(ip, c.flow().totalBytes(), Long::sum);
         ipFlows.merge(ip, 1L, Long::sum);
       }
     }
@@ -113,19 +113,17 @@ public class StoryAggregatesService {
     if (ipBytes.isEmpty()) return List.of();
 
     // Bulk geo lookup
-    Map<String, IpGeoInfoEntity> geoByIp =
-        ipGeoInfoRepository.findAllByIpIn(ipBytes.keySet()).stream()
-            .collect(Collectors.toMap(IpGeoInfoEntity::getIp, g -> g, (a, b) -> a));
+    Map<String, GeoOrgLookup.IpAttribution> geoByIp = geoOrgLookup.attributionFor(ipBytes.keySet());
 
     // Group by (asn, org, country)
     record AsnKey(String asn, String org, String country) {}
     Map<AsnKey, Long> asnBytes = new HashMap<>();
     Map<AsnKey, Long> asnFlows = new HashMap<>();
     for (Map.Entry<String, Long> e : ipBytes.entrySet()) {
-      IpGeoInfoEntity geo = geoByIp.get(e.getKey());
+      GeoOrgLookup.IpAttribution geo = geoByIp.get(e.getKey());
       AsnKey key =
           geo != null
-              ? new AsnKey(geo.getAsn(), geo.getOrg(), geo.getCountryCode())
+              ? new AsnKey(geo.asn(), geo.org(), geo.countryCode())
               : new AsnKey(null, "Unknown", null);
       asnBytes.merge(key, e.getValue(), Long::sum);
       asnFlows.merge(key, ipFlows.getOrDefault(e.getKey(), 0L), Long::sum);
@@ -173,13 +171,13 @@ public class StoryAggregatesService {
   // ── Protocol × Risk Matrix ─────────────────────────────────────────────────
 
   private List<ProtocolRiskEntry> computeProtocolRiskMatrix(UUID fileId) {
-    return conversationRepository.findProtocolRiskMatrixByFileId(fileId).stream()
+    return conversationLookup.protocolRiskMatrix(fileId).stream()
         .map(
             row ->
                 ProtocolRiskEntry.builder()
-                    .protocol(String.valueOf(row[0]))
-                    .total(((Number) row[1]).longValue())
-                    .atRisk(((Number) row[2]).longValue())
+                    .protocol(row.protocol())
+                    .total(row.total())
+                    .atRisk(row.atRisk())
                     .build())
         .collect(Collectors.toList());
   }
@@ -187,7 +185,7 @@ public class StoryAggregatesService {
   // ── TLS Anomaly Summary ────────────────────────────────────────────────────
 
   private TlsAnomalySummary computeTlsSummary(UUID fileId) {
-    List<ConversationEntity> tlsConvs = conversationRepository.findTlsConversationsByFileId(fileId);
+    List<ConversationFacts> tlsConvs = conversationLookup.tlsConversations(fileId);
     long selfSigned = tlsConvs.stream().filter(TlsAnomalyUtil::isSelfSigned).count();
     long expired = tlsConvs.stream().filter(TlsAnomalyUtil::isExpired).count();
     long unknownCa =
@@ -206,29 +204,31 @@ public class StoryAggregatesService {
 
   private double computeUnknownAppPct(UUID fileId, long totalConversations) {
     if (totalConversations == 0) return 0.0;
-    long unknown = conversationRepository.countUnknownAppByFileId(fileId);
+    long unknown = conversationLookup.unidentifiedAppCount(fileId);
     return Math.round(unknown * 1000.0 / totalConversations) / 10.0;
   }
 
   // ── Beacon Candidates ──────────────────────────────────────────────────────
 
   private List<BeaconCandidate> computeBeaconCandidates(UUID fileId) {
-    List<Object[]> rows = conversationRepository.findFlowsForBeaconDetection(fileId);
+    List<ConversationFacts> rows = conversationLookup.conversationFacts(fileId);
 
     // Group by (srcIp, dstIp, dstPort, protocol)
     record FlowKey(String src, String dst, String port, String proto, String app) {}
     Map<FlowKey, List<LocalDateTime>> groups = new HashMap<>();
-    for (Object[] row : rows) {
-      String src = String.valueOf(row[0]);
-      String dst = row[1] != null ? String.valueOf(row[1]) : "";
-      String port = row[2] != null ? String.valueOf(row[2]) : "";
-      String proto = String.valueOf(row[3]);
-      String app = row[4] != null ? String.valueOf(row[4]) : null;
-      FlowKey key = new FlowKey(src, dst, port, proto, app);
-      LocalDateTime ts =
-          row[5] instanceof java.sql.Timestamp t ? t.toLocalDateTime() : (LocalDateTime) row[5];
-      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(ts);
+    for (ConversationFacts row : rows) {
+      FlowKey key =
+          new FlowKey(
+              row.flow().srcIp(),
+              row.flow().dstIp() != null ? row.flow().dstIp() : "",
+              row.flow().dstPort() != null ? String.valueOf(row.flow().dstPort()) : "",
+              row.flow().protocol(),
+              row.findings().appName());
+      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(row.flow().startTime());
     }
+    // The old query pre-sorted by start time; grouping in Java must sort explicitly, since the
+    // interval maths below is meaningless on unordered timestamps.
+    groups.values().forEach(java.util.Collections::sort);
 
     List<BeaconCandidate> candidates = new ArrayList<>();
     for (Map.Entry<FlowKey, List<LocalDateTime>> e : groups.entrySet()) {
