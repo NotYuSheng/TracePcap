@@ -5,19 +5,28 @@ name: Sync App Version
 # with no local setup. Compose only interpolates ${...} from the shell env and .env
 # (which is gitignored), so the value has to live in the compose file itself.
 #
-# The commit below is made with GITHUB_TOKEN, which by design cannot trigger further
-# workflows — so this never retriggers publish-ghcr.yml or itself.
+# main is a protected branch (changes must go through a PR), so this cannot push
+# directly. It opens a bump PR and enables auto-merge; the repo requires a PR but no
+# reviews, so the PR merges as soon as it is created. The merge is done with
+# GITHUB_TOKEN, which by design cannot trigger workflows — so the bump PR merging
+# does not retrigger this workflow or publish-ghcr.yml.
 
 on:
   push:
     branches:
       - main
 
+# Serialise runs so two quick merges to main can't open competing bump PRs.
+concurrency:
+  group: sync-app-version
+  cancel-in-progress: false
+
 jobs:
   sync-version:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -61,15 +70,32 @@ jobs:
               print(f"Wrote VITE_APP_VERSION default: {version}")
           PY
 
-      - name: Commit if changed
+      - name: Open and auto-merge a bump PR if changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if git diff --quiet docker-compose.yml; then
-            echo "docker-compose.yml already up to date — no commit needed."
+            echo "docker-compose.yml already up to date — no PR needed."
             exit 0
           fi
 
+          BRANCH="chore/sync-version-${VERSION}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
           git add docker-compose.yml
-          git commit -m "chore: sync app version to ${VERSION} [skip ci]"
-          git push
+          git commit -m "chore: sync app version to ${VERSION}"
+          git push --force-with-lease origin "$BRANCH"
+
+          # Reuse an existing open PR for this branch if the run is retried.
+          PR_URL=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [ -z "$PR_URL" ]; then
+            PR_URL=$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: sync app version to ${VERSION}" \
+              --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest main commit. Opened by .github/workflows/app-version.yml.")
+          fi
+
+          # No reviews are required on main, so auto-merge lands this immediately.
+          gh pr merge "$PR_URL" --squash --auto --delete-branch
