@@ -3,6 +3,7 @@ package com.tracepcap.story.service;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ExtractionManifest;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.story.dto.StoryAggregates;
 import com.tracepcap.story.dto.StoryAggregates.AsnEntry;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -32,6 +34,7 @@ public class StoryAggregatesService {
       Set.of("10.", "127.", "169.254.", "::1", "fc", "fd", "fe80");
 
   private final ConversationLookup conversationLookup;
+  private final ExtractionManifest extractionManifest;
   private final GeoOrgLookup geoOrgLookup;
 
   public StoryAggregates compute(
@@ -60,7 +63,8 @@ public class StoryAggregatesService {
           .topExternalAsns(List.of())
           .protocolRiskMatrix(List.of())
           .tlsAnomalySummary(TlsAnomalySummary.builder().build())
-          .unknownAppPct(0)
+          // Aggregation failed: the share is unknown, and 0% would be a claim we cannot make.
+          .unknownAppPct(null)
           .beaconCandidates(List.of())
           .build();
     }
@@ -202,8 +206,26 @@ public class StoryAggregatesService {
 
   // ── Unknown App % ──────────────────────────────────────────────────────────
 
-  private double computeUnknownAppPct(UUID fileId, long totalConversations) {
+  /**
+   * Share of conversations nDPI could not name, or null when nDPI did not complete.
+   *
+   * <p>Gated on the manifest for the same reason {@code UnknownAppDetector} is (#501): when nDPI is
+   * skipped or fails, every conversation is unidentified for tooling reasons, and a raw count says
+   * "100% unknown". The detector already refuses to call that a security finding — but this number
+   * goes into the LLM's prompt as full-dataset context, so leaving it ungated lets the same false
+   * conclusion back in through the narrative instead of the findings list. Null means "unknowable",
+   * which is the truth; the prompt renders it as such.
+   *
+   * <p>Files analysed before the manifest existed have no row: provenance unknown, so the historic
+   * behaviour stands rather than silently blanking the figure.
+   */
+  private Double computeUnknownAppPct(UUID fileId, long totalConversations) {
     if (totalConversations == 0) return 0.0;
+    Optional<ExtractionManifest.Run> ndpiRun =
+        extractionManifest.runFor(fileId, ExtractionManifest.NDPI);
+    if (ndpiRun.isPresent() && ndpiRun.get().status() != ExtractionManifest.Status.COMPLETED) {
+      return null;
+    }
     long unknown = conversationLookup.unidentifiedAppCount(fileId);
     return Math.round(unknown * 1000.0 / totalConversations) / 10.0;
   }

@@ -223,6 +223,10 @@ public class ConversationLookupAdapter implements ConversationLookup {
   @Override
   public List<RiskTypeStats> riskTypeStats(UUID fileId) {
     return repository.findRiskTypeStatsByFileId(fileId).stream()
+        // A text[] element may be null or blank — nothing in the schema forbids it, and unnest would
+        // pass it straight through. The port promises a name, so the enforcement belongs here rather
+        // than in every scanner that reads risks.
+        .filter(r -> r[0] != null && !((String) r[0]).isBlank())
         .map(
             r ->
                 new RiskTypeStats(

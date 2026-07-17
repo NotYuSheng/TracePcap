@@ -26,7 +26,11 @@ public class StoryAggregates {
   private TlsAnomalySummary tlsAnomalySummary;
 
   /** Unknown application percentage across all conversations (0–100). */
-  private double unknownAppPct;
+  /**
+   * Share of conversations nDPI could not name, or {@code null} when nDPI did not complete — in
+   * which case the share is unknowable rather than 100% (#501).
+   */
+  private Double unknownAppPct;
 
   /**
    * Flows exhibiting periodic beaconing behaviour (CV of inter-arrival times &lt; 0.3, ≥3 flows).

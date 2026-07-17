@@ -398,7 +398,13 @@ public class StoryService {
     prompt.append("## Traffic Summary\n");
     prompt.append(String.format("- Total Packets: %d\n", analysis.packetCount()));
     prompt.append(String.format("- Total Bytes: %d\n", analysis.totalBytes()));
-    prompt.append(String.format("- Duration: %d ms\n", analysis.durationMs()));
+    // durationMs is nullable by contract (the column permits it). %d would render the literal
+    // "null" — harmless in Java, but this string is LLM prompt context, and "Duration: null ms"
+    // invites the model to reason about a value that does not exist.
+    prompt.append(
+        analysis.durationMs() != null
+            ? String.format("- Duration: %d ms\n", analysis.durationMs())
+            : "- Duration: not available (capture has no timestamped packets)\n");
     prompt.append(String.format("- Start Time: %s\n", analysis.startTime()));
     prompt.append(String.format("- End Time: %s\n", analysis.endTime()));
     long totalConversations =
@@ -466,7 +472,11 @@ public class StoryService {
 
     // ── Full-Dataset Traffic Aggregates ────────────────────────────────────
     prompt.append("## Full-Dataset Traffic Aggregates\n");
-    prompt.append(String.format("- Unknown application traffic: %.1f%%\n", agg.getUnknownAppPct()));
+    prompt.append(
+        agg.getUnknownAppPct() != null
+            ? String.format("- Unknown application traffic: %.1f%%\n", agg.getUnknownAppPct())
+            : "- Unknown application traffic: not measurable (nDPI did not complete for this"
+                + " capture — this is a tooling gap, not a property of the network)\n");
 
     if (agg.getTopExternalAsns() != null && !agg.getTopExternalAsns().isEmpty()) {
       prompt.append("### Top External Destinations\n");

@@ -302,7 +302,7 @@ public interface ConversationLookup {
    */
   long unidentifiedAppCount(UUID fileId);
 
-  /** How widely one nDPI risk label appears across a file. */
+  /** How widely one nDPI risk label appears across a file. {@code riskType} is never null or blank. */
   record RiskTypeStats(
       String riskType,
       long conversationCount,
@@ -314,8 +314,10 @@ public interface ConversationLookup {
    * Each nDPI risk label in the file with its spread — how many conversations carry it, and across
    * how many distinct hosts.
    *
-   * <p>Aggregated in the database, unnesting the risk array. <b>INFERRED</b>: these are nDPI's
-   * conclusions, with nDPI's error modes.
+   * <p>Aggregated in the database, unnesting the risk array. Nothing constrains the array's
+   * <em>elements</em>, so a null or blank label is storable; such rows are dropped here rather than
+   * handed on, because "a risk with no name" is not a finding any consumer can render. <b>INFERRED</b>:
+   * these are nDPI's conclusions, with nDPI's error modes.
    */
   List<RiskTypeStats> riskTypeStats(UUID fileId);
 

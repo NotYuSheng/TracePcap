@@ -42,8 +42,10 @@ public class FindingsService {
       try {
         findings.addAll(scanner.scan(context));
       } catch (Exception e) {
-        // One scanner's failure must not cost the others their findings.
-        log.warn("Scanner {} failed: {}", scanner.name(), e.getMessage());
+        // One scanner's failure must not cost the others their findings. The exception goes in
+        // whole rather than as getMessage(): an NPE's message is null, and "Scanner beacon failed:
+        // null" tells whoever is on call nothing at all.
+        log.warn("Scanner {} failed", scanner.name(), e);
       }
     }
 
