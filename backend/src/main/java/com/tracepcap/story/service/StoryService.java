@@ -16,6 +16,7 @@ import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.repository.FileRepository;
 import com.tracepcap.story.dto.*;
 import com.tracepcap.story.entity.StoryEntity;
+import com.tracepcap.story.spi.NarrationContext;
 import com.tracepcap.story.repository.StoryRepository;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -40,6 +41,7 @@ public class StoryService {
   private final ObjectMapper objectMapper;
   private final StoryAggregatesService storyAggregatesService;
   private final FindingsService findingsService;
+  private final NarratorRunner narratorRunner;
   private final InvestigationService investigationService;
   private final TimelineService timelineService;
 
@@ -123,6 +125,7 @@ public class StoryService {
         storyResponse.setAggregates(aggregates);
         storyResponse.setFindings(findings);
         storyResponse.setInvestigationSteps(investigationSteps.isEmpty() ? null : investigationSteps);
+        addNarratorSections(storyResponse, fileId, analysis, findings, aggregates, additionalContext);
         StoryEntity story = StoryEntity.builder()
             .id(storyId).fileId(fileId).generatedAt(generatedAt)
             .status(StoryEntity.StoryStatus.COMPLETED)
@@ -186,6 +189,7 @@ public class StoryService {
       storyResponse.setAggregates(aggregates);
       storyResponse.setFindings(findings);
       storyResponse.setInvestigationSteps(investigationSteps.isEmpty() ? null : investigationSteps);
+      addNarratorSections(storyResponse, fileId, analysis, findings, aggregates, additionalContext);
 
       // Create and save story entity with content
       StoryEntity story =
@@ -326,6 +330,57 @@ public class StoryService {
   }
 
   /** Parse the LLM Q&A response into answer + follow-up questions */
+
+  /**
+   * Prepends every registered {@link com.tracepcap.story.spi.Narrator}'s sections to the LLM's.
+   *
+   * <p>The LLM narrative is one narrator's worth of output that predates the registry; the rest are
+   * discovered. Registry sections lead because the only one today states what the capture could not
+   * tell us, and that belongs before any claim about what it did (#512).
+   */
+  private void addNarratorSections(
+      StoryResponse response,
+      UUID fileId,
+      CaptureSummary analysis,
+      List<Finding> findings,
+      StoryAggregates aggregates,
+      String analystContext) {
+    NarrationContext context =
+        new NarrationContext() {
+          @Override
+          public UUID fileId() {
+            return fileId;
+          }
+
+          @Override
+          public CaptureSummary summary() {
+            return analysis;
+          }
+
+          @Override
+          public List<Finding> findings() {
+            return findings == null ? List.of() : findings;
+          }
+
+          @Override
+          public StoryAggregates aggregates() {
+            return aggregates;
+          }
+
+          @Override
+          public String analystContext() {
+            return analystContext;
+          }
+        };
+
+    List<NarrativeSection> extra = narratorRunner.narrateAll(context);
+    if (extra.isEmpty()) return;
+
+    List<NarrativeSection> merged = new java.util.ArrayList<>(extra);
+    if (response.getNarrative() != null) merged.addAll(response.getNarrative());
+    response.setNarrative(merged);
+  }
+
   private StoryAnswerResponse parseAnswerResponse(String content) {
     try {
       String json = extractJson(content);

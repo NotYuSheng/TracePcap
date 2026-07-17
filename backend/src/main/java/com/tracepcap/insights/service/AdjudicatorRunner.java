@@ -1,0 +1,124 @@
+package com.tracepcap.insights.service;
+
+import com.tracepcap.common.event.AnalysisCompletedEvent;
+import com.tracepcap.common.event.NodeRoleChangedEvent;
+import com.tracepcap.common.stage.Adjudicator;
+import com.tracepcap.common.stage.Tier;
+import jakarta.annotation.PostConstruct;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+/**
+ * Runs every {@link Adjudicator} on the classpath when the facts they answer from change.
+ *
+ * <p><b>It names no adjudicator.</b> Adding one is adding one class (#512). Before this, an
+ * adjudicator also needed its own listener — a copy of the {@code AFTER_COMMIT} +
+ * {@code REQUIRES_NEW} + try/catch plumbing, which has nothing to do with adjudicating anything.
+ * That plumbing is written once here.
+ *
+ * <p><b>It enforces exclusivity at startup.</b> Unlike scanners, two adjudicators answering one
+ * question is a bug, not a feature — the answer would depend on bean order. {@link #validate}
+ * refuses to start rather than let that ship.
+ *
+ * <p><b>Re-adjudication is the point.</b> Conclusions are revisable: this fires on analysis
+ * completion (new facts) and on node-role changes (a human annotated something). Staleness is not a
+ * separate mechanism — it is this one.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class AdjudicatorRunner {
+
+  private final List<Adjudicator> adjudicators;
+
+  /**
+   * Fails startup when two modules claim the same question.
+   *
+   * <p>Loud and early on purpose. The alternative — picking one by bean order — would give an
+   * answer that changes with an unrelated refactor, which is the worst possible failure for a stage
+   * whose entire job is speaking with one voice.
+   */
+  @PostConstruct
+  void validate() {
+    Map<String, List<String>> byQuestion =
+        adjudicators.stream()
+            .collect(
+                Collectors.groupingBy(
+                    Adjudicator::question,
+                    Collectors.mapping(a -> a.getClass().getSimpleName(), Collectors.toList())));
+
+    List<String> contested =
+        byQuestion.entrySet().stream()
+            .filter(e -> e.getValue().size() > 1)
+            .map(e -> e.getKey() + " claimed by " + e.getValue())
+            .toList();
+
+    if (!contested.isEmpty()) {
+      throw new IllegalStateException(
+          "Adjudicate is exclusive: one module per question (#512). Contested: "
+              + String.join("; ", contested));
+    }
+
+    log.info(
+        "Adjudicate: {} adjudicator(s) ({}) — questions: {}",
+        adjudicators.size(),
+        tierBreakdown(),
+        byQuestion.keySet().stream().sorted().collect(Collectors.joining(", ")));
+  }
+
+  /** New facts landed: every question is worth re-answering. */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void onAnalysisCompleted(AnalysisCompletedEvent event) {
+    runAll(event.fileId(), "analysis completion");
+  }
+
+  /** A human annotated something: their input ranks first, so conclusions may change. */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void onNodeRoleChanged(NodeRoleChangedEvent event) {
+    runAll(event.fileId(), "node-role change");
+  }
+
+  private void runAll(UUID fileId, String trigger) {
+    for (Adjudicator adjudicator : adjudicators) {
+      try {
+        adjudicator.adjudicate(fileId);
+      } catch (Exception e) {
+        // One question failing must not cost the others their answers. The whole exception, not
+        // getMessage(): an NPE's message is null.
+        log.error(
+            "Adjudication of '{}' failed for file {} ({})",
+            adjudicator.question(),
+            fileId,
+            trigger,
+            e);
+      }
+    }
+  }
+
+  private String tierBreakdown() {
+    return adjudicators.stream()
+        .collect(Collectors.groupingBy(Adjudicator::tier, Collectors.counting()))
+        .entrySet()
+        .stream()
+        .sorted(Comparator.comparing(e -> e.getKey().name()))
+        .map(e -> e.getValue() + " " + e.getKey())
+        .collect(Collectors.joining(", "));
+  }
+
+  /** Exposed for the adjudicate-registry test: which questions are claimed. */
+  List<String> registeredQuestions() {
+    return adjudicators.stream().map(Adjudicator::question).sorted().toList();
+  }
+}
