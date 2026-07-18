@@ -89,10 +89,12 @@ public class PcapParserService {
             "arp.src.hw_mac",
             "-e",
             "frame.number",
-            // The three trailing fields (frame.number, then these two) are read from the END of the
-            // parsed row, not by fixed index — see the parse loop. Appending here is safe *because*
-            // of that; an earlier version read frame.number as the last field, and appending moved
-            // it, corrupting packet numbers until the reads were switched to tail-relative. (#496)
+            // Every field emitted AFTER _ws.col.Info is read from the END of the parsed row, not by
+            // fixed index — see the parse loop. That is mandatory, not just convenient: _ws.col.Info
+            // is free text that can contain the '|' separator, and a '|' there shifts every following
+            // fixed index (once corrupted packet numbers, #496; later put payload hex into the ARP-IP
+            // slot and overflowed a varchar(45) column, #550). Anything appended here stays safe as
+            // long as it goes after Info and the TAIL count in the parse loop is kept in sync.
             "-e",
             "tcp.flags.syn",
             "-e",
@@ -100,7 +102,8 @@ public class PcapParserService {
     pb.redirectErrorStream(false);
 
     // `packetNumber` counts parsed packets (used for packetCount); each packet's stored number is
-    // the real tshark frame.number (field 20, the last -e) so other passes can locate a packet by it.
+    // the real tshark frame.number (read tail-relative in the parse loop) so other passes can locate
+    // a packet by it.
     long packetNumber = 0;
     try {
       Process process = pb.start();
@@ -151,29 +154,68 @@ public class PcapParserService {
           String udpDport = firstValue(f[9]);
           String protocolRaw = f[10].isEmpty() ? "OTHER" : firstValue(f[10]).toUpperCase();
           String protocol = protocolRaw.length() > 20 ? protocolRaw.substring(0, 20) : protocolRaw;
-          String info = (f.length > 11 && !f[11].isEmpty()) ? f[11] : protocol;
+          // Everything from _ws.col.Info (index 11) onward is read RELATIVE TO THE END of the row,
+          // never by fixed index. _ws.col.Info is free text that can contain the '|' separator (FTP
+          // passive-mode "(|||50076", multi-line SMTP/SIP/LDAP messages, ...). A '|' there splits
+          // Info into extra columns and shifts every field after it. The post-Info fields are all
+          // structured and fixed in count (TAIL of them), so anchoring them to the tail keeps them
+          // aligned no matter how many '|' Info contains. Before this, a shifted tcp.payload hex
+          // string landed in the arp.src.proto_ipv4 slot and overflowed ip_mac_observations.ip
+          // (varchar(45)), aborting the whole analysis transaction. (#550)
+          //
+          // Tail layout, from the end: tcp.payload, udp.payload, ip.ttl, eth.src,
+          // arp.src.proto_ipv4, arp.dst.proto_ipv4, eth.dst, arp.src.hw_mac, frame.number,
+          // tcp.flags.syn, tcp.flags.ack.
+          final int TAIL = 11; // structured fields emitted after _ws.col.Info
+          final int n = f.length;
+          // 11 head fields + Info (>=1 column) + TAIL fields. A shorter row is malformed/truncated;
+          // treat its post-Info fields as absent rather than risk reading a head field as a tail one.
+          boolean aligned = n >= 11 + 1 + TAIL;
 
-          // Extract TTL (field 14) and source MAC (field 15) — best-effort, may be absent
+          // Info spans the columns between the head and the tail. Almost always it is a single column
+          // (f[11]) — it only spans several when its text contained the '|' separator, which we then
+          // rejoin. Fast-path the single-column case so the per-packet hot path allocates no
+          // StringBuilder for the vast majority of rows.
+          final int infoEnd = n - TAIL - 1; // last Info column, when aligned
+          String info = protocol;
+          if (aligned && infoEnd == 11) {
+            if (!f[11].isEmpty()) info = f[11];
+          } else if (aligned) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 11; i <= infoEnd; i++) {
+              if (i > 11) sb.append('|');
+              sb.append(f[i]);
+            }
+            if (sb.length() > 0) info = sb.toString();
+          } else if (f.length > 11 && !f[11].isEmpty()) {
+            info = f[11];
+          }
+
+          String tcpPayloadField = aligned ? f[n - 11] : "";
+          String udpPayloadField = aligned ? f[n - 10] : "";
+
+          // First-seen TTL for the source IP — best-effort, may be absent.
           Integer ttl = null;
-          if (f.length > 14 && !f[14].isEmpty()) {
+          if (aligned && !f[n - 9].isEmpty()) {
             try {
-              ttl = Integer.parseInt(firstValue(f[14]));
+              ttl = Integer.parseInt(firstValue(f[n - 9]));
             } catch (NumberFormatException ignored) {
             }
           }
-          String srcMac =
-              (f.length > 15 && !f[15].isEmpty()) ? firstValue(f[15]).toLowerCase() : null;
+          String srcMac = aligned && !f[n - 8].isEmpty() ? firstValue(f[n - 8]).toLowerCase() : null;
 
           // Layer-2 address fallback for non-IP protocols (ARP, STP, LLDP, CDP, etc.).
           // For ARP: use the embedded protocol (IP) addresses from the ARP payload.
           // For other pure L2 frames: use Ethernet MAC addresses as node identifiers.
-          String arpSrcIp = (f.length > 16 && !f[16].isEmpty()) ? firstValue(f[16]) : null;
-          String arpDstIp = (f.length > 17 && !f[17].isEmpty()) ? firstValue(f[17]) : null;
-          String dstMac =
-              (f.length > 18 && !f[18].isEmpty()) ? firstValue(f[18]).toLowerCase() : null;
-          // ARP sender hardware address (field 19) — the "I own this IP at this MAC" claim.
-          String arpSrcMac =
-              (f.length > 19 && !f[19].isEmpty()) ? firstValue(f[19]).toLowerCase() : null;
+          String arpSrcIp = aligned && !f[n - 7].isEmpty() ? firstValue(f[n - 7]) : null;
+          String arpDstIp = aligned && !f[n - 6].isEmpty() ? firstValue(f[n - 6]) : null;
+          String dstMac = aligned && !f[n - 5].isEmpty() ? firstValue(f[n - 5]).toLowerCase() : null;
+          // ARP sender hardware address — the "I own this IP at this MAC" claim.
+          String arpSrcMac = aligned && !f[n - 4].isEmpty() ? firstValue(f[n - 4]).toLowerCase() : null;
+          // Belt-and-suspenders: these embedded IPs can become a node id and persist to a
+          // varchar(45) column (e.g. ip_mac_observations.ip), so cap them like srcIp/dstIp above.
+          if (arpSrcIp != null && arpSrcIp.length() > 45) arpSrcIp = arpSrcIp.substring(0, 45);
+          if (arpDstIp != null && arpDstIp.length() > 45) arpDstIp = arpDstIp.substring(0, 45);
           if (srcIp == null) srcIp = (arpSrcIp != null) ? arpSrcIp : srcMac;
           if (dstIp == null) dstIp = (arpDstIp != null) ? arpDstIp : dstMac;
 
@@ -265,13 +307,14 @@ public class PcapParserService {
               conv.setInitiatorPort(fSrcPort);
             }
 
-            // Extract payload hex from tcp.payload (index 12) or udp.payload (index 13).
+            // Extract payload hex from tcp.payload / udp.payload (both read tail-relative above, for
+            // the same reason as the other post-Info fields — a '|' in Info must not shift them).
             // tshark outputs byte arrays as colon-separated hex pairs (e.g. "48:54:54:50").
             String tsharkPayload = null;
-            if (f.length > 12 && !f[12].isEmpty()) {
-              tsharkPayload = f[12]; // tcp.payload
-            } else if (f.length > 13 && !f[13].isEmpty()) {
-              tsharkPayload = f[13]; // udp.payload
+            if (!tcpPayloadField.isEmpty()) {
+              tsharkPayload = tcpPayloadField; // tcp.payload
+            } else if (!udpPayloadField.isEmpty()) {
+              tsharkPayload = udpPayloadField; // udp.payload
             }
             String payloadHex = TsharkHexUtil.toHex(tsharkPayload, PacketEntity.PAYLOAD_BYTE_LIMIT);
             // The three trailing fields, in order, are frame.number, tcp.flags.syn, tcp.flags.ack.
