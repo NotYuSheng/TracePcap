@@ -130,30 +130,3 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-
-/* Fullscreen from inside a modal.
-   The shared .nd-css-fullscreen sits at z-index 1040, below Bootstrap's modal
-   (~1055), so a heatmap fullscreened from the monitor dialog would render
-   *behind* the dialog containing it. This variant stacks above instead. */
-.tp-heatmap-fullscreen-over-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1080;
-  border-radius: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--tp-surface, #fff);
-  margin: 0;
-  padding: 1rem 1.25rem;
-  overflow: hidden;
-}
-
-.tp-heatmap-fullscreen-over-modal .tp-heatmap {
-  flex: 1;
-  min-height: 0;
-}
-
-.tp-heatmap-fullscreen-over-modal .tp-heatmap-scroll {
-  flex: 1;
-  min-height: 0;
-}
