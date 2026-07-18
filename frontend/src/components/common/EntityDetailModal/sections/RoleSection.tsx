@@ -56,13 +56,15 @@ export function RoleSection({ fileId, role: r, readOnly, raisedModal }: RoleSect
       <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center justify-content-between">
         <span>
           Role <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· analyst-assigned name</span>
-          <i
-            role="button"
+          <button
+            type="button"
             aria-label="What is a role label?"
-            className="bi bi-info-circle ms-1 text-muted"
-            style={{ fontSize: '0.72rem', cursor: 'pointer' }}
+            className="btn btn-link p-0 ms-1 text-muted"
+            style={{ fontSize: '0.72rem', lineHeight: 1 }}
             onClick={() => setShowRoleHelp(v => !v)}
-          />
+          >
+            <i className="bi bi-info-circle" aria-hidden="true" />
+          </button>
         </span>
         {!r.roleEditing && !r.roleLoading && (
           <div className="d-flex gap-1">

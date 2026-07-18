@@ -5197,8 +5197,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "Override cleared"
           }
         },
         "summary": "Clear the human override, letting the machine vote decide again",
@@ -5244,7 +5244,17 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "Override found"
+          },
+          "204": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverrideDto"
+                }
+              }
+            },
+            "description": "No override set for this entity"
           }
         },
         "summary": "The human override for a question about an entity, if one is set",

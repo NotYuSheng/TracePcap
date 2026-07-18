@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge, Modal } from '@govtechsg/sgds-react';
 import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
@@ -67,12 +67,20 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   const [nestedIp, setNestedIp] = useState<string | null>(null);
 
   // Live adjudicated identity: seeded from the graph node, re-fetched after an override/evidence
-  // change so the panel reflects the new verdict without reloading the whole graph.
+  // change so the panel reflects the new verdict without reloading the whole graph. The ref always
+  // holds the CURRENT node's IP (a closure over the prop would compare stale-to-stale), so a slow
+  // response for node A is dropped once the reused panel has switched to node B.
   const [liveIdentity, setLiveIdentity] = useState<HostIdentity | null>(null);
+  const currentIpRef = useRef(node.data.ip);
+  currentIpRef.current = node.data.ip;
   const refreshIdentity = () => {
+    const forIp = node.data.ip;
     conversationService
       .getHostIdentities(fileId)
-      .then(list => setLiveIdentity(list.find(i => i.ip === node.data.ip) ?? null))
+      .then(list => {
+        if (forIp !== currentIpRef.current) return; // superseded by a node switch
+        setLiveIdentity(list.find(i => i.ip === forIp) ?? null);
+      })
       .catch(() => {});
   };
 
@@ -437,16 +445,18 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                       <span className="text-muted fw-normal" style={{ fontSize: '0.8rem' }}>
                         Evidence weighed
                       </span>
-                      <i
-                        role="button"
+                      <button
+                        type="button"
                         aria-label="How Identity and this evidence relate"
-                        className="bi bi-info-circle ms-1 text-muted"
-                        style={{ cursor: 'pointer', fontSize: '0.8rem' }}
+                        className="btn btn-link p-0 ms-1 text-muted"
+                        style={{ fontSize: '0.8rem', lineHeight: 1 }}
                         onClick={e => {
                           e.stopPropagation();
                           setEvidenceInfoOpen(true);
                         }}
-                      />
+                      >
+                        <i className="bi bi-info-circle" aria-hidden="true" />
+                      </button>
                     </h6>
                     {/* Facts only, no per-axis badge — a badge picks one label, which is a
                         conclusion, and conclusions belong to the Identity verdict alone (#499).
@@ -460,12 +470,21 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         <div key={key} className="mb-1">
                           <div
                             role="button"
+                            tabIndex={0}
+                            aria-expanded={expanded}
                             title={`Inspect ${meta.label} — ${meta.caption}`}
                             className="d-flex align-items-center gap-2"
                             style={{ fontSize: '0.8rem', cursor: 'pointer' }}
                             onClick={e => {
                               e.stopPropagation();
                               setExpandedAxis(expanded ? null : key);
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setExpandedAxis(expanded ? null : key);
+                              }
                             }}
                           >
                             <span className="text-muted" style={{ minWidth: '100px' }}>{meta.label}</span>
