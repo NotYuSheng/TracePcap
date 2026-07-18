@@ -5,6 +5,8 @@ import com.tracepcap.common.adjudication.dto.EvidenceRequest;
 import com.tracepcap.common.adjudication.dto.OverrideDto;
 import com.tracepcap.common.adjudication.dto.OverrideRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -43,6 +45,10 @@ public class AdjudicationOverrideController {
 
   @GetMapping("/{fileId}/adjudications/{question}/{entityKey}/override")
   @Operation(summary = "The human override for a question about an entity, if one is set")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Override found"),
+    @ApiResponse(responseCode = "204", description = "No override set for this entity")
+  })
   public ResponseEntity<OverrideDto> get(
       @PathVariable UUID fileId,
       @PathVariable String question,
@@ -67,6 +73,7 @@ public class AdjudicationOverrideController {
 
   @DeleteMapping("/{fileId}/adjudications/{question}/{entityKey}/override")
   @Operation(summary = "Clear the human override, letting the machine vote decide again")
+  @ApiResponses(@ApiResponse(responseCode = "204", description = "Override cleared"))
   public ResponseEntity<Void> delete(
       @PathVariable UUID fileId,
       @PathVariable String question,

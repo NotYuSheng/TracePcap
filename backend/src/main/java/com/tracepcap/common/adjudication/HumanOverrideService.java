@@ -52,6 +52,16 @@ public class HumanOverrideService {
     entity.setLabel(label);
     entity.setRationale(rationale);
     entity.setActor(currentActor.username()); // server-side, from the token — never the client
+    // A human writing the answer makes it THIS file's own statement, whatever the row was before.
+    // Re-affirming a CARRIED_FORWARD row must flip it to MANUAL and clear the stale flags —
+    // otherwise the stale warning survives the re-affirmation, and the next snapshot's
+    // carry-forward would regenerate (i.e. silently discard) the analyst's fresh answer along
+    // with the other carried rows. The baseline resets to null; the next carry re-derives it
+    // from this file, so drift detection restarts from the re-affirmed state.
+    entity.setOrigin("MANUAL");
+    entity.setStaleSince(null);
+    entity.setStaleFields(null);
+    entity.setObservedProperties(null);
     HumanOverrideEntity saved = repository.save(entity);
     log.info(
         "Human override: {} '{}' for {} in file {} by {}",

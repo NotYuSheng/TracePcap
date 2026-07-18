@@ -95,7 +95,12 @@ public class HostIdentityService implements Adjudicator {
   @Transactional
   public void adjudicateFile(UUID fileId) {
     List<ClassifiedHost> hosts = hostClassificationLookup.classifiedHosts(fileId);
-    if (hosts.isEmpty()) return;
+    if (hosts.isEmpty()) {
+      // A re-analysis that classified nothing must not leave the previous run's identities
+      // standing — stale verdicts about hosts that no longer exist are worse than none.
+      hostIdentityRepository.deleteByFileId(fileId);
+      return;
+    }
 
     // A generic human override ("I disagree, it's X") ranks above everything — the most direct
     // statement of identity there is. Keyed by this adjudicator's own question().
@@ -169,26 +174,27 @@ public class HostIdentityService implements Adjudicator {
 
   private HostIdentityEntity fromOverride(
       UUID fileId, ClassifiedHost host, com.tracepcap.common.adjudication.HumanOverrideEntity override) {
-    return HostIdentityEntity.builder()
-        .fileId(fileId)
-        .ip(host.ip())
-        .primaryLabel(override.getLabel())
-        .basis(HostIdentityEntity.BASIS_HUMAN)
-        .confidence(100)
-        .contested(false)
-        .updatedAt(LocalDateTime.now())
-        .build();
+    return humanIdentity(fileId, host, override.getLabel());
   }
 
-  private HostIdentityEntity fromHuman(
-      UUID fileId, ClassifiedHost host, NodeRoleEntity human) {
+  private HostIdentityEntity fromHuman(UUID fileId, ClassifiedHost host, NodeRoleEntity human) {
+    return humanIdentity(fileId, host, human.getRoleLabel());
+  }
+
+  /**
+   * A human-decided identity: their label IS the answer (confidence 100, never contested), but the
+   * machine's candidates + reasons are still carried so the UI can keep explaining what the
+   * classifier thought — overriding the verdict must not erase the explanation it overrode.
+   */
+  private HostIdentityEntity humanIdentity(UUID fileId, ClassifiedHost host, String label) {
     return HostIdentityEntity.builder()
         .fileId(fileId)
         .ip(host.ip())
-        .primaryLabel(human.getRoleLabel())
+        .primaryLabel(label)
         .basis(HostIdentityEntity.BASIS_HUMAN)
         .confidence(100)
         .contested(false)
+        .candidates(machineCandidates(host))
         .updatedAt(LocalDateTime.now())
         .build();
   }
@@ -259,7 +265,12 @@ public class HostIdentityService implements Adjudicator {
 
     List<Map.Entry<String, Integer>> ranked =
         scores.entrySet().stream()
-            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            // Label tie-breaker: equal scores must rank the same way on every run, or identical
+            // persisted evidence could flip the primary candidate between adjudications.
+            .sorted(
+                Map.Entry.<String, Integer>comparingByValue()
+                    .reversed()
+                    .thenComparing(Map.Entry::getKey))
             .toList();
     String winner = ranked.get(0).getKey();
     int best = ranked.get(0).getValue();

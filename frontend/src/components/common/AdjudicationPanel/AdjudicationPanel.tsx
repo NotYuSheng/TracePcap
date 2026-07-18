@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -135,17 +135,24 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
     setEvWeight(40);
   };
 
+  // Monotonic sequence guarding refresh commits: the panel is reused across entities, so a slow
+  // response for node A must not land after the panel has moved on to node B.
+  const refreshSeq = useRef(0);
   const refresh = () => {
+    const seq = ++refreshSeq.current;
     setLoading(true);
     Promise.all([
       adjudicationService.getOverride(fileId, question, entityKey),
       adjudicationService.listEvidence(fileId, question, entityKey),
     ])
       .then(([o, ev]) => {
+        if (seq !== refreshSeq.current) return; // superseded — a newer entity/refresh owns the panel
         setOverride(o);
         setEvidence(ev);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (seq === refreshSeq.current) setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -342,8 +349,27 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 {override.staleFields && override.staleFields.length > 0 && (
                   <>: {override.staleFields.join('; ')}</>
                 )}
-                . Re-affirm with “I disagree” or revert to the machine verdict.
+                . Re-affirm the answer, or revert to the machine verdict below.
               </div>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                className="py-0 mt-1"
+                style={{ fontSize: '0.72rem' }}
+                onClick={() =>
+                  runAction('Re-affirming the override', async () => {
+                    // Re-saving the same answer flips the row to MANUAL server-side, clearing the
+                    // stale flags and re-baselining drift from this snapshot.
+                    await adjudicationService.setOverride(
+                      fileId, question, entityKey, override.label, override.rationale ?? undefined);
+                    refresh();
+                    onChanged();
+                  })
+                }
+                disabled={busy}
+              >
+                <i className="bi bi-check-lg me-1" />Re-affirm “{override.label}”
+              </Button>
             </Alert>
           )}
 
@@ -445,22 +471,26 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                     {ev.actor === me && (
                       <>
                         {' '}
-                        <i
-                          role="button"
+                        <button
+                          type="button"
                           aria-label="Edit evidence"
                           title="Edit"
-                          className="bi bi-pencil ms-1"
-                          style={{ cursor: 'pointer' }}
+                          className="btn btn-link p-0 ms-1 text-muted align-baseline"
+                          style={{ fontSize: 'inherit' }}
                           onClick={() => handleEditEvidence(ev)}
-                        />
-                        <i
-                          role="button"
+                        >
+                          <i className="bi bi-pencil" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
                           aria-label="Delete evidence"
                           title="Delete"
-                          className="bi bi-trash ms-1"
-                          style={{ cursor: 'pointer' }}
+                          className="btn btn-link p-0 ms-1 text-muted align-baseline"
+                          style={{ fontSize: 'inherit' }}
                           onClick={() => handleDeleteEvidence(ev)}
-                        />
+                        >
+                          <i className="bi bi-trash" aria-hidden="true" />
+                        </button>
                       </>
                     )}
                   </li>

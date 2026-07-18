@@ -297,17 +297,6 @@ export function buildNetworkGraph(
     }
     updateNodeStats(nodeMap[dst.ip], conv, 'received', protocol);
 
-    // Accumulate nDPI appName on BOTH endpoints — the identification is a fact about the
-    // conversation, and either side "did WhatsApp on the wire". Mirrors the backend's symmetric
-    // profile accumulation (DeviceClassifierService.addToProfile runs for src and dst); the old
-    // dst-only version hid the app from hosts that only ever initiated.
-    if (conv.appName) {
-      for (const ip of [src.ip, dst.ip]) {
-        if (!ndpiAppSets[ip]) ndpiAppSets[ip] = new Set();
-        ndpiAppSets[ip].add(conv.appName.toUpperCase());
-      }
-    }
-
     // Create edge
     edges.push(createEdge(conv, src.ip, dst.ip));
 
@@ -339,6 +328,18 @@ export function buildNetworkGraph(
     const [s0, d0] = conv.endpoints;
     if (nodeMap[s0.ip]) applyRoleFromInitiator(nodeMap[s0.ip], conv);
     if (nodeMap[d0.ip]) applyRoleFromInitiator(nodeMap[d0.ip], conv);
+
+    // Accumulate nDPI appName on BOTH endpoints — the identification is a fact about the
+    // conversation, and either side "did WhatsApp on the wire" (mirrors the backend's symmetric
+    // profile accumulation). Runs over the FULL conversation set, like role above: a fact must
+    // not appear or vanish depending on what fit under the rendering cap (#521).
+    if (conv.appName) {
+      for (const ip of [s0.ip, d0.ip]) {
+        if (!nodeMap[ip]) continue; // not on the diagram — nothing to annotate
+        if (!ndpiAppSets[ip]) ndpiAppSets[ip] = new Set();
+        ndpiAppSets[ip].add(conv.appName.toUpperCase());
+      }
+    }
   });
 
   // Node type comes from the backend's adjudicated host identity (see applyIdentities below).
@@ -483,10 +484,12 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
   // The endpoint already returns confirmed labels only; the roleLabel check is just null-safety.
   if (nodeRoles && nodeRoles.length > 0) {
     // MACs are case-insensitive identifiers; normalise both sides so a stored DEVICE key
-    // ("A4:83:E7:…") still matches a lowercase capture-derived node MAC.
+    // ("A4:83:E7:…") still matches a lowercase capture-derived node MAC. Only L2 nodes join the
+    // map: DEVICE roles are created for MAC-identified entities, and a shared/gateway MAC on an
+    // IP node must not steal the label meant for the L2 device itself.
     const nodeByMac = new Map<string, GraphNode>();
     for (const n of Object.values(nodeMap)) {
-      if (n.data.mac) nodeByMac.set(n.data.mac.toLowerCase(), n);
+      if (n.data.isL2 && n.data.mac) nodeByMac.set(n.data.mac.toLowerCase(), n);
     }
     for (const r of nodeRoles) {
       if (!r.roleLabel) continue;

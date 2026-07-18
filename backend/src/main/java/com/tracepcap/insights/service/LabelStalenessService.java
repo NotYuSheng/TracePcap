@@ -65,9 +65,15 @@ public class LabelStalenessService implements LabelStalenessCheck {
     nodeRoleRepository.deleteByFileIdAndOrigin(newFileId, ORIGIN_CARRIED_FORWARD);
     if (prevFileId == null) return List.of();
 
+    List<Drift> drifts = new ArrayList<>();
+    // Overrides carry independently of node roles — a network can have adjudication overrides and
+    // not a single confirmed role, and an early return on the role branch used to silently skip
+    // (and leave uncleaned) every carried override.
+    drifts.addAll(carryForwardOverrides(prevFileId, newFileId));
+
     List<NodeRoleEntity> confirmed =
         nodeRoleRepository.findByFileIdAndConfirmedByHumanTrue(prevFileId);
-    if (confirmed.isEmpty()) return List.of();
+    if (confirmed.isEmpty()) return drifts;
 
     // Entities already labelled directly on the new file — don't overwrite them.
     Set<String> ownKeys =
@@ -76,7 +82,6 @@ public class LabelStalenessService implements LabelStalenessCheck {
             .map(r -> r.getEntityType() + "|" + r.getEntityKey())
             .collect(Collectors.toSet());
 
-    List<Drift> drifts = new ArrayList<>();
     for (NodeRoleEntity prev : confirmed) {
       if (ownKeys.contains(prev.getEntityType() + "|" + prev.getEntityKey())) continue;
 
@@ -125,7 +130,6 @@ public class LabelStalenessService implements LabelStalenessCheck {
       nodeRoleRepository.save(carried);
     }
 
-    drifts.addAll(carryForwardOverrides(prevFileId, newFileId));
     return drifts;
   }
 
@@ -157,7 +161,10 @@ public class LabelStalenessService implements LabelStalenessCheck {
               .collect(Collectors.toSet());
 
       for (HumanOverrideEntity prev : prevOverrides) {
-        if (ORIGIN_CARRIED_FORWARD.equals(prev.getOrigin())) continue; // don't chain carried→carried
+        // Carried rows DO carry again: in a monitor chain each snapshot only sees its immediate
+        // predecessor, so skipping CARRIED_FORWARD rows made an override vanish after one hop
+        // (manual on A → carried to B → gone from C). The original actor and sticky staleness
+        // ride along; the node-role carry above has always chained the same way.
         if (ownKeys.contains(prev.getEntityKey())) continue;
 
         // Overrides are keyed by IP (host-identity/axes are per-host). Reuse the IP property snapshot.

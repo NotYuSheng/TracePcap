@@ -73,7 +73,12 @@ class HostIdentityServiceTest {
   void humanOverride_ranksAboveEverything_neverContested() {
     // Even a strong, uncontested machine winner is replaced by an explicit human override.
     when(lookup.classifiedHosts(fileId))
-        .thenReturn(List.of(host("10.0.0.9", "IOT", 90, 200, "SERVER", 30)));
+        .thenReturn(
+            List.of(
+                new ClassifiedHost(
+                    "10.0.0.9", "IOT", 90, 200, "SERVER", 30,
+                    List.of("MAC OUI is Espressif (+40)"),
+                    List.of("received on 443 (+30)"))));
     when(roleRepo.findByFileIdAndConfirmedByHumanTrue(any())).thenReturn(List.of());
     com.tracepcap.common.adjudication.HumanOverrideEntity override =
         com.tracepcap.common.adjudication.HumanOverrideEntity.builder()
@@ -93,6 +98,13 @@ class HostIdentityServiceTest {
     assertThat(id.getBasis()).isEqualTo(HostIdentityEntity.BASIS_HUMAN);
     assertThat(id.getConfidence()).isEqualTo(100);
     assertThat(id.isContested()).isFalse();
+    // Overriding the verdict must not erase the machine's explanation: the classifier's
+    // candidates and their reasons stay visible so the UI can still show what was overridden.
+    assertThat(id.getCandidates()).hasSize(2);
+    assertThat(id.getCandidates().get(0)).containsEntry("label", "IOT");
+    assertThat(id.getCandidates().get(0).get("reasons"))
+        .isEqualTo(List.of("MAC OUI is Espressif (+40)"));
+    assertThat(id.getCandidates().get(1)).containsEntry("label", "SERVER");
   }
 
   @Test
@@ -160,6 +172,53 @@ class HostIdentityServiceTest {
     @SuppressWarnings("unchecked")
     List<String> reasons = (List<String>) serverCandidate.get("reasons");
     assertThat(reasons).anyMatch(r -> r.contains("analyst (bob)") && r.contains("runs sshd"));
+  }
+
+  @Test
+  void manualEvidence_canOvertakeTheMachineWinner() {
+    // Machine: IOT 90 vs SERVER 30. Analyst adds +100 SERVER evidence → SERVER 130 beats IOT 90:
+    // the winner flips, at the margin-based confidence (40 → 67%), uncontested.
+    when(lookup.classifiedHosts(fileId))
+        .thenReturn(
+            List.of(
+                new ClassifiedHost(
+                    "10.0.0.8", "IOT", 60, 90, "SERVER", 30,
+                    List.of("low traffic volume (+40)"),
+                    List.of("received on 22 (+30)"))));
+    when(roleRepo.findByFileIdAndConfirmedByHumanTrue(any())).thenReturn(List.of());
+    com.tracepcap.common.adjudication.ManualEvidenceEntity ev =
+        com.tracepcap.common.adjudication.ManualEvidenceEntity.builder()
+            .question("host-identity")
+            .fileId(fileId)
+            .entityKey("10.0.0.8")
+            .label("SERVER")
+            .weight(100)
+            .reason("runs sshd, confirmed via console")
+            .actor("bob")
+            .build();
+    when(evidenceRepo.findByQuestionAndFileId("host-identity", fileId)).thenReturn(List.of(ev));
+
+    service.adjudicateFile(fileId);
+
+    HostIdentityEntity id = adjudicated().get(0);
+    assertThat(id.getPrimaryLabel()).isEqualTo("SERVER");
+    assertThat(id.getBasis()).isEqualTo(HostIdentityEntity.BASIS_MACHINE);
+    assertThat(id.getConfidence()).isEqualTo(67); // round((130-90) * 100 / 60)
+    assertThat(id.isContested()).isFalse();
+    assertThat(id.getCandidates().get(0)).containsEntry("label", "SERVER");
+    assertThat(id.getCandidates().get(0)).containsEntry("score", 130);
+    assertThat(id.getCandidates().get(1)).containsEntry("label", "IOT");
+  }
+
+  @Test
+  void reAnalysisWithNoHosts_clearsPreviousIdentities() {
+    when(lookup.classifiedHosts(fileId)).thenReturn(List.of());
+
+    service.adjudicateFile(fileId);
+
+    // Stale verdicts about hosts that no longer classify must not survive the re-analysis.
+    verify(identityRepo).deleteByFileId(fileId);
+    verify(identityRepo, org.mockito.Mockito.never()).saveAll(any());
   }
 
   @Test
