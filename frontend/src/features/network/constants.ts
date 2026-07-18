@@ -41,6 +41,41 @@ export const PROTOCOL_LABELS: Record<string, string> = {
 };
 
 /**
+ * Builds the edge-colour legend entries for the protocols actually present in a
+ * graph, so the NetworkGraph overlay legend explains its coloured strokes.
+ *
+ * - Ordering follows PROTOCOL_COLORS definition order (the source of truth), so
+ *   adding a protocol there makes it appear with no other change.
+ * - Protocols sharing a colour collapse into a single swatch (e.g. HTTPS + TLS
+ *   → one `#3498db` entry). The label comes from the first present protocol of
+ *   that colour, via PROTOCOL_LABELS (so HTTPS → "HTTPS/TLS").
+ * - `hasUnmapped` is true when any present protocol falls back to
+ *   DEFAULT_EDGE_COLOR, so callers can explain the grey strokes.
+ *
+ * Mirrors getProtocolColor(), so the legend stays in sync with the strokes.
+ */
+export function buildProtocolLegend(
+  protocols: Iterable<string>,
+): { entries: Array<{ color: string; label: string }>; hasUnmapped: boolean } {
+  const present = new Set<string>();
+  let hasUnmapped = false;
+  for (const p of protocols) {
+    const key = p.toUpperCase();
+    if (key in PROTOCOL_COLORS) present.add(key);
+    else hasUnmapped = true;
+  }
+
+  const entries: Array<{ color: string; label: string }> = [];
+  const seenColors = new Set<string>();
+  for (const [key, color] of Object.entries(PROTOCOL_COLORS)) {
+    if (!present.has(key) || seenColors.has(color)) continue;
+    seenColors.add(color);
+    entries.push({ color, label: PROTOCOL_LABELS[key] ?? key });
+  }
+  return { entries, hasUnmapped };
+}
+
+/**
  * Single source of truth for all per-node-type display properties.
  * Adding a new NodeType requires only one change here.
  */

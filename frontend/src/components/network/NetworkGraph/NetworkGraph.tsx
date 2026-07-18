@@ -4,10 +4,12 @@ import ELK from 'elkjs';
 const ELK_WORKER_URL = `${import.meta.env.BASE_URL}elk-worker.min.js`;
 import Graph from 'graphology';
 import Sigma from 'sigma';
+import { EdgeArrowProgram } from 'sigma/rendering';
+import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
+import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
 import { makeVolumeEdgeColor } from '@/utils/volumeColor';
 import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
@@ -289,6 +291,60 @@ export function edgeBytesRange(edges: GraphEdge[]): { min: number; max: number }
 }
 
 // ---------------------------------------------------------------------------
+// Parallel-edge curvature
+// ---------------------------------------------------------------------------
+
+/**
+ * Curvature for the edge at `index` within a parallel group of `maxIndex + 1` edges. Zero-index
+ * edges stay flat; the rest fan out symmetrically. `amplitude` keeps big groups from curving so hard
+ * they cross each other. Mirrors the reference implementation from `@sigma/edge-curve`.
+ */
+function getCurvature(index: number, maxIndex: number): number {
+  if (maxIndex <= 0) return 0;
+  if (index < 0) return -getCurvature(-index, maxIndex);
+  const amplitude = 3.5;
+  const maxCurvature = (amplitude * (1 - Math.exp(-maxIndex / amplitude))) / maxIndex;
+  return (maxCurvature * index) / maxIndex;
+}
+
+/**
+ * When two nodes are joined by more than one edge — a different protocol/app per edge, or one in
+ * each direction — straight strokes would draw on top of each other and hide all but one colour
+ * (#497). Curve the parallels apart so every edge (and its protocol colour) is visible; edges with a
+ * single connection between their endpoints stay straight. Reads the parallel-group indices that
+ * `indexParallelEdgesIndex` writes and sets each edge's render `type` + `curvature` accordingly.
+ */
+function applyParallelEdgeCurvature(graph: Graph): void {
+  indexParallelEdgesIndex(graph, {
+    edgeIndexAttribute: 'parallelIndex',
+    edgeMinIndexAttribute: 'parallelMinIndex',
+    edgeMaxIndexAttribute: 'parallelMaxIndex',
+  });
+  graph.forEachEdge((edge, attrs) => {
+    const parallelIndex = attrs.parallelIndex as number | null | undefined;
+    const parallelMinIndex = attrs.parallelMinIndex as number | null | undefined;
+    const parallelMaxIndex = attrs.parallelMaxIndex as number | null | undefined;
+
+    if (typeof parallelMinIndex === 'number') {
+      // Group spans both directions: the middle edge stays straight, the rest curve.
+      graph.mergeEdgeAttributes(edge, {
+        type: parallelIndex ? 'curved' : 'arrow',
+        curvature: getCurvature(parallelIndex as number, parallelMaxIndex as number),
+      });
+    } else if (typeof parallelIndex === 'number') {
+      // Same-direction parallels: curve them all (index 0 gets 0 curvature → renders straight).
+      graph.mergeEdgeAttributes(edge, {
+        type: 'curved',
+        curvature: getCurvature(parallelIndex, parallelMaxIndex as number),
+      });
+    } else {
+      // The only edge between its endpoints — keep it a straight arrow.
+      graph.setEdgeAttribute(edge, 'type', 'arrow');
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Build a graphology graph from GraphNode[] / GraphEdge[]
 // ---------------------------------------------------------------------------
 
@@ -360,6 +416,9 @@ function buildGraph(
       protocol: e.data.protocol,
     });
   }
+
+  // Curve edges that share a node pair so overlapping strokes don't hide each other's colour.
+  applyParallelEdgeCurvature(graph);
 
   return graph;
 }
@@ -496,6 +555,17 @@ export const NetworkGraph = memo(function NetworkGraph({
     [hiddenNodesList]
   );
 
+  // Edge-colour legend entries for the protocols present in the current graph.
+  // Only meaningful when edges are coloured by protocol — in volume mode the
+  // strokes encode byte counts, not protocols, so the swatches would mislead.
+  const protocolLegend = useMemo(
+    () =>
+      edgeColorMode === 'protocol'
+        ? buildProtocolLegend(edges.map(e => e.data.protocol))
+        : { entries: [], hasUnmapped: false },
+    [edges, edgeColorMode]
+  );
+
   const hiddenNeighbors = useMemo<GraphNode[]>(() => {
     if (!hoveredNode || crossEdges.length === 0) return [];
     const neighborIds = new Set<string>();
@@ -550,6 +620,12 @@ export const NetworkGraph = memo(function NetworkGraph({
       renderLabels: true,
       renderEdgeLabels: false,
       defaultEdgeType: 'arrow',
+      // 'arrow' = straight (single edge between a pair); 'curved' = fanned-out parallels, set per
+      // edge by applyParallelEdgeCurvature so overlapping protocol colours stay distinguishable.
+      edgeProgramClasses: {
+        arrow: EdgeArrowProgram,
+        curved: EdgeCurvedArrowProgram,
+      },
       labelDensity: 1,
       labelGridCellSize: 60,
       labelRenderedSizeThreshold: -Infinity, // always call drawNodeLabel at every zoom level
@@ -639,7 +715,17 @@ export const NetworkGraph = memo(function NetworkGraph({
             const t = sigma.graphToViewport(graph.getNodeAttributes(target) as { x: number; y: number });
             labelCtx.beginPath();
             labelCtx.moveTo(s.x, s.y);
-            labelCtx.lineTo(t.x, t.y);
+            // Curved parallels must bow the same way here as Sigma draws them on screen, or the PDF
+            // would show overlapping straight lines again. Same control point Sigma uses: the
+            // midpoint offset perpendicular to the edge by `curvature` (#497).
+            const curvature = (attrs['curvature'] as number) ?? 0;
+            if (attrs['type'] === 'curved' && curvature !== 0) {
+              const cx = (s.x + t.x) / 2 + (t.y - s.y) * curvature;
+              const cy = (s.y + t.y) / 2 - (t.x - s.x) * curvature;
+              labelCtx.quadraticCurveTo(cx, cy, t.x, t.y);
+            } else {
+              labelCtx.lineTo(t.x, t.y);
+            }
             labelCtx.strokeStyle = (attrs['color'] as string) ?? '#999';
             labelCtx.lineWidth = Math.max(0.6, (attrs['size'] as number) ?? 1);
             labelCtx.globalAlpha = 0.75;
@@ -997,6 +1083,26 @@ export const NetworkGraph = memo(function NetworkGraph({
             <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} />
             <span className="ng-legend-label">Unknown</span>
           </div>
+        )}
+
+        {/* ── Edge-protocol colours — line swatches, driven by PROTOCOL_COLORS ── */}
+        {(protocolLegend.entries.length > 0 || protocolLegend.hasUnmapped) && (
+          <>
+            <div className="ng-legend-divider" />
+            <div className="ng-legend-heading">Edges</div>
+            {protocolLegend.entries.map(({ color, label }) => (
+              <div key={color} className="ng-legend-item">
+                <span className="ng-legend-line" style={{ background: color }} />
+                <span className="ng-legend-label">{label}</span>
+              </div>
+            ))}
+            {protocolLegend.hasUnmapped && (
+              <div className="ng-legend-item">
+                <span className="ng-legend-line" style={{ background: DEFAULT_EDGE_COLOR }} />
+                <span className="ng-legend-label">Other</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

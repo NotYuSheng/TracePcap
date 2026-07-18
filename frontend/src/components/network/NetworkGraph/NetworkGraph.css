@@ -158,6 +158,38 @@
   box-shadow: 0 0 4px currentColor;
 }
 
+/* Line swatch for edge-protocol legend entries — a rule, not a dot, so it reads
+   as a connection stroke rather than a node. */
+.ng-legend-line {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Separates the node section from the edge-protocol section. */
+.ng-legend-divider {
+  height: 1px;
+  margin: 3px 0;
+  background: rgba(13, 17, 23, 0.12);
+}
+
+[data-graph-theme='dark'] .ng-legend-divider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ng-legend-heading {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(31, 35, 40, 0.55);
+}
+
+[data-graph-theme='dark'] .ng-legend-heading {
+  color: rgba(201, 209, 217, 0.55);
+}
+
 .ng-legend-label {
   font-size: 11px;
   color: rgba(31, 35, 40, 0.85);
