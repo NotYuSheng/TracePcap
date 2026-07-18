@@ -482,13 +482,16 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
   // Analyst-assigned role labels ("Finance DB") — display-only, for the node-label lines.
   // The endpoint already returns confirmed labels only; the roleLabel check is just null-safety.
   if (nodeRoles && nodeRoles.length > 0) {
+    // MACs are case-insensitive identifiers; normalise both sides so a stored DEVICE key
+    // ("A4:83:E7:…") still matches a lowercase capture-derived node MAC.
     const nodeByMac = new Map<string, GraphNode>();
     for (const n of Object.values(nodeMap)) {
-      if (n.data.mac) nodeByMac.set(n.data.mac, n);
+      if (n.data.mac) nodeByMac.set(n.data.mac.toLowerCase(), n);
     }
     for (const r of nodeRoles) {
       if (!r.roleLabel) continue;
-      const node = r.entityType === 'IP' ? nodeMap[r.entityKey] : nodeByMac.get(r.entityKey);
+      const node =
+        r.entityType === 'IP' ? nodeMap[r.entityKey] : nodeByMac.get(r.entityKey.toLowerCase());
       if (node) node.data.roleLabel = r.roleLabel;
     }
   }

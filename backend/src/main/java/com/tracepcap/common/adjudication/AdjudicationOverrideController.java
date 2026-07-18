@@ -112,7 +112,8 @@ public class AdjudicationOverrideController {
       @Valid @RequestBody EvidenceRequest request) {
     ManualEvidenceEntity saved =
         evidenceService.update(
-            evidenceId, request.getLabel(), request.getWeight(), request.getReason());
+            question, fileId, entityKey, evidenceId,
+            request.getLabel(), request.getWeight(), request.getReason());
     return toDto(saved);
   }
 
@@ -124,7 +125,7 @@ public class AdjudicationOverrideController {
       @PathVariable String question,
       @PathVariable String entityKey,
       @PathVariable Long evidenceId) {
-    evidenceService.delete(evidenceId);
+    evidenceService.delete(question, fileId, entityKey, evidenceId);
   }
 
   private OverrideDto toDto(HumanOverrideEntity e) {

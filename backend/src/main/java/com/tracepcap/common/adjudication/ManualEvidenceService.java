@@ -71,11 +71,14 @@ public class ManualEvidenceService {
 
   /**
    * Updates the analyst's own evidence (label/weight/reason) and re-runs adjudication. Only the
-   * original author may edit their evidence; anyone else gets 403.
+   * original author may edit their evidence; anyone else gets 403. The evidence must belong to the
+   * addressed {@code (question, fileId, entityKey)} — an id under mismatched coordinates is treated
+   * as not found, never silently edited.
    */
   @Transactional
-  public ManualEvidenceEntity update(Long id, String label, int weight, String reason) {
-    ManualEvidenceEntity e = loadOwnedOrThrow(id);
+  public ManualEvidenceEntity update(
+      String question, UUID fileId, String entityKey, Long id, String label, int weight, String reason) {
+    ManualEvidenceEntity e = loadOwnedOrThrow(question, fileId, entityKey, id);
     e.setLabel(label);
     e.setWeight(Math.max(1, Math.min(MAX_WEIGHT, weight)));
     e.setReason(reason);
@@ -87,22 +90,29 @@ public class ManualEvidenceService {
 
   /** Deletes the analyst's own evidence and re-runs adjudication. Author-only; others get 403. */
   @Transactional
-  public void delete(Long id) {
-    ManualEvidenceEntity e = loadOwnedOrThrow(id);
-    UUID fileId = e.getFileId();
+  public void delete(String question, UUID fileId, String entityKey, Long id) {
+    ManualEvidenceEntity e = loadOwnedOrThrow(question, fileId, entityKey, id);
     repository.delete(e);
     log.info("Manual evidence {} deleted by {} in file {}", id, currentActor.username(), fileId);
     eventPublisher.publishEvent(new AdjudicationOverriddenEvent(fileId));
   }
 
   /**
-   * Loads evidence by id and asserts the current actor is its author. Evidence is a personal
-   * statement — only the analyst who made it may change or retract it. A "system" actor (auth off)
-   * may manage system-authored evidence, keeping the auth-disabled path usable.
+   * Loads evidence by id, asserts it belongs to the addressed question/file/entity, and asserts the
+   * current actor is its author. Evidence is a personal statement — only the analyst who made it may
+   * change or retract it. A "system" actor (auth off) may manage system-authored evidence, keeping
+   * the auth-disabled path usable. A coordinate mismatch is a plain 404: the id does not exist
+   * <em>at that address</em>, and answering 403/409 would leak that it exists elsewhere.
    */
-  private ManualEvidenceEntity loadOwnedOrThrow(Long id) {
+  private ManualEvidenceEntity loadOwnedOrThrow(
+      String question, UUID fileId, String entityKey, Long id) {
     ManualEvidenceEntity e =
         repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Evidence", "id", id));
+    if (!e.getQuestion().equals(question)
+        || !e.getFileId().equals(fileId)
+        || !e.getEntityKey().equals(entityKey)) {
+      throw new ResourceNotFoundException("Evidence", "id", id);
+    }
     if (!currentActor.username().equals(e.getActor())) {
       throw new ResponseStatusException(
           HttpStatus.FORBIDDEN, "Only the original author can edit or delete this evidence");

@@ -223,7 +223,9 @@ public class HostIdentityService implements Adjudicator {
     Map<String, Integer> scores = new LinkedHashMap<>();
     Map<String, List<String>> reasons = new LinkedHashMap<>();
     accumulate(scores, reasons, host.deviceType(), score(host.winnerScore()), host.winnerReasons());
-    if (host.runnerUpType() != null) {
+    // Same guard as machineCandidates: a runner-up equal to the winner would merge scores and
+    // duplicate reasons under one candidate instead of representing two.
+    if (host.runnerUpType() != null && !host.runnerUpType().equals(host.deviceType())) {
       accumulate(
           scores, reasons, host.runnerUpType(), score(host.runnerUpScore()), host.runnerUpReasons());
     }

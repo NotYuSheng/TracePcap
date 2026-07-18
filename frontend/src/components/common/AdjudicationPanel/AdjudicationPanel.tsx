@@ -62,9 +62,12 @@ function LabelField({
   placeholder: string;
 }) {
   const OTHER = '__other__';
-  // In "Other" mode when the current value isn't one of the known options.
-  const isOther = !!value && options != null && !options.includes(value);
-  const [mode, setMode] = useState<string>(isOther ? OTHER : value);
+  // The dropdown mode is DERIVED from the value on every render (a value outside the known options
+  // means free-text), so an externally changed/reset value can never desync the dropdown. The only
+  // state kept is the user's explicit "Other…" choice while its text is still empty/option-shaped.
+  const [otherSelected, setOtherSelected] = useState(false);
+  const isOtherValue = !!value && options != null && !options.includes(value);
+  const mode = otherSelected || isOtherValue ? OTHER : value;
   if (!options || options.length === 0) {
     return (
       <Form.Control size="sm" className="mb-2" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
@@ -78,7 +81,7 @@ function LabelField({
         value={mode}
         onChange={e => {
           const v = e.target.value;
-          setMode(v);
+          setOtherSelected(v === OTHER);
           onChange(v === OTHER ? '' : v);
         }}
       >
@@ -118,9 +121,19 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
   const [editingEvidenceId, setEditingEvidenceId] = useState<number | null>(null);
 
   const [busy, setBusy] = useState(false);
+  // Last failed action, surfaced to the analyst — a silent failure reads as "my click did nothing".
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Author of the current session — only the author of a piece of evidence may edit/delete it.
   const me = currentUsername();
+
+  const resetEvidenceForm = () => {
+    setAddingEvidence(false);
+    setEditingEvidenceId(null);
+    setEvLabel('');
+    setEvReason('');
+    setEvWeight(40);
+  };
 
   const refresh = () => {
     setLoading(true);
@@ -135,59 +148,63 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
       .finally(() => setLoading(false));
   };
 
-  useEffect(refresh, [fileId, question, entityKey]);
+  useEffect(() => {
+    // The panel is reused across entities (NodeDetails is not remounted per node) — drop any
+    // open editor, drafts, and stale error so node B never shows node A's half-typed override.
+    setOverriding(false);
+    setOverrideLabel('');
+    setOverrideRationale('');
+    resetEvidenceForm();
+    setActionError(null);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileId, question, entityKey]);
 
-  const handleSaveOverride = async () => {
-    if (!overrideLabel.trim()) return;
+  /** Wraps an action handler: clears the previous error, surfaces a failure to the analyst. */
+  const runAction = async (label: string, action: () => Promise<void>) => {
     setBusy(true);
+    setActionError(null);
     try {
+      await action();
+    } catch (err) {
+      console.error(`${label} failed:`, err);
+      setActionError(`${label} failed${err instanceof Error && err.message ? `: ${err.message}` : ''}. Please retry.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveOverride = () => {
+    if (!overrideLabel.trim()) return;
+    return runAction('Saving the override', async () => {
       await adjudicationService.setOverride(fileId, question, entityKey, overrideLabel.trim(), overrideRationale.trim() || undefined);
       setOverriding(false);
       setOverrideLabel('');
       setOverrideRationale('');
       refresh();
       onChanged();
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   /** Resolve a contested verdict by confirming one candidate — a hard human override that both sets
    *  the label and clears the contested flag (#499). */
-  const handleResolve = async (label: string) => {
-    setBusy(true);
-    try {
+  const handleResolve = (label: string) =>
+    runAction('Confirming the label', async () => {
       await adjudicationService.setOverride(fileId, question, entityKey, label, 'Resolved a contested verdict');
       refresh();
       onChanged();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
-  const handleClearOverride = async () => {
-    setBusy(true);
-    try {
+  const handleClearOverride = () =>
+    runAction('Reverting the override', async () => {
       await adjudicationService.clearOverride(fileId, question, entityKey);
       refresh();
       onChanged();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
-  const resetEvidenceForm = () => {
-    setAddingEvidence(false);
-    setEditingEvidenceId(null);
-    setEvLabel('');
-    setEvReason('');
-    setEvWeight(40);
-  };
-
-  const handleSaveEvidence = async () => {
+  const handleSaveEvidence = () => {
     if (!evLabel.trim() || !evReason.trim()) return;
-    setBusy(true);
-    try {
+    return runAction('Saving evidence', async () => {
       if (editingEvidenceId != null) {
         await adjudicationService.updateEvidence(
           fileId, question, entityKey, editingEvidenceId, evLabel.trim(), evWeight, evReason.trim());
@@ -198,9 +215,7 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
       resetEvidenceForm();
       refresh();
       onChanged();
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const handleEditEvidence = (ev: AdjudicationEvidence) => {
@@ -211,16 +226,12 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
     setAddingEvidence(true);
   };
 
-  const handleDeleteEvidence = async (ev: AdjudicationEvidence) => {
-    setBusy(true);
-    try {
+  const handleDeleteEvidence = (ev: AdjudicationEvidence) =>
+    runAction('Deleting evidence', async () => {
       await adjudicationService.deleteEvidence(fileId, question, entityKey, ev.id);
       refresh();
       onChanged();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   const attributed = (actor: string) => (actor && actor !== 'system' ? actor : 'an analyst');
 
@@ -242,6 +253,13 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
       </h6>
 
       {loading && <div className="text-muted small fst-italic">Loading…</div>}
+
+      {actionError && (
+        <Alert variant="danger" className="d-flex align-items-start gap-2 p-2 mb-2 small">
+          <i className="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" />
+          <span>{actionError}</span>
+        </Alert>
+      )}
 
       {!loading && (
         <>
