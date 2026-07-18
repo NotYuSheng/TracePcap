@@ -1,0 +1,132 @@
+.tp-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tp-heatmap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tp-heatmap-clear {
+  text-decoration: none;
+}
+
+/* The grid is fitted to this box's width, so it should not normally scroll. The
+   overflow is a safety net for narrow containers, and this is also the element
+   the canvas measures itself against. */
+.tp-heatmap-scroll {
+  overflow: auto;
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 4px;
+}
+
+/* Positioning context for the hover tooltip. */
+.tp-heatmap-canvas-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.tp-heatmap-canvas {
+  display: block;
+}
+
+.tp-heatmap-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #212529);
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-heatmap-tooltip-muted {
+  color: var(--tp-text-muted, #6c757d);
+}
+
+.tp-heatmap-readout {
+  min-height: 1.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-heatmap-empty {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+/* ── Fullscreen ────────────────────────────────────────────────
+   Two entry points share these rules:
+     .nd-css-fullscreen                  — the card treatment used by the
+                                           topology diagram (analysis page).
+     .tp-heatmap-fullscreen-over-modal   — used from the monitor dialog. The
+                                           shared card class sits at z-index
+                                           1040, below Bootstrap's modal (~1055),
+                                           so fullscreening from inside the
+                                           dialog would render *behind* it. This
+                                           variant stacks above instead.
+   In both, the toolbar and readout keep their natural height and the matrix
+   takes the rest, so the legend stays visible while a large grid is on screen. */
+.tp-heatmap-fullscreen-over-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tp-surface, #fff);
+  margin: 0;
+  padding: 1rem 1.25rem;
+  overflow: hidden;
+}
+
+.nd-css-fullscreen .tp-heatmap-body,
+.tp-heatmap-fullscreen-over-modal .tp-heatmap-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nd-css-fullscreen .tp-heatmap,
+.tp-heatmap-fullscreen-over-modal .tp-heatmap {
+  flex: 1;
+  min-height: 0;
+}
+
+.nd-css-fullscreen .tp-heatmap-scroll,
+.tp-heatmap-fullscreen-over-modal .tp-heatmap-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.tp-heatmap-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tp-heatmap-zoom .btn {
+  --sgds-btn-padding-y: 0;
+  --sgds-btn-padding-x: 0.35rem;
+  line-height: 1.2;
+}
+
+.tp-heatmap-zoom-value {
+  font-size: 0.7rem;
+  color: var(--tp-text-muted, #6c757d);
+  min-width: 34px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

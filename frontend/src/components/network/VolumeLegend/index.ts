@@ -1,0 +1,1 @@
+export { VolumeLegend } from './VolumeLegend';

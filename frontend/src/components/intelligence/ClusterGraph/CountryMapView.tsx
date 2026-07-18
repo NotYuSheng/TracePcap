@@ -11,18 +11,12 @@ import { Button } from '@govtechsg/sgds-react';
 import type { ClusterGraphResponse, ClusterNode } from '@/features/intelligence/services/intelligenceService';
 import { intelligenceService } from '@/features/intelligence/services/intelligenceService';
 import { formatBytes } from '@/utils/formatters';
+import { makeVolumeColor } from '@/utils/volumeColor';
+import { useResolvedDark } from '@/utils/useResolvedDark';
 import worldTopojson from 'virtual:world-map';
 import centroids from '@/assets/geo/country-centroids.json';
 
 const CENTROID_MAP = centroids as unknown as Record<string, [number, number]>;
-
-// ── Color helpers ──────────────────────────────────────────────────────────────
-function trafficColor(ratio: number): string {
-  const r = Math.round(208 - ratio * (208 - 21));
-  const g = Math.round(228 - ratio * (228 - 101));
-  const b = Math.round(247 - ratio * (247 - 192));
-  return `rgb(${r},${g},${b})`;
-}
 
 type ColorMode = 'risk' | 'traffic';
 
@@ -67,6 +61,7 @@ export function CountryMapView({
   const [cityLoading, setCityLoading] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
+  const dark = useResolvedDark();
 
   const MAX_BYTES = useMemo(() => Math.max(...data.clusters.map(c => c.totalBytes), 1), [data.clusters]);
   const clusterById = useMemo(() => new Map(data.clusters.map(c => [c.id, c])), [data.clusters]);
@@ -127,13 +122,13 @@ export function CountryMapView({
     if (!cluster) return hovered ? '#dee2e6' : '#e9ecef';
     if (cc === drilledCC) return '#bbd4f7';
     const base = colorMode === 'traffic'
-      ? trafficColor(cluster.totalBytes / MAX_BYTES)
+      ? makeVolumeColor(MAX_BYTES, dark)(cluster.totalBytes)
       : cluster.riskCount > 0 ? '#fce8e6' : '#d6e4f7';
     return hovered ? base : base;
   }
 
   function markerFill(cluster: ClusterNode, maxBytes: number): string {
-    if (colorMode === 'traffic') return trafficColor(cluster.totalBytes / maxBytes);
+    if (colorMode === 'traffic') return makeVolumeColor(maxBytes, dark)(cluster.totalBytes);
     return cluster.riskCount > 0 ? '#e74c3c' : '#1a73e8';
   }
 

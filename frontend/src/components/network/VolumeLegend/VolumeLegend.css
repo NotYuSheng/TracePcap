@@ -1,0 +1,35 @@
+.tp-volume-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--tp-text-muted, #6c757d);
+  white-space: nowrap;
+}
+
+.tp-volume-legend-label {
+  font-weight: 600;
+}
+
+.tp-volume-legend-bar {
+  display: inline-block;
+  width: 88px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--tp-border, #dee2e6);
+}
+
+.tp-volume-legend-min,
+.tp-volume-legend-max {
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-volume-legend-log {
+  padding: 0 0.25rem;
+  border: 1px solid var(--tp-border, #dee2e6);
+  border-radius: 2px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: help;
+}

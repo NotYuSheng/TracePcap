@@ -52,10 +52,36 @@ Color Modes
 
 Two color modes are available via the **Color by** toggle:
 
-- **Traffic** — cluster nodes are shaded on a blue heatmap proportional to
-  their ``totalBytes`` relative to the busiest cluster. Darker = more traffic.
+- **Traffic** — cluster nodes are shaded by ``totalBytes`` relative to the
+  busiest cluster, using the shared volume color scale (see below).
 - **Risk** — clusters with at least one nDPI risk flag show a red warning
   badge. Nodes without risk flags are neutral grey.
+
+.. _shared-volume-scale:
+
+The Shared Volume Color Scale
+-----------------------------
+
+Everywhere traffic volume is encoded as color — cluster nodes, the country map,
+the node-to-node heatmap and volume-colored diagram edges (see
+:doc:`network-visualization`) — the same scale is used, so a given shade always
+means the same thing. It lives in ``frontend/src/utils/volumeColor.ts``.
+
+Two properties are worth knowing when reading any of these views:
+
+- **The scale is logarithmic.** Traffic volume is heavily skewed: a handful of
+  pairs typically carry most of the bytes. On a linear ramp that yields one dark
+  mark and a wash of pale ones. Note this means the midpoint of the legend is
+  *not* half the maximum.
+- **The scale is relative to what is on screen.** It normalizes against the
+  busiest item in the current, filtered view — so changing filters re-fits the
+  ramp, and shades are comparable within a view rather than across captures.
+
+In dark mode the anchors flip: magnitude reads as distance from the surface, so
+on a light background "loud" is dark blue, and on a dark background it is bright
+blue. Marks that are stroked rather than filled (diagram edges) use a floored
+variant of the ramp, so even the quietest edge stays visible instead of fading
+into the canvas.
 
 Cluster Side Panel
 ------------------
