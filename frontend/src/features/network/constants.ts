@@ -55,7 +55,7 @@ export const NODE_TYPE_CONFIG: Record<NodeType, {
   'ssh-server':      { label: 'SSH Server',        icon: 'bi-terminal',        badgeClass: 'bg-info text-dark',    color: '#1abc9c' },
   'ftp-server':      { label: 'FTP Server',        icon: 'bi-folder-symlink',  badgeClass: 'bg-secondary',         color: '#16a085' },
   'mail-server':     { label: 'Mail Server',       icon: 'bi-envelope',        badgeClass: 'bg-danger',            color: '#e91e63' },
-  'dhcp-server':     { label: 'DHCP Server',       icon: 'bi-diagram-3',       badgeClass: 'bg-secondary',         color: '#8e44ad' },
+  'dhcp-server':     { label: 'DHCP Server',       icon: 'bi-broadcast',       badgeClass: 'bg-secondary',         color: '#8e44ad' },
   'ntp-server':      { label: 'NTP Server',        icon: 'bi-clock',           badgeClass: 'bg-dark',              color: '#6c3483' },
   'database-server': { label: 'Database Server',   icon: 'bi-database',        badgeClass: 'bg-danger',            color: '#e67e22' },
   router:            { label: 'Router / Gateway',  icon: 'bi-router',          badgeClass: 'bg-warning text-dark', color: '#d4ac0d' },
