@@ -16,6 +16,7 @@ interface NodeLabelSettingsModalProps {
 
 /** Example values used to render a live preview of the chosen label layout. */
 const PREVIEW_VALUES: Record<string, string> = {
+  roleLabel: 'Finance DB',
   ip: '192.168.1.42',
   hostname: 'Johns-MacBook.local',
   mac: 'a4:83:e7:1a:2b:3c',
@@ -34,7 +35,7 @@ export const NodeLabelSettingsModal = ({ show, onHide, container }: NodeLabelSet
 
   // Draft state so changes only apply on Save.
   const [fields, setFields] = useState<NodeLabelFieldOption[]>(config.fields);
-  const [customText, setCustomText] = useState(config.customText);
+  const [customText, setCustomText] = useState<string[]>(config.customText);
 
   // Re-seed the draft from the live config each time the modal opens.
   useEffect(() => {
@@ -43,6 +44,12 @@ export const NodeLabelSettingsModal = ({ show, onHide, container }: NodeLabelSet
       setCustomText(config.customText);
     }
   }, [show, config]);
+
+  const setCustomLine = (index: number, value: string) =>
+    setCustomText(prev => prev.map((t, i) => (i === index ? value : t)));
+  const addCustomLine = () => setCustomText(prev => [...prev, '']);
+  const removeCustomLine = (index: number) =>
+    setCustomText(prev => prev.filter((_, i) => i !== index));
 
   const toggleField = (index: number) =>
     setFields(prev => prev.map((f, i) => (i === index ? { ...f, enabled: !f.enabled } : f)));
@@ -57,7 +64,8 @@ export const NodeLabelSettingsModal = ({ show, onHide, container }: NodeLabelSet
     });
 
   const handleSave = () => {
-    const newConfig: NodeLabelConfig = { fields, customText };
+    // Drop blank lines on save so empty rows don't render as gaps under nodes.
+    const newConfig: NodeLabelConfig = { fields, customText: customText.filter(t => t.trim()) };
     setNodeLabelConfig(newConfig);
     onHide();
   };
@@ -69,7 +77,7 @@ export const NodeLabelSettingsModal = ({ show, onHide, container }: NodeLabelSet
 
   const previewLines = [
     ...fields.filter(f => f.enabled).map(f => PREVIEW_VALUES[f.field]),
-    ...(customText.trim() ? [customText.trim()] : []),
+    ...customText.map(t => t.trim()).filter(Boolean),
   ];
 
   return (
@@ -123,15 +131,33 @@ export const NodeLabelSettingsModal = ({ show, onHide, container }: NodeLabelSet
 
         <Form.Group className="mb-3">
           <Form.Label className="small fw-semibold mb-1">Custom text (optional)</Form.Label>
-          <Form.Control
-            type="text"
-            placeholder="e.g. Lab segment"
-            value={customText}
-            maxLength={40}
-            onChange={e => setCustomText(e.target.value)}
-          />
-          <Form.Text className="text-muted">
-            Shown as the last line under every node.
+          <div className="d-flex flex-column gap-1">
+            {customText.map((line, i) => (
+              <div key={i} className="d-flex align-items-center gap-2">
+                <Form.Control
+                  type="text"
+                  placeholder="e.g. Lab segment"
+                  value={line}
+                  maxLength={40}
+                  onChange={e => setCustomLine(i, e.target.value)}
+                />
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  className="py-0 px-1"
+                  title="Remove line"
+                  onClick={() => removeCustomLine(i)}
+                >
+                  <i className="bi bi-x-lg" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button variant="link" size="sm" className="p-0 mt-1" onClick={addCustomLine}>
+            <i className="bi bi-plus-circle me-1" />Add custom line
+          </Button>
+          <Form.Text className="text-muted d-block">
+            Shown as extra lines under every node, in order.
           </Form.Text>
         </Form.Group>
 

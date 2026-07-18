@@ -27,7 +27,15 @@ public class DeviceClassificationProperties {
   @NotNull
   private Set<String> serverApps = new LinkedHashSet<>();
 
+  /** nDPI app names that only weakly imply a server (clients speak them too, e.g. HTTP/TLS). */
+  @NotNull
+  private Set<String> weakServerApps = new LinkedHashSet<>();
+
   /** nDPI category names strongly associated with IoT / embedded devices. */
   @NotNull
   private Set<String> iotCategories = new LinkedHashSet<>();
+
+  /** nDPI app names that indicate an IoT / appliance endpoint (e.g. printers speak IPP). */
+  @NotNull
+  private Set<String> iotApps = new LinkedHashSet<>();
 }

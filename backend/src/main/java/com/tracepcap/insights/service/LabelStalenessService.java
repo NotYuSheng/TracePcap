@@ -2,6 +2,8 @@ package com.tracepcap.insights.service;
 
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.common.adjudication.HumanOverrideEntity;
+import com.tracepcap.common.adjudication.HumanOverrideRepository;
 import com.tracepcap.monitor.spi.LabelStalenessCheck;
 import com.tracepcap.insights.entity.NodeRoleEntity;
 import com.tracepcap.insights.repository.NodeRoleRepository;
@@ -38,7 +40,12 @@ public class LabelStalenessService implements LabelStalenessCheck {
 
   public static final String ORIGIN_CARRIED_FORWARD = "CARRIED_FORWARD";
 
+  /** Adjudication questions whose human overrides carry forward + go stale in monitor mode (#499). */
+  private static final List<String> OVERRIDE_QUESTIONS =
+      List.of("host-identity", "host-hardware", "host-service", "host-behaviour");
+
   private final NodeRoleRepository nodeRoleRepository;
+  private final HumanOverrideRepository humanOverrideRepository;
   private final HostClassificationLookup hostClassificationLookup;
   private final GeoOrgLookup geoOrgLookup;
   private final JdbcTemplate jdbc;
@@ -109,11 +116,89 @@ public class LabelStalenessService implements LabelStalenessCheck {
               .origin(ORIGIN_CARRIED_FORWARD)
               .llmSuggested(false)
               .confirmedByHuman(true)
+              // Carry the original annotator forward — the confirmation is theirs, not this run's.
+              .confirmedBy(prev.getConfirmedBy())
               .observedProperties(observed)
               .staleSince(staleSince)
               .staleFields(staleFields)
               .build();
       nodeRoleRepository.save(carried);
+    }
+
+    drifts.addAll(carryForwardOverrides(prevFileId, newFileId));
+    return drifts;
+  }
+
+  /**
+   * Carries human adjudication overrides (host-identity + the evidence axes) forward from the
+   * previous snapshot onto the new file and flags those whose classifying evidence drifted (#499).
+   * Mirrors the node-role carry-forward above: CARRIED_FORWARD rows are regenerated each call; an
+   * override the analyst set directly on the new file (origin MANUAL) is left untouched. Staleness is
+   * sticky — it persists until the analyst re-affirms or clears the override.
+   */
+  private List<Drift> carryForwardOverrides(UUID prevFileId, UUID newFileId) {
+    // Regenerate carried rows cleanly for every question.
+    for (String question : OVERRIDE_QUESTIONS) {
+      humanOverrideRepository.deleteByQuestionAndFileIdAndOrigin(
+          question, newFileId, ORIGIN_CARRIED_FORWARD);
+    }
+
+    List<Drift> drifts = new ArrayList<>();
+    for (String question : OVERRIDE_QUESTIONS) {
+      List<HumanOverrideEntity> prevOverrides =
+          humanOverrideRepository.findByQuestionAndFileId(question, prevFileId);
+      if (prevOverrides.isEmpty()) continue;
+
+      // Entities the analyst has overridden directly on the new file — don't overwrite them.
+      Set<String> ownKeys =
+          humanOverrideRepository.findByQuestionAndFileId(question, newFileId).stream()
+              .filter(o -> !ORIGIN_CARRIED_FORWARD.equals(o.getOrigin()))
+              .map(HumanOverrideEntity::getEntityKey)
+              .collect(Collectors.toSet());
+
+      for (HumanOverrideEntity prev : prevOverrides) {
+        if (ORIGIN_CARRIED_FORWARD.equals(prev.getOrigin())) continue; // don't chain carried→carried
+        if (ownKeys.contains(prev.getEntityKey())) continue;
+
+        // Overrides are keyed by IP (host-identity/axes are per-host). Reuse the IP property snapshot.
+        Map<String, Object> observed = computeProperties("IP", prev.getEntityKey(), newFileId);
+        if (!Boolean.TRUE.equals(observed.get("observed"))) continue; // absent in this snapshot
+
+        // A MANUAL override set directly on the previous file has no stored baseline (unlike node
+        // roles, the override endpoint doesn't snapshot one). Derive it from the previous file so the
+        // first carry can still detect drift.
+        Map<String, Object> baseline = prev.getObservedProperties();
+        if (baseline == null || baseline.isEmpty()) {
+          baseline = computeProperties("IP", prev.getEntityKey(), prevFileId);
+        }
+        List<String> changes =
+            (baseline == null || baseline.isEmpty()) ? List.of() : diff(baseline, observed);
+
+        LocalDateTime staleSince = null;
+        List<String> staleFields = null;
+        if (!changes.isEmpty()) {
+          staleSince = prev.getStaleSince() != null ? prev.getStaleSince() : LocalDateTime.now();
+          staleFields = changes;
+          drifts.add(new Drift("IP", prev.getEntityKey(), prev.getLabel(), changes));
+        } else if (prev.getStaleSince() != null) {
+          staleSince = prev.getStaleSince();
+          staleFields = prev.getStaleFields();
+        }
+
+        humanOverrideRepository.save(
+            HumanOverrideEntity.builder()
+                .question(question)
+                .fileId(newFileId)
+                .entityKey(prev.getEntityKey())
+                .label(prev.getLabel())
+                .rationale(prev.getRationale())
+                .actor(prev.getActor())
+                .origin(ORIGIN_CARRIED_FORWARD)
+                .observedProperties(observed)
+                .staleSince(staleSince)
+                .staleFields(staleFields)
+                .build());
+      }
     }
     return drifts;
   }

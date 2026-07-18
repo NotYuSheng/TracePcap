@@ -38,11 +38,23 @@ public class NodeRoleService {
   private final JdbcTemplate jdbc;
   private final LabelStalenessService labelStalenessService;
   private final ApplicationEventPublisher eventPublisher;
+  private final com.tracepcap.config.security.CurrentActor currentActor;
 
   public Optional<NodeRoleDto> getRole(UUID fileId, String entityType, String entityKey) {
     return nodeRoleRepository
         .findByFileIdAndEntityTypeAndEntityKey(fileId, entityType, entityKey)
         .map(this::toDto);
+  }
+
+  /**
+   * All human-confirmed roles in a file — bulk read for graph-wide display (node labels).
+   * Confirmed only: unaccepted AI suggestions are not the analyst's word, and shipping them in a
+   * bulk display payload would leak suggestions the analyst never endorsed.
+   */
+  public List<NodeRoleDto> listConfirmedRoles(UUID fileId) {
+    return nodeRoleRepository.findByFileIdAndConfirmedByHumanTrue(fileId).stream()
+        .map(this::toDto)
+        .toList();
   }
 
   @Transactional
@@ -65,6 +77,8 @@ public class NodeRoleService {
     // Once confirmed by a human, keep llmSuggested as-is; only clear it when human explicitly saves
     if (req.isConfirmedByHuman()) {
       entity.setLlmSuggested(false);
+      // Attribute the confirmation server-side, from the token — never a client-supplied name.
+      entity.setConfirmedBy(currentActor.username());
     }
     // Record this file's current properties as the drift baseline for the next snapshot.
     entity.setObservedProperties(
@@ -294,6 +308,7 @@ public class NodeRoleService {
         .origin(e.getOrigin())
         .llmSuggested(e.isLlmSuggested())
         .confirmedByHuman(e.isConfirmedByHuman())
+        .confirmedBy(e.getConfirmedBy())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
         .staleSince(e.getStaleSince())

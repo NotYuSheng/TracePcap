@@ -30,6 +30,8 @@ public class AppProfileSignal implements DeviceClassificationSignal {
     Set<String> mobileApps = classificationProps.getMobileApps();
     Set<String> desktopApps = classificationProps.getDesktopApps();
     Set<String> serverApps = classificationProps.getServerApps();
+    Set<String> weakServerApps = classificationProps.getWeakServerApps();
+    Set<String> iotApps = classificationProps.getIotApps();
     Set<String> iotCategories = classificationProps.getIotCategories();
 
     for (String app : ctx.profile().apps) {
@@ -38,6 +40,10 @@ public class AppProfileSignal implements DeviceClassificationSignal {
         board.add(DeviceTypes.LAPTOP_DESKTOP, 20, "Desktop app \"" + app + "\" → +20");
       if (serverApps.contains(app))
         board.add(DeviceTypes.SERVER, 20, "Server app \"" + app + "\" → +20");
+      // Weak server apps (HTTP/TLS) nudge but don't decide — clients speak them too.
+      if (weakServerApps.contains(app))
+        board.add(DeviceTypes.SERVER, 5, "App \"" + app + "\" (weak server hint) → +5");
+      if (iotApps.contains(app)) board.add(DeviceTypes.IOT, 20, "IoT app \"" + app + "\" → +20");
     }
     for (String cat : ctx.profile().categories) {
       if (iotCategories.contains(cat)) board.add(DeviceTypes.IOT, 15, "IoT category \"" + cat + "\" → +15");

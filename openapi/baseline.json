@@ -1172,6 +1172,63 @@
         },
         "type": "object"
       },
+      "EvidenceDto": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "weight": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EvidenceRequest": {
+        "properties": {
+          "label": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 10000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "weight": {
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "reason"
+        ],
+        "type": "object"
+      },
       "ExtractedFileResponse": {
         "properties": {
           "conversationId": {
@@ -2175,6 +2232,9 @@
       },
       "NodeRoleDto": {
         "properties": {
+          "confirmedBy": {
+            "type": "string"
+          },
           "confirmedByHuman": {
             "type": "boolean"
           },
@@ -2219,6 +2279,62 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "OverrideDto": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "staleFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "staleSince": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OverrideRequest": {
+        "properties": {
+          "label": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 10000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
         "type": "object"
       },
       "PacketDto": {
@@ -4373,7 +4489,7 @@
     },
     "/api/v1/custom-private-ranges/{id}": {
       "delete": {
-        "operationId": "delete_6",
+        "operationId": "delete_7",
         "parameters": [
           {
             "in": "path",
@@ -4398,7 +4514,7 @@
     },
     "/api/v1/entity-notes": {
       "delete": {
-        "operationId": "delete_5",
+        "operationId": "delete_6",
         "parameters": [
           {
             "in": "query",
@@ -4828,6 +4944,371 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/adjudications/{question}/{entityKey}/evidence": {
+      "get": {
+        "operationId": "listEvidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Analyst evidence for a question about an entity, newest first",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      },
+      "post": {
+        "operationId": "appendEvidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Append weighted evidence toward a candidate; re-runs adjudication",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/adjudications/{question}/{entityKey}/evidence/{evidenceId}": {
+      "delete": {
+        "operationId": "deleteEvidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evidenceId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Delete your own evidence; re-runs adjudication (author-only, else 403)",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      },
+      "put": {
+        "operationId": "updateEvidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evidenceId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit your own evidence; re-runs adjudication (author-only, else 403)",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/adjudications/{question}/{entityKey}/override": {
+      "delete": {
+        "operationId": "delete_5",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Clear the human override, letting the machine vote decide again",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      },
+      "get": {
+        "operationId": "get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverrideDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The human override for a question about an entity, if one is set",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      },
+      "put": {
+        "operationId": "put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverrideDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Set or replace the human override; re-runs adjudication (actor from token)",
+        "tags": [
+          "Adjudication Overrides"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/download": {
       "get": {
         "description": "Download a PCAP file",
@@ -5121,6 +5602,43 @@
         "summary": "List distinct source MACs observed per IP in a file",
         "tags": [
           "Host Classifications"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/node-roles": {
+      "get": {
+        "description": "Bulk read for graph-wide display (node labels). Confirmed labels only — unaccepted AI suggestions are excluded. Single-entity reads/writes live under /node-roles.",
+        "operationId": "listFileNodeRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NodeRoleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "All human-confirmed entity roles in a file",
+        "tags": [
+          "Node Roles",
+          "Host Identities"
         ]
       }
     },
@@ -8067,6 +8585,10 @@
     {
       "description": "Free-text annotations on a monitored network",
       "name": "Network Annotations"
+    },
+    {
+      "description": "A human's final answer to an adjudicated question — outranks the machine vote",
+      "name": "Adjudication Overrides"
     },
     {
       "description": "Large-scale network topology clustering and host analytics",

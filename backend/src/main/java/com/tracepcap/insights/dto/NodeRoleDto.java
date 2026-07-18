@@ -17,6 +17,8 @@ public class NodeRoleDto {
   private String origin; // MANUAL | AI | CARRIED_FORWARD
   private boolean llmSuggested;
   private boolean confirmedByHuman;
+  /** Who confirmed the label (audit trail); "system" when auth is off, null when unconfirmed. */
+  private String confirmedBy;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 

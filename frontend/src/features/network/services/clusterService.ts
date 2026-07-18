@@ -194,7 +194,7 @@ export function applySubnetClustering(
       protocols: dominantProtocols,
       connections: totalConnections,
       nodeType: 'unknown',
-      nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
+      nodeTypeEvidence: { ndpiApps: [] },
       sources: allSources.size > 0 ? [...allSources] : undefined,
       // Cluster-specific
       isCluster: true,

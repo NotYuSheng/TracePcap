@@ -1,4 +1,5 @@
 import type { Conversation, AnalysisSummary, HostClassification, HostIdentity } from '@/types';
+import type { NodeRole } from '@/features/insights/types/insights.types';
 import type {
   GraphNode,
   GraphEdge,
@@ -13,36 +14,6 @@ const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
 function isMacAddress(id: string): boolean {
   return MAC_REGEX.test(id);
-}
-
-/**
- * Classify a node type from its inbound port frequency map, distinct peer count,
- * and the set of nDPI appName values observed on inbound edges.
- *
- * Classification order (highest priority first):
- *   1. nDPI appName (NDPI_APP_MAP) — accurate even on non-standard ports / encrypted flows
- *   2. Well-known port (PORT_SERVICE_MAP) — fallback when appName is unavailable
- *   3. Router heuristic — many distinct peers
- *   4. Generic client / unknown
- *
- * serverPorts: { "53/UDP": 42, "80/TCP": 1 } — counts of connections received on each port.
- * ndpiApps: set of distinct nDPI appName strings seen on inbound edges.
- */
-/**
- * The port a node most often served on — the busiest of its well-known ports. Evidence only: it is
- * shown in the details panel as one input the backend weighed, not used here to decide anything.
- * Deciding what a host *is* moved to the adjudicator (#521); this is a fact, not a judgment.
- */
-function dominantServerPort(serverPorts: Record<string, number>): string | null {
-  let best: string | null = null;
-  let max = 0;
-  for (const [portProto, count] of Object.entries(serverPorts)) {
-    if (count > max) {
-      max = count;
-      best = portProto;
-    }
-  }
-  return best;
 }
 
 /**
@@ -67,7 +38,7 @@ function createNode(ip: string, hostname?: string, mac?: string): GraphNode {
       protocols: [],
       connections: 0,
       nodeType: isL2 ? 'l2-device' : 'unknown',
-      nodeTypeEvidence: { dominantPort: null, connectionCount: 0, distinctPeers: 0 },
+      nodeTypeEvidence: { ndpiApps: [] },
     },
   };
 }
@@ -184,6 +155,13 @@ function applyRoleFromInitiator(node: GraphNode, conv: Conversation) {
   const isInitiator = conv.initiatorIp === node.data.ip;
   const roleHere: 'client' | 'server' = isInitiator ? 'client' : 'server';
 
+  // The measured facts behind the role — surfaced as Behaviour evidence in the details panel.
+  if (isInitiator) {
+    node.data.initiatedConversations = (node.data.initiatedConversations ?? 0) + 1;
+  } else {
+    node.data.answeredConversations = (node.data.answeredConversations ?? 0) + 1;
+  }
+
   // 'unknown' is the initial value AND a truthy string, so a bare `!role` check would skip the
   // first assignment and mark every node 'both' on its second flow — which would defeat the whole
   // point of reading the fact. Treat 'unknown' as "not yet set".
@@ -269,17 +247,13 @@ export function buildNetworkGraph(
   maxConversations: number = 500,
   hostClassifications?: HostClassification[],
   maxNodes: number = 50,
-  hostIdentities?: HostIdentity[]
+  hostIdentities?: HostIdentity[],
+  nodeRoles?: NodeRole[]
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const edges: GraphEdge[] = [];
 
-  // Per-node tracking for node type classification
-  // serverPorts[ip]["53/UDP"] = count of connections received on that port
-  const serverPorts: Record<string, Record<string, number>> = {};
-  // peerSets[ip] = set of all distinct peer IPs
-  const peerSets: Record<string, Set<string>> = {};
-  // ndpiAppSets[ip] = set of distinct nDPI appName values seen on inbound edges (dst = ip)
+  // ndpiAppSets[ip] = distinct nDPI appName values seen in any conversation involving ip
   const ndpiAppSets: Record<string, Set<string>> = {};
 
   // Ghost/phantom node detection tracking
@@ -323,31 +297,15 @@ export function buildNetworkGraph(
     }
     updateNodeStats(nodeMap[dst.ip], conv, 'received', protocol);
 
-    // Track well-known port usage for both endpoints.
-    // A node sending FROM a well-known port (e.g. DNS response from :53) is
-    // just as valid a signal as one receiving ON a well-known port.
-    for (const [nodeIp, port] of [
-      [dst.ip, dst.port],
-      [src.ip, src.port],
-    ] as [string, number][]) {
-      if (port != null && port < 1024) {
-        const portKey = `${port}/${protocol}`;
-        if (!serverPorts[nodeIp]) serverPorts[nodeIp] = {};
-        serverPorts[nodeIp][portKey] = (serverPorts[nodeIp][portKey] || 0) + 1;
-      }
-    }
-
-    // Track distinct peers for both endpoints
-    if (!peerSets[src.ip]) peerSets[src.ip] = new Set();
-    peerSets[src.ip].add(dst.ip);
-    if (!peerSets[dst.ip]) peerSets[dst.ip] = new Set();
-    peerSets[dst.ip].add(src.ip);
-
-    // Accumulate nDPI appName on the destination node (the server side of the flow).
-    // Store uppercased to match NDPI_APP_MAP keys.
+    // Accumulate nDPI appName on BOTH endpoints — the identification is a fact about the
+    // conversation, and either side "did WhatsApp on the wire". Mirrors the backend's symmetric
+    // profile accumulation (DeviceClassifierService.addToProfile runs for src and dst); the old
+    // dst-only version hid the app from hosts that only ever initiated.
     if (conv.appName) {
-      if (!ndpiAppSets[dst.ip]) ndpiAppSets[dst.ip] = new Set();
-      ndpiAppSets[dst.ip].add(conv.appName.toUpperCase());
+      for (const ip of [src.ip, dst.ip]) {
+        if (!ndpiAppSets[ip]) ndpiAppSets[ip] = new Set();
+        ndpiAppSets[ip].add(conv.appName.toUpperCase());
+      }
     }
 
     // Create edge
@@ -390,16 +348,12 @@ export function buildNetworkGraph(
   // is the same evidence the backend already weighs, with a confidence and a contested outcome
   // this code could not express.
   //
-  // serverPorts / peerSets / ndpiAppSets are still accumulated: they populate nodeTypeEvidence,
-  // which the details panel shows as *why*, and they are facts, not judgments.
+  // ndpiAppSets is still accumulated: it populates nodeTypeEvidence, which the details panel shows
+  // as *why*, and it is a fact, not a judgment.
   Object.keys(nodeMap).forEach(ip => {
     const d = nodeMap[ip].data;
     if (d.isL2) return; // L2-only nodes keep their pre-assigned type
-    const domPort = dominantServerPort(serverPorts[ip] ?? {});
     d.nodeTypeEvidence = {
-      dominantPort: domPort,
-      connectionCount: domPort ? (serverPorts[ip]?.[domPort] ?? 0) : 0,
-      distinctPeers: peerSets[ip]?.size ?? 0,
       ndpiApps: Array.from(ndpiAppSets[ip] ?? new Set<string>()),
     };
   });
@@ -523,6 +477,20 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
       // A human-confirmed label outranks every machine-derived display value.
       if (identity.basis === 'HUMAN') d.deviceType = undefined;
     });
+  }
+
+  // Analyst-assigned role labels ("Finance DB") — display-only, for the node-label lines.
+  // The endpoint already returns confirmed labels only; the roleLabel check is just null-safety.
+  if (nodeRoles && nodeRoles.length > 0) {
+    const nodeByMac = new Map<string, GraphNode>();
+    for (const n of Object.values(nodeMap)) {
+      if (n.data.mac) nodeByMac.set(n.data.mac, n);
+    }
+    for (const r of nodeRoles) {
+      if (!r.roleLabel) continue;
+      const node = r.entityType === 'IP' ? nodeMap[r.entityKey] : nodeByMac.get(r.entityKey);
+      if (node) node.data.roleLabel = r.roleLabel;
+    }
   }
 
   // Apply significance-based node cap: keep the top-N most significant nodes

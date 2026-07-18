@@ -100,4 +100,16 @@ public class HostClassificationEntity {
 
   @Column(name = "runner_up_score")
   private Integer runnerUpScore;
+
+  /**
+   * Newline-joined human-readable reasons the winning type scored (one per contributing signal,
+   * e.g. "MAC OUI is Cisco (+40)"). Null pre-migration/override. Split back into a list on read —
+   * this is the explainability trail the adjudicator carries out to the analyst.
+   */
+  @Column(name = "winner_reasons", columnDefinition = "text")
+  private String winnerReasons;
+
+  /** Newline-joined reasons the runner-up scored; null on walkover/override. */
+  @Column(name = "runner_up_reasons", columnDefinition = "text")
+  private String runnerUpReasons;
 }

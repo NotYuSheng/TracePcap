@@ -29,7 +29,20 @@ public interface HostClassificationLookup {
       int confidence,
       Integer winnerScore,
       String runnerUpType,
-      Integer runnerUpScore) {}
+      Integer runnerUpScore,
+      List<String> winnerReasons,
+      List<String> runnerUpReasons) {
+
+    /**
+     * Compact constructor guaranteeing the reason lists are never null — the adjudicator builds
+     * candidate maps from them without guarding. Each list is the human-readable "why" behind its
+     * type's score, e.g. {@code ["MAC OUI is Cisco (+40)", "listens on 53/udp (+30)"]}.
+     */
+    public ClassifiedHost {
+      winnerReasons = winnerReasons == null ? List.of() : List.copyOf(winnerReasons);
+      runnerUpReasons = runnerUpReasons == null ? List.of() : List.copyOf(runnerUpReasons);
+    }
+  }
 
   /**
    * Descriptive facts observed about one host in one file.

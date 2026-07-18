@@ -28,7 +28,9 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
                     e.getConfidence(),
                     e.getWinnerScore(),
                     e.getRunnerUpType(),
-                    e.getRunnerUpScore()))
+                    e.getRunnerUpScore(),
+                    splitReasons(e.getWinnerReasons()),
+                    splitReasons(e.getRunnerUpReasons())))
         .toList();
   }
 
@@ -73,5 +75,14 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
   private static List<String> splitRoles(String joined) {
     if (joined == null || joined.isBlank()) return List.of();
     return Arrays.stream(joined.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+  }
+
+  /**
+   * Splits the newline-joined reasons column into a list (empty when null/blank). Newline, not
+   * comma: a reason may itself contain a comma, so it must not be the delimiter.
+   */
+  private static List<String> splitReasons(String joined) {
+    if (joined == null || joined.isBlank()) return List.of();
+    return Arrays.stream(joined.split("\n")).map(String::trim).filter(s -> !s.isEmpty()).toList();
   }
 }

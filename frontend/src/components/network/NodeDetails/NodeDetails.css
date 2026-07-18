@@ -83,3 +83,14 @@
 .node-details-peer-icon {
   font-size: 0.7rem;
 }
+
+/* Nested modals (add-evidence, evidence explainer) shown from within the NodeDetails panel, which
+   itself renders as a raised overlay in monitor mode (z-index ~1070). These must sit above it so
+   they aren't hidden behind the node panel (modal-in-modal). React-Bootstrap sets its own INLINE
+   z-index on the .modal/.modal-backdrop elements, so !important is required to win over it. */
+.tp-nested-modal {
+  z-index: 2000 !important;
+}
+.tp-nested-modal-backdrop {
+  z-index: 1990 !important;
+}

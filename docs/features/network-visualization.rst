@@ -171,76 +171,55 @@ Click a node to open the **Node Detail Panel**, which shows:
 
 - IP address and MAC address
 - Hostname (SNI extracted from TLS ClientHello, if available)
-- Classification badge — click it to open the **Classification popup** (see
-  below)
+- **Identity** — the adjudicated verdict for "what is this host?" (see below)
+- **Evidence weighed** — the measured facts behind the verdict (see below)
+- **Role** — the analyst-assigned name for the host (e.g. *Finance DB*)
 - Packets sent / received and bytes sent / received / total
 - Protocols used across all conversations
 - Connections table: per-peer breakdown sorted by bytes, with application labels
 
-Classification Popup
-~~~~~~~~~~~~~~~~~~~~
+Identity & Evidence (facts → votes → verdict)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Clicking the classification badge opens a popup with three sections:
+Host classification follows a **facts → votes → verdict** model. The browser
+never classifies; it renders the backend's adjudication (see
+:doc:`../architecture/adjudication-explainability`).
 
-**Type** — the node's network topology role, derived from traffic analysis.
-Classification priority (highest first):
+**Identity (the verdict)** — one adjudicated answer per host, with:
 
-1. **nDPI application name** — the most reliable signal, works even on
-   non-standard ports and encrypted flows. Recognised apps:
-   DNS, HTTP, TLS/QUIC, SSH, FTP, SMTP/IMAP/POP, DHCP, NTP, and common
-   databases (MySQL, PostgreSQL, Redis, MongoDB, Elasticsearch).
-2. **Well-known port / protocol** — fallback when nDPI app is unavailable
-   (e.g. port 443/TCP → web server, port 22/TCP → SSH server).
-3. **Router heuristic** — a node with 10 or more distinct peers that is
-   not acting as a server is classified as a Router / Gateway.
-4. **Role fallback** — nodes that match none of the above are classified
-   as ``Client`` (default for most endpoints) or ``Unknown``.
+- The winning device type (e.g. ``Mobile``, ``Router``, ``Web Server``), its
+  **confidence** (computed from the score margin between winner and runner-up:
+  ``min(100, round(margin × 100 / 60))``), and a **⚠ contested** marker when
+  the margin is too small to assert a winner.
+- **Why** — every candidate type with its score and the human-readable reasons
+  that voted for it (e.g. ``Mobile app "WhatsApp" → +20`` toward ``MOBILE``).
+  One fact can support several candidates.
+- **I disagree** — a first-class human override that sets the verdict.
+- **Add evidence** — an analyst-contributed weighted signal that re-enters the
+  vote (it informs, it does not override).
 
-Node colour in the graph reflects which tier matched:
+**Evidence weighed (the facts)** — three read-only rows listing what was
+*measured*, with no scores and no per-axis conclusion (conclusions belong to
+Identity alone):
 
-- **Specific service types** (dns-server, web-server, ssh-server, etc.)
-  always use their service colour regardless of device classification.
-- **Generic types** (``client``, ``unknown``) show the **device type colour**
-  instead — so an IoT client appears pink and a mobile client appears violet,
-  making hardware diversity visible without requiring a separate filter.
+- **Hardware** — the physical fingerprint: MAC OUI manufacturer and observed
+  TTL.
+- **Ports / Service** — what the host does on the wire: a confirmed service
+  role (DNS/Web/API, detected from its actual responses), or the application
+  nDPI identified in its traffic when no service was detected.
+- **Behaviour** — measured connection direction (who sent the TCP SYN, #496):
+  how many connections the host opened vs. answered. Flows with no measured
+  initiator (UDP, mid-stream captures) count toward neither — unknown is
+  reported as "Nothing observed", never guessed.
 
-Evidence text is shown below the badge (e.g. "42 distinct peers" for a
-router, or the nDPI applications that triggered the classification).
+When the observed service evidence contradicts the Identity verdict (e.g. a
+host that demonstrably served HTTP while the verdict says IoT endpoint), an
+**Evidence conflicts** banner flags it for analyst review.
 
-**Device** — the hardware/OS classification from the multi-signal scorer
-(see :doc:`geolocation` for the full algorithm):
-
-- The device type badge (e.g. ``Mobile``, ``Router``, ``IoT Device``)
-- A bullet list of the signals that contributed:
-
-  - ``MAC OUI matched: <vendor>`` — OUI resolved to a known vendor
-  - ``TTL <N> → <OS family>`` — observed TTL mapped to Linux/Android/iOS,
-    Windows, or Network device (Cisco/BSD)
-  - ``Application traffic profile analysed`` — shown when confidence ≥ 60
-  - ``Network traffic patterns analysed`` — shown when confidence ≥ 25
-
-- A **confidence progress bar** showing the numeric confidence percentage
-  and a qualitative label:
-
-  - **Strong** — ≥ 75%
-  - **Moderate** — ≥ 50%
-  - **Low** — ≥ 25%
-  - **Uncertain** — < 25%
-
-  The confidence is computed from the score margin between the winning device
-  type and the runner-up: ``min(100, round(margin × 100 / 60))``. A margin of
-  60 or more points → 100% (Strong). A tie → 0% (Uncertain).
-
-**Role** — whether this host initiates or receives connections:
-
-- ``Client`` — mostly initiates
-- ``Server`` — mostly receives
-- ``Both`` — significant traffic in both directions
-- Counts of conversations initiated vs. received are shown below the badge
-
-A legend table at the bottom of the popup summarises the signal source for
-each classification dimension (Type: network topology; Device: hardware
-fingerprinting; Role: TCP session direction).
+Node colour in the graph follows the adjudicated identity: service verdicts
+(dns-server, web-server, …) use their service colour; generic endpoints show
+the device-type colour, making hardware diversity visible without a separate
+filter.
 
 Service-Role Detection
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -289,9 +268,10 @@ Node Label Customization
 
 You can control what text is **tagged onto each node** in the topology graph.
 Open the **Node Label** settings to choose which fields render as label lines
-beneath a node — for example IP address, hostname (auto-tagged from the TLS SNI
-/ ClientHello), MAC address, vendor, or device type. A live preview shows the
-chosen layout, and the configuration applies to every node in the graph.
+beneath a node — the analyst-assigned **role** (e.g. *Finance DB*; confirmed
+labels only, shown by default), IP address, hostname (auto-tagged from the TLS
+SNI / ClientHello), MAC address, vendor, or device type. A live preview shows
+the chosen layout, and the configuration applies to every node in the graph.
 
 Hostnames are tagged passively: when a client's name is observed in traffic it
 is attached to the node and available as a label field, with no active probing.
