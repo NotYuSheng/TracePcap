@@ -61,14 +61,20 @@ public class LabelStalenessService implements LabelStalenessCheck {
   @Override
   public List<Drift> carryForwardAndValidate(UUID prevFileId, UUID newFileId) {
     if (newFileId == null) return List.of();
-    // Always clear stale carried rows so a reorder/re-add regenerates cleanly.
+    // Always clear stale carried rows — roles AND overrides — so a reorder/re-add regenerates
+    // cleanly, and so a file disconnected from any predecessor (prevFileId null) doesn't keep
+    // carried overrides standing from whatever it was previously chained to.
     nodeRoleRepository.deleteByFileIdAndOrigin(newFileId, ORIGIN_CARRIED_FORWARD);
+    for (String question : OVERRIDE_QUESTIONS) {
+      humanOverrideRepository.deleteByQuestionAndFileIdAndOrigin(
+          question, newFileId, ORIGIN_CARRIED_FORWARD);
+    }
     if (prevFileId == null) return List.of();
 
     List<Drift> drifts = new ArrayList<>();
     // Overrides carry independently of node roles — a network can have adjudication overrides and
     // not a single confirmed role, and an early return on the role branch used to silently skip
-    // (and leave uncleaned) every carried override.
+    // every carried override.
     drifts.addAll(carryForwardOverrides(prevFileId, newFileId));
 
     List<NodeRoleEntity> confirmed =
@@ -136,16 +142,14 @@ public class LabelStalenessService implements LabelStalenessCheck {
   /**
    * Carries human adjudication overrides (host-identity + the evidence axes) forward from the
    * previous snapshot onto the new file and flags those whose classifying evidence drifted (#499).
-   * Mirrors the node-role carry-forward above: CARRIED_FORWARD rows are regenerated each call; an
-   * override the analyst set directly on the new file (origin MANUAL) is left untouched. Staleness is
-   * sticky — it persists until the analyst re-affirms or clears the override.
+   * Callers must first clear this file's existing CARRIED_FORWARD rows (done unconditionally in
+   * {@link #carryForwardAndValidate}, ahead of the {@code prevFileId == null} short-circuit, so a
+   * file disconnected from any predecessor still loses its carried overrides). Mirrors the
+   * node-role carry-forward above: an override the analyst set directly on the new file (origin
+   * MANUAL) is left untouched. Staleness is sticky — it persists until the analyst re-affirms or
+   * clears the override.
    */
   private List<Drift> carryForwardOverrides(UUID prevFileId, UUID newFileId) {
-    // Regenerate carried rows cleanly for every question.
-    for (String question : OVERRIDE_QUESTIONS) {
-      humanOverrideRepository.deleteByQuestionAndFileIdAndOrigin(
-          question, newFileId, ORIGIN_CARRIED_FORWARD);
-    }
 
     List<Drift> drifts = new ArrayList<>();
     for (String question : OVERRIDE_QUESTIONS) {

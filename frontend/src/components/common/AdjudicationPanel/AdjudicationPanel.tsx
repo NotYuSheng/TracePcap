@@ -150,6 +150,11 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
         setOverride(o);
         setEvidence(ev);
       })
+      .catch(err => {
+        if (seq !== refreshSeq.current) return;
+        console.error('Failed to load adjudication data:', err);
+        setActionError('Failed to load adjudication data. Please retry.');
+      })
       .finally(() => {
         if (seq === refreshSeq.current) setLoading(false);
       });
