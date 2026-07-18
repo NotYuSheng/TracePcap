@@ -172,11 +172,17 @@ public class PcapParserService {
           // treat its post-Info fields as absent rather than risk reading a head field as a tail one.
           boolean aligned = n >= 11 + 1 + TAIL;
 
-          // Info spans the columns between the head and the tail; rejoin the pieces a '|' split apart.
+          // Info spans the columns between the head and the tail. Almost always it is a single column
+          // (f[11]) — it only spans several when its text contained the '|' separator, which we then
+          // rejoin. Fast-path the single-column case so the per-packet hot path allocates no
+          // StringBuilder for the vast majority of rows.
+          final int infoEnd = n - TAIL - 1; // last Info column, when aligned
           String info = protocol;
-          if (aligned) {
+          if (aligned && infoEnd == 11) {
+            if (!f[11].isEmpty()) info = f[11];
+          } else if (aligned) {
             StringBuilder sb = new StringBuilder();
-            for (int i = 11; i <= n - TAIL - 1; i++) {
+            for (int i = 11; i <= infoEnd; i++) {
               if (i > 11) sb.append('|');
               sb.append(f[i]);
             }
