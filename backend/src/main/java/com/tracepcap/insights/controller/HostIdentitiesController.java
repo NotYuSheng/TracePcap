@@ -1,8 +1,10 @@
 package com.tracepcap.insights.controller;
 
 import com.tracepcap.insights.dto.HostIdentityDto;
+import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.repository.HostIdentityRepository;
 import com.tracepcap.insights.service.HostIdentityService;
+import com.tracepcap.insights.service.NodeRoleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +28,7 @@ public class HostIdentitiesController {
 
   private final HostIdentityRepository hostIdentityRepository;
   private final HostIdentityService hostIdentityService;
+  private final NodeRoleService nodeRoleService;
 
   @GetMapping("/{fileId}/host-identities")
   @Operation(summary = "Adjudicated identity per host for a file (winner-or-contested)")
@@ -65,5 +68,16 @@ public class HostIdentitiesController {
                         .build())
             .toList();
     return ResponseEntity.ok(result);
+  }
+
+  @GetMapping("/{fileId}/node-roles")
+  @Operation(
+      summary = "All human-confirmed entity roles in a file",
+      description =
+          "Bulk read for graph-wide display (node labels). Confirmed labels only — unaccepted AI"
+              + " suggestions are excluded. Single-entity reads/writes live under /node-roles.",
+      tags = {"Node Roles"})
+  public List<NodeRoleDto> listFileNodeRoles(@PathVariable UUID fileId) {
+    return nodeRoleService.listConfirmedRoles(fileId);
   }
 }

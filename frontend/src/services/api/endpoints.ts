@@ -17,6 +17,14 @@ export const API_ENDPOINTS = {
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,
 
+  // Adjudication overrides + evidence (generic: any question, keyed by Adjudicator.question())
+  ADJUDICATION_OVERRIDE: (fileId: string, question: string, entityKey: string) =>
+    `/files/${fileId}/adjudications/${question}/${encodeURIComponent(entityKey)}/override`,
+  ADJUDICATION_EVIDENCE: (fileId: string, question: string, entityKey: string) =>
+    `/files/${fileId}/adjudications/${question}/${encodeURIComponent(entityKey)}/evidence`,
+  ADJUDICATION_EVIDENCE_ITEM: (fileId: string, question: string, entityKey: string, evidenceId: number) =>
+    `/files/${fileId}/adjudications/${question}/${encodeURIComponent(entityKey)}/evidence/${evidenceId}`,
+
   // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
   ENTITY_STATS: (fileId: string) => `/conversations/${fileId}/entity-stats`,
@@ -139,6 +147,8 @@ export const SUBNET_ENDPOINTS = {
 export const INSIGHTS_ENDPOINTS = {
   NODE_ROLE: (fileId: string, entityType: string, entityKey: string) =>
     `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  /** All confirmed roles in a file — bulk read for graph-wide node labels. */
+  NODE_ROLES_BY_FILE: (fileId: string) => `/files/${fileId}/node-roles`,
   NODE_ROLE_UPSERT: '/node-roles',
   NODE_ROLE_DELETE: (fileId: string, entityType: string, entityKey: string) =>
     `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,

@@ -217,6 +217,9 @@ public class DeviceClassifierService implements HostClassifier {
               .winnerScore(winnerScore)
               .runnerUpType(runnerUp != null ? runnerUp.getKey() : null)
               .runnerUpScore(runnerUp != null ? runnerUp.getValue() : null)
+              // Explainability: keep the reasons the vote already produced instead of dropping them.
+              .winnerReasons(joinReasons(board.reasonsFor(deviceType)))
+              .runnerUpReasons(runnerUp != null ? joinReasons(board.reasonsFor(runnerUp.getKey())) : null)
               .build());
     }
 
@@ -302,5 +305,13 @@ public class DeviceClassifierService implements HostClassifier {
   /** Joins detected service roles into the comma-separated form stored on the host (null if none). */
   private String joinRoles(Set<String> roles) {
     return (roles == null || roles.isEmpty()) ? null : String.join(",", roles);
+  }
+
+  /**
+   * Joins a signal's reasons into the newline-separated form stored on the host (null if none).
+   * Newline rather than comma: a reason string may itself contain a comma ("listens on 53, 853").
+   */
+  private String joinReasons(List<String> reasons) {
+    return (reasons == null || reasons.isEmpty()) ? null : String.join("\n", reasons);
   }
 }

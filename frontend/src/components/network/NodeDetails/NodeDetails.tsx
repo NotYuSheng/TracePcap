@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Badge } from '@govtechsg/sgds-react';
+import { Badge, Modal } from '@govtechsg/sgds-react';
 import { useNavigate } from 'react-router-dom';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { NODE_TYPE_CONFIG, getProtocolColor } from '@/features/network/constants';
-import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { getProtocolColor } from '@/features/network/constants';
+import { AXIS_ORDER, AXIS_META, detectAxisConflict, axisFacts, type AxisKey } from '@/features/network/classificationAxes';
+import { DEVICE_TYPES, deviceTypeLabel } from '@/utils/deviceType';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { Pagination } from '@components/common/Pagination/Pagination';
-import { NodeClassificationPopup } from '@components/common/NodeClassificationPopup/NodeClassificationPopup';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { RoleSection } from '@components/common/EntityDetailModal/sections/RoleSection';
 import { useEntityRole } from '@components/common/EntityDetailModal/hooks/useEntityRole';
 import { insightsService } from '@/features/insights/services/insightsService';
+import { conversationService } from '@/features/conversation/services/conversationService';
+import { AdjudicationPanel } from '@components/common/AdjudicationPanel/AdjudicationPanel';
+import type { HostIdentity } from '@/types';
 import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
 import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
@@ -32,6 +35,10 @@ interface NodeDetailsProps {
   zIndex?: number;
 }
 
+/** Predefined override/evidence label options for the Identity panel; it appends an "Other…"
+ *  free-text. Derived from the canonical device-type config so a rename/addition there flows here. */
+const DEVICE_LABELS = DEVICE_TYPES.filter(t => t !== 'UNKNOWN').map(deviceTypeLabel);
+
 type BaseTab = 'details' | 'history' | 'notes';
 /** Active tab id: a base tab, or a service-role tab keyed as `svc:<role>` (e.g. "svc:dns"). */
 type Tab = BaseTab | string;
@@ -48,27 +55,26 @@ function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
-function getRoleBadgeClass(role: string): string {
-  switch (role) {
-    case 'client':
-      return 'bg-primary';
-    case 'server':
-      return 'bg-success';
-    case 'both':
-      return 'bg-secondary';
-    default:
-      return 'bg-light text-dark';
-  }
-}
-
 export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIndex }: NodeDetailsProps) {
   const navigate = useNavigate();
-  const [classificationPopupOpen, setClassificationPopupOpen] = useState(false);
+  // Evidence header explainer modal, and which axis fact row is expanded to its derivation.
+  const [evidenceInfoOpen, setEvidenceInfoOpen] = useState(false);
+  const [expandedAxis, setExpandedAxis] = useState<AxisKey | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [peersPage, setPeersPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
   const HISTORY_PAGE_SIZE = 10;
   const [nestedIp, setNestedIp] = useState<string | null>(null);
+
+  // Live adjudicated identity: seeded from the graph node, re-fetched after an override/evidence
+  // change so the panel reflects the new verdict without reloading the whole graph.
+  const [liveIdentity, setLiveIdentity] = useState<HostIdentity | null>(null);
+  const refreshIdentity = () => {
+    conversationService
+      .getHostIdentities(fileId)
+      .then(list => setLiveIdentity(list.find(i => i.ip === node.data.ip) ?? null))
+      .catch(() => {});
+  };
 
   // Notes state
   const [noteText, setNoteText] = useState('');
@@ -131,6 +137,10 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
     setHistoryError(null);
     setPeersPage(1);
     setHistoryPage(1);
+    // Re-fetched identity is per-node: without this reset, clicking another node while the reused
+    // panel is open shows the PREVIOUS node's post-override verdict on the new node.
+    setLiveIdentity(null);
+    setExpandedAxis(null);
   }, [entityType, entityKey]);
 
   // Load history when History tab is first opened
@@ -179,8 +189,6 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
   };
 
   const connectedEdges = edges.filter(e => e.source === node.id || e.target === node.id);
-  const initiatedCount = connectedEdges.filter(e => e.source === node.id).length;
-  const receivedCount = connectedEdges.filter(e => e.target === node.id).length;
 
   // Build per-peer summary: peerIp → { packets, bytes, apps }
   const peerMap = new Map<string, { packets: number; bytes: number; apps: Set<string> }>();
@@ -210,7 +218,6 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
     historyPageClamped * HISTORY_PAGE_SIZE,
   );
 
-  const typeInfo = NODE_TYPE_CONFIG[node.data.nodeType] ?? NODE_TYPE_CONFIG['unknown'];
 
   // Service-role tabs (DNS today; web/API servers later) for the roles this host was detected serving.
   const serviceTabs = (node.data.serviceRoles ?? [])
@@ -320,9 +327,6 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
             {/* ── DETAILS TAB ────────────────────────────────────────── */}
             {activeTab === 'details' && (
               <>
-                {/* Node role (per-file, carried forward + validated across snapshots) */}
-                {entityKey && <RoleSection fileId={fileId} role={role} />}
-
                 {/* Ghost node warning */}
                 {node.data.ghostFlags && node.data.ghostFlags.length > 0 && (
                   <Alert
@@ -382,83 +386,6 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                         </>
                       )}
 
-                      <dt className="col-5 text-muted">Classification</dt>
-                      <dd className="col-7 mb-1">
-                        {(() => {
-                          const isGeneric =
-                            node.data.nodeType === 'client' || node.data.nodeType === 'unknown';
-                          let badgeContent: React.ReactNode;
-                          if (!isGeneric) {
-                            badgeContent = (
-                              <span className={`badge ${typeInfo.badgeClass}`}>{typeInfo.label}</span>
-                            );
-                          } else if (node.data.deviceType) {
-                            badgeContent = (
-                              <span
-                                className="badge"
-                                style={{
-                                  backgroundColor: deviceTypeColor(node.data.deviceType),
-                                  color: '#fff',
-                                }}
-                              >
-                                {deviceTypeLabel(node.data.deviceType)}
-                              </span>
-                            );
-                          } else {
-                            badgeContent = (
-                              <span className={`badge ${getRoleBadgeClass(node.data.role)}`}>
-                                {node.data.role.charAt(0).toUpperCase() + node.data.role.slice(1)}
-                              </span>
-                            );
-                          }
-                          return (
-                            <span
-                              role="button"
-                              title="Click for classification details"
-                              style={{ cursor: 'pointer' }}
-                              onClick={e => {
-                                e.stopPropagation();
-                                setClassificationPopupOpen(true);
-                              }}
-                            >
-                              {badgeContent}
-                            </span>
-                          );
-                        })()}
-                      </dd>
-
-                      {/* Adjudicated identity (#512 slice 5b) — one voice, or an explicit contest */}
-                      {node.data.identityLabel && (() => {
-                        const candidatesText = (node.data.identityCandidates ?? [])
-                          .map(c => `${c.label} (${c.score})`)
-                          .join(' vs ');
-                        return (
-                          <>
-                            <dt className="col-5 text-muted">Identity</dt>
-                            <dd className="col-7 mb-1">
-                              <span
-                                className={`badge ${node.data.identityContested ? 'bg-warning text-dark' : node.data.identityBasis === 'HUMAN' ? 'bg-primary' : 'bg-secondary'}`}
-                                title={
-                                  node.data.identityContested
-                                    ? `Contested — candidates: ${candidatesText}`
-                                    : node.data.identityBasis === 'HUMAN'
-                                      ? 'Confirmed by analyst'
-                                      : `Adjudicated from classification (confidence ${node.data.identityConfidence}%)`
-                                }
-                              >
-                                {node.data.identityBasis === 'HUMAN' ? '✓ ' : ''}
-                                {node.data.identityLabel}
-                                {node.data.identityContested ? ' ⚠ contested' : ''}
-                              </span>
-                              {node.data.identityContested && candidatesText && (
-                                <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
-                                  {candidatesText}
-                                </div>
-                              )}
-                            </dd>
-                          </>
-                        );
-                      })()}
                     </dl>
                   </div>
 
@@ -477,6 +404,119 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
                     </dl>
                   </div>
                 </div>
+
+                {/* Adjudicated identity — explainability, override & evidence in one panel.
+                    Rendered even when no identity was adjudicated (label "Unknown"): a host the
+                    adjudicator never saw (no conversations, pre-adjudicator file, failed fetch) is
+                    exactly one an analyst may want to label, so the tools must not disappear. */}
+                {!node.data.isL2 && (
+                  <AdjudicationPanel
+                    fileId={fileId}
+                    question="host-identity"
+                    entityKey={node.data.ip}
+                    title="Identity"
+                    labelOptions={DEVICE_LABELS}
+                    zIndex={zIndex}
+                    verdict={{
+                      label: liveIdentity?.primaryLabel ?? node.data.identityLabel ?? 'Unknown',
+                      basis: (liveIdentity?.basis ?? node.data.identityBasis ?? 'MACHINE') as 'HUMAN' | 'MACHINE',
+                      confidence: liveIdentity?.confidence ?? node.data.identityConfidence,
+                      contested: liveIdentity?.contested ?? node.data.identityContested ?? false,
+                      candidates: (liveIdentity?.candidates ?? node.data.identityCandidates) ?? undefined,
+                    }}
+                    onChanged={refreshIdentity}
+                  />
+                )}
+
+                {/* Evidence behind Identity (#499) — the independent signals the verdict weighed.
+                    Sits under Identity so it reads as "the verdict, and why". Click a badge to
+                    inspect & adjudicate that axis; the header ⓘ explains the model. */}
+                {!node.data.isL2 && (
+                  <div className="mb-4">
+                    <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center">
+                      <span className="text-muted fw-normal" style={{ fontSize: '0.8rem' }}>
+                        Evidence weighed
+                      </span>
+                      <i
+                        role="button"
+                        aria-label="How Identity and this evidence relate"
+                        className="bi bi-info-circle ms-1 text-muted"
+                        style={{ cursor: 'pointer', fontSize: '0.8rem' }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setEvidenceInfoOpen(true);
+                        }}
+                      />
+                    </h6>
+                    {/* Facts only, no per-axis badge — a badge picks one label, which is a
+                        conclusion, and conclusions belong to the Identity verdict alone (#499).
+                        The row lists what was observed; expanding it opens the derivation and the
+                        analyst tools (override / evidence), which feed the Identity vote. */}
+                    {AXIS_ORDER.map(key => {
+                      const meta = AXIS_META[key];
+                      const facts = axisFacts(node.data, key);
+                      const expanded = expandedAxis === key;
+                      return (
+                        <div key={key} className="mb-1">
+                          <div
+                            role="button"
+                            title={`Inspect ${meta.label} — ${meta.caption}`}
+                            className="d-flex align-items-center gap-2"
+                            style={{ fontSize: '0.8rem', cursor: 'pointer' }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setExpandedAxis(expanded ? null : key);
+                            }}
+                          >
+                            <span className="text-muted" style={{ minWidth: '100px' }}>{meta.label}</span>
+                            {facts.length > 0 ? (
+                              <span className="flex-grow-1">{facts.join(' · ')}</span>
+                            ) : (
+                              <span className="text-muted fst-italic flex-grow-1">Nothing observed</span>
+                            )}
+                            <i className={`bi text-muted ${expanded ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                          </div>
+                          {/* Facts are measurements — there is no per-axis conclusion to dispute,
+                              so no adjudication tools here. Overrides and evidence live on the
+                              Identity panel, where they actually feed the vote. */}
+                          {expanded && (
+                            <div className="mt-2 ms-2 ps-2 border-start text-muted" style={{ fontSize: '0.72rem' }}>
+                              {meta.derivation}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {(() => {
+                      // A human verdict resolves the contest by definition (mirrors
+                      // applyIdentities, which clears deviceType on HUMAN basis at graph build) —
+                      // without this, the banner keeps citing the superseded machine verdict
+                      // after an in-panel "I disagree".
+                      const humanVerdict =
+                        (liveIdentity?.basis ?? node.data.identityBasis) === 'HUMAN';
+                      const { conflict, detail } = detectAxisConflict(
+                        humanVerdict ? { ...node.data, deviceType: undefined } : node.data,
+                      );
+                      return conflict ? (
+                        <div
+                          className="d-flex align-items-start gap-1 mt-2 text-warning-emphasis"
+                          style={{ fontSize: '0.72rem' }}
+                        >
+                          <i className="bi bi-exclamation-triangle-fill mt-1" />
+                          <span>
+                            <strong>Evidence conflicts.</strong> {detail} Worth a look — if the
+                            service evidence is right, correct Identity with <em>“I disagree”</em>.
+                          </span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+
+                {/* Role — the operator's assigned label (persists across captures, feeds Monitor
+                    change-detection). Distinct from the measured Identity above: this is a name you
+                    give the host, not a classification. Grouped directly beneath Identity (#499). */}
+                {entityKey && <RoleSection fileId={fileId} role={role} raisedModal={zIndex != null} />}
 
                 {/* Protocols */}
                 <div className="mb-3">
@@ -741,26 +781,43 @@ export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIn
         />
       )}
 
-      {classificationPopupOpen && (
-        <NodeClassificationPopup
-          info={{
-            ip: node.data.ip,
-            nodeType: node.data.nodeType,
-            typeLabel: typeInfo.label,
-            typeBadgeClass: typeInfo.badgeClass,
-            typeEvidence: node.data.nodeTypeEvidence,
-            role: node.data.role,
-            initiated: initiatedCount,
-            received: receivedCount,
-            deviceType: node.data.deviceType,
-            deviceConfidence: node.data.deviceConfidence,
-            manufacturer: node.data.manufacturer,
-            ttl: node.data.ttl,
-            serviceRoles: node.data.serviceRoles,
-          }}
-          onClose={() => setClassificationPopupOpen(false)}
-        />
-      )}
+      {/* Evidence model explainer (#499) — how Identity relates to the evidence rows. Raised above
+          the node panel's own z-index so it isn't hidden behind it in monitor mode (modal-in-modal). */}
+      <Modal
+        show={evidenceInfoOpen}
+        onHide={() => setEvidenceInfoOpen(false)}
+        centered
+        className="tp-nested-modal"
+        backdropClassName="tp-nested-modal-backdrop"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1rem' }}>How this host is classified</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ fontSize: '0.85rem' }}>
+          <p className="mb-1">The model is <strong>facts → votes → verdict</strong>:</p>
+          <ul>
+            <li>
+              The three rows are the <strong>measured facts</strong>, each independent:{' '}
+              <strong>Hardware</strong> (MAC manufacturer, TTL), <strong>Ports / Service</strong>{' '}
+              (detected service role, or the app nDPI identified), <strong>Behaviour</strong> (who
+              opened the connections).
+            </li>
+            <li>
+              The classifier reads those facts and <strong>votes</strong> on device types with
+              weights — shown with each candidate’s score under <em>Why</em> in the Identity panel.
+              One fact can support several types.
+            </li>
+            <li>
+              <strong>Identity</strong> is the adjudicated <strong>verdict</strong> of that vote —
+              the only place a confidence percentage belongs.
+            </li>
+          </ul>
+          <p className="mb-0">
+            Click any fact row to see how it was derived. To weigh in, use the Identity panel:{' '}
+            <em>Add evidence</em> feeds the vote; <em>“I disagree”</em> sets the verdict yourself.
+          </p>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 }

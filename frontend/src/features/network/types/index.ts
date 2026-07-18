@@ -16,10 +16,8 @@ export type NodeType =
   | 'unknown';
 
 export interface NodeTypeEvidence {
-  dominantPort: string | null;
-  connectionCount: number;
-  distinctPeers: number;
-  /** nDPI appName values that drove the classification (primary signal). */
+  /** nDPI appName values seen in this host's traffic — evidence for the Service axis when no
+   *  service role was detected, and a scoring signal for the Hardware axis on the backend. */
   ndpiApps?: string[];
 }
 
@@ -43,6 +41,11 @@ export interface NodeData {
   bytesReceived: number;
   totalBytes: number;
   role: 'client' | 'server' | 'both' | 'unknown';
+  /** Measured behaviour facts behind `role` (#496): conversations this host opened / answered.
+   *  Counted over the FULL conversation set (same pass that derives `role`), only where the
+   *  backend recorded who initiated — flows with no measured initiator count toward neither. */
+  initiatedConversations?: number;
+  answeredConversations?: number;
   protocols: string[];
   connections: number;
   nodeType: NodeType;
@@ -53,13 +56,15 @@ export interface NodeData {
   serviceRoles?: string[];
   /** Confidence score 0–100 from the classifier. */
   deviceConfidence?: number;
+  /** Analyst-assigned role label (confirmed node role, e.g. "Finance DB") — display-only. */
+  roleLabel?: string;
   /** Adjudicated identity (#512 slice 5b) — the display authority where present. */
   identityLabel?: string;
   identityBasis?: 'HUMAN' | 'MACHINE';
   identityConfidence?: number;
   /** True when machine candidates were too close to call; render the contest, not the winner. */
   identityContested?: boolean;
-  identityCandidates?: { label: string; source: string; score: number }[];
+  identityCandidates?: { label: string; source: string; score: number; reasons?: string[] }[];
   /** Manufacturer from OUI lookup. */
   manufacturer?: string;
   /** TTL observed for this host. */

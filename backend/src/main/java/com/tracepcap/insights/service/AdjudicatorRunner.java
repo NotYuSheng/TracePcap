@@ -1,5 +1,6 @@
 package com.tracepcap.insights.service;
 
+import com.tracepcap.common.event.AdjudicationOverriddenEvent;
 import com.tracepcap.common.event.AnalysisCompletedEvent;
 import com.tracepcap.common.event.NodeRoleChangedEvent;
 import com.tracepcap.common.stage.Adjudicator;
@@ -106,6 +107,12 @@ public class AdjudicatorRunner {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onNodeRoleChanged(NodeRoleChangedEvent event) {
     runAll(event.fileId(), "node-role change");
+  }
+
+  /** A human overrode an adjudicated question: re-answer so the override takes effect at once. */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onAdjudicationOverridden(AdjudicationOverriddenEvent event) {
+    runAll(event.fileId(), "human override");
   }
 
   private void runAll(UUID fileId, String trigger) {

@@ -261,10 +261,12 @@ tracepcap:
       - VNC
       - TeamViewer
     server-apps:
+      # Databases & infra
       - PostgreSQL
       - MySQL
       - MongoDB
       - Redis
+      - RESP        # nDPI's name for the Redis protocol
       - Elasticsearch
       - Kafka
       - RabbitMQ
@@ -273,6 +275,32 @@ tracepcap:
       - Kerberos
       - SNMP
       - Syslog
+      # Service protocols that define a server — nDPI appName values (see V-checked DB sample).
+      # HTTP/TLS are intentionally weak (any client also speaks them), handled below at lower weight.
+      - SMTP        # mail
+      - IMAP
+      - IMAPS
+      - POP3
+      - POPS
+      - FTP_CONTROL # nDPI splits FTP into control/data
+      - FTP_DATA
+      - SSH
+      - Telnet
+      - DNS         # a host answering DNS is serving
+      - SMBv23      # nDPI emits SMBv23 (not "SMB")
+      - SMB
+      - NFS
+      - RDP
+      - VNC
+    # Apps that only weakly imply a server (clients speak them too) — scored at a lower weight so
+    # they nudge rather than decide. Empty by default beyond the strong list above.
+    weak-server-apps:
+      - HTTP
+      - TLS
     iot-categories:
       - IoT-Scada
       - Cloud
+    # nDPI apps that indicate an appliance/IoT endpoint (e.g. network printers speak IPP).
+    iot-apps:
+      - IPP
+      - MDNS

@@ -451,8 +451,8 @@ export interface HostIdentity {
   confidence: number;
   /** True when machine candidates were too close to call; render the contest, not the winner. */
   contested: boolean;
-  /** Competing candidates when contested. */
-  candidates?: { label: string; source: string; score: number }[] | null;
+  /** Competing candidates when contested; each carries the reasons that voted for it. */
+  candidates?: { label: string; source: string; score: number; reasons?: string[] }[] | null;
 }
 
 /** How a host's name was discovered from passive traffic. */

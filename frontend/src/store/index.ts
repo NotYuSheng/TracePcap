@@ -6,7 +6,7 @@ import { createAnalysisSlice } from './slices/analysisSlice';
 import type { AnalysisSlice } from './slices/analysisSlice';
 import { createThemeSlice } from './slices/themeSlice';
 import type { ThemeSlice, ThemeMode } from './slices/themeSlice';
-import { createNodeLabelSlice } from './slices/nodeLabelSlice';
+import { createNodeLabelSlice, normalizeNodeLabelConfig } from './slices/nodeLabelSlice';
 import type { NodeLabelSlice } from './slices/nodeLabelSlice';
 
 export type { ThemeMode };
@@ -31,6 +31,12 @@ export const useStore = create<StoreState>()(
           themeMode: state.themeMode,
           nodeLabelConfig: state.nodeLabelConfig,
         }),
+        // Coerce any legacy persisted shape (customText was a string) into the current shape.
+        onRehydrateStorage: () => state => {
+          if (state?.nodeLabelConfig) {
+            state.nodeLabelConfig = normalizeNodeLabelConfig(state.nodeLabelConfig);
+          }
+        },
       }
     ),
     {

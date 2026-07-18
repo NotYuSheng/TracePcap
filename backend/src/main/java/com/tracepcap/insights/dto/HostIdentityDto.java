@@ -17,6 +17,10 @@ public class HostIdentityDto {
   int confidence;
   /** True when machine candidates were too close to call; render the contest, not the winner. */
   boolean contested;
-  /** Competing candidates [{label, source, score}] when contested; null otherwise. */
+  /**
+   * Competing candidates when contested; null otherwise. Each entry is
+   * {@code {label, source, score, reasons[]}} — {@code reasons} is the human-readable "why" behind
+   * that candidate's score (e.g. "listens on 80/tcp (+60)"), so the UI can explain the contest.
+   */
   List<Map<String, Object>> candidates;
 }

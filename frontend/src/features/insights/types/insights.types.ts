@@ -8,6 +8,8 @@ export interface NodeRole {
   origin: string;
   llmSuggested: boolean;
   confirmedByHuman: boolean;
+  /** Who confirmed the label (audit trail): username, "system" when auth is off, null unconfirmed. */
+  confirmedBy: string | null;
   createdAt: string;
   updatedAt: string;
   /** Staleness (#369): set when a carried-forward label drifts from the prior snapshot's baseline. */

@@ -64,6 +64,13 @@ public class NodeRoleEntity {
   @Column(name = "confirmed_by_human", nullable = false)
   private boolean confirmedByHuman = false;
 
+  /**
+   * Who confirmed this label, for the audit trail. The authenticated username at save time, or
+   * {@code "system"} when auth is off. Null on AI/carried-forward rows no human has confirmed.
+   */
+  @Column(name = "confirmed_by", length = 255)
+  private String confirmedBy;
+
   // ── Per-file properties + staleness (#369) ──────────────────────────────────
   // observedProperties is the snapshot of this node's key properties in THIS file
   // (device type, MAC, dominant protocols, external orgs). It doubles as the drift

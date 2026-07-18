@@ -8,6 +8,12 @@ Current SGDS usage: `Container`, `Row`, `Col`, `Card`, `Modal`, `Pagination`.
 
 Only build a custom component if SGDS has no equivalent.
 
+### Popups & info affordances
+
+- **Explainer / help content behind a `bi bi-info-circle`** must open an **SGDS `Modal`** (or, for a small inline hint, a click-toggled help block) — never rely on a native `title=` tooltip, which is unreliable and inconsistent across the app. The info-circle should be `role="button"` with `cursor: pointer` so it reads as clickable.
+- **Forms that create/edit a thing** (add evidence, override a label, add a snapshot) belong in an **SGDS `Modal`**, not an inline expanding panel — keep the surface uncluttered and the action focused.
+- Keep the copy inside these modals task-oriented: say what the thing is and how to act on it (e.g. "click a badge to inspect it and add evidence").
+
 ## Stack
 
 - **Frontend**: React + TypeScript + Vite, served via nginx

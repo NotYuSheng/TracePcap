@@ -131,6 +131,9 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
     if (!opt.enabled) continue;
     let value: string | undefined;
     switch (opt.field) {
+      case 'roleLabel':
+        value = node.data.roleLabel;
+        break;
       case 'ip':
         value = node.data.ip;
         break;
@@ -157,10 +160,14 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
         value = node.data.manufacturer;
         break;
     }
-    if (value) lines.push(value);
+    // Skip repeats: a confirmed role also becomes the HUMAN identity label, so with both the
+    // role and device-type lines enabled the same text would otherwise print twice.
+    if (value && !lines.includes(value)) lines.push(value);
   }
-  const custom = cfg.customText.trim();
-  if (custom) lines.push(custom);
+  for (const t of cfg.customText) {
+    const custom = t.trim();
+    if (custom) lines.push(custom);
+  }
   // Never render an unlabelled node — fall back to IP (or the node's display label).
   if (lines.length === 0) lines.push(node.data.ip || node.label || '');
   return lines.filter(Boolean);

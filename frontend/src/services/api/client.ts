@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { env } from '@/config/env';
-import { getAccessToken } from '@/auth/tokenStore';
+import { getAccessToken, handleUnauthorized } from '@/auth/tokenStore';
 
 const API_BASE_URL = env.API_BASE_URL;
 
@@ -35,8 +35,11 @@ apiClient.interceptors.response.use(
   error => {
     // Handle global errors
     if (error.response?.status === 401) {
-      // Handle unauthorized - could redirect to login if needed
       localStorage.removeItem('authToken');
+      // When auth is enabled, a 401 means our token is stale/expired (e.g. Keycloak restarted). The
+      // OIDC session still reports authenticated from cached storage, so the AuthGate never re-prompts
+      // — clear the stale user and force a fresh signin instead of silently failing every call.
+      handleUnauthorized();
     }
 
     if (error.response?.status === 500) {
