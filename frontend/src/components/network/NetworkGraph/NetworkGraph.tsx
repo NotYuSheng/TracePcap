@@ -12,6 +12,7 @@ import { makeVolumeEdgeColor } from '@/utils/volumeColor';
 import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
 import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
+import { GENERIC_NODE_TYPES, getNodeIcon } from './nodeIcons';
 import './NetworkGraph.css';
 
 // ---------------------------------------------------------------------------
@@ -73,47 +74,6 @@ const DARK_BG = '#0f1117';
 const CONTESTED_COLOR = '#f59e0b';
 const DARK_SURFACE = '#1e2130';
 const LIGHT_BG = '#f6f8fa';
-
-// ---------------------------------------------------------------------------
-// Bootstrap Icons — unicode codepoints for each node type
-// Pre-rendered to data URLs so Sigma's WebGL renderer can display them.
-// ---------------------------------------------------------------------------
-
-// Icons for specific service nodeTypes
-const NODE_TYPE_ICONS: Record<string, string> = {
-  'dns-server':      '\uf3ef', // bi-globe2
-  'web-server':      '\uf52c', // bi-server
-  'ssh-server':      '\uf5c3', // bi-terminal
-  'ftp-server':      '\uf3d5', // bi-folder-symlink
-  'mail-server':     '\uf32f', // bi-envelope
-  'dhcp-server':     '\uf1d6', // bi-broadcast
-  'ntp-server':      '\uf293', // bi-clock
-  'database-server': '\uf8c4', // bi-database
-  router:            '\uf6ec', // bi-router
-  'l2-device':       '\uf6d5', // bi-ethernet
-  cluster:           '\uf2ee', // bi-diagram-3
-};
-
-// Icons for device types — used on generic (client/unknown) nodes
-const DEVICE_TYPE_ICONS: Record<string, string> = {
-  ROUTER:         '\uf6ec', // bi-router
-  MOBILE:         '\uf4b9', // bi-phone
-  LAPTOP_DESKTOP: '\uf456', // bi-laptop
-  SERVER:         '\uf52c', // bi-server
-  IOT:            '\uf46b', // bi-cpu
-  DNS_SERVER:     '\uf40d', // bi-hdd-network
-  WEB_SERVER:     '\uf3ee', // bi-globe
-  API_SERVER:     '\uf411', // bi-hdd-stack
-};
-
-const FALLBACK_ICON = '\uf505'; // bi-question-circle
-
-function getNodeIcon(nodeType: string, deviceType: string): string {
-  if (!GENERIC_NODE_TYPES.has(nodeType)) {
-    return NODE_TYPE_ICONS[nodeType] ?? FALLBACK_ICON;
-  }
-  return DEVICE_TYPE_ICONS[deviceType] ?? FALLBACK_ICON;
-}
 
 /**
  * Sidecar maps: label → nodeType and label → deviceType.
@@ -264,10 +224,6 @@ function drawNodeLabel(
     }
   }
 }
-
-// Generic nodeTypes that carry no specific service information.
-// For these, deviceType provides a more meaningful colour signal.
-const GENERIC_NODE_TYPES = new Set(['client', 'unknown']);
 
 /**
  * The node's colour, from its adjudicated nodeType.
