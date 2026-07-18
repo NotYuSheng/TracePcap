@@ -508,7 +508,8 @@ public class NetworkIntelligenceService {
     List<HostFacts> webHosts =
         hostClassificationLookup.hostFacts(fileId).stream()
             .filter(h -> hasRole(h, ServiceLogRoles.API)
-                || hasRole(h, ServiceLogRoles.WEB))
+                || hasRole(h, ServiceLogRoles.WEB)
+                || hasRole(h, ServiceLogRoles.TLS))
             .toList();
     if (webHosts.isEmpty()) return List.of();
 

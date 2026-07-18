@@ -121,6 +121,17 @@ class WebServerLogExtractorTest {
   }
 
   @Test
+  void tlsServerHello_countsOnlyOnWebFacingPorts() {
+    // #496 AC #3 — TLS is port-qualified: 443/4433/8443 are web-facing; SIP-TLS/IMAPS and null are not.
+    assertThat(WebServerLogExtractor.isWebFacingTlsPort(443)).isTrue();
+    assertThat(WebServerLogExtractor.isWebFacingTlsPort(8443)).isTrue();
+    assertThat(WebServerLogExtractor.isWebFacingTlsPort(4433)).isTrue();
+    assertThat(WebServerLogExtractor.isWebFacingTlsPort(5061)).isFalse(); // SIP-TLS
+    assertThat(WebServerLogExtractor.isWebFacingTlsPort(993)).isFalse(); // IMAPS
+    assertThat(WebServerLogExtractor.isWebFacingTlsPort(null)).isFalse();
+  }
+
+  @Test
   void repeatedEndpoint_aggregatesCountAndStatuses() {
     exchange("10.0.0.10", "10.0.0.1", "GET", "/api/x", "200", "application/json", "");
     exchange("10.0.0.10", "10.0.0.1", "GET", "/api/x", "200", "application/json", "");
