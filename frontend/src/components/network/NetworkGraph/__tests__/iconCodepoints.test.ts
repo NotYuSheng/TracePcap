@@ -1,5 +1,6 @@
 import { deviceTypeIcon } from '@/utils/deviceType';
-import { NODE_TYPE_ICONS, DEVICE_TYPE_ICONS } from '../nodeIcons';
+import { NODE_TYPE_CONFIG } from '@/features/network/constants';
+import { NODE_TYPE_ICONS, DEVICE_TYPE_ICONS, FALLBACK_ICON } from '../nodeIcons';
 import iconCodepointsByName from 'bootstrap-icons/font/bootstrap-icons.json';
 import nodeIconsSrc from '../nodeIcons.ts?raw';
 
@@ -23,7 +24,7 @@ const classToCodepoint = new Map<string, string>(
   ])
 );
 
-const entries = [...nodeIconsSrc.matchAll(/'\\u([0-9a-fA-F]{4})',\s*\/\/\s*(bi-[\w-]+)/g)];
+const entries = [...nodeIconsSrc.matchAll(/'\\u([0-9a-fA-F]{4})'[;,]\s*\/\/\s*(bi-[\w-]+)/g)];
 
 describe('nodeIcons.ts codepoints match their named Bootstrap Icon class', () => {
   it('finds codepoint/class comment pairs to check (sanity check the regex still matches the file)', () => {
@@ -31,7 +32,7 @@ describe('nodeIcons.ts codepoints match their named Bootstrap Icon class', () =>
   });
 
   it.each(entries.map(m => [m[2], m[1]] as const))('%s resolves to \\u%s', (className, codepoint) => {
-    expect(classToCodepoint.get(className)).toBe(codepoint);
+    expect(classToCodepoint.get(className)).toBe(codepoint.toLowerCase());
   });
 });
 
@@ -44,9 +45,20 @@ describe('DEVICE_TYPE_ICONS matches the legend\'s deviceTypeIcon() class names',
   });
 });
 
+describe('NODE_TYPE_ICONS matches NODE_TYPE_CONFIG icon class names', () => {
+  // 'cluster' is a canvas-only node type with no NODE_TYPE_CONFIG entry.
+  it.each(Object.keys(NODE_TYPE_ICONS).filter(k => k !== 'cluster'))('%s', (nodeType) => {
+    const config = NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG];
+    expect(config).toBeDefined();
+    const expectedCodepoint = classToCodepoint.get(config.icon);
+    expect(expectedCodepoint).toBeDefined();
+    expect(NODE_TYPE_ICONS[nodeType]).toBe(String.fromCharCode(parseInt(expectedCodepoint!, 16)));
+  });
+});
+
 describe('NODE_TYPE_ICONS and DEVICE_TYPE_ICONS have no unexpected extra keys', () => {
   it('every table entry is present among the parsed comment pairs', () => {
-    const allValues = new Set([...Object.values(NODE_TYPE_ICONS), ...Object.values(DEVICE_TYPE_ICONS)]);
+    const allValues = new Set([...Object.values(NODE_TYPE_ICONS), ...Object.values(DEVICE_TYPE_ICONS), FALLBACK_ICON]);
     const commentValues = new Set(entries.map(m => String.fromCharCode(parseInt(m[1], 16))));
     for (const v of allValues) {
       expect(commentValues.has(v)).toBe(true);

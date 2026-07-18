@@ -19,7 +19,7 @@ export const NODE_TYPE_ICONS: Record<string, string> = {
   'ssh-server':      '\uf5c3', // bi-terminal
   'ftp-server':      '\uf3d5', // bi-folder-symlink
   'mail-server':     '\uf32f', // bi-envelope
-  'dhcp-server':     '\uf1d6', // bi-broadcast
+  'dhcp-server':     '\uf2ee', // bi-diagram-3
   'ntp-server':      '\uf293', // bi-clock
   'database-server': '\uf8c4', // bi-database
   router:            '\uf6ec', // bi-router
