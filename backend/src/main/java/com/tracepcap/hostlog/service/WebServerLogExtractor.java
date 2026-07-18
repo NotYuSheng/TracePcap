@@ -55,8 +55,16 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
 
   private static final String ROLE_WEB = ServiceLogRoles.WEB;
   private static final String ROLE_API = ServiceLogRoles.API;
+  private static final String ROLE_TLS = ServiceLogRoles.TLS;
 
   private static final int PATH_MAX_LENGTH = 2048;
+
+  /**
+   * TLS server ports that count as web-facing. A ServerHello on one of these is evidence toward a web
+   * role; a ServerHello on any other port (SIP-TLS 5061, IMAPS 993, …) is a TLS service but not a web
+   * server, so it contributes no web evidence at all (#496 AC #3 — port-qualified, not "any port").
+   */
+  private static final Set<Integer> WEB_TLS_PORTS = Set.of(443, 4433, 8443);
 
   private final HttpEndpointLogRepository httpEndpointLogRepository;
 
@@ -112,25 +120,29 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
         },
         f -> parseHttpFrame(f, endpoints, serverStats, pendingByStream));
 
-    // TLS pass — ServerHello source IP is the TLS server.
+    // TLS pass — ServerHello source IP:port is the TLS server. Port-qualified: only ServerHellos on
+    // web-facing ports (WEB_TLS_PORTS) count as web evidence; TLS on other ports is a different
+    // service and is ignored here (#496 AC #3).
     runPass(
         pcap,
         "tls.handshake.type==2",
-        new String[] {"ip.src"},
+        new String[] {"ip.src", "tcp.srcport"},
         f -> {
           String ip = trimToNull(f[0]);
-          if (ip != null) tlsServers.add(ip);
+          Integer port = f.length > 1 ? parseIntOrNull(firstValue(f[1])) : null;
+          if (ip != null && isWebFacingTlsPort(port)) tlsServers.add(ip);
         });
 
     persist(file, endpoints);
 
-    // Assign each server a role: api-like HTTP servers → "api", other HTTP servers and TLS-only
-    // servers → "web".
+    // Assign each server a role: api-like HTTP servers → "api", other HTTP servers → "web"
+    // (authoritative — they served HTTP). TLS-only servers get the weaker "tls" role: real evidence
+    // toward a web role, but not proof that outranks contrary hardware evidence (#496 AC #4/#6).
     Map<String, String> roleByServerIp = new LinkedHashMap<>();
     for (Map.Entry<String, WebServerStats> e : serverStats.entrySet()) {
       roleByServerIp.put(e.getKey(), isApiLike(e.getValue()) ? ROLE_API : ROLE_WEB);
     }
-    for (String ip : tlsServers) roleByServerIp.putIfAbsent(ip, ROLE_WEB);
+    for (String ip : tlsServers) roleByServerIp.putIfAbsent(ip, ROLE_TLS);
 
     log.info(
         "HTTP endpoint log: {} endpoint row(s) across {} HTTP server(s); {} TLS server(s)",
@@ -254,6 +266,14 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     if (agg.serverSoftware == null && serverSoftware != null) agg.serverSoftware = serverSoftware;
     if (agg.requestFrame == null && requestFrame != null) agg.requestFrame = requestFrame;
     if (agg.responseFrame == null && responseFrame != null) agg.responseFrame = responseFrame;
+  }
+
+  /**
+   * Whether a TLS ServerHello on this port counts as web evidence (#496 AC #3). Only web-facing TLS
+   * ports qualify; a null port or a non-web port (SIP-TLS, IMAPS, …) is not a web server.
+   */
+  static boolean isWebFacingTlsPort(Integer port) {
+    return port != null && WEB_TLS_PORTS.contains(port);
   }
 
   /** A server is "API-like" when JSON dominates its responses, or it uses REST write verbs / api paths. */

@@ -261,15 +261,24 @@ public class DeviceClassifierService implements HostClassifier {
     String cat = conv.getCategory();
     if (cat != null && !cat.isBlank()) p.categories.add(cat);
 
-    if (isSrc) {
-      // This host initiated the conversation
-      p.initiatedCount++;
-      if (conv.getDstPort() != null) p.dstPorts.add(conv.getDstPort());
-      p.peers.add(conv.getDstIp());
-    } else {
-      // This host received the conversation
-      if (conv.getDstPort() != null) p.receivedOnPorts.add(conv.getDstPort());
-      p.peers.add(conv.getSrcIp());
+    // Peers are direction-independent — this host talked to the other endpoint either way.
+    p.peers.add(isSrc ? conv.getDstIp() : conv.getSrcIp());
+
+    // Direction comes from the MEASURED initiator (#496), NOT from srcIp/dstIp — those are sorted by
+    // IP order and do not say who opened the connection. When the initiator is unknown (UDP/ICMP/ARP
+    // or a mid-flow capture) we record nothing directional: guessing from ports is the bug this
+    // removes, not the fallback.
+    String initiatorIp = conv.getInitiatorIp();
+    if (initiatorIp != null) {
+      if (initiatorIp.equals(ip)) {
+        p.measuredInitiations++;
+      } else {
+        // This host is the responder — its peer opened the connection. The port it was reached on is
+        // its own port in the flow (srcPort when it sorted as src, dstPort otherwise).
+        p.measuredResponses++;
+        Integer myPort = isSrc ? conv.getSrcPort() : conv.getDstPort();
+        if (myPort != null) p.respondedOnPorts.add(myPort);
+      }
     }
   }
 
