@@ -27,6 +27,8 @@ import '@xyflow/react/dist/style.css';
 import './ClusterGraph.css';
 import ELK from 'elkjs';
 import { formatBytes } from '@/utils/formatters';
+import { makeVolumeColor, volumeTextColor, volumeRatio } from '@/utils/volumeColor';
+import { useResolvedDark } from '@/utils/useResolvedDark';
 import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } from '@/features/intelligence/services/intelligenceService';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
@@ -311,15 +313,6 @@ const GROUP_ICONS: Record<GroupBy, string> = {
 
 type ColorMode = 'risk' | 'traffic';
 
-/** Returns a blue shade interpolated by ratio (0→light, 1→dark). */
-function trafficColor(ratio: number): string {
-  // Interpolate from #d0e4f7 (light blue) to #1565c0 (dark blue)
-  const r = Math.round(208 - ratio * (208 - 21));
-  const g = Math.round(228 - ratio * (228 - 101));
-  const b = Math.round(247 - ratio * (247 - 192));
-  return `rgb(${r},${g},${b})`;
-}
-
 // ── Custom node ───────────────────────────────────────────────────────────────
 
 interface IntelClusterNodeData extends Record<string, unknown> {
@@ -332,18 +325,25 @@ interface IntelClusterNodeData extends Record<string, unknown> {
   groupType: string;
   selected: boolean;
   colorMode: ColorMode;
-  trafficRatio: number; // 0-1, totalBytes / maxBytes across all clusters
+  /** Largest totalBytes across all clusters — the volume scale's upper bound. */
+  maxBytes: number;
 }
 
 function IntelClusterNode({ data }: NodeProps) {
   const d = data as IntelClusterNodeData;
   const hasRisk = d.riskCount > 0;
   const icon = GROUP_ICONS[d.groupType as GroupBy] ?? 'bi-diagram-3';
+  const dark = useResolvedDark();
 
   const isTrafficMode = d.colorMode === 'traffic';
-  const bgColor = isTrafficMode ? trafficColor(d.trafficRatio) : undefined;
+  // Shared volume scale — the same one the node-to-node heatmap and volume-coloured
+  // diagram edges use, so a shade means the same thing across every view.
+  const trafficRatio = volumeRatio(d.totalBytes, d.maxBytes);
+  const bgColor = isTrafficMode
+    ? makeVolumeColor(d.maxBytes, dark)(d.totalBytes)
+    : undefined;
   const textColor = isTrafficMode
-    ? (d.trafficRatio > 0.55 ? '#fff' : '#212529')
+    ? volumeTextColor(trafficRatio, dark)
     : (hasRisk ? '#e74c3c' : '#495057');
 
   const riskTitle = hasRisk
@@ -361,7 +361,7 @@ function IntelClusterNode({ data }: NodeProps) {
       <Handle type="source" position={Position.Top} className="intel-handle" style={{ top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
 
       {hasRisk && (
-        <span className="intel-cluster-risk-badge" title={riskTitle} style={{ color: isTrafficMode && d.trafficRatio > 0.55 ? '#ffcdd2' : '#e74c3c' }}>
+        <span className="intel-cluster-risk-badge" title={riskTitle} style={{ color: isTrafficMode && trafficRatio > 0.55 ? '#ffcdd2' : '#e74c3c' }}>
           <i className="bi bi-exclamation-triangle-fill" />
         </span>
       )}
@@ -378,7 +378,7 @@ function IntelClusterNode({ data }: NodeProps) {
       {d.dominantProtocols.length > 0 && (
         <div className="intel-cluster-protocols">
           {d.dominantProtocols.slice(0, 3).map(p => (
-            <span key={p} className={`intel-cluster-badge${isTrafficMode && d.trafficRatio > 0.55 ? ' intel-cluster-badge-dark' : ''}`}>{p}</span>
+            <span key={p} className={`intel-cluster-badge${isTrafficMode && trafficRatio > 0.55 ? ' intel-cluster-badge-dark' : ''}`}>{p}</span>
           ))}
         </div>
       )}
@@ -720,7 +720,7 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
         groupType: c.groupType,
         selected: selectedCluster?.id === c.id,
         colorMode,
-        trafficRatio: c.totalBytes / MAX_NODE_BYTES,
+        maxBytes: MAX_NODE_BYTES,
       } satisfies IntelClusterNodeData,
     }));
 

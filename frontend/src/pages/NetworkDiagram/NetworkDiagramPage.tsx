@@ -12,6 +12,12 @@ import { buildActiveFilterLabels, toggleSet } from '@/features/network/constants
 import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
 import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
+import type { EdgeColorMode, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
+import { edgeBytesRange } from '@components/network/NetworkGraph/NetworkGraph';
+import { VolumeHeatmap } from '@components/network/VolumeHeatmap';
+import type { VolumePair } from '@components/network/VolumeHeatmap';
+import { VolumeLegend } from '@components/network/VolumeLegend';
+import { useResolvedDark } from '@/utils/useResolvedDark';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { NodeDetails } from '@components/network/NodeDetails';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
@@ -82,6 +88,13 @@ export const NetworkDiagramPage = () => {
     'circular'
   );
 
+  const isDark = useResolvedDark();
+  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('protocol');
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
+  const heatmapCardRef = useRef<HTMLDivElement>(null);
+  const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
+
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -103,6 +116,19 @@ export const NetworkDiagramPage = () => {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [isFullscreen, showFilterModal, showLabelModal, selectedNode]);
+
+  // Escape exits heatmap fullscreen. Separate from the diagram's handler above so
+  // the two fullscreens never fight over the same key press.
+  useEffect(() => {
+    if (!isHeatmapFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (selectedNode) { setSelectedNode(null); return; }
+      setIsHeatmapFullscreen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isHeatmapFullscreen, selectedNode]);
 
   // ─── "Present" sets: only show options that exist in the data ───────────────
 
@@ -361,6 +387,24 @@ export const NetworkDiagramPage = () => {
     (portFilter ? 1 : 0) +
     (hasRisksOnly ? 1 : 0);
 
+  // Volume range of the *current* view. Derived with the same helper the graph
+  // paints with, so the legend can never describe a different domain than the
+  // edges it explains.
+  const edgeRange = useMemo(() => edgeBytesRange(filteredEdges), [filteredEdges]);
+
+  // Cross-filter: a selected heatmap cell highlights that pair in the diagram.
+  // `highlightedNodes` is keyed by node *label*, not id, so translate first.
+  const highlightedNodes = useMemo(() => {
+    if (!selectedPair) return undefined;
+    const labelById = new Map(filteredNodes.map(n => [n.id, n.label]));
+    const map = new Map<string, NodeHighlight>();
+    const src = labelById.get(selectedPair.source);
+    const dst = labelById.get(selectedPair.target);
+    if (src) map.set(src, { color: '#0d6efd', label: 'src', description: 'Selected pair — source' });
+    if (dst) map.set(dst, { color: '#0d6efd', label: 'dst', description: 'Selected pair — destination' });
+    return map.size > 0 ? map : undefined;
+  }, [selectedPair, filteredNodes]);
+
   // Keep the parent's ref up to date with the currently visible graph state so
   // the report button captures exactly what the user sees.
   useEffect(() => {
@@ -530,7 +574,31 @@ export const NetworkDiagramPage = () => {
           <Card className={isFullscreen ? 'nd-css-fullscreen' : ''} ref={graphCardRef}>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
-              <div className="d-flex align-items-center gap-3">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                {/* Colour is a single channel — protocol and volume are offered as
+                    alternatives rather than layered, and the active one is always
+                    accompanied by its legend. */}
+                <div className="d-flex align-items-center gap-2">
+                  <Form.Label className="mb-0 text-muted small">Color edges by</Form.Label>
+                  <Form.Select
+                    size="sm"
+                    style={{ width: 110 }}
+                    value={edgeColorMode}
+                    onChange={e => setEdgeColorMode(e.target.value as EdgeColorMode)}
+                  >
+                    <option value="protocol">Protocol</option>
+                    <option value="volume">Volume</option>
+                  </Form.Select>
+                </div>
+                {edgeColorMode === 'volume' && (
+                  <VolumeLegend
+                    maxValue={edgeRange.max}
+                    minValue={edgeRange.min}
+                    dark={isDark}
+                    variant="edge"
+                    label="Edge volume"
+                  />
+                )}
                 <Button
                   variant="link"
                   size="sm"
@@ -563,11 +631,70 @@ export const NetworkDiagramPage = () => {
                 onLayoutChange={setLayoutType}
                 onFilterClick={() => setShowFilterModal(true)}
                 activeFilterCount={activeFilterCount}
+                edgeColorMode={edgeColorMode}
+                highlightedNodes={highlightedNodes}
               />
             </Card.Body>
           </Card>
         </div>
       </div>
+
+      {/* Row 3: Node-to-node volume matrix.
+          The diagram answers "who talks to whom"; this answers "how much", which a
+          force-directed layout cannot show. Both read the same filtered edges. */}
+      <Card
+        className={`mt-3 ${isHeatmapFullscreen ? 'nd-css-fullscreen' : ''}`}
+        ref={heatmapCardRef}
+      >
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <div>
+            <strong>Node-to-Node Volume</strong>
+            <span className="text-muted small ms-2">
+              Traffic between each pair of displayed hosts
+            </span>
+          </div>
+          <div className="d-flex align-items-center gap-3">
+            {showHeatmap && (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted"
+                onClick={() => setIsHeatmapFullscreen(f => !f)}
+                title={isHeatmapFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                <i className={`bi ${isHeatmapFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
+              </Button>
+            )}
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 text-muted"
+              onClick={() => {
+                // Collapsing while fullscreen would leave an empty fullscreen shell.
+                if (showHeatmap) setIsHeatmapFullscreen(false);
+                setShowHeatmap(s => !s);
+              }}
+              aria-expanded={showHeatmap}
+            >
+              {showHeatmap ? 'Hide' : 'Show'}
+              <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+            </Button>
+          </div>
+        </Card.Header>
+        {showHeatmap && (
+          <Card.Body className="tp-heatmap-body">
+            <VolumeHeatmap
+              nodes={filteredNodes}
+              edges={filteredEdges}
+              dark={isDark}
+              focusedHost={selectedNode?.id ?? null}
+              selectedPair={selectedPair}
+              onCellClick={setSelectedPair}
+              onHostClick={setSelectedNode}
+            />
+          </Card.Body>
+        )}
+      </Card>
 
       {selectedNode && (
         <NodeDetails

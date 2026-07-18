@@ -19,7 +19,12 @@ import { insightsService } from '@/features/insights/services/insightsService';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NetworkInsight, InsightOptions } from '@/features/insights/types/insights.types';
 import type { GraphNode } from '@/features/network/types';
-import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
+import type { NodeHighlight, EdgeColorMode } from '@/components/network/NetworkGraph/NetworkGraph';
+import { edgeBytesRange } from '@/components/network/NetworkGraph/NetworkGraph';
+import { VolumeHeatmap } from '@/components/network/VolumeHeatmap';
+import type { VolumePair } from '@/components/network/VolumeHeatmap';
+import { VolumeLegend } from '@/components/network/VolumeLegend';
+import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
@@ -134,6 +139,11 @@ export const SnapshotDetailModal = ({
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const isDark = useResolvedDark();
+  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('protocol');
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
+  const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
 
   // Filter state
   const [ipFilter, setIpFilter] = useState('');
@@ -245,6 +255,10 @@ export const SnapshotDetailModal = ({
     }),
   [nodes, edges, hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNodeFilters, portFilter, ipFilter]);
 
+  // Volume range of the current view, from the same helper the graph paints with,
+  // so this snapshot's legend and edges always share a domain.
+  const edgeRange = useMemo(() => edgeBytesRange(filteredEdges), [filteredEdges]);
+
   const activeFilterCount =
     activeLegendProtocols.length + activeNodeFilters.length + activeAppFilters.length +
     activeL7Protocols.length + activeCategories.length + activeRiskTypes.length +
@@ -255,15 +269,32 @@ export const SnapshotDetailModal = ({
   useEffect(() => {
     if (activeTab !== 'diagram') return;
     const handler = (e: KeyboardEvent) => {
+      // Heatmap fullscreen owns Escape while it is open — without this the key
+      // falls through to the dialog and closes the whole thing instead of just
+      // leaving fullscreen. Capture phase, so it runs before the modal's handler.
+      if (e.key === 'Escape' && isHeatmapFullscreen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsHeatmapFullscreen(false);
+        return;
+      }
+      // Snapshot stepping would be disorienting while the matrix is fullscreen.
+      if (isHeatmapFullscreen) return;
       if (e.key === 'ArrowLeft' && diagramIndex > 0) {
         setDiagramSnapshotId(sorted[diagramIndex - 1].id);
       } else if (e.key === 'ArrowRight' && diagramIndex < sorted.length - 1) {
         setDiagramSnapshotId(sorted[diagramIndex + 1].id);
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [activeTab, diagramIndex, sorted]);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen]);
+
+  // A fullscreen matrix is position:fixed outside the dialog's stacking context,
+  // so it must not outlive a tab change that hides the diagram beneath it.
+  useEffect(() => {
+    if (activeTab !== 'diagram') setIsHeatmapFullscreen(false);
+  }, [activeTab]);
 
   // Context tab state
   const [contextDraft, setContextDraft] = useState(snapshot.context ?? '');
@@ -513,6 +544,28 @@ export const SnapshotDetailModal = ({
                   <i className="bi bi-chevron-right" />
                 </Button>
               </div>
+              <div className="d-flex align-items-center gap-2">
+                <Form.Label className="mb-0 text-muted small">Color edges by</Form.Label>
+                <Form.Select
+                  size="sm"
+                  style={{ width: 110 }}
+                  value={edgeColorMode}
+                  onChange={e => setEdgeColorMode(e.target.value as EdgeColorMode)}
+                >
+                  <option value="protocol">Protocol</option>
+                  <option value="volume">Volume</option>
+                </Form.Select>
+                {edgeColorMode === 'volume' && (
+                  <VolumeLegend
+                    maxValue={edgeRange.max}
+                    minValue={edgeRange.min}
+                    dark={isDark}
+                    variant="edge"
+                    label="Edge volume"
+                  />
+                )}
+              </div>
+
               {prevSnap ? (
                 <span className="text-muted small">
                   <i className="bi bi-arrow-left-right me-1" />
@@ -557,6 +610,7 @@ export const SnapshotDetailModal = ({
                   onNodeClick={node => setSelectedNode(node)}
                   onFilterClick={() => setShowFilterModal(true)}
                   activeFilterCount={activeFilterCount}
+                  edgeColorMode={edgeColorMode}
                 />
               )}
             </div>
@@ -564,6 +618,73 @@ export const SnapshotDetailModal = ({
               <div className="text-center text-muted small mt-2">
                 <i className="bi bi-check-circle me-1 text-success" />
                 No node-level changes detected between these two snapshots.
+              </div>
+            )}
+
+            {/* Node-to-node volume for this snapshot. Collapsed by default — the
+                dialog is already dense and the diagram is the primary view here.
+                Unlike the analysis page this does not drive `highlightedNodes`,
+                which in monitor mode already carries snapshot-change highlighting. */}
+            {!graphLoading && (
+              <div
+                className={
+                  isHeatmapFullscreen
+                    ? 'tp-heatmap-fullscreen-over-modal'
+                    : 'mt-3 border-top pt-3'
+                }
+              >
+                <div className="d-flex justify-content-between align-items-center">
+                  <strong className="small">
+                    Node-to-Node Volume
+                    <span className="text-muted fw-normal ms-2">
+                      Traffic between each pair of displayed hosts
+                    </span>
+                  </strong>
+                  <div className="d-flex align-items-center gap-3">
+                    {showHeatmap && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-muted"
+                        onClick={() => setIsHeatmapFullscreen(f => !f)}
+                        title={isHeatmapFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+                      >
+                        <i
+                          className={`bi ${
+                            isHeatmapFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'
+                          }`}
+                        />
+                      </Button>
+                    )}
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-muted"
+                      onClick={() => {
+                        // Collapsing while fullscreen would leave an empty shell.
+                        if (showHeatmap) setIsHeatmapFullscreen(false);
+                        setShowHeatmap(v => !v);
+                      }}
+                      aria-expanded={showHeatmap}
+                    >
+                      {showHeatmap ? 'Hide' : 'Show'}
+                      <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                    </Button>
+                  </div>
+                </div>
+                {showHeatmap && (
+                  <div className={isHeatmapFullscreen ? 'mt-2 tp-heatmap-body' : 'mt-2'}>
+                    <VolumeHeatmap
+                      nodes={filteredNodes}
+                      edges={filteredEdges}
+                      dark={isDark}
+                      focusedHost={selectedNode?.id ?? null}
+                      selectedPair={selectedPair}
+                      onCellClick={setSelectedPair}
+                      onHostClick={setSelectedNode}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

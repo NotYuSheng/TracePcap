@@ -8,6 +8,7 @@ import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
+import { makeVolumeEdgeColor } from '@/utils/volumeColor';
 import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
 import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
@@ -22,6 +23,8 @@ export interface NodeHighlight {
   label: string;
   description?: string;
 }
+
+export type EdgeColorMode = 'protocol' | 'volume';
 
 interface NetworkGraphProps {
   nodes: GraphNode[];
@@ -38,6 +41,18 @@ interface NetworkGraphProps {
   activeFilterCount?: number;
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
+  /**
+   * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
+   * volume shades each edge by `totalBytes` on the shared volume scale — the same
+   * ramp the node-to-node heatmap uses. Note an edge is one protocol/app between a
+   * pair (see `deduplicateEdges`), while a heatmap cell is the pair's total across
+   * all protocols, so the two agree exactly only for single-protocol pairs.
+   *
+   * <p>These are mutually exclusive by design: colour is one channel, and showing
+   * two meanings at once would make neither legible. Whichever is active needs a
+   * legend rendered by the caller.
+   */
+  edgeColorMode?: EdgeColorMode;
   /**
    * Render light regardless of the user's theme — for PDF capture, which always wants white
    * diagrams (see captureNetworkDiagrams.ts).
@@ -299,6 +314,24 @@ function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
   return result;
 }
 
+
+/**
+ * Range of positive edge volumes, used to fit the volume colour scale.
+ * Exported so a caller rendering the legend derives the exact same domain the
+ * edges are painted with — a legend fitted to a different range would lie.
+ */
+export function edgeBytesRange(edges: GraphEdge[]): { min: number; max: number } {
+  let max = 0;
+  let min = Infinity;
+  for (const e of edges) {
+    const b = e.data.totalBytes ?? 0;
+    if (b <= 0) continue;
+    if (b > max) max = b;
+    if (b < min) min = b;
+  }
+  return { min: Number.isFinite(min) ? min : 1, max };
+}
+
 // ---------------------------------------------------------------------------
 // Build a graphology graph from GraphNode[] / GraphEdge[]
 // ---------------------------------------------------------------------------
@@ -307,6 +340,8 @@ function buildGraph(
   nodes: GraphNode[],
   edges: GraphEdge[],
   primarySource?: string,
+  edgeColorMode: EdgeColorMode = 'protocol',
+  darkMode = false,
 ): Graph {
   const graph = new Graph({ multi: true, type: 'directed' });
 
@@ -342,20 +377,31 @@ function buildGraph(
     });
   }
 
+  // Fitting the scale to the current view's range means it re-fits whenever
+  // filters change, so contrast is never wasted on values nothing reaches.
+  const { min: minEdgeBytes, max: maxEdgeBytes } = edgeBytesRange(validEdges);
+  const volumeColor = makeVolumeEdgeColor(maxEdgeBytes, darkMode, minEdgeBytes);
+
   for (const e of validEdges) {
-    const color = getProtocolColor(e.data.protocol);
     const isSecondaryOnly =
       e.data.sources?.length === 1 &&
       primarySource !== undefined &&
       e.data.sources[0] !== primarySource;
 
     graph.addEdgeWithKey(e.id, e.source, e.target, {
-      color,
+      color:
+        edgeColorMode === 'volume'
+          ? volumeColor(e.data.totalBytes ?? 0)
+          : getProtocolColor(e.data.protocol),
       size: 1.2,
       label: e.label,
       type: 'arrow',
       isSecondaryOnly,
       packetCount: e.data.packetCount,
+      // Kept on the edge so the colour mode can be switched by repainting in
+      // place, without rebuilding the graph and throwing away the layout.
+      totalBytes: e.data.totalBytes ?? 0,
+      protocol: e.data.protocol,
     });
   }
 
@@ -417,6 +463,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  edgeColorMode = 'protocol',
   forceLight = false,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
@@ -528,7 +575,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigmaRef.current?.kill();
     sigmaRef.current = null;
 
-    const graph = buildGraph(nodes, edges, primarySource);
+    const graph = buildGraph(nodes, edges, primarySource, edgeColorMode, darkMode);
     graphRef.current = graph;
 
     // Seed the per-node text lines before the first paint. Read config fresh so a
@@ -821,6 +868,46 @@ export const NetworkGraph = memo(function NetworkGraph({
   useEffect(() => {
     sigmaRef.current?.refresh();
   }, [hoveredNode]);
+
+  // Repaint edges when the colour encoding changes.
+  //
+  // Deliberately not a dependency of the graph-building effect above: switching
+  // Protocol↔Volume must not rebuild the graph, because that would re-run the
+  // layout and scramble positions the user has been reading. Everything needed
+  // (protocol, totalBytes) is already on each edge, so this is a pure repaint.
+  //
+  // darkMode is absent from the deps for the opposite reason — a theme change
+  // *does* rebuild via the effect above, which repaints with the correct ramp.
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+
+    let maxEdgeBytes = 0;
+    let minEdgeBytes = Infinity;
+    graph.forEachEdge((_key, attrs) => {
+      const b = (attrs.totalBytes as number) ?? 0;
+      if (b <= 0) return;
+      if (b > maxEdgeBytes) maxEdgeBytes = b;
+      if (b < minEdgeBytes) minEdgeBytes = b;
+    });
+    const volumeColor = makeVolumeEdgeColor(
+      maxEdgeBytes,
+      darkMode,
+      Number.isFinite(minEdgeBytes) ? minEdgeBytes : 1
+    );
+
+    graph.forEachEdge((key, attrs) => {
+      graph.setEdgeAttribute(
+        key,
+        'color',
+        edgeColorMode === 'volume'
+          ? volumeColor((attrs.totalBytes as number) ?? 0)
+          : getProtocolColor((attrs.protocol as string) ?? '')
+      );
+    });
+    sigmaRef.current?.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edgeColorMode]);
 
   // Fit view
   const handleFitView = useCallback(() => {
