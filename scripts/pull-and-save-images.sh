@@ -24,6 +24,9 @@ IMAGES_DIR="$ROOT_DIR/images"
 
 BACKEND_IMAGE="tracepcap-backend:latest"
 NGINX_IMAGE="tracepcap-nginx:latest"
+# Auth-enabled frontend, built only when Keycloak is included. Kept as a separate
+# tag so the auth-off offline stack keeps using the plain nginx image unchanged.
+NGINX_AUTH_IMAGE="tracepcap-nginx-auth:latest"
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -65,12 +68,13 @@ mapfile -t DOCKERHUB_IMAGES < <(
 )
 
 # Optionally include Keycloak, for an authenticated offline deployment. The image
-# tag is read from docker-compose.prod.yml (the auth overlay) so it never drifts.
+# tag is read from docker-compose.offline-prod.yml — the SAME file the offline host
+# starts — so the saved image can never drift from what the offline stack expects.
 # Appending to DOCKERHUB_IMAGES means the pull and save loops below both pick it
 # up automatically. Set INCLUDE_KEYCLOAK=true|false to skip the prompt (e.g. CI).
-PROD_COMPOSE="$ROOT_DIR/docker-compose.prod.yml"
+OFFLINE_PROD_COMPOSE="$ROOT_DIR/docker-compose.offline-prod.yml"
 KEYCLOAK_IMAGE="$(
-  grep -E '^[[:space:]]*image:[[:space:]]*.*keycloak' "$PROD_COMPOSE" 2>/dev/null | \
+  grep -E '^[[:space:]]*image:[[:space:]]*.*keycloak' "$OFFLINE_PROD_COMPOSE" 2>/dev/null | \
   sed -E 's/^[[:space:]]*image:[[:space:]]*"?([^" #]+)"?.*/\1/' | head -n1 || true
 )"
 
@@ -115,14 +119,36 @@ docker build \
   -t "$BACKEND_IMAGE" \
   ./backend
 
+# vite.config.ts REQUIRES a version at build time and falls back to `git describe`,
+# which is unavailable inside the Docker builder (no .git in the build context) —
+# so resolve it here (git works in this checkout) and pass it explicitly, else the
+# frontend build fails. Override by exporting VITE_APP_VERSION.
+VITE_APP_VERSION="${VITE_APP_VERSION:-$(git -C "$ROOT_DIR" describe --tags --always --dirty 2>/dev/null || echo "offline-build")}"
+
 echo "  Building nginx (frontend)..."
 docker build \
-  --build-arg "VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}" \
+  --build-arg "VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api/v1}" \
   --build-arg "VITE_SUPPORTED_FILE_TYPES=${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}" \
   --build-arg "VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}" \
+  --build-arg "VITE_APP_VERSION=${VITE_APP_VERSION}" \
   -t "$NGINX_IMAGE" \
   -f ./nginx/Dockerfile \
   .
+
+if [ "$SAVE_KEYCLOAK" = "1" ]; then
+  echo "  Building nginx (frontend, auth-enabled)..."
+  docker build \
+    --build-arg "VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api/v1}" \
+    --build-arg "VITE_SUPPORTED_FILE_TYPES=${VITE_SUPPORTED_FILE_TYPES:-.pcap,.pcapng,.cap}" \
+    --build-arg "VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=${VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT:-false}" \
+    --build-arg "VITE_APP_VERSION=${VITE_APP_VERSION}" \
+    --build-arg "VITE_AUTH_ENABLED=true" \
+    --build-arg "VITE_OIDC_CLIENT_ID=tracepcap-frontend" \
+    --build-arg "VITE_OIDC_REALM=tracepcap" \
+    -t "$NGINX_AUTH_IMAGE" \
+    -f ./nginx/Dockerfile \
+    .
+fi
 
 # ---------------------------------------------------------------------------
 # 3. Save all images as tars
@@ -136,6 +162,9 @@ for img in "${DOCKERHUB_IMAGES[@]}"; do
 done
 save_image "$BACKEND_IMAGE" "tracepcap-backend.tar"
 save_image "$NGINX_IMAGE"   "tracepcap-nginx.tar"
+if [ "$SAVE_KEYCLOAK" = "1" ]; then
+  save_image "$NGINX_AUTH_IMAGE" "tracepcap-nginx-auth.tar"
+fi
 
 # ---------------------------------------------------------------------------
 # Summary
@@ -154,11 +183,16 @@ echo "  bash scripts/load-images.sh"
 echo "  docker compose -f docker-compose.offline.yml up -d"
 echo ""
 if [ "$SAVE_KEYCLOAK" = "1" ]; then
-  echo "Keycloak image was saved. To run auth offline you must ALSO transfer:"
+  echo "Keycloak (auth) was included. To run authenticated offline, ALSO transfer:"
+  echo "  docker-compose.offline-prod.yml"
   echo "  keycloak/realm-export.json"
-  echo "and start with an auth-enabled compose (add the Keycloak service + auth env,"
-  echo "and rebuild nginx with the VITE_AUTH_* args). Saving the image alone is not"
-  echo "enough — see docs/configuration/authentication.rst."
+  echo ""
+  echo "and start with the auth overlay, setting PUBLIC_URL to the exact origin"
+  echo "you browse to (scheme + host + port):"
+  echo "  PUBLIC_URL=http://<host>:8888 \\"
+  echo "    docker compose -f docker-compose.offline.yml -f docker-compose.offline-prod.yml up -d"
+  echo ""
+  echo "Then manage users at <PUBLIC_URL>/admin — see docs/configuration/user-management.rst."
   echo ""
 fi
 echo "To refresh nDPI: rebuild the backend image (it installs the latest nDPI),"

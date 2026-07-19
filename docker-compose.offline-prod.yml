@@ -1,0 +1,74 @@
+# docker-compose.offline-prod.yml
+#
+# Offline + authentication overlay. Layers OIDC auth (a bundled Keycloak) on top of the
+# offline stack, using pre-built images loaded via scripts/load-images.sh — the offline
+# equivalent of docker-compose.prod.yml (which builds from source and cannot run air-gapped).
+#
+# Prerequisites:
+#   1. On an internet-connected machine, INCLUDE Keycloak when saving images:
+#          INCLUDE_KEYCLOAK=true bash scripts/pull-and-save-images.sh
+#      This saves the Keycloak image AND an auth-enabled frontend (tracepcap-nginx-auth).
+#   2. Transfer images/, this file, docker-compose.offline.yml, keycloak/realm-export.json,
+#      .env, and scripts/load-images.sh to the offline machine.
+#   3. On the offline machine:  bash scripts/load-images.sh
+#
+# Start (layer this file ON TOP of the base offline file):
+#   PUBLIC_URL=http://<host>:8888 \
+#     docker compose -f docker-compose.offline.yml -f docker-compose.offline-prod.yml up -d
+#
+# PUBLIC_URL must be the exact origin you browse to (scheme + host + port). It pins Keycloak's
+# token issuer and the backend's issuer check; the browser must load the app via this same
+# origin. It does NOT track NGINX_PORT — default is http://localhost:8888. See
+# docs/configuration/authentication.rst and docs/getting-started/offline-deployment.rst.
+#
+# Manage users at <PUBLIC_URL>/admin (Keycloak admin console, served same-origin by nginx).
+# Default demo login: analyst / analyst. Default Keycloak admin: user / P@ssw0rd — override
+# both for any real deployment.
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: tracepcap-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-user}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-P@ssw0rd}
+      # Public, browser-facing base URL — determines the token `iss` claim and all KC URLs.
+      KC_HOSTNAME: ${PUBLIC_URL:-http://localhost:8888}
+      # Trust X-Forwarded-* from the nginx proxy (same-origin reverse proxy in front of KC).
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      TZ: Asia/Singapore
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      # Persist Keycloak's embedded H2 store so accounts/credentials created at
+      # runtime in the admin console survive container restart/recreate. (The
+      # online prod overlay is ephemeral by the same start-dev design; persistence
+      # matters more offline, where re-provisioning users is manual.)
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - tracepcap-network
+
+  backend:
+    environment:
+      TRACEPCAP_AUTH_ENABLED: "true"
+      # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
+      # Backend-reachable JWKS endpoint (internal docker network), fetched lazily so the
+      # backend need not wait for Keycloak to be ready.
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/tracepcap/protocol/openid-connect/certs
+    depends_on:
+      keycloak:
+        condition: service_started
+
+  nginx:
+    # Auth-enabled frontend built by pull-and-save-images.sh when Keycloak is included.
+    # Overrides the plain tracepcap-nginx:latest from the base offline file.
+    image: tracepcap-nginx-auth:latest
+    depends_on:
+      - backend
+      - keycloak
+
+volumes:
+  keycloak_data:
+    driver: local
