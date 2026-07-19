@@ -1,4 +1,6 @@
 import type { NodeType } from './types';
+import { deviceTypeLabel } from '@/utils/deviceType';
+import { getAppColor } from '@/utils/appColors';
 
 /**
  * Single source of truth for protocol edge colors and display labels used in
@@ -111,6 +113,27 @@ export function getProtocolColor(protocol: string): string {
 }
 
 /**
+ * Legend entries for the 'application' edge-colour mode: one swatch per distinct nDPI application
+ * present (WhatsApp, YouTube, …), coloured by getAppColor exactly as the strokes are. Edges with no
+ * identified application collapse into `hasUnmapped` (the grey "Other" bucket), mirroring
+ * buildProtocolLegend's shape so the legend renderer handles both modes identically.
+ */
+export function buildAppLegend(
+  appNames: Iterable<string | null | undefined>,
+): { entries: Array<{ color: string; label: string }>; hasUnmapped: boolean } {
+  const present = new Set<string>();
+  let hasUnmapped = false;
+  for (const a of appNames) {
+    if (a) present.add(a);
+    else hasUnmapped = true;
+  }
+  const entries = [...present]
+    .sort()
+    .map(label => ({ color: getAppColor(label), label }));
+  return { entries, hasUnmapped };
+}
+
+/**
  * Display label overrides for edge protocol legend entries.
  * Keys not listed here use the key itself as the label.
  */
@@ -187,27 +210,12 @@ export const NODE_TYPE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * Converts a raw activeNodeFilters key (e.g. "nt:router", "dt:IOT") to a
- * human-readable label using the existing display maps.
+ * Converts a raw activeNodeFilters key (e.g. "id:WEB_SERVER", "id:MOBILE") to a
+ * human-readable label. Filter keys use the single "id:" node-identity taxonomy
+ * (#499/#537); the value is a DeviceType-family key resolved via deviceTypeLabel.
  */
 export function nodeFilterLabel(key: string): string {
-  if (key.startsWith('nt:')) {
-    const type = key.slice(3);
-    return NODE_TYPE_LABELS[type] ?? type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  }
-  if (key.startsWith('dt:')) {
-    // Inline the deviceTypeLabel logic to avoid a circular import.
-    const dt = key.slice(3);
-    switch (dt) {
-      case 'ROUTER': return 'Router';
-      case 'MOBILE': return 'Mobile';
-      case 'LAPTOP_DESKTOP': return 'Laptop / Desktop';
-      case 'SERVER': return 'Server';
-      case 'IOT': return 'IoT Device';
-      case 'UNKNOWN': return 'Unknown';
-      default: return dt;
-    }
-  }
+  if (key.startsWith('id:')) return deviceTypeLabel(key.slice(3));
   return key;
 }
 
@@ -254,7 +262,7 @@ export function buildActiveFilterLabels(filters: {
   if (filters.activeLegendProtocols.length > 0)
     labels.push(`Protocol: ${filters.activeLegendProtocols.join(', ')}`);
   if (filters.activeNodeFilters.length > 0)
-    labels.push(`Node type: ${filters.activeNodeFilters.map(nodeFilterLabel).join(', ')}`);
+    labels.push(`Node identity: ${filters.activeNodeFilters.map(nodeFilterLabel).join(', ')}`);
   if (filters.activeAppFilters.length > 0)
     labels.push(`App: ${filters.activeAppFilters.join(', ')}`);
   if (filters.activeL7Protocols.length > 0)

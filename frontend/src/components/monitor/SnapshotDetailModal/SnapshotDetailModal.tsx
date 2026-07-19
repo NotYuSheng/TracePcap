@@ -26,6 +26,7 @@ import type { VolumePair } from '@/components/network/VolumeHeatmap';
 import { VolumeLegend } from '@/components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
+import { nodeIdentityKey } from '@/utils/deviceType';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
@@ -140,7 +141,8 @@ export const SnapshotDetailModal = ({
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
   const isDark = useResolvedDark();
-  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('protocol');
+  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('transport');
+  const [isDiagramFullscreen, setIsDiagramFullscreen] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
   const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
@@ -203,8 +205,7 @@ export const SnapshotDetailModal = ({
   const { nodes, edges, loading: graphLoading } = useNetworkData(diagramSnap.fileId);
 
   // "Present" sets for filter options
-  const presentNodeTypes = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => s.add(n.data.nodeType)); return s; }, [nodes]);
-  const presentDeviceTypes = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => { if (n.data.deviceType) s.add(n.data.deviceType); }); return s; }, [nodes]);
+  const presentIdentities = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => s.add(nodeIdentityKey(n.data))); return s; }, [nodes]);
   const presentEdgeLegendKeys = useMemo(() => {
     const s = new Set<string>();
     edges.forEach(edge => {
@@ -278,6 +279,15 @@ export const SnapshotDetailModal = ({
         setIsHeatmapFullscreen(false);
         return;
       }
+      // Diagram fullscreen owns Escape too — exit fullscreen instead of closing
+      // the whole dialog. Arrow stepping stays enabled so snapshots can be paged
+      // through while fullscreen.
+      if (e.key === 'Escape' && isDiagramFullscreen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDiagramFullscreen(false);
+        return;
+      }
       // Snapshot stepping would be disorienting while the matrix is fullscreen.
       if (isHeatmapFullscreen) return;
       if (e.key === 'ArrowLeft' && diagramIndex > 0) {
@@ -288,12 +298,15 @@ export const SnapshotDetailModal = ({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen]);
+  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen, isDiagramFullscreen]);
 
-  // A fullscreen matrix is position:fixed outside the dialog's stacking context,
-  // so it must not outlive a tab change that hides the diagram beneath it.
+  // A fullscreen matrix/diagram is position:fixed outside the dialog's stacking
+  // context, so it must not outlive a tab change that hides the diagram beneath it.
   useEffect(() => {
-    if (activeTab !== 'diagram') setIsHeatmapFullscreen(false);
+    if (activeTab !== 'diagram') {
+      setIsHeatmapFullscreen(false);
+      setIsDiagramFullscreen(false);
+    }
   }, [activeTab]);
 
   // Context tab state
@@ -514,7 +527,7 @@ export const SnapshotDetailModal = ({
 
         {/* ── Network Diagram tab ── */}
         {activeTab === 'diagram' && (
-          <div>
+          <div className={isDiagramFullscreen ? 'nd-css-fullscreen-over-modal' : ''}>
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
               <div className="d-flex align-items-center gap-2">
                 <Button size="sm" variant="outline-secondary"
@@ -548,11 +561,12 @@ export const SnapshotDetailModal = ({
                 <Form.Label className="mb-0 text-muted small">Color edges by</Form.Label>
                 <Form.Select
                   size="sm"
-                  style={{ width: 110 }}
+                  style={{ width: 130 }}
                   value={edgeColorMode}
                   onChange={e => setEdgeColorMode(e.target.value as EdgeColorMode)}
                 >
-                  <option value="protocol">Protocol</option>
+                  <option value="transport">Transport</option>
+                  <option value="application">Application</option>
                   <option value="volume">Volume</option>
                 </Form.Select>
                 {edgeColorMode === 'volume' && (
@@ -593,8 +607,20 @@ export const SnapshotDetailModal = ({
               >
                 <i className="bi bi-tags" />
               </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted"
+                onClick={() => setIsDiagramFullscreen(f => !f)}
+                title={isDiagramFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                <i className={`bi ${isDiagramFullscreen ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} />
+              </Button>
             </div>
-            <div className="monitor-diagram-graph" style={{ height: 460 }}>
+            <div
+              className="monitor-diagram-graph"
+              style={isDiagramFullscreen ? undefined : { height: 460 }}
+            >
               {graphLoading ? (
                 <div className="d-flex align-items-center justify-content-center h-100 text-muted">
                   <Spinner animation="border" size="sm" className="me-2" />Loading graph…
@@ -948,8 +974,7 @@ export const SnapshotDetailModal = ({
           activeNodeFilters={activeNodeFilters}
           onNodeFilterClick={toggleNodeFilter}
           onNodeFilterClear={() => setActiveNodeFilters([])}
-          presentNodeTypes={presentNodeTypes}
-          presentDeviceTypes={presentDeviceTypes}
+          presentIdentities={presentIdentities}
           ipFilter={ipFilter}
           onIpFilterChange={setIpFilter}
           portFilter={portFilter}

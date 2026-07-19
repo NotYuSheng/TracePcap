@@ -310,3 +310,23 @@
 .nd-css-fullscreen .network-diagram-graph-body .network-graph-wrapper {
   height: 100%;
 }
+
+/* Diagram fullscreen launched from inside the monitor dialog. Like the heatmap's
+   over-modal variant, it must stack ABOVE Bootstrap's modal (~1055); the shared
+   .nd-css-fullscreen sits at 1040 and would render behind the dialog. */
+.nd-css-fullscreen-over-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tp-surface, #fff);
+  margin: 0;
+  padding: 1rem;
+}
+
+.nd-css-fullscreen-over-modal .monitor-diagram-graph {
+  flex: 1;
+  min-height: 0;
+}

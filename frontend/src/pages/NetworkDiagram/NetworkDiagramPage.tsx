@@ -10,6 +10,7 @@ import {
 } from '@/features/network/hooks/useNetworkData';
 import { buildActiveFilterLabels, toggleSet } from '@/features/network/constants';
 import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
+import { nodeIdentityKey } from '@/utils/deviceType';
 import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import type { EdgeColorMode, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
@@ -89,7 +90,7 @@ export const NetworkDiagramPage = () => {
   );
 
   const isDark = useResolvedDark();
-  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('protocol');
+  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('transport');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
   const heatmapCardRef = useRef<HTMLDivElement>(null);
@@ -132,20 +133,10 @@ export const NetworkDiagramPage = () => {
 
   // ─── "Present" sets: only show options that exist in the data ───────────────
 
-  const presentNodeTypes = useMemo(() => {
-    const types = new Set<string>();
-    nodes.forEach(n => {
-      types.add(n.data.nodeType);
-    });
-    return types;
-  }, [nodes]);
-
-  const presentDeviceTypes = useMemo(() => {
-    const types = new Set<string>();
-    nodes.forEach(n => {
-      if (n.data.deviceType) types.add(n.data.deviceType);
-    });
-    return types;
+  const presentIdentities = useMemo(() => {
+    const ids = new Set<string>();
+    nodes.forEach(n => ids.add(nodeIdentityKey(n.data)));
+    return ids;
   }, [nodes]);
 
   const presentEdgeLegendKeys = useMemo(() => {
@@ -280,11 +271,7 @@ export const NetworkDiagramPage = () => {
         nodes
           .filter(n =>
             activeNodeFilters.some(key => {
-              if (key.startsWith('nt:')) {
-                const nt = key.slice(3);
-                return n.data.nodeType === nt;
-              }
-              if (key.startsWith('dt:')) return n.data.deviceType === key.slice(3);
+              if (key.startsWith('id:')) return nodeIdentityKey(n.data) === key.slice(3);
               return false;
             })
           )
@@ -575,18 +562,20 @@ export const NetworkDiagramPage = () => {
             <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
               <div className="d-flex align-items-center gap-3 flex-wrap">
-                {/* Colour is a single channel — protocol and volume are offered as
-                    alternatives rather than layered, and the active one is always
-                    accompanied by its legend. */}
+                {/* Colour is a single channel — transport, application, and volume are offered as
+                    alternatives rather than layered, and the active one is always accompanied by
+                    its legend. Transport = base protocol (TCP/UDP/ICMP); Application = deepest
+                    identified protocol (HTTPS, DNS, QUIC…). */}
                 <div className="d-flex align-items-center gap-2">
                   <Form.Label className="mb-0 text-muted small">Color edges by</Form.Label>
                   <Form.Select
                     size="sm"
-                    style={{ width: 110 }}
+                    style={{ width: 130 }}
                     value={edgeColorMode}
                     onChange={e => setEdgeColorMode(e.target.value as EdgeColorMode)}
                   >
-                    <option value="protocol">Protocol</option>
+                    <option value="transport">Transport</option>
+                    <option value="application">Application</option>
                     <option value="volume">Volume</option>
                   </Form.Select>
                 </div>
@@ -728,9 +717,8 @@ export const NetworkDiagramPage = () => {
             activeNodeFilters={activeNodeFilters}
             onNodeFilterClick={toggleNodeFilter}
             onNodeFilterClear={() => setActiveNodeFilters([])}
-            presentNodeTypes={presentNodeTypes}
+            presentIdentities={presentIdentities}
             presentEdgeLegendKeys={presentEdgeLegendKeys}
-            presentDeviceTypes={presentDeviceTypes}
             ipFilter={ipFilter}
             onIpFilterChange={setIpFilter}
             portFilter={portFilter}

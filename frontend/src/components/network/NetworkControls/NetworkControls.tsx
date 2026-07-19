@@ -3,7 +3,6 @@ import {
   PROTOCOL_COLORS,
   PROTOCOL_LABELS,
   NODE_TYPE_COLORS,
-  NODE_TYPE_LABELS,
   DEFAULT_EDGE_COLOR,
 } from '@/features/network/constants';
 import { DEVICE_TYPES, deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
@@ -48,8 +47,8 @@ interface NetworkControlsProps {
   activeNodeFilters: string[];
   onNodeFilterClick: (key: string) => void;
   onNodeFilterClear: () => void;
-  presentNodeTypes: Set<string>;
-  presentDeviceTypes: Set<string>;
+  /** Canonical node-identity keys present in the graph (DeviceType values + 'L2_DEVICE'). */
+  presentIdentities: Set<string>;
   ipFilter: string;
   onIpFilterChange: (value: string) => void;
   portFilter: string;
@@ -104,12 +103,6 @@ function edgeLegendLabel(key: string): string {
 function edgeLegendColor(key: string): string {
   return PROTOCOL_COLORS[key] ?? DEFAULT_EDGE_COLOR;
 }
-function nodeLegendLabel(key: string): string {
-  return NODE_TYPE_LABELS[key] ?? key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-function nodeLegendColor(key: string): string {
-  return NODE_TYPE_COLORS[key] ?? '#95a5a6';
-}
 function countryFlag(code: string): string {
   return code
     .toUpperCase()
@@ -126,8 +119,7 @@ export function NetworkControls({
   activeNodeFilters,
   onNodeFilterClick,
   onNodeFilterClear,
-  presentNodeTypes,
-  presentDeviceTypes,
+  presentIdentities,
   ipFilter,
   onIpFilterChange,
   portFilter,
@@ -208,10 +200,15 @@ export function NetworkControls({
     portDebounceRef.current = setTimeout(() => onPortFilterChange(value), 300);
   };
 
-  const allNodeKeys = [
-    ...Array.from(presentNodeTypes).map(k => `nt:${k}`),
-    ...DEVICE_TYPES.filter(dt => presentDeviceTypes.has(dt)).map(dt => `dt:${dt}`),
+  // One identity taxonomy: canonical keys in DEVICE_TYPES display order, then any custom
+  // YAML-override values not in that list (appended, sorted) so nothing is dropped.
+  const orderedIdentities = [
+    ...DEVICE_TYPES.filter(dt => presentIdentities.has(dt)),
+    ...Array.from(presentIdentities)
+      .filter(k => !DEVICE_TYPES.includes(k))
+      .sort(),
   ];
+  const allNodeKeys = orderedIdentities.map(k => `id:${k}`);
 
   const legendPillClass = (isActive: boolean) =>
     `badge rounded-pill border-0 nc-legend-pill filter-pill${isActive ? ' active' : ''}`;
@@ -385,15 +382,16 @@ export function NetworkControls({
                   </div>
                 )}
 
-                {/* Node Types */}
-                {(presentNodeTypes.size > 0 || presentDeviceTypes.size > 0) && <div className="col-12">
+                {/* Node Identity — one taxonomy (#499/#537): the adjudicated identity of each
+                    node, no longer split into overlapping node-type + device-type lists. */}
+                {presentIdentities.size > 0 && <div className="col-12">
                   <PillSectionHeader
-                    label="Node Types"
+                    label="Node Identity"
                     info={
                       <InfoPopover
-                        id="nc-info-nodetypes"
-                        title="Node Types"
-                        body="Filter by the inferred role of each node. Determined from graph data: a node's dominant inbound port identifies it as a specific server type (e.g. DNS, HTTP), a high distinct peer count marks it as a router, and nodes that only initiate connections are classified as clients."
+                        id="nc-info-nodeidentity"
+                        title="Node Identity"
+                        body="Filter by each node's adjudicated identity — the single verdict on what a host is, combining measured service roles, hardware/OUI and behaviour. A human-confirmed identity wins; otherwise it is the machine's best classification."
                       />
                     }
                     onSelectAll={() =>
@@ -404,10 +402,10 @@ export function NetworkControls({
                     onDeselectAll={onNodeFilterClear}
                   />
                   <div className="d-flex flex-wrap gap-1 mt-1">
-                    {Array.from(presentNodeTypes).map(key => {
-                      const fkey = `nt:${key}`;
+                    {orderedIdentities.map(key => {
+                      const fkey = `id:${key}`;
                       const isActive = activeNodeFilters.includes(fkey);
-                      const color = nodeLegendColor(key);
+                      const color = deviceTypeColor(key);
                       return (
                         <button
                           key={fkey}
@@ -421,28 +419,7 @@ export function NetworkControls({
                           onClick={() => onNodeFilterClick(fkey)}
                         >
                           <span className="nc-dot" style={{ background: color }} />
-                          {nodeLegendLabel(key)}
-                        </button>
-                      );
-                    })}
-                    {DEVICE_TYPES.filter(dt => presentDeviceTypes.has(dt)).map(dt => {
-                      const fkey = `dt:${dt}`;
-                      const isActive = activeNodeFilters.includes(fkey);
-                      const color = deviceTypeColor(dt);
-                      return (
-                        <button
-                          key={fkey}
-                          type="button"
-                          className={legendPillClass(isActive)}
-                          style={
-                            isActive
-                              ? { backgroundColor: color, color: getTextColor(color) }
-                              : undefined
-                          }
-                          onClick={() => onNodeFilterClick(fkey)}
-                        >
-                          <span className="nc-dot" style={{ background: color }} />
-                          {deviceTypeLabel(dt)}
+                          {deviceTypeLabel(key)}
                         </button>
                       );
                     })}

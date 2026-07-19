@@ -15,6 +15,7 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { toggleSet } from '@/features/network/constants';
 import { edgeMatchesLegendKey, applyNetworkFilters } from '@/features/network/services/networkService';
+import { nodeIdentityKey } from '@/utils/deviceType';
 import { formatBytes } from '@/utils/formatters';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
 
@@ -144,20 +145,10 @@ export const ComparePage = () => {
 
   // ── "Present" sets ───────────────────────────────────────────────────────
 
-  const presentNodeTypes = useMemo(() => {
-    const types = new Set<string>();
-    mergedNodes.forEach(n => {
-      types.add(n.data.nodeType);
-    });
-    return types;
-  }, [mergedNodes]);
-
-  const presentDeviceTypes = useMemo(() => {
-    const types = new Set<string>();
-    mergedNodes.forEach(n => {
-      if (n.data.deviceType) types.add(n.data.deviceType);
-    });
-    return types;
+  const presentIdentities = useMemo(() => {
+    const ids = new Set<string>();
+    mergedNodes.forEach(n => ids.add(nodeIdentityKey(n.data)));
+    return ids;
   }, [mergedNodes]);
 
   const presentEdgeLegendKeys = useMemo(() => {
@@ -551,9 +542,8 @@ export const ComparePage = () => {
           activeNodeFilters={activeNodeFilters}
           onNodeFilterClick={toggleNodeFilter}
           onNodeFilterClear={() => setActiveNodeFilters([])}
-          presentNodeTypes={presentNodeTypes}
+          presentIdentities={presentIdentities}
           presentEdgeLegendKeys={presentEdgeLegendKeys}
-          presentDeviceTypes={presentDeviceTypes}
           ipFilter={ipFilter}
           onIpFilterChange={setIpFilter}
           portFilter={portFilter}
