@@ -1,10 +1,34 @@
 import {
   buildProtocolLegend,
+  buildAppLegend,
   getProtocolColor,
   normalizeProtocol,
   PROTOCOL_COLORS,
   DEFAULT_EDGE_COLOR,
 } from '../constants';
+import { getAppColor } from '@/utils/appColors';
+
+describe('buildAppLegend', () => {
+  it('lists one swatch per distinct nDPI application, coloured via getAppColor', () => {
+    const { entries, hasUnmapped } = buildAppLegend(['WhatsApp', 'YouTube', 'WhatsApp']);
+    expect(entries).toEqual([
+      { color: getAppColor('WhatsApp'), label: 'WhatsApp' },
+      { color: getAppColor('YouTube'), label: 'YouTube' },
+    ]);
+    expect(hasUnmapped).toBe(false);
+  });
+
+  it('flags edges with no identified application as unmapped (the grey "Other" bucket)', () => {
+    const { entries, hasUnmapped } = buildAppLegend(['WhatsApp', null, undefined, '']);
+    expect(entries).toEqual([{ color: getAppColor('WhatsApp'), label: 'WhatsApp' }]);
+    expect(hasUnmapped).toBe(true);
+  });
+
+  it('sorts application labels for a stable legend order', () => {
+    const { entries } = buildAppLegend(['Zoom', 'Discord', 'Netflix']);
+    expect(entries.map(e => e.label)).toEqual(['Discord', 'Netflix', 'Zoom']);
+  });
+});
 
 describe('buildProtocolLegend', () => {
   it('lists only protocols present in the graph, in PROTOCOL_COLORS order', () => {

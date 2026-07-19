@@ -8,6 +8,7 @@ import type {
   NodeMap,
   NodeType,
 } from '../types';
+import { nodeIdentityKey } from '@/utils/deviceType';
 
 /** MAC address regex — identifies nodes that have no IP and are addressed by MAC only */
 const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
@@ -626,8 +627,7 @@ export function applyNetworkFilters(
       allNodes
         .filter(n =>
           activeNodeFilters.some(k => {
-            if (k.startsWith('nt:')) return n.data.nodeType === k.slice(3);
-            if (k.startsWith('dt:')) return n.data.deviceType === k.slice(3);
+            if (k.startsWith('id:')) return nodeIdentityKey(n.data) === k.slice(3);
             return false;
           })
         )

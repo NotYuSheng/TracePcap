@@ -16,6 +16,9 @@ const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
   DNS_SERVER:     { label: 'DNS Server',       color: '#0ea5e9' }, // sky
   WEB_SERVER:     { label: 'Web Server',       color: '#6366f1' }, // indigo
   API_SERVER:     { label: 'API Server',       color: '#a855f7' }, // purple
+  // Pure L2 nodes (switches/bridges) have no adjudicated identity or device type of their own,
+  // but are still a distinct filterable identity. Teal matches the l2-device node colour.
+  L2_DEVICE:      { label: 'L2 Device',        color: '#1abc9c' }, // teal
   UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
 };
 
@@ -209,6 +212,7 @@ const DEVICE_TYPE_ICONS: Partial<Record<DeviceType, string>> = {
   DNS_SERVER:     'bi-hdd-network',
   WEB_SERVER:     'bi-globe',
   API_SERVER:     'bi-hdd-stack',
+  L2_DEVICE:      'bi-ethernet',
 };
 
 /**
@@ -218,7 +222,7 @@ export function deviceTypeIcon(deviceType: DeviceType): string {
   return DEVICE_TYPE_ICONS[deviceType] ?? 'bi-question-circle';
 }
 
-/** All canonical device type values shown in filter UIs. */
+/** All canonical device type values shown in filter UIs, in display order. */
 export const DEVICE_TYPES: DeviceType[] = [
   'ROUTER',
   'MOBILE',
@@ -228,5 +232,33 @@ export const DEVICE_TYPES: DeviceType[] = [
   'DNS_SERVER',
   'WEB_SERVER',
   'API_SERVER',
+  'L2_DEVICE',
   'UNKNOWN',
 ];
+
+/**
+ * The single canonical identity key for a graph node — the one taxonomy the Node Identity filter
+ * keys on (#499/#537: "Identity owns the verdict"). It replaces the old two parallel filter
+ * dimensions (`nodeType` + `deviceType`) that rendered the same role twice ("Router / Gateway"
+ * vs "Router", "Web Server" twice, …).
+ *
+ * Resolution order mirrors the display authority in networkService:
+ *   1. the adjudicated identity label (already a DeviceType value — WEB_SERVER, ROUTER, …)
+ *   2. else the machine device classification (skipping the non-committal UNKNOWN)
+ *   3. else the structural L2 fallback for pure switches/bridges
+ *   4. else UNKNOWN
+ *
+ * The result is always a DeviceType (plus 'L2_DEVICE'), so deviceTypeLabel/Color/Icon render it
+ * with no extra config. Note this is *finer* than the rendered `nodeType`, which collapses the
+ * Mobile/IoT/Laptop family into "client" — filtering here keeps them distinct.
+ */
+export function nodeIdentityKey(node: {
+  identityLabel?: string;
+  deviceType?: string;
+  nodeType?: string;
+}): string {
+  if (node.identityLabel) return node.identityLabel;
+  if (node.deviceType && node.deviceType !== 'UNKNOWN') return node.deviceType;
+  if (node.nodeType === 'l2-device') return 'L2_DEVICE';
+  return 'UNKNOWN';
+}

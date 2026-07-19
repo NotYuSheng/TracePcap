@@ -9,7 +9,8 @@ import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-cur
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
+import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, buildAppLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
+import { getAppColor } from '@/utils/appColors';
 import { makeVolumeEdgeColor } from '@/utils/volumeColor';
 import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
@@ -27,7 +28,7 @@ export interface NodeHighlight {
   description?: string;
 }
 
-export type EdgeColorMode = 'protocol' | 'volume';
+export type EdgeColorMode = 'transport' | 'application' | 'volume';
 
 interface NetworkGraphProps {
   nodes: GraphNode[];
@@ -354,7 +355,7 @@ function buildGraph(
   nodes: GraphNode[],
   edges: GraphEdge[],
   primarySource?: string,
-  edgeColorMode: EdgeColorMode = 'protocol',
+  edgeColorMode: EdgeColorMode = 'transport',
   darkMode = false,
 ): Graph {
   const graph = new Graph({ multi: true, type: 'directed' });
@@ -402,11 +403,14 @@ function buildGraph(
       primarySource !== undefined &&
       e.data.sources[0] !== primarySource;
 
+    const appName = e.data.appName ?? '';
     graph.addEdgeWithKey(e.id, e.source, e.target, {
       color:
         edgeColorMode === 'volume'
           ? volumeColor(e.data.totalBytes ?? 0)
-          : getProtocolColor(e.data.protocol),
+          : edgeColorMode === 'application'
+            ? (appName ? getAppColor(appName) : DEFAULT_EDGE_COLOR)
+            : getProtocolColor(e.data.protocol),
       size: 1.2,
       label: e.label,
       type: 'arrow',
@@ -416,6 +420,7 @@ function buildGraph(
       // place, without rebuilding the graph and throwing away the layout.
       totalBytes: e.data.totalBytes ?? 0,
       protocol: e.data.protocol,
+      appName,
     });
   }
 
@@ -480,7 +485,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
-  edgeColorMode = 'protocol',
+  edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
@@ -557,16 +562,15 @@ export const NetworkGraph = memo(function NetworkGraph({
     [hiddenNodesList]
   );
 
-  // Edge-colour legend entries for the protocols present in the current graph.
-  // Only meaningful when edges are coloured by protocol — in volume mode the
-  // strokes encode byte counts, not protocols, so the swatches would mislead.
-  const protocolLegend = useMemo(
-    () =>
-      edgeColorMode === 'protocol'
-        ? buildProtocolLegend(edges.map(e => e.data.protocol))
-        : { entries: [], hasUnmapped: false },
-    [edges, edgeColorMode]
-  );
+  // Edge-colour legend entries for the current colour mode. Volume mode encodes
+  // byte counts, not categories, so it has no swatch legend. Transport lists the
+  // base protocols (TCP/UDP/ICMP…); Application lists the nDPI applications
+  // (WhatsApp, YouTube…) the same way the strokes are coloured, via getAppColor.
+  const protocolLegend = useMemo(() => {
+    if (edgeColorMode === 'volume') return { entries: [], hasUnmapped: false };
+    if (edgeColorMode === 'application') return buildAppLegend(edges.map(e => e.data.appName));
+    return buildProtocolLegend(edges.map(e => e.data.protocol));
+  }, [edges, edgeColorMode]);
 
   const hiddenNeighbors = useMemo<GraphNode[]>(() => {
     if (!hoveredNode || crossEdges.length === 0) return [];
@@ -948,7 +952,11 @@ export const NetworkGraph = memo(function NetworkGraph({
         'color',
         edgeColorMode === 'volume'
           ? volumeColor((attrs.totalBytes as number) ?? 0)
-          : getProtocolColor((attrs.protocol as string) ?? '')
+          : edgeColorMode === 'application'
+            ? ((attrs.appName as string)
+                ? getAppColor(attrs.appName as string)
+                : DEFAULT_EDGE_COLOR)
+            : getProtocolColor((attrs.protocol as string) ?? '')
       );
     });
     sigmaRef.current?.refresh();
