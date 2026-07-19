@@ -1,6 +1,20 @@
 Managing Users (Keycloak)
 =========================
 
+.. admonition:: What is Keycloak?
+   :class: tip
+
+   **Keycloak is the "login system" that sits in front of TracePcap.** Instead
+   of TracePcap keeping its own list of usernames and passwords, it hands that
+   job to Keycloak — a separate, well-established tool that owns the login page,
+   stores accounts securely, and checks passwords. When someone opens TracePcap,
+   Keycloak asks them to sign in and only then lets them through.
+
+   The practical upshot: **to give someone access, you create an account for
+   them in Keycloak** (using its admin console, below). You don't add users
+   inside TracePcap itself — there is no user list there. Think of Keycloak as
+   the reception desk that issues the passes; TracePcap just checks the pass.
+
 Application logins are managed in the bundled **Keycloak** identity provider,
 not in TracePcap itself. This page covers creating and managing users in the
 ``tracepcap`` realm. It assumes authentication is already enabled — see
