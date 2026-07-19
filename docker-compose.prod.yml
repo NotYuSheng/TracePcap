@@ -42,7 +42,9 @@ services:
       # runtime in the admin console survive container restart/recreate. Without
       # this, start-dev keeps its data inside the container and every recreate
       # wipes all users, forcing a re-import of only the realm-export.json seed.
-      - keycloak_data:/opt/keycloak/data
+      # Scoped to the h2 subdir (not all of /opt/keycloak/data) so the named
+      # volume doesn't nest over the realm-export.json bind mount above.
+      - keycloak_data:/opt/keycloak/data/h2
     networks:
       - tracepcap-network
 
