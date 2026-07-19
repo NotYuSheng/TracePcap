@@ -54,7 +54,8 @@ demo user. **Change these for any real deployment.**
      - ``user`` / ``P@ssw0rd``
      - ``KEYCLOAK_ADMIN`` / ``KEYCLOAK_ADMIN_PASSWORD`` env vars
 
-The Keycloak admin console is served same-origin at ``/admin``.
+The Keycloak admin console is served same-origin at ``/admin``. To add or manage
+application logins, see :doc:`user-management`.
 
 How it works
 ------------
