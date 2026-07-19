@@ -50,6 +50,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
 
    configuration/environment-variables
    configuration/authentication
+   configuration/user-management
    configuration/llm-setup
    configuration/signature-rules
 
