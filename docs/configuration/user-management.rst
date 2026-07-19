@@ -49,7 +49,7 @@ immediately — no rebuild or restart.
    force a password change at first login (email-based reset flows are not
    configured offline, so a temporary password must be changed by the user at
    the login screen).
-8. Click **Save**.
+8. Click **Save**, then confirm in the **Set password?** popup that appears.
 
 The user can now log in at ``<PUBLIC_URL>`` with that username and password.
 
@@ -57,7 +57,8 @@ Reset a password
 -----------------
 
 **Users** → select the user → **Credentials** → **Reset password**. Set a new
-password (again, leave **Temporary** off) and save.
+password (again, leave **Temporary** off), click **Save**, and confirm in the
+**Reset password?** popup that appears.
 
 Disable or delete a user
 ------------------------
