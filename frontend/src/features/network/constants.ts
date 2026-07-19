@@ -4,18 +4,58 @@ import type { NodeType } from './types';
  * Single source of truth for protocol edge colors and display labels used in
  * NetworkGraph (edge strokes) and NetworkControls (legend).
  *
- * To add a new protocol: add an entry here. The legend renders automatically.
+ * This is a *curated* palette, not a hash: well-known protocols get a hand-picked
+ * colour; everything else falls back to DEFAULT_EDGE_COLOR (grey) and collapses
+ * into one "Other" legend entry. Adding a protocol here makes it appear in the
+ * legend automatically. Each entry needs a UNIQUE colour, or the legend (which
+ * groups by colour) would hide one behind the other — the only deliberate
+ * exceptions are aliases that share a swatch on purpose (HTTPS/TLS).
+ *
+ * Version-suffixed names (TLSv1.2, SSHv2, IGMPv3, …) do NOT need their own entry:
+ * normalizeProtocol() strips the suffix and folds them into the base protocol.
+ * Only irregular/compound variant names go in PROTOCOL_ALIASES below.
+ *
+ * Distinguishing this many colours by eye has limits; the legend is the decoder.
+ * Keys are UPPERCASE (protocol names are matched case-insensitively).
  */
 export const PROTOCOL_COLORS: Record<string, string> = {
+  // Web / transport-security
   HTTP: '#2ecc71',
   HTTPS: '#3498db',
   TLS: '#3498db',
+  QUIC: '#6c5ce7',
+  // Name resolution / discovery
   DNS: '#f39c12',
+  MDNS: '#c0ca33',
+  SSDP: '#00897b',
+  // Core transport / net-layer
   TCP: '#7f8c8d',
   UDP: '#f1c40f',
   ICMP: '#e67e22',
   ICMPV6: '#e67e22',
+  IGMP: '#af7ac5',
   ARP: '#16a085',
+  // Mail (pink/magenta family)
+  SMTP: '#e84393',
+  POP: '#d81b60',
+  IMAP: '#ad1457',
+  // Remote access / file transfer
+  SSH: '#17a2b8',
+  TELNET: '#7d6608',
+  FTP: '#a04000',
+  TFTP: '#a1887f',
+  SMB: '#2471a3',
+  RDP: '#7b1fa2',
+  // Infra services
+  DHCP: '#229954',
+  NTP: '#5c6bc0',
+  SNMP: '#0e7c86',
+  LDAP: '#303f9f',
+  SYSLOG: '#546e7a',
+  // Voice
+  SIP: '#b9770e',
+  RTP: '#ff7043',
+  // L2 control
   STP: '#8e44ad',
   RSTP: '#8e44ad',
   LLDP: '#6c3483',
@@ -26,8 +66,43 @@ export const PROTOCOL_COLORS: Record<string, string> = {
 
 export const DEFAULT_EDGE_COLOR = '#95a5a6';
 
+/**
+ * Irregular variant / compound protocol names that should fold into a base
+ * protocol above but don't follow the "base + version suffix" pattern that
+ * normalizeProtocol() strips automatically. Keep this small — most variants
+ * (TLSv1.2, SSHv2, …) need no entry.
+ */
+export const PROTOCOL_ALIASES: Record<string, string> = {
+  SSL: 'TLS',
+  'HTTP/XML': 'HTTP',
+  'FTP-DATA': 'FTP',
+  'SIP/SDP': 'SIP',
+  'SMTP/IMF': 'SMTP',
+  'POP/IMF': 'POP',
+};
+
+/**
+ * Canonical protocol key for a raw tshark protocol name, used for both colour
+ * and legend grouping. Resolution order:
+ *   1. exact match in PROTOCOL_COLORS  (keeps distinct entries like ICMPv6, RSTP)
+ *   2. explicit alias in PROTOCOL_ALIASES
+ *   3. strip a trailing version suffix (V2, v1.2, " 2") and retry the base
+ *   4. otherwise the uppercased name itself (an unmapped protocol)
+ */
+export function normalizeProtocol(protocol: string): string {
+  const upper = protocol.toUpperCase();
+  if (upper in PROTOCOL_COLORS) return upper;
+  if (upper in PROTOCOL_ALIASES) return PROTOCOL_ALIASES[upper];
+  // Fold "<base><version>" (TLSV1.2, SSHV2, IGMPV3, SMB2, RDPUDP2, PCP V2, …) into
+  // <base>. Requires the base to end in a letter so pure-numeric names like
+  // "802.11" or raw ethertypes ("0X5E00") are left untouched.
+  const base = upper.replace(/\s*V?\d+(?:\.\d+)*$/, '');
+  if (base && base !== upper && base in PROTOCOL_COLORS) return base;
+  return upper;
+}
+
 export function getProtocolColor(protocol: string): string {
-  return PROTOCOL_COLORS[protocol.toUpperCase()] ?? DEFAULT_EDGE_COLOR;
+  return PROTOCOL_COLORS[normalizeProtocol(protocol)] ?? DEFAULT_EDGE_COLOR;
 }
 
 /**
@@ -60,7 +135,9 @@ export function buildProtocolLegend(
   const present = new Set<string>();
   let hasUnmapped = false;
   for (const p of protocols) {
-    const key = p.toUpperCase();
+    // Normalize first so variants (TLSv1.2, SSHv2, SSL, …) fold into their base
+    // entry instead of counting as unmapped.
+    const key = normalizeProtocol(p);
     if (key in PROTOCOL_COLORS) present.add(key);
     else hasUnmapped = true;
   }
