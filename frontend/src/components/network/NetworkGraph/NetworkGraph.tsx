@@ -1047,7 +1047,9 @@ export const NetworkGraph = memo(function NetworkGraph({
       )}
 
       {/* ── Node-type legend — data-driven, matches getNodeColor/getNodeIcon ── */}
-      <div className="ng-legend">
+      {/* Scrollable on-screen so a long protocol list can't overflow the canvas; the PDF-capture
+          render (forceLight) keeps the full height so nothing is clipped in the export. */}
+      <div className={`ng-legend${forceLight ? '' : ' ng-legend--scroll'}`}>
         {/* Specific service nodeTypes present in this graph */}
         {Object.entries(NODE_TYPE_CONFIG)
           .filter(([type]) => !GENERIC_NODE_TYPES.has(type) && type !== 'cluster' &&
