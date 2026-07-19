@@ -1,8 +1,10 @@
 package com.tracepcap.analysis.controller;
 
+import com.tracepcap.analysis.dto.AnalysisProgressResponse;
 import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
 import com.tracepcap.analysis.dto.ProtocolStatsResponse;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
+import com.tracepcap.analysis.service.AnalysisProgressService;
 import com.tracepcap.analysis.service.AnalysisService;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.service.FileService;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class AnalysisController {
 
   private final AnalysisService analysisService;
+  private final AnalysisProgressService analysisProgressService;
   private final FileService fileService;
 
   /**
@@ -80,6 +83,20 @@ public class AnalysisController {
         log.error("Unknown analysis status for file {}: {}", fileId, analysis.getStatus());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
+  }
+
+  /**
+   * Live analysis progress for a file still being analysed. Returns 200 with the current stage while
+   * a run is in flight, or 204 No Content when nothing is being tracked (not started, already
+   * finished, or dropped on a restart) — in which case the client falls back to its size estimate.
+   */
+  @GetMapping("/{fileId}/progress")
+  @Operation(summary = "Live analysis progress (204 when no run is being tracked)")
+  public ResponseEntity<AnalysisProgressResponse> getAnalysisProgress(@PathVariable UUID fileId) {
+    return analysisProgressService
+        .get(fileId)
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.noContent().build());
   }
 
   /**

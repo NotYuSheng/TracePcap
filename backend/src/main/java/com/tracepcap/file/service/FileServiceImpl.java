@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -26,6 +27,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -85,12 +88,17 @@ public class FileServiceImpl implements FileService {
       String minioPath = storageService.uploadFile(file, fileName);
       log.info("DEBUG: Returned minioPath: {}", minioPath);
 
+      // Count packets up front (best-effort) so the loading view can show a packet-based time
+      // estimate immediately, before analysis has run. Overwritten with the exact count on completion.
+      Integer packetCount = countPackets(file);
+
       // Save metadata to database
       FileEntity fileEntity =
           FileEntity.builder()
               .id(fileId)
               .fileName(originalFilename)
               .fileSize(file.getSize())
+              .packetCount(packetCount)
               .minioPath(minioPath)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -319,6 +327,7 @@ public class FileServiceImpl implements FileService {
               .id(newFileId)
               .fileName(mergedName)
               .fileSize(tempOutput.length())
+              .packetCount(countPackets(tempOutput))
               .minioPath(storedName)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -402,6 +411,77 @@ public class FileServiceImpl implements FileService {
       return HexFormat.of().formatHex(digest.digest());
     } catch (Exception e) {
       throw new InvalidFileException("Could not compute hash of merged file", e);
+    }
+  }
+
+  // capinfos machine-readable output line: "Number of packets:   21364"
+  private static final Pattern PACKET_COUNT_PATTERN =
+      Pattern.compile("Number of packets:\\s*(\\d+)");
+
+  /**
+   * Counts packets in an uploaded capture by streaming it through {@code capinfos -M -c -} (reads
+   * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate up
+   * front — cost tracks packets, not bytes. Best-effort: any failure returns {@code null} and the
+   * estimate falls back to a size-based one. Never throws.
+   */
+  private Integer countPackets(MultipartFile file) {
+    Process process = null;
+    try {
+      process =
+          new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
+      final Process p = process;
+      // Feed the capture into capinfos stdin on a daemon thread so we can read stdout concurrently
+      // (avoids a pipe-buffer deadlock). A broken pipe (capinfos closing stdin early) is expected.
+      Thread feeder =
+          new Thread(
+              () -> {
+                try (InputStream in = file.getInputStream();
+                    OutputStream out = p.getOutputStream()) {
+                  in.transferTo(out);
+                } catch (IOException ignored) {
+                  // capinfos may close stdin before consuming everything — not an error for -c
+                }
+              });
+      feeder.setDaemon(true);
+      feeder.start();
+
+      String output = new String(process.getInputStream().readAllBytes());
+      boolean finished = process.waitFor(60, TimeUnit.SECONDS);
+      if (!finished) {
+        process.destroyForcibly();
+        return null;
+      }
+      feeder.join(2000);
+      if (process.exitValue() != 0) return null;
+      Matcher m = PACKET_COUNT_PATTERN.matcher(output);
+      return m.find() ? Integer.parseInt(m.group(1)) : null;
+    } catch (Exception e) {
+      log.warn("capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
+      if (process != null) process.destroyForcibly();
+      return null;
+    }
+  }
+
+  /** Packet count for a local capture file via {@code capinfos -M -c <path>}. Best-effort. */
+  private Integer countPackets(File file) {
+    Process process = null;
+    try {
+      process =
+          new ProcessBuilder("capinfos", "-M", "-c", file.getAbsolutePath())
+              .redirectErrorStream(false)
+              .start();
+      String output = new String(process.getInputStream().readAllBytes());
+      if (!process.waitFor(60, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return null;
+      }
+      if (process.exitValue() != 0) return null;
+      Matcher m = PACKET_COUNT_PATTERN.matcher(output);
+      return m.find() ? Integer.parseInt(m.group(1)) : null;
+    } catch (Exception e) {
+      log.warn("capinfos packet count failed for {}: {}", file.getName(), e.getMessage());
+      if (process != null) process.destroyForcibly();
+      return null;
     }
   }
 

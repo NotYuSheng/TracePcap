@@ -35,6 +35,11 @@ public class FileMetadataDto {
 
   private boolean enableFileExtraction;
 
+  // Rough pre-analysis time estimate (seconds), derived from file size and which analysis stages
+  // are effectively enabled for this file (nDPI / Suricata / file extraction). Lets the loading
+  // view show an estimate that reflects the user's upload choices instead of a size-only guess.
+  private Integer estimatedAnalysisSeconds;
+
   private Integer packetCount;
 
   private Long duration;
