@@ -419,6 +419,11 @@ public class FileServiceImpl implements FileService {
   private static final Pattern PACKET_COUNT_PATTERN =
       Pattern.compile("Number of packets:\\s*(\\d+)");
 
+  // Short bound for the best-effort packet count: capinfos -c only scans record headers and is fast
+  // even on large files, and this runs on the request thread inside the upload/merge transaction, so
+  // it must never hold resources long. On timeout we give up and fall back to the size-based estimate.
+  private static final int CAPINFOS_TIMEOUT_SECONDS = 15;
+
   /**
    * Counts packets in an uploaded capture by streaming it through {@code capinfos -M -c -} (reads
    * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate up
@@ -450,7 +455,7 @@ public class FileServiceImpl implements FileService {
       feeder.setDaemon(true);
       feeder.start();
 
-      if (!process.waitFor(60, TimeUnit.SECONDS)) {
+      if (!process.waitFor(CAPINFOS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         process.destroyForcibly();
         return null;
       }
@@ -477,7 +482,7 @@ public class FileServiceImpl implements FileService {
       // Drain stdout on a daemon thread so a hung capinfos can't block past waitFor's timeout.
       StringBuilder output = new StringBuilder();
       Thread reader = drainStdout(process, output);
-      if (!process.waitFor(60, TimeUnit.SECONDS)) {
+      if (!process.waitFor(CAPINFOS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         process.destroyForcibly();
         return null;
       }
