@@ -88,8 +88,13 @@ export const PROTOCOL_ALIASES: Record<string, string> = {
  *   2. explicit alias in PROTOCOL_ALIASES
  *   3. strip a trailing version suffix (V2, v1.2, " 2") and retry the base
  *   4. otherwise the uppercased name itself (an unmapped protocol)
+ *
+ * Tolerates missing/malformed values (null/undefined/non-string) by returning '',
+ * which resolves to DEFAULT_EDGE_COLOR / the "Other" legend bucket — an edge with
+ * no protocol must never crash the whole graph render.
  */
-export function normalizeProtocol(protocol: string): string {
+export function normalizeProtocol(protocol: string | null | undefined): string {
+  if (typeof protocol !== 'string' || protocol === '') return '';
   const upper = protocol.toUpperCase();
   if (upper in PROTOCOL_COLORS) return upper;
   if (upper in PROTOCOL_ALIASES) return PROTOCOL_ALIASES[upper];

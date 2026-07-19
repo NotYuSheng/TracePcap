@@ -300,7 +300,9 @@ export function edgeBytesRange(edges: GraphEdge[]): { min: number; max: number }
  * they cross each other. Mirrors the reference implementation from `@sigma/edge-curve`.
  */
 function getCurvature(index: number, maxIndex: number): number {
-  if (maxIndex <= 0) return 0;
+  // `!maxIndex` also rejects undefined/null/NaN (a missing parallel-index attribute) — those would
+  // otherwise sail past `<= 0` and produce NaN curvature.
+  if (!maxIndex || maxIndex <= 0) return 0;
   if (index < 0) return -getCurvature(-index, maxIndex);
   const amplitude = 3.5;
   const maxCurvature = (amplitude * (1 - Math.exp(-maxIndex / amplitude))) / maxIndex;
@@ -719,7 +721,9 @@ export const NetworkGraph = memo(function NetworkGraph({
             // would show overlapping straight lines again. Same control point Sigma uses: the
             // midpoint offset perpendicular to the edge by `curvature` (#497).
             const curvature = (attrs['curvature'] as number) ?? 0;
-            if (attrs['type'] === 'curved' && curvature !== 0) {
+            // Number.isFinite guards against a NaN curvature (missing/malformed index) reaching
+            // quadraticCurveTo, which would silently drop the stroke.
+            if (attrs['type'] === 'curved' && Number.isFinite(curvature) && curvature !== 0) {
               const cx = (s.x + t.x) / 2 + (t.y - s.y) * curvature;
               const cy = (s.y + t.y) / 2 - (t.x - s.x) * curvature;
               labelCtx.quadraticCurveTo(cx, cy, t.x, t.y);
