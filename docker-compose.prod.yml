@@ -38,6 +38,11 @@ services:
       TZ: Asia/Singapore
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      # Persist Keycloak's embedded H2 store so accounts/credentials created at
+      # runtime in the admin console survive container restart/recreate. Without
+      # this, start-dev keeps its data inside the container and every recreate
+      # wipes all users, forcing a re-import of only the realm-export.json seed.
+      - keycloak_data:/opt/keycloak/data
     networks:
       - tracepcap-network
 
@@ -64,3 +69,7 @@ services:
     depends_on:
       - backend
       - keycloak
+
+volumes:
+  keycloak_data:
+    driver: local
