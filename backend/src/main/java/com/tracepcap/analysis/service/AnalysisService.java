@@ -93,6 +93,12 @@ public class AnalysisService {
    * only — it never claims interior progress on an opaque external stage.
    */
   private void reportStage(UUID fileId, List<StageStep> plan, int index) {
+    // Defensive: indices are hardcoded at the call sites against buildStagePlan. A mismatch (e.g. a
+    // stage added/removed without updating both) should degrade to no progress, not crash analysis.
+    if (index < 0 || index >= plan.size()) {
+      log.warn("reportStage: index {} out of range for plan of size {}", index, plan.size());
+      return;
+    }
     int totalWeight = plan.stream().mapToInt(StageStep::weight).sum();
     int doneWeight = 0;
     for (int i = 0; i < index; i++) doneWeight += plan.get(i).weight();
@@ -403,6 +409,10 @@ public class AnalysisService {
 
     } catch (Exception e) {
       log.error("Error analyzing file {}: {}", fileId, e.getMessage(), e);
+
+      // Clear progress on every failure path, including ones that never reached the inner finally
+      // (e.g. createTempFile throwing after the first reportStage). Idempotent — safe if already done.
+      analysisProgressService.clear(fileId);
 
       // Mark analysis and file as FAILED in a separate committed transaction so the status persists
       // even though the outer transaction is being rolled back.

@@ -16,6 +16,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -430,6 +431,10 @@ public class FileServiceImpl implements FileService {
       process =
           new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
       final Process p = process;
+      // Drain stdout on a daemon thread so waitFor's timeout is honoured even if capinfos hangs
+      // without closing stdout (a blocking readAllBytes here would bypass the timeout entirely).
+      StringBuilder output = new StringBuilder();
+      Thread reader = drainStdout(p, output);
       // Feed the capture into capinfos stdin on a daemon thread so we can read stdout concurrently
       // (avoids a pipe-buffer deadlock). A broken pipe (capinfos closing stdin early) is expected.
       Thread feeder =
@@ -445,15 +450,14 @@ public class FileServiceImpl implements FileService {
       feeder.setDaemon(true);
       feeder.start();
 
-      String output = new String(process.getInputStream().readAllBytes());
-      boolean finished = process.waitFor(60, TimeUnit.SECONDS);
-      if (!finished) {
+      if (!process.waitFor(60, TimeUnit.SECONDS)) {
         process.destroyForcibly();
         return null;
       }
       feeder.join(2000);
+      reader.join(2000);
       if (process.exitValue() != 0) return null;
-      Matcher m = PACKET_COUNT_PATTERN.matcher(output);
+      Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
       return m.find() ? Integer.parseInt(m.group(1)) : null;
     } catch (Exception e) {
       log.warn("capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
@@ -470,19 +474,38 @@ public class FileServiceImpl implements FileService {
           new ProcessBuilder("capinfos", "-M", "-c", file.getAbsolutePath())
               .redirectErrorStream(false)
               .start();
-      String output = new String(process.getInputStream().readAllBytes());
+      // Drain stdout on a daemon thread so a hung capinfos can't block past waitFor's timeout.
+      StringBuilder output = new StringBuilder();
+      Thread reader = drainStdout(process, output);
       if (!process.waitFor(60, TimeUnit.SECONDS)) {
         process.destroyForcibly();
         return null;
       }
+      reader.join(2000);
       if (process.exitValue() != 0) return null;
-      Matcher m = PACKET_COUNT_PATTERN.matcher(output);
+      Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
       return m.find() ? Integer.parseInt(m.group(1)) : null;
     } catch (Exception e) {
       log.warn("capinfos packet count failed for {}: {}", file.getName(), e.getMessage());
       if (process != null) process.destroyForcibly();
       return null;
     }
+  }
+
+  /** Reads a process's stdout into {@code sink} on a started daemon thread (UTF-8). */
+  private Thread drainStdout(Process process, StringBuilder sink) {
+    Thread reader =
+        new Thread(
+            () -> {
+              try (InputStream in = process.getInputStream()) {
+                sink.append(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+              } catch (IOException ignored) {
+                // best-effort: caller treats missing output as an unparseable count → null
+              }
+            });
+    reader.setDaemon(true);
+    reader.start();
+    return reader;
   }
 
   /** Compute SHA-256 hex digest of the uploaded file using a streaming approach */
