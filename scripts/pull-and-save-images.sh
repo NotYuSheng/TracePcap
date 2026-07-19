@@ -64,6 +64,40 @@ mapfile -t DOCKERHUB_IMAGES < <(
   sort -u
 )
 
+# Optionally include Keycloak, for an authenticated offline deployment. The image
+# tag is read from docker-compose.prod.yml (the auth overlay) so it never drifts.
+# Appending to DOCKERHUB_IMAGES means the pull and save loops below both pick it
+# up automatically. Set INCLUDE_KEYCLOAK=true|false to skip the prompt (e.g. CI).
+PROD_COMPOSE="$ROOT_DIR/docker-compose.prod.yml"
+KEYCLOAK_IMAGE="$(
+  grep -E '^[[:space:]]*image:[[:space:]]*.*keycloak' "$PROD_COMPOSE" 2>/dev/null | \
+  sed -E 's/^[[:space:]]*image:[[:space:]]*"?([^" #]+)"?.*/\1/' | head -n1
+)"
+
+want_keycloak() {
+  [ -n "$KEYCLOAK_IMAGE" ] || return 1
+  # Explicit override wins (true/1/yes vs anything else).
+  if [ -n "${INCLUDE_KEYCLOAK:-}" ]; then
+    case "${INCLUDE_KEYCLOAK,,}" in true|1|yes|y) return 0 ;; *) return 1 ;; esac
+  fi
+  # No TTY (piped/CI) and no override: default to excluding, so existing automated
+  # runs are unchanged.
+  if [ ! -t 0 ]; then
+    echo "  (no TTY; skipping Keycloak — set INCLUDE_KEYCLOAK=true to include it)"
+    return 1
+  fi
+  local reply=""
+  read -r -p "  Include Keycloak ($KEYCLOAK_IMAGE) for authenticated offline use? [y/N] " reply || true
+  case "$reply" in [yY]|[yY][eE][sS]) return 0 ;; *) return 1 ;; esac
+}
+
+SAVE_KEYCLOAK=0
+if want_keycloak; then
+  echo "  Including Keycloak: $KEYCLOAK_IMAGE"
+  DOCKERHUB_IMAGES+=("$KEYCLOAK_IMAGE")
+  SAVE_KEYCLOAK=1
+fi
+
 for img in "${DOCKERHUB_IMAGES[@]}"; do
   echo "  Pulling $img (Docker Hub)..."
   docker pull "$img"
@@ -119,5 +153,13 @@ echo "Then on the offline machine run:"
 echo "  bash scripts/load-images.sh"
 echo "  docker compose -f docker-compose.offline.yml up -d"
 echo ""
+if [ "$SAVE_KEYCLOAK" = "1" ]; then
+  echo "Keycloak image was saved. To run auth offline you must ALSO transfer:"
+  echo "  keycloak/realm-export.json"
+  echo "and start with an auth-enabled compose (add the Keycloak service + auth env,"
+  echo "and rebuild nginx with the VITE_AUTH_* args). Saving the image alone is not"
+  echo "enough — see docs/configuration/authentication.rst."
+  echo ""
+fi
 echo "To refresh nDPI: rebuild the backend image (it installs the latest nDPI),"
 echo "re-run this script, transfer images/tracepcap-backend.tar, and load-images.sh."
