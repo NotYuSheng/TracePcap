@@ -71,14 +71,14 @@ mapfile -t DOCKERHUB_IMAGES < <(
 PROD_COMPOSE="$ROOT_DIR/docker-compose.prod.yml"
 KEYCLOAK_IMAGE="$(
   grep -E '^[[:space:]]*image:[[:space:]]*.*keycloak' "$PROD_COMPOSE" 2>/dev/null | \
-  sed -E 's/^[[:space:]]*image:[[:space:]]*"?([^" #]+)"?.*/\1/' | head -n1
+  sed -E 's/^[[:space:]]*image:[[:space:]]*"?([^" #]+)"?.*/\1/' | head -n1 || true
 )"
 
 want_keycloak() {
   [ -n "$KEYCLOAK_IMAGE" ] || return 1
   # Explicit override wins (true/1/yes vs anything else).
   if [ -n "${INCLUDE_KEYCLOAK:-}" ]; then
-    case "${INCLUDE_KEYCLOAK,,}" in true|1|yes|y) return 0 ;; *) return 1 ;; esac
+    case "$INCLUDE_KEYCLOAK" in [tT][rR][uU][eE]|1|[yY][eE][sS]|[yY]) return 0 ;; *) return 1 ;; esac
   fi
   # No TTY (piped/CI) and no override: default to excluding, so existing automated
   # runs are unchanged.
