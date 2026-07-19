@@ -119,7 +119,10 @@ setting ``PUBLIC_URL`` to the exact origin you browse to (scheme + host + port):
 .. warning::
    ``PUBLIC_URL`` does **not** track ``NGINX_PORT`` (default
    ``http://localhost:8888``). It pins Keycloak's token issuer and the backend's
-   issuer check, so the browser must load the app via this same origin.
+   issuer check, so the browser must load the app via this same origin. Do **not**
+   include a trailing slash (use ``http://<host>:8888``, not
+   ``http://<host>:8888/``) — it produces a double slash in the issuer URI and
+   breaks JWT validation.
 
 Create and manage logins at ``<PUBLIC_URL>/admin`` — see
 :doc:`../configuration/user-management`. The default demo login is
