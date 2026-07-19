@@ -7,8 +7,9 @@ export const API_ENDPOINTS = {
   FILE_DOWNLOAD: (fileId: string) => `/files/${fileId}/download`,
   FILES_MERGE: '/files/merge',
 
-  // Analysis (Not yet implemented in backend)
+  // Analysis
   ANALYSIS_SUMMARY: (fileId: string) => `/analysis/${fileId}/summary`,
+  ANALYSIS_PROGRESS: (fileId: string) => `/analysis/${fileId}/progress`,
   PROTOCOL_STATS: (fileId: string) => `/analysis/${fileId}/protocols`,
   FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
   KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,

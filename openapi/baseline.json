@@ -19,6 +19,26 @@
         ],
         "type": "object"
       },
+      "AnalysisProgressResponse": {
+        "properties": {
+          "percent": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "stageIndex": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalStages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "AnalysisSummaryResponse": {
         "properties": {
           "analysisId": {
@@ -1324,6 +1344,10 @@
           "endTime": {
             "format": "date-time",
             "type": "string"
+          },
+          "estimatedAnalysisSeconds": {
+            "format": "int32",
+            "type": "integer"
           },
           "fileId": {
             "type": "string"
@@ -3419,6 +3443,38 @@
   },
   "openapi": "3.0.1",
   "paths": {
+    "/api/v1/analysis/{fileId}/progress": {
+      "get": {
+        "operationId": "getAnalysisProgress",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisProgressResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Live analysis progress (204 when no run is being tracked)",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
     "/api/v1/analysis/{fileId}/protocols": {
       "get": {
         "operationId": "getProtocolStats",

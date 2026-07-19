@@ -15,6 +15,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -26,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -85,12 +89,17 @@ public class FileServiceImpl implements FileService {
       String minioPath = storageService.uploadFile(file, fileName);
       log.info("DEBUG: Returned minioPath: {}", minioPath);
 
+      // Count packets up front (best-effort) so the loading view can show a packet-based time
+      // estimate immediately, before analysis has run. Overwritten with the exact count on completion.
+      Integer packetCount = countPackets(file);
+
       // Save metadata to database
       FileEntity fileEntity =
           FileEntity.builder()
               .id(fileId)
               .fileName(originalFilename)
               .fileSize(file.getSize())
+              .packetCount(packetCount)
               .minioPath(minioPath)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -319,6 +328,7 @@ public class FileServiceImpl implements FileService {
               .id(newFileId)
               .fileName(mergedName)
               .fileSize(tempOutput.length())
+              .packetCount(countPackets(tempOutput))
               .minioPath(storedName)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -403,6 +413,104 @@ public class FileServiceImpl implements FileService {
     } catch (Exception e) {
       throw new InvalidFileException("Could not compute hash of merged file", e);
     }
+  }
+
+  // capinfos machine-readable output line: "Number of packets:   21364"
+  private static final Pattern PACKET_COUNT_PATTERN =
+      Pattern.compile("Number of packets:\\s*(\\d+)");
+
+  // Short bound for the best-effort packet count: capinfos -c only scans record headers and is fast
+  // even on large files, and this runs on the request thread inside the upload/merge transaction, so
+  // it must never hold resources long. On timeout we give up and fall back to the size-based estimate.
+  private static final int CAPINFOS_TIMEOUT_SECONDS = 15;
+
+  /**
+   * Counts packets in an uploaded capture by streaming it through {@code capinfos -M -c -} (reads
+   * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate up
+   * front — cost tracks packets, not bytes. Best-effort: any failure returns {@code null} and the
+   * estimate falls back to a size-based one. Never throws.
+   */
+  private Integer countPackets(MultipartFile file) {
+    Process process = null;
+    try {
+      process =
+          new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
+      final Process p = process;
+      // Drain stdout on a daemon thread so waitFor's timeout is honoured even if capinfos hangs
+      // without closing stdout (a blocking readAllBytes here would bypass the timeout entirely).
+      StringBuilder output = new StringBuilder();
+      Thread reader = drainStdout(p, output);
+      // Feed the capture into capinfos stdin on a daemon thread so we can read stdout concurrently
+      // (avoids a pipe-buffer deadlock). A broken pipe (capinfos closing stdin early) is expected.
+      Thread feeder =
+          new Thread(
+              () -> {
+                try (InputStream in = file.getInputStream();
+                    OutputStream out = p.getOutputStream()) {
+                  in.transferTo(out);
+                } catch (IOException ignored) {
+                  // capinfos may close stdin before consuming everything — not an error for -c
+                }
+              });
+      feeder.setDaemon(true);
+      feeder.start();
+
+      if (!process.waitFor(CAPINFOS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return null;
+      }
+      feeder.join(2000);
+      reader.join(2000);
+      if (process.exitValue() != 0) return null;
+      Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
+      return m.find() ? Integer.parseInt(m.group(1)) : null;
+    } catch (Exception e) {
+      log.warn("capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
+      if (process != null) process.destroyForcibly();
+      return null;
+    }
+  }
+
+  /** Packet count for a local capture file via {@code capinfos -M -c <path>}. Best-effort. */
+  private Integer countPackets(File file) {
+    Process process = null;
+    try {
+      process =
+          new ProcessBuilder("capinfos", "-M", "-c", file.getAbsolutePath())
+              .redirectErrorStream(false)
+              .start();
+      // Drain stdout on a daemon thread so a hung capinfos can't block past waitFor's timeout.
+      StringBuilder output = new StringBuilder();
+      Thread reader = drainStdout(process, output);
+      if (!process.waitFor(CAPINFOS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return null;
+      }
+      reader.join(2000);
+      if (process.exitValue() != 0) return null;
+      Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
+      return m.find() ? Integer.parseInt(m.group(1)) : null;
+    } catch (Exception e) {
+      log.warn("capinfos packet count failed for {}: {}", file.getName(), e.getMessage());
+      if (process != null) process.destroyForcibly();
+      return null;
+    }
+  }
+
+  /** Reads a process's stdout into {@code sink} on a started daemon thread (UTF-8). */
+  private Thread drainStdout(Process process, StringBuilder sink) {
+    Thread reader =
+        new Thread(
+            () -> {
+              try (InputStream in = process.getInputStream()) {
+                sink.append(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+              } catch (IOException ignored) {
+                // best-effort: caller treats missing output as an unparseable count → null
+              }
+            });
+    reader.setDaemon(true);
+    reader.start();
+    return reader;
   }
 
   /** Compute SHA-256 hex digest of the uploaded file using a streaming approach */
