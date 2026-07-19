@@ -19,6 +19,10 @@ export async function uploadAndProcessFixture(request: APIRequestContext): Promi
         buffer: fs.readFileSync(FIXTURE_PCAP),
       },
       enableNdpi: 'true',
+      // Suricata defaults to on at the API, but loading the Emerging Threats ruleset adds ~60s
+      // per analysis — enough to blow this smoke test's processing deadline and make it flaky.
+      // These tests only need a *completed* file to reach the Story/Filter tabs, so skip the IDS.
+      enableSuricata: 'false',
       enableFileExtraction: 'true',
       source: 'ANALYSIS',
     },
