@@ -278,6 +278,8 @@ public class DeviceClassifierService implements HostClassifier {
         p.measuredResponses++;
         Integer myPort = isSrc ? conv.getSrcPort() : conv.getDstPort();
         if (myPort != null) p.respondedOnPorts.add(myPort);
+        // The app is one this host SERVED, not merely spoke — gate server/IoT app votes on it (#539).
+        if (app != null && !app.isBlank()) p.servedApps.add(app);
       }
     }
   }
