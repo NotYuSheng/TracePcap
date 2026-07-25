@@ -28,6 +28,14 @@ public class HostProfile {
   public final Set<Integer> respondedOnPorts = new LinkedHashSet<>();
 
   public final Set<String> apps = new LinkedHashSet<>();
+
+  /**
+   * Apps this host was observed <b>serving</b> — the app of a flow on which this host was the
+   * MEASURED responder. A subset of {@link #apps}: an endpoint-agnostic protocol name (DNS, SMB,
+   * MDNS, …) lands here only for the side that answered, never for the side that queried. Server/IoT
+   * app signals must key off this set, not {@link #apps}, or a DNS client scores as a DNS server (#539).
+   */
+  public final Set<String> servedApps = new LinkedHashSet<>();
   public final Set<String> categories = new LinkedHashSet<>();
   public final Set<String> peers = new LinkedHashSet<>();
 }
