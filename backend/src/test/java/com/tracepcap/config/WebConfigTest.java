@@ -48,15 +48,18 @@ class WebConfigTest {
     verify(registry, never()).addMapping(org.mockito.ArgumentMatchers.anyString());
   }
 
+  private CorsRegistration fluentRegistration() {
+    return mock(CorsRegistration.class, invocation ->
+        // Fluent builder — every chained call returns the same registration.
+        invocation.getMethod().getReturnType().equals(CorsRegistration.class)
+            ? invocation.getMock()
+            : null);
+  }
+
   @Test
   void configuredOriginsRegisterCorsMapping() {
     CorsRegistry registry = mock(CorsRegistry.class);
-    CorsRegistration registration = mock(CorsRegistration.class, invocation -> {
-      // Fluent builder — every chained call returns the same registration.
-      return invocation.getMethod().getReturnType().equals(CorsRegistration.class)
-          ? invocation.getMock()
-          : null;
-    });
+    CorsRegistration registration = fluentRegistration();
     when(registry.addMapping("/api/**")).thenReturn(registration);
 
     webConfigWith("https://app.example.com,https://admin.example.com")
@@ -65,5 +68,30 @@ class WebConfigTest {
     verify(registry).addMapping("/api/**");
     verify(registration)
         .allowedOrigins("https://app.example.com", "https://admin.example.com");
+  }
+
+  @Test
+  void originsAreTrimmedAndEmptyTokensDropped() {
+    CorsRegistry registry = mock(CorsRegistry.class);
+    CorsRegistration registration = fluentRegistration();
+    when(registry.addMapping("/api/**")).thenReturn(registration);
+
+    // Whitespace around the comma + leading/trailing/duplicated commas.
+    webConfigWith(" https://app.example.com , https://admin.example.com ,, ")
+        .addCorsMappings(registry);
+
+    // Each origin registered without surrounding whitespace, no empty tokens.
+    verify(registration)
+        .allowedOrigins("https://app.example.com", "https://admin.example.com");
+  }
+
+  @Test
+  void whitespaceAndCommaOnlyOriginsRegisterNoMapping() {
+    CorsRegistry registry = mock(CorsRegistry.class);
+
+    // Only separators/whitespace → no valid origin → no mapping.
+    webConfigWith(" , , ").addCorsMappings(registry);
+
+    verify(registry, never()).addMapping(org.mockito.ArgumentMatchers.anyString());
   }
 }

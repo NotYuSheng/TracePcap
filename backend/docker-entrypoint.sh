@@ -25,9 +25,25 @@ chmod 664 /app/config/signatures.yml 2>/dev/null || true
 # Ensure the log directory exists and is writable by the spring user. The prod Spring profile
 # logs to a file (${LOG_DIR}/application.log, default /app/logs); the default dev profile is
 # console-only so this is a harmless no-op there. Runs as root so it can create + chown it.
-export LOG_DIR=${LOG_DIR:-/app/logs}
-mkdir -p "${LOG_DIR}"
-chown spring:spring "${LOG_DIR}" 2>/dev/null || true
+#
+# Fail fast rather than swallow errors: an immutable mount, a read-only volume, or a dir
+# pre-owned by another user would otherwise let the app boot with no file logging or crash
+# deep inside Logback init. Verify the spring user can actually create the log file before exec.
+export LOG_DIR="${LOG_DIR:-/app/logs}"
+if ! mkdir -p "${LOG_DIR}"; then
+  echo "FATAL: cannot create log directory ${LOG_DIR}" >&2
+  exit 1
+fi
+if ! chown spring:spring "${LOG_DIR}"; then
+  echo "FATAL: cannot chown log directory ${LOG_DIR} to spring:spring (immutable/read-only mount, or owned by another user?)" >&2
+  exit 1
+fi
+# Prove the spring user can actually create a file in the dir the prod profile will log into,
+# then clean up the probe. Catches read-only/immutable mounts that survive mkdir + chown.
+if ! gosu spring sh -c "touch \"${LOG_DIR}/.write-probe\" && rm -f \"${LOG_DIR}/.write-probe\""; then
+  echo "FATAL: spring user cannot write into log directory ${LOG_DIR}" >&2
+  exit 1
+fi
 
 echo "TracePcap backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
