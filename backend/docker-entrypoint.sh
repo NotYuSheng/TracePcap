@@ -28,26 +28,37 @@ elif [ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
 fi
 
 case "$CGROUP_LIMIT_BYTES" in
-  # Unlimited ("max", empty, or an implausibly large v1 sentinel): no enforced limit to read.
-  ''|max|[0-9]*[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+  # Unlimited ("max", empty, or the cgroup v1 no-limit sentinel): no enforced limit to read.
+  # v1 reports PAGE_COUNTER_MAX (LONG_MAX rounded down to a page multiple), which varies with page
+  # size, so match the two known 19-digit forms rather than a length-based glob.
+  ''|max|9223372036854771712|9223372036854775807)
     MEM_MODE="APP_MEMORY_MB (no container memory limit detected)"
-    JVM_HEAP_MB=$(( MEM * JVM_HEAP_PERCENT / 100 ))
+    EFFECTIVE_MEM_MB=${MEM}
+    JVM_HEAP_MB=$(( EFFECTIVE_MEM_MB * JVM_HEAP_PERCENT / 100 ))
     JVM_MEM_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m"
     ;;
   *)
-    MEM_MODE="cgroup limit ($(( CGROUP_LIMIT_BYTES / 1024 / 1024 )) MB)"
-    JVM_HEAP_MB=$(( CGROUP_LIMIT_BYTES / 1024 / 1024 * JVM_HEAP_PERCENT / 100 ))
+    EFFECTIVE_MEM_MB=$(( CGROUP_LIMIT_BYTES / 1024 / 1024 ))
+    MEM_MODE="cgroup limit (${EFFECTIVE_MEM_MB} MB)"
+    JVM_HEAP_MB=$(( EFFECTIVE_MEM_MB * JVM_HEAP_PERCENT / 100 ))
     # InitialRAMPercentage mirrors Max so the heap is still pre-committed, matching the previous
     # -Xms == -Xmx behaviour (no heap-growth pauses mid-analysis).
     JVM_MEM_OPTS="-XX:InitialRAMPercentage=${JVM_HEAP_PERCENT} -XX:MaxRAMPercentage=${JVM_HEAP_PERCENT}"
     ;;
 esac
 
-# Max upload = 25% of APP_MEMORY_MB, expressed in bytes
-MAX_UPLOAD_BYTES=$(( MEM * 25 / 100 * 1024 * 1024 ))
+# Everything below derives from EFFECTIVE_MEM_MB — the budget actually enforced on this container —
+# NOT from APP_MEMORY_MB. These must not diverge: if the cgroup limit is lowered below
+# APP_MEMORY_MB (e.g. BACKEND_MEM_LIMIT=1g with APP_MEMORY_MB=2048), sizing the upload from
+# APP_MEMORY_MB would permit a 512 MB upload inside a 1024 MB container whose heap already claims
+# 512 MB — consuming the entire native headroom this change exists to protect. Deriving both from
+# the same effective budget keeps the 50/25 split coherent at any limit.
+#
+# Max upload = 25% of the effective budget, expressed in bytes
+MAX_UPLOAD_BYTES=$(( EFFECTIVE_MEM_MB * 25 / 100 * 1024 * 1024 ))
 
-# Analysis/proxy timeout: 45% of APP_MEMORY_MB, clamped to [300, 900] seconds
-TIMEOUT=$(( MEM * 45 / 100 ))
+# Analysis/proxy timeout: 45% of the effective budget, clamped to [300, 900] seconds
+TIMEOUT=$(( EFFECTIVE_MEM_MB * 45 / 100 ))
 if [ "$TIMEOUT" -lt 300 ]; then TIMEOUT=300; fi
 if [ "$TIMEOUT" -gt 900 ]; then TIMEOUT=900; fi
 
@@ -85,6 +96,11 @@ fi
 echo "TracePcap backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
 echo "  Memory budget from   = ${MEM_MODE}"
+echo "  Effective budget     = ${EFFECTIVE_MEM_MB} MB (drives heap, upload and timeout)"
+if [ "${EFFECTIVE_MEM_MB}" -ne "${MEM}" ]; then
+  echo "  NOTE: the enforced container limit differs from APP_MEMORY_MB (${MEM} MB); the enforced"
+  echo "        limit wins so upload/timeout stay in proportion to the memory actually available."
+fi
 echo "  JVM heap             = ${JVM_HEAP_MB} MB (${JVM_HEAP_PERCENT}% of budget)"
 echo "  Native headroom      = $(( 100 - JVM_HEAP_PERCENT ))% for JVM non-heap + tshark/ndpi/Suricata"
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"

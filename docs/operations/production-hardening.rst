@@ -165,6 +165,13 @@ Sizing
 ``BACKEND_MEM_LIMIT`` defaults to ``APP_MEMORY_MB``, so raising the latter raises
 the enforced limit in step and the two cannot silently diverge.
 
+If you do set ``BACKEND_MEM_LIMIT`` explicitly, the **enforced limit wins**: the
+heap, the max upload size and the analysis timeout are all derived from it rather
+than from ``APP_MEMORY_MB``, and the startup banner reports the mismatch. This
+matters because the alternative is unsafe — sizing the upload from a larger
+``APP_MEMORY_MB`` while the kernel enforces a smaller cap would let a single
+upload consume the whole native headroom this section exists to protect.
+
 .. list-table::
    :header-rows: 1
    :widths: 18 16 16 16 34
@@ -201,7 +208,8 @@ the enforced limit in step and the two cannot silently diverge.
      - 2
      - Auth overlays only.
 
-Totals ``~5.4 GB`` for the default stack, ``~6.4 GB`` with an auth overlay.
+Totals ``~4.4 GB`` for the default stack, ``~5.4 GB`` with an auth overlay
+(including the 128 MB ``minio-init`` bootstrap job).
 
 Every value is overridable, e.g. for a 4-core / 8 GB host:
 
