@@ -1,0 +1,23 @@
+/* Peer-row affordance in the graph Connections table (GraphNodeDetailsSection). */
+.node-details-peer-row {
+  cursor: pointer;
+}
+.node-details-peer-icon {
+  font-size: 0.7rem;
+}
+.node-details-hostname {
+  font-size: 0.85rem;
+}
+
+/* Nested modals (add-evidence, evidence explainer, role help) opened from within this modal, which
+   itself renders as a raised overlay in monitor/graph mode. These must sit above it so they aren't
+   hidden behind the parent panel (modal-in-modal). React-Bootstrap sets its own INLINE z-index on
+   the .modal/.modal-backdrop elements, so !important is required to win over it.
+   (Previously these lived in NodeDetails.css and only loaded when the graph node panel was on the
+   page — now they ship with the shared modal, so the conversation/monitor paths get them too.) */
+.tp-nested-modal {
+  z-index: 2000 !important;
+}
+.tp-nested-modal-backdrop {
+  z-index: 1990 !important;
+}

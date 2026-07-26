@@ -8,7 +8,7 @@ import type { GraphNode } from '@/features/network/types';
 import { useCompareData } from '@/features/network/hooks/useCompareData';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { NetworkControls } from '@components/network/NetworkControls';
-import { NodeDetails } from '@components/network/NodeDetails';
+import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { apiClient } from '@/services/api/client';
@@ -645,14 +645,16 @@ export const ComparePage = () => {
       </div>
 
       {selectedNode && (
-        <NodeDetails
-          node={selectedNode}
-          edges={mergedEdges}
+        <EntityDetailModal
+          {...graphNodeEntity(selectedNode)}
           fileId={
             selectedNode.data.sources?.[0]
               ? (fileIds[labels.indexOf(selectedNode.data.sources[0])] ?? fileIds[0])
               : fileIds[0]
           }
+          graphNode={selectedNode}
+          graphEdges={mergedEdges}
+          onNavigate={navigate}
           onClose={() => setSelectedNode(null)}
         />
       )}
