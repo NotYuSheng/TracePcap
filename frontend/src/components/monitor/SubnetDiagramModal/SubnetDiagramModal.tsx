@@ -3,6 +3,7 @@ import { Modal, Button, Form } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { ipInCidr } from '@/utils/ipClassification';
 import { apiClient } from '@/services/api/client';
 import { networkService } from '@/features/network/services/networkService';
 import { conversationService } from '@/features/conversation/services/conversationService';
@@ -26,21 +27,6 @@ interface HostClassification {
   deviceType: string | null;
   confidence: number | null;
   ttl: number | null;
-}
-
-function ipToInt(ip: string): number {
-  const parts = ip.split('.').map(Number);
-  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
-}
-
-function ipInCidr(ip: string, cidr: string): boolean {
-  try {
-    const [base, bits] = cidr.split('/');
-    const mask = bits ? (0xffffffff << (32 - parseInt(bits))) >>> 0 : 0xffffffff;
-    return (ipToInt(ip) & mask) === (ipToInt(base) & mask);
-  } catch {
-    return false;
-  }
 }
 
 export function SubnetDiagramModal({ subnet, snapshots, onHide, defaultSnapId }: SubnetDiagramModalProps) {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import type { GraphNode } from '@/features/network/types';
@@ -20,7 +20,7 @@ import type { VolumePair } from '@components/network/VolumeHeatmap';
 import { VolumeLegend } from '@components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
 import { NetworkControls } from '@components/network/NetworkControls';
-import { NodeDetails } from '@components/network/NodeDetails';
+import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
@@ -56,6 +56,7 @@ export const NetworkDiagramPage = () => {
   const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } =
     useNetworkData(fileId, data, nodeLimit);
 
+  const navigate = useNavigate();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
   const toggleGhostFilter = toggleSet(setActiveGhostFilters);
@@ -686,10 +687,12 @@ export const NetworkDiagramPage = () => {
       </Card>
 
       {selectedNode && (
-        <NodeDetails
-          node={selectedNode}
-          edges={edges}
+        <EntityDetailModal
+          {...graphNodeEntity(selectedNode)}
           fileId={fileId}
+          graphNode={selectedNode}
+          graphEdges={edges}
+          onNavigate={navigate}
           onClose={() => setSelectedNode(null)}
         />
       )}

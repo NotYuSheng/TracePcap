@@ -10,7 +10,12 @@ import { EntityStatsSection } from './sections/EntityStatsSection';
 import { SnapshotHistoryTable } from './sections/SnapshotHistoryTable';
 import { CaptureHistoryTable } from './sections/CaptureHistoryTable';
 import { NotesTab } from './sections/NotesTab';
+import { GraphNodeDetailsSection } from './sections/GraphNodeDetailsSection';
+import { GraphHistoryTab } from './sections/GraphHistoryTab';
+import { ServiceLogTab } from '@components/network/ServiceLogTab/ServiceLogTab';
+import { getServiceTab, type ServiceTabConfig } from '@/features/network/serviceTabs';
 import type { EntityDetailModalProps, Tab } from './types';
+import './EntityDetailModal.css';
 
 export function EntityDetailModal({
   entityType,
@@ -25,11 +30,27 @@ export function EntityDetailModal({
   snapshots,
   onClose,
   zIndex,
+  graphNode,
+  graphEdges,
+  changeHighlight,
+  onNavigate,
 }: EntityDetailModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [nestedIp, setNestedIp] = useState<string | null>(null);
 
   const showRole = entityType === 'IP' || entityType === 'DEVICE';
+
+  // Graph context (#578): when a node is supplied, the modal renders the network-graph host detail —
+  // traffic counters + Connections table + a History tab + service-role log tabs.
+  const isGraph = !!graphNode;
+  const serviceTabs: ServiceTabConfig<unknown, unknown>[] = isGraph
+    ? (graphNode!.data.serviceRoles ?? [])
+        .map(getServiceTab)
+        .filter((t): t is ServiceTabConfig<unknown, unknown> => Boolean(t))
+    : [];
+  const activeServiceTab = serviceTabs.find(t => `svc:${t.role}` === activeTab);
+  // A peer/history navigation: route via the caller, then close (the graph is behind this modal).
+  const navigateAndClose = (path: string) => { onClose(); onNavigate?.(path); };
 
   const role = useEntityRole(entityType, entityKey, fileId, showRole);
   const { stats, statsLoading, statsError } = useEntityStats(entityType, entityKey, fileId);
@@ -51,6 +72,13 @@ export function EntityDetailModal({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  // If the active service tab is no longer offered (modal reused for a node without that role),
+  // fall back to Details so the body never goes blank.
+  useEffect(() => {
+    const isBaseTab = activeTab === 'details' || activeTab === 'notes' || activeTab === 'history';
+    if (!isBaseTab && !activeServiceTab) setActiveTab('details');
+  }, [activeTab, activeServiceTab]);
 
   const entityLabel =
     entityType === 'PROTOCOL' ? 'protocol'
@@ -106,10 +134,10 @@ export function EntityDetailModal({
             <button type="button" className="btn-close ms-3" onClick={onClose} title="Close (Esc)" />
           </div>
 
-          {/* Tabs */}
+          {/* Tabs — graph context adds a History tab (cross-capture role trail) and service-role tabs. */}
           <div className="modal-header py-0 border-bottom-0">
             <ul className="nav nav-pills gap-1" style={{ paddingTop: '4px', paddingBottom: '4px' }}>
-              {(['details', 'notes'] as Tab[]).map(tab => (
+              {((isGraph ? ['details', 'history', 'notes'] : ['details', 'notes']) as Tab[]).map(tab => (
                 <li key={tab} className="nav-item">
                   <button
                     className={`nav-link py-1 px-3${activeTab === tab ? ' active' : ''}`}
@@ -117,6 +145,7 @@ export function EntityDetailModal({
                     onClick={() => setActiveTab(tab)}
                   >
                     {tab === 'details' && <i className="bi bi-bar-chart me-1" />}
+                    {tab === 'history' && <i className="bi bi-clock-history me-1" />}
                     {tab === 'notes' && (
                       <>
                         <i className="bi bi-sticky me-1" />
@@ -129,6 +158,21 @@ export function EntityDetailModal({
                   </button>
                 </li>
               ))}
+              {serviceTabs.map(svc => {
+                const id = `svc:${svc.role}`;
+                return (
+                  <li key={id} className="nav-item">
+                    <button
+                      className={`nav-link py-1 px-3${activeTab === id ? ' active' : ''}`}
+                      style={{ fontSize: '0.875rem' }}
+                      onClick={() => setActiveTab(id)}
+                    >
+                      <i className={`bi ${svc.icon} me-1`} />
+                      {svc.label}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -137,12 +181,35 @@ export function EntityDetailModal({
             {/* ── DETAILS TAB ──────────────────────────────────────── */}
             {activeTab === 'details' && (
               <div>
+                {/* Change-event highlight banner (Monitor snapshot / Compare diff). */}
+                {changeHighlight && (
+                  <div
+                    className="d-flex align-items-center gap-2 rounded p-2 mb-3 small"
+                    style={{ background: changeHighlight.color + '22', border: `1px solid ${changeHighlight.color}55` }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: changeHighlight.color, flexShrink: 0, display: 'inline-block' }} />
+                    <span style={{ color: changeHighlight.color, fontWeight: 600 }}>{changeHighlight.label}</span>
+                    {changeHighlight.description && <span className="text-muted">— {changeHighlight.description}</span>}
+                  </div>
+                )}
+
                 {/* Multi-snapshot context: role is edited per-snapshot in the history table below,
                     so the top card is a read-only present-day summary. */}
-                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
+                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} raisedModal={zIndex != null} />}
 
                 {entityType === 'IP' && fileId && (
                   <HostIdentitySection fileId={fileId} ip={entityKey} zIndex={zIndex} />
+                )}
+
+                {/* Graph host detail: traffic counters, protocol chips, per-peer Connections table. */}
+                {isGraph && !graphNode!.data.isL2 && graphEdges && (
+                  <GraphNodeDetailsSection
+                    node={graphNode!}
+                    edges={graphEdges}
+                    fileId={fileId}
+                    onOpenPeer={setNestedIp}
+                    onNavigate={navigateAndClose}
+                  />
                 )}
 
                 {hasFileStats && (
@@ -155,7 +222,7 @@ export function EntityDetailModal({
                 )}
 
                 {/* Fallback for entity types without file stats and no role section */}
-                {!showRole && !hasFileStats && (
+                {!showRole && !hasFileStats && !isGraph && (
                   <p className="text-muted small fst-italic">
                     No per-file stats available in this context.
                   </p>
@@ -173,7 +240,9 @@ export function EntityDetailModal({
                   </div>
                 )}
 
-                {showSnapshotHistory ? (
+                {/* Cross-capture history: the graph surface has its own tab for it (role trail), so
+                    only the non-graph entity panel renders it inline here. */}
+                {!isGraph && (showSnapshotHistory ? (
                   <SnapshotHistoryTable
                     entityType={entityType}
                     entityKey={entityKey}
@@ -188,8 +257,23 @@ export function EntityDetailModal({
                     historyError={historyError}
                     onClose={onClose}
                   />
-                )}
+                ))}
               </div>
+            )}
+
+            {/* ── HISTORY TAB (graph context only) ─────────────────── */}
+            {activeTab === 'history' && isGraph && (
+              <GraphHistoryTab
+                entityType={entityType}
+                entityKey={entityKey}
+                fileId={fileId}
+                onNavigate={navigateAndClose}
+              />
+            )}
+
+            {/* ── SERVICE-ROLE TAB (DNS, …) ────────────────────────── */}
+            {activeServiceTab && graphNode && (
+              <ServiceLogTab fileId={fileId} ip={graphNode.data.ip} config={activeServiceTab} />
             )}
 
             {/* ── NOTES TAB ────────────────────────────────────────── */}

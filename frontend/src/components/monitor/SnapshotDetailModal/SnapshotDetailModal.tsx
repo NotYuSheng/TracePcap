@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { subnetService } from '@/features/subnets/services/subnetService';
@@ -10,7 +11,7 @@ import { SnapshotSecurityTab } from '@/components/monitor/SnapshotSecurityTab/Sn
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { NetworkControls } from '@/components/network/NetworkControls';
-import { NodeDetails } from '@/components/network/NodeDetails';
+import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@/components/network/NodeLabelSettingsModal';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
 import { toggleSet } from '@/features/network/constants';
@@ -129,6 +130,7 @@ export const SnapshotDetailModal = ({
   onSnapshotUpdated,
   onHide,
 }: SnapshotDetailModalProps) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'diagram');
   const [changesPage, setChangesPage] = useState(1);
   const CHANGES_PAGE_SIZE = 15;
@@ -950,10 +952,12 @@ export const SnapshotDetailModal = ({
     </Modal>
 
     {selectedNode && (
-      <NodeDetails
-        node={selectedNode}
-        edges={edges}
+      <EntityDetailModal
+        {...graphNodeEntity(selectedNode)}
         fileId={diagramSnap.fileId}
+        graphNode={selectedNode}
+        graphEdges={edges}
+        onNavigate={navigate}
         onClose={() => setSelectedNode(null)}
         changeHighlight={highlightedNodes.get(selectedNode.label ?? '') ?? highlightedNodes.get(selectedNode.data.ip ?? '') ?? highlightedNodes.get(selectedNode.data.mac ?? '')}
         zIndex={1070}
