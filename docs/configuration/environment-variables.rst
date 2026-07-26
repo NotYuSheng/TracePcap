@@ -19,11 +19,35 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
      - Description
    * - ``APP_MEMORY_MB``
      - ``2048``
-     - Total RAM (in MB) allocated to the backend container. Derived
-       automatically from this value: JVM heap = 75%, max upload size = 25%,
-       nginx body limit = max upload + 50 MB multipart buffer, and the
-       proxy/analysis timeout scales with memory (300–900 s). Examples:
-       ``2048`` → 512 MB max upload (default), ``4096`` → 1 GB, ``8192`` → 2 GB.
+     - Total RAM (in MB) allocated to the backend container — both the enforced
+       container memory limit and the budget for derived settings: JVM heap =
+       50% of the enforced limit, max upload size = 25%, nginx body limit = max
+       upload + 50 MB multipart buffer, and the proxy/analysis timeout scales
+       with memory (300–900 s). Examples: ``2048`` → 512 MB max upload
+       (default), ``4096`` → 1 GB, ``8192`` → 2 GB. The heap is 50% rather than
+       75% because tshark/ndpi/Suricata allocate outside the JVM heap — see
+       :doc:`../operations/production-hardening`.
+   * - ``BACKEND_MEM_LIMIT``
+     - ``APP_MEMORY_MB``
+     - Enforced backend container memory limit. Tracks ``APP_MEMORY_MB`` by
+       default; set only to decouple the cgroup cap from the app's budget.
+   * - ``BACKEND_CPU_LIMIT``
+     - ``4``
+     - Backend CPU limit. Analysis is subprocess-heavy and parallel, so the
+       backend is sized above the other services.
+   * - ``POSTGRES_MEM_LIMIT`` / ``POSTGRES_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - Postgres container limits.
+   * - ``MINIO_MEM_LIMIT`` / ``MINIO_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - MinIO container limits.
+   * - ``NGINX_MEM_LIMIT`` / ``NGINX_CPU_LIMIT``
+     - ``256m`` / ``1``
+     - nginx container limits. It streams uploads rather than buffering them
+       whole, so it needs far less than the max upload size.
+   * - ``KEYCLOAK_MEM_LIMIT`` / ``KEYCLOAK_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - Keycloak container limits (auth overlays only).
 
 File Retention
 --------------

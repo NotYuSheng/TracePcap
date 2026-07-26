@@ -3,8 +3,45 @@ set -e
 
 MEM=${APP_MEMORY_MB:-2048}
 
-# JVM heap = 75% of APP_MEMORY_MB
-JVM_HEAP_MB=$(( MEM * 75 / 100 ))
+# JVM heap fraction of the container memory budget. Deliberately NOT 75%: the backend shells out
+# to native subprocesses (tshark, ndpi, Suricata, tcpflow — see PcapParserService, NdpiService,
+# TsharkEnrichmentService, SessionReconstructionService, SuricataService, …) whose RSS lives
+# *outside* the JVM heap, and the JVM itself needs non-heap room (metaspace, thread stacks, code
+# cache, direct buffers ≈ 250–400 MB). At 75% a Suricata-heavy analysis pushed the container past
+# its budget; once a hard memory limit exists that becomes a reliable OOM-kill instead of a
+# diffuse host-level problem. Budget: ~50% heap / ~20% JVM non-heap / ~30% native subprocesses.
+# See issue #378 and docs/operations/production-hardening.rst (Container Resource Limits).
+JVM_HEAP_PERCENT=${JVM_HEAP_PERCENT:-50}
+
+# Prefer the real cgroup limit over APP_MEMORY_MB. The JRE (Temurin 21) is container-aware, so
+# -XX:MaxRAMPercentage sizes the heap from the limit the kernel will actually enforce. This keeps
+# the heap correct even when the compose/k8s memory limit and APP_MEMORY_MB disagree — the failure
+# mode that makes hand-computed -Xmx dangerous. Falls back to APP_MEMORY_MB arithmetic when the
+# container runs unlimited (no limit set), where there is no cgroup value worth reading.
+#
+# cgroup v2 exposes "max" (literal string) when unlimited; v1 reports a sentinel near LONG_MAX.
+CGROUP_LIMIT_BYTES=""
+if [ -r /sys/fs/cgroup/memory.max ]; then
+  CGROUP_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory.max)
+elif [ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+  CGROUP_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
+fi
+
+case "$CGROUP_LIMIT_BYTES" in
+  # Unlimited ("max", empty, or an implausibly large v1 sentinel): no enforced limit to read.
+  ''|max|[0-9]*[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+    MEM_MODE="APP_MEMORY_MB (no container memory limit detected)"
+    JVM_HEAP_MB=$(( MEM * JVM_HEAP_PERCENT / 100 ))
+    JVM_MEM_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m"
+    ;;
+  *)
+    MEM_MODE="cgroup limit ($(( CGROUP_LIMIT_BYTES / 1024 / 1024 )) MB)"
+    JVM_HEAP_MB=$(( CGROUP_LIMIT_BYTES / 1024 / 1024 * JVM_HEAP_PERCENT / 100 ))
+    # InitialRAMPercentage mirrors Max so the heap is still pre-committed, matching the previous
+    # -Xms == -Xmx behaviour (no heap-growth pauses mid-analysis).
+    JVM_MEM_OPTS="-XX:InitialRAMPercentage=${JVM_HEAP_PERCENT} -XX:MaxRAMPercentage=${JVM_HEAP_PERCENT}"
+    ;;
+esac
 
 # Max upload = 25% of APP_MEMORY_MB, expressed in bytes
 MAX_UPLOAD_BYTES=$(( MEM * 25 / 100 * 1024 * 1024 ))
@@ -47,13 +84,15 @@ fi
 
 echo "TracePcap backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
-echo "  JVM heap (-Xms/-Xmx) = ${JVM_HEAP_MB} MB"
+echo "  Memory budget from   = ${MEM_MODE}"
+echo "  JVM heap             = ${JVM_HEAP_MB} MB (${JVM_HEAP_PERCENT}% of budget)"
+echo "  Native headroom      = $(( 100 - JVM_HEAP_PERCENT ))% for JVM non-heap + tshark/ndpi/Suricata"
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"
 echo "  Analysis timeout     = ${TIMEOUT} s"
 
+# shellcheck disable=SC2086 # JVM_MEM_OPTS is intentionally word-split into separate flags
 exec gosu spring java \
-  -Xmx${JVM_HEAP_MB}m \
-  -Xms${JVM_HEAP_MB}m \
+  ${JVM_MEM_OPTS} \
   -DMAX_UPLOAD_SIZE_BYTES=${MAX_UPLOAD_BYTES} \
   -DANALYSIS_TIMEOUT_SECONDS=${TIMEOUT} \
   -jar app.jar
