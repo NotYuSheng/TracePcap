@@ -33,6 +33,9 @@ export function GraphHistoryTab({ entityType, entityKey, fileId, onNavigate }: P
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    // Guard every async state write: the modal is reused across nodes, so a slow response for a
+    // previous entity must not overwrite the newer one's history.
+    let alive = true;
     setHistory([]);
     setHistoryRoles({});
     setHistoryError(null);
@@ -41,6 +44,7 @@ export function GraphHistoryTab({ entityType, entityKey, fileId, onNavigate }: P
     entityNotesService
       .getHistory(entityType, entityKey)
       .then(entries => {
+        if (!alive) return;
         setHistory(entries);
         Promise.all(
           entries.map(e =>
@@ -49,10 +53,11 @@ export function GraphHistoryTab({ entityType, entityKey, fileId, onNavigate }: P
               .then(r => [e.fileId, { label: r?.roleLabel ?? null, origin: r?.origin ?? null, stale: !!r?.staleSince }] as const)
               .catch(() => [e.fileId, { label: null, origin: null, stale: false }] as const),
           ),
-        ).then(pairs => setHistoryRoles(Object.fromEntries(pairs)));
+        ).then(pairs => { if (alive) setHistoryRoles(Object.fromEntries(pairs)); });
       })
-      .catch(() => setHistoryError('Failed to load history'))
-      .finally(() => setHistoryLoading(false));
+      .catch(() => { if (alive) setHistoryError('Failed to load history'); })
+      .finally(() => { if (alive) setHistoryLoading(false); });
+    return () => { alive = false; };
   }, [entityType, entityKey]);
 
   const totalPages = Math.ceil(history.length / HISTORY_PAGE_SIZE);

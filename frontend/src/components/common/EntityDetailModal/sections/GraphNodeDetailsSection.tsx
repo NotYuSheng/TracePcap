@@ -5,18 +5,26 @@ import { getProtocolColor } from '@/features/network/constants';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { Alert } from '@components/common/Alert';
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
-
-const formatNumber = (num: number) => num.toLocaleString();
+import { formatBytes, formatNumber } from '../format';
 
 const PEERS_PAGE_SIZE = 15;
+
+/**
+ * Human-readable phantom-node explanations, joined with a space (the icmp/no-response messages are
+ * mutually exclusive with the more specific arp/ttl ones, mirroring the original precedence).
+ */
+function ghostMessages(flags: string[]): string[] {
+  const msgs: string[] = [];
+  if (flags.includes('arp-no-reply')) msgs.push('ARP request target — never replied.');
+  if (flags.includes('ttl-exceeded')) msgs.push('Traceroute intermediate hop — only appeared via ICMP TTL-exceeded replies.');
+  if (flags.includes('icmp-unreachable') && !flags.includes('arp-no-reply') && !flags.includes('ttl-exceeded')) {
+    msgs.push('ICMP probe target — never responded.');
+  }
+  if (flags.includes('no-response') && !flags.includes('arp-no-reply') && !flags.includes('icmp-unreachable') && !flags.includes('ttl-exceeded')) {
+    msgs.push('Scan target — received traffic but never sent a reply.');
+  }
+  return msgs;
+}
 
 const GHOST_META: Record<string, { label: string; color: string }> = {
   'no-response':      { label: 'No response',      color: '#e74c3c' },
@@ -72,12 +80,7 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
           <i className="bi bi-slash-circle mt-1 flex-shrink-0" aria-hidden="true" />
           <div>
             <span className="fw-semibold">Phantom node</span>
-            <span className="ms-2">
-              {node.data.ghostFlags.includes('arp-no-reply') && 'ARP request target — never replied.'}
-              {node.data.ghostFlags.includes('ttl-exceeded') && 'Traceroute intermediate hop — only appeared via ICMP TTL-exceeded replies.'}
-              {node.data.ghostFlags.includes('icmp-unreachable') && !node.data.ghostFlags.includes('arp-no-reply') && !node.data.ghostFlags.includes('ttl-exceeded') && 'ICMP probe target — never responded.'}
-              {node.data.ghostFlags.includes('no-response') && !node.data.ghostFlags.includes('arp-no-reply') && !node.data.ghostFlags.includes('icmp-unreachable') && !node.data.ghostFlags.includes('ttl-exceeded') && 'Scan target — received traffic but never sent a reply.'}
-            </span>
+            <span className="ms-2">{ghostMessages(node.data.ghostFlags).join(' ')}</span>
             <div className="mt-1 d-flex flex-wrap gap-1">
               {node.data.ghostFlags.map(flag => {
                 const { label, color } = GHOST_META[flag] ?? { label: flag, color: '#6c757d' };

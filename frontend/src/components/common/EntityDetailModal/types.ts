@@ -3,8 +3,9 @@ import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
 
-/** Base tabs; graph context adds a 'history' tab and dynamic `svc:<role>` service tabs. */
-export type Tab = 'details' | 'notes' | 'history' | string;
+/** Base tabs; graph context adds a 'history' tab and dynamic `svc:<role>` service tabs. The
+ *  `string & {}` keeps literal autocomplete for the known names while still allowing `svc:<role>`. */
+export type Tab = 'details' | 'notes' | 'history' | (string & {});
 
 export interface HostClassification {
   ip: string | null;
