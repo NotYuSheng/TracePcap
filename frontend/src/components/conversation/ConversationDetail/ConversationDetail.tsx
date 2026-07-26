@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -165,17 +165,24 @@ function HostFlowCard({
   hostname?: string;
   cls?: HostClassification;
   identity?: HostIdentity;
-  onOpen: () => void;
+  /** Opens the full host-detail modal. Omitted when there is no fileId to load it — the card then
+   *  renders non-interactive rather than as a button whose click silently does nothing. */
+  onOpen?: () => void;
 }) {
   // Prefer the adjudicated verdict; fall back to the raw device type when identities haven't loaded.
   const label = identity?.primaryLabel ?? (cls ? deviceTypeLabel(cls.deviceType) : null);
-  const deviceType = (identity?.primaryLabel ?? cls?.deviceType) as DeviceType | undefined;
+  // primaryLabel is only a DeviceType code for MACHINE verdicts; a HUMAN label (e.g. "Bob's Laptop")
+  // is free text, so it must not be cast to DeviceType or the icon/colour lookup gets garbage. Fall
+  // back to the machine classification's deviceType for the icon in that case.
+  const deviceType = (
+    identity && identity.basis !== 'HUMAN' ? identity.primaryLabel : cls?.deviceType
+  ) as DeviceType | undefined;
   const confidence = identity?.confidence ?? cls?.confidence;
   const contested = identity?.contested ?? false;
   const iconColor = deviceType ? deviceTypeColor(deviceType) : '#6b7280';
 
-  return (
-    <button type="button" className="cd-host" onClick={onOpen} aria-label={`Open full details for ${ip}`}>
+  const inner = (
+    <>
       {confidence != null && !contested && identity?.basis !== 'HUMAN' && (
         <span className="cd-conf-pill">{confidence}% {confidenceWord(confidence)}</span>
       )}
@@ -193,14 +200,24 @@ function HostFlowCard({
             <strong>{label}</strong>
             <small className="text-muted">
               {contested ? (
-                <span className="cd-contested"><i className="bi bi-exclamation-triangle" /> contested</span>
+                <span className="cd-contested"><i className="bi bi-exclamation-triangle" aria-hidden="true" /> contested</span>
               ) : identity?.basis === 'HUMAN' ? 'Identity · confirmed' : 'Identity'}
             </small>
           </span>
         </span>
       )}
-      <span className="cd-host-open">Open full host details →</span>
+      {onOpen && <span className="cd-host-open">Open full host details →</span>}
+    </>
+  );
+
+  // Interactive only when there is a modal to open (needs a fileId). Otherwise a plain, non-focusable
+  // card so the click affordance is never a dead end.
+  return onOpen ? (
+    <button type="button" className="cd-host" onClick={onOpen} aria-label={`Open full details for ${ip}`}>
+      {inner}
     </button>
+  ) : (
+    <div className="cd-host cd-host-static">{inner}</div>
   );
 }
 
@@ -296,24 +313,20 @@ export const ConversationDetail = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightPacketNumber, conversation.id, packetPageSize]);
 
-  // Load adjudicated identities for the file's hosts (for the flow-header chip). One call per file;
-  // guarded so a stale response for file A can't overwrite file B's map.
-  useEffect(() => {
+  // Load adjudicated identities for the file's hosts (for the flow-header chip). One call per file.
+  // Also re-run when the host-detail modal closes, so an in-modal "I disagree" override is reflected
+  // in the chip without waiting for a remount.
+  const refreshIdentities = useCallback(() => {
     if (!fileId) return;
-    let alive = true;
     conversationService
       .getHostIdentities(fileId)
-      .then(list => {
-        if (!alive) return;
-        setIdentityMap(new Map(list.map(i => [i.ip, i])));
-      })
-      .catch(() => {
-        if (alive) setIdentityMap(new Map());
-      });
-    return () => {
-      alive = false;
-    };
+      .then(list => setIdentityMap(new Map(list.map(i => [i.ip, i]))))
+      .catch(() => setIdentityMap(new Map()));
   }, [fileId]);
+
+  useEffect(() => {
+    refreshIdentities();
+  }, [refreshIdentities]);
 
   useEffect(() => {
     if (!fileId) return;
@@ -380,7 +393,7 @@ export const ConversationDetail = ({
               role="client"
               cls={srcClass}
               identity={identityMap.get(source.ip)}
-              onOpen={() => setHostModalIp(source.ip)}
+              onOpen={fileId ? () => setHostModalIp(source.ip) : undefined}
             />
 
             <div className="cd-connector">
@@ -411,7 +424,7 @@ export const ConversationDetail = ({
               hostname={conversation.hostname}
               cls={dstClass}
               identity={identityMap.get(destination.ip)}
-              onOpen={() => setHostModalIp(destination.ip)}
+              onOpen={fileId ? () => setHostModalIp(destination.ip) : undefined}
             />
           </div>
 
@@ -698,7 +711,7 @@ export const ConversationDetail = ({
           entityKey={hostModalIp}
           displayName={hostModalIp}
           fileId={fileId}
-          onClose={() => setHostModalIp(null)}
+          onClose={() => { setHostModalIp(null); refreshIdentities(); }}
         />
       )}
     </div>

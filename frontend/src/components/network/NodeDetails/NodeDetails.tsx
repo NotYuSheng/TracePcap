@@ -49,7 +49,6 @@ function formatNumber(num: number): string {
 
 export function NodeDetails({ node, edges, fileId, onClose, changeHighlight, zIndex }: NodeDetailsProps) {
   const navigate = useNavigate();
-  // Evidence header explainer modal, and which axis fact row is expanded to its derivation.
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [peersPage, setPeersPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);

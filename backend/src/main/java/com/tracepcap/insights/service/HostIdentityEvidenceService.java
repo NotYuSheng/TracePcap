@@ -9,6 +9,7 @@ import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.insights.dto.HostIdentityEvidenceDto;
 import com.tracepcap.insights.entity.HostIdentityEntity;
 import com.tracepcap.insights.repository.HostIdentityRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -50,14 +51,24 @@ public class HostIdentityEvidenceService {
     }
     HostFacts facts = factsOpt.get();
 
-    if (hostIdentityRepository.findByFileId(fileId).isEmpty()) {
-      hostIdentityService.adjudicateFile(fileId);
+    // Lazy backfill (#521): files analysed before the adjudicator existed have classifications but no
+    // identities. Adjudicate on first read. This mirrors HostIdentitiesController#getHostIdentities,
+    // including the concurrent-first-read recovery: two panels opened at once can both find it empty
+    // and both delete-and-regenerate; the loser hits a unique (file_id, ip) violation, which is fine
+    // as long as the winner's rows are now present — otherwise it was a real failure and propagates.
+    List<HostIdentityEntity> identities = hostIdentityRepository.findByFileId(fileId);
+    if (identities.isEmpty()) {
+      try {
+        hostIdentityService.adjudicateFile(fileId);
+      } catch (DataIntegrityViolationException raced) {
+        if (hostIdentityRepository.findByFileId(fileId).isEmpty()) {
+          throw raced;
+        }
+      }
+      identities = hostIdentityRepository.findByFileId(fileId);
     }
     HostIdentityEntity identity =
-        hostIdentityRepository.findByFileId(fileId).stream()
-            .filter(h -> ip.equals(h.getIp()))
-            .findFirst()
-            .orElse(null);
+        identities.stream().filter(h -> ip.equals(h.getIp())).findFirst().orElse(null);
 
     // Behaviour + nDPI apps, folded from this IP's conversations (#496).
     //

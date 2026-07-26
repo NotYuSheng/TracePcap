@@ -141,7 +141,7 @@ export function EntityDetailModal({
                     so the top card is a read-only present-day summary. */}
                 {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
-                {entityType === 'IP' && (
+                {entityType === 'IP' && fileId && (
                   <HostIdentitySection fileId={fileId} ip={entityKey} zIndex={zIndex} />
                 )}
 

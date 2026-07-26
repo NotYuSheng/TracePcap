@@ -137,12 +137,6 @@ function toNodeData(ev: HostIdentityEvidence): NodeData {
 interface Props {
   fileId: string;
   ip: string;
-  /**
-   * Optional pre-fetched evidence (the network graph already holds it on the node) — when supplied,
-   * the section renders immediately without a fetch. Omit it and the section self-fetches by IP,
-   * which is what every non-graph surface (conversation, monitor, analysis) does.
-   */
-  seed?: HostIdentityEvidence;
   /** Z-index of a surrounding raised modal, so the add-evidence popup stacks above it. */
   zIndex?: number;
   /** Called after an override/evidence change, so a parent (e.g. the graph) can refresh its copy. */
@@ -158,9 +152,9 @@ interface Props {
  * graph node all render the same explainable classification, so users see how a verdict was derived
  * and can correct or append to it everywhere, not only in the graph.
  */
-export function HostIdentitySection({ fileId, ip, seed, zIndex, onChanged }: Props) {
-  const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(seed ?? null);
-  const [loading, setLoading] = useState(!seed);
+export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
+  const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedAxis, setExpandedAxis] = useState<AxisKey | null>(null);
   const [evidenceInfoOpen, setEvidenceInfoOpen] = useState(false);
@@ -189,18 +183,13 @@ export function HostIdentitySection({ fileId, ip, seed, zIndex, onChanged }: Pro
 
   useEffect(() => {
     setExpandedAxis(null);
-    if (seed) {
-      setEvidence(seed);
-      setLoading(false);
-      return;
-    }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId, ip, seed]);
+  }, [fileId, ip]);
 
   const handleChanged = () => {
     // Re-fetch our own copy so the verdict reflects the override, then let the parent refresh too.
-    if (!seed) load();
+    load();
     onChanged?.();
   };
 
@@ -287,7 +276,7 @@ export function HostIdentitySection({ fileId, ip, seed, zIndex, onChanged }: Pro
                 ) : (
                   <span className="text-muted fst-italic flex-grow-1">Nothing observed</span>
                 )}
-                <i className={`bi text-muted ${expanded ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                <i className={`bi text-muted ${expanded ? 'bi-chevron-up' : 'bi-chevron-down'}`} aria-hidden="true" />
               </div>
               {expanded && (
                 <div className="mt-2 ms-2 ps-2 border-start text-muted" style={{ fontSize: '0.72rem' }}>
@@ -307,7 +296,7 @@ export function HostIdentitySection({ fileId, ip, seed, zIndex, onChanged }: Pro
               className="d-flex align-items-start gap-1 mt-2 text-warning-emphasis"
               style={{ fontSize: '0.72rem' }}
             >
-              <i className="bi bi-exclamation-triangle-fill mt-1" />
+              <i className="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true" />
               <span>
                 <strong>Evidence conflicts.</strong> {detail} Worth a look — if the service
                 evidence is right, correct Identity with <em>“I disagree”</em>.
@@ -334,8 +323,8 @@ export function HostIdentitySection({ fileId, ip, seed, zIndex, onChanged }: Pro
             “Why”.
           </p>
           <p className="mb-0">
-            The <strong>evidence axes</strong> below are the independent measured facts the verdict
-            weighed — <em>Hardware</em> (physical fingerprint), <em>Ports / Service</em> (what it did
+            The <strong>evidence axes</strong> in this panel are the independent measured facts the
+            verdict weighed — <em>Hardware</em> (physical fingerprint), <em>Ports / Service</em> (what it did
             on the wire), and <em>Behaviour</em> (who opened the connections). They carry facts only;
             the scores belong to Identity. Disagree with the verdict? Use “I disagree” to set it, or
             add evidence to feed the vote.

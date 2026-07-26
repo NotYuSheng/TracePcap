@@ -63,6 +63,9 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, .1);
 }
 .cd-host:focus-visible { outline: 2px solid var(--sgds-primary, #6366f1); outline-offset: 2px; }
+/* Non-interactive variant (no fileId to open a detail modal): no pointer, no hover affordance. */
+.cd-host-static { cursor: default; }
+.cd-host-static:hover { border-color: var(--tp-border); background: var(--tp-surface); box-shadow: none; }
 
 .cd-host-role {
   font-size: 0.62rem;
@@ -71,7 +74,8 @@
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 4px;
-  align-self: flex-start;
+  /* Right-aligned so it sits opposite the top-left confidence pill and the two never overlap. */
+  align-self: flex-end;
 }
 .cd-role-client { background: rgba(59, 130, 246, .14); color: #3b82f6; }
 .cd-role-server { background: rgba(16, 185, 129, .14); color: #10b981; }
@@ -113,15 +117,14 @@
   border: 1px solid var(--tp-border);
   white-space: nowrap;
 }
-/* The role badge shares the top row with the top-left confidence pill; align it to the right so the
-   two never overlap. */
-.cd-host-role { margin-left: auto; }
 .cd-host-open {
   position: absolute; right: 12px; bottom: 9px;
   font-size: 0.66rem; color: var(--sgds-primary, #6366f1);
   opacity: 0; transition: opacity .12s;
 }
-.cd-host:hover .cd-host-open { opacity: 1; }
+/* Reveal the affordance on hover and on keyboard focus, so tabbing users see it too. */
+.cd-host:hover .cd-host-open,
+.cd-host:focus-visible .cd-host-open { opacity: 1; }
 
 .cd-connector {
   display: flex;
