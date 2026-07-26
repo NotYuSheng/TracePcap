@@ -50,6 +50,10 @@ services:
 
   backend:
     environment:
+      # Activate the prod Spring profile (overrides the base file's `dev`): strict CORS (no
+      # localhost defaults), stacktraces/exception details suppressed in error responses, Swagger
+      # UI + /v3/api-docs disabled, WARN-level logging to file. See docs production-hardening.
+      SPRING_PROFILES_ACTIVE: prod
       TRACEPCAP_AUTH_ENABLED: "true"
       # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
       KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap

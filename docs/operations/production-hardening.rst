@@ -4,6 +4,43 @@ Production Hardening
 The default TracePcap configuration is optimised for quick local testing.
 Before exposing the application to a wider audience, follow these steps.
 
+Spring Profile per Deployment Mode
+----------------------------------
+
+The backend selects behaviour via ``SPRING_PROFILES_ACTIVE``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - Compose invocation
+     - Profile
+     - Notes
+   * - ``docker-compose.yml`` (base)
+     - ``dev``
+     - Open quick-start / Lanturn. Swagger on, verbose errors, localhost CORS
+       defaults, DEBUG logging.
+   * - ``docker-compose.offline.yml``
+     - ``dev``
+     - Air-gapped quick-start. Same dev defaults as the base file.
+   * - ``… -f docker-compose.prod.yml``
+     - ``prod``
+     - Auth overlay. Strict CORS, Swagger + ``/v3/api-docs`` disabled,
+       stacktraces/exception details suppressed, WARN logging to file.
+   * - ``… -f docker-compose.offline-prod.yml``
+     - ``prod``
+     - Offline auth overlay. Same ``prod`` hardening as above.
+
+The two ``*-prod.yml`` overlays set ``SPRING_PROFILES_ACTIVE=prod`` on the
+backend, overriding the base file's ``dev``. This is the intended production
+path — enabling authentication (below) and the ``prod`` profile together.
+
+Under the ``prod`` profile CORS defaults to **empty** (no localhost origins).
+The shipped stack is same-origin — nginx serves the SPA and proxies ``/api`` on
+one origin — so browser→API calls never trigger CORS and no origins need
+allowing. Set ``CORS_ALLOWED_ORIGINS`` (comma-separated) **only** if you host
+the frontend on a different origin from the API.
+
 Change Default Credentials
 ---------------------------
 
