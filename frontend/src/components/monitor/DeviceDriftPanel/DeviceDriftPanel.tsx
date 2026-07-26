@@ -164,6 +164,7 @@ export const DeviceDriftPanel = ({ snapshots }: DeviceDriftPanelProps) => {
           pageSize={BADGE_PAGE_SIZE}
           onPageChange={setPage}
           showPageSizeSelector={false}
+          compact
         />
       )}
       {absentMacs.length > 0 && (
