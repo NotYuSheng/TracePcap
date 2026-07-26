@@ -1,13 +1,11 @@
 import { test, expect, Page, Locator } from '@playwright/test';
 import {
   NETWORK_NAME,
-  DEMO_FILE,
   demoFilePath,
   clearDemoFile,
   seedWeekFiles,
   seedRoleLabels,
   assertNetworkInsights,
-  findNetworkId,
   seedNetwork,
 } from './demo-fixture';
 import { Timeline } from './demo-timeline';
@@ -46,6 +44,18 @@ const GLANCE = ms(650);
 const CURSOR = ms(300);
 
 const timeline = new Timeline();
+
+/**
+ * The slice of Sigma's API this recording uses, via the window.__sigma seam
+ * NetworkGraph installs. Structural, not imported: sigma's own types would pull
+ * the graph library into the e2e tsconfig for three method signatures.
+ */
+interface SigmaLike {
+  getContainer(): HTMLElement;
+  getGraph(): { forEachNode(cb: (n: string) => void): void };
+  getNodeDisplayData(n: string): { x: number; y: number; size: number } | null;
+  framedGraphToViewport(c: { x: number; y: number }): { x: number; y: number };
+}
 
 /** Hold on the current view so a viewer can take it in before the next step. */
 async function beat(page: Page, ms = BEAT) {
@@ -122,6 +132,39 @@ async function showType(target: Locator, text: string) {
 async function openTab(page: Page, label: RegExp) {
   await showClick(page, page.locator('ul.nav-tabs').getByRole('button', { name: label }).first());
   await page.waitForTimeout(400);
+}
+
+/**
+ * Where the biggest nodes are on screen, in viewport coordinates, largest first.
+ *
+ * Sigma draws to WebGL, so a node has no DOM element, no addressable pixel and
+ * no selector — an earlier version of this recording swept blind fractions of
+ * the plot area and mostly hovered empty space. NetworkGraph exposes its Sigma
+ * instance on window.__sigma for exactly this: ask where the nodes actually are
+ * rather than guessing a coordinate and silently filming a miss.
+ *
+ * Off-screen nodes are dropped. The hierarchical graph is taller than the
+ * viewport, and clicking at a negative y lands on whatever is scrolled up there
+ * instead — so scroll the graph into view before calling this.
+ */
+async function graphNodePoints(page: Page, count: number) {
+  return page.evaluate(n => {
+    const s = (window as unknown as { __sigma?: SigmaLike }).__sigma;
+    if (!s) return [];
+    const rect = s.getContainer().getBoundingClientRect();
+    const pts: { x: number; y: number; size: number }[] = [];
+    s.getGraph().forEachNode((node: string) => {
+      const d = s.getNodeDisplayData(node);
+      if (!d) return;
+      const v = s.framedGraphToViewport({ x: d.x, y: d.y });
+      const x = rect.left + v.x;
+      const y = rect.top + v.y;
+      if (x > 20 && x < 1260 && y > 20 && y < 700) pts.push({ x, y, size: d.size });
+    });
+    // Biggest node = most connected = the most interesting one to open.
+    pts.sort((a, b) => b.size - a.size);
+    return pts.slice(0, n);
+  }, count);
 }
 
 /**
@@ -303,26 +346,38 @@ test('README demo walkthrough', async ({ page }) => {
   await convBody.evaluate(el => el.scrollTo(0, 0));
   await beat(page, GLANCE);
 
-  // The remote endpoint is a clickable host chip — it opens that host's identity
-  // panel without leaving the conversation.
-  const serverChip = convModal.getByText(/^91\.108\./).first();
-  await expect(serverChip, 'server endpoint chip not found').toBeVisible({ timeout: 10_000 });
+  // The destination's device-type badge opens its classification popup: what the
+  // host was judged to be, and the signals behind that judgement.
+  //
+  // The badge, not the IP text beside it — the address is inert, and clicking it
+  // silently does nothing. Anchored on the badge's title attribute, since its
+  // visible label is the device type (Server, Router, …) and varies by host.
+  const serverChip = convModal.locator('[title="Click for details"]').last();
+  await expect(serverChip, 'destination device badge not found').toBeVisible({ timeout: 10_000 });
   await showClick(page, serverChip);
-  await beat(page, READ);
 
-  // Evidence weighed — the three measured axes behind the identity verdict.
-  const hostModal = page.getByRole('dialog').last();
-  const evidence = hostModal.getByText('Evidence weighed').first();
-  await expect(evidence, 'Evidence weighed section not rendered').toBeVisible({ timeout: 15_000 });
-  await reveal(evidence);
-  await beat(page, READ);
+  // Type / Device / Role, each with the evidence that produced it — the MAC OUI
+  // match and the observed TTL, weighted into a confidence bar. This is the
+  // whole identity story in one panel, so hold on it properly.
+  const classification = page.getByText('Classification', { exact: true }).first();
+  await expect(classification, 'classification popup did not open').toBeVisible({
+    timeout: 15_000,
+  });
+  await beat(page, READ + ms(1_200));
 
-  // Each axis row expands in place. Hardware is the physical fingerprint (OUI,
-  // TTL) — the most legible one to open on camera.
-  const hardware = hostModal.locator('[title^="Inspect Hardware"]').first();
-  await expect(hardware).toBeVisible({ timeout: 10_000 });
-  await showClick(page, hardware);
-  await beat(page, READ + 400);
+  // Dismissed by its own close button — this is a bare styled div, not a
+  // Bootstrap modal: no backdrop, no dialog role, and Escape does not close it.
+  // Scoped to the popup by walking up from its header, since "Close" is a common
+  // accessible name and the conversation modal underneath has one too.
+  const closeClassification = classification
+    .locator('xpath=../..')
+    .getByRole('button', { name: /close/i })
+    .first();
+  if (await closeClassification.isVisible().catch(() => false)) {
+    await showClick(page, closeClassification);
+    await expect(classification).toBeHidden({ timeout: 10_000 });
+  }
+  await beat(page, GLANCE);
 
   await closeAllModals(page);
 
@@ -356,8 +411,78 @@ test('README demo walkthrough', async ({ page }) => {
   const storyError = page.getByText(/Failed to Generate Story/i);
   await expect(storyError, 'story generation failed — check the LLM server').toBeHidden();
   await beat(page, READ);
-  await scrollBy(page, 420);
-  await beat(page, READ);
+
+  // The Story page is seven stacked panels, not one blob of prose, and the point
+  // of the tab is how they relate: deterministic findings and full-dataset
+  // aggregates are computed, the LLM only writes prose over them. A single
+  // scrollBy past the lot showed none of it, so stop on each in page order.
+  //
+  // Anchored on each panel's own heading rather than by scroll distance — the
+  // panels are conditional (aggregates, findings, and investigation each render
+  // only when the story has them), so any fixed offset lands somewhere different
+  // depending on what this capture produced.
+  for (const [label, heading] of [
+    // What the LLM was given and what it's allowed to do with it.
+    ['generation settings', /How stories are generated/i],
+    // Pre-computed analytics over the whole capture, not a sample.
+    ['traffic intelligence', /Traffic Intelligence/i],
+    // The detector output the narrative is required to cover.
+    ['deterministic findings', /Deterministic Findings/i],
+    // What the LLM went back and looked up while writing.
+    ['investigation steps', /Investigation/i],
+  ] as const) {
+    const panel = page.getByText(heading).first();
+    if (!(await panel.isVisible().catch(() => false))) continue;
+    await reveal(panel);
+    await beat(page, READ);
+    // Findings is the one worth dwelling on — it is the evidence the narrative
+    // is accountable to, and it is the densest panel on the page.
+    if (label === 'deterministic findings') await beat(page, READ);
+  }
+
+  // The narrative itself, with its Key Events rail alongside.
+  const narrative = page.getByRole('heading', { name: /^Narrative/ }).first();
+  if (await narrative.isVisible().catch(() => false)) {
+    await reveal(narrative);
+    await beat(page, READ);
+    await scrollBy(page, 380);
+    await beat(page, READ);
+  }
+
+  // Ask the LLM a question about the capture. This is the part of the Story tab
+  // that is genuinely interactive, and it never appeared in the recording before.
+  // A suggested question is used rather than typed prose: it is one click, it is
+  // guaranteed answerable against this story, and it shows the affordance.
+  const chatCard = page.locator('.card').filter({ hasText: 'Ask the LLM' }).first();
+  if (await chatCard.isVisible().catch(() => false)) {
+    await reveal(chatCard);
+    await beat(page, READ);
+
+    // A suggested question only *fills* the box — it does not send. So click one
+    // to show the affordance, hold while the text lands in the input, then send.
+    const suggestion = chatCard.getByRole('button').filter({ hasText: /\?/ }).first();
+    const chatInput = chatCard.getByPlaceholder(/Ask a question about this story/i);
+    if (await suggestion.isVisible().catch(() => false)) {
+      await showClick(page, suggestion);
+      await beat(page, GLANCE + 250);
+      await expect(chatInput).not.toHaveValue('');
+      await chatInput.press('Enter');
+
+      // Another LLM round-trip, so race it. Wait on the "Thinking..." bubble
+      // going away rather than on an answer selector: the assistant bubble
+      // carries only layout classes, so there is nothing stable to match on it,
+      // and the spinner is unambiguous while it is up.
+      await beat(page, GLANCE);
+      await timeline.fastForward('Story Q&A (LLM)', 2, async () => {
+        await expect(chatCard.getByText(/Thinking\.\.\./)).toBeHidden({ timeout: 300_000 });
+      });
+      // Re-frame: the answer grows the card, so the pre-send scroll position no
+      // longer has the reply in shot.
+      await reveal(chatCard);
+      await beat(page, READ + ms(800));
+    }
+  }
+
   await page.evaluate(() => window.scrollTo(0, 0));
 
   // ── 6. Filter generator ────────────────────────────────────────────────
@@ -428,15 +553,6 @@ test('README demo walkthrough', async ({ page }) => {
   await showClick(page, page.locator('[title="Fit view"]').first());
   await beat(page, READ);
 
-  // Colour is a single channel, so the three modes are alternatives. Cycling
-  // them shows what the same topology says about transport, app, and volume.
-  const colorBy = page.locator('select').filter({ hasText: /Transport/ }).first();
-  await expect(colorBy).toBeVisible({ timeout: 10_000 });
-  for (const mode of ['application', 'volume', 'transport']) {
-    await colorBy.selectOption(mode);
-    await beat(page, GLANCE + 250);
-  }
-
   // Node label customization — open, show the preview, close.
   await showClick(page, page.locator('[title="Customize node labels"]').first());
   const labelModal = page.getByRole('dialog');
@@ -446,24 +562,14 @@ test('README demo walkthrough', async ({ page }) => {
   await beat(page, READ);
   await closeAllModals(page);
 
-  // Drift the cursor across the graph so node tooltips surface on camera.
-  //
-  // The graph is drawn to <canvas>, not DOM nodes — there is no per-host element
-  // to target, and hovering a named IP is not expressible as a selector. So this
-  // sweeps a few points across the plot area instead: with the force layout
-  // settled, the dense middle is where the hosts are. Purely visual, so nothing
-  // is asserted — a miss costs a dwell frame, not a failed recording.
-  const canvas = page.locator('.network-diagram-graph-body canvas').first();
-  const plot = await canvas.boundingBox().catch(() => null);
-  if (plot) {
-    for (const [fx, fy] of [
-      [0.5, 0.5],
-      [0.38, 0.42],
-      [0.62, 0.58],
-    ]) {
-      await page.mouse.move(plot.x + plot.width * fx, plot.y + plot.height * fy, { steps: 20 });
-      await page.waitForTimeout(GLANCE);
-    }
+  // Drift the cursor over the three biggest hosts so their hover state and
+  // labels surface on camera. Purely visual, so nothing is asserted — an empty
+  // list costs a few dwell frames, not a failed recording.
+  await reveal(graphBody);
+  await page.waitForTimeout(ms(600));
+  for (const pt of await graphNodePoints(page, 3)) {
+    await page.mouse.move(pt.x, pt.y, { steps: 20 });
+    await page.waitForTimeout(GLANCE);
   }
 
   // Hierarchical layout, then fit the view — a hierarchical graph is taller than
@@ -475,19 +581,38 @@ test('README demo walkthrough', async ({ page }) => {
   await showClick(page, page.locator('[title="Fit view"]').first());
   await beat(page, READ + 400);
 
-  // Node-to-node volume: what the topology can't show — how much.
-  // Scoped to the card that owns them, so "Show" and "Fullscreen" can't resolve
-  // to the topology diagram's controls above.
-  const heatmapCard = page
-    .locator('.card')
-    .filter({ hasText: 'Node-to-Node Volume' })
-    .last();
-  await reveal(heatmapCard);
-  await showClick(page, heatmapCard.getByRole('button', { name: /Show/ }).first());
-  await beat(page, BEAT);
-  // Fullscreen so the whole matrix is on screen rather than clipped by the card.
-  await showClick(page, heatmapCard.locator('[title="Fullscreen"]').first());
-  await beat(page, READ + 600);
+  // Open one host's details from the graph. The topology is the obvious place a
+  // viewer would ask "what is that node?", and the answer — the same identity
+  // panel the rest of the app opens — is the point of the whole graph.
+  //
+  // Read the coordinates *after* the fit-view camera animation has settled. Fit
+  // view animates over ~300ms, and positions sampled mid-animation are stale by
+  // the time the click lands: the click then hits empty canvas and the modal
+  // never opens. This bit the recording once already.
+  await page.waitForTimeout(ms(900));
+  const [nodePoint] = await graphNodePoints(page, 1);
+  expect(nodePoint, 'no graph node found to open — is window.__sigma exposed?').toBeTruthy();
+
+  await page.mouse.move(nodePoint.x, nodePoint.y, { steps: 16 });
+  await beat(page, GLANCE);
+  await page.mouse.click(nodePoint.x, nodePoint.y);
+
+  // Asserted, not best-effort: this step is the reason the section exists, so a
+  // miss should fail the recording rather than quietly skip and leave a gap.
+  const nodeModal = page.locator('.modal', { hasText: 'Node Details' }).first();
+  await expect(nodeModal, 'clicking a graph node did not open Node Details').toBeVisible({
+    timeout: 15_000,
+  });
+  await beat(page, READ + ms(500));
+  // Scroll past the header so the identity detail is in shot, not just the title.
+  await nodeModal.locator('.modal-body').evaluate(el => el.scrollBy(0, 320));
+  await beat(page, READ);
+  await closeAllModals(page);
+
+  // Close on the graph filled to the frame. Fullscreen drops the surrounding
+  // chrome so the topology is the whole picture, which is how it reads best.
+  await showClick(page, page.locator('[title="Fullscreen"]').first());
+  await beat(page, READ + ms(700));
   await page.keyboard.press('Escape');
   await beat(page, GLANCE);
 
@@ -604,17 +729,39 @@ test('README demo walkthrough', async ({ page }) => {
   await showClick(page, week8);
   const snapModal = page.getByRole('dialog');
   await expect(snapModal).toBeVisible({ timeout: 15_000 });
-  await beat(page, READ);
+
+  // The modal opens on the Network Diagram tab, whose graph is fetched per
+  // snapshot. Wait for it properly before holding, in two steps — the spinner
+  // clearing is not the same as the graph being drawn:
+  //   1. the fetch spinner goes away, then
+  //   2. Sigma mounts its WebGL canvases and paints.
+  // Waiting only on the spinner left a window where the modal was open over an
+  // empty grey panel, which is exactly what the hold then filmed. This is also
+  // why the tab loop below skips Diagram — it is already on screen.
+  await expect(snapModal.locator('.spinner-border')).toHaveCount(0, { timeout: 120_000 });
+  await expect(snapModal.locator('canvas.sigma-nodes')).toBeVisible({ timeout: 120_000 });
+  // Sigma paints a frame after mounting; without this the first held frame can
+  // still be the blank canvas it mounted with.
+  await page.waitForTimeout(ms(1_200));
+  await beat(page, READ + ms(900));
 
   // Tab through the snapshot's facets. Anchored at the start only, not exact:
   // several tabs append a count badge to their label ("Changes28", "Security6"),
-  // so an end-anchored or exact match never fires. Insights is held longest —
-  // it lazy-loads on first open.
+  // so an end-anchored or exact match never fires.
+  //
+  // Each tab gets a real hold rather than a glance: this modal is the per-week
+  // detail the whole eight-week story resolves to, and a viewer who cannot read
+  // a panel has no reason to care that it exists. Security and Insights both
+  // fetch on first open, so wait for their content, not just for the click.
   for (const tab of [/^Changes/i, /^Security/i, /^Context/i, /^Subnets/i, /^Insights/i]) {
     const t = snapModal.getByRole('button', { name: tab }).first();
     if (!(await t.isVisible().catch(() => false))) continue;
     await showClick(page, t);
-    await beat(page, tab.source.includes('Insights') ? READ : GLANCE + 250);
+    // Wait on the spinner element, not on loading copy: Insights renders a bare
+    // <Spinner> with no text at all, so a text assertion passes instantly while
+    // the spinner is still up — which is exactly the bug this is fixing.
+    await expect(snapModal.locator('.spinner-border')).toHaveCount(0, { timeout: 120_000 });
+    await beat(page, READ + ms(400));
   }
   await closeAllModals(page);
 

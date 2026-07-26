@@ -579,6 +579,15 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     sigmaRef.current = sigma;
 
+    // Test seam for the README demo recording (frontend/e2e/demo.spec.ts).
+    //
+    // The graph is WebGL, so a node has no DOM element and no addressable pixel:
+    // there is nothing for a test to hover or click by selector, and Sigma does
+    // its hit-testing internally. Exposing the instance lets the recording ask
+    // where a node actually is on screen (viewportForNode) and click that point,
+    // instead of guessing coordinates and silently filming a miss.
+    (window as unknown as { __sigma?: Sigma }).__sigma = sigma;
+
     // ── Node dragging ──────────────────────────────────────────────────────────
     // Track which node is being dragged. These are plain vars (not refs) because
     // they're local to this effect closure and reset on every rebuild.
@@ -743,6 +752,7 @@ export const NetworkGraph = memo(function NetworkGraph({
       document.removeEventListener('mouseup', onDragEnd);
       sigmaRef.current?.kill();
       sigmaRef.current = null;
+      delete (window as unknown as { __sigma?: Sigma }).__sigma;
       elkRef.current?.terminateWorker();
       elkRef.current = null;
     };
