@@ -104,6 +104,141 @@ Upload limits are derived from a single memory budget. Set ``APP_MEMORY_MB`` in
 
    APP_MEMORY_MB=4096  # ~1 GB max upload
 
+Container Resource Limits
+-------------------------
+
+Every service declares CPU and memory limits via ``deploy.resources.limits``.
+Without them a single large capture can exhaust host memory and take the whole
+box down with it.
+
+Why the backend is the one that matters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The backend does **not** do its packet work inside the JVM. It shells out to
+native subprocesses — ``tshark``, ``ndpi``, ``Suricata``, ``tcpflow`` — whose
+memory lives entirely *outside* the JVM heap. A container budget therefore has
+to cover three things, not one:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 15 55
+
+   * - Consumer
+     - Share
+     - Notes
+   * - JVM heap
+     - ~50%
+     - ``-Xmx``/``MaxRAMPercentage``; pre-committed at startup.
+   * - JVM non-heap
+     - ~20%
+     - Metaspace, thread stacks, code cache, direct buffers (~250–400 MB).
+   * - Native subprocesses
+     - ~30%
+     - ``tshark``/``ndpi``/``Suricata``; scales with capture size.
+
+This is why the heap is **50%** of the budget rather than the 75% used before
+issue #378. At 75% there was no room left for the native half of the workload;
+once a hard memory limit exists, that overflow becomes an immediate OOM-kill of
+the backend container instead of a diffuse host-level memory problem.
+
+How the heap is sized
+~~~~~~~~~~~~~~~~~~~~~
+
+``backend/docker-entrypoint.sh`` reads the **enforced cgroup limit** and sets the
+heap to 50% of it via ``-XX:MaxRAMPercentage``. It does not simply trust
+``APP_MEMORY_MB``. This matters because the JVM then sizes itself against the
+limit the kernel will actually enforce, even if the compose limit and
+``APP_MEMORY_MB`` have drifted apart. When the container runs with no memory
+limit at all, it falls back to computing ``-Xms``/``-Xmx`` from ``APP_MEMORY_MB``.
+
+The startup banner reports which path was taken::
+
+   TracePcap backend starting:
+     APP_MEMORY_MB        = 2048 MB
+     Memory budget from   = cgroup limit (2048 MB)
+     JVM heap             = 1024 MB (50% of budget)
+     Native headroom      = 50% for JVM non-heap + tshark/ndpi/Suricata
+
+Sizing
+~~~~~~
+
+``BACKEND_MEM_LIMIT`` defaults to ``APP_MEMORY_MB``, so raising the latter raises
+the enforced limit in step and the two cannot silently diverge.
+
+If you do set ``BACKEND_MEM_LIMIT`` explicitly, the **enforced limit wins**: the
+heap, the max upload size and the analysis timeout are all derived from it rather
+than from ``APP_MEMORY_MB``, and the startup banner reports the mismatch. This
+matters because the alternative is unsafe — sizing the upload from a larger
+``APP_MEMORY_MB`` while the kernel enforces a smaller cap would let a single
+upload consume the whole native headroom this section exists to protect.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 16 16 16 34
+
+   * - Service
+     - Minimum
+     - Default
+     - CPU
+     - Notes
+   * - backend
+     - 2 GB
+     - 2 GB
+     - 4
+     - Raise via ``APP_MEMORY_MB``. 4 GB+ recommended for captures >100 MB or
+       with ``SURICATA_ENABLED=true``.
+   * - postgres
+     - 512 MB
+     - 1 GB
+     - 2
+     - Grows with retained analysis history.
+   * - minio
+     - 512 MB
+     - 1 GB
+     - 2
+     - Streams objects; not upload-size bound.
+   * - nginx
+     - 128 MB
+     - 256 MB
+     - 1
+     - Buffers request bodies, but large ones spill to disk in ``/tmp`` rather
+       than RAM — so memory stays flat while upload size grows.
+   * - keycloak
+     - 512 MB
+     - 1 GB
+     - 2
+     - Auth overlays only.
+
+Totals ``~4.4 GB`` for the default stack, ``~5.4 GB`` with an auth overlay
+(including the 128 MB ``minio-init`` bootstrap job).
+
+Every value is overridable, e.g. for a 4-core / 8 GB host:
+
+.. code-block:: ini
+
+   APP_MEMORY_MB=4096      # backend budget + enforced limit, 2 GB heap
+   BACKEND_CPU_LIMIT=3
+   POSTGRES_MEM_LIMIT=1g
+   MINIO_MEM_LIMIT=512m
+
+.. note::
+
+   ``deploy.resources.limits`` is honoured by ``docker compose up`` — it is not
+   Swarm-only. ``deploy.resources.reservations`` (CPU/memory *requests*) **is**
+   Swarm/Kubernetes-only and is deliberately not used here; requests are a
+   scheduling concept with no meaning on a single Compose host.
+
+Restart Policies
+----------------
+
+All long-running services set ``restart: unless-stopped`` so a crashed container
+comes back automatically and the stack survives a host reboot. The ``minio-init``
+bucket-bootstrap job is deliberately excluded — it is meant to run once and exit
+``0``, and a restart policy would loop it forever.
+
+To stop a service and have it *stay* stopped, use ``docker compose stop <svc>``;
+``unless-stopped`` honours a manual stop across daemon restarts.
+
 Configure LLM Privacy
 ---------------------
 

@@ -28,7 +28,15 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: tracepcap-keycloak
+    restart: unless-stopped
     command: ["start-dev", "--import-realm"]
+    # Keycloak is a JVM app too: 1g covers its heap plus the embedded H2 store at this scale.
+    # See docs/operations/production-hardening.rst (Container Resource Limits).
+    deploy:
+      resources:
+        limits:
+          cpus: ${KEYCLOAK_CPU_LIMIT:-2}
+          memory: ${KEYCLOAK_MEM_LIMIT:-1g}
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-user}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-P@ssw0rd}

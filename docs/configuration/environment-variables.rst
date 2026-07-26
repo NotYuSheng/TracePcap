@@ -19,11 +19,42 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
      - Description
    * - ``APP_MEMORY_MB``
      - ``2048``
-     - Total RAM (in MB) allocated to the backend container. Derived
-       automatically from this value: JVM heap = 75%, max upload size = 25%,
+     - Total RAM (in MB) allocated to the backend container — the default for
+       the enforced container memory limit and the budget for derived settings.
+       All derived values use the *effective* budget (the enforced cgroup limit
+       when one is set, else this value): JVM heap = 50%, max upload size = 25%,
        nginx body limit = max upload + 50 MB multipart buffer, and the
        proxy/analysis timeout scales with memory (300–900 s). Examples:
-       ``2048`` → 512 MB max upload (default), ``4096`` → 1 GB, ``8192`` → 2 GB.
+       ``2048`` → 512 MB max upload
+       (default), ``4096`` → 1 GB, ``8192`` → 2 GB. The heap is 50% rather than
+       75% because tshark/ndpi/Suricata allocate outside the JVM heap — see
+       :doc:`../operations/production-hardening`.
+   * - ``BACKEND_MEM_LIMIT``
+     - ``APP_MEMORY_MB``
+     - Enforced backend container memory limit. Tracks ``APP_MEMORY_MB`` by
+       default. When set explicitly it becomes the **effective budget**: the JVM
+       heap, max upload size and analysis timeout are all derived from it rather
+       than from ``APP_MEMORY_MB``, keeping the 50%/25% split coherent at any
+       cap. Setting it lower therefore also lowers the max upload size.
+   * - ``BACKEND_CPU_LIMIT``
+     - ``4``
+     - Backend CPU limit. Analysis is subprocess-heavy and parallel, so the
+       backend is sized above the other services.
+   * - ``POSTGRES_MEM_LIMIT`` / ``POSTGRES_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - Postgres container limits.
+   * - ``MINIO_MEM_LIMIT`` / ``MINIO_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - MinIO container limits.
+   * - ``NGINX_MEM_LIMIT`` / ``NGINX_CPU_LIMIT``
+     - ``256m`` / ``1``
+     - nginx container limits. Request bodies larger than
+       ``client_body_buffer_size`` spill to disk rather than RAM, so nginx needs
+       far less memory than the max upload size (but does need scratch space in
+       ``/tmp``).
+   * - ``KEYCLOAK_MEM_LIMIT`` / ``KEYCLOAK_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - Keycloak container limits (auth overlays only).
 
 File Retention
 --------------

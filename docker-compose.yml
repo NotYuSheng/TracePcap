@@ -1,8 +1,27 @@
+# Container resource limits (issue #378)
+# ---------------------------------------
+# `deploy.resources.limits` IS honoured by Compose v2 `up` (it is not Swarm-only, unlike
+# `deploy.resources.reservations`, which is a no-op outside Swarm — CPU/memory *requests* are a
+# Kubernetes scheduling concept and are deliberately not modelled here; see #366 Helm work).
+#
+# The backend limit is the one that matters: it must cover the JVM heap PLUS the native
+# tshark/ndpi/Suricata subprocesses, which allocate outside the heap. BACKEND_MEM_LIMIT therefore
+# tracks APP_MEMORY_MB by default, and backend/docker-entrypoint.sh reads this enforced cgroup
+# limit to size the heap at 50% of it. Raising APP_MEMORY_MB alone raises both in step.
+#
+# Sizing guidance and the validated minimums live in
+# docs/operations/production-hardening.rst (Container Resource Limits).
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: tracepcap-postgres
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: ${POSTGRES_CPU_LIMIT:-2}
+          memory: ${POSTGRES_MEM_LIMIT:-1g}
     environment:
       POSTGRES_DB: tracepcap
       POSTGRES_USER: tracepcap_user
@@ -24,7 +43,13 @@ services:
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: tracepcap-minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          cpus: ${MINIO_CPU_LIMIT:-2}
+          memory: ${MINIO_MEM_LIMIT:-1g}
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -43,9 +68,16 @@ services:
       - tracepcap-network
 
   # MinIO Client (mc) - Create bucket on startup
+  # One-shot bucket bootstrap: it is *meant* to exit 0, so it gets no restart policy
+  # (`unless-stopped` would restart it forever) and needs only a nominal memory cap.
   minio-init:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     container_name: tracepcap-minio-init
+    deploy:
+      resources:
+        limits:
+          cpus: ${MINIO_INIT_CPU_LIMIT:-0.5}
+          memory: ${MINIO_INIT_MEM_LIMIT:-128m}
     depends_on:
       - minio
     entrypoint: >
@@ -65,6 +97,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tracepcap-backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # Must cover JVM heap + JVM non-heap + native tshark/ndpi/Suricata subprocesses.
+          # Defaults to APP_MEMORY_MB so the enforced limit and the app's memory budget cannot
+          # silently diverge; the entrypoint sizes the heap at 50% of this limit. Override only
+          # if you deliberately want the cgroup cap to differ from APP_MEMORY_MB.
+          memory: ${BACKEND_MEM_LIMIT:-${APP_MEMORY_MB:-2048}m}
+          # Analysis is subprocess-heavy and parallel (ASYNC_MAX_POOL_SIZE=10 by default), so the
+          # backend is the service that will actually use several cores. Sized above the others.
+          cpus: ${BACKEND_CPU_LIMIT:-4}
     environment:
       SPRING_PROFILES_ACTIVE: dev
       # Authentication off by default — the app runs fully open (e.g. Lanturn). To enable OIDC,
@@ -137,9 +181,23 @@ services:
         # Export APP_VERSION to override (CI passes the live `git describe` for GHCR images).
         VITE_APP_VERSION: ${APP_VERSION:-v0.1.1-194-gb2fbd3f}
     container_name: tracepcap-nginx
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # proxy_request_buffering defaults to on, so nginx buffers the whole request body — but
+          # anything past client_body_buffer_size spills to disk in /tmp rather than RAM, so the
+          # cap holds regardless of upload size. 256m covers workers + in-memory proxy buffers.
+          cpus: ${NGINX_CPU_LIMIT:-1}
+          memory: ${NGINX_MEM_LIMIT:-256m}
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # The BACKEND's enforced cap, passed through so nginx can mirror the backend's *effective*
+      # budget. nginx cannot read another container's cgroup, so without this the edge body limit
+      # would be sized from APP_MEMORY_MB while the backend enforces a smaller cap — nginx would
+      # accept an upload Spring then rejects. Must stay in sync with the backend's memory limit.
+      BACKEND_MEM_LIMIT: ${BACKEND_MEM_LIMIT:-}
       # LLM timeout — nginx proxy_read_timeout is set to max(memory-derived, LLM_TIMEOUT+60s)
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       # Timezone Configuration
