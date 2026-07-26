@@ -185,13 +185,19 @@ services:
     deploy:
       resources:
         limits:
-          # nginx streams uploads to the backend rather than buffering them whole, so it needs
-          # far less than the upload size; 256m covers worker processes + proxy buffers.
+          # proxy_request_buffering defaults to on, so nginx buffers the whole request body — but
+          # anything past client_body_buffer_size spills to disk in /tmp rather than RAM, so the
+          # cap holds regardless of upload size. 256m covers workers + in-memory proxy buffers.
           cpus: ${NGINX_CPU_LIMIT:-1}
           memory: ${NGINX_MEM_LIMIT:-256m}
     environment:
       # Memory allocation — nginx body limit and timeouts derived from this
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # The BACKEND's enforced cap, passed through so nginx can mirror the backend's *effective*
+      # budget. nginx cannot read another container's cgroup, so without this the edge body limit
+      # would be sized from APP_MEMORY_MB while the backend enforces a smaller cap — nginx would
+      # accept an upload Spring then rejects. Must stay in sync with the backend's memory limit.
+      BACKEND_MEM_LIMIT: ${BACKEND_MEM_LIMIT:-}
       # LLM timeout — nginx proxy_read_timeout is set to max(memory-derived, LLM_TIMEOUT+60s)
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       # Timezone Configuration

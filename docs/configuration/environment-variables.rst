@@ -48,8 +48,10 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
      - MinIO container limits.
    * - ``NGINX_MEM_LIMIT`` / ``NGINX_CPU_LIMIT``
      - ``256m`` / ``1``
-     - nginx container limits. It streams uploads rather than buffering them
-       whole, so it needs far less than the max upload size.
+     - nginx container limits. Request bodies larger than
+       ``client_body_buffer_size`` spill to disk rather than RAM, so nginx needs
+       far less memory than the max upload size (but does need scratch space in
+       ``/tmp``).
    * - ``KEYCLOAK_MEM_LIMIT`` / ``KEYCLOAK_CPU_LIMIT``
      - ``1g`` / ``2``
      - Keycloak container limits (auth overlays only).

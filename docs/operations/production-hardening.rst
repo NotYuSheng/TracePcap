@@ -201,7 +201,8 @@ upload consume the whole native headroom this section exists to protect.
      - 128 MB
      - 256 MB
      - 1
-     - Streams uploads rather than buffering them whole.
+     - Buffers request bodies, but large ones spill to disk in ``/tmp`` rather
+       than RAM — so memory stays flat while upload size grows.
    * - keycloak
      - 512 MB
      - 1 GB

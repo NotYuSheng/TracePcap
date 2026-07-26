@@ -158,6 +158,9 @@ services:
           memory: ${NGINX_MEM_LIMIT:-256m}
     environment:
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # The BACKEND's enforced cap, so nginx mirrors the backend's effective budget rather than
+      # sizing the edge body limit from APP_MEMORY_MB alone. See docker-compose.yml.
+      BACKEND_MEM_LIMIT: ${BACKEND_MEM_LIMIT:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       TZ: Asia/Singapore
     ports:

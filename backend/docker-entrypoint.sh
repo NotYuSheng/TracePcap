@@ -13,6 +13,21 @@ MEM=${APP_MEMORY_MB:-2048}
 # See issue #378 and docs/operations/production-hardening.rst (Container Resource Limits).
 JVM_HEAP_PERCENT=${JVM_HEAP_PERCENT:-50}
 
+# Validate before use: this value is interpolated into arithmetic and into -XX:MaxRAMPercentage.
+# A non-numeric value would abort mid-script under `set -e`, and a value >90 would size the heap
+# at or above the cgroup limit — an immediate OOM-kill that `restart: unless-stopped` converts
+# into a crash loop. Fail loudly here instead, where the reason is visible in the logs.
+case "${JVM_HEAP_PERCENT}" in
+  ''|*[!0-9]*)
+    echo "FATAL: JVM_HEAP_PERCENT must be an integer, got '${JVM_HEAP_PERCENT}'" >&2
+    exit 1 ;;
+esac
+if [ "${JVM_HEAP_PERCENT}" -lt 10 ] || [ "${JVM_HEAP_PERCENT}" -gt 90 ]; then
+  echo "FATAL: JVM_HEAP_PERCENT must be between 10 and 90, got ${JVM_HEAP_PERCENT}. Above ~90 leaves" >&2
+  echo "       no room for JVM non-heap + native tshark/ndpi/Suricata and will OOM-kill the container." >&2
+  exit 1
+fi
+
 # Prefer the real cgroup limit over APP_MEMORY_MB. The JRE (Temurin 21) is container-aware, so
 # -XX:MaxRAMPercentage sizes the heap from the limit the kernel will actually enforce. This keeps
 # the heap correct even when the compose/k8s memory limit and APP_MEMORY_MB disagree — the failure
