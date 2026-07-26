@@ -51,18 +51,44 @@ const GEO_SOURCE_LABEL: Record<string, { label: string; title: string }> = {
 };
 
 /**
- * Geolocation block for external hosts — the country/flag, ASN, org and geo-source provenance the
- * conversation modal used to be the only place to see. Rendered only when the host has a geo record
- * (private/internal IPs never do, so the block is simply absent for them).
+/** RFC 1918 / loopback / link-local / ULA — addresses no geo database can (or should) resolve. */
+function isPrivateIp(ip: string): boolean {
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:|::1$)/i.test(ip);
+}
+
+/**
+ * Geolocation block for a host — country/flag, ASN, org, and geo-source provenance. Always rendered
+ * so the section never silently vanishes: when there is no data it states *why* — "Private IP" for
+ * internal addresses (which are never geolocated), or "No geolocation on record" for a public IP the
+ * geo database didn't resolve.
  */
 function GeoBlock({ ev }: { ev: HostIdentityEvidence }) {
-  if (!ev.countryCode && !ev.country && !ev.asn && !ev.org) return null;
+  const hasGeo = !!(ev.countryCode || ev.country || ev.asn || ev.org);
   const src = ev.geoSource ? GEO_SOURCE_LABEL[ev.geoSource] : undefined;
+
+  const heading = (
+    <h6 className="border-bottom pb-1 mb-2">
+      <span className="text-muted fw-normal" style={{ fontSize: '0.8rem' }}>Geolocation</span>
+    </h6>
+  );
+
+  if (!hasGeo) {
+    const priv = isPrivateIp(ev.ip);
+    return (
+      <div className="mb-4">
+        {heading}
+        <p className="text-muted fst-italic mb-0" style={{ fontSize: '0.78rem' }}>
+          {priv
+            ? 'Private IP — not geolocated. Internal addresses (RFC 1918) are not registered to any location.'
+            : 'No geolocation on record for this address.'}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-4">
-      <h6 className="border-bottom pb-1 mb-2">
-        <span className="text-muted fw-normal" style={{ fontSize: '0.8rem' }}>Geolocation</span>
-      </h6>
+      {heading}
       <dl className="row mb-0" style={{ fontSize: '0.8rem' }}>
         <dt className="col-4 text-muted fw-normal">Country</dt>
         <dd className="col-8 mb-1">
