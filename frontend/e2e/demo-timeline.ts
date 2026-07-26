@@ -25,6 +25,14 @@ export interface Span {
   label: string;
 }
 
+/**
+ * How hard to race the waits. A story generation can run 3+ minutes against a
+ * local model, which even at 10x is ~19s of spinner — most of the finished GIF.
+ * The wait is still shown, just briefly: the point is that the work is real, not
+ * that you watch it. Override with DEMO_FF_SPEED to slow it back down.
+ */
+const SPEED = Number(process.env.DEMO_FF_SPEED ?? 40);
+
 export class Timeline {
   private t0 = Date.now();
   private spans: Span[] = [];
@@ -48,7 +56,7 @@ export class Timeline {
     const result = await fn();
     const end = this.now();
     if (end - start >= minSeconds) {
-      this.spans.push({ start, end, speed: 10, label });
+      this.spans.push({ start, end, speed: SPEED, label });
     }
     return result;
   }

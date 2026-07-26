@@ -43,8 +43,13 @@ export default defineConfig({
           {
             name: 'demo' as const,
             testMatch: /demo\.spec\.ts/,
-            // The walkthrough's pauses and processing wait exceed the default.
-            timeout: 240_000,
+            // The walkthrough's deliberate pauses alone run several minutes, and
+            // it also waits out real work on camera: a Suricata-enabled analysis
+            // of the uploaded capture, then story and filter generation against a
+            // local LLM. Generous rather than tuned — this bounds a hang, it is
+            // not a performance assertion, and a recording that dies at minute
+            // eight wastes everything before it.
+            timeout: 20 * 60_000,
             use: {
               ...devices['Desktop Chrome'],
               launchOptions: { args: ['--no-sandbox'] },

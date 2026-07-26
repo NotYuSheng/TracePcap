@@ -13,6 +13,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MONITOR_DIR = path.resolve(here, '../../sample-files/monitor_large');
+const SAMPLE_DIR = path.resolve(here, '../../sample-files');
+
+/** The capture the analysis half of the demo uploads on camera. */
+export const DEMO_FILE = 'demo_all_rules.pcap';
 
 export const NETWORK_NAME = 'Office Audit — Corp HQ';
 export const NETWORK_DESCRIPTION =
@@ -142,6 +146,93 @@ export async function seedRoleLabels(
     });
     expect(res.ok(), `role upsert failed for ${ip}: ${res.status()}`).toBeTruthy();
   }
+}
+
+/**
+ * Remove every copy of the demo capture so the recording can upload it on camera.
+ *
+ * The backend dedups by hash: with the file already present, the upload modal
+ * shows the "already uploaded" branch and offers to open the existing analysis
+ * rather than running one — not the flow the GIF is meant to show. Deleting
+ * first is what makes step 1 reproducible on a stack that has recorded before.
+ */
+export async function clearDemoFile(request: APIRequestContext): Promise<void> {
+  const list = await request.get('/api/v1/files?page=1&pageSize=200');
+  if (!list.ok()) return;
+  for (const f of (await list.json()).data ?? []) {
+    if (f.fileName === DEMO_FILE) {
+      await request.delete(`/api/v1/files/${f.fileId}`);
+    }
+  }
+}
+
+/** Absolute path to the demo capture, for setInputFiles(). */
+export function demoFilePath(): string {
+  return path.join(SAMPLE_DIR, DEMO_FILE);
+}
+
+/** The demo network's id, or null when it doesn't exist yet. */
+export async function findNetworkId(request: APIRequestContext): Promise<string | null> {
+  const list = await request.get('/api/v1/monitor/networks');
+  if (!list.ok()) return null;
+  const body = await list.json();
+  const networks = Array.isArray(body) ? body : (body.data ?? []);
+  return networks.find((n: { name: string }) => n.name === NETWORK_NAME)?.id ?? null;
+}
+
+/**
+ * Ensure the demo network exists with all eight weekly snapshots attached, and
+ * return its id. Reuses an existing network rather than recreating it: each
+ * snapshot POST recomputes drift against its predecessor, and the operator's
+ * generated insights hang off the network row.
+ */
+export async function seedNetwork(
+  request: APIRequestContext,
+  fileIds: Map<string, string>
+): Promise<string> {
+  let id = await findNetworkId(request);
+  if (!id) {
+    const created = await request.post('/api/v1/monitor/networks', {
+      data: { name: NETWORK_NAME, description: NETWORK_DESCRIPTION },
+    });
+    expect(created.ok(), `network create failed: ${created.status()}`).toBeTruthy();
+    id = (await created.json()).id as string;
+  }
+
+  // Attach only the weeks that aren't already snapshots, so a re-run against a
+  // seeded stack is a no-op instead of eight duplicate rows.
+  const existing = await request.get(`/api/v1/monitor/networks/${id}/snapshots`);
+  const snaps = existing.ok() ? await existing.json() : [];
+  const have = new Set(
+    (Array.isArray(snaps) ? snaps : (snaps.data ?? [])).map((s: { fileId: string }) => s.fileId)
+  );
+  for (const [, fileId] of fileIds) {
+    if (have.has(fileId)) continue;
+    const res = await request.post(`/api/v1/monitor/networks/${id}/snapshots`, {
+      data: { fileId },
+    });
+    expect(res.ok(), `adding snapshot failed: ${res.status()}`).toBeTruthy();
+  }
+  return id;
+}
+
+/**
+ * Assert the Monitor half of the demo has something to show.
+ *
+ * The walkthrough films network insights (step 11) rather than generating them —
+ * a ~20s+ LLM call at the very end of a long recording. This fails loudly, and
+ * early, rather than letting the run reach step 11 and film an empty panel.
+ */
+export async function assertNetworkInsights(
+  request: APIRequestContext,
+  networkId: string
+): Promise<void> {
+  const res = await request.get(`/api/v1/monitor/networks/${networkId}/insights/latest`);
+  expect(
+    res.ok(),
+    'network insights have not been generated — generate them before recording'
+  ).toBeTruthy();
+  expect((await res.json()).status, 'network insights are not COMPLETED').toBe('COMPLETED');
 }
 
 /** Delete any existing demo network so each recording starts from a clean slate. */

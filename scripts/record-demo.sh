@@ -16,12 +16,31 @@ OUT="${1:-$REPO_ROOT/sample-files/TracePcap-Demo.gif}"
 VIDEO_DIR="$REPO_ROOT/frontend/test-results"
 BASE_URL="${E2E_BASE_URL:-http://localhost:8888}"
 
-# Tuning knobs. 800px matches the previous README GIF; 10fps/128 colors keeps a
-# ~25s walkthrough near ~3MB, which is about where GitHub stops rendering it
-# promptly. Raising any of these grows the file fast — check the printed size.
-WIDTH="${DEMO_WIDTH:-800}"
-FPS="${DEMO_FPS:-10}"
-MAX_COLORS="${DEMO_COLORS:-96}"
+# Tuning knobs for the full eleven-section walkthrough (~75s once the LLM waits
+# are raced). Expect ~7MB. That is above the ~3MB where GitHub renders a GIF
+# promptly — the walkthrough covers the whole product, and cutting it to 3MB
+# means cutting sections, not settings. Check the printed size after any change.
+#
+# Per-10s-segment cost is near-uniform (0.6–1.6MB), so there is no expensive
+# section to trim: the levers here are all global. Measured on this walkthrough,
+# against the fast-forwarded source:
+#           256c    128c
+#   640/6fps  9.1M   6.6M
+#   640/5fps  8.2M   6.2M
+#   560/6fps  7.5M     —
+#   480/6fps  5.8M     —
+# Resolution is the weakest lever of the three and the most costly: this is a UI
+# demo, so text legibility is the point, and 480px starts to blur it.
+#
+# MAX_COLORS is the strongest lever, contrary to what a single-frame measurement
+# suggests. The topology graph does carry ~15k distinct colours in one frame, but
+# it is a few seconds of a 75s tour; across the whole walkthrough 256->128 costs
+# ~40dB PSNR on the *worst* frames (topology, world map, pie charts) — visually
+# indistinguishable — and saves 2.5MB. Going below 96 does start to posterise the
+# graph, so 128 is the floor worth taking.
+WIDTH="${DEMO_WIDTH:-640}"
+FPS="${DEMO_FPS:-6}"
+MAX_COLORS="${DEMO_COLORS:-128}"
 
 command -v ffmpeg >/dev/null || { echo "error: ffmpeg not found. sudo apt install ffmpeg" >&2; exit 1; }
 
@@ -83,8 +102,14 @@ echo "==> Encoding GIF (${WIDTH}px, ${FPS}fps, ${MAX_COLORS} colors)"
 # Two passes: build a palette tuned to this video, then apply it. A single-pass
 # GIF uses a generic palette and visibly banners flat UI backgrounds.
 FILTERS="fps=${FPS},scale=${WIDTH}:-1:flags=lanczos"
+# stats_mode=full, not diff: `diff` weights the palette toward pixels that change
+# between frames, which on a mostly-static UI means colours that appear only
+# briefly (a chart, a highlighted badge) get approximated from the palette of
+# whatever was on screen longest. Measured across a moving clip, `full` tracks
+# the source more closely (mean error 1.58 vs 1.69 per channel) for ~12% more
+# bytes — worth it, since colour drift is the thing viewers notice.
 ffmpeg -v error -y -i "$SOURCE" \
-  -vf "${FILTERS},palettegen=max_colors=${MAX_COLORS}:stats_mode=diff" "$PALETTE"
+  -vf "${FILTERS},palettegen=max_colors=${MAX_COLORS}:stats_mode=full" "$PALETTE"
 
 # dither=none is both smaller and sharper here (measured: ~700KB cheaper than
 # bayer). Dithering pays off on photographic gradients; on flat UI panels its
