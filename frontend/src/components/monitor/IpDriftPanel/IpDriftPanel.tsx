@@ -7,6 +7,7 @@ import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/mon
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
 import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
 import type { CustomPrivateRange, IpClassification } from '@/features/intelligence/types/customPrivateRange.types';
+import { isPrivateIp, ipInCidr, ipToInt } from '@/utils/ipClassification';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { Pagination } from '@components/common/Pagination/Pagination';
 
@@ -21,36 +22,6 @@ type EntityGroup = {
   active: string[];
   absent: AbsentEntity[];
 };
-
-function isRfc1918(ip: string): boolean {
-  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
-}
-
-function isPrivateIp(ip: string, customRanges: CustomPrivateRange[]): boolean {
-  // A user override wins over the RFC1918 heuristic, in either direction — the first
-  // matching range takes precedence (ranges arrive most-recent-first).
-  const match = customRanges.find(r => ipInCidr(ip, r.cidr));
-  if (match) return match.classification !== 'PUBLIC';
-  return isRfc1918(ip);
-}
-
-function ipToInt(ip: string): number {
-  const parts = ip.split('.').map(Number);
-  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
-}
-
-function ipInCidr(ip: string, cidr: string): boolean {
-  // ipToInt is IPv4-only; a colon means IPv6, which would otherwise both parse to 0
-  // and spuriously match. Bail out so IPv6 addresses never match an IPv4 CIDR (or vice versa).
-  if (ip.includes(':') || cidr.includes(':')) return false;
-  try {
-    const [base, bits] = cidr.split('/');
-    const mask = bits ? (0xffffffff << (32 - parseInt(bits))) >>> 0 : 0xffffffff;
-    return (ipToInt(ip) & mask) === (ipToInt(base) & mask);
-  } catch {
-    return false;
-  }
-}
 
 const CLASSIFICATION_HINT =
   'Addresses are sorted automatically by their range (RFC1918 private vs. public). ' +

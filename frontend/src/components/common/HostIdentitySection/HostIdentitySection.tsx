@@ -13,6 +13,9 @@ import { DEVICE_TYPES, deviceTypeLabel } from '@/utils/deviceType';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { DeviceType, HostIdentityEvidence } from '@/types';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { isPrivateIp } from '@/utils/ipClassification';
+import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
+import type { CustomPrivateRange } from '@/features/intelligence/types/customPrivateRange.types';
 
 /** Predefined override/evidence label options for the Identity panel (matches NodeDetails). */
 const DEVICE_LABELS = DEVICE_TYPES.filter(t => t !== 'UNKNOWN').map(deviceTypeLabel);
@@ -49,20 +52,14 @@ const GEO_SOURCE_LABEL: Record<string, { label: string; title: string }> = {
     title: 'Resolved from the bundled DB-IP Lite database (offline, or ipinfo unreachable). Accuracy may be lower, especially for cloud IPs.',
   },
 };
-
-/**
-/** RFC 1918 / loopback / link-local / ULA — addresses no geo database can (or should) resolve. */
-function isPrivateIp(ip: string): boolean {
-  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:|::1$)/i.test(ip);
-}
-
 /**
  * Geolocation block for a host — country/flag, ASN, org, and geo-source provenance. Always rendered
  * so the section never silently vanishes: when there is no data it states *why* — "Private IP" for
  * internal addresses (which are never geolocated), or "No geolocation on record" for a public IP the
- * geo database didn't resolve.
+ * geo database didn't resolve. Custom private-range overrides feed the private/public decision so the
+ * message agrees with how the rest of the app classifies the address.
  */
-function GeoBlock({ ev }: { ev: HostIdentityEvidence }) {
+function GeoBlock({ ev, isPrivate }: { ev: HostIdentityEvidence; isPrivate: boolean }) {
   const hasGeo = !!(ev.countryCode || ev.country || ev.asn || ev.org);
   const src = ev.geoSource ? GEO_SOURCE_LABEL[ev.geoSource] : undefined;
 
@@ -73,12 +70,11 @@ function GeoBlock({ ev }: { ev: HostIdentityEvidence }) {
   );
 
   if (!hasGeo) {
-    const priv = isPrivateIp(ev.ip);
     return (
       <div className="mb-4">
         {heading}
         <p className="text-muted fst-italic mb-0" style={{ fontSize: '0.78rem' }}>
-          {priv
+          {isPrivate
             ? 'Private IP — not geolocated. Internal addresses (RFC 1918) are not registered to any location.'
             : 'No geolocation on record for this address.'}
         </p>
@@ -184,6 +180,14 @@ export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [expandedAxis, setExpandedAxis] = useState<AxisKey | null>(null);
   const [evidenceInfoOpen, setEvidenceInfoOpen] = useState(false);
+  // Custom private-range overrides, so the "why no geo" message agrees with how the rest of the app
+  // classifies this address (a user can force a public IP internal, or vice versa).
+  const [customRanges, setCustomRanges] = useState<CustomPrivateRange[]>([]);
+  useEffect(() => {
+    let alive = true;
+    customPrivateRangeService.list().then(r => { if (alive) setCustomRanges(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // Guard against a slow response landing after the section has moved to another host.
   const currentIpRef = useRef(ip);
@@ -333,7 +337,7 @@ export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
       </div>
 
       {/* Geolocation — external-host country/ASN/org, restored from the old conversation modal. */}
-      <GeoBlock ev={evidence} />
+      <GeoBlock ev={evidence} isPrivate={isPrivateIp(evidence.ip, customRanges)} />
 
       {/* Explainer modal — how Identity and the evidence axes relate (#499). */}
       <Modal show={evidenceInfoOpen} onHide={() => setEvidenceInfoOpen(false)} centered

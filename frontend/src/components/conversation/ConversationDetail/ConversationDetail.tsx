@@ -19,6 +19,7 @@ import { Pagination } from '@components/common/Pagination/Pagination';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { isPrivateIp } from '@/utils/ipClassification';
 import type { DeviceType } from '@/types';
 import './ConversationDetail.css';
 
@@ -39,11 +40,6 @@ function countryFlag(code: string): string {
     .join('');
 }
 
-function isPrivateIp(ip: string): boolean {
-  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(
-    ip
-  );
-}
 
 const GEO_SOURCE_INFO: Record<string, { label: string; title: string; description: string; bg: string }> = {
   ipinfo: {
