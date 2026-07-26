@@ -10,6 +10,7 @@ import type {
   Packet,
   HostClassification,
   HostIdentity,
+  HostIdentityEvidence,
 } from '@/types';
 import type { ConversationFilters } from '../types';
 
@@ -384,6 +385,20 @@ export const conversationService = {
   /** Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). */
   getHostIdentities: async (fileId: string): Promise<HostIdentity[]> => {
     const response = await apiClient.get<HostIdentity[]>(API_ENDPOINTS.HOST_IDENTITIES(fileId));
+    return response.data;
+  },
+
+  /**
+   * Full explainable classification (verdict + evidence axes) for one host, keyed by fileId+ip —
+   * lets any surface render the graph's "verdict, and why" panel without the graph's node data.
+   */
+  getHostIdentityEvidence: async (
+    fileId: string,
+    ip: string,
+  ): Promise<HostIdentityEvidence> => {
+    const response = await apiClient.get<HostIdentityEvidence>(
+      API_ENDPOINTS.HOST_IDENTITY_EVIDENCE(fileId, ip),
+    );
     return response.data;
   },
 

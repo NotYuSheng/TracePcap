@@ -1687,6 +1687,86 @@
         },
         "type": "object"
       },
+      "HostIdentityEvidenceDto": {
+        "properties": {
+          "answeredConversations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "asn": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "additionalProperties": {
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "contested": {
+            "type": "boolean"
+          },
+          "conversationCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "country": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "geoSource": {
+            "type": "string"
+          },
+          "initiatedConversations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "ndpiApps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "org": {
+            "type": "string"
+          },
+          "peerCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "primaryLabel": {
+            "type": "string"
+          },
+          "serviceRoles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ttl": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "HostSummaryDto": {
         "properties": {
           "conversationCount": {
@@ -5631,6 +5711,47 @@
           }
         },
         "summary": "Adjudicated identity per host for a file (winner-or-contested)",
+        "tags": [
+          "Host Identities"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/hosts/{ip}/identity": {
+      "get": {
+        "description": "The full explainable classification for a single IP — the verdict (label/basis/confidence/contested/candidates) and the measured facts behind it (hardware, service, behaviour) — so any surface holding a fileId+ip can render 'the verdict, and why' without the graph.",
+        "operationId": "getHostIdentityEvidence",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostIdentityEvidenceDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Adjudicated identity plus evidence axes for one host",
         "tags": [
           "Host Identities"
         ]

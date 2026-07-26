@@ -3,10 +3,9 @@ import { useEntityRole } from './hooks/useEntityRole';
 import { useEntityStats } from './hooks/useEntityStats';
 import { useEntityNote } from './hooks/useEntityNote';
 import { useEntityHistory } from './hooks/useEntityHistory';
-import { useHostClassification } from './hooks/useHostClassification';
 import { useIpSnapshotHistory } from './hooks/useIpSnapshotHistory';
 import { RoleSection } from './sections/RoleSection';
-import { HostClassificationSection } from './sections/HostClassificationSection';
+import { HostIdentitySection } from '@components/common/HostIdentitySection';
 import { EntityStatsSection } from './sections/EntityStatsSection';
 import { SnapshotHistoryTable } from './sections/SnapshotHistoryTable';
 import { CaptureHistoryTable } from './sections/CaptureHistoryTable';
@@ -36,7 +35,6 @@ export function EntityDetailModal({
   const { stats, statsLoading, statsError } = useEntityStats(entityType, entityKey, fileId);
   const note = useEntityNote(entityType, entityKey);
   const { history, historyLoading, historyError } = useEntityHistory(entityType, entityKey);
-  const hostClass = useHostClassification(entityType, entityKey, fileId);
   const { ipSnapHistory, ipHistoryLoading, reload: reloadIpHistory } = useIpSnapshotHistory(entityType, entityKey, snapshots);
 
   // ESC closes — but not if a nested IP modal is open (let the nested one handle it first)
@@ -143,8 +141,8 @@ export function EntityDetailModal({
                     so the top card is a read-only present-day summary. */}
                 {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
-                {entityType === 'IP' && hostClass && (
-                  <HostClassificationSection hostClass={hostClass} />
+                {entityType === 'IP' && fileId && (
+                  <HostIdentitySection fileId={fileId} ip={entityKey} zIndex={zIndex} />
                 )}
 
                 {hasFileStats && (

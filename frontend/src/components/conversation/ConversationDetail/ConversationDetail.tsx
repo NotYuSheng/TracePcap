@@ -1,25 +1,25 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import type { Conversation, ConversationGeoInfo, Packet, HostClassification } from '@/types';
+import type { Conversation, ConversationGeoInfo, Packet, HostClassification, HostIdentity } from '@/types';
 import { getExtractionsByConversation } from '@features/extractedFiles/services/extractedFilesService';
+import { conversationService } from '@/features/conversation/services/conversationService';
 import { formatBytes, formatTimestamp, formatIpPort } from '@/utils/formatters';
 import {
   getAppColor,
-  getL7ProtocolColor,
   getTextColor,
   getSeverityColor,
   RISK_BADGE,
   IDS_BADGE,
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
-import { deviceTypeLabel, deviceTypeColor } from '@/utils/deviceType';
+import { deviceTypeLabel, deviceTypeColor, deviceTypeIcon } from '@/utils/deviceType';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
-import { DeviceClassificationPopup } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
-import type { DeviceClassificationInfo } from '@components/common/DeviceClassificationPopup/DeviceClassificationPopup';
+import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import type { DeviceType } from '@/types';
 import './ConversationDetail.css';
 
 interface ConversationDetailProps {
@@ -123,23 +123,125 @@ function GeoInfoRows({ geo, label, ip }: { geo?: ConversationGeoInfo; label: str
     if (!isPrivateIp(ip)) return null;
     return (
       <>
-        <dt className="col-sm-4">{label} Country:</dt>
-        <dd className="col-sm-8">
-          <span className="text-muted">Internal</span>
-        </dd>
+        <dt>{label}</dt>
+        <dd><span className="text-muted">Internal (private)</span></dd>
       </>
     );
   }
   return (
     <>
-      <dt className="col-sm-4">{label} Country:</dt>
-      <dd className="col-sm-8">
+      <dt>{label}</dt>
+      <dd>
         {countryFlag(geo.countryCode)} {geo.country} ({geo.countryCode})
         {geo.asn && <small className="text-muted ms-2">{geo.asn}</small>}
         <GeoSourceBadge source={geo.geoSource} />
         {geo.org && <small className="text-muted d-block">{geo.org}</small>}
       </dd>
     </>
+  );
+}
+
+const confidenceWord = (pct: number): string =>
+  pct >= 75 ? 'Strong' : pct >= 50 ? 'Moderate' : pct >= 25 ? 'Low' : 'Uncertain';
+
+/**
+ * One host in the conversation flow header — its role in this conversation, address, and adjudicated
+ * identity. The whole card is a button that opens the shared host-detail modal (identity + evidence
+ * axes + adjudication), so the analyst sees how the classification was derived and can correct it —
+ * the same panel the network graph uses, rather than a stripped-down popup (#556 follow-up).
+ */
+function HostFlowCard({
+  ip,
+  port,
+  role,
+  hostname,
+  cls,
+  identity,
+  onOpen,
+}: {
+  ip: string;
+  port: number | null;
+  role: 'client' | 'server';
+  hostname?: string;
+  cls?: HostClassification;
+  identity?: HostIdentity;
+  /** Opens the full host-detail modal. Omitted when there is no fileId to load it — the card then
+   *  renders non-interactive rather than as a button whose click silently does nothing. */
+  onOpen?: () => void;
+}) {
+  // Prefer the adjudicated verdict; fall back to the raw device type when identities haven't loaded.
+  const label = identity?.primaryLabel ?? (cls ? deviceTypeLabel(cls.deviceType) : null);
+  // primaryLabel is only a DeviceType code for MACHINE verdicts; a HUMAN label (e.g. "Bob's Laptop")
+  // is free text, so it must not be cast to DeviceType or the icon/colour lookup gets garbage. Fall
+  // back to the machine classification's deviceType for the icon in that case.
+  const deviceType = (
+    identity && identity.basis !== 'HUMAN' ? identity.primaryLabel : cls?.deviceType
+  ) as DeviceType | undefined;
+  const confidence = identity?.confidence ?? cls?.confidence;
+  const contested = identity?.contested ?? false;
+  const iconColor = deviceType ? deviceTypeColor(deviceType) : '#6b7280';
+
+  const inner = (
+    <>
+      {confidence != null && !contested && identity?.basis !== 'HUMAN' && (
+        <span className="cd-conf-pill">{confidence}% {confidenceWord(confidence)}</span>
+      )}
+      <span className={`cd-host-role cd-role-${role}`}>
+        {role === 'client' ? 'Client · initiated' : 'Server · responded'}
+      </span>
+      <span className="cd-host-ip">{formatIpPort(ip, port ?? undefined)}</span>
+      {hostname && <span className="cd-host-hostname">{hostname}</span>}
+      {label && (
+        <span className="cd-identity">
+          <span className="cd-identity-ico" style={{ backgroundColor: iconColor }}>
+            <i className={`bi ${deviceType ? deviceTypeIcon(deviceType) : 'bi-question-circle'}`} aria-hidden="true" />
+          </span>
+          <span className="cd-identity-who">
+            <strong>{label}</strong>
+            <small className="text-muted">
+              {contested ? (
+                <span className="cd-contested"><i className="bi bi-exclamation-triangle" aria-hidden="true" /> contested</span>
+              ) : identity?.basis === 'HUMAN' ? 'Identity · confirmed' : 'Identity'}
+            </small>
+          </span>
+        </span>
+      )}
+      {onOpen && <span className="cd-host-open">Open full host details →</span>}
+    </>
+  );
+
+  // Interactive only when there is a modal to open (needs a fileId). Otherwise a plain, non-focusable
+  // card so the click affordance is never a dead end.
+  return onOpen ? (
+    <button type="button" className="cd-host" onClick={onOpen} aria-label={`Open full details for ${ip}`}>
+      {inner}
+    </button>
+  ) : (
+    <div className="cd-host cd-host-static">{inner}</div>
+  );
+}
+
+/** A collapsible group of conversation metadata rows — replaces the flat dt/dd wall. */
+function MetaGroup({
+  title,
+  note,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  note?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="cd-group" open={defaultOpen}>
+      <summary>
+        <span>{title}</span>
+        {note && <span className="cd-group-note">{note}</span>}
+        <i className="bi bi-chevron-right cd-group-chev" aria-hidden="true" />
+      </summary>
+      <div className="cd-group-body">{children}</div>
+    </details>
   );
 }
 
@@ -172,7 +274,11 @@ export const ConversationDetail = ({
   const [activeTab, setActiveTab] = useState<'packets' | 'session'>('packets');
   const [extractedCount, setExtractedCount] = useState<number | null>(null);
   const [expandedPacketId, setExpandedPacketId] = useState<string | null>(null);
-  const [devicePopup, setDevicePopup] = useState<DeviceClassificationInfo | null>(null);
+  // IP whose full host-detail modal (identity + axes + adjudication) is open, or null.
+  const [hostModalIp, setHostModalIp] = useState<string | null>(null);
+  // Adjudicated identity per host in this file — feeds the flow-header identity chip. The axes and
+  // adjudication tools live in the click-through modal, so this is the only extra fetch we need.
+  const [identityMap, setIdentityMap] = useState<Map<string, HostIdentity>>(new Map());
   const [packetPage, setPacketPage] = useState(1);
   const [packetPageSize, setPacketPageSize] = useState(50);
   const highlightRowRef = useRef<HTMLTableRowElement>(null);
@@ -207,23 +313,20 @@ export const ConversationDetail = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightPacketNumber, conversation.id, packetPageSize]);
 
-  const openDevicePopup = (
-    cls: HostClassification,
-    ip: string,
-    role: 'client' | 'server',
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation();
-    setDevicePopup({
-      ip,
-      deviceType: cls.deviceType,
-      confidence: cls.confidence,
-      manufacturer: cls.manufacturer,
-      ttl: cls.ttl,
-      role,
-      conversationPort: destination.port ?? undefined,
-    });
-  };
+  // Load adjudicated identities for the file's hosts (for the flow-header chip). One call per file.
+  // Also re-run when the host-detail modal closes, so an in-modal "I disagree" override is reflected
+  // in the chip without waiting for a remount.
+  const refreshIdentities = useCallback(() => {
+    if (!fileId) return;
+    conversationService
+      .getHostIdentities(fileId)
+      .then(list => setIdentityMap(new Map(list.map(i => [i.ip, i]))))
+      .catch(() => setIdentityMap(new Map()));
+  }, [fileId]);
+
+  useEffect(() => {
+    refreshIdentities();
+  }, [refreshIdentities]);
 
   useEffect(() => {
     if (!fileId) return;
@@ -281,242 +384,136 @@ export const ConversationDetail = ({
           )}
         </Card.Header>
         <Card.Body>
-          <div className="row">
-            <div className="col-md-6">
-              <dl className="row mb-0">
-                <dt className="col-sm-4">Source:</dt>
-                <dd className="col-sm-8">
-                  {formatIpPort(source.ip, source.port)}
-                  {srcClass && (
-                    <Badge
-                      className="ms-2"
-                      style={{
-                        backgroundColor: deviceTypeColor(srcClass.deviceType),
-                        color: '#fff',
-                        fontSize: '0.7em',
-                        cursor: 'pointer',
-                      }}
-                      title="Click for details"
-                      onClick={e => openDevicePopup(srcClass, source.ip, 'client', e)}
-                    >
-                      {deviceTypeLabel(srcClass.deviceType)}
-                    </Badge>
-                  )}
-                </dd>
-                <dt className="col-sm-4">Destination:</dt>
-                <dd className="col-sm-8">
-                  {formatIpPort(destination.ip, destination.port)}
-                  {dstClass && (
-                    <Badge
-                      className="ms-2"
-                      style={{
-                        backgroundColor: deviceTypeColor(dstClass.deviceType),
-                        color: '#fff',
-                        fontSize: '0.7em',
-                        cursor: 'pointer',
-                      }}
-                      title="Click for details"
-                      onClick={e => openDevicePopup(dstClass, destination.ip, 'server', e)}
-                    >
-                      {deviceTypeLabel(dstClass.deviceType)}
-                    </Badge>
-                  )}
-                  {conversation.hostname && (
-                    <small className="text-info d-block">{conversation.hostname}</small>
-                  )}
-                </dd>
-                <GeoInfoRows geo={conversation.srcGeo} label="Src" ip={source.ip} />
-                <GeoInfoRows geo={conversation.dstGeo} label="Dst" ip={destination.ip} />
-                <dt className="col-sm-4">Protocol:</dt>
-                <dd className="col-sm-8">
-                  {(() => {
-                    const bg = getProtocolColor(conversation.protocol.name);
-                    return (
-                      <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
-                        {conversation.protocol.name}
-                      </Badge>
-                    );
-                  })()}
-                </dd>
-                {conversation.tsharkProtocol && (
-                  <>
-                    <dt className="col-sm-4">Dissected Protocol:</dt>
-                    <dd className="col-sm-8">
-                      {(() => {
-                        const bg = getL7ProtocolColor(conversation.tsharkProtocol!);
-                        return (
-                          <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
-                            {conversation.tsharkProtocol}
-                          </Badge>
-                        );
-                      })()}
-                    </dd>
-                  </>
-                )}
-                {conversation.appName && (
-                  <>
-                    <dt className="col-sm-4">Application:</dt>
-                    <dd className="col-sm-8">
-                      {(() => {
-                        const bg = getAppColor(conversation.appName!);
-                        return (
-                          <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
-                            {conversation.appName}
-                          </Badge>
-                        );
-                      })()}
-                    </dd>
-                  </>
-                )}
-                {conversation.flowRisks && conversation.flowRisks.length > 0 && (
-                  <>
-                    <dt className="col-sm-4">Security Flags:</dt>
-                    <dd className="col-sm-8">
-                      <div className="d-flex flex-wrap gap-1">
-                        {conversation.flowRisks.map(risk => (
-                          <Badge
-                            key={risk}
-                            style={{
-                              backgroundColor: RISK_BADGE.bg,
-                              color: RISK_BADGE.text,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {risk}
-                          </Badge>
-                        ))}
-                      </div>
-                    </dd>
-                  </>
-                )}
-                {conversation.customSignatures && conversation.customSignatures.length > 0 && (
-                  <>
-                    <dt className="col-sm-4">Custom Rules:</dt>
-                    <dd className="col-sm-8">
-                      <div className="d-flex flex-wrap gap-1">
-                        {conversation.customSignatures.map(rule => {
-                          const { bg, text } = getSeverityColor(signatureSeverities[rule]);
-                          return (
-                            <Badge
-                              key={rule}
-                              style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}
-                            >
-                              {rule.replace(/_/g, ' ')}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </dd>
-                  </>
-                )}
-                {conversation.suricataAlerts && conversation.suricataAlerts.length > 0 && (
-                  <>
-                    <dt className="col-sm-4">IDS Alerts:</dt>
-                    <dd className="col-sm-8">
-                      <div className="d-flex flex-wrap gap-1">
-                        {conversation.suricataAlerts.map(alert => (
-                          <Badge
-                            key={alert}
-                            style={{
-                              backgroundColor: IDS_BADGE.bg,
-                              color: IDS_BADGE.text,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {alert}
-                          </Badge>
-                        ))}
-                      </div>
-                    </dd>
-                  </>
-                )}
-                {conversation.httpUserAgents && conversation.httpUserAgents.length > 0 && (
-                  <>
-                    <dt className="col-sm-4">User-Agents:</dt>
-                    <dd className="col-sm-8">
-                      <ul className="mb-0 ps-3">
-                        {conversation.httpUserAgents.map((ua, i) => (
-                          <li key={i}>
-                            <small className="text-break">{ua}</small>
-                          </li>
-                        ))}
-                      </ul>
-                    </dd>
-                  </>
-                )}
-                {conversation.ja3Client && (
-                  <>
-                    <dt className="col-sm-4">JA3 Client:</dt>
-                    <dd className="col-sm-8">
-                      <code className="small">{conversation.ja3Client}</code>
-                    </dd>
-                  </>
-                )}
-                {conversation.ja3Server && (
-                  <>
-                    <dt className="col-sm-4">JA3S Server:</dt>
-                    <dd className="col-sm-8">
-                      <code className="small">{conversation.ja3Server}</code>
-                    </dd>
-                  </>
-                )}
-                {conversation.tlsIssuer && (
-                  <>
-                    <dt className="col-sm-4">TLS Issuer:</dt>
-                    <dd className="col-sm-8">
-                      <small>{conversation.tlsIssuer}</small>
-                    </dd>
-                  </>
-                )}
-                {conversation.tlsSubject && (
-                  <>
-                    <dt className="col-sm-4">TLS Subject:</dt>
-                    <dd className="col-sm-8">
-                      <small>{conversation.tlsSubject}</small>
-                    </dd>
-                  </>
-                )}
-                {conversation.tlsNotBefore != null && (
-                  <>
-                    <dt className="col-sm-4">Cert Valid From:</dt>
-                    <dd className="col-sm-8">
-                      <small>{formatTimestamp(conversation.tlsNotBefore)}</small>
-                    </dd>
-                  </>
-                )}
-                {conversation.tlsNotAfter != null && (
-                  <>
-                    <dt className="col-sm-4">Cert Valid To:</dt>
-                    <dd className="col-sm-8">
-                      <small
-                        className={
-                          conversation.tlsNotAfter < Date.now()
-                            ? 'text-danger fw-semibold'
-                            : undefined
-                        }
-                      >
-                        {formatTimestamp(conversation.tlsNotAfter)}
-                        {conversation.tlsNotAfter < Date.now() && (
-                          <Badge bg="danger" className="ms-1">Expired</Badge>
-                        )}
-                      </small>
-                    </dd>
-                  </>
-                )}
-              </dl>
+          {/* Flow header — the two hosts facing each other across the connection. Each host opens
+              the shared host-detail modal (identity + evidence axes + adjudication). */}
+          <div className="cd-flow">
+            <HostFlowCard
+              ip={source.ip}
+              port={source.port}
+              role="client"
+              cls={srcClass}
+              identity={identityMap.get(source.ip)}
+              onOpen={fileId ? () => setHostModalIp(source.ip) : undefined}
+            />
+
+            <div className="cd-connector">
+              <span className="cd-conn-arrow" aria-hidden="true">→</span>
+              {(() => {
+                const bg = getProtocolColor(conversation.protocol.name);
+                return (
+                  <Badge style={{ backgroundColor: bg, color: getTextColor(bg) }}>
+                    {conversation.protocol.name}
+                    {conversation.tsharkProtocol && ` · ${conversation.tsharkProtocol}`}
+                  </Badge>
+                );
+              })()}
+              {conversation.appName && (
+                <Badge style={{ backgroundColor: getAppColor(conversation.appName), color: getTextColor(getAppColor(conversation.appName)) }}>
+                  {conversation.appName}
+                </Badge>
+              )}
+              <span className="cd-conn-stats">
+                {conversation.packetCount.toLocaleString()} pkts · {formatBytes(conversation.totalBytes)}
+              </span>
             </div>
-            <div className="col-md-6">
-              <dl className="row mb-0">
-                <dt className="col-sm-4">Packets:</dt>
-                <dd className="col-sm-8">{conversation.packetCount.toLocaleString()}</dd>
-                <dt className="col-sm-4">Bytes:</dt>
-                <dd className="col-sm-8">{formatBytes(conversation.totalBytes)}</dd>
-                <dt className="col-sm-4">Start Time:</dt>
-                <dd className="col-sm-8">
-                  <small>{formatTimestamp(conversation.startTime)}</small>
-                </dd>
-              </dl>
+
+            <HostFlowCard
+              ip={destination.ip}
+              port={destination.port}
+              role="server"
+              hostname={conversation.hostname}
+              cls={dstClass}
+              identity={identityMap.get(destination.ip)}
+              onOpen={fileId ? () => setHostModalIp(destination.ip) : undefined}
+            />
+          </div>
+
+          {/* Security strip — flow risks / custom rules / IDS alerts, surfaced up top when present. */}
+          {((conversation.flowRisks?.length ?? 0) > 0 ||
+            (conversation.customSignatures?.length ?? 0) > 0 ||
+            (conversation.suricataAlerts?.length ?? 0) > 0 ||
+            (conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now())) && (
+            <div className="cd-sec-strip">
+              <span className="cd-sec-lead"><i className="bi bi-exclamation-triangle-fill" /> Security signals</span>
+              {conversation.flowRisks?.map(risk => (
+                <span key={risk} className="cd-chip" style={{ backgroundColor: RISK_BADGE.bg, color: RISK_BADGE.text }}>{risk}</span>
+              ))}
+              {conversation.customSignatures?.map(rule => {
+                const { bg, text } = getSeverityColor(signatureSeverities[rule]);
+                return <span key={rule} className="cd-chip" style={{ backgroundColor: bg, color: text }}>{rule.replace(/_/g, ' ')}</span>;
+              })}
+              {conversation.suricataAlerts?.map(alert => (
+                <span key={alert} className="cd-chip" style={{ backgroundColor: IDS_BADGE.bg, color: IDS_BADGE.text }}>{alert}</span>
+              ))}
+              {conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now() && (
+                <span className="cd-chip" style={{ backgroundColor: '#dc2626', color: '#fff' }}>Expired certificate</span>
+              )}
             </div>
+          )}
+
+          {/* Grouped metadata — scannable sections in place of the flat field wall. */}
+          <div className="cd-groups">
+            <MetaGroup title="Timing &amp; Volume" defaultOpen>
+              <dl className="cd-kv">
+                <dt>Packets</dt><dd>{conversation.packetCount.toLocaleString()}</dd>
+                <dt>Bytes</dt><dd>{formatBytes(conversation.totalBytes)}</dd>
+                <dt>Start</dt><dd>{formatTimestamp(conversation.startTime)}</dd>
+              </dl>
+            </MetaGroup>
+
+            {(conversation.srcGeo?.countryCode || conversation.dstGeo?.countryCode ||
+              isPrivateIp(source.ip) || isPrivateIp(destination.ip)) && (
+              <MetaGroup title="Geolocation" defaultOpen>
+                <dl className="cd-kv cd-kv-geo">
+                  <GeoInfoRows geo={conversation.srcGeo} label="Src" ip={source.ip} />
+                  <GeoInfoRows geo={conversation.dstGeo} label="Dst" ip={destination.ip} />
+                </dl>
+              </MetaGroup>
+            )}
+
+            {(conversation.httpUserAgents?.length ?? 0) > 0 && (
+              <MetaGroup title="HTTP" defaultOpen>
+                <dl className="cd-kv">
+                  <dt>User-Agents</dt>
+                  <dd>
+                    <ul className="mb-0 ps-3">
+                      {conversation.httpUserAgents!.map((ua, i) => (
+                        <li key={i}><small className="text-break">{ua}</small></li>
+                      ))}
+                    </ul>
+                  </dd>
+                </dl>
+              </MetaGroup>
+            )}
+
+            {(conversation.ja3Client || conversation.ja3Server || conversation.tlsIssuer ||
+              conversation.tlsSubject || conversation.tlsNotBefore != null ||
+              conversation.tlsNotAfter != null) && (
+              <MetaGroup
+                title="TLS Certificate"
+                defaultOpen
+                note={conversation.tlsNotAfter != null && conversation.tlsNotAfter < Date.now() ? 'expired' : undefined}
+              >
+                <dl className="cd-kv">
+                  {conversation.tlsIssuer && (<><dt>Issuer</dt><dd><small>{conversation.tlsIssuer}</small></dd></>)}
+                  {conversation.tlsSubject && (<><dt>Subject</dt><dd><small>{conversation.tlsSubject}</small></dd></>)}
+                  {conversation.tlsNotBefore != null && (<><dt>Valid from</dt><dd><small>{formatTimestamp(conversation.tlsNotBefore)}</small></dd></>)}
+                  {conversation.tlsNotAfter != null && (
+                    <>
+                      <dt>Valid to</dt>
+                      <dd>
+                        <small className={conversation.tlsNotAfter < Date.now() ? 'text-danger fw-semibold' : undefined}>
+                          {formatTimestamp(conversation.tlsNotAfter)}
+                          {conversation.tlsNotAfter < Date.now() && <Badge bg="danger" className="ms-1">Expired</Badge>}
+                        </small>
+                      </dd>
+                    </>
+                  )}
+                  {conversation.ja3Client && (<><dt>JA3</dt><dd><code className="small">{conversation.ja3Client}</code></dd></>)}
+                  {conversation.ja3Server && (<><dt>JA3S</dt><dd><code className="small">{conversation.ja3Server}</code></dd></>)}
+                </dl>
+              </MetaGroup>
+            )}
           </div>
         </Card.Body>
       </Card>
@@ -708,8 +705,14 @@ export const ConversationDetail = ({
         )}
       </div>
 
-      {devicePopup && (
-        <DeviceClassificationPopup info={devicePopup} onClose={() => setDevicePopup(null)} />
+      {hostModalIp && fileId && (
+        <EntityDetailModal
+          entityType="IP"
+          entityKey={hostModalIp}
+          displayName={hostModalIp}
+          fileId={fileId}
+          onClose={() => { setHostModalIp(null); refreshIdentities(); }}
+        />
       )}
     </div>
   );

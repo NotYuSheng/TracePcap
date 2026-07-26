@@ -93,8 +93,25 @@ describe('axisFacts — behaviour (measured who-opened-it counts)', () => {
     ]);
   });
 
-  it('is empty when no initiator was ever measured (unknown, not guessed)', () => {
+  it('is empty when no initiator was measured AND there is no fan-out to fall back on', () => {
     expect(axisFacts(node({}), 'behaviour')).toEqual([]);
+  });
+
+  it('falls back to raw fan-out when direction was never measured (the router-signal input)', () => {
+    const n = node({ conversationCount: 240, peerCount: 182 });
+    expect(axisFacts(n, 'behaviour')).toEqual([
+      '240 conversations',
+      '182 distinct peers (fan-out)',
+      'who opened each flow was not measured',
+    ]);
+  });
+
+  it('prefers measured direction over the fan-out fallback when both are present', () => {
+    const n = node({ initiatedConversations: 5, conversationCount: 240, peerCount: 182 });
+    expect(axisFacts(n, 'behaviour')).toEqual([
+      'Opened 5 connections',
+      'Never seen answering a connection',
+    ]);
   });
 
   it('never reads the identity candidates (vote reasons are not behaviour facts)', () => {

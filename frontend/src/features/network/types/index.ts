@@ -46,6 +46,12 @@ export interface NodeData {
    *  backend recorded who initiated — flows with no measured initiator count toward neither. */
   initiatedConversations?: number;
   answeredConversations?: number;
+  /** Direction-independent fan-out (#496): total conversations and distinct peers, counted WITHOUT
+   *  the measured-initiator gate. These are the router signal's raw input, so the Behaviour axis can
+   *  still show real evidence on a capture where flow direction was never measured (initiated/
+   *  answered both 0). */
+  conversationCount?: number;
+  peerCount?: number;
   protocols: string[];
   connections: number;
   nodeType: NodeType;
