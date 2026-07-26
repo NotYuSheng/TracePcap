@@ -22,6 +22,13 @@ fi
 chown spring:spring /app/config/signatures.yml 2>/dev/null || true
 chmod 664 /app/config/signatures.yml 2>/dev/null || true
 
+# Ensure the log directory exists and is writable by the spring user. The prod Spring profile
+# logs to a file (${LOG_DIR}/application.log, default /app/logs); the default dev profile is
+# console-only so this is a harmless no-op there. Runs as root so it can create + chown it.
+export LOG_DIR=${LOG_DIR:-/app/logs}
+mkdir -p "${LOG_DIR}"
+chown spring:spring "${LOG_DIR}" 2>/dev/null || true
+
 echo "TracePcap backend starting:"
 echo "  APP_MEMORY_MB        = ${MEM} MB"
 echo "  JVM heap (-Xms/-Xmx) = ${JVM_HEAP_MB} MB"

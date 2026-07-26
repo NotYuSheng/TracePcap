@@ -153,6 +153,38 @@ walkthrough. They are ignored by the base stack.
    build args are set automatically by ``docker-compose.prod.yml`` and derived
    from ``PUBLIC_URL`` — you normally do not set them by hand.
 
+Spring Profile & CORS
+---------------------
+
+The active Spring profile selects dev vs. hardened behaviour. The two
+``*-prod.yml`` overlays set ``SPRING_PROFILES_ACTIVE=prod``; the base stacks
+run ``dev``. See :doc:`../operations/production-hardening` for the full profile
+matrix.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 25 40
+
+   * - Variable
+     - Default
+     - Description
+   * - ``SPRING_PROFILES_ACTIVE``
+     - ``dev`` (base) / ``prod`` (``*-prod.yml`` overlays)
+     - ``prod`` enforces strict CORS, disables Swagger + ``/v3/api-docs``,
+       suppresses stacktraces/exception details in error responses, and logs at
+       WARN to a file.
+   * - ``CORS_ALLOWED_ORIGINS``
+     - dev: localhost list / prod: *(empty)*
+     - Comma-separated allowed browser origins for ``/api``. Under ``prod`` it
+       has **no localhost defaults**; leave it empty for the same-origin shipped
+       stack (nginx proxies ``/api``, so CORS is never exercised). Set it only
+       when the frontend is hosted on a different origin from the API.
+   * - ``LOG_DIR``
+     - ``/app/logs``
+     - Directory for the ``prod`` profile's ``application.log`` (created and
+       owned by the container's non-root user at startup). Ignored under ``dev``
+       (console-only logging).
+
 LLM
 ---
 

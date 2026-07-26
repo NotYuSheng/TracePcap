@@ -26,7 +26,12 @@ public class WebConfig implements WebMvcConfigurer {
         API_PREFIX, HandlerTypePredicate.forBasePackage("com.tracepcap"));
   }
 
-  @Value("${cors.allowed-origins}")
+  // Default to empty: the shipped deployment serves the SPA and proxies /api through the same
+  // nginx origin, so browser→API calls are same-origin and never trigger CORS. The prod profile
+  // sets this from ${CORS_ALLOWED_ORIGINS} with no default, so leaving it unset must not crash the
+  // app — an empty value simply registers no cross-origin allowance. Set it only for a genuinely
+  // cross-origin frontend (e.g. a separately-hosted SPA). The dev profile keeps localhost origins.
+  @Value("${cors.allowed-origins:}")
   private String allowedOrigins;
 
   @Value("${cors.allowed-methods}")
@@ -43,9 +48,16 @@ public class WebConfig implements WebMvcConfigurer {
 
   @Override
   public void addCorsMappings(CorsRegistry registry) {
+    // No configured origins (the same-origin prod default) → register no CORS mapping at all.
+    // Registering with an empty/blank origin list would either allow nothing useful or, with
+    // allowCredentials=true, be an invalid configuration; skipping is the correct no-op.
+    String origins = allowedOrigins == null ? "" : allowedOrigins.trim();
+    if (origins.isEmpty()) {
+      return;
+    }
     registry
         .addMapping("/api/**")
-        .allowedOrigins(allowedOrigins.split(","))
+        .allowedOrigins(origins.split(","))
         .allowedMethods(allowedMethods.split(","))
         .allowedHeaders(allowedHeaders.split(","))
         .allowCredentials(allowCredentials)
