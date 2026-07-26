@@ -114,12 +114,27 @@ export function axisFacts(node: NodeData, axis: AxisKey): string[] {
   // behaviour — the counts behind the role, from the same measured who-opened-it pass (#496).
   const opened = node.initiatedConversations ?? 0;
   const answered = node.answeredConversations ?? 0;
-  if (opened === 0 && answered === 0) return [];
-  const facts: string[] = [];
-  if (opened > 0) facts.push(`Opened ${opened} connection${opened === 1 ? '' : 's'}`);
-  if (answered > 0) facts.push(`Answered ${answered} connection${answered === 1 ? '' : 's'} opened by peers`);
-  else if (opened > 0) facts.push('Never seen answering a connection');
-  return facts;
+  if (opened > 0 || answered > 0) {
+    const facts: string[] = [];
+    if (opened > 0) facts.push(`Opened ${opened} connection${opened === 1 ? '' : 's'}`);
+    if (answered > 0) facts.push(`Answered ${answered} connection${answered === 1 ? '' : 's'} opened by peers`);
+    else if (opened > 0) facts.push('Never seen answering a connection');
+    return facts;
+  }
+
+  // Direction was never measured (UDP/ICMP/ARP-only, or a mid-flow capture) → the initiator gate
+  // above yields nothing. Fall back to the raw fan-out the router signal actually weighs, so a
+  // high-peer host still shows the evidence behind its verdict instead of a blank axis.
+  const convs = node.conversationCount ?? 0;
+  const peers = node.peerCount ?? 0;
+  if (convs > 0 || peers > 0) {
+    const facts: string[] = [];
+    if (convs > 0) facts.push(`${convs} conversation${convs === 1 ? '' : 's'}`);
+    if (peers > 0) facts.push(`${peers} distinct peer${peers === 1 ? '' : 's'} (fan-out)`);
+    facts.push('who opened each flow was not measured');
+    return facts;
+  }
+  return [];
 }
 
 /**

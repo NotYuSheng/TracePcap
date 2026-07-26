@@ -455,6 +455,40 @@ export interface HostIdentity {
   candidates?: { label: string; source: string; score: number; reasons?: string[] }[] | null;
 }
 
+/**
+ * The full explainable classification for one host (#556 follow-up): the adjudicated verdict plus
+ * the measured evidence axes, fetchable from just fileId+ip so every host-inspection surface renders
+ * the same "verdict, and why" experience.
+ */
+export interface HostIdentityEvidence {
+  ip: string;
+  // Verdict
+  primaryLabel: string;
+  basis: 'HUMAN' | 'MACHINE';
+  confidence: number;
+  contested: boolean;
+  candidates?: { label: string; source: string; score: number; reasons?: string[] }[] | null;
+  // Hardware facts
+  manufacturer?: string | null;
+  ttl?: number | null;
+  // Service facts
+  serviceRoles: string[];
+  ndpiApps: string[];
+  // Behaviour facts (#496)
+  initiatedConversations: number;
+  answeredConversations: number;
+  /** Direction-independent fan-out: total conversations / distinct peers, no measured-initiator gate.
+   *  The router signal's raw input, shown when initiated/answered are both 0. */
+  conversationCount: number;
+  peerCount: number;
+  // Geolocation (external hosts only; all null for private/internal IPs).
+  country?: string | null;
+  countryCode?: string | null;
+  asn?: string | null;
+  org?: string | null;
+  geoSource?: string | null;
+}
+
 /** How a host's name was discovered from passive traffic. */
 export type HostnameSource = 'reverse_dns' | 'mdns' | 'nbns' | 'dhcp' | 'manual';
 

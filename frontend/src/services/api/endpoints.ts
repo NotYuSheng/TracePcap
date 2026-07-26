@@ -17,6 +17,9 @@ export const API_ENDPOINTS = {
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,
+  /** Full explainable classification (verdict + evidence axes) for one host. */
+  HOST_IDENTITY_EVIDENCE: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/identity`,
 
   // Adjudication overrides + evidence (generic: any question, keyed by Adjudicator.question())
   ADJUDICATION_OVERRIDE: (fileId: string, question: string, entityKey: string) =>

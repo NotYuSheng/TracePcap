@@ -1,8 +1,11 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.insights.dto.HostIdentityDto;
+import com.tracepcap.insights.dto.HostIdentityEvidenceDto;
 import com.tracepcap.insights.dto.NodeRoleDto;
 import com.tracepcap.insights.repository.HostIdentityRepository;
+import com.tracepcap.insights.service.HostIdentityEvidenceService;
 import com.tracepcap.insights.service.HostIdentityService;
 import com.tracepcap.insights.service.NodeRoleService;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,7 @@ public class HostIdentitiesController {
 
   private final HostIdentityRepository hostIdentityRepository;
   private final HostIdentityService hostIdentityService;
+  private final HostIdentityEvidenceService hostIdentityEvidenceService;
   private final NodeRoleService nodeRoleService;
 
   @GetMapping("/{fileId}/host-identities")
@@ -68,6 +72,24 @@ public class HostIdentitiesController {
                         .build())
             .toList();
     return ResponseEntity.ok(result);
+  }
+
+  @GetMapping("/{fileId}/hosts/{ip}/identity")
+  @Operation(
+      summary = "Adjudicated identity plus evidence axes for one host",
+      description =
+          "The full explainable classification for a single IP — the verdict (label/basis/confidence/"
+              + "contested/candidates) and the measured facts behind it (hardware, service, behaviour) —"
+              + " so any surface holding a fileId+ip can render 'the verdict, and why' without the graph.")
+  public ResponseEntity<HostIdentityEvidenceDto> getHostIdentityEvidence(
+      @PathVariable UUID fileId, @PathVariable String ip) {
+    return ResponseEntity.ok(
+        hostIdentityEvidenceService
+            .evidenceFor(fileId, ip)
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "No host " + ip + " in file " + fileId)));
   }
 
   @GetMapping("/{fileId}/node-roles")
