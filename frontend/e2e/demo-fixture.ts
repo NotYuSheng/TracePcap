@@ -234,16 +234,3 @@ export async function assertNetworkInsights(
   ).toBeTruthy();
   expect((await res.json()).status, 'network insights are not COMPLETED').toBe('COMPLETED');
 }
-
-/** Delete any existing demo network so each recording starts from a clean slate. */
-export async function resetNetwork(request: APIRequestContext): Promise<void> {
-  const list = await request.get('/api/v1/monitor/networks');
-  if (!list.ok()) return;
-  const body = await list.json();
-  const networks = Array.isArray(body) ? body : (body.data ?? []);
-  for (const n of networks) {
-    if (n.name === NETWORK_NAME) {
-      await request.delete(`/api/v1/monitor/networks/${n.id}`);
-    }
-  }
-}

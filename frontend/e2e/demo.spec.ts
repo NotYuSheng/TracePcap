@@ -914,10 +914,15 @@ test('README demo walkthrough', async ({ page }) => {
   // right half of the panel empty.
   const grid = heatmapCard.locator('svg, canvas').first();
   const zoomOut = heatmapCard.locator('[title="Zoom out"]').first();
+  // Budget from the live viewport, not a literal 720: the recording size lives in
+  // playwright.config.ts, and hardcoding it here would silently stop fitting if
+  // that changed. The reserve covers the navbar plus the card's own header,
+  // legend and footnote, which sit outside the grid box being measured.
+  const gridBudget = page.viewportSize()!.height - NAVBAR - 150;
   for (let i = 0; i < 8; i++) {
     if (await zoomOut.isDisabled().catch(() => true)) break;
     const box = await grid.boundingBox();
-    if (box && box.height <= 720 - NAVBAR - 150) break;
+    if (box && box.height <= gridBudget) break;
     await zoomOut.click();
     await page.waitForTimeout(200);
   }
