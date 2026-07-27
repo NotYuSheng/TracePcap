@@ -480,13 +480,13 @@ test('README demo walkthrough', async ({ page }) => {
   const evidence = hostModal.getByText(/Evidence weighed/i).first();
   if (await evidence.isVisible().catch(() => false)) {
     await evidence.evaluate(el => el.scrollIntoView({ block: 'center' }));
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
 
     // Expand the hardware axis — the MAC OUI match that anchors the verdict.
     const hardware = hostModal.getByRole('button', { name: /Hardware/i }).first();
     if (await hardware.isVisible().catch(() => false)) {
       await showClick(page, hardware);
-      await beat(page, HOLD);
+      await beat(page, FEATURE);
     }
   }
   // Back to the conversation modal — the host modal stacked on top of it, so
@@ -513,7 +513,7 @@ test('README demo walkthrough', async ({ page }) => {
   await packetTabs.evaluate(el => el.scrollIntoView({ block: 'start' }));
   // Nudge back up so the tab strip isn't flush against the modal's top edge.
   await convBody.evaluate(el => el.scrollBy(0, -70));
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Both views of the same flow: the packet-by-packet table, then the
   // reassembled session.
@@ -742,7 +742,7 @@ test('README demo walkthrough', async ({ page }) => {
 
   // Then the matched packets themselves.
   await scrollBy(page, 300);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // ── 7. Extracted files ─────────────────────────────────────────────────
   await openTab(page, /Extracted Files/i);
@@ -814,9 +814,9 @@ test('README demo walkthrough', async ({ page }) => {
   await showClick(page, page.locator('[title="Customize node labels"]').first());
   const labelModal = page.getByRole('dialog');
   await expect(labelModal).toBeVisible({ timeout: 10_000 });
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
   await labelModal.locator('.modal-body').evaluate(el => el.scrollBy(0, 600));
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
   await closeAllModals(page);
 
   // Drift the cursor over the three biggest hosts so their hover state and
@@ -840,7 +840,7 @@ test('README demo walkthrough', async ({ page }) => {
     await expect(page.getByText(/Computing layout/i)).toBeHidden({ timeout: 120_000 });
   });
   await showClick(page, page.locator('[title="Fit view"]').first());
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Open one host's details from the graph. The topology is the obvious place a
   // viewer would ask "what is that node?", and the answer — the same identity
@@ -871,7 +871,7 @@ test('README demo walkthrough', async ({ page }) => {
   await beat(page, FEATURE);
   // Scroll past the header so the identity detail is in shot, not just the title.
   await nodeModal.locator('.modal-body').evaluate(el => el.scrollBy(0, 320));
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
   await closeAllModals(page);
 
   // Close the section on the node-to-node volume heatmap: the same traffic the
@@ -942,7 +942,7 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(groupBy, 'group-by control not found').toBeVisible({ timeout: 20_000 });
   await showClick(page, groupBy);
   await groupBy.selectOption('country');
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Italy is a single-host cluster in this capture — small enough that drilling
   // into it lands on one city (Pistoia) rather than a crowded list.
@@ -976,7 +976,7 @@ test('README demo walkthrough', async ({ page }) => {
     await italy.hover();
     await beat(page, HOLD);
     await italy.click();
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
 
     // Drilled in: city markers replace the country view. Click the marker's
     // circle, not its caption — the caption is an unclickable <text> sitting
@@ -992,7 +992,7 @@ test('README demo walkthrough', async ({ page }) => {
       await pistoiaMarker.hover();
       await beat(page, HOLD);
       await pistoiaMarker.click({ force: true });
-      await beat(page, HOLD);
+      await beat(page, FEATURE);
 
       // The city detail is an inline side panel, not a dialog — closeAllModals
       // would be a silent no-op here, so dismiss it via its own close button.
@@ -1108,16 +1108,16 @@ test('README demo walkthrough', async ({ page }) => {
   // through the nav, rather than scrolling the page from the outside. It also
   // puts the nav itself on camera, with the active link tracking the section.
   await gotoSection(page, 'Traffic Overview');
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Change events — the drift the auditor never had to go looking for.
   await gotoSection(page, 'Change Events');
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Devices, then the IP drift panel. 192.0.2.99 is the shadow host: it appears
   // mid-series and never resolves to a labelled device.
   await gotoSection(page, 'Drift Panels');
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   const shadowIp = page.getByText('192.0.2.99', { exact: true }).first();
   if (await shadowIp.isVisible().catch(() => false)) {
@@ -1130,9 +1130,12 @@ test('README demo walkthrough', async ({ page }) => {
     // visible filmed an empty shell. Wait for the body to fill, then hold long
     // enough to actually read it.
     await expect(ipModal.locator('.spinner-border')).toHaveCount(0, { timeout: 30_000 });
-    await beat(page, HOLD);
+    // The shadow host is the point of the drift section, and the modal is dense
+    // — per-snapshot first/last-seen, the role trail, the notes. Give it the
+    // long read hold rather than a landing beat.
+    await beat(page, READ_HOLD);
     await closeAllModals(page);
-    await beat(page, HOLD);
+    await beat(page, BEAT);
   }
 
   // The remaining panels are a stop-by, not destinations.
@@ -1143,7 +1146,7 @@ test('README demo walkthrough', async ({ page }) => {
     'Analyst Annotations',
   ]) {
     await gotoSection(page, label);
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
   }
 
   // Insights close the demo: the LLM correlating the week-7 drop-off with the
@@ -1152,7 +1155,7 @@ test('README demo walkthrough', async ({ page }) => {
   // trades the insight components for footer whitespace as the last thing on
   // screen, and this is the note the eight-week story has been building to.
   await gotoSection(page, 'Network Insights');
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   timeline.write();
 });
