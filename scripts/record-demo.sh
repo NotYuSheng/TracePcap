@@ -16,33 +16,28 @@ OUT="${1:-$REPO_ROOT/sample-files/TracePcap-Demo.gif}"
 VIDEO_DIR="$REPO_ROOT/frontend/test-results"
 BASE_URL="${E2E_BASE_URL:-http://localhost:8888}"
 
-# Tuning knobs for the full eleven-section walkthrough (~75s once the LLM waits
-# are raced). Expect ~7MB. That is above the ~3MB where GitHub renders a GIF
-# promptly — the walkthrough covers the whole product, and cutting it to 3MB
-# means cutting sections, not settings. Check the printed size after any change.
+# Tuning knobs for the full eleven-section walkthrough (~118s once the LLM waits
+# are raced). Expect ~5MB, which GitHub renders inline fine (the limit is ~10MB).
+# Check the printed size after any change.
 #
-# Per-10s-segment cost is near-uniform (0.6–1.6MB), so there is no expensive
-# section to trim: the levers here are all global. Measured on this walkthrough,
-# against the fast-forwarded source:
-#           256c    128c
-#   640/6fps  9.1M   6.6M
-#   640/5fps  8.2M   6.2M
-#   560/6fps  7.5M     —
-#   480/6fps  5.8M     —
-# Resolution is the weakest lever of the three and the most costly: this is a UI
-# demo, so text legibility is the point, and 480px starts to blur it.
+# Per-10s-segment cost is near-uniform, so there is no expensive section to trim:
+# the levers here are all global. Measured on the current walkthrough, against
+# the fast-forwarded source:
+#             256c   128c
+#   640/6fps   7.2M   5.3M
+#   640/5fps     —    5.0M
+#   560/6fps     —    4.8M
+#   480/6fps     —    3.3M
+# Resolution is the weakest lever and the most costly: this is a UI demo, so text
+# legibility is the point, and 480px starts to blur it.
 #
-# MAX_COLORS is the strongest lever: across the whole walkthrough 256->128 costs
-# ~40dB PSNR on the *worst* frames (topology, world map, pie charts) and saves
-# ~2.5MB, and below 96 the graph visibly posterises.
-#
-# Set to 256 deliberately, despite that: this is a UI demo whose colour-coded
-# views (edge-colour modes, the volume gradient, the country choropleth) are the
-# feature being shown, so colour fidelity is worth the bytes here. Drop to 128
-# via DEMO_COLORS=128 if size matters more than the gradients.
+# MAX_COLORS is the strongest lever. 256 -> 128 costs ~40dB PSNR on the worst
+# frames (topology, world map, pie charts) — the colour-coded views still read
+# correctly — and saves ~2MB. Below 96 the graph visibly posterises. Raise it
+# with DEMO_COLORS=256 if the gradients matter more than the download.
 WIDTH="${DEMO_WIDTH:-640}"
 FPS="${DEMO_FPS:-6}"
-MAX_COLORS="${DEMO_COLORS:-256}"
+MAX_COLORS="${DEMO_COLORS:-128}"
 
 command -v ffmpeg >/dev/null || { echo "error: ffmpeg not found. sudo apt install ffmpeg" >&2; exit 1; }
 
