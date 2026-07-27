@@ -340,24 +340,31 @@ test('README demo walkthrough', async ({ page }) => {
     await expect(convModal.getByText(/Reconstructing session/i)).toBeHidden({
       timeout: 60_000,
     });
-    // Re-frame after the content lands, so the tab strip sits near the top of
-    // the modal and the table below it is fully in shot — the pre-click framing
-    // leaves the strip at y≈438 of a 720px viewport, pushing the table off the
-    // bottom edge.
+    // Re-frame after the content lands: the pre-click framing leaves the tab
+    // strip at y≈438 of a 720px viewport, pushing the table off the bottom edge.
     //
-    // Scroll to the end rather than nudging: this modal has only ~230px of
-    // scroll, so the end position is what puts the tabs, the protocol badge and
-    // the payload in frame together.
-    //
-    // Twice, with a settle between. The session panel is taller while it shows
-    // the "Reconstructing…" spinner than it is once the text renders, so the
-    // browser clamps scrollTop when the panel shrinks — a single scroll fired on
-    // the spinner disappearing gets silently undone a frame later, which is
-    // exactly what the recording caught.
-    for (let i = 0; i < 2; i++) {
-      await convBody.evaluate(el => el.scrollTo({ top: el.scrollHeight }));
-      await page.waitForTimeout(ms(400));
+    // Position the strip near the modal's top edge, so the table below it gets
+    // the rest of the height. Anchoring on the strip rather than scrolling
+    // to the bottom matters: the session panel finishes growing *after* the
+    // payload first renders, so scrollHeight read at this moment is stale and a
+    // scrollTo(scrollHeight) stops ~54px short — which is what kept filming the
+    // tab strip at y≈400 with the table hanging off the bottom edge. Scrolling
+    // by the strip's own offset overshoots that stale extent, and the browser
+    // honours it once the content has grown.
+    let settled = 0;
+    let lastMax = -1;
+    for (let i = 0; i < 40 && settled < 4; i++) {
+      const max = await convBody.evaluate(el => el.scrollHeight - el.clientHeight);
+      settled = max === lastMax ? settled + 1 : 0;
+      lastMax = max;
+      await page.waitForTimeout(150);
     }
+    await convBody.evaluate(el => {
+      const strip = el.querySelector('ul.card-header-tabs');
+      if (strip) {
+        el.scrollBy(0, strip.getBoundingClientRect().top - el.getBoundingClientRect().top - 40);
+      }
+    });
     await beat(page, READ);
   }
 
@@ -621,14 +628,19 @@ test('README demo walkthrough', async ({ page }) => {
   // swaps in a magnitude legend. Held on each so the recolour is legible rather
   // than a flicker, and re-framed because the volume mode adds a legend row that
   // grows the card and pushes the header back off the top.
-  const edgeColorSelect = page.locator('select').filter({ hasText: 'Transport' }).first();
-  if (await edgeColorSelect.isVisible().catch(() => false)) {
-    for (const mode of ['application', 'volume', 'transport']) {
-      await edgeColorSelect.selectOption(mode);
-      await page.waitForTimeout(ms(500));
-      await frameTopology();
-      await beat(page, READ);
-    }
+  // Anchored on the option values it must contain, not on its rendered text: the
+  // "Color edges by" Form.Label has no htmlFor, so getByLabel cannot reach it,
+  // and filtering a <select> by hasText matches against its options — which
+  // silently matched nothing here and skipped the whole cycle.
+  const edgeColorSelect = page
+    .locator('select:has(option[value="transport"]):has(option[value="volume"])')
+    .first();
+  await expect(edgeColorSelect, 'edge-colour select not found').toBeVisible({ timeout: 10_000 });
+  for (const mode of ['application', 'volume', 'transport']) {
+    await edgeColorSelect.selectOption(mode);
+    await page.waitForTimeout(ms(500));
+    await frameTopology();
+    await beat(page, READ);
   }
 
   // Node label customization — open, show the preview, close.
