@@ -6,8 +6,9 @@ name: Sync App Version
 # (which is gitignored), so the value has to live in the compose file itself.
 #
 # main is a protected branch (changes must go through a PR), so this cannot push
-# directly. It opens a bump PR and enables auto-merge; the repo requires a PR but no
-# reviews, so the PR merges as soon as it is created. The merge is done with
+# directly. It opens a bump PR and merges it immediately, retrying while GitHub
+# finishes computing mergeability: main requires a PR but no reviews and no status
+# checks, so the PR is mergeable the moment it exists. The merge is done with
 # GITHUB_TOKEN, which by design cannot trigger workflows — so the bump PR merging
 # does not retrigger this workflow or publish-ghcr.yml.
 
@@ -97,5 +98,33 @@ jobs:
               --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest main commit. Opened by .github/workflows/app-version.yml.")
           fi
 
-          # No reviews are required on main, so auto-merge lands this immediately.
-          gh pr merge "$PR_URL" --squash --auto --delete-branch
+          # Step off the bump branch: `gh pr merge --delete-branch` deletes the local
+          # branch too, and git refuses to delete the one that is checked out — which
+          # makes gh exit nonzero even when the remote merge succeeded.
+          git checkout --detach
+
+          # Auto-merge only queues a merge behind pending requirements, and GitHub
+          # rejects it outright for a PR that is already mergeable ("Pull request is
+          # in clean status"). main has no required reviews or status checks, so a
+          # bump PR is always clean on creation and must be merged directly.
+          #
+          # Retry rather than falling back to --auto on any error: right after
+          # `gh pr create` GitHub may still report mergeability as UNKNOWN, and a
+          # blanket `|| gh pr merge --auto` would also mask a real failure (e.g. a
+          # conflict against a moved main) as a green step that never lands the PR.
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge "$PR_URL" --squash --delete-branch; then
+              echo "Merged $PR_URL"
+              exit 0
+            fi
+            # Already merged by a concurrent run — nothing left to do.
+            if [ "$(gh pr view "$PR_URL" --json state --jq .state)" = "MERGED" ]; then
+              echo "$PR_URL is already merged."
+              exit 0
+            fi
+            echo "Merge attempt $attempt failed; mergeability may still be computing. Retrying..."
+            sleep 10
+          done
+
+          echo "::error::Could not merge $PR_URL after 5 attempts — it needs a look."
+          exit 1
