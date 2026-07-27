@@ -103,6 +103,7 @@ function BadgeGroup({
           pageSize={BADGE_GROUP_PAGE_SIZE}
           onPageChange={setPage}
           showPageSizeSelector={false}
+          compact
         />
       )}
     </>

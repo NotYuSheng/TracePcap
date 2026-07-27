@@ -217,6 +217,9 @@ public class DeviceClassifierService implements HostClassifier {
               .winnerScore(winnerScore)
               .runnerUpType(runnerUp != null ? runnerUp.getKey() : null)
               .runnerUpScore(runnerUp != null ? runnerUp.getValue() : null)
+              // Explainability: keep the reasons the vote already produced instead of dropping them.
+              .winnerReasons(joinReasons(board.reasonsFor(deviceType)))
+              .runnerUpReasons(runnerUp != null ? joinReasons(board.reasonsFor(runnerUp.getKey())) : null)
               .build());
     }
 
@@ -258,15 +261,26 @@ public class DeviceClassifierService implements HostClassifier {
     String cat = conv.getCategory();
     if (cat != null && !cat.isBlank()) p.categories.add(cat);
 
-    if (isSrc) {
-      // This host initiated the conversation
-      p.initiatedCount++;
-      if (conv.getDstPort() != null) p.dstPorts.add(conv.getDstPort());
-      p.peers.add(conv.getDstIp());
-    } else {
-      // This host received the conversation
-      if (conv.getDstPort() != null) p.receivedOnPorts.add(conv.getDstPort());
-      p.peers.add(conv.getSrcIp());
+    // Peers are direction-independent — this host talked to the other endpoint either way.
+    p.peers.add(isSrc ? conv.getDstIp() : conv.getSrcIp());
+
+    // Direction comes from the MEASURED initiator (#496), NOT from srcIp/dstIp — those are sorted by
+    // IP order and do not say who opened the connection. When the initiator is unknown (UDP/ICMP/ARP
+    // or a mid-flow capture) we record nothing directional: guessing from ports is the bug this
+    // removes, not the fallback.
+    String initiatorIp = conv.getInitiatorIp();
+    if (initiatorIp != null) {
+      if (initiatorIp.equals(ip)) {
+        p.measuredInitiations++;
+      } else {
+        // This host is the responder — its peer opened the connection. The port it was reached on is
+        // its own port in the flow (srcPort when it sorted as src, dstPort otherwise).
+        p.measuredResponses++;
+        Integer myPort = isSrc ? conv.getSrcPort() : conv.getDstPort();
+        if (myPort != null) p.respondedOnPorts.add(myPort);
+        // The app is one this host SERVED, not merely spoke — gate server/IoT app votes on it (#539).
+        if (app != null && !app.isBlank()) p.servedApps.add(app);
+      }
     }
   }
 
@@ -302,5 +316,13 @@ public class DeviceClassifierService implements HostClassifier {
   /** Joins detected service roles into the comma-separated form stored on the host (null if none). */
   private String joinRoles(Set<String> roles) {
     return (roles == null || roles.isEmpty()) ? null : String.join(",", roles);
+  }
+
+  /**
+   * Joins a signal's reasons into the newline-separated form stored on the host (null if none).
+   * Newline rather than comma: a reason string may itself contain a comma ("listens on 53, 853").
+   */
+  private String joinReasons(List<String> reasons) {
+    return (reasons == null || reasons.isEmpty()) ? null : String.join("\n", reasons);
   }
 }

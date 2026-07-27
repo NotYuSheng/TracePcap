@@ -381,8 +381,11 @@ Known divergence
 Measured against the model above; frozen in the ArchUnit baseline where enforceable. Each entry
 is a refactor target, not a shrug.
 
-* **755 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
-  entities (rule 2). Rule 1 holds at **zero** violations. **Module cycles: zero** — three were
+* **66 class dependencies** bypass ``analysis.spi`` and reach into ``analysis`` repositories or
+  entities (rule 2) — down from 757 (757 → 738 in slice 6a, → 687 in 6b, → 529 in 6c, → 66 in 6d).
+  Approaching the documented residual: 27 are ``DeviceClassifierService`` (accepted, see below), 10
+  are ``extraction``'s cross-module FK, 26 are ``InvestigationService``. Rule 1 holds at **zero**
+  violations. **Module cycles: zero** — three were
   eliminated across slices 1 and 3: ``analysis ↔ file`` (listener moved to its consumer),
   ``monitor ↔ insights`` and ``monitor ↔ subnets`` (a ``monitor.spi`` port package —
   ``LabelStalenessCheck``, ``SnapshotRevalidationHook``, ``InsightPresence`` — implemented by
@@ -405,18 +408,119 @@ is a refactor target, not a shrug.
   of *"100% of Traffic Has Unknown Application, HIGH"* (#501). Remaining extractors (tshark
   enrichment, Suricata when it runs, hostname resolution, service logs) are not yet
   instrumented — their absent rows mean "unknown provenance", same as pre-manifest files.
-* **The frontend scans and adjudicates.** ``networkService.ts`` computes ``nodeType`` from
-  ports/nDPI (scanning) and ``getNodeColor`` resolves the nodeType-vs-deviceType conflict by
-  display precedence (adjudicating) — client-side, on a truncated node set. #496/#499 are the
-  predictable symptoms. The fix direction: these decisions move behind the API; Present consumes
-  adjudications.
+* **Present no longer scans or adjudicates** (#521, resolved). ``networkService.ts`` used to
+  compute ``nodeType`` from ports/nDPI (scanning) and ``getNodeColor`` resolved the
+  nodeType-vs-deviceType conflict by display precedence (adjudicating) — client-side, on a
+  truncated 50-node set, so a host could classify differently depending on what else fit on screen.
+  All four functions (``determineRole``, ``finalizeNodeRole``, ``classifyNodeType``,
+  ``getNodeColor``'s precedence) are deleted. ``role`` reads ``initiatorIp`` (the MEASURED SYN fact,
+  #496); ``nodeType`` is a projection of the adjudicated host identity through one label map, so
+  the two taxonomies that both contained "Web Server" (#499) become one — the adjudicator decides,
+  the graph renders. Legacy files with classifications but no identities backfill lazily on first
+  read of ``GET /files/{fileId}/host-identities`` (idempotent).
 * **The first real adjudicator exists** (slice 5): ``HostIdentityService`` in ``insights`` answers
   "what is this host?" with one voice — human-confirmed node-role labels ranked first, then the
   classification vote (whose runner-up is now persisted so a knife-edge is distinguishable from a
   walkover), with an explicit **contested** outcome listing candidates. Re-adjudication fires on
   ``AnalysisCompletedEvent`` and ``NodeRoleChangedEvent`` (staleness IS re-adjudication, live).
-  Served at ``GET /files/{fileId}/host-identities``. Remaining gap: the frontend still computes
-  its own ``nodeType``/``getNodeColor`` precedence instead of consuming this (#499/#498 close
-  fully when it does — the next slice).
+  Served at ``GET /files/{fileId}/host-identities``, and — as of #521 — this is what the graph
+  renders: the frontend consumes the adjudication instead of computing its own (closing #499).
+* **``insights`` is fully behind the seam** (slice 6b): 34 → **zero**. ``NodeRoleService`` and
+  ``LabelStalenessService`` read hosts through ``HostClassificationLookup`` and external orgs
+  through the new ``GeoOrgLookup``; ``HostClassificationsController`` reads through the port and
+  the new ``IpMacObservationLookup``. Three ports rather than one on purpose — the shapes are
+  genuinely different questions (a host's description, an IP's claimants, a peer set's orgs), and
+  widening one port to serve all three is how a seam decays back into a repository. Note the split
+  *within* ``HostClassificationLookup``: ``ClassifiedHost`` carries the contest (winner + runner-up)
+  for adjudication, ``HostFacts`` carries the description for display and prompt context. Logic the
+  consumers used to duplicate — splitting the comma-joined ``service_roles`` column, grouping
+  observations by IP, filtering blank orgs — now lives in the adapters, which is what makes the
+  port's javadoc a promise rather than a suggestion.
+* **``hostclassification``'s 27 remaining violations are accepted, not pending.** They are all
+  ``DeviceClassifierService.classify``, which *implements* the ``HostClassifier`` port — a port
+  whose own signature returns ``HostClassificationEntity``. The class touches the entity because
+  the seam hands it over; that is the contract working. The rule matches package names and cannot
+  distinguish "reached around the port" from "used the type the port gave you". Clearing them means
+  changing what ``HostClassifier`` returns — the entity conceptually belongs to
+  ``hostclassification`` but physically lives in ``analysis.entity`` for JPA's sake — which is a
+  schema-shaped change, not seam work. Do not "fix" these by rewriting the classifier.
+* **The conversation fact base is behind the seam** (slice 6c): 687 → 529. ``tracer`` 56 → 0,
+  ``monitor`` 66 → 3, ``extraction`` 49 → 10. Consumers read ~24 distinct fields off
+  ``ConversationEntity``, so ``ConversationFacts`` carries **three nested groups rather than 24 flat
+  fields** — and the grouping is the fact grades, which fell out of measuring what each module reads
+  rather than being imposed: ``FlowIdentity`` (MEASURED — endpoints, bytes, times; read by
+  everyone), ``TlsFacts`` (REPORTED — cert subject, JA3, SNI; the fields a host can forge), and
+  ``Findings`` (INFERRED — nDPI app, Suricata alerts, risks). One record and one query, though:
+  three ports would mean three round-trips over the same row. ``PacketLookup`` *is* separate,
+  because the grain differs — folding packets into a conversation would drag thousands of rows
+  behind every timeline bin.
+* **Two structural reaches that field-level porting cannot close**, both now handled:
+
+  - ``ConversationRepository.buildSpec`` returns ``Specification<ConversationEntity>`` — the entity
+    sits in the *caller's signature*, so ``intelligence``/``conversation``/``story`` were coupled to
+    it by type, not by field access. The port takes ``ConversationFilterParams`` (already on the
+    seam) and keeps the 168-line Specification inside ``analysis``: callers say what they want, not
+    how rows are selected.
+  - ``ExtractedFileEntity`` holds a JPA ``@ManyToOne`` to ``ConversationEntity``. The FK crosses the
+    module boundary *at the schema level*, so no read port removes it — same class as
+    ``DeviceClassifierService``, structural rather than lazy. ``extraction``'s residual is this.
+* **All four stages are registries** — Extract, Scan, Adjudicate and Narrate each discover their
+  own modules, so adding capability is adding one class. Each has a probe module in its tests: one
+  class, registered nowhere, touching nothing in ``main``, asserted on by its *output* rather than
+  by bean counts. Verified live on real captures::
+
+     Extract     3 extractors  (3 DETERMINISTIC)
+     Scan        8 scanners    (8 DETERMINISTIC)
+     Adjudicate  1 adjudicator (1 DETERMINISTIC) — questions: host-identity
+     Narrate     1 narrator    (1 DETERMINISTIC)
+
+  The contracts differ per stage, because the stages differ:
+
+  - **Extract writes.** ``ExtractionTarget`` carries the *mutable* working set; extractors fill in
+    conversations before persistence. The module owns its own enable conditions (Suricata's global
+    kill-switch moved out of ``AnalysisService`` onto ``SuricataService``), and the manifest row is
+    automatic — an extractor cannot forget, and forgetting is the #501 conflation. ``tshark`` gained
+    a manifest row it never had, for free.
+  - **Scan reads.** ``ScanContext`` carries *immutable* facts, memoised so eight scanners asking for
+    the conversation list read the database once. Additive: a new scanner never conflicts.
+  - **Adjudicate is exclusive.** One voice per question — so discovery alone would be the wrong
+    contract. ``AdjudicatorRunner`` refuses to start when two modules claim one question, because
+    picking by bean order would make the answer change with an unrelated refactor. The
+    ``AFTER_COMMIT``/``REQUIRES_NEW`` plumbing that every adjudicator used to copy is written once.
+  - **Narrate reads conclusions.** A narrator that judges is a scanner nobody can inspect. Its
+    output reaches the UI: ``CoverageNarrator`` is DETERMINISTIC and states what the capture could
+    *not* tell us — the section a language model should never write — in front of the LLM's prose.
+    Before the registry every section came from one LLM call, because there was only one way in.
+
+  ``Tier`` lives in ``common.stage``: every stage holds all three tiers, and an extractor and a
+  scanner answer to the same three words. The D/L/H taxonomy is something the code knows, not a
+  table in this document.
+* **Scan was the first stage to get its registry** (slice 6d) — *the first slice that built the
+  playbook rather than clearing the way for it.* ``FindingsService`` held eight detector fields and eight call
+  lines; a ninth detector meant editing it, which is the "edit a core to add capability" this whole
+  architecture exists to prevent. It now injects ``List<Scanner>`` and names nobody.
+
+  The blocker was signature drift: the eight detectors had **five different** ``detect(..)``
+  signatures between them, so there was no common interface to list-inject — which is *why* no
+  registry existed. ``ScanContext`` collapses them into one, memoising its reads so eight scanners
+  asking for the conversation list read the database once.
+
+  ``story.spi`` now holds the three types the playbook is built on:
+
+  - ``Scanner`` — ``name()``, ``tier()``, ``scan(ScanContext)``. Every implementation is discovered.
+  - ``Tier`` — ``DETERMINISTIC`` / ``LLM`` / ``HUMAN_ASSISTED``, declared by the module itself. The
+    D/L/H taxonomy stops being a table in this document and becomes something the code knows.
+  - ``ScanContext`` — the facts a scanner may read. Growing it as a new scanner needs a new fact is
+    the seam working; a scanner taking a bespoke parameter is not.
+
+  Discovery is Spring ``List<T>`` injection, the pattern ``SnapshotRevalidationHook`` already uses
+  (slice 3) — zero new machinery, and reversible: ``Scanner`` is the contract, and how instances are
+  found can change without touching a scanner.
+
+  **The definition of done, and how it is enforced**: ``ScannerRegistryTest`` declares a probe
+  scanner in a test file, registered nowhere, touching nothing in ``main`` — then asserts on the
+  *finding that comes back through* ``FindingsService``. Its first version checked bean counts
+  instead, and passed against a ``FindingsService`` whose scanner list had been emptied; that is
+  precisely the failure it exists to catch, so it observes output now.
 * **``FilterService`` reads the pcap** to validate LLM-generated filters — the one grey case in
   rule 4, baselined rather than blessed.

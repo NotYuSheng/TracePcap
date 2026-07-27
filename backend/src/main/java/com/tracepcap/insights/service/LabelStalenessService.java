@@ -1,14 +1,14 @@
 package com.tracepcap.insights.service;
 
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.common.adjudication.HumanOverrideEntity;
+import com.tracepcap.common.adjudication.HumanOverrideRepository;
 import com.tracepcap.monitor.spi.LabelStalenessCheck;
 import com.tracepcap.insights.entity.NodeRoleEntity;
 import com.tracepcap.insights.repository.NodeRoleRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,9 +40,14 @@ public class LabelStalenessService implements LabelStalenessCheck {
 
   public static final String ORIGIN_CARRIED_FORWARD = "CARRIED_FORWARD";
 
+  /** Adjudication questions whose human overrides carry forward + go stale in monitor mode (#499). */
+  private static final List<String> OVERRIDE_QUESTIONS =
+      List.of("host-identity", "host-hardware", "host-service", "host-behaviour");
+
   private final NodeRoleRepository nodeRoleRepository;
-  private final HostClassificationRepository hostClassificationRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final HumanOverrideRepository humanOverrideRepository;
+  private final HostClassificationLookup hostClassificationLookup;
+  private final GeoOrgLookup geoOrgLookup;
   private final JdbcTemplate jdbc;
 
   /**
@@ -56,13 +61,25 @@ public class LabelStalenessService implements LabelStalenessCheck {
   @Override
   public List<Drift> carryForwardAndValidate(UUID prevFileId, UUID newFileId) {
     if (newFileId == null) return List.of();
-    // Always clear stale carried rows so a reorder/re-add regenerates cleanly.
+    // Always clear stale carried rows — roles AND overrides — so a reorder/re-add regenerates
+    // cleanly, and so a file disconnected from any predecessor (prevFileId null) doesn't keep
+    // carried overrides standing from whatever it was previously chained to.
     nodeRoleRepository.deleteByFileIdAndOrigin(newFileId, ORIGIN_CARRIED_FORWARD);
+    for (String question : OVERRIDE_QUESTIONS) {
+      humanOverrideRepository.deleteByQuestionAndFileIdAndOrigin(
+          question, newFileId, ORIGIN_CARRIED_FORWARD);
+    }
     if (prevFileId == null) return List.of();
+
+    List<Drift> drifts = new ArrayList<>();
+    // Overrides carry independently of node roles — a network can have adjudication overrides and
+    // not a single confirmed role, and an early return on the role branch used to silently skip
+    // every carried override.
+    drifts.addAll(carryForwardOverrides(prevFileId, newFileId));
 
     List<NodeRoleEntity> confirmed =
         nodeRoleRepository.findByFileIdAndConfirmedByHumanTrue(prevFileId);
-    if (confirmed.isEmpty()) return List.of();
+    if (confirmed.isEmpty()) return drifts;
 
     // Entities already labelled directly on the new file — don't overwrite them.
     Set<String> ownKeys =
@@ -71,7 +88,6 @@ public class LabelStalenessService implements LabelStalenessCheck {
             .map(r -> r.getEntityType() + "|" + r.getEntityKey())
             .collect(Collectors.toSet());
 
-    List<Drift> drifts = new ArrayList<>();
     for (NodeRoleEntity prev : confirmed) {
       if (ownKeys.contains(prev.getEntityType() + "|" + prev.getEntityKey())) continue;
 
@@ -111,11 +127,89 @@ public class LabelStalenessService implements LabelStalenessCheck {
               .origin(ORIGIN_CARRIED_FORWARD)
               .llmSuggested(false)
               .confirmedByHuman(true)
+              // Carry the original annotator forward — the confirmation is theirs, not this run's.
+              .confirmedBy(prev.getConfirmedBy())
               .observedProperties(observed)
               .staleSince(staleSince)
               .staleFields(staleFields)
               .build();
       nodeRoleRepository.save(carried);
+    }
+
+    return drifts;
+  }
+
+  /**
+   * Carries human adjudication overrides (host-identity + the evidence axes) forward from the
+   * previous snapshot onto the new file and flags those whose classifying evidence drifted (#499).
+   * Callers must first clear this file's existing CARRIED_FORWARD rows (done unconditionally in
+   * {@link #carryForwardAndValidate}, ahead of the {@code prevFileId == null} short-circuit, so a
+   * file disconnected from any predecessor still loses its carried overrides). Mirrors the
+   * node-role carry-forward above: an override the analyst set directly on the new file (origin
+   * MANUAL) is left untouched. Staleness is sticky — it persists until the analyst re-affirms or
+   * clears the override.
+   */
+  private List<Drift> carryForwardOverrides(UUID prevFileId, UUID newFileId) {
+
+    List<Drift> drifts = new ArrayList<>();
+    for (String question : OVERRIDE_QUESTIONS) {
+      List<HumanOverrideEntity> prevOverrides =
+          humanOverrideRepository.findByQuestionAndFileId(question, prevFileId);
+      if (prevOverrides.isEmpty()) continue;
+
+      // Entities the analyst has overridden directly on the new file — don't overwrite them.
+      Set<String> ownKeys =
+          humanOverrideRepository.findByQuestionAndFileId(question, newFileId).stream()
+              .filter(o -> !ORIGIN_CARRIED_FORWARD.equals(o.getOrigin()))
+              .map(HumanOverrideEntity::getEntityKey)
+              .collect(Collectors.toSet());
+
+      for (HumanOverrideEntity prev : prevOverrides) {
+        // Carried rows DO carry again: in a monitor chain each snapshot only sees its immediate
+        // predecessor, so skipping CARRIED_FORWARD rows made an override vanish after one hop
+        // (manual on A → carried to B → gone from C). The original actor and sticky staleness
+        // ride along; the node-role carry above has always chained the same way.
+        if (ownKeys.contains(prev.getEntityKey())) continue;
+
+        // Overrides are keyed by IP (host-identity/axes are per-host). Reuse the IP property snapshot.
+        Map<String, Object> observed = computeProperties("IP", prev.getEntityKey(), newFileId);
+        if (!Boolean.TRUE.equals(observed.get("observed"))) continue; // absent in this snapshot
+
+        // A MANUAL override set directly on the previous file has no stored baseline (unlike node
+        // roles, the override endpoint doesn't snapshot one). Derive it from the previous file so the
+        // first carry can still detect drift.
+        Map<String, Object> baseline = prev.getObservedProperties();
+        if (baseline == null || baseline.isEmpty()) {
+          baseline = computeProperties("IP", prev.getEntityKey(), prevFileId);
+        }
+        List<String> changes =
+            (baseline == null || baseline.isEmpty()) ? List.of() : diff(baseline, observed);
+
+        LocalDateTime staleSince = null;
+        List<String> staleFields = null;
+        if (!changes.isEmpty()) {
+          staleSince = prev.getStaleSince() != null ? prev.getStaleSince() : LocalDateTime.now();
+          staleFields = changes;
+          drifts.add(new Drift("IP", prev.getEntityKey(), prev.getLabel(), changes));
+        } else if (prev.getStaleSince() != null) {
+          staleSince = prev.getStaleSince();
+          staleFields = prev.getStaleFields();
+        }
+
+        humanOverrideRepository.save(
+            HumanOverrideEntity.builder()
+                .question(question)
+                .fileId(newFileId)
+                .entityKey(prev.getEntityKey())
+                .label(prev.getLabel())
+                .rationale(prev.getRationale())
+                .actor(prev.getActor())
+                .origin(ORIGIN_CARRIED_FORWARD)
+                .observedProperties(observed)
+                .staleSince(staleSince)
+                .staleFields(staleFields)
+                .build());
+      }
     }
     return drifts;
   }
@@ -133,22 +227,22 @@ public class LabelStalenessService implements LabelStalenessCheck {
     String ip = null;
     if ("IP".equalsIgnoreCase(entityType)) {
       ip = entityKey;
-      hostClassificationRepository
-          .findFirstByFileIdAndIpOrderByIdAsc(fileId, entityKey)
+      hostClassificationLookup
+          .hostFactsByIp(fileId, entityKey)
           .ifPresent(
               h -> {
                 props.put("observed", true);
-                if (h.getMac() != null) props.put("mac", h.getMac());
-                if (h.getDeviceType() != null) props.put("deviceType", h.getDeviceType());
+                if (h.mac() != null) props.put("mac", h.mac());
+                if (h.deviceType() != null) props.put("deviceType", h.deviceType());
               });
     } else if ("DEVICE".equalsIgnoreCase(entityType)) {
       props.put("mac", entityKey);
-      Optional<com.tracepcap.analysis.entity.HostClassificationEntity> host =
-          hostClassificationRepository.findFirstByFileIdAndMacIgnoreCaseOrderByIdAsc(fileId, entityKey);
+      Optional<HostClassificationLookup.HostFacts> host =
+          hostClassificationLookup.hostFactsByMac(fileId, entityKey);
       if (host.isPresent()) {
         props.put("observed", true);
-        ip = host.get().getIp();
-        if (host.get().getDeviceType() != null) props.put("deviceType", host.get().getDeviceType());
+        ip = host.get().ip();
+        if (host.get().deviceType() != null) props.put("deviceType", host.get().deviceType());
       }
     }
 
@@ -210,18 +304,7 @@ public class LabelStalenessService implements LabelStalenessCheck {
     peers.remove(ip);
     peers.remove(null);
     if (peers.isEmpty()) return List.of();
-    return geoOrgs(peers);
-  }
-
-  /**
-   * Distinct non-blank org names for the geo records of the given IPs (proxy for external orgs).
-   */
-  private List<String> geoOrgs(Collection<String> ips) {
-    return ipGeoInfoRepository.findAllByIpIn(ips).stream()
-        .map(IpGeoInfoEntity::getOrg)
-        .filter(o -> o != null && !o.isBlank())
-        .distinct()
-        .collect(Collectors.toList());
+    return geoOrgLookup.orgsFor(peers);
   }
 
   // ── Diffing ───────────────────────────────────────────────────────────────────

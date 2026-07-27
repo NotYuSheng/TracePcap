@@ -11,11 +11,21 @@
 # Start:  docker compose -f docker-compose.offline.yml up -d
 # Stop:   docker compose -f docker-compose.offline.yml down
 
+# Container resource limits (issue #378) — mirrors docker-compose.yml. See the commentary there
+# and docs/operations/production-hardening.rst (Container Resource Limits) for sizing guidance.
+# The backend limit tracks APP_MEMORY_MB by default; the entrypoint sizes the JVM heap at 50% of
+# the enforced cgroup limit, leaving headroom for the native tshark/ndpi/Suricata subprocesses.
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: tracepcap-postgres
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: ${POSTGRES_CPU_LIMIT:-2}
+          memory: ${POSTGRES_MEM_LIMIT:-1g}
     environment:
       POSTGRES_DB: tracepcap
       POSTGRES_USER: tracepcap_user
@@ -37,7 +47,13 @@ services:
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: tracepcap-minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          cpus: ${MINIO_CPU_LIMIT:-2}
+          memory: ${MINIO_MEM_LIMIT:-1g}
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -56,9 +72,15 @@ services:
       - tracepcap-network
 
   # MinIO Client (mc) - Create bucket on startup
+  # One-shot bucket bootstrap: it is *meant* to exit 0, so no restart policy here.
   minio-init:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     container_name: tracepcap-minio-init
+    deploy:
+      resources:
+        limits:
+          cpus: ${MINIO_INIT_CPU_LIMIT:-0.5}
+          memory: ${MINIO_INIT_MEM_LIMIT:-128m}
     depends_on:
       - minio
     entrypoint: >
@@ -76,6 +98,14 @@ services:
   backend:
     image: tracepcap-backend:latest
     container_name: tracepcap-backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # Covers JVM heap + non-heap + native tshark/ndpi/Suricata. Tracks APP_MEMORY_MB so the
+          # enforced limit and the app's memory budget cannot silently diverge.
+          memory: ${BACKEND_MEM_LIMIT:-${APP_MEMORY_MB:-2048}m}
+          cpus: ${BACKEND_CPU_LIMIT:-4}
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DATABASE_URL: jdbc:postgresql://postgres:5432/tracepcap
@@ -120,8 +150,17 @@ services:
   nginx:
     image: tracepcap-nginx:latest
     container_name: tracepcap-nginx
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: ${NGINX_CPU_LIMIT:-1}
+          memory: ${NGINX_MEM_LIMIT:-256m}
     environment:
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # The BACKEND's enforced cap, so nginx mirrors the backend's effective budget rather than
+      # sizing the edge body limit from APP_MEMORY_MB alone. See docker-compose.yml.
+      BACKEND_MEM_LIMIT: ${BACKEND_MEM_LIMIT:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
       TZ: Asia/Singapore
     ports:

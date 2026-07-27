@@ -121,12 +121,59 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  background: rgba(13, 17, 23, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px 12px;
   backdrop-filter: blur(6px);
   pointer-events: none;
+
+  /*
+   * Follows the graph canvas's theme, not the page's — [data-graph-theme] is set by
+   * NetworkGraph from the same `darkMode` the canvas uses. Two reasons it cannot be either
+   * a hardcoded colour or the page theme:
+   *   - it was hardcoded dark, so in light mode a dark box floated on a white canvas;
+   *   - PDF capture renders the graph light (forceLight) while the page stays dark, and the
+   *     legend has to come with it or the exported diagram carries a dark box.
+   * Light is the default so a wrapper without the attribute still reads correctly.
+   */
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(13, 17, 23, 0.12);
+}
+
+[data-graph-theme='dark'] .ng-legend {
+  background: rgba(13, 17, 23, 0.72);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/*
+ * On-screen the legend caps its height to the canvas and scrolls when the protocol list is long
+ * (a protocol-zoo capture can list ~20 edge colours). Scrolling needs pointer events, so this
+ * corner no longer pans the graph underneath — an acceptable trade for a legend panel. Not applied
+ * to the forceLight (PDF-capture) render, which keeps full height so the export isn't clipped.
+ */
+.ng-legend--scroll {
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+/* Slim, unobtrusive scrollbar that reads in both canvas themes. */
+.ng-legend--scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(13, 17, 23, 0.28) transparent;
+}
+.ng-legend--scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.ng-legend--scroll::-webkit-scrollbar-thumb {
+  background: rgba(13, 17, 23, 0.28);
+  border-radius: 3px;
+}
+[data-graph-theme='dark'] .ng-legend--scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+[data-graph-theme='dark'] .ng-legend--scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .ng-legend-item {
@@ -143,10 +190,46 @@
   box-shadow: 0 0 4px currentColor;
 }
 
+/* Line swatch for edge-protocol legend entries — a rule, not a dot, so it reads
+   as a connection stroke rather than a node. */
+.ng-legend-line {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Separates the node section from the edge-protocol section. */
+.ng-legend-divider {
+  height: 1px;
+  margin: 3px 0;
+  background: rgba(13, 17, 23, 0.12);
+}
+
+[data-graph-theme='dark'] .ng-legend-divider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ng-legend-heading {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(31, 35, 40, 0.55);
+}
+
+[data-graph-theme='dark'] .ng-legend-heading {
+  color: rgba(201, 209, 217, 0.55);
+}
+
 .ng-legend-label {
   font-size: 11px;
-  color: rgba(201, 209, 217, 0.8);
+  color: rgba(31, 35, 40, 0.85);
   white-space: nowrap;
+}
+
+[data-graph-theme='dark'] .ng-legend-label {
+  color: rgba(201, 209, 217, 0.8);
 }
 
 /* ── Hidden neighbor tooltip ───────────────────────────────── */
@@ -226,4 +309,24 @@
 
 .nd-css-fullscreen .network-diagram-graph-body .network-graph-wrapper {
   height: 100%;
+}
+
+/* Diagram fullscreen launched from inside the monitor dialog. Like the heatmap's
+   over-modal variant, it must stack ABOVE Bootstrap's modal (~1055); the shared
+   .nd-css-fullscreen sits at 1040 and would render behind the dialog. */
+.nd-css-fullscreen-over-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tp-surface, #fff);
+  margin: 0;
+  padding: 1rem;
+}
+
+.nd-css-fullscreen-over-modal .monitor-diagram-graph {
+  flex: 1;
+  min-height: 0;
 }

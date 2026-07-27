@@ -10,6 +10,7 @@ import type {
   Packet,
   HostClassification,
   HostIdentity,
+  HostIdentityEvidence,
 } from '@/types';
 import type { ConversationFilters } from '../types';
 
@@ -20,6 +21,9 @@ interface ConversationApiResponse {
   srcPort: number | null;
   dstIp: string;
   dstPort: number | null;
+  /** Who sent SYN without ACK (#496). Null when unknown — no handshake, or capture joined mid-flow. */
+  initiatorIp?: string | null;
+  initiatorPort?: number | null;
   protocol: string;
   appName?: string | null;
   tsharkProtocol?: string | null;
@@ -53,6 +57,9 @@ interface PacketApiResponse {
   srcPort: number | null;
   dstIp: string;
   dstPort: number | null;
+  /** Who sent SYN without ACK (#496). Null when unknown — no handshake, or capture joined mid-flow. */
+  initiatorIp?: string | null;
+  initiatorPort?: number | null;
   protocol: string;
   packetSize: number;
   info: string | null;
@@ -100,6 +107,8 @@ function transformConversation(
   return {
     id: apiData.conversationId,
     endpoints: [srcEndpoint, dstEndpoint],
+    initiatorIp: apiData.initiatorIp ?? undefined,
+    initiatorPort: apiData.initiatorPort ?? undefined,
     protocol: getProtocol(apiData.protocol),
     appName: apiData.appName ?? undefined,
     tsharkProtocol: apiData.tsharkProtocol ?? undefined,
@@ -376,6 +385,20 @@ export const conversationService = {
   /** Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). */
   getHostIdentities: async (fileId: string): Promise<HostIdentity[]> => {
     const response = await apiClient.get<HostIdentity[]>(API_ENDPOINTS.HOST_IDENTITIES(fileId));
+    return response.data;
+  },
+
+  /**
+   * Full explainable classification (verdict + evidence axes) for one host, keyed by fileId+ip —
+   * lets any surface render the graph's "verdict, and why" panel without the graph's node data.
+   */
+  getHostIdentityEvidence: async (
+    fileId: string,
+    ip: string,
+  ): Promise<HostIdentityEvidence> => {
+    const response = await apiClient.get<HostIdentityEvidence>(
+      API_ENDPOINTS.HOST_IDENTITY_EVIDENCE(fileId, ip),
+    );
     return response.data;
   },
 

@@ -1,9 +1,9 @@
 package com.tracepcap.tracer.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.PacketEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.PacketRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.PacketLookup;
+import com.tracepcap.analysis.spi.PacketLookup.PacketFacts;
 import com.tracepcap.common.exception.LlmException;
 import com.tracepcap.story.service.LlmClient;
 import com.tracepcap.tracer.dto.*;
@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ConversationTracerService {
 
-  private final ConversationRepository conversationRepository;
-  private final PacketRepository packetRepository;
+  private final ConversationLookup conversationLookup;
+  private final PacketLookup packetLookup;
   private final LlmClient llmClient;
 
   /** LRU cache (max 500 entries) to avoid repeating LLM calls for the same conversation. */
@@ -37,36 +37,36 @@ public class ConversationTracerService {
   // ── Public API ────────────────────────────────────────────────────────────
 
   public TracerStepsResponse getSteps(UUID conversationId) {
-    ConversationEntity conv = conversationRepository.findById(conversationId)
+    ConversationFacts conv = conversationLookup.conversationFactsById(conversationId)
         .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
 
-    List<PacketEntity> packets =
-        packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
+    List<PacketFacts> packets =
+        packetLookup.packetsInConversation(conversationId);
 
     List<TracerStep> steps = new ArrayList<>();
     for (int i = 0; i < packets.size(); i++) {
-      PacketEntity p = packets.get(i);
-      String direction = p.getSrcIp().equals(conv.getSrcIp()) ? "CLIENT" : "SERVER";
+      PacketFacts p = packets.get(i);
+      String direction = p.srcIp().equals(conv.flow().srcIp()) ? "CLIENT" : "SERVER";
       steps.add(TracerStep.builder()
           .stepIndex(i)
-          .packetNumber(p.getPacketNumber())
-          .timestamp(p.getTimestamp() != null ? p.getTimestamp().format(TS_FMT) : null)
+          .packetNumber(p.packetNumber())
+          .timestamp(p.timestamp() != null ? p.timestamp().format(TS_FMT) : null)
           .direction(direction)
-          .protocol(p.getProtocol())
-          .size(p.getPacketSize())
-          .info(p.getInfo())
-          .payloadHex(p.getPayload())
+          .protocol(p.protocol())
+          .size(p.packetSize())
+          .info(p.info())
+          .payloadHex(p.payload())
           .build());
     }
 
     return TracerStepsResponse.builder()
         .conversationId(conversationId.toString())
-        .srcIp(conv.getSrcIp())
-        .srcPort(conv.getSrcPort())
-        .dstIp(conv.getDstIp())
-        .dstPort(conv.getDstPort())
-        .protocol(conv.getProtocol())
-        .appName(conv.getAppName())
+        .srcIp(conv.flow().srcIp())
+        .srcPort(conv.flow().srcPort())
+        .dstIp(conv.flow().dstIp())
+        .dstPort(conv.flow().dstPort())
+        .protocol(conv.flow().protocol())
+        .appName(conv.findings().appName())
         .steps(steps)
         .build();
   }
@@ -78,16 +78,16 @@ public class ConversationTracerService {
    * which is reliable across protocols (ARP, ICMP, TCP/UDP port scans) regardless of nDPI risks.
    */
   public TracerPeersResponse getPeers(UUID conversationId) {
-    ConversationEntity conv = conversationRepository.findById(conversationId)
+    ConversationFacts conv = conversationLookup.conversationFactsById(conversationId)
         .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
 
-    String hostIp = conv.getSrcIp();
-    UUID fileId = conv.getFile().getId();
+    String hostIp = conv.flow().srcIp();
+    UUID fileId = conv.fileId();
 
-    List<ConversationEntity> hostConvs = conversationRepository.findByFileIdAndIp(fileId, hostIp);
+    List<ConversationFacts> hostConvs = conversationLookup.conversationFactsForIp(fileId, hostIp);
 
     Set<UUID> respondedConvIds = new HashSet<>(
-        packetRepository.findConversationIdsWithReplyFromPeer(fileId, hostIp));
+        packetLookup.conversationIdsWithReplyFromPeer(fileId, hostIp));
 
     // Aggregate per peer IP: a peer counts as responding if any of its conversations had a reply.
     // Preserve packetCount-desc ordering from the query via a LinkedHashMap.
@@ -95,18 +95,18 @@ public class ConversationTracerService {
     Map<String, Long> packetTotals = new HashMap<>();
     Map<String, Boolean> respondedByPeer = new HashMap<>();
 
-    for (ConversationEntity c : hostConvs) {
-      String peerIp = hostIp.equals(c.getSrcIp()) ? c.getDstIp() : c.getSrcIp();
+    for (ConversationFacts c : hostConvs) {
+      String peerIp = hostIp.equals(c.flow().srcIp()) ? c.flow().dstIp() : c.flow().srcIp();
       if (peerIp == null || peerIp.equals(hostIp)) continue;
-      boolean replied = respondedConvIds.contains(c.getId());
+      boolean replied = respondedConvIds.contains(c.id());
       respondedByPeer.merge(peerIp, replied, Boolean::logicalOr);
-      packetTotals.merge(peerIp, c.getPacketCount() != null ? c.getPacketCount() : 0L, Long::sum);
+      packetTotals.merge(peerIp, c.flow().packetCount(), Long::sum);
       byPeer.computeIfAbsent(
           peerIp,
           ip -> TracerPeer.builder()
               .ip(ip)
-              .conversationId(c.getId().toString())
-              .protocol(c.getProtocol()));
+              .conversationId(c.id().toString())
+              .protocol(c.flow().protocol()));
     }
 
     List<TracerPeer> peers = byPeer.entrySet().stream()
@@ -134,11 +134,11 @@ public class ConversationTracerService {
           .build();
     }
 
-    ConversationEntity conv = conversationRepository.findById(conversationId)
+    ConversationFacts conv = conversationLookup.conversationFactsById(conversationId)
         .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + conversationId));
 
-    List<PacketEntity> packets =
-        packetRepository.findByConversationIdOrderByPacketNumberAsc(conversationId);
+    List<PacketFacts> packets =
+        packetLookup.packetsInConversation(conversationId);
 
     if (packets.isEmpty()) {
       return TracerExplainResponse.builder()
@@ -177,7 +177,7 @@ public class ConversationTracerService {
 
   // ── Prompt building ───────────────────────────────────────────────────────
 
-  private String buildSystemPrompt(ConversationEntity conv) {
+  private String buildSystemPrompt(ConversationFacts conv) {
     return """
         You are a network protocol expert analysing a packet capture (PCAP) file.
         For each packet in the conversation below, provide a concise 1-2 sentence plain-English explanation of what is happening at that network step.
@@ -186,30 +186,30 @@ public class ConversationTracerService {
         STEP <n>: <explanation>
         Keep each explanation to 1-2 sentences. Use plain language suitable for a security analyst.
         Conversation: %s:%s -> %s:%s (%s%s)""".formatted(
-        conv.getSrcIp(),
-        conv.getSrcPort() != null ? conv.getSrcPort() : "?",
-        conv.getDstIp(),
-        conv.getDstPort() != null ? conv.getDstPort() : "?",
-        conv.getProtocol(),
-        conv.getAppName() != null ? " / " + conv.getAppName() : "");
+        conv.flow().srcIp(),
+        conv.flow().srcPort() != null ? conv.flow().srcPort() : "?",
+        conv.flow().dstIp(),
+        conv.flow().dstPort() != null ? conv.flow().dstPort() : "?",
+        conv.flow().protocol(),
+        conv.findings().appName() != null ? " / " + conv.findings().appName() : "");
   }
 
-  private String buildUserPrompt(ConversationEntity conv, List<PacketEntity> packets) {
+  private String buildUserPrompt(ConversationFacts conv, List<PacketFacts> packets) {
     StringBuilder sb = new StringBuilder();
     sb.append("Explain each of the following ").append(packets.size())
         .append(" packets in the conversation.\n\n");
 
     for (int i = 0; i < packets.size(); i++) {
-      PacketEntity p = packets.get(i);
-      String dir = p.getSrcIp().equals(conv.getSrcIp()) ? "CLIENT->SERVER" : "SERVER->CLIENT";
+      PacketFacts p = packets.get(i);
+      String dir = p.srcIp().equals(conv.flow().srcIp()) ? "CLIENT->SERVER" : "SERVER->CLIENT";
       sb.append("Packet ").append(i + 1).append(":\n");
       sb.append("  Direction: ").append(dir).append("\n");
-      sb.append("  Protocol: ").append(p.getProtocol()).append("\n");
-      sb.append("  Size: ").append(p.getPacketSize()).append(" bytes\n");
-      if (p.getInfo() != null && !p.getInfo().isBlank()) {
-        sb.append("  Info: ").append(p.getInfo()).append("\n");
+      sb.append("  Protocol: ").append(p.protocol()).append("\n");
+      sb.append("  Size: ").append(p.packetSize()).append(" bytes\n");
+      if (p.info() != null && !p.info().isBlank()) {
+        sb.append("  Info: ").append(p.info()).append("\n");
       }
-      String ascii = extractAsciiPayload(p.getPayload());
+      String ascii = extractAsciiPayload(p.payload());
       if (!ascii.isEmpty()) {
         sb.append("  Payload (ASCII): ").append(ascii).append("\n");
       }

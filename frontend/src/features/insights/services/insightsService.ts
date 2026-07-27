@@ -21,6 +21,12 @@ export const insightsService = {
         throw err;
       }),
 
+  /** All human-confirmed roles in a file — bulk read for graph-wide display (node labels). */
+  listNodeRoles: (fileId: string): Promise<NodeRole[]> =>
+    apiClient
+      .get<NodeRole[]>(INSIGHTS_ENDPOINTS.NODE_ROLES_BY_FILE(fileId))
+      .then(r => r.data ?? []),
+
   upsertNodeRole: (
     entityType: string,
     entityKey: string,

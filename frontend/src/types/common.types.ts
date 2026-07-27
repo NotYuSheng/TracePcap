@@ -52,6 +52,17 @@ export interface ConversationGeoInfo {
 export interface Conversation {
   id: string;
   endpoints: [NetworkEndpoint, NetworkEndpoint];
+  /**
+   * The endpoint that opened the connection — sent SYN without ACK (#496). MEASURED.
+   *
+   * <p>Not `endpoints[0]`: A→B and B→A are normalised into one conversation, so the first endpoint
+   * is whichever sorted first, not who started it.
+   *
+   * Undefined means **unknown**, never "nobody initiated" — UDP/ICMP/ARP have no handshake, and a
+   * capture can join mid-flow. Do not fill the gap by guessing from port numbers: that was #496.
+   */
+  initiatorIp?: string;
+  initiatorPort?: number;
   protocol: Protocol;
   appName?: string;
   tsharkProtocol?: string;
@@ -440,8 +451,42 @@ export interface HostIdentity {
   confidence: number;
   /** True when machine candidates were too close to call; render the contest, not the winner. */
   contested: boolean;
-  /** Competing candidates when contested. */
-  candidates?: { label: string; source: string; score: number }[] | null;
+  /** Competing candidates when contested; each carries the reasons that voted for it. */
+  candidates?: { label: string; source: string; score: number; reasons?: string[] }[] | null;
+}
+
+/**
+ * The full explainable classification for one host (#556 follow-up): the adjudicated verdict plus
+ * the measured evidence axes, fetchable from just fileId+ip so every host-inspection surface renders
+ * the same "verdict, and why" experience.
+ */
+export interface HostIdentityEvidence {
+  ip: string;
+  // Verdict
+  primaryLabel: string;
+  basis: 'HUMAN' | 'MACHINE';
+  confidence: number;
+  contested: boolean;
+  candidates?: { label: string; source: string; score: number; reasons?: string[] }[] | null;
+  // Hardware facts
+  manufacturer?: string | null;
+  ttl?: number | null;
+  // Service facts
+  serviceRoles: string[];
+  ndpiApps: string[];
+  // Behaviour facts (#496)
+  initiatedConversations: number;
+  answeredConversations: number;
+  /** Direction-independent fan-out: total conversations / distinct peers, no measured-initiator gate.
+   *  The router signal's raw input, shown when initiated/answered are both 0. */
+  conversationCount: number;
+  peerCount: number;
+  // Geolocation (external hosts only; all null for private/internal IPs).
+  country?: string | null;
+  countryCode?: string | null;
+  asn?: string | null;
+  org?: string | null;
+  geoSource?: string | null;
 }
 
 /** How a host's name was discovered from passive traffic. */

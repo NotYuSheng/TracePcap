@@ -1,6 +1,6 @@
 package com.tracepcap.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -33,26 +33,26 @@ public final class TlsAnomalyUtil {
     return KNOWN_CA_KEYWORDS.stream().anyMatch(lower::contains);
   }
 
-  public static boolean isExpired(ConversationEntity conv) {
-    return conv.getTlsNotAfter() != null && conv.getTlsNotAfter().isBefore(LocalDateTime.now());
+  public static boolean isExpired(ConversationFacts conv) {
+    return conv.tls().tlsNotAfter() != null && conv.tls().tlsNotAfter().isBefore(LocalDateTime.now());
   }
 
-  public static boolean isSelfSigned(ConversationEntity conv) {
-    return conv.getTlsSubject() != null
-        && conv.getTlsIssuer() != null
-        && conv.getTlsSubject().equalsIgnoreCase(conv.getTlsIssuer());
+  public static boolean isSelfSigned(ConversationFacts conv) {
+    return conv.tls().tlsSubject() != null
+        && conv.tls().tlsIssuer() != null
+        && conv.tls().tlsSubject().equalsIgnoreCase(conv.tls().tlsIssuer());
   }
 
-  public static boolean isUnknownCa(ConversationEntity conv) {
-    return conv.getTlsIssuer() != null && !isKnownCa(conv.getTlsIssuer());
+  public static boolean isUnknownCa(ConversationFacts conv) {
+    return conv.tls().tlsIssuer() != null && !isKnownCa(conv.tls().tlsIssuer());
   }
 
-  public static boolean isNoteworthy(ConversationEntity conv) {
+  public static boolean isNoteworthy(ConversationFacts conv) {
     if (isExpired(conv)) return true;
     if (isSelfSigned(conv)) return true;
     if (isUnknownCa(conv)) return true;
-    if (conv.getFlowRisks() != null) {
-      for (String r : conv.getFlowRisks()) {
+    {
+      for (String r : conv.findings().flowRisks()) {
         if (r.contains("tls") || r.contains("certificate") || r.contains("ssl")) return true;
       }
     }

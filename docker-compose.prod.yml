@@ -23,7 +23,15 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: tracepcap-keycloak
+    restart: unless-stopped
     command: ["start-dev", "--import-realm"]
+    # Keycloak is a JVM app too: 1g covers its heap plus the embedded H2 store at this scale.
+    # See docs/operations/production-hardening.rst (Container Resource Limits).
+    deploy:
+      resources:
+        limits:
+          cpus: ${KEYCLOAK_CPU_LIMIT:-2}
+          memory: ${KEYCLOAK_MEM_LIMIT:-1g}
     environment:
       # Demo admin credentials. The Keycloak admin console is reachable on the same public origin
       # (/admin) — override KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD for any real deployment.
@@ -38,11 +46,22 @@ services:
       TZ: Asia/Singapore
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      # Persist Keycloak's embedded H2 store so accounts/credentials created at
+      # runtime in the admin console survive container restart/recreate. Without
+      # this, start-dev keeps its data inside the container and every recreate
+      # wipes all users, forcing a re-import of only the realm-export.json seed.
+      # Scoped to the h2 subdir (not all of /opt/keycloak/data) so the named
+      # volume doesn't nest over the realm-export.json bind mount above.
+      - keycloak_data:/opt/keycloak/data/h2
     networks:
       - tracepcap-network
 
   backend:
     environment:
+      # Activate the prod Spring profile (overrides the base file's `dev`): strict CORS (no
+      # localhost defaults), stacktraces/exception details suppressed in error responses, Swagger
+      # UI + /v3/api-docs disabled, WARN-level logging to file. See docs production-hardening.
+      SPRING_PROFILES_ACTIVE: prod
       TRACEPCAP_AUTH_ENABLED: "true"
       # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
       KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
@@ -64,3 +83,7 @@ services:
     depends_on:
       - backend
       - keycloak
+
+volumes:
+  keycloak_data:
+    driver: local

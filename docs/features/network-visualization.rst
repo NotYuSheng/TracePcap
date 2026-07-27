@@ -36,7 +36,93 @@ they produce multiple edges — one per conversation row.
 
 Edge thickness is fixed: **1.5 px** for edges in a single capture, or **2.5 px**
 for edges that appear in both captures when using the Compare view. Edge width
-does not vary with traffic volume.
+does not vary with traffic volume — volume is carried by color instead, when the
+**Color edges by** control is set to Volume (see below).
+
+Edge Color Modes
+~~~~~~~~~~~~~~~~
+
+The **Color edges by** control above the diagram switches what edge color means:
+
+- **Protocol** (default) — each edge takes its protocol's color.
+- **Volume** — each edge is shaded by its ``totalBytes`` on the
+  :ref:`shared volume color scale <shared-volume-scale>`, the same scale the
+  node-to-node heatmap uses. A gradient legend appears beside the control.
+
+These are alternatives rather than layers. Color is a single channel, and
+encoding two meanings in it at once would make neither readable — so only one is
+active at a time, and whichever is active is accompanied by its legend.
+
+Switching modes repaints the edges in place; it does not re-run the layout, so
+node positions are preserved.
+
+The control is available in both the analysis-mode diagram and the monitor-mode
+snapshot diagram, which share the same underlying graph component.
+
+Node-to-Node Volume Heatmap
+---------------------------
+
+Below the diagram, the **Node-to-Node Volume** panel renders a src×dst matrix of
+the displayed hosts, each cell shaded by the volume between that pair on the
+:ref:`shared volume color scale <shared-volume-scale>`. The diagram answers
+*who talks to whom*; the matrix answers *how much*, which a force-directed
+layout cannot show — a hairball is the wrong shape for "which pair is loudest".
+
+Key properties:
+
+- **Same data as the diagram.** The matrix is aggregated from exactly the
+  filtered edges the diagram is rendering, so filtering the diagram re-fits the
+  matrix too. Note the two aggregate at different levels: a cell is the total
+  across every conversation between a pair, whereas the diagram draws one edge
+  per protocol/app. For a single-protocol pair a cell and its edge are the same
+  number; for a multi-protocol pair the cell is the sum of its edges. Each view
+  normalizes against its own maximum, so compare within a view.
+- **Busiest-first ordering.** Rows and columns are sorted by total volume, so
+  the dark cells cluster toward the top-left and the shape of the matrix itself
+  carries information.
+- **Renders every host.** The grid is drawn to a ``<canvas>``, not a table, so it
+  is not limited the way a DOM grid would be — a 500-host capture is 250,000
+  cells, which as DOM nodes would freeze the tab. Because the matrix is *sparse*,
+  only pairs that actually exchanged traffic are drawn, so cost scales with the
+  number of conversations rather than with N². A sanity cap of 1000 hosts applies;
+  beyond that a cell is under a pixel. Any hosts dropped by that cap are the
+  *quietest*, since the axes are ordered by volume.
+- **Fits, then zooms.** Cell size is fitted to the panel width (2–22px). At high
+  host counts the matrix becomes a dense overview texture where block structure
+  and hotspots are the signal, and axis labels drop out below 9px per cell. The
+  zoom control trades that overview for an inspectable grid that scrolls, and
+  fullscreen gives the fitted view more room — 100 hosts fit with labels at
+  17px per cell in fullscreen, versus 10px in the inline panel.
+- **Cross-filtering.** Clicking a cell highlights that pair in the diagram;
+  selecting a node in the diagram emphasizes its row and column in the matrix.
+- **Axis labels are IP addresses**, shown when cells are at least 9px, and
+  clicking one opens that host's details panel. IPs are used rather than identity
+  or device-type labels because those are not unique — two hosts can carry the
+  same one, which on a matrix axis would leave two rows that cannot be told
+  apart. Hosts with no IP (L2-only nodes) fall back to their MAC. Hovering a
+  cell shows the fuller identity of both endpoints — hostname and adjudicated
+  identity where known — in the readout beneath the grid.
+
+The panel appears in two places, with the same canvas rendering, zoom and
+fullscreen in both:
+
+- the **Network Topology Diagram** tab in analysis mode
+  (``/analysis/<fileId>/network-diagram``), below the diagram;
+- the **Network Diagram** tab of the snapshot dialog in monitor mode, reached
+  from **Capture Timeline** on a network's detail page.
+
+The one difference is where fullscreen stacks: from the snapshot dialog it must
+sit *above* the modal containing it, so it uses its own overlay rather than the
+shared card treatment. In the dialog the panel is collapsed by default, since
+that view is already dense and the diagram is the primary subject.
+
+.. note::
+
+   Cells are directed (row = source, column = destination), but each
+   conversation's ``totalBytes`` covers **both** directions of that exchange. A
+   cell therefore reads as "volume of the exchanges this host initiated", not
+   "bytes this host sent". Separating the two requires per-direction counters,
+   which are not yet captured.
 
 Node Attributes and Their Sources
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -171,76 +257,55 @@ Click a node to open the **Node Detail Panel**, which shows:
 
 - IP address and MAC address
 - Hostname (SNI extracted from TLS ClientHello, if available)
-- Classification badge — click it to open the **Classification popup** (see
-  below)
+- **Identity** — the adjudicated verdict for "what is this host?" (see below)
+- **Evidence weighed** — the measured facts behind the verdict (see below)
+- **Role** — the analyst-assigned name for the host (e.g. *Finance DB*)
 - Packets sent / received and bytes sent / received / total
 - Protocols used across all conversations
 - Connections table: per-peer breakdown sorted by bytes, with application labels
 
-Classification Popup
-~~~~~~~~~~~~~~~~~~~~
+Identity & Evidence (facts → votes → verdict)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Clicking the classification badge opens a popup with three sections:
+Host classification follows a **facts → votes → verdict** model. The browser
+never classifies; it renders the backend's adjudication (see
+:doc:`../architecture/adjudication-explainability`).
 
-**Type** — the node's network topology role, derived from traffic analysis.
-Classification priority (highest first):
+**Identity (the verdict)** — one adjudicated answer per host, with:
 
-1. **nDPI application name** — the most reliable signal, works even on
-   non-standard ports and encrypted flows. Recognised apps:
-   DNS, HTTP, TLS/QUIC, SSH, FTP, SMTP/IMAP/POP, DHCP, NTP, and common
-   databases (MySQL, PostgreSQL, Redis, MongoDB, Elasticsearch).
-2. **Well-known port / protocol** — fallback when nDPI app is unavailable
-   (e.g. port 443/TCP → web server, port 22/TCP → SSH server).
-3. **Router heuristic** — a node with 10 or more distinct peers that is
-   not acting as a server is classified as a Router / Gateway.
-4. **Role fallback** — nodes that match none of the above are classified
-   as ``Client`` (default for most endpoints) or ``Unknown``.
+- The winning device type (e.g. ``Mobile``, ``Router``, ``Web Server``), its
+  **confidence** (computed from the score margin between winner and runner-up:
+  ``min(100, round(margin × 100 / 60))``), and a **⚠ contested** marker when
+  the margin is too small to assert a winner.
+- **Why** — every candidate type with its score and the human-readable reasons
+  that voted for it (e.g. ``Mobile app "WhatsApp" → +20`` toward ``MOBILE``).
+  One fact can support several candidates.
+- **I disagree** — a first-class human override that sets the verdict.
+- **Add evidence** — an analyst-contributed weighted signal that re-enters the
+  vote (it informs, it does not override).
 
-Node colour in the graph reflects which tier matched:
+**Evidence weighed (the facts)** — three read-only rows listing what was
+*measured*, with no scores and no per-axis conclusion (conclusions belong to
+Identity alone):
 
-- **Specific service types** (dns-server, web-server, ssh-server, etc.)
-  always use their service colour regardless of device classification.
-- **Generic types** (``client``, ``unknown``) show the **device type colour**
-  instead — so an IoT client appears pink and a mobile client appears violet,
-  making hardware diversity visible without requiring a separate filter.
+- **Hardware** — the physical fingerprint: MAC OUI manufacturer and observed
+  TTL.
+- **Ports / Service** — what the host does on the wire: a confirmed service
+  role (DNS/Web/API, detected from its actual responses), or the application
+  nDPI identified in its traffic when no service was detected.
+- **Behaviour** — measured connection direction (who sent the TCP SYN, #496):
+  how many connections the host opened vs. answered. Flows with no measured
+  initiator (UDP, mid-stream captures) count toward neither — unknown is
+  reported as "Nothing observed", never guessed.
 
-Evidence text is shown below the badge (e.g. "42 distinct peers" for a
-router, or the nDPI applications that triggered the classification).
+When the observed service evidence contradicts the Identity verdict (e.g. a
+host that demonstrably served HTTP while the verdict says IoT endpoint), an
+**Evidence conflicts** banner flags it for analyst review.
 
-**Device** — the hardware/OS classification from the multi-signal scorer
-(see :doc:`geolocation` for the full algorithm):
-
-- The device type badge (e.g. ``Mobile``, ``Router``, ``IoT Device``)
-- A bullet list of the signals that contributed:
-
-  - ``MAC OUI matched: <vendor>`` — OUI resolved to a known vendor
-  - ``TTL <N> → <OS family>`` — observed TTL mapped to Linux/Android/iOS,
-    Windows, or Network device (Cisco/BSD)
-  - ``Application traffic profile analysed`` — shown when confidence ≥ 60
-  - ``Network traffic patterns analysed`` — shown when confidence ≥ 25
-
-- A **confidence progress bar** showing the numeric confidence percentage
-  and a qualitative label:
-
-  - **Strong** — ≥ 75%
-  - **Moderate** — ≥ 50%
-  - **Low** — ≥ 25%
-  - **Uncertain** — < 25%
-
-  The confidence is computed from the score margin between the winning device
-  type and the runner-up: ``min(100, round(margin × 100 / 60))``. A margin of
-  60 or more points → 100% (Strong). A tie → 0% (Uncertain).
-
-**Role** — whether this host initiates or receives connections:
-
-- ``Client`` — mostly initiates
-- ``Server`` — mostly receives
-- ``Both`` — significant traffic in both directions
-- Counts of conversations initiated vs. received are shown below the badge
-
-A legend table at the bottom of the popup summarises the signal source for
-each classification dimension (Type: network topology; Device: hardware
-fingerprinting; Role: TCP session direction).
+Node colour in the graph follows the adjudicated identity: service verdicts
+(dns-server, web-server, …) use their service colour; generic endpoints show
+the device-type colour, making hardware diversity visible without a separate
+filter.
 
 Service-Role Detection
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -289,9 +354,10 @@ Node Label Customization
 
 You can control what text is **tagged onto each node** in the topology graph.
 Open the **Node Label** settings to choose which fields render as label lines
-beneath a node — for example IP address, hostname (auto-tagged from the TLS SNI
-/ ClientHello), MAC address, vendor, or device type. A live preview shows the
-chosen layout, and the configuration applies to every node in the graph.
+beneath a node — the analyst-assigned **role** (e.g. *Finance DB*; confirmed
+labels only, shown by default), IP address, hostname (auto-tagged from the TLS
+SNI / ClientHello), MAC address, vendor, or device type. A live preview shows
+the chosen layout, and the configuration applies to every node in the graph.
 
 Hostnames are tagged passively: when a client's name is observed in traffic it
 is attached to the node and available as a label field, with no active probing.

@@ -7,8 +7,9 @@ export const API_ENDPOINTS = {
   FILE_DOWNLOAD: (fileId: string) => `/files/${fileId}/download`,
   FILES_MERGE: '/files/merge',
 
-  // Analysis (Not yet implemented in backend)
+  // Analysis
   ANALYSIS_SUMMARY: (fileId: string) => `/analysis/${fileId}/summary`,
+  ANALYSIS_PROGRESS: (fileId: string) => `/analysis/${fileId}/progress`,
   PROTOCOL_STATS: (fileId: string) => `/analysis/${fileId}/protocols`,
   FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
   KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,
@@ -16,6 +17,17 @@ export const API_ENDPOINTS = {
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,
+  /** Full explainable classification (verdict + evidence axes) for one host. */
+  HOST_IDENTITY_EVIDENCE: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/identity`,
+
+  // Adjudication overrides + evidence (generic: any question, keyed by Adjudicator.question())
+  ADJUDICATION_OVERRIDE: (fileId: string, question: string, entityKey: string) =>
+    `/files/${fileId}/adjudications/${question}/${encodeURIComponent(entityKey)}/override`,
+  ADJUDICATION_EVIDENCE: (fileId: string, question: string, entityKey: string) =>
+    `/files/${fileId}/adjudications/${question}/${encodeURIComponent(entityKey)}/evidence`,
+  ADJUDICATION_EVIDENCE_ITEM: (fileId: string, question: string, entityKey: string, evidenceId: number) =>
+    `/files/${fileId}/adjudications/${question}/${encodeURIComponent(entityKey)}/evidence/${evidenceId}`,
 
   // Conversations
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
@@ -139,6 +151,8 @@ export const SUBNET_ENDPOINTS = {
 export const INSIGHTS_ENDPOINTS = {
   NODE_ROLE: (fileId: string, entityType: string, entityKey: string) =>
     `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,
+  /** All confirmed roles in a file — bulk read for graph-wide node labels. */
+  NODE_ROLES_BY_FILE: (fileId: string) => `/files/${fileId}/node-roles`,
   NODE_ROLE_UPSERT: '/node-roles',
   NODE_ROLE_DELETE: (fileId: string, entityType: string, entityKey: string) =>
     `/node-roles?fileId=${fileId}&entityType=${encodeURIComponent(entityType)}&entityKey=${encodeURIComponent(entityKey)}`,

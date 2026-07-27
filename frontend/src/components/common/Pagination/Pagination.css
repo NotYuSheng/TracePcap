@@ -53,6 +53,33 @@
   border-color: #0056b3;
 }
 
+/* Keep the Previous/Next direction buttons on a single line. Their icon-text variant
+   renders an icon + a label; in narrow containers (the monitor drift panels, where the
+   pager sits in a ~250px column) the label otherwise wraps under the icon — "Previous"
+   drops to a second row and "Next" gets clipped. */
+.pagination-container .pagination .page-link {
+  white-space: nowrap;
+}
+
+/* The pager nav must never overflow its container. Let the page-number list wrap onto
+   another row instead of spilling past the right edge when the column is too narrow. */
+.pagination-container .pagination {
+  flex-wrap: wrap;
+}
+
+/* Compact mode: the pager lives in a narrow column (monitor drift panels). Stack the
+   "Showing X of Y" line above the nav and pull the padding in so it fits without wrapping. */
+.pagination-container--compact {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+  gap: 0.5rem;
+}
+
+.pagination-container--compact .pagination-info {
+  font-size: 0.8rem;
+}
+
 /* Responsive adjustments */
 @media (width <= 768px) {
   .pagination-container {

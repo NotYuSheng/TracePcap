@@ -1,11 +1,12 @@
 package com.tracepcap.monitor.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.entity.HostClassificationEntity;
-import com.tracepcap.analysis.entity.IpGeoInfoEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
-import com.tracepcap.analysis.repository.HostClassificationRepository;
-import com.tracepcap.analysis.repository.IpGeoInfoRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
+import com.tracepcap.analysis.spi.ConversationLookup.Facet;
+import com.tracepcap.analysis.spi.GeoOrgLookup;
+import com.tracepcap.analysis.spi.GeoOrgLookup.IpAttribution;
+import com.tracepcap.analysis.spi.HostClassificationLookup;
+import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.monitor.spi.LabelStalenessCheck;
 import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
 import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
@@ -53,9 +54,9 @@ public class ChangeDetectionService {
   private static final int PRIVATE_172_MIN = 16;
   private static final int PRIVATE_172_MAX = 31;
 
-  private final HostClassificationRepository hostClassificationRepository;
-  private final ConversationRepository conversationRepository;
-  private final IpGeoInfoRepository ipGeoInfoRepository;
+  private final HostClassificationLookup hostClassificationLookup;
+  private final ConversationLookup conversationLookup;
+  private final GeoOrgLookup geoOrgLookup;
   private final NetworkChangeEventRepository changeEventRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
@@ -173,15 +174,15 @@ public class ChangeDetectionService {
       NetworkSnapshotEntity fromSnapshot,
       NetworkSnapshotEntity toSnapshot) {
 
-    Map<String, HostClassificationEntity> fromHosts = macMap(fromFileId);
-    Map<String, HostClassificationEntity> toHosts = macMap(toFileId);
+    Map<String, HostFacts> fromHosts = macMap(fromFileId);
+    Map<String, HostFacts> toHosts = macMap(toFileId);
 
     List<NetworkChangeEventEntity> events = new ArrayList<>();
 
     // New MACs in toSnapshot
-    for (Map.Entry<String, HostClassificationEntity> entry : toHosts.entrySet()) {
+    for (Map.Entry<String, HostFacts> entry : toHosts.entrySet()) {
       if (!fromHosts.containsKey(entry.getKey())) {
-        HostClassificationEntity h = entry.getValue();
+        HostFacts h = entry.getValue();
         events.add(
             buildEvent(
                 toSnapshot.getNetwork().getId(),
@@ -189,12 +190,12 @@ public class ChangeDetectionService {
                 toSnapshot,
                 ChangeType.MAC_ADDED,
                 EntityType.DEVICE,
-                h.getMac(),
+                h.mac(),
                 null,
                 Map.of(
-                    "ip", orEmpty(h.getIp()),
-                    "manufacturer", orEmpty(h.getManufacturer()),
-                    "deviceType", orEmpty(h.getDeviceType())),
+                    "ip", orEmpty(h.ip()),
+                    "manufacturer", orEmpty(h.manufacturer()),
+                    "deviceType", orEmpty(h.deviceType())),
                 Severity.WARNING));
       }
     }
@@ -281,19 +282,19 @@ public class ChangeDetectionService {
     Set<String> fromExternalIps = externalIpsForFile(fromFileId, fromCidrs);
     Set<String> toExternalIps = externalIpsForFile(toFileId, toCidrs);
 
-    Map<String, IpGeoInfoEntity> fromGeo = geoMapFor(fromExternalIps);
-    Map<String, IpGeoInfoEntity> toGeo = geoMapFor(toExternalIps);
+    Map<String, IpAttribution> fromGeo = geoMapFor(fromExternalIps);
+    Map<String, IpAttribution> toGeo = geoMapFor(toExternalIps);
 
     // Build ASN key sets: "asn|org"
-    Map<String, IpGeoInfoEntity> fromAsns = asnMap(fromGeo);
-    Map<String, IpGeoInfoEntity> toAsns = asnMap(toGeo);
+    Map<String, IpAttribution> fromAsns = asnMap(fromGeo);
+    Map<String, IpAttribution> toAsns = asnMap(toGeo);
 
     List<NetworkChangeEventEntity> events = new ArrayList<>();
 
     // New ASNs
-    for (Map.Entry<String, IpGeoInfoEntity> entry : toAsns.entrySet()) {
+    for (Map.Entry<String, IpAttribution> entry : toAsns.entrySet()) {
       if (!fromAsns.containsKey(entry.getKey())) {
-        IpGeoInfoEntity geo = entry.getValue();
+        IpAttribution geo = entry.getValue();
         events.add(
             buildEvent(
                 toSnapshot.getNetwork().getId(),
@@ -304,9 +305,9 @@ public class ChangeDetectionService {
                 entry.getKey(),
                 null,
                 Map.of(
-                    "asn", orEmpty(geo.getAsn()),
-                    "org", orEmpty(geo.getOrg()),
-                    "country", orEmpty(geo.getCountryCode())),
+                    "asn", orEmpty(geo.asn()),
+                    "org", orEmpty(geo.org()),
+                    "country", orEmpty(geo.countryCode())),
                 Severity.INFO));
       }
     }
@@ -318,8 +319,8 @@ public class ChangeDetectionService {
     String toGateway = topExternalIp(toFileId, toGeo, toCidrs);
     // (rules threaded through so force-public overrides beat RFC1918)
     if (fromGateway != null && toGateway != null && !fromGateway.equals(toGateway)) {
-      IpGeoInfoEntity fromGeoEntry = fromGeo.get(fromGateway);
-      IpGeoInfoEntity toGeoEntry = toGeo.get(toGateway);
+      IpAttribution fromGeoEntry = fromGeo.get(fromGateway);
+      IpAttribution toGeoEntry = toGeo.get(toGateway);
       events.add(
           buildEvent(
               toSnapshot.getNetwork().getId(),
@@ -330,12 +331,12 @@ public class ChangeDetectionService {
               "gateway",
               Map.of(
                   "ip", fromGateway,
-                  "asn", fromGeoEntry != null ? orEmpty(fromGeoEntry.getAsn()) : "",
-                  "org", fromGeoEntry != null ? orEmpty(fromGeoEntry.getOrg()) : ""),
+                  "asn", fromGeoEntry != null ? orEmpty(fromGeoEntry.asn()) : "",
+                  "org", fromGeoEntry != null ? orEmpty(fromGeoEntry.org()) : ""),
               Map.of(
                   "ip", toGateway,
-                  "asn", toGeoEntry != null ? orEmpty(toGeoEntry.getAsn()) : "",
-                  "org", toGeoEntry != null ? orEmpty(toGeoEntry.getOrg()) : ""),
+                  "asn", toGeoEntry != null ? orEmpty(toGeoEntry.asn()) : "",
+                  "org", toGeoEntry != null ? orEmpty(toGeoEntry.org()) : ""),
               Severity.CRITICAL));
     }
 
@@ -352,8 +353,8 @@ public class ChangeDetectionService {
 
     if (fromFileId == null) return List.of();
 
-    List<ConversationEntity> fromConvs = conversationRepository.findByFileId(fromFileId);
-    List<ConversationEntity> toConvs = conversationRepository.findByFileId(toFileId);
+    List<ConversationFacts> fromConvs = conversationLookup.conversationFacts(fromFileId);
+    List<ConversationFacts> toConvs = conversationLookup.conversationFacts(toFileId);
 
     Set<String> fromApps = appSet(fromConvs);
     Set<String> toApps = appSet(toConvs);
@@ -473,29 +474,29 @@ public class ChangeDetectionService {
     // IDS alerts (Suricata) — added CRITICAL, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        cleanSet(conversationRepository.findDistinctSuricataAlertsByFileId(fromFileId)),
-        cleanSet(conversationRepository.findDistinctSuricataAlertsByFileId(toFileId)),
+        cleanSet(conversationLookup.distinctValues(fromFileId, Facet.SURICATA_ALERT)),
+        cleanSet(conversationLookup.distinctValues(toFileId, Facet.SURICATA_ALERT)),
         "ids", Severity.CRITICAL, true);
 
     // Custom signatures — added CRITICAL, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        cleanSet(conversationRepository.findDistinctCustomSignaturesByFileId(fromFileId)),
-        cleanSet(conversationRepository.findDistinctCustomSignaturesByFileId(toFileId)),
+        cleanSet(conversationLookup.distinctValues(fromFileId, Facet.CUSTOM_SIGNATURE)),
+        cleanSet(conversationLookup.distinctValues(toFileId, Facet.CUSTOM_SIGNATURE)),
         "signature", Severity.CRITICAL, true);
 
     // nDPI flow risks (excluding VPN, handled by VPN_DRIFT) — added WARNING, removed INFO
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        nonVpnRiskSet(conversationRepository.findDistinctRiskTypesByFileId(fromFileId)),
-        nonVpnRiskSet(conversationRepository.findDistinctRiskTypesByFileId(toFileId)),
+        nonVpnRiskSet(conversationLookup.distinctValues(fromFileId, Facet.RISK_TYPE)),
+        nonVpnRiskSet(conversationLookup.distinctValues(toFileId, Facet.RISK_TYPE)),
         "risk", Severity.WARNING, true);
 
     // Detected file types — added INFO only (removals not actionable)
     diffSecurity(
         events, fromSnapshot, toSnapshot,
-        cleanSet(conversationRepository.findDistinctFileTypesByFileId(fromFileId)),
-        cleanSet(conversationRepository.findDistinctFileTypesByFileId(toFileId)),
+        cleanSet(conversationLookup.distinctValues(fromFileId, Facet.FILE_TYPE)),
+        cleanSet(conversationLookup.distinctValues(toFileId, Facet.FILE_TYPE)),
         "fileType", Severity.INFO, false);
 
     return events;
@@ -580,20 +581,18 @@ public class ChangeDetectionService {
         .build();
   }
 
-  private Map<String, HostClassificationEntity> macMap(UUID fileId) {
+  private Map<String, HostFacts> macMap(UUID fileId) {
     if (fileId == null) return Map.of();
-    return hostClassificationRepository.findByFileId(fileId).stream()
-        .filter(h -> h.getMac() != null && !h.getMac().isBlank())
-        .collect(Collectors.toMap(HostClassificationEntity::getMac, h -> h, (a, b) -> a));
+    return hostClassificationLookup.hostFacts(fileId).stream()
+        .filter(h -> h.mac() != null && !h.mac().isBlank())
+        .collect(Collectors.toMap(HostFacts::mac, h -> h, (a, b) -> a));
   }
 
   private Map<String, String> macToIpMap(UUID fileId) {
     if (fileId == null) return Map.of();
-    return hostClassificationRepository.findByFileId(fileId).stream()
-        .filter(h -> h.getMac() != null && !h.getMac().isBlank() && h.getIp() != null)
-        .collect(
-            Collectors.toMap(
-                HostClassificationEntity::getMac, HostClassificationEntity::getIp, (a, b) -> a));
+    return hostClassificationLookup.hostFacts(fileId).stream()
+        .filter(h -> h.mac() != null && !h.mac().isBlank() && h.ip() != null)
+        .collect(Collectors.toMap(HostFacts::mac, HostFacts::ip, (a, b) -> a));
   }
 
   private Map<String, String> invertMap(Map<String, String> map) {
@@ -604,25 +603,30 @@ public class ChangeDetectionService {
 
   private Set<String> externalIpsForFile(UUID fileId, LocalityRules rules) {
     if (fileId == null) return Set.of();
-    return conversationRepository.findByFileId(fileId).stream()
-        .flatMap(c -> Stream.of(c.getSrcIp(), c.getDstIp()))
+    return conversationLookup.conversationFacts(fileId).stream()
+        .flatMap(c -> Stream.of(c.flow().srcIp(), c.flow().dstIp()))
         .filter(ip -> ip != null && !isPrivate(ip, rules))
         .collect(Collectors.toSet());
   }
 
-  private Map<String, IpGeoInfoEntity> geoMapFor(Set<String> ips) {
-    if (ips.isEmpty()) return Map.of();
-    return ipGeoInfoRepository.findAllByIpIn(ips).stream()
-        .collect(Collectors.toMap(IpGeoInfoEntity::getIp, g -> g, (a, b) -> a));
+  private Map<String, IpAttribution> geoMapFor(Set<String> ips) {
+    return geoOrgLookup.attributionFor(ips);
   }
 
-  /** Builds a map of "asn|org" → first IpGeoInfoEntity with that ASN. */
-  private Map<String, IpGeoInfoEntity> asnMap(Map<String, IpGeoInfoEntity> geoMap) {
-    Map<String, IpGeoInfoEntity> result = new HashMap<>();
-    for (IpGeoInfoEntity geo : geoMap.values()) {
-      if (geo.getAsn() != null && !geo.getAsn().isBlank()) {
-        String key = geo.getAsn() + "|" + orEmpty(geo.getOrg());
-        result.putIfAbsent(key, geo);
+  /**
+   * Builds a map of ASN → the first attribution seen with it.
+   *
+   * <p>Keyed on the ASN alone, deliberately. The key was once {@code asn|org}, which made an ASN's
+   * identity depend on its org name — so an org enriched from unknown to known (or a lookup that
+   * came back empty this time) presented as a brand-new ASN and raised a spurious ASN_CHANGE. The
+   * {@link IpAttribution} contract is that a null field means "unknown", never "changed"; keying on
+   * a field that may be absent breaks that. The org still travels on the event for display.
+   */
+  Map<String, IpAttribution> asnMap(Map<String, IpAttribution> geoMap) {
+    Map<String, IpAttribution> result = new HashMap<>();
+    for (IpAttribution geo : geoMap.values()) {
+      if (geo.asn() != null && !geo.asn().isBlank()) {
+        result.putIfAbsent(geo.asn(), geo);
       }
     }
     return result;
@@ -630,18 +634,18 @@ public class ChangeDetectionService {
 
   /** Returns the external IP with the highest total bytes for a file (gateway heuristic). */
   private String topExternalIp(
-      UUID fileId, Map<String, IpGeoInfoEntity> geoMap, LocalityRules rules) {
+      UUID fileId, Map<String, IpAttribution> geoMap, LocalityRules rules) {
     if (fileId == null || geoMap.isEmpty()) return null;
     Map<String, Long> ipBytes = new HashMap<>();
-    for (ConversationEntity c : conversationRepository.findByFileId(fileId)) {
-      String dst = c.getDstIp();
-      String src = c.getSrcIp();
+    for (ConversationFacts c : conversationLookup.conversationFacts(fileId)) {
+      String dst = c.flow().dstIp();
+      String src = c.flow().srcIp();
       String external = null;
       if (dst != null && !isPrivate(dst, rules) && geoMap.containsKey(dst)) external = dst;
       else if (src != null && !isPrivate(src, rules) && geoMap.containsKey(src))
         external = src;
       if (external != null) {
-        ipBytes.merge(external, c.getTotalBytes() != null ? c.getTotalBytes() : 0L, Long::sum);
+        ipBytes.merge(external, c.flow().totalBytes(), Long::sum);
       }
     }
     return ipBytes.entrySet().stream()
@@ -650,26 +654,25 @@ public class ChangeDetectionService {
         .orElse(null);
   }
 
-  private Set<String> appSet(List<ConversationEntity> convs) {
+  private Set<String> appSet(List<ConversationFacts> convs) {
     return convs.stream()
-        .map(ConversationEntity::getAppName)
+        .map(c -> c.findings().appName())
         .filter(a -> a != null && !a.isBlank())
         .map(String::toUpperCase)
         .collect(Collectors.toSet());
   }
 
-  private Set<String> protoSet(List<ConversationEntity> convs) {
+  private Set<String> protoSet(List<ConversationFacts> convs) {
     return convs.stream()
-        .map(ConversationEntity::getTsharkProtocol)
+        .map(c -> c.findings().tsharkProtocol())
         .filter(p -> p != null && !p.isBlank())
         .map(String::toUpperCase)
         .collect(Collectors.toSet());
   }
 
-  private Set<String> vpnSet(List<ConversationEntity> convs) {
+  private Set<String> vpnSet(List<ConversationFacts> convs) {
     return convs.stream()
-        .filter(c -> c.getFlowRisks() != null)
-        .flatMap(c -> Arrays.stream(c.getFlowRisks()))
+        .flatMap(c -> c.findings().flowRisks().stream())
         .filter(r -> r != null && r.toUpperCase().contains("VPN"))
         .collect(Collectors.toSet());
   }

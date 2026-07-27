@@ -85,11 +85,14 @@ export function useEntityRole(entityType: EntityType, entityKey: string, fileId:
     }
   };
 
+  // Removes the role outright — used both to discard an AI suggestion and to delete a
+  // human-confirmed label (the backend delete re-fires downstream re-adjudication either way).
   const discard = async () => {
     setRoleSaving(true);
     try {
       await insightsService.deleteNodeRole(entityType, entityKey, fileId);
       setRole(null);
+      setRoleEditing(false);
     } catch (err) {
       console.error('Failed to discard role:', err);
     } finally {

@@ -31,6 +31,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Full history + tags, so `git describe --tags` can reach the nearest tag
+          # instead of degrading to a bare hash.
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -43,6 +47,10 @@ jobs:
 
           # Version string for the frontend footer (e.g. v0.1.1-113-g6e040b4)
           APP_VERSION=$(git describe --tags --always 2>/dev/null || echo "$SHORT_SHA")
+          if [ -z "$APP_VERSION" ] || [ "$APP_VERSION" = "dev" ]; then
+            echo "::error::Resolved APP_VERSION is empty or 'dev' — the build would not be traceable to a commit."
+            exit 1
+          fi
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
           # Convert repository owner to lowercase for Docker image naming

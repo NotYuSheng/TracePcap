@@ -35,7 +35,40 @@ class WebApiServerSignalTest {
     apiSignal.contribute(ctx(Set.of("web")), board);
     webSignal.contribute(ctx(Set.of("web")), board);
 
+    // Cleartext HTTP is authoritative — it stays dominant.
     assertThat(board.winner(DeviceTypes.UNKNOWN)).isEqualTo(DeviceTypes.WEB_SERVER);
+  }
+
+  @Test
+  void tlsOnlyRole_withNoContraryEvidence_classifiesWebServer() {
+    ScoreBoard board = new ScoreBoard();
+    apiSignal.contribute(ctx(Set.of("tls")), board);
+    webSignal.contribute(ctx(Set.of("tls")), board);
+
+    // #496 AC #3 — TLS is evidence toward a web role; with nothing contrary it wins.
+    assertThat(board.winner(DeviceTypes.UNKNOWN)).isEqualTo(DeviceTypes.WEB_SERVER);
+    assertThat(board.scores()).containsEntry(DeviceTypes.WEB_SERVER, WebServerSignal.WEIGHT_TLS);
+  }
+
+  @Test
+  void tlsOnlyRole_losesToStrongRouterHardware() {
+    ScoreBoard board = new ScoreBoard();
+    // Router OUI (+40) + TTL 255 (+30) + high fan-out (+35) = 105, the AC #6 scenario.
+    board.add(DeviceTypes.ROUTER, 105, "router OUI + TTL 255 + fan-out");
+    apiSignal.contribute(ctx(Set.of("tls")), board);
+    webSignal.contribute(ctx(Set.of("tls")), board);
+
+    // #496 AC #6 — a router serving its own admin UI over TLS classifies as Router, not Web Server.
+    assertThat(board.winner(DeviceTypes.UNKNOWN)).isEqualTo(DeviceTypes.ROUTER);
+  }
+
+  @Test
+  void httpEvidence_outranksTlsEvidence_whenBothPresent() {
+    ScoreBoard board = new ScoreBoard();
+    webSignal.contribute(ctx(Set.of("web", "tls")), board);
+
+    // HTTP is authoritative; the vote is the HTTP weight, not the TLS weight, and not both summed.
+    assertThat(board.scores()).containsEntry(DeviceTypes.WEB_SERVER, WebServerSignal.WEIGHT_HTTP);
   }
 
   @Test

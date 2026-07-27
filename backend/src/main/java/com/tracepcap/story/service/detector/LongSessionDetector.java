@@ -1,35 +1,48 @@
 package com.tracepcap.story.service.detector;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.LongSession;
 import com.tracepcap.story.dto.Finding;
 import com.tracepcap.story.dto.FindingType;
 import com.tracepcap.story.dto.Severity;
+import com.tracepcap.story.spi.ScanContext;
+import com.tracepcap.story.spi.Scanner;
+import com.tracepcap.common.stage.Tier;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class LongSessionDetector {
+public class LongSessionDetector implements Scanner {
 
   private static final long THRESHOLD_SECONDS = 900; // 15 minutes
 
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
 
-  public List<Finding> detect(UUID fileId) {
-    List<Object[]> rows =
-        conversationRepository.findLongSessionsByFileId(fileId, THRESHOLD_SECONDS);
+  @Override
+  public String name() {
+    return "long-session";
+  }
+
+  @Override
+  public Tier tier() {
+    return Tier.DETERMINISTIC;
+  }
+
+  @Override
+  public List<Finding> scan(ScanContext context) {
     List<Finding> findings = new ArrayList<>();
 
-    for (Object[] row : rows) {
-      String srcIp = String.valueOf(row[0]);
-      String dstIp = row[1] != null ? String.valueOf(row[1]) : "?";
-      Object dstPortObj = row[2];
-      String protocol = String.valueOf(row[3]);
-      String appName = row[4] != null ? String.valueOf(row[4]) : null;
-      double durationMs = ((Number) row[5]).doubleValue();
-      long totalBytes = ((Number) row[6]).longValue();
-      long packetCount = ((Number) row[7]).longValue();
+    for (LongSession row : conversationLookup.longSessions(context.fileId(), THRESHOLD_SECONDS)) {
+      String srcIp = row.srcIp();
+      String dstIp = row.dstIp() != null ? row.dstIp() : "?";
+      Object dstPortObj = row.dstPort();
+      String protocol = row.protocol();
+      String appName = row.appName();
+      double durationMs = row.durationMs();
+      long totalBytes = row.totalBytes();
+      long packetCount = row.packetCount();
 
       long durationSec = (long) (durationMs / 1000);
       String durationStr =

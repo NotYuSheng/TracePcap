@@ -19,6 +19,7 @@ import { ClusterGraph } from '@components/intelligence/ClusterGraph/ClusterGraph
 import { TopHostsTable } from '@components/intelligence/TopHostsTable/TopHostsTable';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { toggleSet } from '@/features/network/constants';
+import { nodeIdentityKey } from '@/utils/deviceType';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -65,7 +66,7 @@ export const NetworkIntelligencePage = () => {
   const [presentFileTypes, setPresentFileTypes] = useState<string[]>([]);
   const [presentCustomSigs, setPresentCustomSigs] = useState<string[]>([]);
   const [presentCountries, setPresentCountries] = useState<string[]>([]);
-  const [presentDeviceTypes, setPresentDeviceTypes] = useState<Set<string>>(new Set());
+  const [presentIdentities, setPresentIdentities] = useState<Set<string>>(new Set());
   const [presentNetLabels, setPresentNetLabels] = useState<string[]>([]);
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export const NetworkIntelligencePage = () => {
       if (active) setPresentCountries(codes.map(c => c.split('|')[0]).filter(Boolean).sort());
     }).catch(() => {});
     conversationService.getHostClassifications(fileId).then(hosts => {
-      if (active) setPresentDeviceTypes(new Set(hosts.map(h => h.deviceType).filter(Boolean) as string[]));
+      if (active) setPresentIdentities(new Set(hosts.map(h => nodeIdentityKey(h))));
     }).catch(() => {});
     ipOrgRuleService.list().then(rules => {
       if (active) setPresentNetLabels([...new Set(rules.map(r => r.label))].sort());
@@ -132,9 +133,6 @@ export const NetworkIntelligencePage = () => {
     [data],
   );
 
-  // node types not meaningful at cluster level — pass empty set
-  const presentNodeTypes = useMemo(() => new Set<string>(), []);
-
   // ── Filter toggles ────────────────────────────────────────────────────────
   const toggleLegendProtocol = toggleSet(setActiveLegendProtocols);
   const toggleNodeFilter = toggleSet(setActiveNodeFilters);
@@ -180,9 +178,10 @@ export const NetworkIntelligencePage = () => {
 
   // ── Build IntelClusterFilters from active filter state ────────────────────
   const intelFilters = useMemo((): IntelClusterFilters => {
-    // Map activeNodeFilters (dt:MOBILE etc.) → deviceTypes param
+    // Map activeNodeFilters (id:MOBILE etc.) → deviceTypes param. The node-identity keys are
+    // DeviceType values, so they pass straight through to the cluster backend's deviceTypes filter.
     const deviceTypes = activeNodeFilters
-      .filter(k => k.startsWith('dt:'))
+      .filter(k => k.startsWith('id:'))
       .map(k => k.slice(3));
 
     return {
@@ -348,8 +347,7 @@ export const NetworkIntelligencePage = () => {
             activeNodeFilters={activeNodeFilters}
             onNodeFilterClick={toggleNodeFilter}
             onNodeFilterClear={() => setActiveNodeFilters([])}
-            presentNodeTypes={presentNodeTypes}
-            presentDeviceTypes={presentDeviceTypes}
+            presentIdentities={presentIdentities}
             ipFilter={ipFilter}
             onIpFilterChange={setIpFilter}
             portFilter={portFilter}

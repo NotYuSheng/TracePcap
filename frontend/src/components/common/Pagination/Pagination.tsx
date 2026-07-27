@@ -11,6 +11,12 @@ interface PaginationProps {
   onPageSizeChange?: (pageSize: number) => void;
   pageSizeOptions?: number[];
   showPageSizeSelector?: boolean;
+  /**
+   * Compact mode for narrow containers (e.g. the monitor drift panels, where the pager
+   * sits in a ~250px column). Drops the "Previous"/"Next" text labels for icon-only
+   * direction buttons and shows fewer page numbers so the whole pager fits on one row.
+   */
+  compact?: boolean;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
@@ -22,6 +28,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   onPageSizeChange,
   pageSizeOptions = [10, 25, 50, 100],
   showPageSizeSelector = true,
+  compact = false,
 }) => {
   if (totalPages === 0) return null;
 
@@ -42,7 +49,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="pagination-container">
+    <div className={`pagination-container${compact ? ' pagination-container--compact' : ''}`}>
       <div className="pagination-meta">
         <span className="pagination-info">
           Showing {startItem} to {endItem} of {totalItems} items
@@ -80,10 +87,10 @@ export const Pagination: React.FC<PaginationProps> = ({
           itemsPerPage={pageSize}
           setCurrentPage={setCurrentPage}
           size="sm"
-          limit={5}
+          limit={compact ? 3 : 5}
           ellipsisOn
           ellipsisJump={2}
-          directionVariant="icon-text"
+          directionVariant={compact ? 'icon' : 'icon-text'}
         />
       </div>
     </div>

@@ -6,7 +6,7 @@ import { createAnalysisSlice } from './slices/analysisSlice';
 import type { AnalysisSlice } from './slices/analysisSlice';
 import { createThemeSlice } from './slices/themeSlice';
 import type { ThemeSlice, ThemeMode } from './slices/themeSlice';
-import { createNodeLabelSlice } from './slices/nodeLabelSlice';
+import { createNodeLabelSlice, normalizeNodeLabelConfig } from './slices/nodeLabelSlice';
 import type { NodeLabelSlice } from './slices/nodeLabelSlice';
 
 export type { ThemeMode };
@@ -31,6 +31,17 @@ export const useStore = create<StoreState>()(
           themeMode: state.themeMode,
           nodeLabelConfig: state.nodeLabelConfig,
         }),
+        // Coerce any legacy persisted shape (customText was a string; fields added since the
+        // config was saved) into the current shape. Done in merge — which produces the hydrated
+        // state — rather than by mutating the store afterwards, which would bypass subscribers.
+        merge: (persisted, current) => {
+          const p = (persisted ?? {}) as Partial<StoreState>;
+          const merged = { ...current, ...p };
+          if (p.nodeLabelConfig) {
+            merged.nodeLabelConfig = normalizeNodeLabelConfig(p.nodeLabelConfig);
+          }
+          return merged;
+        },
       }
     ),
     {

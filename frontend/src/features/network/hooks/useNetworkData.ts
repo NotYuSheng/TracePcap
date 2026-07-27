@@ -3,6 +3,8 @@ import { conversationService } from '@/features/conversation/services/conversati
 import { networkService } from '../services/networkService';
 import type { GraphNode, GraphEdge, NetworkStats } from '../types';
 import type { Conversation, HostClassification, HostIdentity } from '@/types';
+import type { NodeRole } from '@/features/insights/types/insights.types';
+import { insightsService } from '@/features/insights/services/insightsService';
 import type { AnalysisSummary } from '@/types';
 import { env } from '@/config/env';
 
@@ -42,6 +44,7 @@ export function useNetworkData(
   const conversationsRef = useRef<Conversation[]>([]);
   const hostClassificationsRef = useRef<HostClassification[] | undefined>(undefined);
   const hostIdentitiesRef = useRef<HostIdentity[] | undefined>(undefined);
+  const nodeRolesRef = useRef<NodeRole[] | undefined>(undefined);
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -64,7 +67,8 @@ export function useNetworkData(
     hostClassifications: HostClassification[] | undefined,
     summary: AnalysisSummary | undefined,
     limit: number,
-    hostIdentities?: HostIdentity[]
+    hostIdentities?: HostIdentity[],
+    nodeRoles?: NodeRole[]
   ) => {
     const graphData = networkService.buildNetworkGraph(
       conversations,
@@ -72,7 +76,8 @@ export function useNetworkData(
       maxConversations,
       hostClassifications,
       limit,
-      hostIdentities
+      hostIdentities,
+      nodeRoles
     );
     setNodes(graphData.nodes);
     setEdges(graphData.edges);
@@ -98,7 +103,9 @@ export function useNetworkData(
       setLoading(true);
       setError(null);
 
-      const [response] = await Promise.all([
+      // Conversations are required; the other three are best-effort enrichments (older analyses
+      // may predate their endpoints). All depend only on fileId, so they run concurrently.
+      const [response, classificationsRes, identitiesRes, rolesRes] = await Promise.allSettled([
         conversationService.getConversations(fileId, {
           ip: '',
           port: '',
@@ -119,30 +126,29 @@ export function useNetworkData(
           page: 1,
           pageSize: 10000,
         }),
+        conversationService.getHostClassifications(fileId),
+        conversationService.getHostIdentities(fileId),
+        insightsService.listNodeRoles(fileId),
       ]);
-      const conversations = response.data;
+      if (response.status === 'rejected') throw response.reason;
+      const conversations = response.value.data;
 
-      let hostClassifications: HostClassification[] | undefined;
-      try {
-        hostClassifications = await conversationService.getHostClassifications(fileId);
-      } catch {
-        // If the endpoint isn't available (e.g. older analysis), silently skip
-      }
-
-      // Adjudicated identities (#512 slice 5) — best-effort: files analysed before the
-      // adjudicator existed simply have none, and the display falls back to raw classification.
-      let hostIdentities: HostIdentity[] | undefined;
-      try {
-        hostIdentities = await conversationService.getHostIdentities(fileId);
-      } catch {
-        // endpoint unavailable → fall back silently
-      }
+      const hostClassifications: HostClassification[] | undefined =
+        classificationsRes.status === 'fulfilled' ? classificationsRes.value : undefined;
+      // Adjudicated identities (#512 slice 5) — files analysed before the adjudicator existed
+      // simply have none, and the display falls back to raw classification.
+      const hostIdentities: HostIdentity[] | undefined =
+        identitiesRes.status === 'fulfilled' ? identitiesRes.value : undefined;
+      // Analyst-assigned role labels — for the node-label lines.
+      const nodeRoles: NodeRole[] | undefined =
+        rolesRes.status === 'fulfilled' ? rolesRes.value : undefined;
 
       conversationsRef.current = conversations;
       hostClassificationsRef.current = hostClassifications;
       hostIdentitiesRef.current = hostIdentities;
+      nodeRolesRef.current = nodeRoles;
 
-      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes, hostIdentities);
+      applyTransform(conversations, hostClassifications, analysisSummary, maxNodes, hostIdentities, nodeRoles);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load network data';
       setError(errorMessage);
@@ -166,7 +172,8 @@ export function useNetworkData(
       hostClassificationsRef.current,
       analysisSummary,
       maxNodes,
-      hostIdentitiesRef.current
+      hostIdentitiesRef.current,
+      nodeRolesRef.current
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxNodes, analysisSummary]);

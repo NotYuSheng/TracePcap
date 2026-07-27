@@ -86,6 +86,49 @@ Step 3 — Load Images and Start the Stack (offline machine)
    # Start the stack using the offline compose file
    docker compose -f docker-compose.offline.yml up -d
 
+Authenticated Offline Deployment (Keycloak)
+-------------------------------------------
+
+The base offline stack runs with **no login**. To deploy offline *with* OIDC
+authentication, use the ``docker-compose.offline-prod.yml`` overlay — the
+offline equivalent of :doc:`../configuration/authentication` (which builds from
+source and so cannot run air-gapped).
+
+**Step 1 (online machine)** — include Keycloak when saving images:
+
+.. code-block:: bash
+
+   INCLUDE_KEYCLOAK=true bash scripts/pull-and-save-images.sh
+
+This additionally saves the Keycloak image and an **auth-enabled frontend**
+(``tracepcap-nginx-auth``) alongside the normal tarballs.
+
+**Step 2** — also transfer ``docker-compose.offline-prod.yml`` and
+``keycloak/realm-export.json`` (in addition to the files listed above).
+
+**Step 3 (offline machine)** — load images, then start with the auth overlay,
+setting ``PUBLIC_URL`` to the exact origin you browse to (scheme + host + port):
+
+.. code-block:: bash
+
+   bash scripts/load-images.sh
+
+   PUBLIC_URL=http://<host>:8888 \
+     docker compose -f docker-compose.offline.yml -f docker-compose.offline-prod.yml up -d
+
+.. warning::
+   ``PUBLIC_URL`` does **not** track ``NGINX_PORT`` (default
+   ``http://localhost:8888``). It pins Keycloak's token issuer and the backend's
+   issuer check, so the browser must load the app via this same origin. Do **not**
+   include a trailing slash (use ``http://<host>:8888``, not
+   ``http://<host>:8888/``) — it produces a double slash in the issuer URI and
+   breaks JWT validation.
+
+Create and manage logins at ``<PUBLIC_URL>/admin`` — see
+:doc:`../configuration/user-management`. The default demo login is
+``analyst`` / ``analyst`` and the default Keycloak admin is ``user`` /
+``P@ssw0rd``; **change both for any real deployment.**
+
 LLM Configuration for Offline Use
 ----------------------------------
 

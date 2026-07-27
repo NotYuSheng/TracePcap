@@ -19,11 +19,42 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
      - Description
    * - ``APP_MEMORY_MB``
      - ``2048``
-     - Total RAM (in MB) allocated to the backend container. Derived
-       automatically from this value: JVM heap = 75%, max upload size = 25%,
+     - Total RAM (in MB) allocated to the backend container — the default for
+       the enforced container memory limit and the budget for derived settings.
+       All derived values use the *effective* budget (the enforced cgroup limit
+       when one is set, else this value): JVM heap = 50%, max upload size = 25%,
        nginx body limit = max upload + 50 MB multipart buffer, and the
        proxy/analysis timeout scales with memory (300–900 s). Examples:
-       ``2048`` → 512 MB max upload (default), ``4096`` → 1 GB, ``8192`` → 2 GB.
+       ``2048`` → 512 MB max upload
+       (default), ``4096`` → 1 GB, ``8192`` → 2 GB. The heap is 50% rather than
+       75% because tshark/ndpi/Suricata allocate outside the JVM heap — see
+       :doc:`../operations/production-hardening`.
+   * - ``BACKEND_MEM_LIMIT``
+     - ``APP_MEMORY_MB``
+     - Enforced backend container memory limit. Tracks ``APP_MEMORY_MB`` by
+       default. When set explicitly it becomes the **effective budget**: the JVM
+       heap, max upload size and analysis timeout are all derived from it rather
+       than from ``APP_MEMORY_MB``, keeping the 50%/25% split coherent at any
+       cap. Setting it lower therefore also lowers the max upload size.
+   * - ``BACKEND_CPU_LIMIT``
+     - ``4``
+     - Backend CPU limit. Analysis is subprocess-heavy and parallel, so the
+       backend is sized above the other services.
+   * - ``POSTGRES_MEM_LIMIT`` / ``POSTGRES_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - Postgres container limits.
+   * - ``MINIO_MEM_LIMIT`` / ``MINIO_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - MinIO container limits.
+   * - ``NGINX_MEM_LIMIT`` / ``NGINX_CPU_LIMIT``
+     - ``256m`` / ``1``
+     - nginx container limits. Request bodies larger than
+       ``client_body_buffer_size`` spill to disk rather than RAM, so nginx needs
+       far less memory than the max upload size (but does need scratch space in
+       ``/tmp``).
+   * - ``KEYCLOAK_MEM_LIMIT`` / ``KEYCLOAK_CPU_LIMIT``
+     - ``1g`` / ``2``
+     - Keycloak container limits (auth overlays only).
 
 File Retention
 --------------
@@ -152,6 +183,38 @@ walkthrough. They are ignored by the base stack.
    ``KEYCLOAK_ISSUER_URI``, ``KEYCLOAK_JWK_SET_URI``, and the ``VITE_AUTH_*``
    build args are set automatically by ``docker-compose.prod.yml`` and derived
    from ``PUBLIC_URL`` — you normally do not set them by hand.
+
+Spring Profile & CORS
+---------------------
+
+The active Spring profile selects dev vs. hardened behaviour. The two
+``*-prod.yml`` overlays set ``SPRING_PROFILES_ACTIVE=prod``; the base stacks
+run ``dev``. See :doc:`../operations/production-hardening` for the full profile
+matrix.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 25 40
+
+   * - Variable
+     - Default
+     - Description
+   * - ``SPRING_PROFILES_ACTIVE``
+     - ``dev`` (base) / ``prod`` (``*-prod.yml`` overlays)
+     - ``prod`` enforces strict CORS, disables Swagger + ``/v3/api-docs``,
+       suppresses stacktraces/exception details in error responses, and logs at
+       WARN to a file.
+   * - ``CORS_ALLOWED_ORIGINS``
+     - dev: localhost list / prod: *(empty)*
+     - Comma-separated allowed browser origins for ``/api``. Under ``prod`` it
+       has **no localhost defaults**; leave it empty for the same-origin shipped
+       stack (nginx proxies ``/api``, so CORS is never exercised). Set it only
+       when the frontend is hosted on a different origin from the API.
+   * - ``LOG_DIR``
+     - ``/app/logs``
+     - Directory for the ``prod`` profile's ``application.log`` (created and
+       owned by the container's non-root user at startup). Ignored under ``dev``
+       (console-only logging).
 
 LLM
 ---

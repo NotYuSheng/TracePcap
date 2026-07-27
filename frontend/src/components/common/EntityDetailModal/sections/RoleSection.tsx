@@ -1,4 +1,5 @@
-import { Badge, Button, Form } from '@govtechsg/sgds-react';
+import { useState } from 'react';
+import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { staleTooltip } from '@/features/insights/utils/nodeRoleStaleness';
@@ -12,10 +13,16 @@ interface RoleSectionProps {
    * where roles are edited per-snapshot in the Snapshot History table below (#369).
    */
   readOnly?: boolean;
+  /**
+   * When set, the role help modal renders above a raised parent panel (monitor mode's NodeDetails
+   * is itself a modal, so a plain nested modal would hide behind it — modal-in-modal).
+   */
+  raisedModal?: boolean;
 }
 
 /** Role panel for IP/DEVICE entities — view, AI-suggest, accept/discard, manual edit. */
-export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
+export function RoleSection({ fileId, role: r, readOnly, raisedModal }: RoleSectionProps) {
+  const [showRoleHelp, setShowRoleHelp] = useState(false);
   if (readOnly) {
     return (
       <div className="mb-4">
@@ -47,7 +54,18 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
   return (
     <div className="mb-4">
       <h6 className="border-bottom pb-1 mb-2 d-flex align-items-center justify-content-between">
-        <span>Role</span>
+        <span>
+          Role <span className="text-muted fw-normal" style={{ fontSize: '0.75rem' }}>· analyst-assigned name</span>
+          <button
+            type="button"
+            aria-label="What is a role label?"
+            className="btn btn-link p-0 ms-1 text-muted"
+            style={{ fontSize: '0.72rem', lineHeight: 1 }}
+            onClick={() => setShowRoleHelp(v => !v)}
+          >
+            <i className="bi bi-info-circle" aria-hidden="true" />
+          </button>
+        </span>
         {!r.roleEditing && !r.roleLoading && (
           <div className="d-flex gap-1">
             <Button
@@ -59,6 +77,20 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
             >
               <i className="bi bi-pencil me-1" />Edit
             </Button>
+            {/* Removal for a confirmed role — AI suggestions already have their own Discard. */}
+            {r.role?.confirmedByHuman && (
+              <Button
+                variant="outline-danger"
+                size="sm"
+                className="py-0"
+                style={{ fontSize: '0.75rem' }}
+                onClick={r.discard}
+                disabled={r.roleSaving}
+                title="Delete this role label and description"
+              >
+                <i className="bi bi-trash me-1" />Remove
+              </Button>
+            )}
             {fileId && (
               <div className="d-flex align-items-center gap-1">
                 <Button
@@ -74,21 +106,31 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
                     : <><i className="bi bi-stars me-1" />Suggest with AI</>
                   }
                 </Button>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 text-muted"
-                  style={{ fontSize: '0.8rem', lineHeight: 1 }}
-                  onClick={() => r.setRoleInfoOpen(o => !o)}
-                  title="How does this work?"
-                >
-                  <i className="bi bi-info-circle" />
-                </Button>
               </div>
             )}
           </div>
         )}
       </h6>
+
+      <Modal
+        show={showRoleHelp}
+        onHide={() => setShowRoleHelp(false)}
+        centered
+        className={raisedModal ? 'tp-nested-modal' : undefined}
+        backdropClassName={raisedModal ? 'tp-nested-modal-backdrop' : undefined}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1rem' }}>What is a role?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ fontSize: '0.85rem' }}>
+          <p className="mb-0">
+            A <strong>role</strong> is a name you assign this host (e.g. <em>Finance DB</em>,{' '}
+            <em>Guest Wi-Fi AP</em>, <em>Domain Controller</em>) — not a measured classification. It
+            persists across captures and feeds Monitor change-detection, independent of the measured
+            Identity above.
+          </p>
+        </Modal.Body>
+      </Modal>
 
       {r.roleInfoOpen && (
         <Alert variant="info" className="p-2 mb-2 small">
@@ -131,8 +173,20 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
               </Badge>
             )}
             {r.role.confirmedByHuman && (
-              <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.65rem' }} title="Manually labelled by an analyst. Future deviating behaviour can still be flagged.">
+              <Badge
+                bg="secondary"
+                className="ms-2"
+                style={{ fontSize: '0.65rem' }}
+                title={
+                  r.role.confirmedBy && r.role.confirmedBy !== 'system'
+                    ? `Manually labelled by ${r.role.confirmedBy}. Future deviating behaviour can still be flagged.`
+                    : 'Manually labelled by an analyst. Future deviating behaviour can still be flagged.'
+                }
+              >
                 <i className="bi bi-tag me-1" />Manual label
+                {r.role.confirmedBy && r.role.confirmedBy !== 'system' && (
+                  <span className="ms-1 fw-normal">· {r.role.confirmedBy}</span>
+                )}
               </Badge>
             )}
             {r.role.confirmedByHuman && r.role.staleSince && (
@@ -222,7 +276,7 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
           <Form.Control
             size="sm"
             className="mb-2"
-            placeholder="Role label (e.g. SCADA Controller)"
+            placeholder="Role label (e.g. Finance DB, Domain Controller, Guest Wi-Fi AP, SCADA Controller)"
             value={r.roleLabelDraft}
             onChange={e => r.setRoleLabelDraft(e.target.value)}
           />

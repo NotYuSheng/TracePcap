@@ -12,7 +12,10 @@ logging:
     org.springframework: WARN
     org.hibernate: WARN
   file:
-    name: /var/log/tracepcap/application.log
+    # Env-overridable log dir. Default lives under /app (owned by the non-root `spring` user the
+    # container runs as); the entrypoint creates + chowns it. /var/log is NOT writable by `spring`,
+    # so hardcoding it there would make the app fail to start under the prod profile.
+    name: ${LOG_DIR:/app/logs}/application.log
     max-size: 100MB
     max-history: 30
     total-size-cap: 1GB
@@ -41,9 +44,12 @@ server:
     include-stacktrace: never
     include-exception: false
 
-# Strict CORS in production
+# Strict CORS in production — NO localhost defaults (unlike the dev profile's base list).
+# Empty default: the shipped stack is same-origin (nginx serves the SPA and proxies /api), so
+# browser→API calls never hit CORS and no origins need allowing. WebConfig skips the CORS mapping
+# entirely when this is blank. Set CORS_ALLOWED_ORIGINS only for a genuinely cross-origin frontend.
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:}
 
 # Disable Swagger in production
 springdoc:

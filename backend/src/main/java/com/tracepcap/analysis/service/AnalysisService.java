@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.analysis.dto.AnalysisProgressResponse;
 import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
 import com.tracepcap.analysis.dto.ConversationResponse;
 import com.tracepcap.analysis.dto.ProtocolStatsResponse;
@@ -55,12 +56,57 @@ public class AnalysisService {
   // Global Suricata kill-switch (SURICATA_ENABLED). When false, Suricata is skipped for every file
   // regardless of the per-file enableSuricata flag. Suricata dominates per-file analysis cost, so
   // this is the single biggest throughput lever. See application.yml.
-  @Value("${tracepcap.suricata.enabled:true}")
-  private boolean suricataEnabled;
-
   // Flush interval: how many conversations to process before flushing the JPA session.
   // Keeps the Hibernate first-level cache from accumulating unbounded saved entities.
   private static final int JPA_FLUSH_INTERVAL = 50;
+
+  // ---- Live progress stage plan -------------------------------------------------------------
+  // One step per pipeline stage that will actually run for a file. The weights are relative shares
+  // of total wall-clock time (roughly the same reasoning as FileMapper's ETA coefficients) so the
+  // progress bar advances in realistic proportions rather than in equal jumps. Suricata dominates,
+  // so the Extract stage's weight scales with the enabled analysers. Skipped stages are omitted
+  // entirely, which also drives totalStages ("Stage 6 of 6").
+  private record StageStep(String label, int weight) {}
+
+  /** Builds the ordered list of stages that will run for {@code file}, given its enabled options. */
+  private static List<StageStep> buildStagePlan(FileEntity file) {
+    boolean ndpi = file.isEnableNdpi();
+    // Weight only: the effective Suricata state (incl. the global kill-switch) is decided inside the
+    // extractor; using the per-file flag here is a close-enough heuristic for bar proportions.
+    boolean suricata = file.isEnableSuricata();
+    List<StageStep> plan = new ArrayList<>();
+    plan.add(new StageStep("Downloading capture", 3));
+    plan.add(new StageStep("Parsing packets", 20));
+    plan.add(new StageStep("Detecting applications & threats", 5 + (ndpi ? 10 : 0) + (suricata ? 20 : 0)));
+    plan.add(new StageStep("Classifying hosts & geo-locating", 12));
+    plan.add(new StageStep("Saving analysis summary", 2));
+    plan.add(new StageStep("Writing conversations & packets", 20));
+    if (file.isEnableFileExtraction()) {
+      plan.add(new StageStep("Extracting transferred files", 8));
+    }
+    return plan;
+  }
+
+  /**
+   * Publishes progress for the stage at {@code index} (0-based). {@code percent} is the weighted
+   * fraction of work completed <em>before</em> this stage begins, so the bar reflects finished work
+   * only — it never claims interior progress on an opaque external stage.
+   */
+  private void reportStage(UUID fileId, List<StageStep> plan, int index) {
+    // Defensive: indices are hardcoded at the call sites against buildStagePlan. A mismatch (e.g. a
+    // stage added/removed without updating both) should degrade to no progress, not crash analysis.
+    if (index < 0 || index >= plan.size()) {
+      log.warn("reportStage: index {} out of range for plan of size {}", index, plan.size());
+      return;
+    }
+    int totalWeight = plan.stream().mapToInt(StageStep::weight).sum();
+    int doneWeight = 0;
+    for (int i = 0; i < index; i++) doneWeight += plan.get(i).weight();
+    int percent = totalWeight > 0 ? (int) Math.round(doneWeight * 100.0 / totalWeight) : 0;
+    analysisProgressService.update(
+        fileId,
+        new AnalysisProgressResponse(index + 1, plan.size(), plan.get(index).label(), percent));
+  }
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -72,9 +118,8 @@ public class AnalysisService {
   private final FileRepository fileRepository;
   private final StorageService storageService;
   private final PcapParserService pcapParserService;
-  private final NdpiService ndpiService;
-  private final TsharkEnrichmentService tsharkEnrichmentService;
-  private final SuricataService suricataService;
+  // No extractor fields: the runner discovers every Extractor. Adding one touches nothing here.
+  private final ExtractorRunner extractorRunner;
   private final SignatureApplier signatureApplier;
   private final HostClassifier hostClassifier;
   private final HostnameResolverService hostnameResolverService;
@@ -82,6 +127,7 @@ public class AnalysisService {
   private final GeoIpService geoIpService;
   private final FileExtractionStage fileExtractionStage;
   private final AnalysisRecordService analysisRecordService;
+  private final AnalysisProgressService analysisProgressService;
   private final ExtractionRunService extractionRunService;
   private final HostnameAdjudicator hostnameAdjudicator;
   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -106,10 +152,14 @@ public class AnalysisService {
     // frontend can see that analysis has started rather than waiting for the entire job to finish.
     AnalysisResultEntity analysis = analysisRecordService.createInProgress(file);
 
+    // Live progress plan: which stages will run for this file, and their relative weights.
+    List<StageStep> plan = buildStagePlan(file);
+
     try {
       long analysisStart = System.currentTimeMillis();
 
       // Stage 1: Download
+      reportStage(fileId, plan, 0);
       long t = System.currentTimeMillis();
       File tempFile = File.createTempFile("pcap-", ".pcap");
       try {
@@ -117,6 +167,7 @@ public class AnalysisService {
         log.info("[{}] [1/7] Download: {}ms", fileId, System.currentTimeMillis() - t);
 
         // Stage 2: PCAP parse
+        reportStage(fileId, plan, 1);
         t = System.currentTimeMillis();
         PcapParserService.PcapAnalysisResult parseResult =
             pcapParserService.analyzePcapFile(tempFile);
@@ -127,41 +178,19 @@ public class AnalysisService {
             parseResult.getPacketCount(),
             parseResult.getConversations().size());
 
-        // Stage 3: nDPI + tshark enrichment
+        // Stage 3: Extract — every Extractor on the classpath, in turn.
+        //
+        // This block used to name each extractor, hold its enable flag, and record its manifest row
+        // by hand; adding one meant editing this method. It now names none of them: the runner
+        // discovers every Extractor, each decides for itself whether it applies to this capture,
+        // and the manifest row is automatic (#512).
+        reportStage(fileId, plan, 2);
         t = System.currentTimeMillis();
-        if (file.isEnableNdpi()) {
-          NdpiService.Outcome ndpiOutcome =
-              ndpiService.enrich(tempFile, parseResult.getConversations());
-          extractionRunService.record(
-              fileId, ExtractionManifest.NDPI, ndpiOutcome.status(), ndpiOutcome.detail());
-          tsharkEnrichmentService.enrich(tempFile, parseResult.getConversations());
-        } else {
-          extractionRunService.record(
-              fileId,
-              ExtractionManifest.NDPI,
-              ExtractionManifest.Status.SKIPPED,
-              "nDPI disabled for this file");
-        }
-        // Per-file flag AND the global kill-switch must both allow it. SURICATA_ENABLED=false
-        // disables Suricata across the board regardless of the upload-time enableSuricata flag.
-        boolean runSuricata = suricataEnabled && file.isEnableSuricata();
-        if (runSuricata) {
-          suricataService.enrich(tempFile, parseResult.getConversations());
-        } else {
-          extractionRunService.record(
-              fileId,
-              ExtractionManifest.SURICATA,
-              ExtractionManifest.Status.SKIPPED,
-              suricataEnabled ? "Suricata disabled for this file" : "SURICATA_ENABLED=false");
-        }
-        log.info(
-            "[{}] [3/7] Enrichment (nDPI={}, Suricata={}): {}ms",
-            fileId,
-            file.isEnableNdpi(),
-            runSuricata,
-            System.currentTimeMillis() - t);
+        extractorRunner.runAll(file, tempFile, parseResult.getConversations());
+        log.info("[{}] [3/7] Extract: {}ms", fileId, System.currentTimeMillis() - t);
 
         // Stage 4: Signatures, device classification, geo-IP
+        reportStage(fileId, plan, 3);
         t = System.currentTimeMillis();
         Map<String, String> deviceOverrides =
             signatureApplier.applySignatures(parseResult.getConversations());
@@ -219,6 +248,7 @@ public class AnalysisService {
             System.currentTimeMillis() - t);
 
         // Stage 5: Persist analysis result
+        reportStage(fileId, plan, 4);
         t = System.currentTimeMillis();
         analysis.setPacketCount(parseResult.getPacketCount());
         analysis.setTotalBytes(parseResult.getTotalBytes());
@@ -247,6 +277,7 @@ public class AnalysisService {
         log.info("[{}] [5/7] Analysis result saved: {}ms", fileId, System.currentTimeMillis() - t);
 
         // Stage 6: DB inserts (conversations + packets)
+        reportStage(fileId, plan, 5);
         t = System.currentTimeMillis();
         int convIndex = 0;
         long packetsInserted = 0;
@@ -260,6 +291,8 @@ public class AnalysisService {
                   .dstIp(convInfo.getDstIp())
                   .dstPort(convInfo.getDstPort())
                   .protocol(convInfo.getProtocol())
+                  .initiatorIp(convInfo.getInitiatorIp())
+                  .initiatorPort(convInfo.getInitiatorPort())
                   .appName(convInfo.getAppName())
                   .tsharkProtocol(convInfo.getTsharkProtocol())
                   .category(convInfo.getCategory())
@@ -330,9 +363,10 @@ public class AnalysisService {
             parseResult.getConversations().size(),
             packetsInserted);
 
-        // Stage 7: File extraction
+        // Stage 7: File extraction (only in the plan when enabled — index 6)
         t = System.currentTimeMillis();
         if (file.isEnableFileExtraction()) {
+          reportStage(fileId, plan, 6);
           try {
             fileExtractionStage.extractFiles(file, tempFile, savedConversationIds);
             log.info("[{}] [7/7] File extraction: {}ms", fileId, System.currentTimeMillis() - t);
@@ -368,10 +402,17 @@ public class AnalysisService {
 
       } finally {
         tempFile.delete();
+        // Stop tracking live progress: on success the poller flips to the 200 summary; on failure
+        // it flips to 500. Either way the in-memory entry is no longer needed.
+        analysisProgressService.clear(fileId);
       }
 
     } catch (Exception e) {
       log.error("Error analyzing file {}: {}", fileId, e.getMessage(), e);
+
+      // Clear progress on every failure path, including ones that never reached the inner finally
+      // (e.g. createTempFile throwing after the first reportStage). Idempotent — safe if already done.
+      analysisProgressService.clear(fileId);
 
       // Mark analysis and file as FAILED in a separate committed transaction so the status persists
       // even though the outer transaction is being rolled back.

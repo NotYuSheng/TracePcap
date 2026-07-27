@@ -4,13 +4,18 @@ import ELK from 'elkjs';
 const ELK_WORKER_URL = `${import.meta.env.BASE_URL}elk-worker.min.js`;
 import Graph from 'graphology';
 import Sigma from 'sigma';
+import { EdgeArrowProgram } from 'sigma/rendering';
+import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
-import { getProtocolColor, NODE_TYPE_CONFIG } from '@/features/network/constants';
-import { deviceTypeColor, deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
+import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, buildAppLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
+import { getAppColor } from '@/utils/appColors';
+import { makeVolumeEdgeColor } from '@/utils/volumeColor';
+import { deviceTypeIcon, deviceTypeLabel, DEVICE_TYPES } from '@/utils/deviceType';
 import { useStore } from '@/store';
 import type { NodeLabelConfig } from '@/store/slices/nodeLabelSlice';
+import { GENERIC_NODE_TYPES, getNodeIcon } from './nodeIcons';
 import './NetworkGraph.css';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +27,8 @@ export interface NodeHighlight {
   label: string;
   description?: string;
 }
+
+export type EdgeColorMode = 'transport' | 'application' | 'volume';
 
 interface NetworkGraphProps {
   nodes: GraphNode[];
@@ -38,6 +45,27 @@ interface NetworkGraphProps {
   activeFilterCount?: number;
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
+  /**
+   * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
+   * volume shades each edge by `totalBytes` on the shared volume scale — the same
+   * ramp the node-to-node heatmap uses. Note an edge is one protocol/app between a
+   * pair (see `deduplicateEdges`), while a heatmap cell is the pair's total across
+   * all protocols, so the two agree exactly only for single-protocol pairs.
+   *
+   * <p>These are mutually exclusive by design: colour is one channel, and showing
+   * two meanings at once would make neither legible. Whichever is active needs a
+   * legend rendered by the caller.
+   */
+  edgeColorMode?: EdgeColorMode;
+  /**
+   * Render light regardless of the user's theme — for PDF capture, which always wants white
+   * diagrams (see captureNetworkDiagrams.ts).
+   *
+   * <p>A prop rather than a CSS override because this component picks its colours in JavaScript,
+   * from the theme store and matchMedia. No amount of CSS on an ancestor reaches them: the capture
+   * used to set data-theme="light" on <html> and it never worked — it only made the page strobe.
+   */
+  forceLight?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -49,47 +77,6 @@ const DARK_BG = '#0f1117';
 const CONTESTED_COLOR = '#f59e0b';
 const DARK_SURFACE = '#1e2130';
 const LIGHT_BG = '#f6f8fa';
-
-// ---------------------------------------------------------------------------
-// Bootstrap Icons — unicode codepoints for each node type
-// Pre-rendered to data URLs so Sigma's WebGL renderer can display them.
-// ---------------------------------------------------------------------------
-
-// Icons for specific service nodeTypes
-const NODE_TYPE_ICONS: Record<string, string> = {
-  'dns-server':      '\uf3ef', // bi-globe2
-  'web-server':      '\uf52c', // bi-server
-  'ssh-server':      '\uf5c3', // bi-terminal
-  'ftp-server':      '\uf3d5', // bi-folder-symlink
-  'mail-server':     '\uf32f', // bi-envelope
-  'dhcp-server':     '\uf1d6', // bi-broadcast
-  'ntp-server':      '\uf293', // bi-clock
-  'database-server': '\uf8c4', // bi-database
-  router:            '\uf6ec', // bi-router
-  'l2-device':       '\uf6d5', // bi-ethernet
-  cluster:           '\uf2ee', // bi-diagram-3
-};
-
-// Icons for device types — used on generic (client/unknown) nodes
-const DEVICE_TYPE_ICONS: Record<string, string> = {
-  ROUTER:         '\uf6ec', // bi-router
-  MOBILE:         '\uf4b9', // bi-phone
-  LAPTOP_DESKTOP: '\uf456', // bi-laptop
-  SERVER:         '\uf52c', // bi-server
-  IOT:            '\uf46b', // bi-cpu
-  DNS_SERVER:     '\uf40d', // bi-hdd-network
-  WEB_SERVER:     '\uf3ee', // bi-globe
-  API_SERVER:     '\uf411', // bi-hdd-stack
-};
-
-const FALLBACK_ICON = '\uf505'; // bi-question-circle
-
-function getNodeIcon(nodeType: string, deviceType: string): string {
-  if (!GENERIC_NODE_TYPES.has(nodeType)) {
-    return NODE_TYPE_ICONS[nodeType] ?? FALLBACK_ICON;
-  }
-  return DEVICE_TYPE_ICONS[deviceType] ?? FALLBACK_ICON;
-}
 
 /**
  * Sidecar maps: label → nodeType and label → deviceType.
@@ -122,6 +109,9 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
     if (!opt.enabled) continue;
     let value: string | undefined;
     switch (opt.field) {
+      case 'roleLabel':
+        value = node.data.roleLabel;
+        break;
       case 'ip':
         value = node.data.ip;
         break;
@@ -148,10 +138,14 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
         value = node.data.manufacturer;
         break;
     }
-    if (value) lines.push(value);
+    // Skip repeats: a confirmed role also becomes the HUMAN identity label, so with both the
+    // role and device-type lines enabled the same text would otherwise print twice.
+    if (value && !lines.includes(value)) lines.push(value);
   }
-  const custom = cfg.customText.trim();
-  if (custom) lines.push(custom);
+  for (const t of cfg.customText) {
+    const custom = t.trim();
+    if (custom) lines.push(custom);
+  }
   // Never render an unlabelled node — fall back to IP (or the node's display label).
   if (lines.length === 0) lines.push(node.data.ip || node.label || '');
   return lines.filter(Boolean);
@@ -234,19 +228,17 @@ function drawNodeLabel(
   }
 }
 
-// Generic nodeTypes that carry no specific service information.
-// For these, deviceType provides a more meaningful colour signal.
-const GENERIC_NODE_TYPES = new Set(['client', 'unknown']);
-
+/**
+ * The node's colour, from its adjudicated nodeType.
+ *
+ * <p>This used to adjudicate: nodeType-wins-else-deviceType-else-fallback, resolving two competing
+ * classifications by display precedence — in the browser, with no confidence and no contested
+ * state (#521, #499). But nodeType is now a projection of the backend's host-identity adjudication
+ * (see networkService's applyIdentities), so it already *is* the one answer. There is nothing left
+ * to resolve; the colour just follows it.
+ */
 function getNodeColor(node: GraphNode): string {
-  const { nodeType, deviceType } = node.data;
-  // Specific service nodeTypes always take priority (DNS server, web server, etc.)
-  if (!GENERIC_NODE_TYPES.has(nodeType) && NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]) {
-    return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG].color;
-  }
-  // For generic types (client / unknown), prefer the hardware device classification
-  if (deviceType && deviceType !== 'UNKNOWN') return deviceTypeColor(deviceType);
-  // Fall back to the nodeType color (client=blue, unknown=grey)
+  const { nodeType } = node.data;
   return NODE_TYPE_CONFIG[nodeType as keyof typeof NODE_TYPE_CONFIG]?.color ?? '#95a5a6';
 }
 
@@ -281,6 +273,80 @@ function deduplicateEdges(edges: GraphEdge[]): GraphEdge[] {
   return result;
 }
 
+
+/**
+ * Range of positive edge volumes, used to fit the volume colour scale.
+ * Exported so a caller rendering the legend derives the exact same domain the
+ * edges are painted with — a legend fitted to a different range would lie.
+ */
+export function edgeBytesRange(edges: GraphEdge[]): { min: number; max: number } {
+  let max = 0;
+  let min = Infinity;
+  for (const e of edges) {
+    const b = e.data.totalBytes ?? 0;
+    if (b <= 0) continue;
+    if (b > max) max = b;
+    if (b < min) min = b;
+  }
+  return { min: Number.isFinite(min) ? min : 1, max };
+}
+
+// ---------------------------------------------------------------------------
+// Parallel-edge curvature
+// ---------------------------------------------------------------------------
+
+/**
+ * Curvature for the edge at `index` within a parallel group of `maxIndex + 1` edges. Zero-index
+ * edges stay flat; the rest fan out symmetrically. `amplitude` keeps big groups from curving so hard
+ * they cross each other. Mirrors the reference implementation from `@sigma/edge-curve`.
+ */
+function getCurvature(index: number, maxIndex: number): number {
+  // `!maxIndex` also rejects undefined/null/NaN (a missing parallel-index attribute) — those would
+  // otherwise sail past `<= 0` and produce NaN curvature.
+  if (!maxIndex || maxIndex <= 0) return 0;
+  if (index < 0) return -getCurvature(-index, maxIndex);
+  const amplitude = 3.5;
+  const maxCurvature = (amplitude * (1 - Math.exp(-maxIndex / amplitude))) / maxIndex;
+  return (maxCurvature * index) / maxIndex;
+}
+
+/**
+ * When two nodes are joined by more than one edge — a different protocol/app per edge, or one in
+ * each direction — straight strokes would draw on top of each other and hide all but one colour
+ * (#497). Curve the parallels apart so every edge (and its protocol colour) is visible; edges with a
+ * single connection between their endpoints stay straight. Reads the parallel-group indices that
+ * `indexParallelEdgesIndex` writes and sets each edge's render `type` + `curvature` accordingly.
+ */
+function applyParallelEdgeCurvature(graph: Graph): void {
+  indexParallelEdgesIndex(graph, {
+    edgeIndexAttribute: 'parallelIndex',
+    edgeMinIndexAttribute: 'parallelMinIndex',
+    edgeMaxIndexAttribute: 'parallelMaxIndex',
+  });
+  graph.forEachEdge((edge, attrs) => {
+    const parallelIndex = attrs.parallelIndex as number | null | undefined;
+    const parallelMinIndex = attrs.parallelMinIndex as number | null | undefined;
+    const parallelMaxIndex = attrs.parallelMaxIndex as number | null | undefined;
+
+    if (typeof parallelMinIndex === 'number') {
+      // Group spans both directions: the middle edge stays straight, the rest curve.
+      graph.mergeEdgeAttributes(edge, {
+        type: parallelIndex ? 'curved' : 'arrow',
+        curvature: getCurvature(parallelIndex as number, parallelMaxIndex as number),
+      });
+    } else if (typeof parallelIndex === 'number') {
+      // Same-direction parallels: curve them all (index 0 gets 0 curvature → renders straight).
+      graph.mergeEdgeAttributes(edge, {
+        type: 'curved',
+        curvature: getCurvature(parallelIndex, parallelMaxIndex as number),
+      });
+    } else {
+      // The only edge between its endpoints — keep it a straight arrow.
+      graph.setEdgeAttribute(edge, 'type', 'arrow');
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Build a graphology graph from GraphNode[] / GraphEdge[]
 // ---------------------------------------------------------------------------
@@ -289,6 +355,8 @@ function buildGraph(
   nodes: GraphNode[],
   edges: GraphEdge[],
   primarySource?: string,
+  edgeColorMode: EdgeColorMode = 'transport',
+  darkMode = false,
 ): Graph {
   const graph = new Graph({ multi: true, type: 'directed' });
 
@@ -324,22 +392,40 @@ function buildGraph(
     });
   }
 
+  // Fitting the scale to the current view's range means it re-fits whenever
+  // filters change, so contrast is never wasted on values nothing reaches.
+  const { min: minEdgeBytes, max: maxEdgeBytes } = edgeBytesRange(validEdges);
+  const volumeColor = makeVolumeEdgeColor(maxEdgeBytes, darkMode, minEdgeBytes);
+
   for (const e of validEdges) {
-    const color = getProtocolColor(e.data.protocol);
     const isSecondaryOnly =
       e.data.sources?.length === 1 &&
       primarySource !== undefined &&
       e.data.sources[0] !== primarySource;
 
+    const appName = e.data.appName ?? '';
     graph.addEdgeWithKey(e.id, e.source, e.target, {
-      color,
+      color:
+        edgeColorMode === 'volume'
+          ? volumeColor(e.data.totalBytes ?? 0)
+          : edgeColorMode === 'application'
+            ? (appName ? getAppColor(appName) : DEFAULT_EDGE_COLOR)
+            : getProtocolColor(e.data.protocol),
       size: 1.2,
       label: e.label,
       type: 'arrow',
       isSecondaryOnly,
       packetCount: e.data.packetCount,
+      // Kept on the edge so the colour mode can be switched by repainting in
+      // place, without rebuilding the graph and throwing away the layout.
+      totalBytes: e.data.totalBytes ?? 0,
+      protocol: e.data.protocol,
+      appName,
     });
   }
+
+  // Curve edges that share a node pair so overlapping strokes don't hide each other's colour.
+  applyParallelEdgeCurvature(graph);
 
   return graph;
 }
@@ -399,6 +485,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  edgeColorMode = 'transport',
+  forceLight = false,
 }: NetworkGraphProps) {
   const themeMode = useStore(s => s.themeMode);
   const [sysDark, setSysDark] = useState(
@@ -411,7 +499,8 @@ export const NetworkGraph = memo(function NetworkGraph({
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [themeMode]);
-  const darkMode = themeMode === 'dark' || (themeMode === 'system' && sysDark);
+  const darkMode =
+    !forceLight && (themeMode === 'dark' || (themeMode === 'system' && sysDark));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerReady, setContainerReady] = useState(false);
@@ -473,6 +562,16 @@ export const NetworkGraph = memo(function NetworkGraph({
     [hiddenNodesList]
   );
 
+  // Edge-colour legend entries for the current colour mode. Volume mode encodes
+  // byte counts, not categories, so it has no swatch legend. Transport lists the
+  // base protocols (TCP/UDP/ICMP…); Application lists the nDPI applications
+  // (WhatsApp, YouTube…) the same way the strokes are coloured, via getAppColor.
+  const protocolLegend = useMemo(() => {
+    if (edgeColorMode === 'volume') return { entries: [], hasUnmapped: false };
+    if (edgeColorMode === 'application') return buildAppLegend(edges.map(e => e.data.appName));
+    return buildProtocolLegend(edges.map(e => e.data.protocol));
+  }, [edges, edgeColorMode]);
+
   const hiddenNeighbors = useMemo<GraphNode[]>(() => {
     if (!hoveredNode || crossEdges.length === 0) return [];
     const neighborIds = new Set<string>();
@@ -508,7 +607,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigmaRef.current?.kill();
     sigmaRef.current = null;
 
-    const graph = buildGraph(nodes, edges, primarySource);
+    const graph = buildGraph(nodes, edges, primarySource, edgeColorMode, darkMode);
     graphRef.current = graph;
 
     // Seed the per-node text lines before the first paint. Read config fresh so a
@@ -527,6 +626,12 @@ export const NetworkGraph = memo(function NetworkGraph({
       renderLabels: true,
       renderEdgeLabels: false,
       defaultEdgeType: 'arrow',
+      // 'arrow' = straight (single edge between a pair); 'curved' = fanned-out parallels, set per
+      // edge by applyParallelEdgeCurvature so overlapping protocol colours stay distinguishable.
+      edgeProgramClasses: {
+        arrow: EdgeArrowProgram,
+        curved: EdgeCurvedArrowProgram,
+      },
       labelDensity: 1,
       labelGridCellSize: 60,
       labelRenderedSizeThreshold: -Infinity, // always call drawNodeLabel at every zoom level
@@ -587,6 +692,66 @@ export const NetworkGraph = memo(function NetworkGraph({
     // where a node actually is on screen (viewportForNode) and click that point,
     // instead of guessing coordinates and silently filming a miss.
     (window as unknown as { __sigma?: Sigma }).__sigma = sigma;
+
+    // ── Edge overdraw for PDF capture ─────────────────────────────────────────
+    //
+    // Sigma draws edges on a WebGL canvas, and a WebGL canvas cannot be read back from
+    // JavaScript — toDataURL and gl.readPixels both return empty while the edges are plainly
+    // visible on screen, because the pixels only ever exist inside the compositor. So every
+    // capture library produces the same edgeless diagram; this is not an html-to-image problem
+    // and no amount of swapping libraries fixes it (#526).
+    //
+    // The 2D `labels` layer IS readable — it is the only reason nodes and text reach the PDF at
+    // all (they come from drawNodeLabel's overdraw, not from Sigma's WebGL node layer). So for
+    // capture we redraw the edges onto that same 2D layer, underneath the labels.
+    //
+    // Capture-only, deliberately: the interactive renderer keeps its WebGL edges, which is what
+    // makes a 700-edge graph pan smoothly. Doing this always would put every edge through the 2D
+    // context on every frame.
+    if (forceLight) {
+      const labelCanvas = sigma.getCanvases()['labels'];
+      const labelCtx = labelCanvas?.getContext('2d');
+      if (labelCtx) {
+        sigma.on('afterRender', () => {
+          labelCtx.save();
+          // Sigma sizes its canvases for the device pixel ratio; graphToViewport returns CSS
+          // pixels, so match that transform or the lines land in the wrong place on HiDPI.
+          //
+          // Guard clientWidth rather than trusting `|| 1`: that catches 0/0 (NaN, falsy) but NOT
+          // n/0, which is Infinity — truthy, so it sails past the fallback and setTransform then
+          // silently draws nothing. A zero-width layout pass is reachable here, since the capture
+          // container is mounted and measured before the graph has laid out.
+          const dpr = labelCanvas.clientWidth > 0 ? labelCanvas.width / labelCanvas.clientWidth : 1;
+          labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          labelCtx.globalCompositeOperation = 'destination-over'; // behind the labels already drawn
+          graph.forEachEdge((_edge, attrs, source, target) => {
+            if (attrs['hidden']) return;
+            const s = sigma.graphToViewport(graph.getNodeAttributes(source) as { x: number; y: number });
+            const t = sigma.graphToViewport(graph.getNodeAttributes(target) as { x: number; y: number });
+            labelCtx.beginPath();
+            labelCtx.moveTo(s.x, s.y);
+            // Curved parallels must bow the same way here as Sigma draws them on screen, or the PDF
+            // would show overlapping straight lines again. Same control point Sigma uses: the
+            // midpoint offset perpendicular to the edge by `curvature` (#497).
+            const curvature = (attrs['curvature'] as number) ?? 0;
+            // Number.isFinite guards against a NaN curvature (missing/malformed index) reaching
+            // quadraticCurveTo, which would silently drop the stroke.
+            if (attrs['type'] === 'curved' && Number.isFinite(curvature) && curvature !== 0) {
+              const cx = (s.x + t.x) / 2 + (t.y - s.y) * curvature;
+              const cy = (s.y + t.y) / 2 - (t.x - s.x) * curvature;
+              labelCtx.quadraticCurveTo(cx, cy, t.x, t.y);
+            } else {
+              labelCtx.lineTo(t.x, t.y);
+            }
+            labelCtx.strokeStyle = (attrs['color'] as string) ?? '#999';
+            labelCtx.lineWidth = Math.max(0.6, (attrs['size'] as number) ?? 1);
+            labelCtx.globalAlpha = 0.75;
+            labelCtx.stroke();
+          });
+          labelCtx.restore();
+        });
+      }
+    }
 
     // ── Node dragging ──────────────────────────────────────────────────────────
     // Track which node is being dragged. These are plain vars (not refs) because
@@ -764,13 +929,67 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigmaRef.current?.refresh();
   }, [hoveredNode]);
 
+  // Repaint edges when the colour encoding changes.
+  //
+  // Deliberately not a dependency of the graph-building effect above: switching
+  // Protocol↔Volume must not rebuild the graph, because that would re-run the
+  // layout and scramble positions the user has been reading. Everything needed
+  // (protocol, totalBytes) is already on each edge, so this is a pure repaint.
+  //
+  // darkMode is absent from the deps for the opposite reason — a theme change
+  // *does* rebuild via the effect above, which repaints with the correct ramp.
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+
+    let maxEdgeBytes = 0;
+    let minEdgeBytes = Infinity;
+    graph.forEachEdge((_key, attrs) => {
+      const b = (attrs.totalBytes as number) ?? 0;
+      if (b <= 0) return;
+      if (b > maxEdgeBytes) maxEdgeBytes = b;
+      if (b < minEdgeBytes) minEdgeBytes = b;
+    });
+    const volumeColor = makeVolumeEdgeColor(
+      maxEdgeBytes,
+      darkMode,
+      Number.isFinite(minEdgeBytes) ? minEdgeBytes : 1
+    );
+
+    graph.forEachEdge((key, attrs) => {
+      graph.setEdgeAttribute(
+        key,
+        'color',
+        edgeColorMode === 'volume'
+          ? volumeColor((attrs.totalBytes as number) ?? 0)
+          : edgeColorMode === 'application'
+            ? ((attrs.appName as string)
+                ? getAppColor(attrs.appName as string)
+                : DEFAULT_EDGE_COLOR)
+            : getProtocolColor((attrs.protocol as string) ?? '')
+      );
+    });
+    sigmaRef.current?.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edgeColorMode]);
+
   // Fit view
   const handleFitView = useCallback(() => {
     sigmaRef.current?.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
   }, []);
 
   return (
-    <div className="network-graph-wrapper" style={{ background: darkMode ? DARK_BG : LIGHT_BG }}>
+    <div
+      className="network-graph-wrapper"
+      /*
+       * Publishes the graph's own resolved theme for its CSS children (the legend, tooltips).
+       * They cannot read `darkMode` — it is JS state — and they must not read the page's theme
+       * either: under forceLight the page stays dark while this canvas renders light for the PDF.
+       * The canvas is the thing they sit on, so the canvas is what they follow.
+       */
+      data-graph-theme={darkMode ? 'dark' : 'light'}
+      style={{ background: darkMode ? DARK_BG : LIGHT_BG }}
+    >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
       <div className="network-graph-canvas" ref={containerRef} />
 
@@ -850,7 +1069,9 @@ export const NetworkGraph = memo(function NetworkGraph({
       )}
 
       {/* ── Node-type legend — data-driven, matches getNodeColor/getNodeIcon ── */}
-      <div className="ng-legend">
+      {/* Scrollable on-screen so a long protocol list can't overflow the canvas; the PDF-capture
+          render (forceLight) keeps the full height so nothing is clipped in the export. */}
+      <div className={`ng-legend${forceLight ? '' : ' ng-legend--scroll'}`}>
         {/* Specific service nodeTypes present in this graph */}
         {Object.entries(NODE_TYPE_CONFIG)
           .filter(([type]) => !GENERIC_NODE_TYPES.has(type) && type !== 'cluster' &&
@@ -867,7 +1088,16 @@ export const NetworkGraph = memo(function NetworkGraph({
             nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && n.data.deviceType === dt))
           .map(dt => (
             <div key={dt} className="ng-legend-item">
-              <i className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`} style={{ color: deviceTypeColor(dt) }} />
+              {/*
+                Swatch matches what the node actually renders. Generic nodes (client/unknown) now
+                take their colour from NODE_TYPE_CONFIG[nodeType], not from deviceTypeColor — so
+                using the device colour here would advertise a colour no node shows (#521 review).
+                The device icon still distinguishes IoT from Mobile; the colour follows the node.
+              */}
+              <i
+                className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`}
+                style={{ color: NODE_TYPE_CONFIG['client'].color }}
+              />
               <span className="ng-legend-label">{deviceTypeLabel(dt)}</span>
             </div>
           ))}
@@ -877,6 +1107,26 @@ export const NetworkGraph = memo(function NetworkGraph({
             <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} />
             <span className="ng-legend-label">Unknown</span>
           </div>
+        )}
+
+        {/* ── Edge-protocol colours — line swatches, driven by PROTOCOL_COLORS ── */}
+        {(protocolLegend.entries.length > 0 || protocolLegend.hasUnmapped) && (
+          <>
+            <div className="ng-legend-divider" />
+            <div className="ng-legend-heading">Edges</div>
+            {protocolLegend.entries.map(({ color, label }) => (
+              <div key={color} className="ng-legend-item">
+                <span className="ng-legend-line" style={{ background: color }} />
+                <span className="ng-legend-label">{label}</span>
+              </div>
+            ))}
+            {protocolLegend.hasUnmapped && (
+              <div className="ng-legend-item">
+                <span className="ng-legend-line" style={{ background: DEFAULT_EDGE_COLOR }} />
+                <span className="ng-legend-label">Other</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

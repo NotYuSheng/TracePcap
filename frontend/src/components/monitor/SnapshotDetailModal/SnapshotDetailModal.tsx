@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { subnetService } from '@/features/subnets/services/subnetService';
@@ -10,7 +11,7 @@ import { SnapshotSecurityTab } from '@/components/monitor/SnapshotSecurityTab/Sn
 import { NetworkInsightsPanel } from '@/components/monitor/NetworkInsightsPanel/NetworkInsightsPanel';
 import { NetworkGraph } from '@/components/network/NetworkGraph';
 import { NetworkControls } from '@/components/network/NetworkControls';
-import { NodeDetails } from '@/components/network/NodeDetails';
+import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@/components/network/NodeLabelSettingsModal';
 import { useNetworkData } from '@/features/network/hooks/useNetworkData';
 import { toggleSet } from '@/features/network/constants';
@@ -19,8 +20,14 @@ import { insightsService } from '@/features/insights/services/insightsService';
 import type { NetworkSnapshot, ChangeEvent } from '@/features/monitor/types/monitor.types';
 import type { NetworkInsight, InsightOptions } from '@/features/insights/types/insights.types';
 import type { GraphNode } from '@/features/network/types';
-import type { NodeHighlight } from '@/components/network/NetworkGraph/NetworkGraph';
+import type { NodeHighlight, EdgeColorMode } from '@/components/network/NetworkGraph/NetworkGraph';
+import { edgeBytesRange } from '@/components/network/NetworkGraph/NetworkGraph';
+import { VolumeHeatmap } from '@/components/network/VolumeHeatmap';
+import type { VolumePair } from '@/components/network/VolumeHeatmap';
+import { VolumeLegend } from '@/components/network/VolumeLegend';
+import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
+import { nodeIdentityKey } from '@/utils/deviceType';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
@@ -123,6 +130,7 @@ export const SnapshotDetailModal = ({
   onSnapshotUpdated,
   onHide,
 }: SnapshotDetailModalProps) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'diagram');
   const [changesPage, setChangesPage] = useState(1);
   const CHANGES_PAGE_SIZE = 15;
@@ -134,6 +142,12 @@ export const SnapshotDetailModal = ({
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const isDark = useResolvedDark();
+  const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('transport');
+  const [isDiagramFullscreen, setIsDiagramFullscreen] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
+  const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
 
   // Filter state
   const [ipFilter, setIpFilter] = useState('');
@@ -193,8 +207,7 @@ export const SnapshotDetailModal = ({
   const { nodes, edges, loading: graphLoading } = useNetworkData(diagramSnap.fileId);
 
   // "Present" sets for filter options
-  const presentNodeTypes = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => s.add(n.data.nodeType)); return s; }, [nodes]);
-  const presentDeviceTypes = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => { if (n.data.deviceType) s.add(n.data.deviceType); }); return s; }, [nodes]);
+  const presentIdentities = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => s.add(nodeIdentityKey(n.data))); return s; }, [nodes]);
   const presentEdgeLegendKeys = useMemo(() => {
     const s = new Set<string>();
     edges.forEach(edge => {
@@ -245,6 +258,10 @@ export const SnapshotDetailModal = ({
     }),
   [nodes, edges, hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNodeFilters, portFilter, ipFilter]);
 
+  // Volume range of the current view, from the same helper the graph paints with,
+  // so this snapshot's legend and edges always share a domain.
+  const edgeRange = useMemo(() => edgeBytesRange(filteredEdges), [filteredEdges]);
+
   const activeFilterCount =
     activeLegendProtocols.length + activeNodeFilters.length + activeAppFilters.length +
     activeL7Protocols.length + activeCategories.length + activeRiskTypes.length +
@@ -255,15 +272,44 @@ export const SnapshotDetailModal = ({
   useEffect(() => {
     if (activeTab !== 'diagram') return;
     const handler = (e: KeyboardEvent) => {
+      // Heatmap fullscreen owns Escape while it is open — without this the key
+      // falls through to the dialog and closes the whole thing instead of just
+      // leaving fullscreen. Capture phase, so it runs before the modal's handler.
+      if (e.key === 'Escape' && isHeatmapFullscreen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsHeatmapFullscreen(false);
+        return;
+      }
+      // Diagram fullscreen owns Escape too — exit fullscreen instead of closing
+      // the whole dialog. Arrow stepping stays enabled so snapshots can be paged
+      // through while fullscreen.
+      if (e.key === 'Escape' && isDiagramFullscreen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDiagramFullscreen(false);
+        return;
+      }
+      // Snapshot stepping would be disorienting while the matrix is fullscreen.
+      if (isHeatmapFullscreen) return;
       if (e.key === 'ArrowLeft' && diagramIndex > 0) {
         setDiagramSnapshotId(sorted[diagramIndex - 1].id);
       } else if (e.key === 'ArrowRight' && diagramIndex < sorted.length - 1) {
         setDiagramSnapshotId(sorted[diagramIndex + 1].id);
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [activeTab, diagramIndex, sorted]);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen, isDiagramFullscreen]);
+
+  // A fullscreen matrix/diagram is position:fixed outside the dialog's stacking
+  // context, so it must not outlive a tab change that hides the diagram beneath it.
+  useEffect(() => {
+    if (activeTab !== 'diagram') {
+      setIsHeatmapFullscreen(false);
+      setIsDiagramFullscreen(false);
+    }
+  }, [activeTab]);
 
   // Context tab state
   const [contextDraft, setContextDraft] = useState(snapshot.context ?? '');
@@ -483,7 +529,7 @@ export const SnapshotDetailModal = ({
 
         {/* ── Network Diagram tab ── */}
         {activeTab === 'diagram' && (
-          <div>
+          <div className={isDiagramFullscreen ? 'nd-css-fullscreen-over-modal' : ''}>
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
               <div className="d-flex align-items-center gap-2">
                 <Button size="sm" variant="outline-secondary"
@@ -513,6 +559,29 @@ export const SnapshotDetailModal = ({
                   <i className="bi bi-chevron-right" />
                 </Button>
               </div>
+              <div className="d-flex align-items-center gap-2">
+                <Form.Label className="mb-0 text-muted small">Color edges by</Form.Label>
+                <Form.Select
+                  size="sm"
+                  style={{ width: 130 }}
+                  value={edgeColorMode}
+                  onChange={e => setEdgeColorMode(e.target.value as EdgeColorMode)}
+                >
+                  <option value="transport">Transport</option>
+                  <option value="application">Application</option>
+                  <option value="volume">Volume</option>
+                </Form.Select>
+                {edgeColorMode === 'volume' && (
+                  <VolumeLegend
+                    maxValue={edgeRange.max}
+                    minValue={edgeRange.min}
+                    dark={isDark}
+                    variant="edge"
+                    label="Edge volume"
+                  />
+                )}
+              </div>
+
               {prevSnap ? (
                 <span className="text-muted small">
                   <i className="bi bi-arrow-left-right me-1" />
@@ -540,8 +609,20 @@ export const SnapshotDetailModal = ({
               >
                 <i className="bi bi-tags" />
               </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted"
+                onClick={() => setIsDiagramFullscreen(f => !f)}
+                title={isDiagramFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                <i className={`bi ${isDiagramFullscreen ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} />
+              </Button>
             </div>
-            <div className="monitor-diagram-graph" style={{ height: 460 }}>
+            <div
+              className="monitor-diagram-graph"
+              style={isDiagramFullscreen ? undefined : { height: 460 }}
+            >
               {graphLoading ? (
                 <div className="d-flex align-items-center justify-content-center h-100 text-muted">
                   <Spinner animation="border" size="sm" className="me-2" />Loading graph…
@@ -557,6 +638,7 @@ export const SnapshotDetailModal = ({
                   onNodeClick={node => setSelectedNode(node)}
                   onFilterClick={() => setShowFilterModal(true)}
                   activeFilterCount={activeFilterCount}
+                  edgeColorMode={edgeColorMode}
                 />
               )}
             </div>
@@ -564,6 +646,73 @@ export const SnapshotDetailModal = ({
               <div className="text-center text-muted small mt-2">
                 <i className="bi bi-check-circle me-1 text-success" />
                 No node-level changes detected between these two snapshots.
+              </div>
+            )}
+
+            {/* Node-to-node volume for this snapshot. Collapsed by default — the
+                dialog is already dense and the diagram is the primary view here.
+                Unlike the analysis page this does not drive `highlightedNodes`,
+                which in monitor mode already carries snapshot-change highlighting. */}
+            {!graphLoading && (
+              <div
+                className={
+                  isHeatmapFullscreen
+                    ? 'tp-heatmap-fullscreen-over-modal'
+                    : 'mt-3 border-top pt-3'
+                }
+              >
+                <div className="d-flex justify-content-between align-items-center">
+                  <strong className="small">
+                    Node-to-Node Volume
+                    <span className="text-muted fw-normal ms-2">
+                      Traffic between each pair of displayed hosts
+                    </span>
+                  </strong>
+                  <div className="d-flex align-items-center gap-3">
+                    {showHeatmap && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-muted"
+                        onClick={() => setIsHeatmapFullscreen(f => !f)}
+                        title={isHeatmapFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+                      >
+                        <i
+                          className={`bi ${
+                            isHeatmapFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'
+                          }`}
+                        />
+                      </Button>
+                    )}
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-muted"
+                      onClick={() => {
+                        // Collapsing while fullscreen would leave an empty shell.
+                        if (showHeatmap) setIsHeatmapFullscreen(false);
+                        setShowHeatmap(v => !v);
+                      }}
+                      aria-expanded={showHeatmap}
+                    >
+                      {showHeatmap ? 'Hide' : 'Show'}
+                      <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                    </Button>
+                  </div>
+                </div>
+                {showHeatmap && (
+                  <div className={isHeatmapFullscreen ? 'mt-2 tp-heatmap-body' : 'mt-2'}>
+                    <VolumeHeatmap
+                      nodes={filteredNodes}
+                      edges={filteredEdges}
+                      dark={isDark}
+                      focusedHost={selectedNode?.id ?? null}
+                      selectedPair={selectedPair}
+                      onCellClick={setSelectedPair}
+                      onHostClick={setSelectedNode}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -803,10 +952,12 @@ export const SnapshotDetailModal = ({
     </Modal>
 
     {selectedNode && (
-      <NodeDetails
-        node={selectedNode}
-        edges={edges}
+      <EntityDetailModal
+        {...graphNodeEntity(selectedNode)}
         fileId={diagramSnap.fileId}
+        graphNode={selectedNode}
+        graphEdges={edges}
+        onNavigate={navigate}
         onClose={() => setSelectedNode(null)}
         changeHighlight={highlightedNodes.get(selectedNode.label ?? '') ?? highlightedNodes.get(selectedNode.data.ip ?? '') ?? highlightedNodes.get(selectedNode.data.mac ?? '')}
         zIndex={1070}
@@ -827,8 +978,7 @@ export const SnapshotDetailModal = ({
           activeNodeFilters={activeNodeFilters}
           onNodeFilterClick={toggleNodeFilter}
           onNodeFilterClear={() => setActiveNodeFilters([])}
-          presentNodeTypes={presentNodeTypes}
-          presentDeviceTypes={presentDeviceTypes}
+          presentIdentities={presentIdentities}
           ipFilter={ipFilter}
           onIpFilterChange={setIpFilter}
           portFilter={portFilter}

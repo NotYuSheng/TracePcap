@@ -400,6 +400,22 @@
   color: var(--tp-text);
 }
 
+/* Outline-primary buttons that live inside a coloured alert — e.g. the "Contested"
+   candidate-confirm actions on a warning (amber) alert. SGDS keeps their purple
+   text/border in dark mode, which is hard to read on the dark amber/red alert
+   backgrounds. Within alerts, give them a light, legible foreground instead. */
+[data-theme='dark'] .alert .btn-outline-primary {
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+
+[data-theme='dark'] .alert .btn-outline-primary:hover,
+[data-theme='dark'] .alert .btn-outline-primary:focus {
+  background-color: var(--tp-surface-hover);
+  border-color: var(--tp-text);
+  color: var(--tp-text);
+}
+
 [data-theme='dark'] .btn-close {
   filter: invert(1) grayscale(100%) brightness(200%);
 }
