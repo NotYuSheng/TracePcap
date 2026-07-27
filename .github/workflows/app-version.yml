@@ -6,10 +6,10 @@ name: Sync App Version
 # (which is gitignored), so the value has to live in the compose file itself.
 #
 # main is a protected branch (changes must go through a PR), so this cannot push
-# directly. It opens a bump PR and enables auto-merge; the repo requires a PR but no
-# reviews, so the PR merges as soon as it is created. The merge is done with
-# GITHUB_TOKEN, which by design cannot trigger workflows — so the bump PR merging
-# does not retrigger this workflow or publish-ghcr.yml.
+# directly. It opens a bump PR and merges it immediately: main requires a PR but no
+# reviews and no status checks, so the PR is mergeable the moment it exists. The
+# merge is done with GITHUB_TOKEN, which by design cannot trigger workflows — so the
+# bump PR merging does not retrigger this workflow or publish-ghcr.yml.
 
 on:
   push:
@@ -97,5 +97,10 @@ jobs:
               --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest main commit. Opened by .github/workflows/app-version.yml.")
           fi
 
-          # No reviews are required on main, so auto-merge lands this immediately.
-          gh pr merge "$PR_URL" --squash --auto --delete-branch
+          # Auto-merge only queues a merge behind pending requirements, and GitHub
+          # rejects it outright for a PR that is already mergeable ("Pull request is
+          # in clean status"). main has no required reviews or status checks, so a
+          # bump PR is always clean on creation — merge directly, and fall back to
+          # queueing only if required checks are ever added later.
+          gh pr merge "$PR_URL" --squash --delete-branch \
+            || gh pr merge "$PR_URL" --squash --auto --delete-branch
