@@ -340,44 +340,63 @@ test('README demo walkthrough', async ({ page }) => {
     await expect(convModal.getByText(/Reconstructing session/i)).toBeHidden({
       timeout: 60_000,
     });
+    // Re-frame after the content lands, so the tab strip sits near the top of
+    // the modal and the table below it is fully in shot — the pre-click framing
+    // leaves the strip at y≈438 of a 720px viewport, pushing the table off the
+    // bottom edge.
+    //
+    // Scroll to the end rather than nudging: this modal has only ~230px of
+    // scroll, so the end position is what puts the tabs, the protocol badge and
+    // the payload in frame together.
+    //
+    // Twice, with a settle between. The session panel is taller while it shows
+    // the "Reconstructing…" spinner than it is once the text renders, so the
+    // browser clamps scrollTop when the panel shrinks — a single scroll fired on
+    // the spinner disappearing gets silently undone a frame later, which is
+    // exactly what the recording caught.
+    for (let i = 0; i < 2; i++) {
+      await convBody.evaluate(el => el.scrollTo({ top: el.scrollHeight }));
+      await page.waitForTimeout(ms(400));
+    }
     await beat(page, READ);
   }
 
   await convBody.evaluate(el => el.scrollTo(0, 0));
   await beat(page, GLANCE);
 
-  // The destination's device-type badge opens its classification popup: what the
-  // host was judged to be, and the signals behind that judgement.
+  // The destination host opens its full detail modal: what the host was judged
+  // to be, and the signals behind that judgement.
   //
-  // The badge, not the IP text beside it — the address is inert, and clicking it
-  // silently does nothing. Anchored on the badge's title attribute, since its
-  // visible label is the device type (Server, Router, …) and varies by host.
-  const serverChip = convModal.locator('[title="Click for details"]').last();
-  await expect(serverChip, 'destination device badge not found').toBeVisible({ timeout: 10_000 });
-  await showClick(page, serverChip);
+  // The host card, not the IP text beside it — the address itself is inert. This
+  // used to be a device-type badge with title="Click for details"; #575/#578
+  // collapsed that popup into the shared EntityDetailModal, so the affordance is
+  // now the whole host card, matched on its aria-label.
+  const hostCard = convModal.getByRole('button', { name: /^Open full details for / }).last();
+  await expect(hostCard, 'destination host card not found').toBeVisible({ timeout: 10_000 });
+  await showClick(page, hostCard);
 
-  // Type / Device / Role, each with the evidence that produced it — the MAC OUI
-  // match and the observed TTL, weighted into a confidence bar. This is the
-  // whole identity story in one panel, so hold on it properly.
-  const classification = page.getByText('Classification', { exact: true }).first();
-  await expect(classification, 'classification popup did not open').toBeVisible({
-    timeout: 15_000,
-  });
-  await beat(page, READ + ms(1_200));
+  // The host modal stacks on top of the conversation modal, so scope to the last
+  // dialog — getByRole('dialog') alone is a strict-mode violation with two open.
+  const hostModal = page.getByRole('dialog').last();
+  await expect(hostModal, 'host detail modal did not open').toBeVisible({ timeout: 15_000 });
+  await beat(page, READ);
 
-  // Dismissed by its own close button — this is a bare styled div, not a
-  // Bootstrap modal: no backdrop, no dialog role, and Escape does not close it.
-  // Scoped to the popup by walking up from its header, since "Close" is a common
-  // accessible name and the conversation modal underneath has one too.
-  const closeClassification = classification
-    .locator('xpath=../..')
-    .getByRole('button', { name: /close/i })
-    .first();
-  if (await closeClassification.isVisible().catch(() => false)) {
-    await showClick(page, closeClassification);
-    await expect(classification).toBeHidden({ timeout: 10_000 });
+  // "Evidence weighed" is the heart of the panel: the independent measured
+  // signals (hardware fingerprint, ports/services, behaviour) that the
+  // adjudicator combined into one verdict. Scroll it into view inside the modal
+  // body — the modal scrolls, the page behind it does not.
+  const evidence = hostModal.getByText(/Evidence weighed/i).first();
+  if (await evidence.isVisible().catch(() => false)) {
+    await evidence.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await beat(page, READ + ms(800));
+
+    // Expand the hardware axis — the MAC OUI match that anchors the verdict.
+    const hardware = hostModal.getByRole('button', { name: /Hardware/i }).first();
+    if (await hardware.isVisible().catch(() => false)) {
+      await showClick(page, hardware);
+      await beat(page, READ + ms(1_200));
+    }
   }
-  await beat(page, GLANCE);
 
   await closeAllModals(page);
 
@@ -475,11 +494,25 @@ test('README demo walkthrough', async ({ page }) => {
       await beat(page, GLANCE);
       await timeline.fastForward('Story Q&A (LLM)', 2, async () => {
         await expect(chatCard.getByText(/Thinking\.\.\./)).toBeHidden({ timeout: 300_000 });
+
+        // "Thinking..." disappearing means the first token landed, not that the
+        // answer is done — the reply streams in, so re-framing on that signal
+        // filmed a half-written sentence scrolling away. Hold until the text
+        // stops growing (two equal samples). Inside the fast-forward span: this
+        // is still waiting on the model, so it should race like the rest of it.
+        let previous = -1;
+        for (let i = 0; i < 40; i++) {
+          const length = (await chatCard.innerText()).length;
+          if (length === previous) break;
+          previous = length;
+          await page.waitForTimeout(500);
+        }
       });
+
       // Re-frame: the answer grows the card, so the pre-send scroll position no
       // longer has the reply in shot.
       await reveal(chatCard);
-      await beat(page, READ + ms(800));
+      await beat(page, READ + ms(1_800));
     }
   }
 
@@ -498,7 +531,15 @@ test('README demo walkthrough', async ({ page }) => {
       timeout: 300_000,
     });
   });
-  await beat(page, READ);
+
+  // The generated BPF expression is the payload of this section — the whole
+  // point is that plain English became a real filter. Frame it and hold before
+  // executing, or it flashes past on the way to the results table.
+  const generated = page.locator('code, pre').filter({ hasText: /port|host|tcp|udp/i }).first();
+  if (await generated.isVisible().catch(() => false)) {
+    await reveal(generated);
+  }
+  await beat(page, READ + ms(1_500));
 
   await showClick(page, page.getByRole('button', { name: /Execute Filter/i }));
   await timeline.fastForward('Execute Filter', 2, async () => {
@@ -528,10 +569,15 @@ test('README demo walkthrough', async ({ page }) => {
   // ── 7. Extracted files ─────────────────────────────────────────────────
   await openTab(page, /Extracted Files/i);
   await beat(page, READ);
-  await scrollBy(page, 450);
-  await beat(page, GLANCE);
-  await scrollBy(page, 400);
-  await beat(page, GLANCE);
+
+  // The table is the section — carrier files reassembled out of the packet
+  // stream. Frame that and stop; scrolling on to the bottom of the page only
+  // showed footer whitespace.
+  const filesTable = page.locator('table').first();
+  if (await filesTable.isVisible().catch(() => false)) {
+    await reveal(filesTable);
+    await beat(page, READ + ms(800));
+  }
   await page.evaluate(() => window.scrollTo(0, 0));
   await beat(page, GLANCE);
 
@@ -540,18 +586,50 @@ test('README demo walkthrough', async ({ page }) => {
   const topology = page.getByText('Topology Diagram').first();
   await expect(topology, 'topology diagram not rendered').toBeVisible({ timeout: 30_000 });
 
-  // Frame the graph before doing anything to it. Centring the card *header*
-  // (what reveal(topology) does) leaves the plot itself below the fold, so the
-  // colour-mode cycle below would recolour edges nobody can see. Centre the
-  // graph body instead, wait for the force layout to settle, then fit the view
-  // so the whole topology is inside the frame.
+  // Frame the graph before doing anything to it. Anchor on the card *header*
+  // rather than centring the graph body: centring pushes the header off the top
+  // and the diagram then reads as a floating canvas with no title. Pinning the
+  // header just under the sticky navbar keeps "Topology Diagram" on screen with
+  // the whole plot below it.
   const graphBody = page.locator('.network-diagram-graph-body').first();
   await expect(graphBody).toBeVisible({ timeout: 30_000 });
-  await reveal(graphBody);
+  // The card has no class of its own, so reach it structurally — but note it is
+  // the graph body's *grandparent*: the body is a .card-body, and the header
+  // ("Topology Diagram") is its sibling, so xpath=.. lands inside the card and
+  // excludes the very header this is trying to keep on screen.
+  //
+  // Position it explicitly rather than via scrollIntoView + a nudge: the card
+  // sits near the top of the page, so block:'start' is already clamped at scroll
+  // 0 and a corrective scrollBy is silently a no-op. The card is ~570px against
+  // a 720px viewport, so anchoring its top just under the ~100px sticky navbar
+  // fits the header and the whole diagram in one frame.
+  const topologyCard = graphBody.locator('xpath=../..');
+  const frameTopology = () =>
+    topologyCard.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 110));
+  await frameTopology();
   await expect(page.getByText(/Computing layout/i)).toBeHidden({ timeout: 120_000 });
   await beat(page, BEAT);
   await showClick(page, page.locator('[title="Fit view"]').first());
+  // Re-frame after the layout settles and the camera has fitted: both change the
+  // card's height, so the position set before them no longer holds the header
+  // under the navbar. Framing only once filmed a headerless canvas.
+  await frameTopology();
   await beat(page, READ);
+
+  // Cycle the edge-colour modes. Same topology, recoloured three ways: by
+  // transport protocol, by detected application, then by volume — which also
+  // swaps in a magnitude legend. Held on each so the recolour is legible rather
+  // than a flicker, and re-framed because the volume mode adds a legend row that
+  // grows the card and pushes the header back off the top.
+  const edgeColorSelect = page.locator('select').filter({ hasText: 'Transport' }).first();
+  if (await edgeColorSelect.isVisible().catch(() => false)) {
+    for (const mode of ['application', 'volume', 'transport']) {
+      await edgeColorSelect.selectOption(mode);
+      await page.waitForTimeout(ms(500));
+      await frameTopology();
+      await beat(page, READ);
+    }
+  }
 
   // Node label customization — open, show the preview, close.
   await showClick(page, page.locator('[title="Customize node labels"]').first());
@@ -565,7 +643,9 @@ test('README demo walkthrough', async ({ page }) => {
   // Drift the cursor over the three biggest hosts so their hover state and
   // labels surface on camera. Purely visual, so nothing is asserted — an empty
   // list costs a few dwell frames, not a failed recording.
-  await reveal(graphBody);
+  // frameTopology, not reveal(): centring the graph body pushes the card header
+  // back above the fold, which is the framing this section is meant to hold.
+  await frameTopology();
   await page.waitForTimeout(ms(600));
   for (const pt of await graphNodePoints(page, 3)) {
     await page.mouse.move(pt.x, pt.y, { steps: 20 });
@@ -599,8 +679,12 @@ test('README demo walkthrough', async ({ page }) => {
 
   // Asserted, not best-effort: this step is the reason the section exists, so a
   // miss should fail the recording rather than quietly skip and leave a gap.
-  const nodeModal = page.locator('.modal', { hasText: 'Node Details' }).first();
-  await expect(nodeModal, 'clicking a graph node did not open Node Details').toBeVisible({
+  //
+  // Anchored on the modal's title id, not on the text "Node Details": #578
+  // collapsed that modal into the shared EntityDetailModal, whose title is the
+  // host's own display name and therefore varies by node.
+  const nodeModal = page.locator('.modal:has(#entity-detail-title)').first();
+  await expect(nodeModal, 'clicking a graph node did not open host details').toBeVisible({
     timeout: 15_000,
   });
   await beat(page, READ + ms(500));
@@ -745,24 +829,36 @@ test('README demo walkthrough', async ({ page }) => {
   await page.waitForTimeout(ms(1_200));
   await beat(page, READ + ms(900));
 
-  // Tab through the snapshot's facets. Anchored at the start only, not exact:
-  // several tabs append a count badge to their label ("Changes28", "Security6"),
-  // so an end-anchored or exact match never fires.
+  // Tab through the snapshot's facets. Matched loosely and scoped to the pill
+  // strip — NOT start-anchored. Every tab label is preceded by a decorative <i>
+  // icon, which pads the computed accessible name with whitespace, so /^Changes/
+  // matches nothing; the accessible names are actually " Changes28", " Security6",
+  // " Context & Notes". Anchoring silently matched zero tabs and the whole loop
+  // `continue`d past every one, filming a 2-second flash of the diagram instead
+  // of the five panels.
   //
   // Each tab gets a real hold rather than a glance: this modal is the per-week
   // detail the whole eight-week story resolves to, and a viewer who cannot read
   // a panel has no reason to care that it exists. Security and Insights both
   // fetch on first open, so wait for their content, not just for the click.
-  for (const tab of [/^Changes/i, /^Security/i, /^Context/i, /^Subnets/i, /^Insights/i]) {
-    const t = snapModal.getByRole('button', { name: tab }).first();
-    if (!(await t.isVisible().catch(() => false))) continue;
+  const snapTabs = snapModal.locator('ul.nav-pills');
+  for (const tab of [/Changes/i, /Security/i, /Context/i, /Subnets/i, /Insights/i]) {
+    const t = snapTabs.getByRole('button', { name: tab }).first();
+    // Asserted, not skipped: a missing tab is a broken recording, and silently
+    // continuing is what hid this bug in the first place.
+    await expect(t, `snapshot tab ${tab} not found`).toBeVisible({ timeout: 10_000 });
     await showClick(page, t);
     // Wait on the spinner element, not on loading copy: Insights renders a bare
     // <Spinner> with no text at all, so a text assertion passes instantly while
     // the spinner is still up — which is exactly the bug this is fixing.
     await expect(snapModal.locator('.spinner-border')).toHaveCount(0, { timeout: 120_000 });
-    await beat(page, READ + ms(400));
+    // A tab swap repaints the whole modal body, so give the new panel a moment
+    // to lay out before the hold starts — otherwise the first held frames are
+    // of the outgoing panel and the section reads as a flicker.
+    await page.waitForTimeout(ms(500));
+    await beat(page, READ + ms(1_400));
   }
+  await beat(page, GLANCE);
   await closeAllModals(page);
 
   // The network detail page is long, and it ships a sticky section nav for
@@ -784,9 +880,18 @@ test('README demo walkthrough', async ({ page }) => {
   const shadowIp = page.getByText('192.0.2.99', { exact: true }).first();
   if (await shadowIp.isVisible().catch(() => false)) {
     await showClick(page, shadowIp);
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
-    await beat(page, READ);
+    const ipModal = page.getByRole('dialog');
+    await expect(ipModal).toBeVisible({ timeout: 10_000 });
+    // This modal is the payoff of the whole drift section — the shadow host that
+    // appears mid-series and never resolves to a labelled device. It also loads
+    // its per-snapshot history on open, so closing on the dialog merely being
+    // visible filmed an empty shell. Wait for the body to fill, then hold long
+    // enough to actually read it.
+    await expect(ipModal.locator('.spinner-border')).toHaveCount(0, { timeout: 30_000 });
+    await page.waitForTimeout(ms(600));
+    await beat(page, READ + ms(2_200));
     await closeAllModals(page);
+    await beat(page, GLANCE);
   }
 
   // The remaining panels are a stop-by, not destinations.
