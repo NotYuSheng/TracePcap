@@ -406,13 +406,23 @@ test('README demo walkthrough', async ({ page }) => {
   });
   await beat(page, HOLD);
 
-  // The filter panel is collapsed by default — open it, and hold on the range of
-  // filters available before narrowing to one.
+  // The filter panel is collapsed by default — frame it at the top of the
+  // screen, open it, and hold on the range of filters available before narrowing
+  // to one. Framing first means the expanded panel opens into an empty viewport
+  // rather than unfolding off the bottom edge.
   // Scoped to the panel, not the page: "Filter Generator" is also a button here.
   // Not exact-matched either — the toggle wraps its label in two decorative <i>
   // icons, so its accessible name carries whitespace and `exact: true` misses it.
-  const filterPanel = page.locator('.conversation-filter-panel');
+  const filterPanel = page.locator('.conversation-filter-panel').first();
+  await expect(filterPanel, 'conversation filter panel not found').toBeVisible({
+    timeout: 15_000,
+  });
+  await frameCardTop(filterPanel);
+  await beat(page, HOLD);
   await showClick(page, filterPanel.getByRole('button', { name: 'Filters' }).first());
+  // Re-frame: expanding pushes the panel's own height down, and the badges the
+  // next step clicks are in the part that just appeared.
+  await frameCardTop(filterPanel);
   await beat(page, HOLD);
 
   // App badges are buttons, one per detected application. Telegram is the most
@@ -437,11 +447,59 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(convModal).toBeVisible({ timeout: 15_000 });
   await beat(page, HOLD);
 
+  // The destination host opens its full detail modal: what the host was judged
+  // to be, and the signals behind that judgement.
+  //
+  // The host card, not the IP text beside it — the address itself is inert. This
+  // used to be a device-type badge with title="Click for details"; #575/#578
+  // collapsed that popup into the shared EntityDetailModal, so the affordance is
+  // now the whole host card, matched on its aria-label.
+  const hostCard = convModal.getByRole('button', { name: /^Open full details for / }).last();
+  await expect(hostCard, 'destination host card not found').toBeVisible({ timeout: 10_000 });
+  await showClick(page, hostCard);
+
+  // The host modal stacks on top of the conversation modal, so scope to the last
+  // dialog — getByRole('dialog') alone is a strict-mode violation with two open.
+  const hostModal = page.getByRole('dialog').last();
+  await expect(hostModal, 'host detail modal did not open').toBeVisible({ timeout: 15_000 });
+  await beat(page, HOLD);
+
+  // "Evidence weighed" is the heart of the panel: the independent measured
+  // signals (hardware fingerprint, ports/services, behaviour) that the
+  // adjudicator combined into one verdict. Scroll it into view inside the modal
+  // body — the modal scrolls, the page behind it does not.
+  const evidence = hostModal.getByText(/Evidence weighed/i).first();
+  if (await evidence.isVisible().catch(() => false)) {
+    await evidence.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await beat(page, HOLD);
+
+    // Expand the hardware axis — the MAC OUI match that anchors the verdict.
+    const hardware = hostModal.getByRole('button', { name: /Hardware/i }).first();
+    if (await hardware.isVisible().catch(() => false)) {
+      await showClick(page, hardware);
+      await beat(page, HOLD);
+    }
+  }
+  // Back to the conversation modal — the host modal stacked on top of it, so
+  // close only that one rather than both.
+  //
+  // Asserted on the host modal's own id and the dialog count, not on
+  // expect(hostModal).toBeHidden(): hostModal is getByRole('dialog').last(),
+  // which re-resolves after the close to the conversation modal underneath — so
+  // a toBeHidden() on it would be checking the wrong element and fail even
+  // though the right thing happened.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#entity-detail-title')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await beat(page, HOLD);
+
+
+  const convBody = convModal.locator('.modal-body');
+  const packetTabs = convModal.locator('ul.card-header-tabs');
+
   // Packet list + session reconstruction live below the modal's fold. Scroll to
   // frame that card rather than to the bottom of the modal: the tabs sit at the
   // card's top, so bottoming out puts the thing being demonstrated off-screen.
-  const convBody = convModal.locator('.modal-body');
-  const packetTabs = convModal.locator('ul.card-header-tabs');
   await expect(packetTabs, 'packet/session tabs not found').toBeVisible({ timeout: 10_000 });
   await packetTabs.evaluate(el => el.scrollIntoView({ block: 'start' }));
   // Nudge back up so the tab strip isn't flush against the modal's top edge.
@@ -484,43 +542,6 @@ test('README demo walkthrough', async ({ page }) => {
       }
     });
     await beat(page, HOLD);
-  }
-
-  await convBody.evaluate(el => el.scrollTo(0, 0));
-  await beat(page, HOLD);
-
-  // The destination host opens its full detail modal: what the host was judged
-  // to be, and the signals behind that judgement.
-  //
-  // The host card, not the IP text beside it — the address itself is inert. This
-  // used to be a device-type badge with title="Click for details"; #575/#578
-  // collapsed that popup into the shared EntityDetailModal, so the affordance is
-  // now the whole host card, matched on its aria-label.
-  const hostCard = convModal.getByRole('button', { name: /^Open full details for / }).last();
-  await expect(hostCard, 'destination host card not found').toBeVisible({ timeout: 10_000 });
-  await showClick(page, hostCard);
-
-  // The host modal stacks on top of the conversation modal, so scope to the last
-  // dialog — getByRole('dialog') alone is a strict-mode violation with two open.
-  const hostModal = page.getByRole('dialog').last();
-  await expect(hostModal, 'host detail modal did not open').toBeVisible({ timeout: 15_000 });
-  await beat(page, HOLD);
-
-  // "Evidence weighed" is the heart of the panel: the independent measured
-  // signals (hardware fingerprint, ports/services, behaviour) that the
-  // adjudicator combined into one verdict. Scroll it into view inside the modal
-  // body — the modal scrolls, the page behind it does not.
-  const evidence = hostModal.getByText(/Evidence weighed/i).first();
-  if (await evidence.isVisible().catch(() => false)) {
-    await evidence.evaluate(el => el.scrollIntoView({ block: 'center' }));
-    await beat(page, HOLD);
-
-    // Expand the hardware axis — the MAC OUI match that anchors the verdict.
-    const hardware = hostModal.getByRole('button', { name: /Hardware/i }).first();
-    if (await hardware.isVisible().catch(() => false)) {
-      await showClick(page, hardware);
-      await beat(page, HOLD);
-    }
   }
 
   await closeAllModals(page);
