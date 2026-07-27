@@ -32,15 +32,17 @@ BASE_URL="${E2E_BASE_URL:-http://localhost:8888}"
 # Resolution is the weakest lever of the three and the most costly: this is a UI
 # demo, so text legibility is the point, and 480px starts to blur it.
 #
-# MAX_COLORS is the strongest lever, contrary to what a single-frame measurement
-# suggests. The topology graph does carry ~15k distinct colours in one frame, but
-# it is a few seconds of a 75s tour; across the whole walkthrough 256->128 costs
-# ~40dB PSNR on the *worst* frames (topology, world map, pie charts) — visually
-# indistinguishable — and saves 2.5MB. Going below 96 does start to posterise the
-# graph, so 128 is the floor worth taking.
+# MAX_COLORS is the strongest lever: across the whole walkthrough 256->128 costs
+# ~40dB PSNR on the *worst* frames (topology, world map, pie charts) and saves
+# ~2.5MB, and below 96 the graph visibly posterises.
+#
+# Set to 256 deliberately, despite that: this is a UI demo whose colour-coded
+# views (edge-colour modes, the volume gradient, the country choropleth) are the
+# feature being shown, so colour fidelity is worth the bytes here. Drop to 128
+# via DEMO_COLORS=128 if size matters more than the gradients.
 WIDTH="${DEMO_WIDTH:-640}"
 FPS="${DEMO_FPS:-6}"
-MAX_COLORS="${DEMO_COLORS:-128}"
+MAX_COLORS="${DEMO_COLORS:-256}"
 
 command -v ffmpeg >/dev/null || { echo "error: ffmpeg not found. sudo apt install ffmpeg" >&2; exit 1; }
 

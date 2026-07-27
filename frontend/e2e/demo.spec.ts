@@ -63,14 +63,64 @@ async function beat(page: Page, ms = BEAT) {
 }
 
 /**
- * Bring an element into view, centred. Deliberately not smooth-scrolled: an
- * animated scroll repaints the whole frame for ~1s, and full-frame changes are
- * the worst case for GIF inter-frame compression (a smooth pass costs more
- * bytes than the destination view it lands on). A hard cut costs one frame.
+ * Bring an element into view, centred, and wait for the scroll to land.
+ *
+ * The app sets html { scroll-behavior: smooth } globally, so this animates over
+ * ~1s whether or not the call asks it to — that costs GIF bytes (a full-frame
+ * repaint per frame of the pan) but it cannot be opted out of from here, so the
+ * thing that matters is not filming the hold before the scroll has arrived.
  */
 async function reveal(target: Locator) {
   await target.evaluate(el => el.scrollIntoView({ block: 'center' }));
-  await target.page().waitForTimeout(120);
+  await settleScroll(target.page());
+}
+
+/**
+ * Wait for a scroll to actually land.
+ *
+ * html { scroll-behavior: smooth } is set globally, so every scrollIntoView and
+ * scrollBy on the window animates over ~1s regardless of the flag passed to it.
+ * A fixed wait samples that mid-flight, and the hold then films the page still
+ * gliding toward its target.
+ *
+ * Three consecutive equal samples, not one: a smooth scroll eases in and out, so
+ * two reads 80ms apart can round to the same value while it is still moving.
+ */
+async function settleScroll(page: Page) {
+  let previous = -1;
+  let stable = 0;
+  for (let i = 0; i < 60 && stable < 3; i++) {
+    const y = await page.evaluate(() => Math.round(window.scrollY));
+    stable = y === previous ? stable + 1 : 0;
+    previous = y;
+    await page.waitForTimeout(80);
+  }
+}
+
+/** Height of the sticky navbar — content scrolled to y=0 hides underneath it. */
+const NAVBAR = 110;
+
+/**
+ * Put a card's top edge just below the sticky navbar, so its header reads as the
+ * top of the screen and the body gets the rest of the viewport.
+ *
+ * Distinct from reveal(): centring a card leaves its header mid-screen with dead
+ * space above, and for a card taller than the fold it pushes the header off the
+ * top entirely. Takes the element whose top edge should land — pass the card,
+ * not its header, or the header's own offset inside the card is lost.
+ */
+async function frameCardTop(target: Locator) {
+  const page = target.page();
+  await target.evaluate(
+    (el, nav) => window.scrollBy(0, el.getBoundingClientRect().top - nav),
+    NAVBAR,
+  );
+  await settleScroll(page);
+}
+
+/** The enclosing .card of an element inside it (a header, a heading, a label). */
+function cardOf(target: Locator) {
+  return target.locator('xpath=ancestor::div[contains(@class,"card")][1]');
 }
 
 /**
@@ -80,7 +130,7 @@ async function reveal(target: Locator) {
  */
 async function scrollBy(page: Page, dy: number) {
   await page.evaluate(y => window.scrollBy(0, y), dy);
-  await page.waitForTimeout(150);
+  await settleScroll(page);
 }
 
 /**
@@ -438,16 +488,69 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(storyError, 'story generation failed — check the LLM server').toBeHidden();
   await beat(page, READ);
 
-  // The Story page is seven stacked panels, not one blob of prose, and the point
-  // of the tab is how they relate: deterministic findings and full-dataset
+  // Ask the LLM first — it is the one genuinely interactive thing on this tab,
+  // and it is also first in page order, so leading with it means the section
+  // reads top-to-bottom rather than doubling back.
+  //
+  // A suggested question rather than typed prose: it is one click, it is
+  // guaranteed answerable against this story, and it puts the affordance itself
+  // on camera.
+  const chatCard = page.locator('.card').filter({ hasText: 'Ask the LLM' }).first();
+  await expect(chatCard, 'Ask the LLM card not found').toBeVisible({ timeout: 15_000 });
+  await frameCardTop(chatCard);
+  await beat(page, READ);
+
+  // A suggested question only *fills* the box — it does not send. So click one
+  // to show the affordance, hold while the text lands in the input, then send.
+  const suggestion = chatCard.getByRole('button').filter({ hasText: /\?/ }).first();
+  const chatInput = chatCard.getByPlaceholder(/Ask a question about this story/i);
+  await expect(suggestion, 'no suggested question to click').toBeVisible({ timeout: 10_000 });
+  await showClick(page, suggestion);
+  await beat(page, GLANCE + 250);
+  await expect(chatInput).not.toHaveValue('');
+  await chatInput.press('Enter');
+
+  // Another LLM round-trip, so race it. Wait on the "Thinking..." bubble going
+  // away rather than on an answer selector: the assistant bubble carries only
+  // layout classes, so there is nothing stable to match on it, and the spinner
+  // is unambiguous while it is up.
+  await beat(page, GLANCE);
+  await timeline.fastForward('Story Q&A (LLM)', 2, async () => {
+    await expect(chatCard.getByText(/Thinking\.\.\./)).toBeHidden({ timeout: 300_000 });
+
+    // "Thinking..." disappearing means the first token landed, not that the
+    // answer is done — the reply streams in, so re-framing on that signal filmed
+    // a half-written sentence scrolling away. Hold until the text stops growing
+    // (two equal samples). Inside the fast-forward span: this is still waiting
+    // on the model, so it should race like the rest of it.
+    let previous = -1;
+    for (let i = 0; i < 40; i++) {
+      const length = (await chatCard.innerText()).length;
+      if (length === previous) break;
+      previous = length;
+      await page.waitForTimeout(500);
+    }
+  });
+
+  // Then hold on the answer, properly — this is the payoff of the section, and
+  // the reply is prose that has to actually be read. Re-frame first: the answer
+  // grows the card, so the pre-send position no longer has the reply in shot.
+  await frameCardTop(chatCard);
+  await beat(page, READ + ms(2_400));
+
+  // The rest of the Story page is stacked panels, not one blob of prose, and the
+  // point of the tab is how they relate: deterministic findings and full-dataset
   // aggregates are computed, the LLM only writes prose over them. A single
-  // scrollBy past the lot showed none of it, so stop on each in page order.
+  // scrollBy past the lot showed none of it, so stop on each in page order with
+  // its header at the top of the screen.
   //
   // Anchored on each panel's own heading rather than by scroll distance — the
   // panels are conditional (aggregates, findings, and investigation each render
   // only when the story has them), so any fixed offset lands somewhere different
   // depending on what this capture produced.
   for (const [label, heading] of [
+    // The narrative itself, with its Key Events rail alongside.
+    ['narrative', /^Narrative/],
     // What the LLM was given and what it's allowed to do with it.
     ['generation settings', /How stories are generated/i],
     // Pre-computed analytics over the whole capture, not a sample.
@@ -457,72 +560,20 @@ test('README demo walkthrough', async ({ page }) => {
     // What the LLM went back and looked up while writing.
     ['investigation steps', /Investigation/i],
   ] as const) {
-    const panel = page.getByText(heading).first();
-    if (!(await panel.isVisible().catch(() => false))) continue;
-    await reveal(panel);
+    const panelHeading = page.getByText(heading).first();
+    if (!(await panelHeading.isVisible().catch(() => false))) continue;
+    // Frame the enclosing card, not the heading: scrolling the heading itself to
+    // the top clips the card's own header padding and border, so the panel reads
+    // as starting mid-way through.
+    const card = cardOf(panelHeading);
+    await frameCardTop((await card.count()) ? card.first() : panelHeading);
     await beat(page, READ);
     // Findings is the one worth dwelling on — it is the evidence the narrative
     // is accountable to, and it is the densest panel on the page.
     if (label === 'deterministic findings') await beat(page, READ);
   }
 
-  // The narrative itself, with its Key Events rail alongside.
-  const narrative = page.getByRole('heading', { name: /^Narrative/ }).first();
-  if (await narrative.isVisible().catch(() => false)) {
-    await reveal(narrative);
-    await beat(page, READ);
-    await scrollBy(page, 380);
-    await beat(page, READ);
-  }
-
-  // Ask the LLM a question about the capture. This is the part of the Story tab
-  // that is genuinely interactive, and it never appeared in the recording before.
-  // A suggested question is used rather than typed prose: it is one click, it is
-  // guaranteed answerable against this story, and it shows the affordance.
-  const chatCard = page.locator('.card').filter({ hasText: 'Ask the LLM' }).first();
-  if (await chatCard.isVisible().catch(() => false)) {
-    await reveal(chatCard);
-    await beat(page, READ);
-
-    // A suggested question only *fills* the box — it does not send. So click one
-    // to show the affordance, hold while the text lands in the input, then send.
-    const suggestion = chatCard.getByRole('button').filter({ hasText: /\?/ }).first();
-    const chatInput = chatCard.getByPlaceholder(/Ask a question about this story/i);
-    if (await suggestion.isVisible().catch(() => false)) {
-      await showClick(page, suggestion);
-      await beat(page, GLANCE + 250);
-      await expect(chatInput).not.toHaveValue('');
-      await chatInput.press('Enter');
-
-      // Another LLM round-trip, so race it. Wait on the "Thinking..." bubble
-      // going away rather than on an answer selector: the assistant bubble
-      // carries only layout classes, so there is nothing stable to match on it,
-      // and the spinner is unambiguous while it is up.
-      await beat(page, GLANCE);
-      await timeline.fastForward('Story Q&A (LLM)', 2, async () => {
-        await expect(chatCard.getByText(/Thinking\.\.\./)).toBeHidden({ timeout: 300_000 });
-
-        // "Thinking..." disappearing means the first token landed, not that the
-        // answer is done — the reply streams in, so re-framing on that signal
-        // filmed a half-written sentence scrolling away. Hold until the text
-        // stops growing (two equal samples). Inside the fast-forward span: this
-        // is still waiting on the model, so it should race like the rest of it.
-        let previous = -1;
-        for (let i = 0; i < 40; i++) {
-          const length = (await chatCard.innerText()).length;
-          if (length === previous) break;
-          previous = length;
-          await page.waitForTimeout(500);
-        }
-      });
-
-      // Re-frame: the answer grows the card, so the pre-send scroll position no
-      // longer has the reply in shot.
-      await reveal(chatCard);
-      await beat(page, READ + ms(1_800));
-    }
-  }
-
+  
   await page.evaluate(() => window.scrollTo(0, 0));
 
   // ── 6. Filter generator ────────────────────────────────────────────────
