@@ -165,9 +165,19 @@ async function frameCardTop(target: Locator) {
   await settleScroll(page);
 }
 
-/** The enclosing .card of an element inside it (a header, a heading, a label). */
+/**
+ * The enclosing .card of an element inside it (a header, a heading, a label).
+ *
+ * Matches the class token exactly. contains(@class,"card") also matches
+ * "card-header" and "card-body", so it returned the header — a 57px element
+ * whose top is the card's top only by coincidence, and whose height never grows
+ * when the card expands. That silently mis-framed the heatmap by ~130px and
+ * broke a height check that assumed it had the real card.
+ */
 function cardOf(target: Locator) {
-  return target.locator('xpath=ancestor::div[contains(@class,"card")][1]');
+  return target.locator(
+    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " card ")][1]',
+  );
 }
 
 /**
@@ -228,7 +238,9 @@ async function showType(target: Locator, text: string) {
  */
 async function openTab(page: Page, label: RegExp) {
   await showClick(page, page.locator('ul.nav-tabs').getByRole('button', { name: label }).first());
-  await page.waitForTimeout(400);
+  // Let the route swap commit, but do not pad the pause: the caller's HOLD is
+  // the pause. settleScroll also lands the new tab's scroll position.
+  await settleScroll(page);
 }
 
 /**
@@ -276,7 +288,9 @@ async function gotoSection(page: Page, label: string) {
   const link = page.locator('.tp-section-nav').getByRole('link', { name: label }).first();
   await expect(link, `no "${label}" link in the section nav`).toBeVisible({ timeout: 10_000 });
   await showClick(page, link);
-  await page.waitForTimeout(ms(700));
+  // The section nav scrolls the page itself; wait for that to land rather than
+  // adding a fixed delay on top of the caller's HOLD.
+  await settleScroll(page);
 }
 
 // Setup is not story. The Monitor half needs eight analysed captures, a network,
@@ -676,7 +690,9 @@ test('README demo walkthrough', async ({ page }) => {
   // first, or the nudge is applied mid-flight and undone.
   const matching = page.getByRole('heading', { name: /Matching Packets/i }).first();
   await expect(matching, 'filter returned no results to show').toBeVisible({ timeout: 30_000 });
-  await page.waitForTimeout(ms(1_200));
+  // The page smooth-scrolls itself here regardless of disableSmoothScroll (it is
+  // the app's own scrollIntoView), so wait for it to land before nudging.
+  await settleScroll(page);
   await scrollBy(page, -90);
   await beat(page, HOLD);
 
@@ -749,7 +765,6 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(edgeColorSelect, 'edge-colour select not found').toBeVisible({ timeout: 10_000 });
   for (const mode of ['application', 'volume', 'transport']) {
     await edgeColorSelect.selectOption(mode);
-    await page.waitForTimeout(ms(500));
     await frameTopology();
     await beat(page, HOLD);
   }
@@ -828,8 +843,23 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(page.locator('.tp-heatmap-body'), 'heatmap did not expand').toBeVisible({
     timeout: 20_000,
   });
-  // Re-frame: expanding the card grows it, so the pre-click position no longer
-  // has the matrix in shot.
+  // Re-frame once the matrix has finished laying out. The body turning visible is
+  // not the end of it — the grid keeps growing for a few hundred ms, so framing
+  // on visibility alone used stale geometry and left the card ~130px low, with
+  // the topology's tail still occupying the top of the shot.
+  await expect
+    .poll(() => heatmapCard.evaluate(el => Math.round(el.getBoundingClientRect().height)), {
+      timeout: 20_000,
+      intervals: [120],
+    })
+    .toBeGreaterThan(300);
+  let lastHeight = -1;
+  for (let i = 0; i < 30; i++) {
+    const h = await heatmapCard.evaluate(el => Math.round(el.getBoundingClientRect().height));
+    if (h === lastHeight) break;
+    lastHeight = h;
+    await page.waitForTimeout(100);
+  }
   await frameCardTop(heatmapCard);
   await beat(page, HOLD);
 
@@ -960,8 +990,19 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(snapModal.locator('.spinner-border')).toHaveCount(0, { timeout: 120_000 });
   await expect(snapModal.locator('canvas.sigma-nodes')).toBeVisible({ timeout: 120_000 });
   // Sigma paints a frame after mounting; without this the first held frame can
-  // still be the blank canvas it mounted with.
-  await page.waitForTimeout(ms(1_200));
+  // still be the blank canvas it mounted with. Waiting on the paint is not a
+  // pause — poll for it so this stop lasts one HOLD like every other, instead of
+  // HOLD plus a fixed 1.2s.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const c = document.querySelector('canvas.sigma-nodes') as HTMLCanvasElement | null;
+          return c ? c.width * c.height : 0;
+        }),
+      { timeout: 30_000, intervals: [100] },
+    )
+    .toBeGreaterThan(0);
   await beat(page, HOLD);
 
   // Tab through the snapshot's facets. Matched loosely and scoped to the pill
@@ -987,10 +1028,15 @@ test('README demo walkthrough', async ({ page }) => {
     // <Spinner> with no text at all, so a text assertion passes instantly while
     // the spinner is still up — which is exactly the bug this is fixing.
     await expect(snapModal.locator('.spinner-border')).toHaveCount(0, { timeout: 120_000 });
-    // A tab swap repaints the whole modal body, so give the new panel a moment
-    // to lay out before the hold starts — otherwise the first held frames are
-    // of the outgoing panel and the section reads as a flicker.
-    await page.waitForTimeout(ms(500));
+    // A tab swap repaints the whole modal body. Wait for the new panel to have
+    // laid out (non-zero height) rather than adding a fixed delay: a fixed one
+    // made these six stops visibly longer than the rest of the tour.
+    await expect
+      .poll(() => snapModal.locator('.modal-body').evaluate(el => el.scrollHeight), {
+        timeout: 15_000,
+        intervals: [100],
+      })
+      .toBeGreaterThan(0);
     await beat(page, HOLD);
   }
   await beat(page, HOLD);
@@ -1023,7 +1069,6 @@ test('README demo walkthrough', async ({ page }) => {
     // visible filmed an empty shell. Wait for the body to fill, then hold long
     // enough to actually read it.
     await expect(ipModal.locator('.spinner-border')).toHaveCount(0, { timeout: 30_000 });
-    await page.waitForTimeout(ms(600));
     await beat(page, HOLD);
     await closeAllModals(page);
     await beat(page, HOLD);
