@@ -37,23 +37,32 @@ const PACE = Number(process.env.DEMO_PACE ?? 2.5);
 const ms = (n: number) => Math.round(n / PACE);
 
 /**
- * One pause length for the whole tour.
+ * Two pause lengths, in real milliseconds of finished GIF.
  *
- * Every stop is the same beat: land on a thing, hold, move on. Per-step timings
- * drifted to fifteen different values across sixty-odd calls, which read as
- * arbitrary rather than deliberate — some sections dawdled while others cut away
- * before they registered. A single constant makes the rhythm predictable and
- * makes the pacing one number to turn.
+ * Note these are NOT divided by PACE. PACE shortens the waits *while recording*,
+ * so the recording is already the finished timing — there is no speed-up pass on
+ * top. A 600ms wait is 600ms on screen, which turned out to be too quick to take
+ * a feature in.
  *
- * Override with DEMO_HOLD (milliseconds, pre-PACE) to retime the whole demo.
+ * BEAT   — transitions and steps within a feature: opening a filter, switching a
+ *          tab, moving between panels. Enough to follow, not enough to dwell.
+ * FEATURE — landing on the thing the section exists to show. A full second is
+ *          about the floor for recognising a chart, a diagram or a table before
+ *          it cuts away.
+ *
+ * Override either with DEMO_BEAT / DEMO_FEATURE (milliseconds, as filmed).
  */
-const HOLD = ms(Number(process.env.DEMO_HOLD ?? 1_500));
+const BEAT = Number(process.env.DEMO_BEAT ?? 600);
+const FEATURE = Number(process.env.DEMO_FEATURE ?? 1_100);
+
+/** Default for beat() — most calls are the in-between steps, not the payoff. */
+const HOLD = BEAT;
 
 /**
- * The exception: content that has to actually be read rather than recognised —
- * currently just the LLM's answer in the Story tab.
+ * Content that has to be read word by word rather than recognised — currently
+ * just the LLM's answer in the Story tab.
  */
-const READ_HOLD = HOLD * 2;
+const READ_HOLD = FEATURE * 2;
 
 /** Cursor travel before a click. Short enough to read as intent, not hesitation. */
 const CURSOR = ms(300);
@@ -337,9 +346,9 @@ test('README demo walkthrough', async ({ page }) => {
   // ticking it is the beat worth filming.
   const optionsModal = page.getByRole('dialog');
   await expect(optionsModal.getByText(/Analysis options/i)).toBeVisible({ timeout: 10_000 });
-  // One short hold to take in the modal, then act. The two options that are
-  // already on need no dwell — only the Suricata tick is a decision.
-  await beat(page, HOLD);
+  // The modal is a feature in its own right — what the analysis will actually
+  // run — so give it the full landing hold before acting on it.
+  await beat(page, FEATURE);
 
   // Checkboxes carry no accessible name (their text lives in sibling divs), so
   // target the Suricata one via the label block that owns it.
@@ -378,7 +387,7 @@ test('README demo walkthrough', async ({ page }) => {
   const summary = page.locator('.analysis-summary').first();
   await expect(summary, 'analysis summary not found').toBeVisible({ timeout: 15_000 });
   await frameCardTop(summary);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Then the protocol and category pie charts, each with its own header at the
   // top of the screen. Anchored on the breakdown container, not the <h3> and not
@@ -393,7 +402,7 @@ test('README demo walkthrough', async ({ page }) => {
   const pieCount = await breakdowns.count();
   for (let i = 0; i < pieCount; i++) {
     await frameCardTop(breakdowns.nth(i));
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
   }
 
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -418,12 +427,12 @@ test('README demo walkthrough', async ({ page }) => {
     timeout: 15_000,
   });
   await frameCardTop(filterPanel);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
   await showClick(page, filterPanel.getByRole('button', { name: 'Filters' }).first());
   // Re-frame: expanding pushes the panel's own height down, and the badges the
   // next step clicks are in the part that just appeared.
   await frameCardTop(filterPanel);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // App badges are buttons, one per detected application. Telegram is the most
   // recognisable app in this capture.
@@ -445,7 +454,7 @@ test('README demo walkthrough', async ({ page }) => {
 
   const convModal = page.getByRole('dialog');
   await expect(convModal).toBeVisible({ timeout: 15_000 });
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // The destination host opens its full detail modal: what the host was judged
   // to be, and the signals behind that judgement.
@@ -462,7 +471,7 @@ test('README demo walkthrough', async ({ page }) => {
   // dialog — getByRole('dialog') alone is a strict-mode violation with two open.
   const hostModal = page.getByRole('dialog').last();
   await expect(hostModal, 'host detail modal did not open').toBeVisible({ timeout: 15_000 });
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // "Evidence weighed" is the heart of the panel: the independent measured
   // signals (hardware fingerprint, ports/services, behaviour) that the
@@ -589,7 +598,7 @@ test('README demo walkthrough', async ({ page }) => {
   const chatCard = page.locator('.card').filter({ hasText: 'Ask the LLM' }).first();
   await expect(chatCard, 'Ask the LLM card not found').toBeVisible({ timeout: 15_000 });
   await frameCardTop(chatCard);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // A suggested question only *fills* the box — it does not send. So click one
   // to show the affordance, hold while the text lands in the input, then send.
@@ -662,7 +671,7 @@ test('README demo walkthrough', async ({ page }) => {
     // nobody reads them off a GIF, so the job here is to show that they exist
     // and what shape they are. The Ask-the-LLM answer above is the one thing on
     // this tab that has to be read, and it keeps its long hold.
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
     // Findings is the exception worth an extra look — it is the evidence the
     // narrative is accountable to, and the densest panel on the page.
     if (label === 'deterministic findings') await beat(page, HOLD);
@@ -675,6 +684,11 @@ test('README demo walkthrough', async ({ page }) => {
   await openTab(page, /Filter Generator/i);
   const prompt = page.getByPlaceholder(/Show me all HTTP traffic/i);
   await expect(prompt, 'filter prompt box not found').toBeVisible({ timeout: 15_000 });
+  // Frame "Ask in Natural Language" at the top before typing, so the prompt box,
+  // the button and the generated filter below it all stay in one shot — the tab
+  // otherwise opens with the card halfway down and the result lands off-screen.
+  await frameCardTop(cardOf(prompt));
+  await beat(page, FEATURE);
   await showType(prompt, 'Find any traffic to database, cache, or file-sharing ports');
   await beat(page);
 
@@ -688,11 +702,20 @@ test('README demo walkthrough', async ({ page }) => {
   // The generated BPF expression is the payload of this section — the whole
   // point is that plain English became a real filter. Frame it and hold before
   // executing, or it flashes past on the way to the results table.
-  const generated = page.locator('code, pre').filter({ hasText: /port|host|tcp|udp/i }).first();
-  if (await generated.isVisible().catch(() => false)) {
-    await reveal(generated);
-  }
-  await beat(page, HOLD);
+  // #filter, not a <code>/<pre>: the generated expression renders into an
+  // *editable* Form.Control so the analyst can tweak it before running. A
+  // previous version matched 'code, pre' behind an isVisible() guard, which
+  // never matched and silently skipped this whole step.
+  const generated = page.locator('#filter');
+  await expect(generated, 'no generated filter expression to show').toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(generated, 'generated filter is empty').not.toHaveValue('');
+  // Frame the card rather than centring the expression: the explanation above it
+  // and the Execute button below are both part of what just happened, and
+  // centring the <code> alone crops one or the other.
+  await frameCardTop(cardOf(generated));
+  await beat(page, FEATURE);
 
   await showClick(page, page.getByRole('button', { name: /Execute Filter/i }));
   await timeline.fastForward('Execute Filter', 2, async () => {
@@ -715,7 +738,7 @@ test('README demo walkthrough', async ({ page }) => {
   // the app's own scrollIntoView), so wait for it to land before nudging.
   await settleScroll(page);
   await scrollBy(page, -90);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Then the matched packets themselves.
   await scrollBy(page, 300);
@@ -723,18 +746,15 @@ test('README demo walkthrough', async ({ page }) => {
 
   // ── 7. Extracted files ─────────────────────────────────────────────────
   await openTab(page, /Extracted Files/i);
-  await beat(page, HOLD);
 
-  // The table is the section — carrier files reassembled out of the packet
-  // stream. Frame that and stop; scrolling on to the bottom of the page only
-  // showed footer whitespace.
-  const filesTable = page.locator('table').first();
-  if (await filesTable.isVisible().catch(() => false)) {
-    await reveal(filesTable);
-    await beat(page, HOLD);
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await beat(page, HOLD);
+  // The Files card is the section — carrier files reassembled out of the packet
+  // stream. Frame its header at the top and stop there: no second scroll, since
+  // the rows below already fill the shot and carrying on only reached footer
+  // whitespace.
+  const filesHeading = page.getByRole('heading', { name: /^Files$/ }).first();
+  await expect(filesHeading, 'extracted files card not found').toBeVisible({ timeout: 20_000 });
+  await frameCardTop(cardOf(filesHeading));
+  await beat(page, FEATURE);
 
   // ── 8. Network visualization ───────────────────────────────────────────
   await openTab(page, /Network Visualization/i);
@@ -769,7 +789,7 @@ test('README demo walkthrough', async ({ page }) => {
   // card's height, so the position set before them no longer holds the header
   // under the navbar. Framing only once filmed a headerless canvas.
   await frameTopology();
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Cycle the edge-colour modes. Same topology, recoloured three ways: by
   // transport protocol, by detected application, then by volume — which also
@@ -787,7 +807,7 @@ test('README demo walkthrough', async ({ page }) => {
   for (const mode of ['application', 'volume', 'transport']) {
     await edgeColorSelect.selectOption(mode);
     await frameTopology();
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
   }
 
   // Node label customization — open, show the preview, close.
@@ -848,7 +868,7 @@ test('README demo walkthrough', async ({ page }) => {
   await expect(nodeModal, 'clicking a graph node did not open host details').toBeVisible({
     timeout: 15_000,
   });
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
   // Scroll past the header so the identity detail is in shot, not just the title.
   await nodeModal.locator('.modal-body').evaluate(el => el.scrollBy(0, 320));
   await beat(page, HOLD);
@@ -882,7 +902,27 @@ test('README demo walkthrough', async ({ page }) => {
     await page.waitForTimeout(100);
   }
   await frameCardTop(heatmapCard);
-  await beat(page, HOLD);
+  await beat(page, BEAT);
+
+  // Zoom out until the whole matrix fits the viewport. At the default 19px per
+  // cell a 50-host grid is far taller than the fold, so the recording only ever
+  // showed its top-left corner. The control steps through fixed sizes and
+  // disables itself at MIN_CELL, so drive it by that rather than a fixed count.
+  // Measure the grid itself, not the card: the card keeps its full width no
+  // matter how small the cells get, so a width test on it never tightens and a
+  // height-only test overshoots — the first run zoomed to 6px/cell and left the
+  // right half of the panel empty.
+  const grid = heatmapCard.locator('svg, canvas').first();
+  const zoomOut = heatmapCard.locator('[title="Zoom out"]').first();
+  for (let i = 0; i < 8; i++) {
+    if (await zoomOut.isDisabled().catch(() => true)) break;
+    const box = await grid.boundingBox();
+    if (box && box.height <= 720 - NAVBAR - 150) break;
+    await zoomOut.click();
+    await page.waitForTimeout(200);
+  }
+  await frameCardTop(heatmapCard);
+  await beat(page, FEATURE);
 
   // ── 9. Network intelligence ────────────────────────────────────────────
   await openTab(page, /Network Intelligence/i);
@@ -895,7 +935,7 @@ test('README demo walkthrough', async ({ page }) => {
   // Frame the card, not the body: "Network Cluster View" lives in the sibling
   // Card.Header, so centring the body alone leaves the diagram unlabelled.
   await frameCardTop(clusterBody.locator('xpath=..'));
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Then regroup by country, which swaps the cluster graph for the world map.
   const groupBy = page.locator('select').filter({ hasText: /ASN \/ Organization/ }).first();
@@ -990,7 +1030,7 @@ test('README demo walkthrough', async ({ page }) => {
   const captureTimeline = page.locator('#sec-timeline');
   await expect(captureTimeline).toBeVisible({ timeout: 20_000 });
   await reveal(captureTimeline);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Week 8 is the resolution — violations back near baseline after the audit
   // notice. Its snapshot modal is where per-week detail lives.
@@ -1024,7 +1064,7 @@ test('README demo walkthrough', async ({ page }) => {
       { timeout: 30_000, intervals: [100] },
     )
     .toBeGreaterThan(0);
-  await beat(page, HOLD);
+  await beat(page, FEATURE);
 
   // Tab through the snapshot's facets. Matched loosely and scoped to the pill
   // strip — NOT start-anchored. Every tab label is preceded by a decorative <i>
@@ -1058,7 +1098,7 @@ test('README demo walkthrough', async ({ page }) => {
         intervals: [100],
       })
       .toBeGreaterThan(0);
-    await beat(page, HOLD);
+    await beat(page, FEATURE);
   }
   await beat(page, HOLD);
   await closeAllModals(page);
