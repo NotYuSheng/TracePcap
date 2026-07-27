@@ -684,6 +684,15 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     sigmaRef.current = sigma;
 
+    // Test seam for the README demo recording (frontend/e2e/demo.spec.ts).
+    //
+    // The graph is WebGL, so a node has no DOM element and no addressable pixel:
+    // there is nothing for a test to hover or click by selector, and Sigma does
+    // its hit-testing internally. Exposing the instance lets the recording ask
+    // where a node actually is on screen (viewportForNode) and click that point,
+    // instead of guessing coordinates and silently filming a miss.
+    (window as unknown as { __sigma?: Sigma }).__sigma = sigma;
+
     // ── Edge overdraw for PDF capture ─────────────────────────────────────────
     //
     // Sigma draws edges on a WebGL canvas, and a WebGL canvas cannot be read back from
@@ -908,6 +917,7 @@ export const NetworkGraph = memo(function NetworkGraph({
       document.removeEventListener('mouseup', onDragEnd);
       sigmaRef.current?.kill();
       sigmaRef.current = null;
+      delete (window as unknown as { __sigma?: Sigma }).__sigma;
       elkRef.current?.terminateWorker();
       elkRef.current = null;
     };

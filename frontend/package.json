@@ -17,7 +17,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "demo:record": "DEMO=1 playwright test --project=demo"
   },
   "dependencies": {
     "@govtechsg/sgds": "^2.3.6",
