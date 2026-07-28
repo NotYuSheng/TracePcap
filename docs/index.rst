@@ -61,8 +61,6 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    operations/backup-restore
    operations/logs-monitoring
    operations/production-hardening
-   operations/production-readiness
-   operations/security-audit
    operations/scalability
    operations/storage-redundancy
 

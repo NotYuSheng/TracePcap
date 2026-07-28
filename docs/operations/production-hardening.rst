@@ -4,6 +4,22 @@ Production Hardening
 The default TracePcap configuration is optimised for quick local testing.
 Before exposing the application to a wider audience, follow these steps.
 
+Checklist
+---------
+
+Any deployment beyond local development must:
+
+- Override **all** sample credentials — PostgreSQL, MinIO, and the Keycloak admin.
+- Restrict exposed services so PostgreSQL and MinIO are not externally reachable.
+- Terminate **TLS** at nginx.
+- Set explicit ``CORS_ALLOWED_ORIGINS`` if the frontend is served from a
+  different origin than the API.
+- Point the LLM at a **local inference server**, so capture-derived content is
+  never sent to a third party.
+- Enable authentication via the Keycloak overlay where the deployment is shared.
+
+Each is covered in detail below.
+
 Spring Profile per Deployment Mode
 ----------------------------------
 
