@@ -38,5 +38,14 @@ ExecStart=/usr/bin/env bash scripts/backup.sh
 # mid-write and leave a truncated archive.
 TimeoutStartSec=3600
 
-[Install]
-WantedBy=multi-user.target
+# The timer's Persistent=true catches up a run missed while the box was off, which
+# means this unit can fire moments after boot — when dockerd is up (satisfying
+# After=docker.service) but the containers have not finished starting. The script
+# correctly refuses to back up a stopped stack, so retry a few times rather than
+# losing the caught-up run until the next night.
+Restart=on-failure
+RestartSec=120
+
+# NOTE: no [Install] section. This unit is started by tracepcap-backup.timer, which
+# carries WantedBy=timers.target. Enabling the *service* as well would additionally
+# run a backup on every boot — the least likely moment for the stack to be ready.

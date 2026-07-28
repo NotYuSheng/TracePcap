@@ -25,4 +25,4 @@ images/*.tar
 docs/_build/
 
 # Local backup archives (scripts/backup.sh)
-backups/
+/backups/

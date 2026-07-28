@@ -72,6 +72,16 @@ Configuration
 Credentials are read from ``.env`` (or the environment), so the script needs no
 configuration of its own beyond the two variables above.
 
+``.env`` is parsed as Compose-format ``KEY=value`` lines rather than executed as
+shell, so passwords containing spaces, ``$``, backticks or quotes are handled
+safely. **Explicit environment variables take precedence over ``.env``** — the
+systemd unit's ``BACKUP_DIR`` wins over a ``BACKUP_DIR`` in the file.
+
+Staging happens inside ``BACKUP_DIR``, not ``/tmp``. The archive is assembled
+from an uncompressed copy of the data, so the directory needs roughly **twice the
+size of a backup** in free space during the run — and on hosts where ``/tmp`` is
+RAM-backed, staging there would exhaust memory on a large capture set.
+
 Running a Backup Manually
 -------------------------
 
@@ -114,9 +124,20 @@ Perform the restore, with the backend stopped so nothing writes underneath it:
    bash scripts/restore.sh backups/tracepcap-backup-20260728-110713.tar.gz
    docker compose start backend
 
-The script verifies the result rather than trusting exit codes — it counts the
-tables actually present afterwards and fails if the database came back empty. It
-also rejects corrupt archives and tarballs that are not TracePcap backups.
+The script verifies the result rather than trusting exit codes:
+
+- ``pg_restore`` stderr is inspected and real errors are separated from the
+  routine "does not exist" notices ``--clean`` produces, so a genuine failure
+  (disk full, truncated dump) is not mistaken for noise.
+- The number of tables present afterwards must be non-zero.
+- The object count in the bucket must match the manifest, so a partial transfer
+  fails loudly instead of quietly restoring some of your PCAPs.
+- Corrupt archives and tarballs that are not TracePcap backups are rejected.
+
+The bucket restore uses ``mc mirror --remove``, so it is a **replacement**, not a
+merge: objects not present in the archive are deleted. Rolling back to an earlier
+backup therefore leaves no orphaned PCAPs that the restored database has no rows
+for.
 
 Rehearsing a Restore
 --------------------

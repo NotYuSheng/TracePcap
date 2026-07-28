@@ -24,13 +24,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$ROOT_DIR"
 
-if [[ -f .env ]]; then
-  # shellcheck disable=SC1091
-  set -a; source ./.env; set +a
-fi
+# .env is Compose's format, not shell — parsed rather than sourced so a password
+# containing $(...), a backtick or a space cannot execute or break the script, and
+# so the caller's environment wins over the file. See backup.sh for the full note.
+load_env_file() {
+  local file="$1" line key value
+  [[ -f "$file" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    [[ "$line" == export\ * ]] && line="${line#export }"
+    [[ "$line" != *=* ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    if [[ "$value" == \"*\" && ${#value} -ge 2 ]]; then value="${value:1:${#value}-2}"
+    elif [[ "$value" == \'*\' && ${#value} -ge 2 ]]; then value="${value:1:${#value}-2}"
+    fi
+    [[ -n "${!key+x}" ]] || export "$key=$value"
+  done < "$file"
+}
+load_env_file ./.env
 
 POSTGRES_DB="${POSTGRES_DB:-tracepcap}"
 POSTGRES_USER="${POSTGRES_USER:-tracepcap_user}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-tracepcap_pass}"
 MINIO_ROOT_USER="${MINIO_ROOT_USER:-minioadmin}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-minioadmin}"
 MINIO_BUCKET="${MINIO_BUCKET:-tracepcap-files}"
@@ -77,6 +96,12 @@ if [[ "$MANIFEST_DB" != "$POSTGRES_DB" ]]; then
   log "         The backend will only see the data if DATABASE_URL points at '$POSTGRES_DB'."
 fi
 
+MANIFEST_BUCKET=$(grep '^minio_bucket=' "$STAGE/manifest.txt" | cut -d= -f2)
+if [[ -n "$MANIFEST_BUCKET" && "$MANIFEST_BUCKET" != "$MINIO_BUCKET" ]]; then
+  log "WARNING: backup came from bucket '$MANIFEST_BUCKET' but this deployment uses '$MINIO_BUCKET'."
+  log "         Objects will be restored into '$MINIO_BUCKET'; the backend must be configured to read it."
+fi
+
 require_container() {
   docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null | grep -q true \
     || fail "container '$1' is not running — start postgres and minio before restoring"
@@ -99,13 +124,27 @@ fi
 # --clean --if-exists drops existing objects first, so restoring over a populated
 # database succeeds instead of failing on every duplicate.
 log "Restoring PostgreSQL…"
-docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD:-tracepcap_pass}" "$PG_CONTAINER" \
+PG_ERR="$WORK_DIR/pg_restore.err"
+docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" "$PG_CONTAINER" \
   pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner \
-  < "$STAGE/postgres.dump" \
-  || log "  pg_restore reported warnings (usually harmless 'does not exist' on --clean)"
+  < "$STAGE/postgres.dump" 2> "$PG_ERR" || true
 
-# Confirm the restore actually produced tables, rather than trusting the exit code.
-TABLE_COUNT=$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-tracepcap_pass}" "$PG_CONTAINER" \
+# pg_restore exits non-zero for harmless reasons under --clean --if-exists (it reports
+# every "does not exist" as an error), so the exit code alone is unusable. Filter those
+# out and treat anything remaining as a real failure — otherwise a genuine break (disk
+# full, truncated dump, wrong user) would be indistinguishable from routine noise, and
+# the table count below would still pass on the objects --clean had already dropped.
+REAL_ERRORS=$(grep -c '^pg_restore: error:' "$PG_ERR" 2>/dev/null || true)
+BENIGN=$(grep -c 'does not exist' "$PG_ERR" 2>/dev/null || true)
+if [[ "${REAL_ERRORS:-0}" -gt "${BENIGN:-0}" ]]; then
+  log "  pg_restore reported errors beyond the expected '--clean' notices:"
+  grep '^pg_restore: error:' "$PG_ERR" | grep -v 'does not exist' | head -5 | sed 's/^/    /'
+  fail "pg_restore failed — the database may be partially restored. Do NOT start the backend against it."
+fi
+[[ "${BENIGN:-0}" -gt 0 ]] && log "  ($BENIGN expected '--clean' notices ignored)"
+
+# Independently confirm the restore produced tables, rather than trusting exit codes.
+TABLE_COUNT=$(docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" "$PG_CONTAINER" \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
 [[ "$TABLE_COUNT" -gt 0 ]] || fail "restore left 0 tables in '$POSTGRES_DB' — restore did NOT succeed"
@@ -118,11 +157,15 @@ if [[ -d "$STAGE/minio" ]]; then
   docker cp "$STAGE/minio" "$MINIO_CONTAINER:/tmp/mc-restore" >/dev/null \
     || fail "copying objects into the MinIO container failed"
 
+  # --remove makes this a true replacement, matching what the prompt and the docs
+  # promise. Without it the restore is additive: rolling back a bad import would
+  # leave that import's objects orphaned in the bucket, invisible to the restored
+  # database (which has no rows for them) and never reclaimed.
   docker exec "$MINIO_CONTAINER" sh -c '
     set -e
     mc alias set rs http://localhost:9000 "$0" "$1" >/dev/null
     mc mb --ignore-existing "rs/$2" >/dev/null
-    mc mirror --overwrite --quiet /tmp/mc-restore "rs/$2" >/dev/null
+    mc mirror --overwrite --remove --quiet /tmp/mc-restore "rs/$2" >/dev/null
     rm -rf /tmp/mc-restore
   ' "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" "$MINIO_BUCKET" \
     || fail "mc mirror (restore) failed"
@@ -130,8 +173,16 @@ if [[ -d "$STAGE/minio" ]]; then
   RESTORED=$(docker exec "$MINIO_CONTAINER" sh -c '
     mc alias set rs http://localhost:9000 "$0" "$1" >/dev/null
     mc ls --recursive "rs/$2" | wc -l
-  ' "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" "$MINIO_BUCKET")
+  ' "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" "$MINIO_BUCKET" | tr -d '[:space:]')
   log "  objects in bucket: $RESTORED"
+
+  # The manifest records what was captured precisely so the restore can be checked
+  # against it. An interrupted transfer that restores 3 of 50 PCAPs must not report
+  # success — that is the failure the operator would only discover at recovery time.
+  EXPECTED_OBJ=$(grep '^minio_object_count=' "$STAGE/manifest.txt" | cut -d= -f2 | tr -d '[:space:]')
+  if [[ -n "$EXPECTED_OBJ" && "$RESTORED" != "$EXPECTED_OBJ" ]]; then
+    fail "expected $EXPECTED_OBJ object(s) from the manifest but the bucket holds $RESTORED — restore is INCOMPLETE"
+  fi
 else
   log "No MinIO objects in this archive — skipping."
 fi
@@ -140,8 +191,13 @@ fi
 if [[ -n "$(ls -A "$STAGE/config" 2>/dev/null)" ]]; then
   if docker inspect -f '{{.State.Running}}' "$BACKEND_CONTAINER" 2>/dev/null | grep -q true; then
     log "Restoring config files…"
-    docker cp "$STAGE/config/." "$BACKEND_CONTAINER:/app/config/" >/dev/null \
-      && log "  config restored (restart the backend to pick up signatures.yml)"
+    # Explicit || — a bare `&&` would swallow the failure and still let the script
+    # print "Restore complete.", leaving signatures.yml quietly missing.
+    if docker cp "$STAGE/config/." "$BACKEND_CONTAINER:/app/config/" >/dev/null 2>&1; then
+      log "  config restored (restart the backend to pick up signatures.yml)"
+    else
+      fail "config restore failed — signatures.yml was NOT restored"
+    fi
   else
     log "Backend not running — skipping config restore. Start it and re-run to restore signatures.yml."
   fi
