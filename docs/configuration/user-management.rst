@@ -35,8 +35,9 @@ The stack must be running with the production overlay:
    PUBLIC_URL=http://localhost:8888 \
      docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
-You also need the **Keycloak admin** credentials (default ``user`` /
-``P@ssw0rd`` — override with ``KEYCLOAK_ADMIN`` / ``KEYCLOAK_ADMIN_PASSWORD``).
+You also need the **Keycloak admin** credentials. These have **no default** —
+set ``KEYCLOAK_ADMIN`` and ``KEYCLOAK_ADMIN_PASSWORD`` in ``.env`` or the
+production overlay aborts before starting anything.
 
 Create a user via the admin console
 -----------------------------------

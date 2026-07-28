@@ -49,19 +49,28 @@ Credentials come from ``.env`` — there is no need to edit any compose file.
 The base stack defaults them to well-known development values
 (``tracepcap_pass``, ``minioadmin``) so a local or CI run works with no ``.env``.
 **Those defaults are public.** The two ``*-prod.yml`` overlays therefore *require*
-every credential and abort before starting anything if one is unset, so a
-production deployment cannot silently run on them.
+every credential and abort before starting anything if one is unset.
+
+.. important::
+
+   That check tests only that a value is **present**, not that it is a good one.
+   Nothing stops an operator writing ``tracepcap_pass`` or ``minioadmin`` into
+   ``.env`` — the overlay would start normally. Replace every value below with a
+   unique secret; the fail-fast only catches the case where you forgot.
 
 Set all of these in ``.env`` (see ``.env.example`` for the full list):
 
 .. code-block:: ini
 
+   # First start only — see the warning below before changing these on a
+   # deployment that already has a database volume.
    POSTGRES_DB=tracepcap
-   POSTGRES_USER=tracepcap
+   POSTGRES_USER=tracepcap_user
    POSTGRES_PASSWORD=<strong-unique-value>
-   MINIO_ROOT_USER=tracepcap
+
+   MINIO_ROOT_USER=<strong-unique-value>
    MINIO_ROOT_PASSWORD=<strong-unique-value>   # MinIO requires 8+ characters
-   KEYCLOAK_ADMIN=admin                        # auth overlays only
+   KEYCLOAK_ADMIN=<admin-username>             # auth overlays only
    KEYCLOAK_ADMIN_PASSWORD=<strong-unique-value>
 
 One value feeds every consumer that has to agree on it — the backend, the
@@ -69,12 +78,25 @@ Postgres healthcheck, and the MinIO bucket bootstrap — so they cannot drift ap
 
 .. warning::
 
-   ``POSTGRES_USER`` and ``POSTGRES_DB`` are applied **only when the database
-   volume is first initialised**. Setting them against an existing deployment
-   will not rename the role or database: Postgres keeps the old ones while the
-   backend tries to connect with the new, and startup fails. Set them before
-   first start, or recreate the volume (destroying existing data) or issue a
-   manual ``ALTER ROLE`` / ``ALTER DATABASE``.
+   **All three ``POSTGRES_*`` values above are applied only when the database
+   volume is first initialised**, including the password. Changing any of them
+   against an existing deployment does not update PostgreSQL:
+
+   - ``POSTGRES_USER`` / ``POSTGRES_DB`` — the old role and database remain, the
+     backend connects with the new name, and startup fails.
+   - ``POSTGRES_PASSWORD`` — the old password stays active and the new one is
+     silently ignored. This is the more dangerous case, because the deployment
+     looks like it accepted a rotated credential when it did not.
+
+   Set them before first start. To change them afterwards, either recreate the
+   volume (destroying existing data — take a backup first, see
+   :doc:`backup-restore`) or alter the running database and update ``.env`` to
+   match:
+
+   .. code-block:: bash
+
+      docker exec -it tracepcap-postgres psql -U <current-user> -d <current-db> \
+        -c "ALTER ROLE <user> WITH PASSWORD '<new-password>';"
 
 Enable Authentication
 ---------------------
