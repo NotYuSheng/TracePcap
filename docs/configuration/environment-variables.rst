@@ -172,12 +172,13 @@ walkthrough. They are ignored by the base stack.
        permit-all. The prod overlay sets this to ``true`` to gate ``/api``
        behind a Keycloak JWT.
    * - ``KEYCLOAK_ADMIN``
-     - ``user``
+     - *(none)*
      - Keycloak bootstrap admin username (admin console is served same-origin
-       at ``/admin``). **Change for any real deployment.**
+       at ``/admin``). **Required** — the production overlays abort if unset.
    * - ``KEYCLOAK_ADMIN_PASSWORD``
-     - ``P@ssw0rd``
-     - Keycloak bootstrap admin password. **Change for any real deployment.**
+     - *(none)*
+     - Keycloak bootstrap admin password. **Required** — the production overlays
+       abort if unset. See :doc:`../operations/production-hardening`.
 
 .. note::
    ``KEYCLOAK_ISSUER_URI``, ``KEYCLOAK_JWK_SET_URI``, and the ``VITE_AUTH_*``

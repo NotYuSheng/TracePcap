@@ -22,8 +22,9 @@
 # docs/configuration/authentication.rst and docs/getting-started/offline-deployment.rst.
 #
 # Manage users at <PUBLIC_URL>/admin (Keycloak admin console, served same-origin by nginx).
-# Default demo login: analyst / analyst. Default Keycloak admin: user / P@ssw0rd — override
-# both for any real deployment.
+# The realm seeds a demo app login (analyst / analyst) — change it for any real deployment.
+# The Keycloak admin account has NO default here: KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD must
+# be set in .env or this overlay aborts before starting anything.
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -64,6 +65,7 @@ services:
   # offline deployment cannot silently start on the shipped defaults.
   postgres:
     environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env — see .env.example}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env — see .env.example}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
 
@@ -81,6 +83,7 @@ services:
       TRACEPCAP_AUTH_ENABLED: "true"
       # Re-asserted so the backend fails fast alongside the datastores rather than starting and
       # then failing to authenticate against them.
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?set POSTGRES_DB in .env — see .env.example}
       DATABASE_USERNAME: ${POSTGRES_USER:?set POSTGRES_USER in .env — see .env.example}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env — see .env.example}

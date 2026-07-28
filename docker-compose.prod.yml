@@ -62,6 +62,7 @@ services:
   # means a production deployment cannot silently start on the shipped defaults.
   postgres:
     environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env — see .env.example}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env — see .env.example}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
 
@@ -79,6 +80,7 @@ services:
       TRACEPCAP_AUTH_ENABLED: "true"
       # Re-asserted so the backend fails fast alongside the datastores rather than starting and
       # then failing to authenticate against them.
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?set POSTGRES_DB in .env — see .env.example}
       DATABASE_USERNAME: ${POSTGRES_USER:?set POSTGRES_USER in .env — see .env.example}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env — see .env.example}

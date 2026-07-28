@@ -51,8 +51,9 @@ demo user. **Change these for any real deployment.**
      - ``analyst`` / ``analyst``
      - Keycloak admin console → Users, or edit the realm export
    * - Keycloak admin
-     - ``user`` / ``P@ssw0rd``
-     - ``KEYCLOAK_ADMIN`` / ``KEYCLOAK_ADMIN_PASSWORD`` env vars
+     - *no default — must be set*
+     - ``KEYCLOAK_ADMIN`` / ``KEYCLOAK_ADMIN_PASSWORD`` in ``.env``; the
+       production overlays abort if either is unset
 
 The Keycloak admin console is served same-origin at ``/admin``. To add or manage
 application logins, see :doc:`user-management`.

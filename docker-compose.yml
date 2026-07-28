@@ -35,7 +35,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tracepcap_user} -d ${POSTGRES_DB:-tracepcap}"]
+      # Reads the container's own POSTGRES_USER/POSTGRES_DB rather than interpolating them here,
+      # so a value containing a space or shell metacharacter can't break the check (which would
+      # leave postgres permanently unhealthy and block every service that depends on it).
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -83,10 +86,17 @@ services:
           memory: ${MINIO_INIT_MEM_LIMIT:-128m}
     depends_on:
       - minio
+    environment:
+      # Passed as env vars, NOT interpolated into the entrypoint string below. Compose would
+      # substitute the value textually and `sh` would then re-parse it, so a password containing
+      # a space, `;`, `$` or `"` would split the argument, run as a second command, or expand.
+      # `$$VAR` escapes the `$` so the container's shell does the expansion, not Compose.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     entrypoint: >
       /bin/sh -c "
       sleep 5;
-      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      /usr/bin/mc alias set myminio http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\";
       /usr/bin/mc mb myminio/tracepcap-files --ignore-existing;
       /usr/bin/mc anonymous set public myminio/tracepcap-files;
       exit 0;
