@@ -38,8 +38,10 @@ services:
           cpus: ${KEYCLOAK_CPU_LIMIT:-2}
           memory: ${KEYCLOAK_MEM_LIMIT:-1g}
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-user}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-P@ssw0rd}
+      # REQUIRED — the admin console is reachable on the same public origin (/admin), so a
+      # shipped default would be a publicly known administrator password.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env — see .env.example}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env — see .env.example}
       # Public, browser-facing base URL — determines the token `iss` claim and all KC URLs.
       KC_HOSTNAME: ${PUBLIC_URL:-http://localhost:8888}
       # Trust X-Forwarded-* from the nginx proxy (same-origin reverse proxy in front of KC).
@@ -57,6 +59,19 @@ services:
     networks:
       - tracepcap-network
 
+  # Datastore credentials are REQUIRED in the production path. The base offline file defaults them
+  # so an air-gapped smoke test works without a .env; re-declaring them with `:?` here means a real
+  # offline deployment cannot silently start on the shipped defaults.
+  postgres:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env — see .env.example}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
+
+  minio:
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env — see .env.example}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env — see .env.example}
+
   backend:
     environment:
       # Activate the prod Spring profile (overrides the base offline file's `dev`): strict CORS (no
@@ -64,6 +79,12 @@ services:
       # UI + /v3/api-docs disabled, WARN-level logging to file. See docs production-hardening.
       SPRING_PROFILES_ACTIVE: prod
       TRACEPCAP_AUTH_ENABLED: "true"
+      # Re-asserted so the backend fails fast alongside the datastores rather than starting and
+      # then failing to authenticate against them.
+      DATABASE_USERNAME: ${POSTGRES_USER:?set POSTGRES_USER in .env — see .env.example}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env — see .env.example}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env — see .env.example}
       # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
       KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
       # Backend-reachable JWKS endpoint (internal docker network), fetched lazily so the
