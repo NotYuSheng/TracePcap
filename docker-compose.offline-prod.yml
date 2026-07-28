@@ -88,10 +88,13 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env — see .env.example}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env — see .env.example}
-      # Data egress. docker-compose.offline.yml already defaults these safely (MMDB-only geo, a
-      # localhost LLM); restated here so an air-gapped deployment's guarantee doesn't rest on a
-      # default in the file below it, and stays aligned with docker-compose.prod.yml.
-      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:1234/v1}
+      # Data egress. REQUIRED, matching docker-compose.prod.yml. The base offline file defaults
+      # this to http://localhost:1234/v1, which resolves to the *backend container itself*, not to
+      # any inference host on the network — so inheriting it would leave Story mode and Network
+      # Insights failing at request time with a connection error instead of at startup.
+      LLM_API_BASE_URL: ${LLM_API_BASE_URL:?set LLM_API_BASE_URL in .env (e.g. http://<host>:1234/v1) — see .env.example}
+      # Restated so an air-gapped deployment's guarantee doesn't rest on a default in the file
+      # below it. Left overridable: a deployment with internet access may opt back in.
       GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
       KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap

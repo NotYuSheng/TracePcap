@@ -245,13 +245,22 @@ Configure LLM Privacy
 AI features (Story mode, Network Insights) build their prompts from analysed
 capture content, so the LLM endpoint is a **data egress path**.
 
-The production overlays **require** ``LLM_API_BASE_URL`` — they abort rather than
-falling back to the base file's convenience default of ``api.openai.com``. Point
-it at a locally-hosted inference server (LM Studio, Ollama, vLLM):
+Both production overlays **require** ``LLM_API_BASE_URL`` and abort if it is
+unset, rather than falling back to a default — the online overlay would otherwise
+inherit ``api.openai.com`` from the base file, and the offline overlay
+``localhost``. Point it at a locally-hosted inference server (LM Studio, Ollama,
+vLLM):
 
 .. code-block:: bash
 
    LLM_API_BASE_URL=http://<your-inference-host>:1234/v1
+
+.. warning::
+
+   Use the address of the inference host **as reachable from the backend
+   container**. ``localhost`` resolves to the container itself, not to a server
+   running on the Docker host or elsewhere on the LAN, so it will fail at request
+   time rather than at startup.
 
 Do **not** configure a cloud API endpoint if your PCAP data is sensitive.
 
