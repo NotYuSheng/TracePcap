@@ -51,9 +51,16 @@ services:
       # runtime in the admin console survive container restart/recreate. Without
       # this, start-dev keeps its data inside the container and every recreate
       # wipes all users, forcing a re-import of only the realm-export.json seed.
-      # Scoped to the h2 subdir (not all of /opt/keycloak/data) so the named
-      # volume doesn't nest over the realm-export.json bind mount above.
-      - keycloak_data:/opt/keycloak/data/h2
+      #
+      # Mounted at the PARENT (/opt/keycloak/data), not the h2 subdirectory. Docker
+      # copies image content *and ownership* into an empty named volume only when
+      # the mount point exists in the image: /opt/keycloak/data does (owned by uid
+      # 1000, the keycloak user), /opt/keycloak/data/h2 does not. Mounting the
+      # subdirectory left the volume root-owned, so Keycloak — which runs as uid
+      # 1000 — could not write its H2 file and crash-looped on any fresh volume
+      # (#612). The bind mount above is applied on top of this one, so the realm
+      # import is still visible and is not shadowed.
+      - keycloak_data:/opt/keycloak/data
     networks:
       - tracepcap-network
 
