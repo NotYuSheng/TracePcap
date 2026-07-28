@@ -23,16 +23,22 @@ services:
           cpus: ${POSTGRES_CPU_LIMIT:-2}
           memory: ${POSTGRES_MEM_LIMIT:-1g}
     environment:
-      POSTGRES_DB: tracepcap
-      POSTGRES_USER: tracepcap_user
-      POSTGRES_PASSWORD: tracepcap_pass
+      # Credentials default to the well-known dev values so `docker compose up` works with
+      # no .env (local dev, CI). The production overlays require them to be set explicitly —
+      # see docker-compose.prod.yml. Override in .env for any shared deployment.
+      POSTGRES_DB: ${POSTGRES_DB:-tracepcap}
+      POSTGRES_USER: ${POSTGRES_USER:-tracepcap_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tracepcap_pass}
       TZ: Asia/Singapore
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracepcap_user -d tracepcap"]
+      # Reads the container's own POSTGRES_USER/POSTGRES_DB rather than interpolating them here,
+      # so a value containing a space or shell metacharacter can't break the check (which would
+      # leave postgres permanently unhealthy and block every service that depends on it).
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,8 +57,8 @@ services:
           cpus: ${MINIO_CPU_LIMIT:-2}
           memory: ${MINIO_MEM_LIMIT:-1g}
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       TZ: Asia/Singapore
     ports:
       - "9000:9000"  # API
@@ -80,10 +86,17 @@ services:
           memory: ${MINIO_INIT_MEM_LIMIT:-128m}
     depends_on:
       - minio
+    environment:
+      # Passed as env vars, NOT interpolated into the entrypoint string below. Compose would
+      # substitute the value textually and `sh` would then re-parse it, so a password containing
+      # a space, `;`, `$` or `"` would split the argument, run as a second command, or expand.
+      # `$$VAR` escapes the `$` so the container's shell does the expansion, not Compose.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     entrypoint: >
       /bin/sh -c "
       sleep 5;
-      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc alias set myminio http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\";
       /usr/bin/mc mb myminio/tracepcap-files --ignore-existing;
       /usr/bin/mc anonymous set public myminio/tracepcap-files;
       exit 0;
@@ -114,16 +127,17 @@ services:
       # Authentication off by default — the app runs fully open (e.g. Lanturn). To enable OIDC,
       # use docker-compose.prod.yml (bundles Keycloak) or set TRACEPCAP_AUTH_ENABLED + KEYCLOAK_* envs.
       TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
-      DATABASE_URL: jdbc:postgresql://postgres:5432/tracepcap
-      DATABASE_USERNAME: tracepcap_user
-      DATABASE_PASSWORD: tracepcap_pass
+      # Must resolve to the same values as the postgres service above.
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tracepcap}
+      DATABASE_USERNAME: ${POSTGRES_USER:-tracepcap_user}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-tracepcap_pass}
       # HikariCP connection pool. Sized above the base default so concurrent analysis inserts +
       # request traffic don't starve the pool. Stays well under Postgres max_connections (100). See #393.
       DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-20}
       DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-5}
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: tracepcap-files
       # Memory allocation — all limits (JVM heap, max upload, timeouts) are derived
       # from this single value in the container entrypoint script
