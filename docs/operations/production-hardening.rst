@@ -44,22 +44,70 @@ the frontend on a different origin from the API.
 Change Default Credentials
 ---------------------------
 
-**MinIO:**
+Credentials come from ``.env`` — there is no need to edit any compose file.
 
-In ``docker-compose.yml``, change:
+The base stack defaults them to well-known development values
+(``tracepcap_pass``, ``minioadmin``) so a local or CI run works with no ``.env``.
+**Those defaults are public.** The two ``*-prod.yml`` overlays therefore *require*
+every credential and abort before starting anything if one is unset.
 
-.. code-block:: yaml
+.. important::
 
-   MINIO_ROOT_USER: minioadmin
-   MINIO_ROOT_PASSWORD: minioadmin
+   That check tests only that a value is **present**, not that it is a good one.
+   Nothing stops an operator writing ``tracepcap_pass`` or ``minioadmin`` into
+   ``.env`` — the overlay would start normally. Replace every value below with a
+   unique secret; the fail-fast only catches the case where you forgot.
 
-to strong, unique credentials. Update any references in the backend service
-environment as well.
+Set all of these in ``.env`` (see ``.env.example`` for the full list):
 
-**PostgreSQL:**
+.. code-block:: ini
 
-Change ``POSTGRES_PASSWORD`` to a strong password and update the backend's
-``SPRING_DATASOURCE_PASSWORD`` to match.
+   # First start only — see the warning below before changing these on a
+   # deployment that already has a database volume.
+   POSTGRES_DB=tracepcap
+   POSTGRES_USER=tracepcap_user
+   POSTGRES_PASSWORD=<strong-unique-value>
+
+   MINIO_ROOT_USER=<strong-unique-value>
+   MINIO_ROOT_PASSWORD=<strong-unique-value>   # MinIO requires 8+ characters
+   KEYCLOAK_ADMIN=<admin-username>             # auth overlays only
+   KEYCLOAK_ADMIN_PASSWORD=<strong-unique-value>
+
+One value feeds every consumer that has to agree on it — the backend, the
+Postgres healthcheck, and the MinIO bucket bootstrap — so they cannot drift apart.
+
+.. warning::
+
+   **All three ``POSTGRES_*`` values above are applied only when the database
+   volume is first initialised**, including the password. Changing any of them
+   against an existing deployment does not update PostgreSQL:
+
+   - ``POSTGRES_USER`` / ``POSTGRES_DB`` — the old role and database remain, the
+     backend connects with the new name, and startup fails.
+   - ``POSTGRES_PASSWORD`` — the old password stays active and the new one is
+     silently ignored. This is the more dangerous case, because the deployment
+     looks like it accepted a rotated credential when it did not.
+
+   Set them before first start. To change them afterwards, either recreate the
+   volume (destroying existing data — take a backup first, see
+   :doc:`backup-restore`) or alter the running database and update ``.env`` to
+   match.
+
+   To rotate the password, use ``psql``'s ``\password`` meta-command. It prompts
+   for the value and sends it pre-hashed, so the plaintext never reaches your
+   shell history, the process list, or the server log:
+
+   .. code-block:: bash
+
+      docker exec -it tracepcap-postgres psql -U <current-user> -d <current-db>
+
+   .. code-block:: text
+
+      \password <user>
+      \q
+
+   Then set the same value as ``POSTGRES_PASSWORD`` in ``.env`` and restart the
+   backend so it reconnects with the new credential.
 
 Enable Authentication
 ---------------------
@@ -74,9 +122,12 @@ overlay:
      docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 This gates the API behind a Keycloak JWT and adds a login flow to the frontend.
-**Change the demo credentials** (app login ``analyst`` / ``analyst`` and the
-Keycloak admin ``user`` / ``P@ssw0rd``) before exposing the app. See
-:doc:`../configuration/authentication` for the full walkthrough.
+
+The Keycloak admin account has **no default** — set ``KEYCLOAK_ADMIN`` and
+``KEYCLOAK_ADMIN_PASSWORD`` in ``.env`` (the overlay aborts otherwise). The realm
+still seeds a demo **app login** of ``analyst`` / ``analyst``; change it before
+exposing the app. See :doc:`../configuration/authentication` for the full
+walkthrough.
 
 If you prefer an external identity layer instead, you can still front nginx
 with an `oauth2-proxy <https://oauth2-proxy.github.io/oauth2-proxy/>`_,

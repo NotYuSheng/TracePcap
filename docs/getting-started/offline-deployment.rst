@@ -125,9 +125,10 @@ setting ``PUBLIC_URL`` to the exact origin you browse to (scheme + host + port):
    breaks JWT validation.
 
 Create and manage logins at ``<PUBLIC_URL>/admin`` — see
-:doc:`../configuration/user-management`. The default demo login is
-``analyst`` / ``analyst`` and the default Keycloak admin is ``user`` /
-``P@ssw0rd``; **change both for any real deployment.**
+:doc:`../configuration/user-management`. The realm seeds a demo app login of
+``analyst`` / ``analyst``; **change it for any real deployment.** The Keycloak
+admin account has no default — ``KEYCLOAK_ADMIN`` and
+``KEYCLOAK_ADMIN_PASSWORD`` must be set in ``.env`` or the overlay aborts.
 
 LLM Configuration for Offline Use
 ----------------------------------

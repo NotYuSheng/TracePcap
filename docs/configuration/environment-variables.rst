@@ -355,9 +355,9 @@ you are connecting to an external database.
    * - ``POSTGRES_USER``
      - Database user
    * - ``POSTGRES_PASSWORD``
-     - Database password — **change this in production**
-   * - ``SPRING_DATASOURCE_PASSWORD``
-     - Backend database connection password — must match ``POSTGRES_PASSWORD``
+     - Database password — **change this in production**. The backend's
+       ``DATABASE_PASSWORD`` is derived from this value in the compose files, so
+       the two cannot drift apart; there is no separate variable to set.
 
 MinIO Configuration (internal)
 -------------------------------
