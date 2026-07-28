@@ -44,22 +44,37 @@ the frontend on a different origin from the API.
 Change Default Credentials
 ---------------------------
 
-**MinIO:**
+Credentials come from ``.env`` — there is no need to edit any compose file.
 
-In ``docker-compose.yml``, change:
+The base stack defaults them to well-known development values
+(``tracepcap_pass``, ``minioadmin``) so a local or CI run works with no ``.env``.
+**Those defaults are public.** The two ``*-prod.yml`` overlays therefore *require*
+every credential and abort before starting anything if one is unset, so a
+production deployment cannot silently run on them.
 
-.. code-block:: yaml
+Set all of these in ``.env`` (see ``.env.example`` for the full list):
 
-   MINIO_ROOT_USER: minioadmin
-   MINIO_ROOT_PASSWORD: minioadmin
+.. code-block:: ini
 
-to strong, unique credentials. Update any references in the backend service
-environment as well.
+   POSTGRES_DB=tracepcap
+   POSTGRES_USER=tracepcap
+   POSTGRES_PASSWORD=<strong-unique-value>
+   MINIO_ROOT_USER=tracepcap
+   MINIO_ROOT_PASSWORD=<strong-unique-value>   # MinIO requires 8+ characters
+   KEYCLOAK_ADMIN=admin                        # auth overlays only
+   KEYCLOAK_ADMIN_PASSWORD=<strong-unique-value>
 
-**PostgreSQL:**
+One value feeds every consumer that has to agree on it — the backend, the
+Postgres healthcheck, and the MinIO bucket bootstrap — so they cannot drift apart.
 
-Change ``POSTGRES_PASSWORD`` to a strong password and update the backend's
-``SPRING_DATASOURCE_PASSWORD`` to match.
+.. warning::
+
+   ``POSTGRES_USER`` and ``POSTGRES_DB`` are applied **only when the database
+   volume is first initialised**. Setting them against an existing deployment
+   will not rename the role or database: Postgres keeps the old ones while the
+   backend tries to connect with the new, and startup fails. Set them before
+   first start, or recreate the volume (destroying existing data) or issue a
+   manual ``ALTER ROLE`` / ``ALTER DATABASE``.
 
 Enable Authentication
 ---------------------
@@ -74,9 +89,12 @@ overlay:
      docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 This gates the API behind a Keycloak JWT and adds a login flow to the frontend.
-**Change the demo credentials** (app login ``analyst`` / ``analyst`` and the
-Keycloak admin ``user`` / ``P@ssw0rd``) before exposing the app. See
-:doc:`../configuration/authentication` for the full walkthrough.
+
+The Keycloak admin account has **no default** — set ``KEYCLOAK_ADMIN`` and
+``KEYCLOAK_ADMIN_PASSWORD`` in ``.env`` (the overlay aborts otherwise). The realm
+still seeds a demo **app login** of ``analyst`` / ``analyst``; change it before
+exposing the app. See :doc:`../configuration/authentication` for the full
+walkthrough.
 
 If you prefer an external identity layer instead, you can still front nginx
 with an `oauth2-proxy <https://oauth2-proxy.github.io/oauth2-proxy/>`_,
