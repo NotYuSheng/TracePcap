@@ -91,12 +91,23 @@ Postgres healthcheck, and the MinIO bucket bootstrap — so they cannot drift ap
    Set them before first start. To change them afterwards, either recreate the
    volume (destroying existing data — take a backup first, see
    :doc:`backup-restore`) or alter the running database and update ``.env`` to
-   match:
+   match.
+
+   To rotate the password, use ``psql``'s ``\password`` meta-command. It prompts
+   for the value and sends it pre-hashed, so the plaintext never reaches your
+   shell history, the process list, or the server log:
 
    .. code-block:: bash
 
-      docker exec -it tracepcap-postgres psql -U <current-user> -d <current-db> \
-        -c "ALTER ROLE <user> WITH PASSWORD '<new-password>';"
+      docker exec -it tracepcap-postgres psql -U <current-user> -d <current-db>
+
+   .. code-block:: text
+
+      \password <user>
+      \q
+
+   Then set the same value as ``POSTGRES_PASSWORD`` in ``.env`` and restart the
+   backend so it reconnects with the new credential.
 
 Enable Authentication
 ---------------------
