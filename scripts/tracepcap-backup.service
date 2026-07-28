@@ -1,0 +1,51 @@
+# systemd unit for scheduled TracePcap backups.
+#
+# Install (adjust the paths and User to match your deployment):
+#   sudo cp scripts/tracepcap-backup.service scripts/tracepcap-backup.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tracepcap-backup.timer
+#
+# Check:
+#   systemctl list-timers tracepcap-backup.timer
+#   systemctl status tracepcap-backup.service
+#   journalctl -u tracepcap-backup.service -n 50
+#
+# Run once by hand (does not affect the schedule):
+#   sudo systemctl start tracepcap-backup.service
+
+[Unit]
+Description=TracePcap backup (PostgreSQL + MinIO + config)
+Documentation=https://github.com/NotYuSheng/TracePcap
+# Docker must be up: the script talks to the running containers, not the volumes.
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+
+# The user must be able to run `docker` (i.e. be in the docker group or root).
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Desktop/TracePcap
+
+# Where archives land. Point this at mounted off-host storage (NAS, USB, remote
+# mount) — a backup on the same disk as the data does not survive that disk.
+Environment=BACKUP_DIR=/home/ubuntu/Desktop/TracePcap/backups
+Environment=BACKUP_RETENTION_DAYS=14
+
+ExecStart=/usr/bin/env bash scripts/backup.sh
+
+# A backup of a large capture set can take a while; don't let systemd kill it
+# mid-write and leave a truncated archive.
+TimeoutStartSec=3600
+
+# The timer's Persistent=true catches up a run missed while the box was off, which
+# means this unit can fire moments after boot — when dockerd is up (satisfying
+# After=docker.service) but the containers have not finished starting. The script
+# correctly refuses to back up a stopped stack, so retry a few times rather than
+# losing the caught-up run until the next night.
+Restart=on-failure
+RestartSec=120
+
+# NOTE: no [Install] section. This unit is started by tracepcap-backup.timer, which
+# carries WantedBy=timers.target. Enabling the *service* as well would additionally
+# run a backup on every boot — the least likely moment for the stack to be ready.
