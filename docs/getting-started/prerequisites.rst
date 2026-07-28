@@ -25,9 +25,11 @@ Hardware Requirements
 ---------------------
 
 All three tiers below size the TracePcap stack **only**. They assume AI features
-are either disabled or pointed at an LLM server on another machine via
-``LLM_BASE_URL``. Self-hosting an LLM on the same box adds to every figure — see
-the note at the end of this section.
+are either disabled or pointed via ``LLM_BASE_URL`` at a separate inference
+server on the same local network. TracePcap must function fully offline, so
+``LLM_BASE_URL`` must never reference a public or internet-hosted API. Running
+the LLM on the TracePcap host itself adds to every figure — see the note at the
+end of this section.
 
 **Minimum:**
 
@@ -56,6 +58,7 @@ caps uploads at 512 MB, which is usually the first limit reached:
    BACKEND_CPU_LIMIT=6
    POSTGRES_MEM_LIMIT=2g
    MINIO_MEM_LIMIT=1g
+   SURICATA_ENABLED=true   # the default; set explicitly if lowered for Minimum
 
 An SSD matters here: Postgres analysis history, MinIO object storage, and nginx
 spilling large request bodies to ``/tmp`` are all disk-bound before they are
