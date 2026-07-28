@@ -1,0 +1,23 @@
+# Nightly schedule for tracepcap-backup.service.
+#
+# See tracepcap-backup.service for installation instructions.
+
+[Unit]
+Description=Nightly TracePcap backup
+Documentation=https://github.com/NotYuSheng/TracePcap
+
+[Timer]
+# 02:30 daily — outside analyst working hours, so the dump is not competing with
+# analysis jobs for CPU and the database is quiet.
+OnCalendar=*-*-* 02:30:00
+
+# If the box was off at 02:30, run the backup once it comes back up rather than
+# silently skipping the night.
+Persistent=true
+
+# Spread the start over 5 minutes so several hosts backing up to the same NAS
+# don't all begin writing at once.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
