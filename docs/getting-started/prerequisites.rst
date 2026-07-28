@@ -24,21 +24,79 @@ Software Requirements
 Hardware Requirements
 ---------------------
 
+All three tiers below size the TracePcap stack **only**. They assume AI features
+are either disabled or pointed via ``LLM_BASE_URL`` at a separate inference
+server on the same local network. TracePcap must function fully offline, so
+``LLM_BASE_URL`` must never reference a public or internet-hosted API. Running
+the LLM on the TracePcap host itself adds to every figure — see the note at the
+end of this section.
+
 **Minimum:**
 
-- RAM: 4 GB
+- RAM: 6 GB, with ``SURICATA_ENABLED=false``
+- CPU: 4 cores
 - Storage: 10 GB (database, PCAP files, object storage)
 
 **Recommended:**
 
 - RAM: 8 GB or more
-- Storage: 50 GB+ for large PCAP collections
 - CPU: 4+ cores for fast nDPI analysis
+- Storage: 50 GB+ for large PCAP collections
+
+**Comfortable** — Suricata enabled, routine work on large captures:
+
+- RAM: 16 GB
+- CPU: 8 cores
+- Storage: 100 GB+ SSD
+
+At this tier, raise the defaults in ``.env`` — the shipped ``APP_MEMORY_MB=2048``
+caps uploads at 512 MB, which is usually the first limit reached:
+
+.. code-block:: ini
+
+   APP_MEMORY_MB=8192      # 4 GB heap, 2 GB max upload
+   BACKEND_CPU_LIMIT=6
+   POSTGRES_MEM_LIMIT=2g
+   MINIO_MEM_LIMIT=1g
+   SURICATA_ENABLED=true   # the default; set explicitly if lowered for Minimum
+
+An SSD matters here: Postgres analysis history, MinIO object storage, and nginx
+spilling large request bodies to ``/tmp`` are all disk-bound before they are
+memory-bound.
 
 .. note::
 
-   If you plan to run an LLM locally for AI features, allocate additional RAM
-   (8–16 GB typical for a 7B–14B parameter model).
+   The Comfortable tier is an operational recommendation, not a measured
+   benchmark. It is derived from the backend guidance in
+   :doc:`../operations/production-hardening` (4 GB+ for the backend alone with
+   Suricata on captures over 100 MB), with headroom for the rest of the stack.
+
+.. important::
+
+   The default stack declares ~4.4 GB of enforced container memory limits
+   (~5.4 GB with an authentication overlay), before the host OS and Docker
+   itself — a 4 GB host cannot run it at default settings. See
+   :doc:`../operations/production-hardening` for the per-service breakdown and
+   the environment variables that override each limit.
+
+   ``.env.example`` ships ``SURICATA_ENABLED=true``, for which 4 GB+ for the
+   backend alone is recommended on captures over 100 MB. Budget 8 GB+ if you
+   keep Suricata enabled.
+
+.. note::
+
+   TracePcap itself never uses a GPU — packet dissection (tshark, nDPI) and
+   threat detection (Suricata) are CPU-bound, and no container in the stack
+   requests a GPU device.
+
+   A GPU is relevant only when self-hosting the LLM, and it is that server's
+   requirement rather than TracePcap's. Budget roughly 8 GB of VRAM for a 7B
+   parameter model or 16 GB for a 14B, quantised, plus 5–30 GB of storage for
+   model weights, **on top of** the tiers above. CPU-only inference works but is
+   slow enough that long generations such as Story Mode may approach the proxy
+   timeout. Pointing ``LLM_BASE_URL`` at an LLM server on another machine — which
+   still satisfies the offline requirement on a local network — leaves the tiers
+   above unchanged.
 
 Operating System
 ----------------
