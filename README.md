@@ -71,8 +71,36 @@ This makes it well-suited for:
 | LLM Server | Any OpenAI-compatible API | AI features (e.g., LM Studio, Ollama, OpenAI) |
 
 **Minimum Hardware:**
-- RAM: 4GB (8GB+ recommended)
-- Storage: 10GB (for database, PCAP files, and object storage)
+
+The default stack's enforced container limits total ~4.4GB (~5.4GB with the Keycloak
+auth overlay), so size the host above that — see
+[Container Resource Limits](docs/operations/production-hardening.rst) for the
+per-service breakdown.
+
+These tiers size the TracePcap stack **only** — AI features disabled, or
+`LLM_BASE_URL` pointed at an LLM server on another machine.
+
+| | Minimum | Recommended | Comfortable |
+|---|---------|-------------|-------------|
+| RAM | 6GB (with `SURICATA_ENABLED=false`) | 8GB+ | 16GB |
+| CPU | 4 cores | 4+ cores for fast nDPI analysis | 8 cores |
+| Storage | 10GB (database, PCAP files, object storage) | 50GB+ for large PCAP collections | 100GB+ SSD |
+
+**Comfortable** assumes Suricata enabled and routine work on large captures. Raise the
+`.env` defaults to match — the shipped `APP_MEMORY_MB=2048` caps uploads at 512MB, since
+max upload is 25% of the backend budget:
+
+```ini
+APP_MEMORY_MB=8192      # 4 GB heap, 2 GB max upload
+BACKEND_CPU_LIMIT=6
+POSTGRES_MEM_LIMIT=2g
+MINIO_MEM_LIMIT=1g
+```
+
+**GPU:** not used by TracePcap — packet dissection and threat detection are CPU-bound,
+and no container requests a GPU device. A GPU only matters if you self-host the LLM,
+where it is that server's requirement: ~8GB VRAM for a 7B model, ~16GB for a 14B
+(quantised), plus 5–30GB of storage for weights, **on top of** the tiers above.
 
 ### Installation
 
