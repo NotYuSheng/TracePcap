@@ -17,6 +17,7 @@ import com.tracepcap.analysis.repository.PacketRepository;
 import com.tracepcap.analysis.spi.ExtractionManifest;
 import com.tracepcap.analysis.spi.FileExtractionStage;
 import com.tracepcap.analysis.spi.HostClassifier;
+import com.tracepcap.analysis.spi.PacketPartitions;
 import com.tracepcap.analysis.spi.SignatureApplier;
 import com.tracepcap.analysis.spi.ServiceLogRoles;
 import com.tracepcap.analysis.spi.HostServiceLogExtractor;
@@ -113,6 +114,7 @@ public class AnalysisService {
   private final AnalysisResultRepository analysisResultRepository;
   private final ConversationRepository conversationRepository;
   private final PacketRepository packetRepository;
+  private final PacketPartitions packetPartitions;
   private final HostClassificationRepository hostClassificationRepository;
   private final IpMacObservationRepository ipMacObservationRepository;
   private final FileRepository fileRepository;
@@ -279,6 +281,9 @@ public class AnalysisService {
         // Stage 6: DB inserts (conversations + packets)
         reportStage(fileId, plan, 5);
         t = System.currentTimeMillis();
+        // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
+        // partition must exist before the first insert below or the row has nowhere to land.
+        packetPartitions.ensurePartition(fileId);
         int convIndex = 0;
         long packetsInserted = 0;
         List<UUID> savedConversationIds = new ArrayList<>();

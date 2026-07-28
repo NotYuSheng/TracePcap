@@ -1,6 +1,6 @@
 @startuml ERD
 
-footer Schema v6 | db/migration/V1-V6
+footer Schema v41 | db/migration/V1-V41 | packets is LIST-partitioned by file_id (#394)
 
 skinparam linetype ortho
 hide circle
@@ -46,6 +46,7 @@ entity "files" as files {
   enable_ndpi : boolean
   enable_file_extraction : boolean
   uploaded_at : timestamp
+  packets_pruned_at : timestamp
   created_at : timestamp
   updated_at : timestamp
 }
@@ -99,10 +100,10 @@ entity "conversations" as conversations {
   created_at : timestamp
 }
 
-entity "packets" as packets {
+entity "packets" as packets <<partitioned by file_id>> {
   * id : uuid
+  * file_id : uuid
   --
-  file_id : uuid
   conversation_id : uuid
   packet_number : bigint
   timestamp : timestamp

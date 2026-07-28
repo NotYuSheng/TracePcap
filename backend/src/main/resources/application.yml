@@ -185,6 +185,9 @@ tracepcap:
     enabled: ${FILE_RETENTION_ENABLED:true}
     retention-hours: ${FILE_RETENTION_HOURS:12}  # Analysis files deleted after this many hours
     monitor-retention-hours: ${MONITOR_FILE_RETENTION_HOURS:0}  # Monitor files: 0 = never expire
+    # Raw packets pruned this many hours after upload, keeping the file's summaries (0 = only when
+    # the file itself is deleted). Set below retention-hours to reclaim storage early.
+    packet-retention-hours: ${PACKET_RETENTION_HOURS:0}
   reconciliation:
     # Recovers files stuck in PROCESSING (queue overflow, worker crash, or restart) by flipping
     # them to FAILED once past the timeout, so they surface in the UI instead of polling forever.

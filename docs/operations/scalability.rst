@@ -41,15 +41,39 @@ observations:
 Partitioning
 ------------
 
-Retention deletes whole files, and ``ON DELETE CASCADE`` then removes millions of
-``packets`` rows per file on each cleanup cycle, causing significant autovacuum churn.
+``packets`` is **LIST-partitioned by ``file_id``, one partition per file**
+(`issue #394 <https://github.com/NotYuSheng/TracePcap/issues/394>`_). Because retention
+deletes whole files, the partition boundary matches the deletion boundary exactly, so
+reclaiming a file's frames is a single ``DROP TABLE`` — an O(1) unlink with no row visits,
+no index maintenance and nothing left for autovacuum. Previously this was a cascading
+delete of millions of rows per file on every cleanup cycle.
 
-**List or hash partitioning ``packets`` by ``file_id`` turns cleanup into an instant
-``DROP``/``DETACH`` of a partition.** This is the recommended approach and is tracked in
-`issue #394 <https://github.com/NotYuSheng/TracePcap/issues/394>`_.
+Per-file queries benefit too: the planner prunes to the single relevant partition instead
+of scanning an index spanning every file.
+
+Two operational consequences:
+
+- A partition is created at ingest, before the first packet insert. There is deliberately
+  **no default partition**, so a missing one fails loudly rather than silently landing rows
+  somewhere that cannot be dropped instantly.
+- Partition count tracks the number of live files. Retention bounds it in normal operation;
+  planning cost grows with very large partition counts, so keep retention enabled.
 
 TimescaleDB is a **weaker fit** here. It optimises time-range operations, whereas
 TracePcap deletes per file, not per time window.
+
+Splitting packet retention from summary retention
+--------------------------------------------------
+
+``packets`` is the bulky table; ``conversations`` and ``analysis_results`` are compact
+summaries that stay useful long after the raw frames are worth storing. Setting
+``PACKET_RETENTION_HOURS`` below ``FILE_RETENTION_HOURS`` drops the packet partitions early
+while the file keeps its summaries, reclaiming most of the storage at the cost of
+packet-level drill-down.
+
+Pruned files are stamped with ``files.packets_pruned_at``, which distinguishes "packets
+pruned" from "this capture had no packets". Conversation lists, the network graph and all
+per-file summaries are unaffected; packet step-through returns an empty list.
 
 Connection Pooling
 ------------------
