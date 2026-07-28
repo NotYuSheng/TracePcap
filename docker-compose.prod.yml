@@ -85,6 +85,15 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.example}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env — see .env.example}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env — see .env.example}
+      # Data egress. The base file defaults the LLM to api.openai.com for convenience in local
+      # dev; inheriting that here would send capture-derived prompts (Story mode, Network
+      # Insights) to a third party from the deployment most likely to hold real operational data.
+      # REQUIRED, so the endpoint is always a deliberate choice — point it at a local inference
+      # server (LM Studio, Ollama, vLLM) for an offline deployment.
+      LLM_API_BASE_URL: ${LLM_API_BASE_URL:?set LLM_API_BASE_URL in .env (e.g. http://<host>:1234/v1) — see .env.example}
+      # Resolve GeoIP from the bundled MMDB instead of probing ipinfo.io at runtime, matching
+      # docker-compose.offline.yml. Set GEO_FORCE_OFFLINE=false to opt back into online lookups.
+      GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       # Public issuer (matches the token `iss`). Must equal PUBLIC_URL + /realms/tracepcap.
       KEYCLOAK_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8888}/realms/tracepcap
       # Backend-reachable JWKS endpoint (internal docker network). Decouples key fetch from the

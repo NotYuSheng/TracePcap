@@ -242,8 +242,23 @@ To stop a service and have it *stay* stopped, use ``docker compose stop <svc>``;
 Configure LLM Privacy
 ---------------------
 
-If you use AI features, ensure ``LLM_API_BASE_URL`` points to a locally-hosted
-model. Do **not** configure a cloud API endpoint if your PCAP data is sensitive.
+AI features (Story mode, Network Insights) build their prompts from analysed
+capture content, so the LLM endpoint is a **data egress path**.
+
+The production overlays **require** ``LLM_API_BASE_URL`` — they abort rather than
+falling back to the base file's convenience default of ``api.openai.com``. Point
+it at a locally-hosted inference server (LM Studio, Ollama, vLLM):
+
+.. code-block:: bash
+
+   LLM_API_BASE_URL=http://<your-inference-host>:1234/v1
+
+Do **not** configure a cloud API endpoint if your PCAP data is sensitive.
+
+The production overlays also default ``GEO_FORCE_OFFLINE`` to ``true``, resolving
+geolocation from the bundled DB-IP Lite MMDB instead of probing ``ipinfo.io`` at
+runtime. Set ``GEO_FORCE_OFFLINE=false`` only if outbound lookups are acceptable
+and the deployment has internet access.
 
 Restrict MinIO Console Access
 -------------------------------
