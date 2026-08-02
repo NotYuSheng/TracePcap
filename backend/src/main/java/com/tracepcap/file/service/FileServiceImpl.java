@@ -7,6 +7,7 @@ import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.entity.FileEntity.FileSource;
+import com.tracepcap.file.event.FileDeletedEvent;
 import com.tracepcap.file.event.FileUploadedEvent;
 import com.tracepcap.file.mapper.FileMapper;
 import com.tracepcap.file.repository.FileRepository;
@@ -174,6 +175,12 @@ public class FileServiceImpl implements FileService {
 
     // Delete from database
     fileRepository.delete(fileEntity);
+
+    // The FK cascade empties the packet partition but cannot remove the partition itself, so it
+    // must be dropped explicitly or every deleted file leaves an empty table attached to `packets`
+    // (#394). Announced rather than called directly: dropping it means reaching into `analysis`,
+    // and `file` must not depend on `analysis` (LayerDependencyTest forbids the cycle).
+    eventPublisher.publishEvent(new FileDeletedEvent(this, fileId));
 
     log.info("File deleted successfully: {} (ID: {})", fileEntity.getFileName(), fileId);
   }

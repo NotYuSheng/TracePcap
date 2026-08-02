@@ -13,6 +13,16 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 
+/**
+ * A single captured frame.
+ *
+ * <p>The underlying table is LIST-partitioned on {@code file_id}, one partition per file, so
+ * retention can drop a file's frames outright (#394). Postgres requires the partition key in every
+ * unique constraint, so the physical primary key is {@code (id, file_id)} — but {@code id} alone
+ * stays the JPA identifier: it is a UUID and unique on its own, and a composite {@code @IdClass}
+ * here would force every lookup to carry a file id it does not otherwise need. {@code ddl-auto:
+ * validate} checks columns and types, not key composition, so the two views coexist.
+ */
 @Entity
 @Table(name = "packets")
 @Getter

@@ -76,6 +76,14 @@ File Retention
      - Number of hours after upload before a file is automatically deleted
        (only applies when ``FILE_RETENTION_ENABLED=true``). Monitor Network
        files are exempt from automatic deletion by default.
+   * - ``PACKET_RETENTION_HOURS``
+     - ``0``
+     - Number of hours after upload before a file's **raw packets** are pruned,
+       while the file keeps its conversations and analysis results (``0`` = packets
+       live as long as the file). Packets dominate database size (~1.5–2M rows per
+       GB of PCAP), so setting this below ``FILE_RETENTION_HOURS`` reclaims most of
+       the storage early at the cost of packet-level drill-down. Pruning drops the
+       file's ``packets`` partition outright, so it is O(1) regardless of size.
 
 Analysis Queue & Reconciliation
 -------------------------------

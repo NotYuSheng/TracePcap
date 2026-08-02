@@ -29,6 +29,12 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
   /** Find files by source uploaded before the specified timestamp (for source-specific cleanup) */
   List<FileEntity> findBySourceAndUploadedAtBefore(FileEntity.FileSource source, LocalDateTime timestamp);
 
+  /**
+   * Find files whose packets are still stored and are older than the timestamp (for packet pruning,
+   * #394). Excludes already-pruned files so each one is dropped once, not re-swept every cycle.
+   */
+  List<FileEntity> findByPacketsPrunedAtIsNullAndUploadedAtBefore(LocalDateTime timestamp);
+
   /** Find files in a given status uploaded before the timestamp (for stuck-file reconciliation) */
   List<FileEntity> findByStatusAndUploadedAtBefore(
       FileEntity.FileStatus status, LocalDateTime timestamp);

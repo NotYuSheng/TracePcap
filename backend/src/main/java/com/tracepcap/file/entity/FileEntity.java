@@ -75,6 +75,16 @@ public class FileEntity {
   @Column(name = "uploaded_at", nullable = false)
   private LocalDateTime uploadedAt;
 
+  /**
+   * When this file's raw packets were pruned, or null while they are still stored (#394).
+   *
+   * <p>Packet retention runs on a shorter clock than file retention, so a file can outlive its own
+   * frames: the conversations and analysis results remain, but packet-level drill-down is gone.
+   * Distinguishes "pruned" from "this capture had no packets", which the UI must not conflate.
+   */
+  @Column(name = "packets_pruned_at")
+  private LocalDateTime packetsPrunedAt;
+
   @Column(name = "status", nullable = false, length = 50)
   @Enumerated(EnumType.STRING)
   private FileStatus status;

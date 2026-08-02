@@ -1,5 +1,6 @@
 package com.tracepcap.cleanup;
 
+import com.tracepcap.analysis.spi.PacketPartitions;
 import com.tracepcap.config.CleanupProperties;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.entity.FileEntity.FileSource;
@@ -28,6 +29,7 @@ public class FileCleanupService {
   private final FileRepository fileRepository;
   private final FileService fileService;
   private final CleanupProperties cleanupProperties;
+  private final PacketPartitions packetPartitions;
 
   /**
    * Scheduled task to clean up expired files Runs according to the cron expression configured in
@@ -97,6 +99,57 @@ public class FileCleanupService {
 
     } catch (Exception e) {
       log.error("Error during scheduled file cleanup", e);
+    }
+  }
+
+  /**
+   * Prunes raw packets from files that have outlived {@code packetRetentionHours} but not their own
+   * retention window (#394).
+   *
+   * <p>Runs on the same schedule as file cleanup but as a separate task, so a failure to prune
+   * packets never stops expired files from being deleted (or vice versa). Dropping the partition is
+   * an O(1) unlink, so this stays cheap no matter how many frames the file held.
+   */
+  @Scheduled(cron = "${tracepcap.cleanup.cron}")
+  public void prunePacketsOfAgedFiles() {
+    if (!cleanupProperties.isEnabled() || cleanupProperties.getPacketRetentionHours() <= 0) {
+      return;
+    }
+
+    LocalDateTime packetExpiry =
+        LocalDateTime.now().minusHours(cleanupProperties.getPacketRetentionHours());
+    log.info("Pruning packets for files uploaded before: {}", packetExpiry);
+
+    try {
+      List<FileEntity> candidates =
+          fileRepository.findByPacketsPrunedAtIsNullAndUploadedAtBefore(packetExpiry);
+      if (candidates.isEmpty()) {
+        log.info("No files with packets due for pruning");
+        return;
+      }
+
+      int prunedCount = 0;
+      int failureCount = 0;
+
+      for (FileEntity file : candidates) {
+        try {
+          packetPartitions.dropPartition(file.getId());
+          // Marked regardless of whether a partition was actually there: either way the file now
+          // has no packets, and the timestamp is what stops it being swept again next cycle.
+          file.setPacketsPrunedAt(LocalDateTime.now());
+          fileRepository.save(file);
+          prunedCount++;
+        } catch (Exception e) {
+          log.error(
+              "Failed to prune packets for file: {} (ID: {})", file.getFileName(), file.getId(), e);
+          failureCount++;
+        }
+      }
+
+      log.info("Packet pruning completed. Pruned: {}, Failed: {}", prunedCount, failureCount);
+
+    } catch (Exception e) {
+      log.error("Error during scheduled packet pruning", e);
     }
   }
 }
