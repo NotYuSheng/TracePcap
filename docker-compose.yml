@@ -163,6 +163,15 @@ services:
       # Global Suricata IDS kill-switch. false = skip Suricata for every file (biggest throughput
       # lever, ~94% of per-file analysis cost). See .env.example.
       SURICATA_ENABLED: ${SURICATA_ENABLED:-true}
+      # Data retention. Every value here is opt-out: FILE_RETENTION_ENABLED=false keeps
+      # uploaded files forever (the cleanup scheduler is not even registered), and the two
+      # *_HOURS knobs treat 0 as "never". Without these lines the variables documented in
+      # .env.example never reach the container, and the app silently falls back to deleting
+      # analysis files after 12h — see application.yml `tracepcap.cleanup`.
+      FILE_RETENTION_ENABLED: ${FILE_RETENTION_ENABLED:-true}
+      FILE_RETENTION_HOURS: ${FILE_RETENTION_HOURS:-12}
+      MONITOR_FILE_RETENTION_HOURS: ${MONITOR_FILE_RETENTION_HOURS:-0}
+      PACKET_RETENTION_HOURS: ${PACKET_RETENTION_HOURS:-0}
       # Analysis queue sizing + stuck-file reconciliation (see .env.example / docs)
       ASYNC_CORE_POOL_SIZE: ${ASYNC_CORE_POOL_SIZE:-5}
       ASYNC_MAX_POOL_SIZE: ${ASYNC_MAX_POOL_SIZE:-10}

@@ -59,6 +59,21 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
 File Retention
 --------------
 
+Retention is **entirely opt-out**. To keep everything indefinitely — the usual
+choice for air-gapped or evidence-preservation deployments — set:
+
+.. code-block:: ini
+
+   FILE_RETENTION_ENABLED=false
+
+That is sufficient on its own: the cleanup scheduler is not registered at all, so
+nothing is ever deleted automatically. ``MONITOR_FILE_RETENTION_HOURS`` and
+``PACKET_RETENTION_HOURS`` both already default to ``0``, which means "never" for
+each of those independently.
+
+Deletion is only ever triggered by these settings; nothing else in the
+application removes captures or packets on its own.
+
 .. list-table::
    :header-rows: 1
    :widths: 35 15 50

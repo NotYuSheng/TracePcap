@@ -132,6 +132,14 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: tracepcap-files
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # Data retention. Every value here is opt-out: FILE_RETENTION_ENABLED=false keeps
+      # uploaded files forever (the cleanup scheduler is not even registered), and the two
+      # *_HOURS knobs treat 0 as "never". Air-gapped deployments are the likeliest to want
+      # indefinite retention for evidence preservation, so these must actually be settable.
+      FILE_RETENTION_ENABLED: ${FILE_RETENTION_ENABLED:-true}
+      FILE_RETENTION_HOURS: ${FILE_RETENTION_HOURS:-12}
+      MONITOR_FILE_RETENTION_HOURS: ${MONITOR_FILE_RETENTION_HOURS:-0}
+      PACKET_RETENTION_HOURS: ${PACKET_RETENTION_HOURS:-0}
       # Air-gapped by default: suppress the one intentional runtime egress (ipinfo.io) and
       # resolve geo from the bundled MMDB only. Override with GEO_FORCE_OFFLINE=false if this
       # offline stack does have outbound access and you want live ipinfo.io enrichment.
