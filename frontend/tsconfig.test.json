@@ -1,0 +1,17 @@
+/*
+ * Type-checks the test suite, which tsconfig.app.json deliberately excludes (see the note there).
+ *
+ * Identical to the app config except that it puts the tests back in. Deliberately does NOT add
+ * Node types: tests pull in browser sources, and Node's globals would redefine those (setTimeout
+ * returning NodeJS.Timeout, etc.), flagging correct app code. Tests needing repo files import them
+ * instead. Run via `npm run typecheck:test` — needs the full repo, not just `frontend/`.
+ */
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["vite/client", "vitest/globals"]
+  },
+  "include": ["src"],
+  "exclude": []
+}
