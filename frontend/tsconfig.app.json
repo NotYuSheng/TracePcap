@@ -40,5 +40,12 @@
       "@assets/*": ["./src/assets/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  /*
+   * Tests are not part of the shipped app, and the production image builds from a context holding
+   * only `frontend/` — so a test that reads a repo-root file (e.g. openapi/baseline.json) must not
+   * be compiled here or `docker compose build` fails. Tests are type-checked by
+   * `npm run typecheck:test` (tsconfig.test.json), which runs in CI with the full repo checked out.
+   */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/__tests__/**", "src/test"]
 }

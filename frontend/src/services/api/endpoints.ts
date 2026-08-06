@@ -33,6 +33,10 @@ export const API_ENDPOINTS = {
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
   ENTITY_STATS: (fileId: string) => `/conversations/${fileId}/entity-stats`,
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,
+  CONVERSATIONS_EXPORT: (fileId: string) => `/conversations/${fileId}/export`,
+  CONVERSATIONS_PCAP_EXPORT: (fileId: string) => `/conversations/${fileId}/export-pcap`,
+  CONVERSATION_PCAP_EXPORT: (conversationId: string) =>
+    `/conversations/detail/${conversationId}/export-pcap`,
   SECURITY_ALERTS: (fileId: string) => `/files/${fileId}/security-alerts`,
   RISK_TYPES: (fileId: string) => `/conversations/${fileId}/risk-types`,
   DISTINCT_IPS: (fileId: string) => `/conversations/${fileId}/distinct-ips`,
@@ -59,6 +63,8 @@ export const API_ENDPOINTS = {
   EXTRACTED_FILES_WARNINGS: (fileId: string) => `/files/${fileId}/extractions/warnings`,
   EXTRACTED_FILE_DOWNLOAD: (fileId: string, extractionId: string) =>
     `/files/${fileId}/extractions/${extractionId}/download`,
+  EXTRACTED_FILE_PREVIEW: (fileId: string, extractionId: string) =>
+    `/files/${fileId}/extractions/${extractionId}/preview`,
 
   // Network Intelligence
   NETWORK_INTELLIGENCE_CLUSTERS: (fileId: string, groupBy: string) =>
@@ -87,6 +93,7 @@ export const API_ENDPOINTS = {
 
   // System
   SYSTEM_TIME: '/system/time',
+  SYSTEM_LIMITS: '/system/limits',
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,

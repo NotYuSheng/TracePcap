@@ -1,4 +1,5 @@
 import { apiClient } from '@/services/api/client';
+import { directApiUrl } from '@/services/api/directUrl';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 
 /** A file extracted from a PCAP, or one detected but skipped (when `skippedReason` is set). */
@@ -63,10 +64,10 @@ export async function getExtractionsByConversation(
 
 /** Builds the download URL for an extracted file (triggers an attachment download). */
 export function getDownloadUrl(fileId: string, extractionId: string): string {
-  return `/api${API_ENDPOINTS.EXTRACTED_FILE_DOWNLOAD(fileId, extractionId)}`;
+  return directApiUrl(API_ENDPOINTS.EXTRACTED_FILE_DOWNLOAD(fileId, extractionId));
 }
 
 /** Builds the inline-preview URL for an extracted file (browser-renderable types only). */
 export function getPreviewUrl(fileId: string, extractionId: string): string {
-  return `/api/v1/files/${fileId}/extractions/${extractionId}/preview`;
+  return directApiUrl(API_ENDPOINTS.EXTRACTED_FILE_PREVIEW(fileId, extractionId));
 }
