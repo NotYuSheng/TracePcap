@@ -89,6 +89,78 @@ under the PostgreSQL ``max_connections`` default of 100.
    in `issue #393 <https://github.com/NotYuSheng/TracePcap/issues/393>`_; the pool is now
    configured in the base compose file so it applies regardless of profile.
 
+Capacity Planning
+-----------------
+
+Storage consumed is roughly **2.5× the PCAP volume ingested** — the objects
+themselves (1×) plus a database that grows to about 1–1.5× the captures. Use that
+multiplier in both directions.
+
+Checking where you stand
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``scripts/capacity.sh`` reports current usage and projects forward from the
+observed ingest rate:
+
+.. code-block:: bash
+
+   bash scripts/capacity.sh
+
+It is read-only and safe on a live deployment. ``--quiet`` prints a single summary
+line, and the exit code makes it usable as a cron canary — ``0`` OK, ``2``
+warning, ``3`` critical:
+
+.. code-block:: bash
+
+   0 7 * * * cd /path/to/TracePcap && bash scripts/capacity.sh --quiet || mail -s 'TracePcap capacity' ops@example.com
+
+Thresholds are configurable via ``CAPACITY_WARN_PERCENT`` (default 75),
+``CAPACITY_CRIT_PERCENT`` (90), ``CAPACITY_WARN_DAYS`` (30) and
+``CAPACITY_RATE_WINDOW_DAYS`` (7).
+
+Sizing a deployment
+~~~~~~~~~~~~~~~~~~~
+
+**With retention enabled**, the working set is bounded — you only ever hold one
+retention window of captures, so the disk requirement does not grow with time::
+
+   steady state  ~=  ingest_per_day  x  2.5  x  (FILE_RETENTION_HOURS / 24)
+
+For 20 GB of captures a week (~2.9 GB/day) at the default 12-hour retention:
+``2.9 × 2.5 × 0.5`` ≈ **3.6 GB** steady state. Retention, not disk size, is what
+determines the footprint.
+
+Inverting it gives the retention window a given disk can sustain::
+
+   FILE_RETENTION_HOURS  ~=  (usable_disk x 24) / (ingest_per_day x 2.5)
+
+**With retention disabled** (``FILE_RETENTION_ENABLED=false``), growth is
+unbounded and the disk is the only limit::
+
+   days_until_full  ~=  free_disk / (ingest_per_day x 2.5)
+
+The same 2.9 GB/day on a 2 TB disk gives roughly **285 days**. Long-term
+retention deployments should plan around that number and revisit it as the
+ingest rate changes.
+
+.. important::
+
+   Leave headroom beyond the steady-state figure. ``scripts/backup.sh`` stages an
+   uncompressed copy of the data set before archiving, so a backup run needs
+   roughly **twice the live data size** free. ``capacity.sh`` checks this and
+   reports CRITICAL if the margin is gone.
+
+Two caveats
+~~~~~~~~~~~
+
+- **Monitor snapshots are exempt** from ``FILE_RETENTION_HOURS`` and default to
+  never expiring, so they are not covered by the steady-state formula. On a
+  monitor-heavy deployment they are the component that actually grows without
+  bound.
+- **Packet density varies widely** between captures. The 2.5× multiplier is a
+  planning figure, not a guarantee; ``capacity.sh`` measures your real rate, so
+  prefer its output once the deployment has seen representative traffic.
+
 Object Storage
 --------------
 
@@ -99,23 +171,44 @@ SNMD/MNMD upgrade paths.
 Archival & Retention
 --------------------
 
-A scheduled job prunes analysis files after ``FILE_RETENTION_HOURS`` (default 12h);
-retention can be disabled entirely with ``FILE_RETENTION_ENABLED``. **Monitor-mode files
-never expire**, which is where unbounded growth actually accumulates.
+A scheduled job prunes analysis files after ``FILE_RETENTION_HOURS`` (default 12h).
+``FILE_RETENTION_ENABLED=false`` keeps everything indefinitely — it is the **master
+switch**, and while it is false the scheduler is not registered, so no other retention
+setting has any effect.
 
-Pruning is currently all-or-nothing through the file cascade, with no export beforehand.
-The recommended policy is to **decouple packet retention from summary retention** — drop
-the bulky ``packets`` rows early while keeping ``analysis_results`` and ``conversations``
-summaries, since the summaries are a small fraction of the storage. Tracked in
-`issue #602 <https://github.com/NotYuSheng/TracePcap/issues/602>`_.
+.. warning::
+
+   ``0`` means "never" only for ``MONITOR_FILE_RETENTION_HOURS`` and
+   ``PACKET_RETENTION_HOURS``. For ``FILE_RETENTION_HOURS`` it means *delete everything
+   now*. Disable deletion with ``FILE_RETENTION_ENABLED=false``.
+
+Within an enabled scheduler, packet retention is **tunable separately** from file
+retention: setting ``PACKET_RETENTION_HOURS`` below ``FILE_RETENTION_HOURS`` drops the
+bulky ``packets`` partitions early while keeping the compact ``analysis_results`` and
+``conversations`` summaries. See "Splitting packet retention from summary retention"
+above.
+
+**Monitor-mode files default to never expiring**
+(``MONITOR_FILE_RETENTION_HOURS=0``), because a monitor network is a time series and
+expiring its snapshots destroys the drift history. Monitor mode is therefore where
+unbounded growth accumulates on a long-lived deployment. Note this pulls against the
+partitioning guidance above — retention is what bounds partition count, but monitor
+snapshots are exempt from it by default, so a monitor-heavy deployment accrues partitions
+that nothing reclaims. Prune those snapshots through the UI rather than by setting a
+non-zero value here, until `issue #635
+<https://github.com/NotYuSheng/TracePcap/issues/635>`_ is resolved.
+
+See :doc:`../configuration/environment-variables` for all four settings.
 
 Schema Notes
 ------------
 
 Corrections against older documentation:
 
-- There is **no ``dns_query_log`` table** in the migrations.
+- ``dns_query_log`` **does** exist, created by ``V20__dns_query_log.sql``. It did not
+  when the original sizing audit was written, and that stale note was carried forward
+  here in error.
 - The geolocation table is **``ip_geo_cache``** (keyed by IP), not ``ip_geo_info``;
   ``IpGeoInfoEntity`` maps to ``ip_geo_cache``.
-- Migrations are V1–V15 with V7 absent. ``V1__baseline_schema.sql`` is the source of
-  truth for indexes.
+- ``V1__baseline_schema.sql`` is the source of truth for the original indexes; later
+  migrations amend it (``packets`` partitioning arrived in ``V41``).
