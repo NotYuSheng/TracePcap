@@ -90,7 +90,15 @@ application removes captures or packets on its own.
      - ``12``
      - Number of hours after upload before a file is automatically deleted
        (only applies when ``FILE_RETENTION_ENABLED=true``). Monitor Network
-       files are exempt from automatic deletion by default.
+       files are exempt — they use ``MONITOR_FILE_RETENTION_HOURS`` instead.
+   * - ``MONITOR_FILE_RETENTION_HOURS``
+     - ``0``
+     - Number of hours before a **monitor-mode snapshot** file is deleted;
+       ``0`` (the default) means **never**. Monitor networks are a time series,
+       so expiring their snapshots destroys the drift history that makes them
+       useful — which is why they are exempt from ``FILE_RETENTION_HOURS``. This
+       is also where unbounded growth accumulates on a long-lived deployment, so
+       set a non-zero value if snapshots are numerous and disk is constrained.
    * - ``PACKET_RETENTION_HOURS``
      - ``0``
      - Number of hours after upload before a file's **raw packets** are pruned,

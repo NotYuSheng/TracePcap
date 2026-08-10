@@ -99,15 +99,22 @@ SNMD/MNMD upgrade paths.
 Archival & Retention
 --------------------
 
-A scheduled job prunes analysis files after ``FILE_RETENTION_HOURS`` (default 12h);
-retention can be disabled entirely with ``FILE_RETENTION_ENABLED``. **Monitor-mode files
-never expire**, which is where unbounded growth actually accumulates.
+A scheduled job prunes analysis files after ``FILE_RETENTION_HOURS`` (default 12h).
+Retention is **entirely opt-out**: ``FILE_RETENTION_ENABLED=false`` keeps everything
+indefinitely, and the scheduler is then never registered at all.
 
-Pruning is currently all-or-nothing through the file cascade, with no export beforehand.
-The recommended policy is to **decouple packet retention from summary retention** — drop
-the bulky ``packets`` rows early while keeping ``analysis_results`` and ``conversations``
-summaries, since the summaries are a small fraction of the storage. Tracked in
-`issue #602 <https://github.com/NotYuSheng/TracePcap/issues/602>`_.
+**Monitor-mode files default to never expiring**
+(``MONITOR_FILE_RETENTION_HOURS=0``), because a monitor network is a time series and
+expiring its snapshots destroys the drift history. That makes monitor mode the place
+where unbounded growth actually accumulates on a long-lived deployment — set a non-zero
+value there if snapshots are numerous and disk is constrained.
+
+Packet retention is **separable** from file retention: setting
+``PACKET_RETENTION_HOURS`` below ``FILE_RETENTION_HOURS`` drops the bulky ``packets``
+partitions early while keeping the compact ``analysis_results`` and ``conversations``
+summaries. See "Splitting packet retention from summary retention" above.
+
+See :doc:`../configuration/environment-variables` for all four settings.
 
 Schema Notes
 ------------
@@ -117,5 +124,5 @@ Corrections against older documentation:
 - There is **no ``dns_query_log`` table** in the migrations.
 - The geolocation table is **``ip_geo_cache``** (keyed by IP), not ``ip_geo_info``;
   ``IpGeoInfoEntity`` maps to ``ip_geo_cache``.
-- Migrations are V1–V15 with V7 absent. ``V1__baseline_schema.sql`` is the source of
-  truth for indexes.
+- ``V1__baseline_schema.sql`` is the source of truth for the original indexes; later
+  migrations amend it (``packets`` partitioning arrived in ``V41``).
