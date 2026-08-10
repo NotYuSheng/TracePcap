@@ -25,7 +25,11 @@ import {
  * — this test makes the frontend answer to it too.
  */
 
-/** Collapses `{anything}` to `{}` so path-parameter *names* may differ across the stack. */
+/**
+ * Collapses `{anything}` to `{}` so path-parameter *names* may differ across the stack, and drops
+ * the query string. Note the limitation that follows: this checks the *path* only, so a wrong
+ * query parameter still passes.
+ */
 function normalize(path: string): string {
   return decodeURIComponent(path)
     .split('?')[0]
@@ -34,6 +38,9 @@ function normalize(path: string): string {
 }
 
 const backendPaths = new Set(Object.keys(baseline.paths).map(normalize));
+
+/** An entry in one of the endpoint maps: a fixed path, or a builder that takes path parameters. */
+type EndpointValue = string | ((...args: never[]) => string);
 
 /** Reads a builder's parameter names so each can be filled with an OpenAPI-style `{placeholder}`. */
 function parameterNames(fn: (...args: never[]) => string): string[] {
@@ -46,7 +53,7 @@ function parameterNames(fn: (...args: never[]) => string): string[] {
 }
 
 /** Renders an endpoint entry as a templated path (`/files/{fileId}`), whatever its arity. */
-function templatize(value: string | ((...args: never[]) => string)): string {
+function templatize(value: EndpointValue): string {
   if (typeof value === 'string') return value;
   const args = parameterNames(value).map(name => `{${name}}`);
   return value(...(args as never[]));
@@ -61,9 +68,6 @@ function templatize(value: string | ((...args: never[]) => string)): string {
  * entry when the endpoint is either implemented or removed from `endpoints.ts`.
  */
 const KNOWN_MISSING_ROUTES: Record<string, string> = {
-  // Declared as "not yet implemented in backend" in endpoints.ts; no controller serves /timeline.
-  TIMELINE_DATA: 'no backend route',
-  TIMELINE_RANGE: 'no backend route',
   // No controller serves /analysis/{id}/five-ws or /kill-chain. analysisService.getFiveWs() and
   // getKillChain() exist but nothing calls them.
   FIVE_WS: 'no backend route; analysisService.getFiveWs() is uncalled',
@@ -99,10 +103,21 @@ describe('endpoint paths match the backend OpenAPI contract', () => {
   });
 
   it('exempts only endpoints that are still absent from the contract', () => {
-    // Stops the exemption list outliving the problem: once a route ships, its entry must go.
-    const allKeys = new Set(Object.values(ENDPOINT_MAPS).flatMap(map => Object.keys(map)));
+    // Stops the exemption list outliving the problem. An entry goes stale two ways: the endpoint is
+    // deleted from endpoints.ts, or the backend grows the route. The second matters more — a
+    // silently-kept exemption means that endpoint is never contract-checked again.
+    const entries = new Map<string, EndpointValue>(
+      Object.values(ENDPOINT_MAPS).flatMap(map => Object.entries(map) as [string, EndpointValue][])
+    );
     for (const key of Object.keys(KNOWN_MISSING_ROUTES)) {
-      expect(allKeys, `${key} is exempted but no longer exists — drop it`).toContain(key);
+      const value = entries.get(key);
+      expect(value, `${key} is exempted but no longer exists — drop it`).toBeDefined();
+
+      const path = normalize(`${API_URL_PREFIX}${templatize(value!)}`);
+      expect(
+        backendPaths,
+        `${key} now resolves to a real backend route (${path}) — drop its exemption so it is checked`
+      ).not.toContain(path);
     }
   });
 });

@@ -43,10 +43,11 @@ export const API_ENDPOINTS = {
   DISTINCT_APPS: (fileId: string) => `/conversations/${fileId}/distinct-apps`,
   DISTINCT_PROTOCOLS: (fileId: string) => `/conversations/${fileId}/distinct-protocols`,
 
-  // Timeline (Not yet implemented in backend)
+  // Timeline
   TIMELINE_DATA: (fileId: string) => `/timeline/${fileId}`,
-  TIMELINE_RANGE: (fileId: string, start: number, end: number) =>
-    `/timeline/${fileId}?start=${start}&end=${end}`,
+  /** `start`/`end` are ISO-8601 timestamps — TimelineController parses them with LocalDateTime. */
+  TIMELINE_RANGE: (fileId: string, start: string, end: string) =>
+    `/timeline/${fileId}/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
 
   // Story
   STORIES: '/stories',
