@@ -17,6 +17,8 @@ Any deployment beyond local development must:
 - Point the LLM at a **local inference server**, so capture-derived content is
   never sent to a third party.
 - Enable authentication via the Keycloak overlay where the deployment is shared.
+- **Choose a retention window.** The default deletes captures after 12 hours.
+- **Confirm disk headroom** against that window, with room for backups.
 
 Each is covered in detail below.
 
@@ -34,7 +36,7 @@ The backend selects behaviour via ``SPRING_PROFILES_ACTIVE``:
      - Notes
    * - ``docker-compose.yml`` (base)
      - ``dev``
-     - Open quick-start / Lanturn. Swagger on, verbose errors, localhost CORS
+     - Open quick-start. Swagger on, verbose errors, localhost CORS
        defaults, DEBUG logging.
    * - ``docker-compose.offline.yml``
      - ``dev``
@@ -152,13 +154,114 @@ nginx ``auth_basic``, or restrict access at the VPN/firewall level.
 Configure SSL/TLS
 -----------------
 
-By default nginx serves HTTP. For production, terminate TLS at the nginx layer:
+nginx serves plain HTTP by default. Everything the browser sends — including the
+sign-on token once authentication is enabled — crosses the network unencrypted
+until you terminate TLS.
 
-1. Obtain a certificate (e.g. from your internal CA or Let's Encrypt on an
-   internet-connected machine).
-2. Mount the certificate and key into the nginx container.
-3. Update ``nginx/nginx.conf`` to add an HTTPS server block and redirect HTTP
-   to HTTPS.
+.. note::
+
+   The config is **baked into the nginx image** at build time
+   (``nginx/nginx.conf.template``) and rendered by ``envsubst`` at container
+   start. Editing the running container's ``/etc/nginx/nginx.conf`` does not
+   survive a restart. Use one of the two routes below.
+
+Step 1 — obtain a certificate
+   From your internal CA for a private deployment, or Let's Encrypt if the host is
+   internet-reachable. You need the certificate chain and the private key, e.g.
+   ``fullchain.pem`` and ``privkey.pem``.
+
+Step 2 — mount the certificate and publish 443
+   Add to the ``nginx`` service. Keep the key read-only, and note it must be
+   readable by the nginx worker user inside the container.
+
+   .. code-block:: yaml
+
+      services:
+        nginx:
+          ports:
+            - "${NGINX_PORT:-80}:80"
+            - "443:443"
+          volumes:
+            - ./certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+            - ./certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+
+Step 3 — add the HTTPS server block
+   Edit ``nginx/nginx.conf.template``. Change the existing ``server`` block to
+   listen on 443 with TLS, and add a redirect for plain HTTP. Keep every existing
+   ``location`` block — they proxy ``/api`` and, under the auth overlay, the
+   sign-on paths.
+
+   .. code-block:: nginx
+
+      server {
+          listen 80;
+          server_name _;
+          return 301 https://$host$request_uri;
+      }
+
+      server {
+          listen 443 ssl;
+          http2 on;
+          server_name _;
+
+          ssl_certificate     /etc/nginx/certs/fullchain.pem;
+          ssl_certificate_key /etc/nginx/certs/privkey.pem;
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_ciphers         HIGH:!aNULL:!MD5;
+          ssl_session_cache   shared:SSL:10m;
+
+          add_header Strict-Transport-Security "max-age=31536000" always;
+
+          # ... keep the existing location blocks unchanged ...
+      }
+
+   Rebuild so the change lands in the image:
+
+   .. code-block:: bash
+
+      docker compose up -d --build nginx
+
+   **Offline deployments** run a pre-built image and cannot rebuild on the target
+   host. Either bake the change in when you build the image bundle, or bind-mount
+   a finished config over the rendered one:
+
+   .. code-block:: yaml
+
+      volumes:
+        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+   A bind-mount bypasses ``envsubst``, so substitute ``${NGINX_MAX_BODY_SIZE}``
+   and ``${NGINX_PROXY_TIMEOUT}`` with literal values first, or the upload limit
+   and proxy timeout will be wrong.
+
+Step 4 — update the public origin
+   With the authentication overlay, ``PUBLIC_URL`` pins the token issuer and the
+   backend's issuer check. It must match the origin the browser actually loads,
+   scheme included:
+
+   .. code-block:: ini
+
+      PUBLIC_URL=https://app.example.com
+
+   Getting this wrong fails the redirect or the issuer check rather than falling
+   back gracefully. Recreate Keycloak after changing it. See
+   :doc:`../configuration/authentication`.
+
+Step 5 — verify
+   .. code-block:: bash
+
+      curl -sI https://app.example.com | head -1        # expect 200
+      curl -sI http://app.example.com  | head -1        # expect 301
+
+   Confirm the redirect lands on the same host you set in ``PUBLIC_URL``, then log
+   in once end to end — a mismatch usually surfaces at the sign-on redirect rather
+   than at the first page load.
+
+.. tip::
+
+   If a reverse proxy, load balancer or Tailscale already terminates TLS in front
+   of this host, leave nginx on HTTP and set ``PUBLIC_URL`` to the external
+   ``https://`` origin instead. The stack trusts ``X-Forwarded-*`` from the proxy.
 
 Adjust Upload Limits
 ---------------------
@@ -294,6 +397,77 @@ Every value is overridable, e.g. for a 4-core / 8 GB host:
    Swarm-only. ``deploy.resources.reservations`` (CPU/memory *requests*) **is**
    Swarm/Kubernetes-only and is deliberately not used here; requests are a
    scheduling concept with no meaning on a single Compose host.
+
+Plan Storage & Retention
+------------------------
+
+Container limits bound memory and CPU. Disk is bounded by **retention**, and it is
+the one resource the stack will happily consume until it runs out — which takes
+the service down and breaks the next backup with it.
+
+.. danger::
+
+   The shipped default deletes analysis captures **after 12 hours**. That is
+   deliberate for local testing and wrong for most real deployments. Decide the
+   window before go-live rather than discovering it when a capture disappears.
+
+Step 1 — choose a retention window
+   Set these in ``.env``. See :doc:`../configuration/environment-variables` for
+   the full table.
+
+   .. code-block:: ini
+
+      FILE_RETENTION_ENABLED=true    # false keeps everything, forever
+      FILE_RETENTION_HOURS=12        # analysis captures
+      MONITOR_FILE_RETENTION_HOURS=0 # monitor snapshots; 0 = never expire
+      PACKET_RETENTION_HOURS=0       # 0 = packets live as long as the capture
+
+   For **evidence preservation or air-gapped audit work**, set
+   ``FILE_RETENTION_ENABLED=false``. That alone is sufficient — the clean-up
+   scheduler is then never registered, so nothing below it can delete anything.
+
+   .. warning::
+
+      ``0`` means "never" only for ``MONITOR_FILE_RETENTION_HOURS`` and
+      ``PACKET_RETENTION_HOURS``. For ``FILE_RETENTION_HOURS`` it means *delete
+      everything now*. To disable deletion use ``FILE_RETENTION_ENABLED=false``,
+      never ``FILE_RETENTION_HOURS=0``.
+
+Step 2 — size the disk against that window
+   Storage runs to roughly **2.5x the capture volume ingested** — the objects
+   themselves plus a database of comparable size. With retention on, the working
+   set stops growing:
+
+   .. code-block:: text
+
+      steady state  ~=  ingest_per_day  x  2.5  x  (FILE_RETENTION_HOURS / 24)
+
+   So 20 GB of captures a week (~2.9 GB/day) at the default 12-hour window holds
+   about **3.6 GB**. With ``FILE_RETENTION_ENABLED=false`` there is no steady
+   state and the disk is the only limit — size it for the full retained corpus.
+   :doc:`scalability` works both directions, including the disk-to-window inverse.
+
+Step 3 — leave headroom for backups
+   ``scripts/backup.sh`` stages an uncompressed copy before archiving, so a run
+   needs roughly **twice the live data set** free. A full disk breaks backups at
+   exactly the moment they matter.
+
+Step 4 — check it, and keep checking
+   .. code-block:: bash
+
+      bash scripts/capacity.sh
+
+   Reports current usage and projects when the disk fills, from the observed
+   ingest rate. It is read-only and safe on a live deployment; the exit code makes
+   it usable as a cron canary. See :doc:`scalability` for thresholds.
+
+.. note::
+
+   **Monitor snapshots do not expire by default.** They are exempt from
+   ``FILE_RETENTION_HOURS`` because a monitor network is a time series and
+   expiring its snapshots destroys the drift history. On a monitor-heavy
+   deployment they are therefore the component that actually accumulates — check
+   them first when disk grows unexpectedly.
 
 Restart Policies
 ----------------

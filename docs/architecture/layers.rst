@@ -159,7 +159,7 @@ Narrate
 ~~~~~~~
 
 Turns insights into prose a human can act on. LLM-driven, always offline-capable
-(``LLM_BASE_URL`` → local inference server; no hosted APIs).
+(``LLM_API_BASE_URL`` → local inference server; no hosted APIs).
 
 Contract: narrators emit **evidence references** with every claim; a deterministic citation
 checker verifies the references resolve to real facts. ``InvestigationService``'s
