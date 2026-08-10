@@ -401,9 +401,9 @@ The [`sample-files/`](sample-files/) directory contains example PCAPs:
 
 <a href="https://www.star-history.com/?type=date&repos=NotYuSheng%2FTracePcap">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=NotYuSheng/TracePcap&type=date&theme=dark&legend=top-left&sealed_token=bP8r_g4hzyQiVmI8sv4l49OQlHsb4JgXkHd7e_SD-EsBU427XgUNLZrj3jHG2BmXS33vDA_RcWG-GetRWhnuGp-n6THTA8SGwhYM-J3FLrLAl499lnoRk4CFLUg8qy-4XwTJ_0sqcFWPcjtco8CDoIcF9aPuNmoRdSFWblxjwy2a3y2SxttHUlzDc4Uv" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=NotYuSheng/TracePcap&type=date&legend=top-left&sealed_token=bP8r_g4hzyQiVmI8sv4l49OQlHsb4JgXkHd7e_SD-EsBU427XgUNLZrj3jHG2BmXS33vDA_RcWG-GetRWhnuGp-n6THTA8SGwhYM-J3FLrLAl499lnoRk4CFLUg8qy-4XwTJ_0sqcFWPcjtco8CDoIcF9aPuNmoRdSFWblxjwy2a3y2SxttHUlzDc4Uv" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=NotYuSheng/TracePcap&type=date&legend=top-left&sealed_token=bP8r_g4hzyQiVmI8sv4l49OQlHsb4JgXkHd7e_SD-EsBU427XgUNLZrj3jHG2BmXS33vDA_RcWG-GetRWhnuGp-n6THTA8SGwhYM-J3FLrLAl499lnoRk4CFLUg8qy-4XwTJ_0sqcFWPcjtco8CDoIcF9aPuNmoRdSFWblxjwy2a3y2SxttHUlzDc4Uv" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=NotYuSheng/TracePcap&type=date&theme=dark&legend=top-left&sealed_token=D9LPtWzHI5tnKqoizk26myDmStDNwaytLiuCwkJKxwX7MzFH4ohD0wndbvmqPTyMMgETf436S_A9Rn9P6oUJg0G90ahClkr_pehyp6Ka7gHIXUjxbpQDiBlxtg6UmTpTHVZGfAYIFWBPTLmPxFIGtV6WXBbEX3nFrriIph2g7prnmubhH7xBaxldvq8s" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=NotYuSheng/TracePcap&type=date&legend=top-left&sealed_token=D9LPtWzHI5tnKqoizk26myDmStDNwaytLiuCwkJKxwX7MzFH4ohD0wndbvmqPTyMMgETf436S_A9Rn9P6oUJg0G90ahClkr_pehyp6Ka7gHIXUjxbpQDiBlxtg6UmTpTHVZGfAYIFWBPTLmPxFIGtV6WXBbEX3nFrriIph2g7prnmubhH7xBaxldvq8s" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=NotYuSheng/TracePcap&type=date&legend=top-left&sealed_token=D9LPtWzHI5tnKqoizk26myDmStDNwaytLiuCwkJKxwX7MzFH4ohD0wndbvmqPTyMMgETf436S_A9Rn9P6oUJg0G90ahClkr_pehyp6Ka7gHIXUjxbpQDiBlxtg6UmTpTHVZGfAYIFWBPTLmPxFIGtV6WXBbEX3nFrriIph2g7prnmubhH7xBaxldvq8s" />
  </picture>
 </a>
 
