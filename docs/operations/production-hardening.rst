@@ -36,7 +36,7 @@ The backend selects behaviour via ``SPRING_PROFILES_ACTIVE``:
      - Notes
    * - ``docker-compose.yml`` (base)
      - ``dev``
-     - Open quick-start / Lanturn. Swagger on, verbose errors, localhost CORS
+     - Open quick-start. Swagger on, verbose errors, localhost CORS
        defaults, DEBUG logging.
    * - ``docker-compose.offline.yml``
      - ``dev``
@@ -154,13 +154,114 @@ nginx ``auth_basic``, or restrict access at the VPN/firewall level.
 Configure SSL/TLS
 -----------------
 
-By default nginx serves HTTP. For production, terminate TLS at the nginx layer:
+nginx serves plain HTTP by default. Everything the browser sends — including the
+sign-on token once authentication is enabled — crosses the network unencrypted
+until you terminate TLS.
 
-1. Obtain a certificate (e.g. from your internal CA or Let's Encrypt on an
-   internet-connected machine).
-2. Mount the certificate and key into the nginx container.
-3. Update ``nginx/nginx.conf`` to add an HTTPS server block and redirect HTTP
-   to HTTPS.
+.. note::
+
+   The config is **baked into the nginx image** at build time
+   (``nginx/nginx.conf.template``) and rendered by ``envsubst`` at container
+   start. Editing the running container's ``/etc/nginx/nginx.conf`` does not
+   survive a restart. Use one of the two routes below.
+
+Step 1 — obtain a certificate
+   From your internal CA for a private deployment, or Let's Encrypt if the host is
+   internet-reachable. You need the certificate chain and the private key, e.g.
+   ``fullchain.pem`` and ``privkey.pem``.
+
+Step 2 — mount the certificate and publish 443
+   Add to the ``nginx`` service. Keep the key read-only, and note it must be
+   readable by the nginx worker user inside the container.
+
+   .. code-block:: yaml
+
+      services:
+        nginx:
+          ports:
+            - "${NGINX_PORT:-80}:80"
+            - "443:443"
+          volumes:
+            - ./certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+            - ./certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+
+Step 3 — add the HTTPS server block
+   Edit ``nginx/nginx.conf.template``. Change the existing ``server`` block to
+   listen on 443 with TLS, and add a redirect for plain HTTP. Keep every existing
+   ``location`` block — they proxy ``/api`` and, under the auth overlay, the
+   sign-on paths.
+
+   .. code-block:: nginx
+
+      server {
+          listen 80;
+          server_name _;
+          return 301 https://$host$request_uri;
+      }
+
+      server {
+          listen 443 ssl;
+          http2 on;
+          server_name _;
+
+          ssl_certificate     /etc/nginx/certs/fullchain.pem;
+          ssl_certificate_key /etc/nginx/certs/privkey.pem;
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_ciphers         HIGH:!aNULL:!MD5;
+          ssl_session_cache   shared:SSL:10m;
+
+          add_header Strict-Transport-Security "max-age=31536000" always;
+
+          # ... keep the existing location blocks unchanged ...
+      }
+
+   Rebuild so the change lands in the image:
+
+   .. code-block:: bash
+
+      docker compose up -d --build nginx
+
+   **Offline deployments** run a pre-built image and cannot rebuild on the target
+   host. Either bake the change in when you build the image bundle, or bind-mount
+   a finished config over the rendered one:
+
+   .. code-block:: yaml
+
+      volumes:
+        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+   A bind-mount bypasses ``envsubst``, so substitute ``${NGINX_MAX_BODY_SIZE}``
+   and ``${NGINX_PROXY_TIMEOUT}`` with literal values first, or the upload limit
+   and proxy timeout will be wrong.
+
+Step 4 — update the public origin
+   With the authentication overlay, ``PUBLIC_URL`` pins the token issuer and the
+   backend's issuer check. It must match the origin the browser actually loads,
+   scheme included:
+
+   .. code-block:: ini
+
+      PUBLIC_URL=https://app.example.com
+
+   Getting this wrong fails the redirect or the issuer check rather than falling
+   back gracefully. Recreate Keycloak after changing it. See
+   :doc:`../configuration/authentication`.
+
+Step 5 — verify
+   .. code-block:: bash
+
+      curl -sI https://app.example.com | head -1        # expect 200
+      curl -sI http://app.example.com  | head -1        # expect 301
+
+   Confirm the redirect lands on the same host you set in ``PUBLIC_URL``, then log
+   in once end to end — a mismatch usually surfaces at the sign-on redirect rather
+   than at the first page load.
+
+.. tip::
+
+   If a reverse proxy, load balancer or Tailscale already terminates TLS in front
+   of this host, leave nginx on HTTP and set ``PUBLIC_URL`` to the external
+   ``https://`` origin instead. The stack trusts ``X-Forwarded-*`` from the proxy.
 
 Adjust Upload Limits
 ---------------------

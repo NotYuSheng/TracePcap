@@ -9,7 +9,7 @@ behind a JWT, and rebuilds the frontend with the login flow.
 
 .. note::
    Authentication is disabled in the base stack so single-user, air-gapped, and
-   automated (e.g. Lanturn) deployments keep working with no login. Only the
+   automated deployments keep working with no login. Only the
    ``docker-compose.prod.yml`` overlay turns it on.
 
 Enabling authentication
