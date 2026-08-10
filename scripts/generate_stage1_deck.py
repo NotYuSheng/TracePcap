@@ -53,7 +53,7 @@ CONTENT_W = Inches(12.09)
 HEADER_H = Inches(1.34)
 BODY_TOP = Inches(1.72)
 
-TOTAL_SLIDES = 9
+TOTAL_SLIDES = 13
 
 
 # ──────────────────────────────────────────────
@@ -185,6 +185,46 @@ def style_cell(cell, text, size=10.5, color=INK_2, bold=False,
     p.text = text
     f = p.font
     f.name, f.size, f.color.rgb, f.bold = font, Pt(size), color, bold
+
+
+def add_data_table(slide, headers, rows, left, top, width, col_widths,
+                   row_h=Inches(0.3), head_h=Inches(0.28), size=10):
+    """Small figures table — used by the detail slides."""
+    shape = slide.shapes.add_table(len(rows) + 1, len(headers), left, top,
+                                   width, head_h + row_h * len(rows))
+    table = shape.table
+    for i, cw in enumerate(col_widths):
+        table.columns[i].width = cw
+    for c, text in enumerate(headers):
+        style_cell(table.cell(0, c), text, size=8.5, color=INK_3, bold=True,
+                   font=FONT_MONO, fill=SURFACE_2)
+    table.rows[0].height = head_h
+    for r, row in enumerate(rows, start=1):
+        for c, text in enumerate(row):
+            style_cell(table.cell(r, c), text, size=size,
+                       color=INK if c == 0 else INK_2,
+                       bold=(c == 0), font=FONT_MONO if c else FONT)
+        table.rows[r].height = row_h
+    return table
+
+
+def add_bullets(slide, heading, items, left, top, width, height):
+    """Guidance column: small caps heading, then accent-marked lines."""
+    add_text(slide, heading.upper(), left, top, width, Inches(0.22),
+             size=9, color=INK_3, font=FONT_MONO)
+    box = slide.shapes.add_textbox(left, top + Inches(0.3), width, height)
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    for i, item in enumerate(items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.line_spacing = 1.26
+        p.space_after = Pt(7)
+        dot = p.add_run(); dot.text = "— "
+        dot.font.name, dot.font.size, dot.font.color.rgb = FONT, Pt(10.5), ACCENT
+        body = p.add_run(); body.text = item
+        body.font.name, body.font.size, body.font.color.rgb = FONT, Pt(10.5), INK_2
+    return box
 
 
 # ──────────────────────────────────────────────
@@ -328,7 +368,173 @@ def build_04_changed(prs):
     return slide
 
 
-def build_05_uncovered(prs):
+def build_05_concurrency(prs):
+    slide = create_slide(prs)
+    add_header(slide, "Detail · concurrent use", "How many analysts, and how to scale")
+    add_lede(slide,
+             "Analysts browsing results are not the constraint — those reads are sub-second and "
+             "comfortably handle the full team. The limit is how many captures can be analysed at "
+             "once.", width=Inches(11.4))
+
+    add_data_table(
+        slide,
+        ["SIMULTANEOUS ANALYSES", "TIME PER CAPTURE", "COMPLETED"],
+        [("5", "66 s", "100%"),
+         ("10", "1 m 55 s", "100%"),
+         ("15", "2 m 43 s", "100%"),
+         ("20", "3 m 20 s", "past budget"),
+         ("30", "3 m 43 s", "past budget")],
+        MARGIN, Inches(2.86), Inches(5.5),
+        [Inches(2.3), Inches(1.75), Inches(1.45)])
+
+    add_text(slide,
+             "Measured on a contended development box with roughly six cores available and a small "
+             "capture. Treat these as the shape of the curve, not the capacity of the target "
+             "hardware.",
+             MARGIN, Inches(4.88), Inches(5.5), Inches(0.7),
+             size=10, color=INK_3, spacing=1.25)
+
+    add_bullets(slide, "What sets the limit, and what moves it", [
+        "Threat detection is roughly 94% of the time spent on each capture — about 53 seconds of a "
+        "53-second job. Turning it off is an 18-fold throughput gain and is a single setting.",
+        "Cores are the lever. The ceiling above is not fixed; it rises with CPU. Keep the analysis "
+        "worker count at or below the core count — the default is 10, and a 24-core box would run 20.",
+        "Bursts queue rather than fail. Once workers and queue are both full the upload slows down "
+        "instead of dropping work, which was a defect fixed during this period.",
+        "For 10–25 analysts the practical question is not how many can be logged in, but how many "
+        "captures they submit at the same moment.",
+    ], Inches(6.5), Inches(2.86), Inches(6.2), Inches(3.4))
+    add_footer(slide, 5)
+    return slide
+
+
+def build_06_capacity(prs):
+    slide = create_slide(prs)
+    add_header(slide, "Detail · retention & capacity", "How storage is sized and bounded")
+    add_lede(slide,
+             "Packet rows dominate everything else, so retention — not disk size — is what "
+             "determines the footprint.", width=Inches(11.4))
+
+    add_data_table(
+        slide,
+        ["QUANTITY", "FIGURE"],
+        [("Packet rows per GB of capture", "1.5 – 2 M"),
+         ("Database growth per GB", "1 – 1.5x"),
+         ("Total storage per GB ingested", "~2.5x"),
+         ("Reclaiming one capture's packets", "~5 ms"),
+         ("20 GB/week at 12 h retention", "~3.6 GB held")],
+        MARGIN, Inches(2.72), Inches(5.5),
+        [Inches(3.7), Inches(1.8)])
+
+    add_text(slide,
+             "Steady state  =  ingest per day  x  2.5  x  (retention hours / 24)",
+             MARGIN, Inches(4.76), Inches(5.5), Inches(0.3),
+             size=10, color=ACCENT, font=FONT_MONO)
+    add_text(slide,
+             "With retention on, the working set stops growing — the disk requirement is set by the "
+             "window, not by how long the tool has been running.",
+             MARGIN, Inches(5.12), Inches(5.5), Inches(0.6),
+             size=10, color=INK_3, spacing=1.25)
+
+    add_bullets(slide, "The controls, and what to watch", [
+        "Captures expire after a set number of hours. Turning retention off keeps everything "
+        "indefinitely, for evidence preservation.",
+        "Packet data can be dropped earlier than the capture itself, reclaiming most of the storage "
+        "while conversations and analysis summaries stay intact.",
+        "Deleting a capture's packets is now a single instant operation rather than removing "
+        "millions of rows, so clean-up no longer competes with live analysis.",
+        "Monitor snapshots are deliberately exempt from expiry, because expiring them destroys the "
+        "drift history. On a monitor-heavy deployment they are what actually accumulates.",
+        "A capacity command reports current usage and projects when the disk will fill.",
+    ], Inches(6.5), Inches(2.72), Inches(6.2), Inches(3.6))
+    add_footer(slide, 6)
+    return slide
+
+
+def build_07_backup(prs):
+    slide = create_slide(prs)
+    add_header(slide, "Detail · backup & recovery", "What is protected, and what is not")
+    add_lede(slide,
+             "One archive each night holds everything that cannot be regenerated: the database, the "
+             "captures, and the custom detection rules.", width=Inches(11.4))
+
+    add_data_table(
+        slide,
+        ["PROPERTY", "VALUE"],
+        [("Schedule", "nightly, 02:30"),
+         ("Recovery point", "up to 24 h"),
+         ("Recovery time", "minutes"),
+         ("Restore rehearsed", "yes — full loss"),
+         ("Recovered capture", "byte-identical")],
+        MARGIN, Inches(2.72), Inches(5.5),
+        [Inches(3.0), Inches(2.5)])
+
+    add_text(slide,
+             "Validated by deliberately destroying the database and the capture store, then "
+             "restoring: row counts returned exactly and the recovered file matched the original "
+             "byte for byte.",
+             MARGIN, Inches(4.76), Inches(5.5), Inches(0.8),
+             size=10, color=INK_3, spacing=1.25)
+
+    add_bullets(slide, "How it behaves, and the gaps", [
+        "Old archives are deleted only after the new one has been verified, so a failed run can "
+        "never destroy the last good backup.",
+        "A failure exits noisily so the scheduler reports it — silent backup failure being the "
+        "usual way this goes wrong.",
+        "Captures are re-importable, so the packets are never truly lost. Analyst labels, overrides "
+        "and notes entered since the last run are the real exposure.",
+        "Not covered: recovery to an arbitrary moment rather than last night, sign-on accounts "
+        "created in the admin console, and hardware failure — backups protect data, not uptime.",
+        "Shortening the window is a scheduling change, not development work.",
+    ], Inches(6.5), Inches(2.72), Inches(6.2), Inches(3.6))
+    add_footer(slide, 7)
+    return slide
+
+
+def build_08_prodsettings(prs):
+    slide = create_slide(prs)
+    add_header(slide, "Detail · production settings", "What production turns on, and refuses")
+    add_lede(slide,
+             "The production deployment is a deliberate configuration rather than the same stack "
+             "with a flag flipped — and it will not start if the operator has missed something.",
+             width=Inches(11.4))
+
+    add_data_table(
+        slide,
+        ["SERVICE", "MEMORY", "CPU"],
+        [("Analysis backend", "2 GB", "4"),
+         ("Database", "1 GB", "2"),
+         ("Capture store", "1 GB", "2"),
+         ("Web server", "256 MB", "1"),
+         ("Sign-on", "1 GB", "2")],
+        MARGIN, Inches(2.86), Inches(5.5),
+        [Inches(2.6), Inches(1.6), Inches(1.3)])
+
+    add_text(slide,
+             "About 4.4 GB for the base stack, 5.4 GB with sign-on. Raise the backend to 4 GB or "
+             "more for captures above 100 MB. Half its budget is reserved for the analysis tools, "
+             "which run outside the application.",
+             MARGIN, Inches(4.88), Inches(5.5), Inches(0.8),
+             size=10, color=INK_3, spacing=1.25)
+
+    add_bullets(slide, "Refuses to start without", [
+        "Database name, user and password — no shipped defaults.",
+        "Capture-store user and password.",
+        "Sign-on administrator account, since its console is reachable on the public address.",
+        "An AI endpoint, so capture content is never sent to a third party by accident.",
+    ], Inches(6.5), Inches(2.86), Inches(6.2), Inches(1.7))
+
+    add_bullets(slide, "And changes behaviour", [
+        "Geolocation resolves from the bundled database with no outbound lookups.",
+        "Error responses stop leaking internal detail; the API documentation browser is switched "
+        "off; logging drops to warnings.",
+        "Every service is capped, so one large capture cannot exhaust the host.",
+    ], Inches(6.5), Inches(4.86), Inches(6.2), Inches(1.6))
+    add_footer(slide, 8)
+    return slide
+
+
+def build_09_uncovered(prs):
     slide = create_slide(prs)
     add_header(slide, "Worth knowing", "What the hardening work uncovered")
     add_lede(slide,
@@ -358,11 +564,11 @@ def build_05_uncovered(prs):
     for tag, title, body in finds:
         add_finding(slide, MARGIN, top, CONTENT_W, Inches(0.78), tag, title, body)
         top += Inches(0.92)
-    add_footer(slide, 5)
+    add_footer(slide, 9)
     return slide
 
 
-def build_06_alongside(prs):
+def build_10_alongside(prs):
     slide = create_slide(prs)
     add_header(slide, "18 June – 10 August", "Also delivered alongside")
     add_lede(slide,
@@ -402,11 +608,11 @@ def build_06_alongside(prs):
         col, row = i % 4, i // 4
         add_card(slide, MARGIN + (w + gap) * col,
                  Inches(2.72) + (h + gap) * row, w, h, title, body)
-    add_footer(slide, 6)
+    add_footer(slide, 10)
     return slide
 
 
-def build_07_security(prs):
+def build_11_security(prs):
     slide = create_slide(prs)
     add_header(slide, "Security review", "Where security stands")
     add_lede(slide,
@@ -440,11 +646,11 @@ def build_07_security(prs):
              "is a small change and it is the one finding that undoes the sign-on work. The rest can "
              "be scheduled deliberately once the trust assumptions of the deployment are confirmed.",
              height=Inches(0.86))
-    add_footer(slide, 7)
+    add_footer(slide, 11)
     return slide
 
 
-def build_08_limits(prs):
+def build_12_limits(prs):
     slide = create_slide(prs)
     add_header(slide, "Scope boundaries", "What Stage 1 does not cover")
     add_lede(slide,
@@ -479,11 +685,11 @@ def build_08_limits(prs):
              "one known defect where scheduled clean-up of monitor snapshots can leave the "
              "change history inconsistent. It is disabled by default and documented, so no "
              "deployment is exposed today.", height=Inches(0.86))
-    add_footer(slide, 7)
+    add_footer(slide, 12)
     return slide
 
 
-def build_09_recommendation(prs):
+def build_13_recommendation(prs):
     slide = create_slide(prs)
     add_header(slide, "Next steps", "Recommendation")
     add_lede(slide,
@@ -515,7 +721,7 @@ def build_09_recommendation(prs):
              "and safe defaults. It has not yet been exercised by that team on that "
              "hardware — so the recommendation is to go to UAT now, not to go live "
              "directly.", height=Inches(0.86))
-    add_footer(slide, 9)
+    add_footer(slide, 13)
     return slide
 
 
@@ -531,11 +737,15 @@ def main():
     build_02_standing(prs)
     build_03_scorecard(prs)
     build_04_changed(prs)
-    build_05_uncovered(prs)
-    build_06_alongside(prs)
-    build_07_security(prs)
-    build_08_limits(prs)
-    build_09_recommendation(prs)
+    build_05_concurrency(prs)
+    build_06_capacity(prs)
+    build_07_backup(prs)
+    build_08_prodsettings(prs)
+    build_09_uncovered(prs)
+    build_10_alongside(prs)
+    build_11_security(prs)
+    build_12_limits(prs)
+    build_13_recommendation(prs)
 
     prs.save(out)
     print(f"Saved {out}  ({len(prs.slides)} slides, expected {TOTAL_SLIDES})")
