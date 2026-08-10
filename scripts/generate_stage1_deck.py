@@ -55,6 +55,10 @@ BODY_TOP = Inches(1.72)
 
 TOTAL_SLIDES = 13
 
+# Published documentation. Slides describing something an operator has to
+# configure carry a link to the page that tells them how.
+DOCS = "https://notyusheng.github.io/TracePcap"
+
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -185,6 +189,23 @@ def style_cell(cell, text, size=10.5, color=INK_2, bold=False,
     p.text = text
     f = p.font
     f.name, f.size, f.color.rgb, f.bold = font, Pt(size), color, bold
+
+
+def add_doclink(slide, label, path, top=Inches(6.56)):
+    """Footer-level pointer to the setup page for whatever the slide describes."""
+    add_text(slide, "SET UP", MARGIN, top + Inches(0.02), Inches(0.72), Inches(0.22),
+             size=8.5, color=INK_3, font=FONT_MONO)
+    box = slide.shapes.add_textbox(MARGIN + Inches(0.74), top, Inches(9.4), Inches(0.26))
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    para = tf.paragraphs[0]
+    para.alignment = PP_ALIGN.LEFT
+    run = para.add_run()
+    run.text = label
+    run.font.name, run.font.size, run.font.color.rgb = FONT, Pt(10), ACCENT
+    run.hyperlink.address = f"{DOCS}/{path}"
+    return box
 
 
 def add_data_table(slide, headers, rows, left, top, width, col_widths,
@@ -404,6 +425,8 @@ def build_05_concurrency(prs):
         "For 10–25 analysts the practical question is not how many can be logged in, but how many "
         "captures they submit at the same moment.",
     ], Inches(6.5), Inches(2.86), Inches(6.2), Inches(3.4))
+    add_doclink(slide, "Tuning the analysis workers — Environment Variables › Analysis Queue",
+                "configuration/environment-variables.html#analysis-queue-reconciliation")
     add_footer(slide, 5)
     return slide
 
@@ -447,6 +470,8 @@ def build_06_capacity(prs):
         "drift history. On a monitor-heavy deployment they are what actually accumulates.",
         "A capacity command reports current usage and projects when the disk will fill.",
     ], Inches(6.5), Inches(2.72), Inches(6.2), Inches(3.6))
+    add_doclink(slide, "Choosing a retention window and sizing the disk — Production Hardening › Plan Storage & Retention",
+                "operations/production-hardening.html#plan-storage-retention")
     add_footer(slide, 6)
     return slide
 
@@ -487,6 +512,8 @@ def build_07_backup(prs):
         "created in the admin console, and hardware failure — backups protect data, not uptime.",
         "Shortening the window is a scheduling change, not development work.",
     ], Inches(6.5), Inches(2.72), Inches(6.2), Inches(3.6))
+    add_doclink(slide, "Scheduling backups and rehearsing a restore — Backup & Restore",
+                "operations/backup-restore.html#automated-backups")
     add_footer(slide, 7)
     return slide
 
@@ -530,6 +557,8 @@ def build_08_prodsettings(prs):
         "off; logging drops to warnings.",
         "Every service is capped, so one large capture cannot exhaust the host.",
     ], Inches(6.5), Inches(4.86), Inches(6.2), Inches(1.6))
+    add_doclink(slide, "Running the production overlay — Production Hardening",
+                "operations/production-hardening.html#checklist")
     add_footer(slide, 8)
     return slide
 
@@ -636,16 +665,18 @@ def build_11_security(prs):
          "geolocation egress is closed off. Secrets are still environment variables, not a managed "
          "store — acceptable at this scale, revisit for Stage 2."),
     ]
-    top = Inches(2.76)
+    top = Inches(2.70)
     for tag, title, body in items:
-        add_finding(slide, MARGIN, top, CONTENT_W, Inches(0.68), tag, title, body)
-        top += Inches(0.80)
+        add_finding(slide, MARGIN, top, CONTENT_W, Inches(0.66), tag, title, body)
+        top += Inches(0.76)
 
-    add_note(slide, Inches(5.98), "Recommendation.",
+    add_note(slide, Inches(5.76), "Recommendation.",
              "Close the public object storage before the tool holds real operational captures — it "
              "is a small change and it is the one finding that undoes the sign-on work. The rest can "
              "be scheduled deliberately once the trust assumptions of the deployment are confirmed.",
-             height=Inches(0.86))
+             height=Inches(0.72))
+    add_doclink(slide, "Terminating TLS at nginx — Production Hardening › Configure SSL/TLS",
+                "operations/production-hardening.html#configure-ssl-tls")
     add_footer(slide, 11)
     return slide
 
