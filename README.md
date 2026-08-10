@@ -314,7 +314,7 @@ docker compose -f docker-compose.offline.yml up -d
 
 ## Authentication (OIDC / Keycloak)
 
-Authentication is **disabled by default** — the base `docker-compose.yml` runs the app fully open, exactly as before (suitable for single-user / trusted-network deployments like Lanturn).
+Authentication is **disabled by default** — the base `docker-compose.yml` runs the app fully open.
 
 To run with login enabled, use the production overlay, which bundles a Keycloak identity provider and rebuilds the frontend with the OIDC client. Set `PUBLIC_URL` to the exact origin you browse to (scheme + host + port):
 

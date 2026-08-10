@@ -124,7 +124,7 @@ services:
           cpus: ${BACKEND_CPU_LIMIT:-4}
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      # Authentication off by default — the app runs fully open (e.g. Lanturn). To enable OIDC,
+      # Authentication off by default — the app runs fully open. To enable OIDC,
       # use docker-compose.prod.yml (bundles Keycloak) or set TRACEPCAP_AUTH_ENABLED + KEYCLOAK_* envs.
       TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
       # Must resolve to the same values as the postgres service above.

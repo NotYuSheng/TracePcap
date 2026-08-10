@@ -14,8 +14,8 @@ import org.springframework.security.web.SecurityFilterChain;
  *
  * <p>Spring Security is on the classpath (for the resource-server option), which would otherwise
  * lock everything down behind generated-password HTTP Basic. This chain explicitly permits all
- * requests so the application behaves exactly as it did before auth existed — letting deployments
- * such as Lanturn run with no login.
+ * requests so the application behaves exactly as it did before auth existed — letting single-user
+ * and trusted-network deployments run with no login.
  *
  * @see AuthEnabledSecurityConfig the JWT-gated counterpart used when auth is on
  */
