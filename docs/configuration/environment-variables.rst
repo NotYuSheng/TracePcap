@@ -56,6 +56,61 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
      - ``1g`` / ``2``
      - Keycloak container limits (auth overlays only).
 
+Feature Toggles
+---------------
+
+Every switch that turns a capability on or off, in one place. Each is also
+documented in its own section below with the surrounding detail.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 12 54
+
+   * - Variable
+     - Default
+     - Effect
+   * - ``TRACEPCAP_AUTH_ENABLED``
+     - ``false``
+     - Gates the API behind a Keycloak JWT and adds a login flow. Set to
+       ``true`` by the production overlays; you rarely set it directly. See
+       :doc:`authentication`.
+   * - ``SURICATA_ENABLED``
+     - ``true``
+     - Deployment-wide switch for intrusion-detection enrichment. ``false``
+       skips it for **every** capture regardless of the per-upload toggle.
+       Suricata dominates analysis time, so this is the single biggest
+       throughput lever.
+   * - ``FILE_RETENTION_ENABLED``
+     - ``true``
+     - Master switch for automatic deletion. ``false`` keeps captures
+       indefinitely and the clean-up scheduler is never registered, so no other
+       retention setting has any effect. See :doc:`../operations/production-hardening`.
+   * - ``STUCK_FILE_RECONCILIATION_ENABLED``
+     - ``true``
+     - Scheduled job that flips captures stranded in ``PROCESSING`` to
+       ``FAILED`` after a timeout. Disabling it leaves crashed or
+       restart-interrupted analyses stuck indefinitely.
+   * - ``GEO_FORCE_OFFLINE``
+     - ``false`` / ``true``
+     - Suppresses the ``ipinfo.io`` connectivity probe and lookups, resolving
+       geolocation from the bundled database only. Defaults to ``false`` in the
+       base stack and ``true`` in the offline stack and both production
+       overlays. This is the one intentional outbound call at runtime.
+
+.. note::
+
+   These are **deployment-wide**. Several analysis features also have per-upload
+   toggles in the UI (nDPI, Suricata, file extraction) which apply to a single
+   capture. Where both exist the deployment-wide switch wins: turning Suricata
+   off here skips it even for an upload that requested it.
+
+.. note::
+
+   Two capabilities are switched by configuration rather than a boolean. AI
+   features are governed by ``LLM_API_BASE_URL`` — point it at a reachable local
+   inference server to enable them; the production overlays require it to be set
+   explicitly. Custom detection rules activate when a signatures file is present.
+
 File Retention
 --------------
 
