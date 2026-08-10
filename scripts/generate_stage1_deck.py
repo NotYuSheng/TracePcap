@@ -53,7 +53,7 @@ CONTENT_W = Inches(12.09)
 HEADER_H = Inches(1.34)
 BODY_TOP = Inches(1.72)
 
-TOTAL_SLIDES = 8
+TOTAL_SLIDES = 9
 
 
 # ──────────────────────────────────────────────
@@ -314,10 +314,10 @@ def build_04_changed(prs):
          "A reporting command shows current usage and projects when the disk runs out, "
          "plus sizing guidance for choosing a retention window against a given disk.",
          "~2.5x ingest volume"),
-        ("Safe by default",
+        ("Safe startup defaults",
          "Production refuses to start on shipped passwords, with an unset AI endpoint, or "
-         "without resource limits. Mistakes fail loudly at startup rather than silently "
-         "in operation.", "Fail fast, not fail quiet"),
+         "without resource limits. Mistakes fail loudly at startup. Security beyond that "
+         "is a separate picture — see slide 07.", "Fail fast, not fail quiet"),
     ]
     gap = Inches(0.18)
     w = (CONTENT_W - gap * 3) / 4
@@ -406,7 +406,45 @@ def build_06_alongside(prs):
     return slide
 
 
-def build_07_limits(prs):
+def build_07_security(prs):
+    slide = create_slide(prs)
+    add_header(slide, "Security review", "Where security stands")
+    add_lede(slide,
+             "Stage 1 did not include a security workstream — the June plan assumed a trusted, "
+             "physically-controlled network. The audit findings are therefore mostly still open, "
+             "and one is worth a decision now.")
+
+    items = [
+        ("Open", "Captures are downloadable without logging in",
+         "Object storage is set to public read in every deployment path, including production, and "
+         "its port is published. Sign-on gates the application; it does not gate the captures "
+         "behind it — so the most sensitive data is the one thing not covered. Newly raised."),
+        ("Open", "No transport encryption",
+         "Traffic is HTTP. Fine inside a trusted network with the browser and server on the same "
+         "segment; not acceptable if the deployment is ever reached across an untrusted one."),
+        ("Open", "Unauthenticated detection-rule editing",
+         "Custom signature rules can be read and rewritten without credentials when the base stack "
+         "runs without sign-on. Enabling the auth overlay closes this."),
+        ("Partly closed", "Credentials, secrets and data egress",
+         "Shipped passwords are gone and production will not start without real ones. AI and "
+         "geolocation egress is closed off. Secrets are still environment variables, not a managed "
+         "store — acceptable at this scale, revisit for Stage 2."),
+    ]
+    top = Inches(2.76)
+    for tag, title, body in items:
+        add_finding(slide, MARGIN, top, CONTENT_W, Inches(0.68), tag, title, body)
+        top += Inches(0.80)
+
+    add_note(slide, Inches(5.98), "Recommendation.",
+             "Close the public object storage before the tool holds real operational captures — it "
+             "is a small change and it is the one finding that undoes the sign-on work. The rest can "
+             "be scheduled deliberately once the trust assumptions of the deployment are confirmed.",
+             height=Inches(0.86))
+    add_footer(slide, 7)
+    return slide
+
+
+def build_08_limits(prs):
     slide = create_slide(prs)
     add_header(slide, "Scope boundaries", "What Stage 1 does not cover")
     add_lede(slide,
@@ -445,7 +483,7 @@ def build_07_limits(prs):
     return slide
 
 
-def build_08_recommendation(prs):
+def build_09_recommendation(prs):
     slide = create_slide(prs)
     add_header(slide, "Next steps", "Recommendation")
     add_lede(slide,
@@ -477,7 +515,7 @@ def build_08_recommendation(prs):
              "and safe defaults. It has not yet been exercised by that team on that "
              "hardware — so the recommendation is to go to UAT now, not to go live "
              "directly.", height=Inches(0.86))
-    add_footer(slide, 8)
+    add_footer(slide, 9)
     return slide
 
 
@@ -495,8 +533,9 @@ def main():
     build_04_changed(prs)
     build_05_uncovered(prs)
     build_06_alongside(prs)
-    build_07_limits(prs)
-    build_08_recommendation(prs)
+    build_07_security(prs)
+    build_08_limits(prs)
+    build_09_recommendation(prs)
 
     prs.save(out)
     print(f"Saved {out}  ({len(prs.slides)} slides, expected {TOTAL_SLIDES})")
