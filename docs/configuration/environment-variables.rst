@@ -90,6 +90,11 @@ documented in its own section below with the surrounding detail.
      - Scheduled job that flips captures stranded in ``PROCESSING`` to
        ``FAILED`` after a timeout. Disabling it leaves crashed or
        restart-interrupted analyses stuck indefinitely.
+   * - ``GEO_ENRICHMENT_ENABLED``
+     - ``true``
+     - Turns geolocation enrichment off entirely — no lookups, no bundled-database
+       resolution, no geo fields on hosts. Distinct from ``GEO_FORCE_OFFLINE``,
+       which keeps enrichment but stops it reaching the network.
    * - ``GEO_FORCE_OFFLINE``
      - ``false`` / ``true``
      - Suppresses the ``ipinfo.io`` connectivity probe and lookups, resolving

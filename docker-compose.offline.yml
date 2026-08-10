@@ -144,6 +144,31 @@ services:
       # Air-gapped by default: suppress the one intentional runtime egress (ipinfo.io) and
       # resolve geo from the bundled MMDB only. Override with GEO_FORCE_OFFLINE=false if this
       # offline stack does have outbound access and you want live ipinfo.io enrichment.
+      # Present in docker-compose.yml but previously missing here, so the offline stack
+      # could not tune analysis throughput or turn Suricata off (#641) — the deployment
+      # most likely to want that, given it runs on whatever hardware is on site.
+      SURICATA_ENABLED: ${SURICATA_ENABLED:-true}
+      ASYNC_CORE_POOL_SIZE: ${ASYNC_CORE_POOL_SIZE:-5}
+      ASYNC_MAX_POOL_SIZE: ${ASYNC_MAX_POOL_SIZE:-10}
+      ASYNC_QUEUE_CAPACITY: ${ASYNC_QUEUE_CAPACITY:-100}
+      STUCK_FILE_RECONCILIATION_ENABLED: ${STUCK_FILE_RECONCILIATION_ENABLED:-true}
+      STUCK_FILE_TIMEOUT_MINUTES: ${STUCK_FILE_TIMEOUT_MINUTES:-30}
+      EXTRACTION_MAX_MATCHES_PER_STREAM: ${EXTRACTION_MAX_MATCHES_PER_STREAM:-20}
+      EXTRACTION_MAX_STREAM_CONVERSATIONS: ${EXTRACTION_MAX_STREAM_CONVERSATIONS:-50}
+      EXTRACTION_MAX_FILE_SIZE_MB: ${EXTRACTION_MAX_FILE_SIZE_MB:-50}
+      # Analysis tuning and detection thresholds. These are read by the backend
+      # (application.yml) but were previously never passed in, so setting them had no
+      # effect (#641). Defaults match application.yml exactly.
+      GEO_ENRICHMENT_ENABLED: ${GEO_ENRICHMENT_ENABLED:-true}
+      GEO_TIMEOUT_SECONDS: ${GEO_TIMEOUT_SECONDS:-10}
+      GEO_MMDB_PATH: ${GEO_MMDB_PATH:-}
+      SIGNATURES_PATH: ${SIGNATURES_PATH:-/app/config/signatures.yml}
+      DNS_NXDOMAIN_MIN_QUERIES: ${DNS_NXDOMAIN_MIN_QUERIES:-20}
+      DNS_NXDOMAIN_SUSPICIOUS_RATIO: ${DNS_NXDOMAIN_SUSPICIOUS_RATIO:-0.5}
+      HTTP_MIN_REQUESTS: ${HTTP_MIN_REQUESTS:-20}
+      HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO: ${HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO:-0.5}
+      OVERVIEW_APPS_MAX: ${OVERVIEW_APPS_MAX:-100}
+      OVERVIEW_APPS_LIMITED: ${OVERVIEW_APPS_LIMITED:-true}
       GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:1234/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
