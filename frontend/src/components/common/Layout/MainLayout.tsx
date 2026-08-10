@@ -7,6 +7,8 @@ import { SignaturesModal } from '@components/signatures/SignaturesModal';
 import { AuthMenu } from '@/auth/AuthMenu';
 import { getAccessToken } from '@/auth/tokenStore';
 import { env } from '@/config/env';
+import { directApiUrl } from '@/services/api/directUrl';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { useStore } from '@/store';
 import type { ThemeMode } from '@/store';
 
@@ -23,7 +25,7 @@ function useBackendReady() {
         // response means the backend is reachable — under auth a tokenless (or not-yet-synced)
         // probe may return 401, which still proves it's up; real content calls use the axios client.
         const token = getAccessToken();
-        const res = await fetch('/api/v1/system/limits', {
+        const res = await fetch(directApiUrl(API_ENDPOINTS.SYSTEM_LIMITS), {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         // A 401/403 still proves the backend is reachable (auth-gated, tokenless probe); other 4xx

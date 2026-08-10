@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - 'frontend/**'
+      # endpointPaths.test.ts checks every frontend URL against the backend's committed route
+      # snapshot, so a backend-only route change must re-run these tests too — otherwise the
+      # frontend silently points at a route that no longer exists.
+      - 'openapi/**'
       - '.github/workflows/test-frontend.yml'
 
 permissions:
@@ -32,6 +36,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # tsconfig.app.json excludes tests so the production image build stays free of them, so this
+      # is the only place they get type-checked.
+      - name: Type-check tests
+        run: npm run typecheck:test
 
       - name: Run unit tests
         run: npm run test

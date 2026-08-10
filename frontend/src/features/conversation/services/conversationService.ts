@@ -1,4 +1,5 @@
 import { apiClient } from '@/services/api/client';
+import { directApiUrl } from '@/services/api/directUrl';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import type {
@@ -285,14 +286,14 @@ export const conversationService = {
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
-    return `/api/v1/conversations/${fileId}/export${qs ? '?' + qs : ''}`;
+    return directApiUrl(`${API_ENDPOINTS.CONVERSATIONS_EXPORT(fileId)}${qs ? '?' + qs : ''}`);
   },
 
   /**
    * Build a URL to export a single conversation as a PCAP file.
    */
   getConversationPcapExportUrl: (conversationId: string): string => {
-    return `/api/v1/conversations/detail/${conversationId}/export-pcap`;
+    return directApiUrl(API_ENDPOINTS.CONVERSATION_PCAP_EXPORT(conversationId));
   },
 
   /**
@@ -321,7 +322,7 @@ export const conversationService = {
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortBy) params.set('sortDir', filters.sortDir);
     const qs = params.toString();
-    return `/api/v1/conversations/${fileId}/export-pcap${qs ? '?' + qs : ''}`;
+    return directApiUrl(`${API_ENDPOINTS.CONVERSATIONS_PCAP_EXPORT(fileId)}${qs ? '?' + qs : ''}`);
   },
 
   /**

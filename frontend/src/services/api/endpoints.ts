@@ -11,8 +11,8 @@ export const API_ENDPOINTS = {
   ANALYSIS_SUMMARY: (fileId: string) => `/analysis/${fileId}/summary`,
   ANALYSIS_PROGRESS: (fileId: string) => `/analysis/${fileId}/progress`,
   PROTOCOL_STATS: (fileId: string) => `/analysis/${fileId}/protocols`,
-  FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
-  KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,
+  // No /five-ws or /kill-chain endpoint exists. The five-Ws data ships as the `fiveWs` field of
+  // the analysis summary above; there is no kill-chain equivalent.
 
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
@@ -33,16 +33,21 @@ export const API_ENDPOINTS = {
   CONVERSATIONS: (fileId: string) => `/conversations/${fileId}`,
   ENTITY_STATS: (fileId: string) => `/conversations/${fileId}/entity-stats`,
   CONVERSATION_DETAIL: (conversationId: string) => `/conversations/detail/${conversationId}`,
+  CONVERSATIONS_EXPORT: (fileId: string) => `/conversations/${fileId}/export`,
+  CONVERSATIONS_PCAP_EXPORT: (fileId: string) => `/conversations/${fileId}/export-pcap`,
+  CONVERSATION_PCAP_EXPORT: (conversationId: string) =>
+    `/conversations/detail/${conversationId}/export-pcap`,
   SECURITY_ALERTS: (fileId: string) => `/files/${fileId}/security-alerts`,
   RISK_TYPES: (fileId: string) => `/conversations/${fileId}/risk-types`,
   DISTINCT_IPS: (fileId: string) => `/conversations/${fileId}/distinct-ips`,
   DISTINCT_APPS: (fileId: string) => `/conversations/${fileId}/distinct-apps`,
   DISTINCT_PROTOCOLS: (fileId: string) => `/conversations/${fileId}/distinct-protocols`,
 
-  // Timeline (Not yet implemented in backend)
+  // Timeline
   TIMELINE_DATA: (fileId: string) => `/timeline/${fileId}`,
-  TIMELINE_RANGE: (fileId: string, start: number, end: number) =>
-    `/timeline/${fileId}?start=${start}&end=${end}`,
+  /** `start`/`end` are ISO-8601 timestamps — TimelineController parses them with LocalDateTime. */
+  TIMELINE_RANGE: (fileId: string, start: string, end: string) =>
+    `/timeline/${fileId}/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
 
   // Story
   STORIES: '/stories',
@@ -59,6 +64,8 @@ export const API_ENDPOINTS = {
   EXTRACTED_FILES_WARNINGS: (fileId: string) => `/files/${fileId}/extractions/warnings`,
   EXTRACTED_FILE_DOWNLOAD: (fileId: string, extractionId: string) =>
     `/files/${fileId}/extractions/${extractionId}/download`,
+  EXTRACTED_FILE_PREVIEW: (fileId: string, extractionId: string) =>
+    `/files/${fileId}/extractions/${extractionId}/preview`,
 
   // Network Intelligence
   NETWORK_INTELLIGENCE_CLUSTERS: (fileId: string, groupBy: string) =>
@@ -87,6 +94,7 @@ export const API_ENDPOINTS = {
 
   // System
   SYSTEM_TIME: '/system/time',
+  SYSTEM_LIMITS: '/system/limits',
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
@@ -106,8 +114,6 @@ export const MONITOR_ENDPOINTS = {
   SNAPSHOTS: (networkId: string) => `/monitor/networks/${networkId}/snapshots`,
   SNAPSHOT: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
-  SNAPSHOT_BASELINE: (networkId: string, snapshotId: string) =>
-    `/monitor/networks/${networkId}/snapshots/${snapshotId}/baseline`,
   CHANGES: (networkId: string) => `/monitor/networks/${networkId}/changes`,
   CHANGE: (networkId: string, eventId: string) => `/monitor/networks/${networkId}/changes/${eventId}`,
   BASELINE_DEFINITIONS: (networkId: string) =>
