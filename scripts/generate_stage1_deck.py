@@ -319,7 +319,7 @@ def build_03_scorecard(prs):
         ("Crash / memory safety",
          "CPU and memory limits on every service, sized for native subprocesses", "Done"),
         ("Automatic backups + tested restore",
-         "Nightly backup, restore rehearsed against total data loss", "Done"),
+         "Nightly once the timer is installed; restore rehearsed against total loss", "Done"),
         ("Turn on production settings",
          "Production profile active; third-party AI and online geo egress closed", "Done"),
         ("Basic password hygiene",
@@ -364,9 +364,9 @@ def build_04_changed(prs):
 
     cards = [
         ("A safety net",
-         "Nightly backup of the database, the captures and the custom rules. The restore "
-         "was rehearsed by deliberately destroying everything and bringing it back — "
-         "recovered data was byte-identical.", "RPO 24 h · RTO minutes"),
+         "Install the timer once and the database, captures and custom rules are backed up "
+         "nightly. The restore was rehearsed by deliberately destroying everything and "
+         "bringing it back — recovered data was byte-identical.", "RPO 24 h · RTO minutes"),
         ("Bounded data growth",
          "Reclaiming a capture's packets is now an instant operation rather than deleting "
          "millions of rows. Bulky packet data can expire early while the analysis "
@@ -480,13 +480,15 @@ def build_07_backup(prs):
     slide = create_slide(prs)
     add_header(slide, "Detail · backup & recovery", "What is protected, and what is not")
     add_lede(slide,
-             "One archive each night holds everything that cannot be regenerated: the database, the "
-             "captures, and the custom detection rules.", width=Inches(11.4))
+             "Once the scheduled task is installed, one archive each night holds everything that "
+             "cannot be regenerated: the database, the captures, and the custom detection rules.",
+             width=Inches(11.4))
 
     add_data_table(
         slide,
         ["PROPERTY", "VALUE"],
-        [("Schedule", "nightly, 02:30"),
+        [("Enabled by", "operator, once"),
+         ("Schedule", "nightly, 02:30"),
          ("Recovery point", "up to 24 h"),
          ("Recovery time", "minutes"),
          ("Restore rehearsed", "yes — full loss"),
@@ -502,6 +504,8 @@ def build_07_backup(prs):
              size=10, color=INK_3, spacing=1.25)
 
     add_bullets(slide, "How it behaves, and the gaps", [
+        "It is opt-in. Nothing is backed up until an operator installs the scheduled task — a "
+        "fresh deployment has none, however long it has been running.",
         "Old archives are deleted only after the new one has been verified, so a failed run can "
         "never destroy the last good backup.",
         "A failure exits noisily so the scheduler reports it — silent backup failure being the "
