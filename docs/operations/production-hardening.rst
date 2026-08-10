@@ -17,6 +17,8 @@ Any deployment beyond local development must:
 - Point the LLM at a **local inference server**, so capture-derived content is
   never sent to a third party.
 - Enable authentication via the Keycloak overlay where the deployment is shared.
+- **Choose a retention window.** The default deletes captures after 12 hours.
+- **Confirm disk headroom** against that window, with room for backups.
 
 Each is covered in detail below.
 
@@ -294,6 +296,77 @@ Every value is overridable, e.g. for a 4-core / 8 GB host:
    Swarm-only. ``deploy.resources.reservations`` (CPU/memory *requests*) **is**
    Swarm/Kubernetes-only and is deliberately not used here; requests are a
    scheduling concept with no meaning on a single Compose host.
+
+Plan Storage & Retention
+------------------------
+
+Container limits bound memory and CPU. Disk is bounded by **retention**, and it is
+the one resource the stack will happily consume until it runs out — which takes
+the service down and breaks the next backup with it.
+
+.. danger::
+
+   The shipped default deletes analysis captures **after 12 hours**. That is
+   deliberate for local testing and wrong for most real deployments. Decide the
+   window before go-live rather than discovering it when a capture disappears.
+
+Step 1 — choose a retention window
+   Set these in ``.env``. See :doc:`../configuration/environment-variables` for
+   the full table.
+
+   .. code-block:: ini
+
+      FILE_RETENTION_ENABLED=true    # false keeps everything, forever
+      FILE_RETENTION_HOURS=12        # analysis captures
+      MONITOR_FILE_RETENTION_HOURS=0 # monitor snapshots; 0 = never expire
+      PACKET_RETENTION_HOURS=0       # 0 = packets live as long as the capture
+
+   For **evidence preservation or air-gapped audit work**, set
+   ``FILE_RETENTION_ENABLED=false``. That alone is sufficient — the clean-up
+   scheduler is then never registered, so nothing below it can delete anything.
+
+   .. warning::
+
+      ``0`` means "never" only for ``MONITOR_FILE_RETENTION_HOURS`` and
+      ``PACKET_RETENTION_HOURS``. For ``FILE_RETENTION_HOURS`` it means *delete
+      everything now*. To disable deletion use ``FILE_RETENTION_ENABLED=false``,
+      never ``FILE_RETENTION_HOURS=0``.
+
+Step 2 — size the disk against that window
+   Storage runs to roughly **2.5x the capture volume ingested** — the objects
+   themselves plus a database of comparable size. With retention on, the working
+   set stops growing:
+
+   .. code-block:: text
+
+      steady state  ~=  ingest_per_day  x  2.5  x  (FILE_RETENTION_HOURS / 24)
+
+   So 20 GB of captures a week (~2.9 GB/day) at the default 12-hour window holds
+   about **3.6 GB**. With ``FILE_RETENTION_ENABLED=false`` there is no steady
+   state and the disk is the only limit — size it for the full retained corpus.
+   :doc:`scalability` works both directions, including the disk-to-window inverse.
+
+Step 3 — leave headroom for backups
+   ``scripts/backup.sh`` stages an uncompressed copy before archiving, so a run
+   needs roughly **twice the live data set** free. A full disk breaks backups at
+   exactly the moment they matter.
+
+Step 4 — check it, and keep checking
+   .. code-block:: bash
+
+      bash scripts/capacity.sh
+
+   Reports current usage and projects when the disk fills, from the observed
+   ingest rate. It is read-only and safe on a live deployment; the exit code makes
+   it usable as a cron canary. See :doc:`scalability` for thresholds.
+
+.. note::
+
+   **Monitor snapshots do not expire by default.** They are exempt from
+   ``FILE_RETENTION_HOURS`` because a monitor network is a time series and
+   expiring its snapshots destroys the drift history. On a monitor-heavy
+   deployment they are therefore the component that actually accumulates — check
+   them first when disk grows unexpectedly.
 
 Restart Policies
 ----------------

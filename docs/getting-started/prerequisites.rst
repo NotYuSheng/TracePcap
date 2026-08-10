@@ -25,9 +25,9 @@ Hardware Requirements
 ---------------------
 
 All three tiers below size the TracePcap stack **only**. They assume AI features
-are either disabled or pointed via ``LLM_BASE_URL`` at a separate inference
+are either disabled or pointed via ``LLM_API_BASE_URL`` at a separate inference
 server on the same local network. TracePcap must function fully offline, so
-``LLM_BASE_URL`` must never reference a public or internet-hosted API. Running
+``LLM_API_BASE_URL`` must never reference a public or internet-hosted API. Running
 the LLM on the TracePcap host itself adds to every figure — see the note at the
 end of this section.
 
@@ -66,6 +66,22 @@ memory-bound.
 
 .. note::
 
+   **Sizing storage from your own workload.** The figures above are starting
+   points. Storage runs to roughly **2.5x the capture volume ingested** (the
+   objects plus a database of comparable size), and how much is held at once is
+   set by the retention window rather than by how long the tool has been running:
+
+   .. code-block:: text
+
+      steady state  ~=  ingest_per_day  x  2.5  x  (FILE_RETENTION_HOURS / 24)
+
+   If you intend to keep captures indefinitely there is no steady state — size
+   for the full corpus. Decide this before installing; see
+   :doc:`../operations/production-hardening` (Plan Storage & Retention) and
+   :doc:`../operations/scalability`.
+
+.. note::
+
    The Comfortable tier is an operational recommendation, not a measured
    benchmark. It is derived from the backend guidance in
    :doc:`../operations/production-hardening` (4 GB+ for the backend alone with
@@ -94,7 +110,7 @@ memory-bound.
    parameter model or 16 GB for a 14B, quantised, plus 5–30 GB of storage for
    model weights, **on top of** the tiers above. CPU-only inference works but is
    slow enough that long generations such as Story Mode may approach the proxy
-   timeout. Pointing ``LLM_BASE_URL`` at an LLM server on another machine — which
+   timeout. Pointing ``LLM_API_BASE_URL`` at an LLM server on another machine — which
    still satisfies the offline requirement on a local network — leaves the tiers
    above unchanged.
 
