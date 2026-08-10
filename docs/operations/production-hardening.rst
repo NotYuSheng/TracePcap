@@ -19,6 +19,7 @@ Any deployment beyond local development must:
 - Enable authentication via the Keycloak overlay where the deployment is shared.
 - **Choose a retention window.** The default deletes captures after 12 hours.
 - **Confirm disk headroom** against that window, with room for backups.
+- **Install the backup timer.** Nothing is backed up until you do.
 
 Each is covered in detail below.
 
@@ -468,6 +469,48 @@ Step 4 — check it, and keep checking
    expiring its snapshots destroys the drift history. On a monitor-heavy
    deployment they are therefore the component that actually accumulates — check
    them first when disk grows unexpectedly.
+
+Set Up Backups
+--------------
+
+.. danger::
+
+   **No backup runs until you install the timer.** ``scripts/backup.sh`` is a
+   standalone script — it is not wired into Docker Compose, the application, or
+   any scheduler. A fresh deployment has no backups at all, however long it has
+   been running.
+
+The scripts and unit files ship in ``scripts/``; installing them is a deliberate
+step:
+
+.. code-block:: bash
+
+   sudo cp scripts/tracepcap-backup.service scripts/tracepcap-backup.timer \
+     /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now tracepcap-backup.timer
+
+Edit ``User``, ``WorkingDirectory`` and ``BACKUP_DIR`` in the ``.service`` file
+first so they match this deployment. Then confirm it is actually scheduled —
+copying the files is not enough on its own:
+
+.. code-block:: bash
+
+   systemctl list-timers tracepcap-backup.timer
+
+Point ``BACKUP_DIR`` at storage on a **different disk** from the deployment. A
+backup on the same disk does not survive that disk failing, which is the main
+thing it exists for.
+
+.. important::
+
+   Rehearse the restore before the deployment holds data you care about. An
+   untested backup is not a backup, and the restore is the one procedure you do
+   not want to be performing for the first time during an incident. The rehearsal
+   is a documented five-step drill in :doc:`backup-restore`.
+
+Full detail — what is captured, recovery objectives, the cron alternative, and
+what is deliberately *not* covered — is in :doc:`backup-restore`.
 
 Restart Policies
 ----------------
