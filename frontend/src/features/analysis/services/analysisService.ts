@@ -1,6 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import type { AnalysisSummary, ProtocolStats, FiveWsAnalysis, KillChainPhase } from '@/types';
+import type { AnalysisSummary, ProtocolStats } from '@/types';
 
 export const analysisService = {
   /**
@@ -67,19 +67,4 @@ export const analysisService = {
     return response.data;
   },
 
-  /**
-   * Get Five W's analysis for a PCAP file
-   */
-  getFiveWs: async (fileId: string): Promise<FiveWsAnalysis> => {
-    const response = await apiClient.get<FiveWsAnalysis>(API_ENDPOINTS.FIVE_WS(fileId));
-    return response.data;
-  },
-
-  /**
-   * Get Cyber Kill Chain analysis for a PCAP file
-   */
-  getKillChain: async (fileId: string): Promise<KillChainPhase[]> => {
-    const response = await apiClient.get<KillChainPhase[]>(API_ENDPOINTS.KILL_CHAIN(fileId));
-    return response.data;
-  },
 };

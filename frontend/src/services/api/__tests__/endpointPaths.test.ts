@@ -60,22 +60,15 @@ function templatize(value: EndpointValue): string {
 }
 
 /**
- * Pre-existing mismatches, exempted so this guard could be introduced without a wider cleanup.
- * Every one is currently **unreferenced** by any component, so none breaks a live feature — but
- * each is a loaded gun: wiring one up gives an instant 404.
+ * Escape hatch for endpoints the backend genuinely does not serve yet. **Intentionally empty** —
+ * every path in `endpoints.ts` currently resolves to a real route, and the aim is to keep it that
+ * way, so an addition here should be rare and argued for.
  *
- * Do not add entries to silence a mismatch on a live call site — fix the path instead. Delete an
- * entry when the endpoint is either implemented or removed from `endpoints.ts`.
+ * Never add an entry to silence a mismatch on a live call site — fix the path instead. The value is
+ * the reason for the exemption. Entries are themselves checked below: one whose route later ships
+ * fails the suite, so the list cannot quietly outlive the problem.
  */
-const KNOWN_MISSING_ROUTES: Record<string, string> = {
-  // No controller serves /analysis/{id}/five-ws or /kill-chain. analysisService.getFiveWs() and
-  // getKillChain() exist but nothing calls them.
-  FIVE_WS: 'no backend route; analysisService.getFiveWs() is uncalled',
-  KILL_CHAIN: 'no backend route; analysisService.getKillChain() is uncalled',
-  // Baselines hang off the network, not a snapshot: /monitor/networks/{id}/baseline/definitions
-  // (see BASELINE_DEFINITIONS, which is correct). This entry is uncalled.
-  SNAPSHOT_BASELINE: 'wrong shape; superseded by BASELINE_DEFINITIONS',
-};
+const KNOWN_MISSING_ROUTES: Record<string, string> = {};
 
 const ENDPOINT_MAPS = {
   API_ENDPOINTS,

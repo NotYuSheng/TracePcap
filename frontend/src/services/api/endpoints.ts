@@ -11,8 +11,8 @@ export const API_ENDPOINTS = {
   ANALYSIS_SUMMARY: (fileId: string) => `/analysis/${fileId}/summary`,
   ANALYSIS_PROGRESS: (fileId: string) => `/analysis/${fileId}/progress`,
   PROTOCOL_STATS: (fileId: string) => `/analysis/${fileId}/protocols`,
-  FIVE_WS: (fileId: string) => `/analysis/${fileId}/five-ws`,
-  KILL_CHAIN: (fileId: string) => `/analysis/${fileId}/kill-chain`,
+  // No /five-ws or /kill-chain endpoint exists. The five-Ws data ships as the `fiveWs` field of
+  // the analysis summary above; there is no kill-chain equivalent.
 
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
@@ -114,8 +114,6 @@ export const MONITOR_ENDPOINTS = {
   SNAPSHOTS: (networkId: string) => `/monitor/networks/${networkId}/snapshots`,
   SNAPSHOT: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,
-  SNAPSHOT_BASELINE: (networkId: string, snapshotId: string) =>
-    `/monitor/networks/${networkId}/snapshots/${snapshotId}/baseline`,
   CHANGES: (networkId: string) => `/monitor/networks/${networkId}/changes`,
   CHANGE: (networkId: string, eventId: string) => `/monitor/networks/${networkId}/changes/${eventId}`,
   BASELINE_DEFINITIONS: (networkId: string) =>
