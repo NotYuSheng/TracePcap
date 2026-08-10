@@ -89,6 +89,78 @@ under the PostgreSQL ``max_connections`` default of 100.
    in `issue #393 <https://github.com/NotYuSheng/TracePcap/issues/393>`_; the pool is now
    configured in the base compose file so it applies regardless of profile.
 
+Capacity Planning
+-----------------
+
+Storage consumed is roughly **2.5× the PCAP volume ingested** — the objects
+themselves (1×) plus a database that grows to about 1–1.5× the captures. Use that
+multiplier in both directions.
+
+Checking where you stand
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``scripts/capacity.sh`` reports current usage and projects forward from the
+observed ingest rate:
+
+.. code-block:: bash
+
+   bash scripts/capacity.sh
+
+It is read-only and safe on a live deployment. ``--quiet`` prints a single summary
+line, and the exit code makes it usable as a cron canary — ``0`` OK, ``2``
+warning, ``3`` critical:
+
+.. code-block:: bash
+
+   0 7 * * * cd /path/to/TracePcap && bash scripts/capacity.sh --quiet || mail -s 'TracePcap capacity' ops@example.com
+
+Thresholds are configurable via ``CAPACITY_WARN_PERCENT`` (default 75),
+``CAPACITY_CRIT_PERCENT`` (90), ``CAPACITY_WARN_DAYS`` (30) and
+``CAPACITY_RATE_WINDOW_DAYS`` (7).
+
+Sizing a deployment
+~~~~~~~~~~~~~~~~~~~
+
+**With retention enabled**, the working set is bounded — you only ever hold one
+retention window of captures, so the disk requirement does not grow with time::
+
+   steady state  ~=  ingest_per_day  x  2.5  x  (FILE_RETENTION_HOURS / 24)
+
+For 20 GB of captures a week (~2.9 GB/day) at the default 12-hour retention:
+``2.9 × 2.5 × 0.5`` ≈ **3.6 GB** steady state. Retention, not disk size, is what
+determines the footprint.
+
+Inverting it gives the retention window a given disk can sustain::
+
+   FILE_RETENTION_HOURS  ~=  (usable_disk x 24) / (ingest_per_day x 2.5)
+
+**With retention disabled** (``FILE_RETENTION_ENABLED=false``), growth is
+unbounded and the disk is the only limit::
+
+   days_until_full  ~=  free_disk / (ingest_per_day x 2.5)
+
+The same 2.9 GB/day on a 2 TB disk gives roughly **285 days**. Long-term
+retention deployments should plan around that number and revisit it as the
+ingest rate changes.
+
+.. important::
+
+   Leave headroom beyond the steady-state figure. ``scripts/backup.sh`` stages an
+   uncompressed copy of the data set before archiving, so a backup run needs
+   roughly **twice the live data size** free. ``capacity.sh`` checks this and
+   reports CRITICAL if the margin is gone.
+
+Two caveats
+~~~~~~~~~~~
+
+- **Monitor snapshots are exempt** from ``FILE_RETENTION_HOURS`` and default to
+  never expiring, so they are not covered by the steady-state formula. On a
+  monitor-heavy deployment they are the component that actually grows without
+  bound.
+- **Packet density varies widely** between captures. The 2.5× multiplier is a
+  planning figure, not a guarantee; ``capacity.sh`` measures your real rate, so
+  prefer its output once the deployment has seen representative traffic.
+
 Object Storage
 --------------
 
