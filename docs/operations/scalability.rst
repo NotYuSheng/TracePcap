@@ -100,19 +100,31 @@ Archival & Retention
 --------------------
 
 A scheduled job prunes analysis files after ``FILE_RETENTION_HOURS`` (default 12h).
-Retention is **entirely opt-out**: ``FILE_RETENTION_ENABLED=false`` keeps everything
-indefinitely, and the scheduler is then never registered at all.
+``FILE_RETENTION_ENABLED=false`` keeps everything indefinitely — it is the **master
+switch**, and while it is false the scheduler is not registered, so no other retention
+setting has any effect.
+
+.. warning::
+
+   ``0`` means "never" only for ``MONITOR_FILE_RETENTION_HOURS`` and
+   ``PACKET_RETENTION_HOURS``. For ``FILE_RETENTION_HOURS`` it means *delete everything
+   now*. Disable deletion with ``FILE_RETENTION_ENABLED=false``.
+
+Within an enabled scheduler, packet retention is **tunable separately** from file
+retention: setting ``PACKET_RETENTION_HOURS`` below ``FILE_RETENTION_HOURS`` drops the
+bulky ``packets`` partitions early while keeping the compact ``analysis_results`` and
+``conversations`` summaries. See "Splitting packet retention from summary retention"
+above.
 
 **Monitor-mode files default to never expiring**
 (``MONITOR_FILE_RETENTION_HOURS=0``), because a monitor network is a time series and
-expiring its snapshots destroys the drift history. That makes monitor mode the place
-where unbounded growth actually accumulates on a long-lived deployment — set a non-zero
-value there if snapshots are numerous and disk is constrained.
-
-Packet retention is **separable** from file retention: setting
-``PACKET_RETENTION_HOURS`` below ``FILE_RETENTION_HOURS`` drops the bulky ``packets``
-partitions early while keeping the compact ``analysis_results`` and ``conversations``
-summaries. See "Splitting packet retention from summary retention" above.
+expiring its snapshots destroys the drift history. Monitor mode is therefore where
+unbounded growth accumulates on a long-lived deployment. Note this pulls against the
+partitioning guidance above — retention is what bounds partition count, but monitor
+snapshots are exempt from it by default, so a monitor-heavy deployment accrues partitions
+that nothing reclaims. Prune those snapshots through the UI rather than by setting a
+non-zero value here, until `issue #635
+<https://github.com/NotYuSheng/TracePcap/issues/635>`_ is resolved.
 
 See :doc:`../configuration/environment-variables` for all four settings.
 
@@ -121,7 +133,9 @@ Schema Notes
 
 Corrections against older documentation:
 
-- There is **no ``dns_query_log`` table** in the migrations.
+- ``dns_query_log`` **does** exist, created by ``V20__dns_query_log.sql``. It did not
+  when the original sizing audit was written, and that stale note was carried forward
+  here in error.
 - The geolocation table is **``ip_geo_cache``** (keyed by IP), not ``ip_geo_info``;
   ``IpGeoInfoEntity`` maps to ``ip_geo_cache``.
 - ``V1__baseline_schema.sql`` is the source of truth for the original indexes; later

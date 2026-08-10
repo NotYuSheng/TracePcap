@@ -66,10 +66,20 @@ choice for air-gapped or evidence-preservation deployments — set:
 
    FILE_RETENTION_ENABLED=false
 
-That is sufficient on its own: the cleanup scheduler is not registered at all, so
-nothing is ever deleted automatically. ``MONITOR_FILE_RETENTION_HOURS`` and
-``PACKET_RETENTION_HOURS`` both already default to ``0``, which means "never" for
-each of those independently.
+That is sufficient on its own, and it is the **master switch**: the cleanup
+scheduler is not registered at all, so none of the settings below do anything
+while it is ``false``.
+
+.. danger::
+
+   ``0`` does **not** mean "never" for ``FILE_RETENTION_HOURS``. It means *delete
+   every analysis file immediately* — an expiry cutoff of "now" — and the next
+   hourly sweep will remove them all.
+
+   ``0`` means "never" only for ``MONITOR_FILE_RETENTION_HOURS`` and
+   ``PACKET_RETENTION_HOURS``, which are explicitly guarded against zero. To
+   disable deletion, use ``FILE_RETENTION_ENABLED=false``; never
+   ``FILE_RETENTION_HOURS=0``.
 
 Deletion is only ever triggered by these settings; nothing else in the
 application removes captures or packets on its own.
@@ -88,17 +98,29 @@ application removes captures or packets on its own.
        long-term-audit deployments where evidence preservation is required.
    * - ``FILE_RETENTION_HOURS``
      - ``12``
-     - Number of hours after upload before a file is automatically deleted
-       (only applies when ``FILE_RETENTION_ENABLED=true``). Monitor Network
-       files are exempt — they use ``MONITOR_FILE_RETENTION_HOURS`` instead.
+     - Number of hours after upload before an analysis file is automatically
+       deleted (only applies when ``FILE_RETENTION_ENABLED=true``). **Not
+       zero-guarded** — ``0`` deletes everything immediately; see the warning
+       above. Monitor Network files are exempt and use
+       ``MONITOR_FILE_RETENTION_HOURS`` instead.
    * - ``MONITOR_FILE_RETENTION_HOURS``
      - ``0``
      - Number of hours before a **monitor-mode snapshot** file is deleted;
        ``0`` (the default) means **never**. Monitor networks are a time series,
        so expiring their snapshots destroys the drift history that makes them
-       useful — which is why they are exempt from ``FILE_RETENTION_HOURS``. This
-       is also where unbounded growth accumulates on a long-lived deployment, so
-       set a non-zero value if snapshots are numerous and disk is constrained.
+       useful — which is why they are exempt from ``FILE_RETENTION_HOURS``.
+       Monitor mode is consequently where unbounded growth accumulates on a
+       long-lived deployment.
+
+       .. warning::
+
+          Setting a non-zero value here is **not currently recommended**.
+          Scheduled cleanup deletes the file directly, bypassing the snapshot
+          re-ordering and change-detection replay that removing a snapshot
+          through the UI performs, which leaves gaps in ``snapshot_order`` and
+          orphaned change events. Prune monitor snapshots through the UI until
+          `issue #635 <https://github.com/NotYuSheng/TracePcap/issues/635>`_ is
+          resolved.
    * - ``PACKET_RETENTION_HOURS``
      - ``0``
      - Number of hours after upload before a file's **raw packets** are pruned,
