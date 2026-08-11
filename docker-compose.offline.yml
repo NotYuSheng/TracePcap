@@ -120,6 +120,9 @@ services:
           cpus: ${BACKEND_CPU_LIMIT:-4}
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      # Matches the base stack: auth is off unless the offline-prod overlay turns it on,
+      # but the switch is at least reachable from either base file.
+      TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
       # Must resolve to the same values as the postgres service above.
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tracepcap}
       DATABASE_USERNAME: ${POSTGRES_USER:-tracepcap_user}
@@ -141,9 +144,6 @@ services:
       FILE_RETENTION_HOURS: ${FILE_RETENTION_HOURS:-12}
       MONITOR_FILE_RETENTION_HOURS: ${MONITOR_FILE_RETENTION_HOURS:-0}
       PACKET_RETENTION_HOURS: ${PACKET_RETENTION_HOURS:-0}
-      # Air-gapped by default: suppress the one intentional runtime egress (ipinfo.io) and
-      # resolve geo from the bundled MMDB only. Override with GEO_FORCE_OFFLINE=false if this
-      # offline stack does have outbound access and you want live ipinfo.io enrichment.
       # Present in docker-compose.yml but previously missing here, so the offline stack
       # could not tune analysis throughput or turn Suricata off (#641) — the deployment
       # most likely to want that, given it runs on whatever hardware is on site.
@@ -169,6 +169,9 @@ services:
       HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO: ${HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO:-0.5}
       OVERVIEW_APPS_MAX: ${OVERVIEW_APPS_MAX:-100}
       OVERVIEW_APPS_LIMITED: ${OVERVIEW_APPS_LIMITED:-true}
+      # Air-gapped by default: suppress the one intentional runtime egress (ipinfo.io) and
+      # resolve geo from the bundled MMDB only. Override with GEO_FORCE_OFFLINE=false if this
+      # offline stack does have outbound access and you want live ipinfo.io enrichment.
       GEO_FORCE_OFFLINE: ${GEO_FORCE_OFFLINE:-true}
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-http://localhost:1234/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}

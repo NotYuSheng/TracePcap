@@ -9,7 +9,7 @@ on:
     paths:
       - 'backend/src/main/resources/application*.yml'
       - 'docker-compose*.yml'
-      - 'scripts/check-env-passthrough.sh'
+      - 'scripts/check_env_passthrough.py'
       - '.github/workflows/env-passthrough.yml'
   workflow_dispatch:
 
@@ -22,5 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Read-only validation job; it needs no git credentials after checkout.
+          persist-credentials: false
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
       - name: Check compose passes every variable the backend reads
-        run: bash scripts/check-env-passthrough.sh
+        run: python3 scripts/check_env_passthrough.py
