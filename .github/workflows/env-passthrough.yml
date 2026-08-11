@@ -1,0 +1,32 @@
+name: Env Passthrough
+
+# Catches environment variables the backend reads that no compose file passes into
+# the container. That failure is silent — the setting is documented, an operator
+# sets it, and nothing happens — and it has shipped twice (#628, #641).
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/main/resources/application*.yml'
+      - 'docker-compose*.yml'
+      - 'scripts/check_env_passthrough.py'
+      - '.github/workflows/env-passthrough.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Backend env vars reach the container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Read-only validation job; it needs no git credentials after checkout.
+          persist-credentials: false
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: Check compose passes every variable the backend reads
+        run: python3 scripts/check_env_passthrough.py

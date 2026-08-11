@@ -84,6 +84,11 @@ services:
       # localhost defaults), stacktraces/exception details suppressed in error responses, Swagger
       # UI + /v3/api-docs disabled, WARN-level logging to file. See docs production-hardening.
       SPRING_PROFILES_ACTIVE: prod
+      # Read by application-prod.yml, which intends an empty default. Passing it here is
+      # what makes it settable at all — previously an operator could set it and nothing
+      # happened (#641). Deliberately absent from the base file so the dev profile keeps
+      # its own localhost default.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       TRACEPCAP_AUTH_ENABLED: "true"
       # Re-asserted so the backend fails fast alongside the datastores rather than starting and
       # then failing to authenticate against them.

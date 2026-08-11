@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Fail if the backend reads an environment variable no compose file passes in.
+
+The failure this catches is silent: the variable is documented, an operator sets
+it in .env, nothing happens, and the deployment quietly runs on the default. It
+has shipped twice — the retention settings (#628) and eleven more including
+CORS_ALLOWED_ORIGINS and GEO_ENRICHMENT_ENABLED (#641).
+
+Two things it is deliberately careful about:
+
+  * It reads every Spring profile a stack activates, not just application.yml —
+    CORS_ALLOWED_ORIGINS is declared in application-prod.yml, and a check that
+    ignored profile files would miss that whole class.
+  * It parses YAML and looks only at services.backend.environment. Grepping the
+    compose file whole would let a variable in the postgres service, or merely
+    mentioned in a comment, satisfy the backend's requirement.
+
+Usage: python3 scripts/check_env_passthrough.py
+Exit:  0 clean, 1 unreachable variables found
+"""
+
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+PLACEHOLDER = re.compile(r"\$\{([A-Z][A-Z0-9_]*)[:}]")
+
+# Each deployable stack: the compose files layered in order, and the Spring
+# profile files active for it. Checked independently — a variable passed only by
+# the offline file is still unreachable from the base stack.
+STACKS = {
+    "dev":          (["docker-compose.yml"], ["application.yml"]),
+    "prod":         (["docker-compose.yml", "docker-compose.prod.yml"],
+                     ["application.yml", "application-prod.yml"]),
+    "offline":      (["docker-compose.offline.yml"], ["application.yml"]),
+    "offline-prod": (["docker-compose.offline.yml", "docker-compose.offline-prod.yml"],
+                     ["application.yml", "application-prod.yml"]),
+}
+
+# Supplied by other legitimate means. Each needs a reason — if you are adding
+# here, be sure it is genuinely supplied, not merely unimportant.
+EXEMPT = {
+    "MAX_UPLOAD_SIZE_BYTES":   "passed as -D by backend/docker-entrypoint.sh, derived from the memory budget",
+    "ANALYSIS_TIMEOUT_SECONDS": "passed as -D by backend/docker-entrypoint.sh, derived from the memory budget",
+    "SERVER_PORT":             "internal; fixed at 8080 behind nginx",
+    "SPRING_PROFILES_ACTIVE":  "set per compose file to select the profile",
+    "LOG_DIR":                 "set by backend/docker-entrypoint.sh",
+    # Deliberately passed by the production overlays only. Setting it in the base
+    # file would either leak the dev profile's localhost origins into production,
+    # or — passed empty — defeat the dev default, since Spring treats an empty env
+    # var as set. See docker-compose.prod.yml.
+    "CORS_ALLOWED_ORIGINS":    "prod overlays only, by design",
+    # Derived from PUBLIC_URL by the auth overlays; meaningless with auth off.
+    "KEYCLOAK_ISSUER_URI":     "set by the auth overlays from PUBLIC_URL",
+    "KEYCLOAK_JWK_SET_URI":    "set by the auth overlays (internal service address)",
+}
+
+
+def vars_read(profile_files):
+    """Placeholders referenced by the Spring config files a stack activates."""
+    found = set()
+    for name in profile_files:
+        path = ROOT / "backend/src/main/resources" / name
+        if path.exists():
+            found |= set(PLACEHOLDER.findall(path.read_text()))
+    return found
+
+
+def vars_passed(compose_files):
+    """Keys under services.backend.environment, merged in overlay order."""
+    passed = set()
+    for name in compose_files:
+        doc = yaml.safe_load((ROOT / name).read_text()) or {}
+        env = (doc.get("services", {}).get("backend", {}) or {}).get("environment")
+        if isinstance(env, dict):
+            passed |= {k for k in env if k}
+        elif isinstance(env, list):          # "KEY=value" form
+            passed |= {item.split("=", 1)[0] for item in env}
+    return passed
+
+
+def main():
+    missing = []
+    for stack, (compose_files, profile_files) in sorted(STACKS.items()):
+        reachable = vars_passed(compose_files)
+        for var in sorted(vars_read(profile_files)):
+            if var not in EXEMPT and var not in reachable:
+                missing.append((stack, var))
+
+    if not missing:
+        print("OK — every variable the backend reads is passed by its stack (or exempt).")
+        return 0
+
+    print("FAIL — the backend reads these, but the stack's compose files never pass")
+    print("them to services.backend.environment. Setting them has no effect.\n")
+    for stack, var in missing:
+        print(f"  {stack:14} {var}")
+    print("\nFix: add each to the backend environment of that stack's compose file,")
+    print("using ${VAR:-default} with the default from application.yml. If it is")
+    print("supplied another way, add it to EXEMPT here with the reason.")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
