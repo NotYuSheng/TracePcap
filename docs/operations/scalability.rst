@@ -92,9 +92,24 @@ under the PostgreSQL ``max_connections`` default of 100.
 Capacity Planning
 -----------------
 
-Storage consumed is roughly **2.5× the PCAP volume ingested** — the objects
-themselves (1×) plus a database that grows to about 1–1.5× the captures. Use that
-multiplier in both directions.
+Storage consumed is roughly **2.5× the PCAP volume ingested**. Concretely, for
+every 100 GB of captures you put in:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 60 40
+
+   * - What it is
+     - Disk needed
+   * - The capture files themselves
+     - 100 GB
+   * - The database they build
+     - 100 – 150 GB
+   * - **Total**
+     - **~250 GB**
+
+Use that multiplier in both directions — to size a disk for a given workload, or
+to work out the retention window a given disk can sustain.
 
 Checking where you stand
 ~~~~~~~~~~~~~~~~~~~~~~~~
