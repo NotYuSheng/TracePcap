@@ -94,14 +94,16 @@ documented in its own section below with the surrounding detail.
    * - ``GEO_ENRICHMENT_ENABLED``
      - ``true``
      - Turns geolocation enrichment off entirely — no lookups, no bundled-database
-       resolution, no geo fields on hosts. Distinct from ``GEO_FORCE_OFFLINE``,
-       which keeps enrichment but stops it reaching the network.
+       resolution, so captures analyzed while it is off get no geo fields.
+       Distinct from ``GEO_FORCE_OFFLINE``, which keeps enrichment but stops it
+       reaching the network. Not retroactive. See `Geolocation`_.
    * - ``GEO_FORCE_OFFLINE``
      - ``false`` / ``true``
      - Suppresses the ``ipinfo.io`` connectivity probe and lookups, resolving
        geolocation from the bundled database only. Defaults to ``false`` in the
        base stack and ``true`` in the offline stack and both production
-       overlays. This is the one intentional outbound call at runtime.
+       overlays. This is the one intentional outbound call at runtime. See
+       `Geolocation`_.
 
 .. note::
 
@@ -379,6 +381,66 @@ LLM
      - ``300``
      - HTTP timeout in seconds for LLM API requests. Local models can be slow —
        increase if you get timeout errors.
+
+Geolocation
+-----------
+
+External IP addresses are enriched with country, city and (online only) ASN.
+Two independent switches govern this: ``GEO_ENRICHMENT_ENABLED`` decides
+*whether* geolocation happens at all, and ``GEO_FORCE_OFFLINE`` decides *where*
+the answer comes from. They are easy to confuse.
+
+.. code-block:: text
+
+   GEO_ENRICHMENT_ENABLED=false  ->  no geo data at all (no lookups of any kind)
+   GEO_FORCE_OFFLINE=true        ->  geo data from the bundled MMDB only, zero egress
+   GEO_FORCE_OFFLINE=false       ->  ipinfo.io when reachable, MMDB when not
+
+For an air-gapped deployment you want ``GEO_FORCE_OFFLINE=true``, **not**
+``GEO_ENRICHMENT_ENABLED=false`` — the MMDB lookup is local to the container and
+never touches the network, so disabling enrichment outright loses the map, the
+country columns and the geo-based scanning signals for no egress benefit. See
+:doc:`../getting-started/offline-deployment`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - Variable
+     - Default
+     - Description
+   * - ``GEO_ENRICHMENT_ENABLED``
+     - ``true``
+     - Master switch. ``false`` skips every lookup — online and offline alike —
+       so captures analyzed while it is off carry no country, city or ASN. It
+       is **not retroactive**: rows already written keep their geo, and entries
+       already in ``ip_geo_cache`` are still served to the features that read
+       the cache directly (subnet label suggestions, host identity evidence,
+       change detection). Clear the cache table if you need the data gone.
+   * - ``GEO_FORCE_OFFLINE``
+     - ``false`` / ``true``
+     - Suppresses the ``ipinfo.io`` connectivity probe and all lookups,
+       resolving from the bundled DB-IP Lite MMDB only (``geo_source = mmdb``).
+       ``false`` in the base stack; ``true`` in the offline stack and both
+       production overlays. ASN and organisation are unavailable from the MMDB,
+       so those fields stay empty offline.
+   * - ``GEO_MMDB_PATH``
+     - *(bundled)*
+     - Override the location of the offline MMDB. Empty (the default) uses the
+       DB-IP Lite database bundled in the backend image at
+       ``/app/geoip/dbip-city-lite.mmdb``. Set it only when mounting a newer or
+       commercial MaxMind-format database.
+
+       A path that does **not exist** logs a warning and falls back to the
+       bundled copy. A path that exists but cannot be **opened** — corrupt file,
+       wrong format, or unreadable permissions on a bind mount — does *not* fall
+       back: it logs ``Failed to open GeoIP MMDB`` and leaves the deployment
+       with no offline database at all. Check the startup log for
+       ``GeoIP MMDB loaded successfully`` after pointing this at your own file.
+
+Results are cached in ``ip_geo_cache`` with the source that produced them, and
+re-looked up after 30 days. Switching a deployment offline therefore does not
+invalidate geo data already resolved via ipinfo.io.
 
 Overview Applications
 ---------------------

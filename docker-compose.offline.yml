@@ -160,7 +160,6 @@ services:
       # (application.yml) but were previously never passed in, so setting them had no
       # effect (#641). Defaults match application.yml exactly.
       GEO_ENRICHMENT_ENABLED: ${GEO_ENRICHMENT_ENABLED:-true}
-      GEO_TIMEOUT_SECONDS: ${GEO_TIMEOUT_SECONDS:-10}
       GEO_MMDB_PATH: ${GEO_MMDB_PATH:-}
       SIGNATURES_PATH: ${SIGNATURES_PATH:-/app/config/signatures.yml}
       DNS_NXDOMAIN_MIN_QUERIES: ${DNS_NXDOMAIN_MIN_QUERIES:-20}

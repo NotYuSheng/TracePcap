@@ -206,8 +206,9 @@ tracepcap:
   signatures:
     path: ${SIGNATURES_PATH:/app/config/signatures.yml}  # Path to the custom signatures YAML file
   geo:
+    # Master switch: false disables geolocation entirely (no ipinfo.io, no MMDB).
     enabled: ${GEO_ENRICHMENT_ENABLED:true}
-    timeout-seconds: ${GEO_TIMEOUT_SECONDS:10}
+    # Override the offline MMDB location; empty uses the copy bundled in the image.
     mmdb-path: ${GEO_MMDB_PATH:}
     # When true, suppresses all ipinfo.io egress (connectivity probe + lookups) and resolves
     # geo exclusively from the bundled MMDB. For air-gapped / egress-monitored deployments.
