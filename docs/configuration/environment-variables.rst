@@ -78,9 +78,9 @@ documented in its own section below with the surrounding detail.
      - ``true``
      - Deployment-wide switch for intrusion-detection enrichment. ``false``
        skips it for **every** capture regardless of the per-upload toggle.
-       Adds a roughly fixed ~50 s per capture regardless of size, so it is the
-       single biggest throughput lever — and proportionally the most costly on
-       small captures.
+       Adds ~50 s of fixed rule-loading overhead to every capture, on top of
+       packet scanning that scales with size. The fixed floor makes it the
+       biggest throughput lever, and proportionally heaviest on small captures.
    * - ``FILE_RETENTION_ENABLED``
      - ``true``
      - Master switch for automatic deletion. ``false`` keeps captures
@@ -195,9 +195,10 @@ Analysis Queue & Reconciliation
 -------------------------------
 
 Uploaded files are analyzed asynchronously by an in-memory thread pool. Analysis
-is **Suricata-dominated**: it adds roughly **50 s to every file**, and that cost is
-largely *fixed* rather than proportional to capture size, because the full rule set
-is reloaded on each invocation. Throughput is therefore CPU-bound. When the
+is **Suricata-dominated**: it adds roughly **50 s of fixed overhead to every file**,
+because the full rule set is reloaded on each invocation. Packet scanning on top of
+that still scales with capture size, so total analysis time grows — but the 50 s
+floor is paid even by a tiny capture. Throughput is CPU-bound. When the
 pool and its queue are both full the executor applies **back-pressure**: the
 upload request runs the analysis inline and slows down, rather than dropping the
 file. A reconciliation job additionally flips any file left stuck in
@@ -244,10 +245,10 @@ and MinIO) with a queue of a few hundred is a reasonable starting point.
      - ``true``
      - Deployment-wide kill-switch for Suricata IDS enrichment. Set to
        ``false`` to skip Suricata for **every** file regardless of the per-file
-       upload toggle. It adds a roughly fixed ~50 s per capture — the rule set is
-       reloaded each time, so the cost does not scale with capture size. That
-       makes it the single biggest throughput lever, and the dominant share of
-       the work on small captures specifically.
+       upload toggle. It adds ~50 s of fixed overhead per capture — the rule set is
+       reloaded each time — plus packet scanning that does scale with size. On a
+       538 KB test capture the fixed floor alone was ~94% of total analysis time;
+       on a large capture it is a much smaller share.
 
 Nginx
 -----

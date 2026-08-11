@@ -68,9 +68,9 @@ memory-bound.
 
    **Sizing storage from your own workload.** The figures above are starting
    points. Storage runs to roughly **2.5x the capture volume ingested** — 100 GB
-   of captures needs about 250 GB of disk, being the files themselves plus a
-   database of comparable size. How much is held at once is set by the retention
-   window rather than by how long the tool has been running:
+   of captures needs about 250 GB of disk: the 100 GB of files themselves, plus
+   100–150 GB of database built from them. How much is held at once is set by the
+   retention window rather than by how long the tool has been running:
 
    .. code-block:: text
 

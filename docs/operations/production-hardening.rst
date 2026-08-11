@@ -436,8 +436,9 @@ Step 1 — choose a retention window
 
 Step 2 — size the disk against that window
    Storage runs to roughly **2.5x the capture volume ingested** — 100 GB of
-   captures needs about 250 GB of disk, being the files themselves plus a database
-   of comparable size. With retention on, the working set stops growing:
+   captures needs about 250 GB of disk: the 100 GB of files themselves, plus
+   100–150 GB of database built from them. With retention on, the working set
+   stops growing:
 
    .. code-block:: text
 
