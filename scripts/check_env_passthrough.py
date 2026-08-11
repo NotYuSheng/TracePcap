@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-"""Fail if the backend reads an environment variable no compose file passes in.
+"""Fail if backend environment variables and Spring config disagree, either way.
 
 The failure this catches is silent: the variable is documented, an operator sets
 it in .env, nothing happens, and the deployment quietly runs on the default. It
 has shipped twice — the retention settings (#628) and eleven more including
 CORS_ALLOWED_ORIGINS and GEO_ENRICHMENT_ENABLED (#641).
+
+It checks both directions, because each has already bitten:
+
+  * **Read but not passed** — the variable is documented, an operator sets it in
+    .env, nothing happens, and the deployment runs on the default (#628, #641).
+  * **Passed but not read** — compose supplies a knob no Spring config consumes,
+    so it looks configurable and does nothing. GEO_TIMEOUT_SECONDS shipped this
+    way and was removed in #653; the check that was supposed to prevent that
+    class only looked in one direction.
 
 Two things it is deliberately careful about:
 
@@ -27,6 +36,15 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 PLACEHOLDER = re.compile(r"\$\{([A-Z][A-Z0-9_]*)[:}]")
+
+# Backend variables consumed outside Spring, so absent from the config files by
+# design. Kept as an explicit list rather than prefix matching — a broad pattern
+# like "LLM_*" would hide a genuinely dead knob in the same family, which is the
+# failure this half of the check exists to catch.
+PASSTHROUGH = {
+    "APP_MEMORY_MB": "read by backend/docker-entrypoint.sh to size the heap and upload limit",
+    "TZ":            "container timezone, consumed by the OS not the application",
+}
 
 # Each deployable stack: the compose files layered in order, and the Spring
 # profile files active for it. Checked independently — a variable passed only by
@@ -83,24 +101,41 @@ def vars_passed(compose_files):
 
 
 def main():
-    missing = []
+    unreachable, dead = [], []
     for stack, (compose_files, profile_files) in sorted(STACKS.items()):
         reachable = vars_passed(compose_files)
-        for var in sorted(vars_read(profile_files)):
+        read = vars_read(profile_files)
+        for var in sorted(read):
             if var not in EXEMPT and var not in reachable:
-                missing.append((stack, var))
+                unreachable.append((stack, var))
+        for var in sorted(reachable):
+            # Compose legitimately sets things Spring never sees — container
+            # plumbing, and anything the entrypoint consumes.
+            if var not in EXEMPT and var not in read and var not in PASSTHROUGH:
+                dead.append((stack, var))
 
-    if not missing:
-        print("OK — every variable the backend reads is passed by its stack (or exempt).")
+    if not unreachable and not dead:
+        print("OK — backend environment and Spring config agree in both directions.")
         return 0
 
-    print("FAIL — the backend reads these, but the stack's compose files never pass")
-    print("them to services.backend.environment. Setting them has no effect.\n")
-    for stack, var in missing:
-        print(f"  {stack:14} {var}")
-    print("\nFix: add each to the backend environment of that stack's compose file,")
-    print("using ${VAR:-default} with the default from application.yml. If it is")
-    print("supplied another way, add it to EXEMPT here with the reason.")
+    if unreachable:
+        print("FAIL — the backend reads these, but the stack's compose files never pass")
+        print("them to services.backend.environment. Setting them has no effect.\n")
+        for stack, var in unreachable:
+            print(f"  {stack:14} {var}")
+        print("\nFix: add each to the backend environment of that stack's compose file,")
+        print("using ${VAR:-default} with the default from application.yml.\n")
+
+    if dead:
+        print("FAIL — compose passes these to the backend, but no Spring config file")
+        print("reads them. They look configurable and do nothing.\n")
+        for stack, var in dead:
+            print(f"  {stack:14} {var}")
+        print("\nFix: remove them from the compose file, or add the property to")
+        print("application.yml if the setting was meant to work.\n")
+
+    print("If a variable is supplied or consumed another way, add it to EXEMPT")
+    print("or PASSTHROUGH here with the reason.")
     return 1
 
 
