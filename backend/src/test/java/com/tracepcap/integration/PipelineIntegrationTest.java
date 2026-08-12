@@ -68,6 +68,8 @@ class PipelineIntegrationTest {
 
   @Autowired private TestRestTemplate rest;
   @Autowired private com.tracepcap.analysis.service.ExtractionRunService extractionRunService;
+  @Autowired private com.tracepcap.extraction.repository.ExtractedFileRepository extractedFiles;
+  @Autowired private com.tracepcap.file.repository.FileRepository files;
 
   @Test
   void filesList_returnsPagedResponseEnvelope() {
@@ -261,5 +263,94 @@ class PipelineIntegrationTest {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     return new HttpEntity<>(body, headers);
+  }
+
+  // --- extracted-file download (#630) ---------------------------------------
+  //
+  // The endpoint the frontend pointed at for months without reaching it: getDownloadUrl()
+  // built "/api/files/..." while the route lives under "/api/v1". Nothing exercised the
+  // route from either side, so the 404 was invisible until someone clicked Download.
+  //
+  // A route that does not exist and a route that exists but cannot find the row both answer
+  // 404, so status alone proves nothing. The discriminator is the body: a mapped handler
+  // throws ResourceNotFoundException and GlobalExceptionHandler renders the ErrorResponse
+  // envelope, whereas an unmapped path produces Spring's bare "no handler" 404 with none of
+  // those fields. Asserting the envelope is therefore asserting the route is reachable.
+
+  @Test
+  void extractedFileDownload_unknownExtraction_returns404ErrorEnvelope() {
+    UUID fileId = UUID.fromString(uploadedFileId());
+    UUID missing = UUID.randomUUID();
+
+    ResponseEntity<JsonNode> response =
+        rest.getForEntity(
+            "/api/v1/files/" + fileId + "/extractions/" + missing + "/download", JsonNode.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    JsonNode body = response.getBody();
+    assertThat(body).isNotNull();
+    // Envelope fields, i.e. our handler ran — not Spring's unmapped-path 404.
+    assertThat(body.has("message")).isTrue();
+    assertThat(body.get("message").asText()).contains(missing.toString());
+  }
+
+  @Test
+  void extractedFileDownload_withoutStoredObject_returns404ErrorEnvelope() {
+    // Exercises the handler body rather than only the route: a row exists, so lookup and the
+    // file-ownership check both pass, and it fails at the missing minioPath.
+    UUID fileId = UUID.fromString(uploadedFileId());
+    var extraction =
+        extractedFiles.save(
+            com.tracepcap.extraction.entity.ExtractedFileEntity.builder()
+                .id(UUID.randomUUID())
+                .file(files.findById(fileId).orElseThrow())
+                .filename("evidence.bin")
+                .mimeType("application/octet-stream")
+                .minioPath(null)
+                .createdAt(java.time.LocalDateTime.now())
+                .build());
+
+    ResponseEntity<JsonNode> response =
+        rest.getForEntity(
+            "/api/v1/files/" + fileId + "/extractions/" + extraction.getId() + "/download",
+            JsonNode.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getBody()).isNotNull();
+    assertThat(response.getBody().get("message").asText()).contains("not available");
+  }
+
+  @Test
+  void extractedFileDownload_extractionBelongingToAnotherFile_returns404() {
+    // The ownership guard: a valid extraction id must not be downloadable through a different
+    // file's path, which would otherwise leak another capture's extracted bytes.
+    UUID fileId = UUID.fromString(uploadedFileId());
+    var extraction =
+        extractedFiles.save(
+            com.tracepcap.extraction.entity.ExtractedFileEntity.builder()
+                .id(UUID.randomUUID())
+                .file(files.findById(fileId).orElseThrow())
+                .filename("evidence.bin")
+                .minioPath("some/object/path")
+                .createdAt(java.time.LocalDateTime.now())
+                .build());
+
+    ResponseEntity<JsonNode> response =
+        rest.getForEntity(
+            "/api/v1/files/" + UUID.randomUUID() + "/extractions/" + extraction.getId()
+                + "/download",
+            JsonNode.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  /** Uploads the shared fixture if needed and returns its id, tolerating a 409 from a prior test. */
+  private String uploadedFileId() {
+    ResponseEntity<JsonNode> upload = uploadFixture("ftp.pcap");
+    JsonNode body = upload.getBody();
+    assertThat(body).isNotNull();
+    return upload.getStatusCode() == HttpStatus.CREATED
+        ? body.get("fileId").asText()
+        : body.get("existingFileId").asText();
   }
 }
