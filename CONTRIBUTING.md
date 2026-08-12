@@ -80,10 +80,15 @@ full HTML report as an artifact, retained 14 days.
 
 | Suite | Metric | Coverage |
 |---|---|---|
-| Backend | Instructions | 21.00% |
-| Backend | Branches | 13.85% |
+| Backend | Instructions | 19.41% |
+| Backend | Branches | 12.24% |
 | Frontend | Statements | 3.23% |
 | Frontend | Branches | 2.28% |
+
+Backend figures are 195 tests on `main`. An earlier revision of this table read 21.00% /
+13.85%: that run was measured on a branch cut from an unmerged feature branch, so it counted
+26 tests that are not on `main`. Measure baselines from `main`, not from whatever happens to
+be checked out.
 
 ### What is excluded, and why
 
