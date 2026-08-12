@@ -6,9 +6,14 @@
 // everything would be red from the first run and get switched off. These rules block
 // today; the rest become blocking as the backlog clears (#659).
 
+// Generated build/report output. Flat config does not read .gitignore, so these must be
+// listed or ESLint walks into the coverage HTML report's own bundled scripts (#659).
+// Shared for the same reason the rule is: two copies drift.
+export const generatedOutputIgnores = ['dist', 'coverage', 'playwright-report', 'test-results']
+
 const message =
   'Do not hard-code /api URLs. Use apiClient (adds the base URL) or directApiUrl() from ' +
-  '@/services/api/directUrl for URLs the browser fetches directly.';
+  '@/services/api/directUrl for URLs the browser fetches directly.'
 
 // Hand-written "/api/..." URLs drift from the backend's routes: they skip both apiClient's
 // baseURL and the endpoints.ts map, so nothing checks them against the API contract. That is
@@ -25,7 +30,7 @@ export const noHardCodedApiUrls = [
     selector: 'TemplateElement[value.raw=/^\\u002Fapi(\\u002F|$)/]',
     message,
   },
-];
+]
 
 // directUrl.ts defines the prefix; the API tests and e2e specs assert on and intercept real
 // URLs; vite.config.ts's "/api" is a dev-proxy mount path, not a request URL.
@@ -34,4 +39,4 @@ export const contractRuleExemptions = [
   'src/services/api/__tests__/**',
   'e2e/**',
   'vite.config.ts',
-];
+]
