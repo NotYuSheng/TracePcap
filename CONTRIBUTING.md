@@ -73,17 +73,9 @@ cd frontend && npm run test:coverage
 #   HTML: frontend/coverage/index.html
 ```
 
-CI prints a summary table on every PR (see the run's **Summary** tab) and uploads the
-full HTML report as an artifact, retained 14 days.
-
-### Baseline (Aug 2026)
-
-| Suite | Metric | Coverage |
-|---|---|---|
-| Backend | Instructions | 21.00% |
-| Backend | Branches | 13.85% |
-| Frontend | Statements | 3.23% |
-| Frontend | Branches | 2.28% |
+CI prints a summary table on every PR (see the run's **Summary** tab) and uploads the full
+HTML report as an artifact, retained 14 days. That is deliberately the only place the numbers
+live — a figure copied into this file goes stale the moment anyone merges, and one did.
 
 ### What is excluded, and why
 
