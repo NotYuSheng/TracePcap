@@ -92,6 +92,10 @@ export const API_ENDPOINTS = {
   IP_ORG_RULES: '/ip-org-rules',
   IP_ORG_RULE_DELETE: (id: number) => `/ip-org-rules/${id}`,
 
+  // Custom private ranges
+  CUSTOM_PRIVATE_RANGES: '/custom-private-ranges',
+  CUSTOM_PRIVATE_RANGE_DELETE: (id: number) => `/custom-private-ranges/${id}`,
+
   // System
   SYSTEM_TIME: '/system/time',
   SYSTEM_LIMITS: '/system/limits',
