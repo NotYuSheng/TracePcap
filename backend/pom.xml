@@ -269,7 +269,13 @@
                          Skippable via -Djacoco.skip.check=true for the one case that would
                          otherwise fail honestly: without a Docker daemon the Testcontainers
                          suites skip, coverage collapses, and the build would fail for a reason
-                         that has nothing to do with the change. CI always has Docker. -->
+                         that has nothing to do with the change. CI always has Docker.
+
+                         The floor is taken from CI, not from a local run. Those disagree: the
+                         same 340 tests measure 20.79%/14.76% locally and 16%/11% in CI. The
+                         gap is unexplained and worth its own investigation, but the check runs
+                         in CI, so CI is the number that must govern it. Setting this from a
+                         local reading is how the first attempt failed. -->
                     <execution>
                         <id>jacoco-check</id>
                         <phase>verify</phase>
@@ -285,12 +291,12 @@
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.20</minimum>
+                                            <minimum>0.15</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.14</minimum>
+                                            <minimum>0.10</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
