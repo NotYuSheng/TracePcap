@@ -1,8 +1,12 @@
 name: Delete Branch On Close
 
 # The repo setting "Automatically delete head branches" only fires on **merge**. A PR
-# closed without merging keeps its branch forever, which is how the repo accumulated
-# seven stale chore/sync-version-* branches. This covers the other half.
+# closed *without* merging keeps its branch forever, and nothing in the repo cleaned those
+# up. This covers that half.
+#
+# (The seven stale chore/sync-version-* branches removed alongside this workflow were a
+# different problem: they belonged to PRs that had merged before that setting was enabled
+# on 11 Aug. Merge-time deletion works and is untouched here.)
 #
 # Deleting is safe: GitHub keeps a "Restore branch" button on the closed PR, so a branch
 # removed here can be brought back from the PR page with one click.
