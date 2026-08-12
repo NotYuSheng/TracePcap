@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test';
 const ROUTES = ['/', '/compare', '/monitor'] as const;
 
 /** Requests the app makes to itself. A failure here is a broken contract, not a flaky CDN. */
-const API_CALL = /\/api\//;
+const API_PATH = /^\/api\//;
 
 for (const route of ROUTES) {
   test(`${route} loads without failed API calls or console errors`, async ({ page }) => {
@@ -33,9 +33,14 @@ for (const route of ROUTES) {
     // network layer is concerned, so requestfailed never fires for it. That is precisely how
     // #630 stayed invisible.
     page.on('response', response => {
-      const url = response.url();
-      if (API_CALL.test(url) && response.status() >= 400) {
-        failedRequests.push(`${response.status()} ${url}`);
+      // Same-origin only. Matching "/api/" anywhere in the URL would also catch a third
+      // party that happens to use that path, failing the sweep for something outside the
+      // app's contract. (The app is required to work fully offline, so an external call
+      // should not occur at all — but that is a separate assertion, not this one.)
+      const url = new URL(response.url());
+      const isOwnApi = url.origin === new URL(page.url()).origin && API_PATH.test(url.pathname);
+      if (isOwnApi && response.status() >= 400) {
+        failedRequests.push(`${response.status()} ${url.pathname}`);
       }
     });
 
