@@ -12,12 +12,29 @@
 import type { PaginatedResponse } from '@/types/api.types'
 import type { ApiPath, ResponseOf, Schema } from '../contract'
 
-/** Compiles only when A and B are mutually assignable. */
-type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never
+/**
+ * True only when A and B are the same type.
+ *
+ * The naive `[A] extends [B] ? ([B] extends [A] ? true : never) : never` is unusable here:
+ * its failure value is `never`, and `never` satisfies a `T extends true` constraint, so a
+ * mismatched assertion compiles silently and proves nothing. This resolves to `false` on
+ * mismatch, which genuinely violates the constraint below.
+ */
+type Equals<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 
-function assertExact<T extends true>(): void {
+/** Fails to compile unless T is exactly `true`. */
+function assertTrue<T extends true>(): void {
   void 0 as unknown as T
 }
+
+/**
+ * springdoc emits no `required` list for these DTOs, so every generated field is optional
+ * and carries `| undefined`. Comparing raw field types would therefore fail everywhere for
+ * a reason that says nothing about drift. Strip that one difference and compare the rest,
+ * so a genuine change (`number` becoming `string`) still fails.
+ */
+type Defined<T> = NonNullable<T>
 
 // ---------------------------------------------------------------------------
 // The paged envelope. Every list endpoint returns this shape (CLAUDE.md API
@@ -25,15 +42,17 @@ function assertExact<T extends true>(): void {
 // ---------------------------------------------------------------------------
 
 type BackendPaged = Schema<'PagedResponseFileMetadataDto'>
-type FrontendPaged = PaginatedResponse<BackendPaged['data'] extends (infer E)[] ? E : never>
+type FrontendPaged = PaginatedResponse<Defined<BackendPaged['data']>[number]>
 
-assertExact<Exact<keyof FrontendPaged, keyof BackendPaged>>()
+// Field sets must match exactly: a field added or renamed on either side fails here.
+assertTrue<Equals<keyof FrontendPaged, keyof BackendPaged>>()
 
-// The pagination fields specifically: 1-indexed `page` + `pageSize`, per the conventions.
-assertExact<Exact<FrontendPaged['page'], BackendPaged['page']>>()
-assertExact<Exact<FrontendPaged['pageSize'], BackendPaged['pageSize']>>()
-assertExact<Exact<FrontendPaged['total'], BackendPaged['total']>>()
-assertExact<Exact<FrontendPaged['totalPages'], BackendPaged['totalPages']>>()
+// And each field's type must match, ignoring springdoc's blanket optionality.
+assertTrue<Equals<FrontendPaged['page'], Defined<BackendPaged['page']>>>()
+assertTrue<Equals<FrontendPaged['pageSize'], Defined<BackendPaged['pageSize']>>>()
+assertTrue<Equals<FrontendPaged['total'], Defined<BackendPaged['total']>>>()
+assertTrue<Equals<FrontendPaged['totalPages'], Defined<BackendPaged['totalPages']>>>()
+assertTrue<Equals<FrontendPaged['data'], Defined<BackendPaged['data']>>>()
 
 // ---------------------------------------------------------------------------
 // Route typing. A path or method the backend does not serve resolves to `never`,
@@ -41,10 +60,9 @@ assertExact<Exact<FrontendPaged['totalPages'], BackendPaged['totalPages']>>()
 // caught at compile time rather than as a runtime 404.
 // ---------------------------------------------------------------------------
 
-type FilesList = ResponseOf<'/api/v1/files', 'get'>
-assertExact<Exact<FilesList, Schema<'PagedResponseFileMetadataDto'>>>()
+assertTrue<Equals<ResponseOf<'/api/v1/files', 'get'>, Schema<'PagedResponseFileMetadataDto'>>>()
 
-// A path literal that is not a real route is not assignable to ApiPath.
+// A route that exists is assignable to ApiPath.
 const knownRoute: ApiPath = '/api/v1/files'
 void knownRoute
 

@@ -29,15 +29,19 @@ export type ApiPath = keyof paths
  * The 200 response body for a path + method:
  * `ResponseOf<'/api/v1/files/{fileId}', 'get'>`.
  *
- * Written structurally rather than with `paths[P][M]['responses'][200]...` indexing so it
- * degrades to `never` on a bad path/method pair instead of failing to compile inside this
- * file — the error then lands at the call site, where it is actionable.
+ * The content type is resolved rather than hard-coded. springdoc emits the wildcard media
+ * type (star-slash-star) for every response in this API — all 108 of them — because no
+ * explicit `produces` is declared. Matching on `'application/json'` therefore yielded
+ * `never` for every single route. `C[keyof C]` takes whatever media type is present.
+ *
+ * Written structurally so a bad path/method pair degrades to `never` instead of failing to
+ * compile inside this file — the error then lands at the call site, where it is actionable.
  */
 export type ResponseOf<
   P extends ApiPath,
   M extends keyof paths[P],
 > = paths[P][M] extends {
-  responses: { 200: { content: { 'application/json': infer R } } }
+  responses: { 200: { content: infer C } }
 }
-  ? R
+  ? C[keyof C]
   : never
