@@ -167,13 +167,7 @@ class PipelineIntegrationTest {
     // Re-analysis records the same (file, extractor) again. The naive delete-then-insert dies on
     // the unique constraint (IDENTITY ids flush the INSERT before the queued DELETE), and the
     // recorder's catch would swallow it — so assert the second write actually lands.
-    ResponseEntity<JsonNode> upload = uploadFixture("ftp.pcap");
-    JsonNode body = upload.getBody();
-    UUID fileId =
-        UUID.fromString(
-            upload.getStatusCode() == HttpStatus.CREATED
-                ? body.get("fileId").asText()
-                : body.get("existingFileId").asText());
+    UUID fileId = UUID.fromString(uploadedFileId());
 
     extractionRunService.record(
         fileId,
@@ -344,7 +338,12 @@ class PipelineIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
   }
 
-  /** Uploads the shared fixture if needed and returns its id, tolerating a 409 from a prior test. */
+  /**
+   * Uploads the shared fixture and returns its id.
+   *
+   * <p>201 on a fresh container; 409 once another test in this class has already stored the same
+   * pcap, which returns the existing id instead. Tests share one container, so both are normal.
+   */
   private String uploadedFileId() {
     ResponseEntity<JsonNode> upload = uploadFixture("ftp.pcap");
     JsonNode body = upload.getBody();
