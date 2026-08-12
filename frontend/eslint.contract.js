@@ -39,7 +39,10 @@ export const noHardCodedApiUrls = [
 export const contractRuleExemptions = [
   'src/services/api/generated/**',
   'src/services/api/directUrl.ts',
-  'src/services/api/__tests__/**',
+  // Any test may assert on a real URL — that is how the rule's own subject gets verified.
+  // Narrower than it looks: this exempts assertions, not production code, and a test that
+  // hard-codes a wrong URL still fails endpointPaths.test.ts and its MSW handler.
+  'src/**/__tests__/**',
   'e2e/**',
   'vite.config.ts',
 ]
