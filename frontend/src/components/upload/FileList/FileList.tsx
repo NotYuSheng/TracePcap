@@ -13,7 +13,9 @@ import './FileList.css';
 
 type MultiSelectAction = 'analyze' | 'merge';
 
-interface FileMetadata {
+// Exported so contractConformance.test-d.ts can check it against the backend's
+// FileMetadataDto. It is a deliberate subset — this list renders only these fields.
+export interface FileMetadata {
   fileId: string;
   fileName: string;
   fileSize: number;

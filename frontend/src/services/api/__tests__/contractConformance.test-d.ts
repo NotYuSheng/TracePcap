@@ -9,6 +9,7 @@
  * interface to `Schema<'TheDto'>` outright is better still — then it cannot drift at all —
  * but that is a per-type change, and this catches drift in the meantime.
  */
+import type { FileMetadata } from '@/components/upload/FileList/FileList'
 import type { PaginatedResponse } from '@/types/api.types'
 import type { ApiPath, ResponseOf, Schema } from '../contract'
 
@@ -36,13 +37,33 @@ function assertTrue<T extends true>(): void {
  */
 type Defined<T> = NonNullable<T>
 
+/**
+ * Keys the frontend declares that the backend never sends — `never` when the type is safe.
+ *
+ * This is the asymmetry that matters. A frontend type *missing* a backend field is harmless:
+ * the component simply does not render it. A frontend type declaring a field the backend
+ * does not send reads `undefined` at runtime with a green build, which is the failure this
+ * whole file exists to prevent.
+ *
+ * So item types are checked in that direction only, not for exact equality. Requiring exact
+ * equality would fail on code that is more correct than the contract: `FileMetadata.uploadedAt`
+ * is `string | number[]` because Jackson can serialise a LocalDateTime as an array, while the
+ * spec optimistically declares `string`. That defensive widening should not fail a build.
+ */
+type ExtraKeys<F, B> = Exclude<keyof F, keyof B>
+
 // ---------------------------------------------------------------------------
 // The paged envelope. Every list endpoint returns this shape (CLAUDE.md API
 // conventions), so a change to it breaks every table in the app at once.
 // ---------------------------------------------------------------------------
 
 type BackendPaged = Schema<'PagedResponseFileMetadataDto'>
-type FrontendPaged = PaginatedResponse<Defined<BackendPaged['data']>[number]>
+type BackendFile = Defined<BackendPaged['data']>[number]
+
+// Parameterised with the frontend's own item type, not the backend's. Deriving it from
+// BackendPaged would make the `data` assertion compare the backend array with itself and
+// prove nothing.
+type FrontendPaged = PaginatedResponse<FileMetadata>
 
 // Field sets must match exactly: a field added or renamed on either side fails here.
 assertTrue<Equals<keyof FrontendPaged, keyof BackendPaged>>()
@@ -52,7 +73,9 @@ assertTrue<Equals<FrontendPaged['page'], Defined<BackendPaged['page']>>>()
 assertTrue<Equals<FrontendPaged['pageSize'], Defined<BackendPaged['pageSize']>>>()
 assertTrue<Equals<FrontendPaged['total'], Defined<BackendPaged['total']>>>()
 assertTrue<Equals<FrontendPaged['totalPages'], Defined<BackendPaged['totalPages']>>>()
-assertTrue<Equals<FrontendPaged['data'], Defined<BackendPaged['data']>>>()
+// `data` is deliberately not compared for equality — the item types differ legitimately
+// (see ExtraKeys). What must hold is that the list item claims no field the backend omits.
+assertTrue<Equals<ExtraKeys<FileMetadata, BackendFile>, never>>()
 
 // ---------------------------------------------------------------------------
 // Route typing. A path or method the backend does not serve resolves to `never`,
