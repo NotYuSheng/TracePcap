@@ -55,3 +55,43 @@ If the check fails, run the loop above and commit the result.
   fields — expected, but it will show up in the baseline diff. (Per the API
   conventions in `CLAUDE.md`, prefer `@Valid` + `GlobalExceptionHandler` over
   hand-built error responses.)
+
+## Test Coverage
+
+Both suites report coverage. Neither **gates** on it yet — see
+[#659](https://github.com/NotYuSheng/TracePcap/issues/659). The first job is a truthful
+baseline; a threshold picked before anyone knows the real number just gets bypassed.
+
+```bash
+# Backend — JaCoCo, attached to `verify`
+cd backend && mvn -B clean verify
+#   HTML: backend/target/site/jacoco/index.html
+#   CSV:  backend/target/site/jacoco/jacoco.csv
+
+# Frontend — v8 via vitest
+cd frontend && npm run test:coverage
+#   HTML: frontend/coverage/index.html
+```
+
+CI prints a summary table on every PR (see the run's **Summary** tab) and uploads the
+full HTML report as an artifact, retained 14 days.
+
+### Baseline (Aug 2026)
+
+| Suite | Metric | Coverage |
+|---|---|---|
+| Backend | Instructions | 21.00% |
+| Backend | Branches | 13.85% |
+| Frontend | Statements | 3.23% |
+| Frontend | Branches | 2.28% |
+
+### What is excluded, and why
+
+- **Backend**: the `TracePcapApplication` entry point, plus `**/entity/**` and `**/dto/**`.
+  Those are data carriers — including them measures the mapper, not our logic. A
+  `lombok.config` sets `lombok.addLombokGeneratedAnnotation = true` so JaCoCo skips
+  generated getters/builders/`equals`; without it the figure measures Lombok.
+- **Frontend**: `coverage.all = true` is deliberate. It counts every module under `src/`,
+  not just the ones a test already imports — otherwise the untested majority of the app is
+  simply absent from the report and the number flatters us. Only `src/assets/**` (bundled
+  map geometry and icon tables), test scaffolding, and `main.tsx` are excluded.

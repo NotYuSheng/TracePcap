@@ -98,6 +98,28 @@ export default defineConfig(({ command, mode }) => {
       setupFiles: './src/test/setup.ts',
       css: false,
       exclude: [...configDefaults.exclude, 'e2e/**'],
+      // Report-only: no thresholds are set, so coverage cannot fail a run yet. The first
+      // task is an honest baseline (#659) — a threshold picked before anyone knows the
+      // number just gets bypassed.
+      coverage: {
+        provider: 'v8',
+        reporter: ['text-summary', 'html', 'json-summary', 'lcov'],
+        reportsDirectory: './coverage',
+        // Count every source module, not just the ones a test already imports. Without
+        // this, the ~0%-covered majority of the app is simply absent from the report and
+        // the figure flatters us — which is the exact blind spot #630 came out of.
+        all: true,
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: [
+          'src/**/*.d.ts',
+          'src/**/__tests__/**',
+          'src/test/**',
+          'src/main.tsx',
+          'src/vite-env.d.ts',
+          // Static bundled map geometry and icon tables — data, not logic.
+          'src/assets/**',
+        ],
+      },
     },
     build: {
       outDir: 'dist',

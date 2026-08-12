@@ -42,5 +42,31 @@ jobs:
       - name: Type-check tests
         run: npm run typecheck:test
 
-      - name: Run unit tests
-        run: npm run test
+      # --coverage rather than a bare run: report-only, but it makes the figure visible
+      # on every PR instead of something nobody can quote. See #659.
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          SUMMARY=coverage/coverage-summary.json
+          if [ ! -f "$SUMMARY" ]; then
+            echo "No coverage summary produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node -e '
+            const t = require("./coverage/coverage-summary.json").total;
+            const rows = ["statements","branches","functions","lines"]
+              .map(k => `| ${k} | ${t[k].covered} | ${t[k].total} | ${t[k].pct}% |`)
+              .join("\n");
+            console.log(`## Frontend coverage\n\n| Metric | Covered | Total | % |\n|---|---:|---:|---:|\n${rows}`);
+          ' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 14

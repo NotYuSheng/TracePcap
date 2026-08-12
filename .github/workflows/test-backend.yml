@@ -33,3 +33,32 @@ jobs:
       # Testcontainers needs a Docker daemon; ubuntu-latest runners provide one.
       - name: Run unit + integration tests
         run: mvn -B clean verify
+
+      # JaCoCo is report-only (no <check> rule is bound), so this step reports the
+      # number rather than gating on it. Establishing a truthful baseline comes first;
+      # the ratchet lands once we know what we are ratcheting from. See #659.
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          CSV=target/site/jacoco/jacoco.csv
+          if [ ! -f "$CSV" ]; then
+            echo "No JaCoCo report produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          awk -F, 'NR>1 {
+            miss_i += $4; cov_i += $5; miss_b += $6; cov_b += $7; miss_l += $8; cov_l += $9
+          } END {
+            printf "## Backend coverage\n\n"
+            printf "| Metric | Covered | Total | %% |\n|---|---:|---:|---:|\n"
+            printf "| Instructions | %d | %d | %.2f%% |\n", cov_i, cov_i+miss_i, 100*cov_i/(cov_i+miss_i)
+            printf "| Branches | %d | %d | %.2f%% |\n", cov_b, cov_b+miss_b, (cov_b+miss_b) ? 100*cov_b/(cov_b+miss_b) : 0
+            printf "| Lines | %d | %d | %.2f%% |\n", cov_l, cov_l+miss_l, 100*cov_l/(cov_l+miss_l)
+          }' "$CSV" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/target/site/jacoco/
+          retention-days: 14

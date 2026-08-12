@@ -19,7 +19,8 @@
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "demo:record": "DEMO=1 playwright test --project=demo"
+    "demo:record": "DEMO=1 playwright test --project=demo",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@govtechsg/sgds": "^2.3.6",
@@ -67,6 +68,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-simple-maps": "^3.0.6",
     "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
@@ -79,6 +81,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
