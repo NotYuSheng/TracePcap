@@ -95,3 +95,34 @@ full HTML report as an artifact, retained 14 days.
   not just the ones a test already imports — otherwise the untested majority of the app is
   simply absent from the report and the number flatters us. Only `src/assets/**` (bundled
   map geometry and icon tables), test scaffolding, and `main.tsx` are excluded.
+
+### Generated API types
+
+`frontend/src/services/api/generated/schema.d.ts` is generated from `openapi/baseline.json`
+and **committed**. Regenerate it whenever the baseline changes:
+
+```bash
+cd frontend && npm run api:types
+```
+
+CI regenerates and diffs it (`test-frontend.yml`, which also triggers on `openapi/**`), so a
+stale file fails the build. The generation is deterministic — byte-identical output for the
+same baseline.
+
+Use it instead of hand-writing an interface for a payload the backend already defines:
+
+```ts
+import type { Schema, ResponseOf } from '@/services/api/contract'
+
+type Conversation = Schema<'ConversationResponse'>
+type FilesPage = ResponseOf<'/api/v1/files', 'get'>
+```
+
+`endpointPaths.test.ts` proves every frontend URL resolves to a real route; that guards the
+**URLs**. `contractConformance.test-d.ts` guards the **shapes** travelling over them — it has
+no runtime body and fails by refusing to compile, so it is checked by `npm run typecheck:test`.
+Add a case there whenever a frontend interface mirrors a backend DTO.
+
+Note that `src/types/` still contains hand-written interfaces mirroring backend DTOs, several
+of which have drifted (fields the backend no longer sends). Migrating each to `Schema<'...'>`
+is tracked in #659 — prefer the generated type for anything new or touched.

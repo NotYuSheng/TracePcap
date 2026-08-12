@@ -37,8 +37,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The committed schema must match openapi/baseline.json exactly. Regenerate and diff:
+      # a stale schema means the contract types lie, and the compile-time guards in
+      # contractConformance.test-d.ts would be checking against a contract that no longer
+      # exists. This workflow already triggers on openapi/**, so a backend route change lands
+      # here immediately. See #659.
+      - name: Check generated API types are current
+        run: |
+          npm run api:types
+          if ! git diff --exit-code -- src/services/api/generated/schema.d.ts; then
+            echo "::error::src/services/api/generated/schema.d.ts is stale. Run 'npm run api:types' in frontend/ and commit the result."
+            exit 1
+          fi
+
       # tsconfig.app.json excludes tests so the production image build stays free of them, so this
-      # is the only place they get type-checked.
+      # is the only place they get type-checked. contractConformance.test-d.ts has no runtime body
+      # — it is checked here, by refusing to compile, not by vitest.
       - name: Type-check tests
         run: npm run typecheck:test
 
