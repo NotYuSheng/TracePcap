@@ -5,6 +5,7 @@ import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.story.dto.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -19,14 +20,30 @@ public class InvestigationService {
 
   private final ConversationLookup conversationLookup;
 
+  /** Free-text path: the model's queries need the full set of repairs. */
   public List<InvestigationStep> executeQueries(
       UUID fileId, List<InvestigationQuery> queries, List<Hypothesis> hypotheses) {
+    return executeQueries(fileId, queries, hypotheses, false);
+  }
+
+  /**
+   * @param schemaConstrained whether the queries came from schema-constrained tool calls, which
+   *     changes how much repair {@link InvestigationQuerySanitizer} applies before execution
+   */
+  public List<InvestigationStep> executeQueries(
+      UUID fileId,
+      List<InvestigationQuery> queries,
+      List<Hypothesis> hypotheses,
+      boolean schemaConstrained) {
 
     List<InvestigationStep> steps = new ArrayList<>();
     List<InvestigationQuery> capped = queries.stream().limit(5).collect(Collectors.toList());
 
-    for (InvestigationQuery query : capped) {
-      if (isCatchAll(query)) {
+    for (InvestigationQuery raw : capped) {
+      var sanitized = InvestigationQuerySanitizer.sanitize(raw, schemaConstrained);
+      InvestigationQuery query = sanitized.query();
+
+      if (InvestigationQuerySanitizer.isCatchAll(sanitized)) {
         log.warn("Skipping catch-all investigation query: {}", query.getId());
         continue;
       }
@@ -34,11 +51,11 @@ public class InvestigationService {
       try {
         Hypothesis linked =
             hypotheses.stream()
-                .filter(h -> query.getId().equals(h.getQueryRef()))
+                .filter(h -> query.getId() != null && query.getId().equals(h.getQueryRef()))
                 .findFirst()
                 .orElse(null);
 
-        var page = conversationLookup.conversationPage(fileId, 1, 10, toFilter(query));
+        var page = conversationLookup.conversationPage(fileId, 1, 10, toFilter(sanitized));
 
         List<ConversationEvidence> evidence =
             page.content().stream().map(this::toEvidence).collect(Collectors.toList());
@@ -65,62 +82,39 @@ public class InvestigationService {
     return steps;
   }
 
-  private boolean isCatchAll(InvestigationQuery q) {
-    return q.getSrcIp() == null
-        && q.getDstIp() == null
-        && q.getDstPort() == null
-        && q.getProtocol() == null
-        && q.getAppName() == null
-        && q.getCategory() == null
-        && q.getHasRisks() == null
-        && q.getHasTlsAnomaly() == null
-        && q.getRiskType() == null
-        && q.getMinBytes() == null
-        && q.getMaxBytes() == null
-        && q.getMinFlows() == null;
-  }
-
   /**
-   * Maps an LLM-produced query onto the shared conversation filter (#512 slice 6).
+   * Maps a sanitized, LLM-produced query onto the shared conversation filter.
    *
-   * <p>This used to be a JPA Specification built here, over {@code ConversationEntity} — a second
-   * definition of "filter conversations" living in the story module, free to drift from the one the
-   * conversations table uses. The filtering now happens behind the port, in SQL, which also keeps
-   * the aggregation off the heap.
+   * <p>Two changes met here. This was a JPA Specification built inside the story module — a second
+   * definition of "filter conversations", free to drift from the one the conversations table uses
+   * (#512 slice 6) — and separately the sanitizer arrived to repair model output (#623). Keeping
+   * both means the sentinel decision lives only in {@link InvestigationQuerySanitizer}: this method
+   * reads {@code appNameIsNull} rather than re-deriving it, because two places deciding what
+   * "unknown" means is exactly the drift #733 was about.
    */
-  // Package-private: the mapping is where this service's LLM-facing semantics live.
-  ConversationFilterParams toFilter(InvestigationQuery q) {
-    boolean appUnknown = isUnknownAppSentinel(q.getAppName());
-    // minBytes/maxBytes are per-conversation bounds. Dropped when srcIp or riskType is also set:
-    // in those cases the model tends to pass an aggregate total, which matches nothing.
-    boolean byteFilterSafe = q.getSrcIp() == null && q.getRiskType() == null;
+  ConversationFilterParams toFilter(InvestigationQuerySanitizer.SanitizedQuery sanitized) {
+    InvestigationQuery q = sanitized.query();
+    boolean appIsNull = sanitized.appNameIsNull();
 
     return ConversationFilterParams.builder()
         .srcIp(q.getSrcIp())
         .dstIp(q.getDstIp())
         .dstPort(q.getDstPort())
         .protocols(q.getProtocol() == null ? List.of() : List.of(q.getProtocol().toUpperCase()))
-        .apps(q.getAppName() == null || appUnknown ? List.of() : List.of(q.getAppName()))
-        .appIsNull(appUnknown ? Boolean.TRUE : null)
+        .apps(q.getAppName() == null || appIsNull ? List.of() : List.of(q.getAppName()))
+        .appIsNull(appIsNull ? Boolean.TRUE : null)
         .categories(q.getCategory() == null ? List.of() : List.of(q.getCategory()))
         .hasRisks(Boolean.TRUE.equals(q.getHasRisks()) ? Boolean.TRUE : null)
         .hasTlsAnomaly(Boolean.TRUE.equals(q.getHasTlsAnomaly()) ? Boolean.TRUE : null)
         .riskTypes(q.getRiskType() == null ? List.of() : List.of(q.getRiskType()))
-        .minBytes(byteFilterSafe ? q.getMinBytes() : null)
-        .maxBytes(byteFilterSafe ? q.getMaxBytes() : null)
+        // The sanitizer has already dropped bounds the model was likely to have filled with an
+        // aggregate total, so they pass straight through here.
+        .minBytes(q.getMinBytes())
+        .maxBytes(q.getMaxBytes())
         .minFlows(q.getMinFlows())
         .sortBy("totalBytes")
         .sortDir("desc")
         .build();
-  }
-
-  /** Sentinels the model uses to mean "no identified application". */
-  private static boolean isUnknownAppSentinel(String appName) {
-    if (appName == null) return false;
-    return appName.isBlank()
-        || appName.equalsIgnoreCase("UNKNOWN_APP")
-        || appName.equalsIgnoreCase("unknown")
-        || appName.equalsIgnoreCase("null");
   }
 
   private ConversationEvidence toEvidence(ConversationFacts f) {

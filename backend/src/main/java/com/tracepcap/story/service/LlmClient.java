@@ -40,6 +40,22 @@ public class LlmClient {
   private volatile Integer modelContextLength;
 
   /**
+   * Whether the server accepts {@code tools}. {@code null} = not yet observed; set on the first
+   * tool-enabled call and sticky thereafter, so one rejection does not cost a failed request per
+   * story. Ignored when {@code LLM_TOOL_CALLING} pins the mode to {@code on} or {@code off}.
+   */
+  private volatile Boolean toolCallingSupported;
+
+  /**
+   * Whether the server accepts {@code tool_choice: "required"}. Servers that support tools do not
+   * all support forcing one; those fall back to {@code "auto"} rather than losing tools entirely.
+   */
+  private volatile boolean toolChoiceRequiredSupported = true;
+
+  private static final String TOOL_CALLING_ON = "on";
+  private static final String TOOL_CALLING_OFF = "off";
+
+  /**
    * Query the LLM server for model capabilities on startup. Runs in a background thread so it does
    * not delay application startup when the LLM server is unavailable.
    */
@@ -185,11 +201,151 @@ public class LlmClient {
    * @return the generated text
    */
   public String generateCompletion(String systemPrompt, String userPrompt) {
-    // Pre-flight context-length check — fail immediately without calling the LLM server.
-    // Use ~2 chars/token (conservative) rather than 4 — technical content such as network
-    // logs, JSON, and hex strings tokenises more densely and can easily fall below 3 chars/token.
-    // A tighter estimate means fewer false passes that still fail at the server side.
-    // Only fires when modelContextLength is known (LLM_CONTEXT_LENGTH set or auto-detected).
+    preflight(systemPrompt, userPrompt);
+
+    Message message =
+        post(buildRequest(systemPrompt, userPrompt, null, null), systemPrompt, userPrompt);
+    String content = message.getContent();
+    if (content == null) throw new LlmException("Empty response from LLM API");
+    log.info("Successfully received LLM response, length: {}", content.length());
+    return content;
+  }
+
+  /**
+   * Generate a completion with {@code tools} declared, so a supporting server constrains generation
+   * to the tool's JSON schema instead of letting the model free-type JSON (#623).
+   *
+   * <p>Degrades rather than fails. If tool calling is disabled, unsupported, or rejected by the
+   * server, the same prompts are sent as an ordinary completion and the result comes back as {@link
+   * LlmToolResponse#freeText}, which callers must be prepared to parse themselves — the offline
+   * requirement means we cannot assume a well-behaved hosted API on the other end.
+   *
+   * @param systemPrompt the system prompt
+   * @param userPrompt the user prompt
+   * @param tools tools the model may call
+   * @return either schema-constrained tool calls or free text
+   */
+  public LlmToolResponse generateWithTools(
+      String systemPrompt, String userPrompt, List<LlmToolSpec> tools) {
+
+    preflight(systemPrompt, userPrompt);
+
+    if (tools == null || tools.isEmpty() || !toolCallingEnabled()) {
+      return LlmToolResponse.freeText(sendForContent(systemPrompt, userPrompt));
+    }
+
+    try {
+      Message message = postWithTools(systemPrompt, userPrompt, tools);
+      List<LlmToolResponse.ToolCall> calls = extractToolCalls(message);
+
+      if (!calls.isEmpty()) {
+        toolCallingSupported = Boolean.TRUE;
+        log.info("LLM returned {} schema-constrained tool call(s)", calls.size());
+        return LlmToolResponse.constrained(calls, message.getContent());
+      }
+
+      // Request accepted, tools ignored: the server does not implement them (or the model chose
+      // not to call one). Remember it, and use whatever text came back.
+      log.warn("LLM accepted tools but returned no tool_calls — falling back to free-text parsing");
+      if (isAutoToolCalling()) toolCallingSupported = Boolean.FALSE;
+      return message.getContent() != null
+          ? LlmToolResponse.freeText(message.getContent())
+          : LlmToolResponse.freeText(sendForContent(systemPrompt, userPrompt));
+
+    } catch (RuntimeException e) {
+      if (!isAutoToolCalling() || !looksLikeToolsUnsupported(e)) throw e;
+      log.warn(
+          "LLM server rejected the tool-calling request ({}) — disabling tools and retrying as free text",
+          e.getMessage());
+      toolCallingSupported = Boolean.FALSE;
+      return LlmToolResponse.freeText(sendForContent(systemPrompt, userPrompt));
+    }
+  }
+
+  /**
+   * Send a tool-enabled request, downgrading {@code tool_choice} from {@code required} to {@code
+   * auto} once if the server rejects forcing a call. Servers that implement {@code tools} do not all
+   * implement {@code tool_choice}, and losing the forced call is far cheaper than losing tools.
+   */
+  private Message postWithTools(String systemPrompt, String userPrompt, List<LlmToolSpec> tools) {
+    List<Tool> wireTools = tools.stream().map(Tool::of).toList();
+    if (toolChoiceRequiredSupported) {
+      try {
+        return post(
+            buildRequest(systemPrompt, userPrompt, wireTools, "required"), systemPrompt, userPrompt);
+      } catch (RuntimeException e) {
+        if (!looksLikeToolsUnsupported(e)) throw e;
+        log.warn("LLM server rejected tool_choice=required — retrying with tool_choice=auto");
+        toolChoiceRequiredSupported = false;
+      }
+    }
+    return post(buildRequest(systemPrompt, userPrompt, wireTools, "auto"), systemPrompt, userPrompt);
+  }
+
+  /** Plain completion that tolerates a null message content (used on fallback paths). */
+  private String sendForContent(String systemPrompt, String userPrompt) {
+    Message message =
+        post(buildRequest(systemPrompt, userPrompt, null, null), systemPrompt, userPrompt);
+    if (message.getContent() == null) throw new LlmException("Empty response from LLM API");
+    return message.getContent();
+  }
+
+  /** Whether tool calling should be attempted, honouring the configured mode. */
+  private boolean toolCallingEnabled() {
+    String mode = toolCallingMode();
+    if (TOOL_CALLING_OFF.equals(mode)) return false;
+    if (TOOL_CALLING_ON.equals(mode)) return true;
+    return !Boolean.FALSE.equals(toolCallingSupported);
+  }
+
+  private boolean isAutoToolCalling() {
+    String mode = toolCallingMode();
+    return !TOOL_CALLING_ON.equals(mode) && !TOOL_CALLING_OFF.equals(mode);
+  }
+
+  private String toolCallingMode() {
+    String mode = llmConfig.getApi().getToolCalling();
+    return mode == null ? "auto" : mode.trim().toLowerCase();
+  }
+
+  /**
+   * Whether a failure reads as "this server does not do tool calling" rather than a real outage.
+   * Backends disagree on wording, so this matches on the request fields being named at all — a 400
+   * mentioning {@code tools} is the server telling us it could not parse what we sent.
+   */
+  private static boolean looksLikeToolsUnsupported(Throwable e) {
+    String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+    if (e.getCause() != null && e.getCause().getMessage() != null) {
+      msg = msg + " " + e.getCause().getMessage().toLowerCase();
+    }
+    boolean namesToolFields =
+        msg.contains("tool") || msg.contains("function") || msg.contains("response_format");
+    return namesToolFields && (msg.contains("400") || msg.contains("404") || msg.contains("422"));
+  }
+
+  private List<LlmToolResponse.ToolCall> extractToolCalls(Message message) {
+    if (message.getToolCalls() == null) return List.of();
+    return message.getToolCalls().stream()
+        .filter(c -> c.getFunction() != null && c.getFunction().getName() != null)
+        .map(
+            c ->
+                new LlmToolResponse.ToolCall(
+                    c.getFunction().getName(),
+                    c.getFunction().getArguments() != null ? c.getFunction().getArguments() : "{}"))
+        .toList();
+  }
+
+  /**
+   * Pre-flight context-length check — fail immediately without calling the LLM server. Use ~2
+   * chars/token (conservative) rather than 4 — technical content such as network logs, JSON, and hex
+   * strings tokenises more densely and can easily fall below 3 chars/token. A tighter estimate means
+   * fewer false passes that still fail at the server side. Only fires when modelContextLength is
+   * known (LLM_CONTEXT_LENGTH set or auto-detected).
+   *
+   * <p>Also runs the reachability probe, so users get an instant LLM_UNREACHABLE instead of waiting
+   * for the full generation timeout.
+   */
+  private void preflight(String systemPrompt, String userPrompt) {
     if (modelContextLength != null) {
       int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 2;
       int responseReserve = getEffectiveMaxTokens();
@@ -201,48 +357,50 @@ public class LlmClient {
       }
     }
 
-    // Pre-flight: fail fast with LLM_UNREACHABLE if the server isn't responding (2s timeout).
-    // This runs before the main generation call so users get an instant error instead of waiting
-    // for the full generation timeout.
     checkReachable();
+  }
 
+  private ChatCompletionRequest buildRequest(
+      String systemPrompt, String userPrompt, List<Tool> tools, String toolChoice) {
+    return ChatCompletionRequest.builder()
+        .model(llmConfig.getApi().getModel())
+        .messages(List.of(new Message("system", systemPrompt), new Message("user", userPrompt)))
+        .temperature(llmConfig.getApi().getTemperature())
+        .maxTokens(getEffectiveMaxTokens())
+        .tools(tools)
+        .toolChoice(toolChoice)
+        .build();
+  }
+
+  /**
+   * POST a chat completion and return the first choice's message, preserving the error
+   * classification the callers depend on.
+   */
+  private Message post(ChatCompletionRequest request, String systemPrompt, String userPrompt) {
     try {
       log.info("Sending request to LLM API: {}", llmConfig.getApi().getBaseUrl());
+      log.debug(
+          "Generating completion with max_tokens: {}, tools: {}",
+          getEffectiveMaxTokens(),
+          request.getTools() == null ? 0 : request.getTools().size());
 
-      // Create request payload in OpenAI format
-      ChatCompletionRequest request =
-          ChatCompletionRequest.builder()
-              .model(llmConfig.getApi().getModel())
-              .messages(
-                  List.of(new Message("system", systemPrompt), new Message("user", userPrompt)))
-              .temperature(llmConfig.getApi().getTemperature())
-              .maxTokens(getEffectiveMaxTokens())
-              .build();
-
-      log.debug("Generating completion with max_tokens: {}", getEffectiveMaxTokens());
-
-      // Set headers
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
       headers.setBearerAuth(llmConfig.getApi().getApiKey());
 
       HttpEntity<ChatCompletionRequest> entity = new HttpEntity<>(request, headers);
 
-      // Make API call
       String url = llmConfig.getApi().getBaseUrl() + "/chat/completions";
       ResponseEntity<ChatCompletionResponse> response =
           llmRestTemplate.exchange(url, HttpMethod.POST, entity, ChatCompletionResponse.class);
 
-      // Extract response
       if (response.getBody() != null
           && response.getBody().getChoices() != null
           && !response.getBody().getChoices().isEmpty()) {
 
         var choice = response.getBody().getChoices().get(0);
-        String content = choice.getMessage() != null ? choice.getMessage().getContent() : null;
-        if (content == null) throw new LlmException("Empty response from LLM API");
-        log.info("Successfully received LLM response, length: {}", content.length());
-        return content;
+        if (choice.getMessage() == null) throw new LlmException("Empty response from LLM API");
+        return choice.getMessage();
       }
 
       throw new LlmException("Empty response from LLM API");
@@ -297,9 +455,17 @@ public class LlmClient {
     return m.find() ? Integer.parseInt(m.group(1)) : 0;
   }
 
-  /** OpenAI Chat Completion Request format */
+  /**
+   * OpenAI Chat Completion Request format.
+   *
+   * <p>{@code NON_NULL}: a server that has never heard of {@code tools} must not receive {@code
+   * "tools": null} — strict backends reject unknown fields outright, and the whole point of the
+   * fallback path is to send exactly what the pre-#623 client sent.
+   */
   @Data
   @lombok.Builder
+  @com.fasterxml.jackson.annotation.JsonInclude(
+      com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
   private static class ChatCompletionRequest {
     private String model;
     private List<Message> messages;
@@ -307,14 +473,66 @@ public class LlmClient {
 
     @JsonProperty("max_tokens")
     private Integer maxTokens;
+
+    private List<Tool> tools;
+
+    @JsonProperty("tool_choice")
+    private String toolChoice;
   }
 
   /** Message in the conversation */
   @Data
-  @lombok.AllArgsConstructor
+  @lombok.NoArgsConstructor
+  @com.fasterxml.jackson.annotation.JsonInclude(
+      com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
   private static class Message {
     private String role;
     private String content;
+
+    @JsonProperty("tool_calls")
+    private List<ToolCall> toolCalls;
+
+    Message(String role, String content) {
+      this.role = role;
+      this.content = content;
+    }
+  }
+
+  /** Tool declaration on the request ({@code {"type":"function","function":{...}}}) */
+  @Data
+  @lombok.AllArgsConstructor
+  private static class Tool {
+    private String type;
+    private FunctionDefinition function;
+
+    static Tool of(LlmToolSpec spec) {
+      return new Tool(
+          "function", new FunctionDefinition(spec.name(), spec.description(), spec.parameters()));
+    }
+  }
+
+  /** Function half of a tool declaration */
+  @Data
+  @lombok.AllArgsConstructor
+  private static class FunctionDefinition {
+    private String name;
+    private String description;
+    private java.util.Map<String, Object> parameters;
+  }
+
+  /** Tool call on the response */
+  @Data
+  private static class ToolCall {
+    private String id;
+    private String type;
+    private FunctionCall function;
+  }
+
+  /** Function half of a tool call — {@code arguments} is a JSON string, not an object */
+  @Data
+  private static class FunctionCall {
+    private String name;
+    private String arguments;
   }
 
   /** OpenAI Chat Completion Response format */

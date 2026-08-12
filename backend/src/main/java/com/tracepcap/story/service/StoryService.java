@@ -43,6 +43,7 @@ public class StoryService {
   private final FindingsService findingsService;
   private final NarratorRunner narratorRunner;
   private final InvestigationService investigationService;
+  private final InvestigationTools investigationTools;
   private final TimelineService timelineService;
 
   /**
@@ -108,13 +109,8 @@ public class StoryService {
           log.warn("Failed to fetch timeline bins for custom prompt retry: {}", e.getMessage());
         }
         try {
-          String phase1Json = llmClient.generateCompletion(
-              buildHypothesisSystemPrompt(),
-              buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings,
-                  timelineBinsCustom, maxFindings, maxRiskMatrix));
-          var phase1 = parseHypothesesAndQueries(phase1Json);
-          investigationSteps =
-              investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
+          investigationSteps = investigate(fileId, file, analysis, additionalContext, aggregates,
+              findings, timelineBinsCustom, maxFindings, maxRiskMatrix);
           log.info("Custom prompt retry investigation complete: {} steps", investigationSteps.size());
         } catch (Exception e) {
           log.warn("Investigation phase skipped during custom prompt retry: {}", e.getMessage());
@@ -164,13 +160,8 @@ public class StoryService {
       // Phase 1: LLM generates hypotheses + queries
       List<InvestigationStep> investigationSteps = List.of();
       try {
-        String phase1Json = llmClient.generateCompletion(
-            buildHypothesisSystemPrompt(),
-            buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings, timelineBins, maxFindings, maxRiskMatrix)
-        );
-        var phase1 = parseHypothesesAndQueries(phase1Json);
-        investigationSteps =
-            investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
+        investigationSteps = investigate(fileId, file, analysis, additionalContext, aggregates,
+            findings, timelineBins, maxFindings, maxRiskMatrix);
         log.info(
             "Investigation complete: {} steps for file: {}", investigationSteps.size(), fileId);
       } catch (Exception e) {
@@ -227,6 +218,44 @@ public class StoryService {
       if (e instanceof ContextLengthExceededException) throw (ContextLengthExceededException) e;
       throw new RuntimeException("Failed to generate story: " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Phase 1 — ask the LLM what to look for, then look.
+   *
+   * <p>Prefers the {@code query_conversations} tool, so the server constrains the query to its real
+   * schema (#623). Where the backend does not implement tool calling, {@link
+   * LlmClient#generateWithTools} hands back ordinary text and the free-text JSON parser takes over —
+   * that path is not deprecated, it is the offline guarantee. Same for a server that accepts tools
+   * and calls none: the text it produced instead is still worth parsing before giving up.
+   */
+  private List<InvestigationStep> investigate(
+      UUID fileId, FileEntity file, CaptureSummary analysis, String additionalContext,
+      StoryAggregates aggregates, List<Finding> findings, List<TimelineDataDto> timelineBins,
+      Integer maxFindings, Integer maxRiskMatrix) {
+
+    LlmToolResponse response =
+        llmClient.generateWithTools(
+            buildHypothesisSystemPrompt(),
+            buildHypothesisUserPrompt(file, analysis, additionalContext, aggregates, findings,
+                timelineBins, maxFindings, maxRiskMatrix),
+            List.of(investigationTools.queryConversationsTool()));
+
+    if (response.schemaConstrained()) {
+      var plan = investigationTools.parse(response);
+      if (!plan.isEmpty()) {
+        return investigationService.executeQueries(fileId, plan.queries(), plan.hypotheses(), true);
+      }
+      log.warn("Tool call produced no usable queries — falling back to free-text parsing");
+    }
+
+    if (response.content() == null || response.content().isBlank()) {
+      log.warn("Investigation phase produced neither tool calls nor text");
+      return List.of();
+    }
+
+    var phase1 = parseHypothesesAndQueries(response.content());
+    return investigationService.executeQueries(fileId, phase1.queries(), phase1.hypotheses());
   }
 
   /**
@@ -613,7 +642,9 @@ public class StoryService {
     return """
         You are a cybersecurity analyst. Your ONLY job is to form hypotheses and specify targeted database queries to test them, based on the pre-computed findings and traffic timeline provided.
 
-        You must respond ONLY with valid JSON in this exact format:
+        If you have been given a `query_conversations` tool, call it once per hypothesis (up to 5 calls) and write no prose. Omit any filter field you do not want to constrain rather than passing null. Ignore the JSON format below — it describes the same fields for the case where no tool is available.
+
+        Otherwise you must respond ONLY with valid JSON in this exact format:
         {
           "hypotheses": [
             {

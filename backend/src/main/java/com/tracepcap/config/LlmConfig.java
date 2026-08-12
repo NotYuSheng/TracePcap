@@ -25,6 +25,13 @@ public class LlmConfig {
     private Integer maxTokens;
     private Integer contextLength;
     private Integer timeoutSeconds;
+
+    /**
+     * Native tool calling: {@code auto} (try once, remember whether the server accepts it), {@code
+     * on} (always send tools — for a backend known to support them), {@code off} (never send them —
+     * the pre-#623 free-text-JSON path).
+     */
+    private String toolCalling;
   }
 
   @Data
