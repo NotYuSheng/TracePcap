@@ -115,6 +115,20 @@ class ChangeDetectionLocalityCharacterisationTest {
   }
 
   @Test
+  void isPrivate_missesMostOfTheFe80Slash10LinkLocalRange() {
+    // fe80::/10 spans fe80:: through febf::, but the prefix set holds the literal string
+    // "fe80", so only the first sixteenth of the range matches. febf::1 is link-local and is
+    // classified as PUBLIC — a real gap, and the one place the string-prefix approach visibly
+    // breaks rather than merely being imprecise.
+    //
+    // Pinned, not fixed: correcting it here would change which hosts monitor mode reports as
+    // external, inside a PR whose whole purpose is to prove behaviour unchanged. Recorded on
+    // #694 with the other locality divergences.
+    assertThat(isPrivate("fe80::1")).isTrue();
+    assertThat(isPrivate("febf::1")).isFalse();
+  }
+
+  @Test
   void isPrivate_matchesFePrefixOnlyForFe80NotAllFeAddresses() {
     // The prefix set contains "fe80" rather than "fe", so fec0:: (deprecated site-local) is not
     // matched. Worth pinning: the neighbouring fc/fd entries are two characters, and it would be
