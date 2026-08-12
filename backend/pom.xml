@@ -29,6 +29,8 @@
         <tomcat.version>10.1.35</tomcat.version>
         <tika.version>3.2.2</tika.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <!-- -Djacoco.skip.check=true to build without a Docker daemon; see the check execution. -->
+        <jacoco.skip.check>false</jacoco.skip.check>
     </properties>
 
     <dependencies>
@@ -257,6 +259,43 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                    </execution>
+
+                    <!-- The ratchet (#659). A floor, not a target: it stops coverage sliding
+                         back, and rises as the suite grows. Deliberately set a little under the
+                         measured figure so ordinary variance does not fail an unrelated PR —
+                         the point is to catch a regression, not to police decimals.
+
+                         Skippable via -Djacoco.skip.check=true for the one case that would
+                         otherwise fail honestly: without a Docker daemon the Testcontainers
+                         suites skip, coverage collapses, and the build would fail for a reason
+                         that has nothing to do with the change. CI always has Docker. -->
+                    <execution>
+                        <id>jacoco-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${jacoco.skip.check}</skip>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.20</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.14</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
