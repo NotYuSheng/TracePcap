@@ -81,7 +81,7 @@ class ControllerContractTest {
               new ArchCondition<>("not hard-code the /api or version prefix") {
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
-                  for (String path : requestMappingPaths(item)) {
+                  for (String path : allDeclaredPaths(item)) {
                     if (path.startsWith("/api") || path.matches("/v[0-9]+(/.*)?")) {
                       events.add(
                           SimpleConditionEvent.violated(
@@ -106,7 +106,10 @@ class ControllerContractTest {
               new ArchCondition<>("use kebab-case resource paths") {
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
-                  for (String path : requestMappingPaths(item)) {
+                  // Class-level @RequestMapping and every method-level mapping. Checking only
+                  // the class prefix would let @GetMapping("/dnsServers") through — the 70
+                  // method-level paths are where most of the surface actually is.
+                  for (String path : allDeclaredPaths(item)) {
                     if (!path.isEmpty() && !KEBAB_PATH.matcher(path).matches()) {
                       events.add(
                           SimpleConditionEvent.violated(
@@ -205,6 +208,43 @@ class ControllerContractTest {
     List<String> declared =
         mapping.value().length > 0 ? List.of(mapping.value()) : List.of(mapping.path());
     return declared.stream().filter(p -> !p.isEmpty()).toList();
+  }
+
+  /** Class-level {@code @RequestMapping} paths plus every method-level mapping path. */
+  private static List<String> allDeclaredPaths(JavaClass javaClass) {
+    return java.util.stream.Stream.concat(
+            requestMappingPaths(javaClass).stream(),
+            javaClass.getMethods().stream().flatMap(m -> methodMappingPaths(m).stream()))
+        .toList();
+  }
+
+  /** The paths declared on a handler's mapping annotation, or empty when it maps the root. */
+  private static List<String> methodMappingPaths(JavaMethod method) {
+    if (method.isAnnotatedWith(GetMapping.class)) {
+      GetMapping a = method.getAnnotationOfType(GetMapping.class);
+      return nonEmpty(a.value().length > 0 ? a.value() : a.path());
+    }
+    if (method.isAnnotatedWith(PostMapping.class)) {
+      PostMapping a = method.getAnnotationOfType(PostMapping.class);
+      return nonEmpty(a.value().length > 0 ? a.value() : a.path());
+    }
+    if (method.isAnnotatedWith(PutMapping.class)) {
+      PutMapping a = method.getAnnotationOfType(PutMapping.class);
+      return nonEmpty(a.value().length > 0 ? a.value() : a.path());
+    }
+    if (method.isAnnotatedWith(PatchMapping.class)) {
+      PatchMapping a = method.getAnnotationOfType(PatchMapping.class);
+      return nonEmpty(a.value().length > 0 ? a.value() : a.path());
+    }
+    if (method.isAnnotatedWith(DeleteMapping.class)) {
+      DeleteMapping a = method.getAnnotationOfType(DeleteMapping.class);
+      return nonEmpty(a.value().length > 0 ? a.value() : a.path());
+    }
+    return List.of();
+  }
+
+  private static List<String> nonEmpty(String[] paths) {
+    return java.util.Arrays.stream(paths).filter(p -> !p.isEmpty()).toList();
   }
 
   /**
