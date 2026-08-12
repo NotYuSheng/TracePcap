@@ -105,14 +105,19 @@ def main():
     for stack, (compose_files, profile_files) in sorted(STACKS.items()):
         reachable = vars_passed(compose_files)
         read = vars_read(profile_files)
-        for var in sorted(read):
-            if var not in EXEMPT and var not in reachable:
-                unreachable.append((stack, var))
-        for var in sorted(reachable):
-            # Compose legitimately sets things Spring never sees — container
-            # plumbing, and anything the entrypoint consumes.
-            if var not in EXEMPT and var not in read and var not in PASSTHROUGH:
-                dead.append((stack, var))
+        # Declared by Spring, never supplied by compose: setting it does nothing.
+        unreachable.extend(
+            (stack, var)
+            for var in sorted(read)
+            if var not in EXEMPT and var not in reachable
+        )
+        # Supplied by compose, read by no Spring config: a knob that does nothing.
+        # PASSTHROUGH covers the few consumed outside Spring entirely.
+        dead.extend(
+            (stack, var)
+            for var in sorted(reachable)
+            if var not in EXEMPT and var not in read and var not in PASSTHROUGH
+        )
 
     if not unreachable and not dead:
         print("OK — backend environment and Spring config agree in both directions.")
