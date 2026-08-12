@@ -16,7 +16,7 @@ function conversation(src: string, dst: string, overrides: Partial<Conversation>
       { ip: src, port: 1234 },
       { ip: dst, port: 443 },
     ],
-    protocol: { name: 'TCP', layer: 'Transport' },
+    protocol: { name: 'TCP', layer: 'transport' },
     packetCount: 10,
     totalBytes: 1000,
     startTime: 0,
@@ -80,11 +80,11 @@ describe('buildNetworkGraph', () => {
   it('breaks packet counts down by protocol', () => {
     const result = buildNetworkGraph([
       conversation('10.0.0.1', '8.8.8.8', {
-        protocol: { name: 'TCP', layer: 'Transport' },
+        protocol: { name: 'TCP', layer: 'transport' },
         packetCount: 10,
       } as Partial<Conversation>),
       conversation('10.0.0.2', '1.1.1.1', {
-        protocol: { name: 'UDP', layer: 'Transport' },
+        protocol: { name: 'UDP', layer: 'transport' },
         packetCount: 4,
       } as Partial<Conversation>),
     ])
