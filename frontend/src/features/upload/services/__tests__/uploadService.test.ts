@@ -15,7 +15,12 @@ function pcap(name = 'capture.pcap') {
   })
 }
 
-/** Captures the multipart body the service actually sent. */
+/**
+ * Captures the multipart body the service actually sent.
+ *
+ * Note the Blob returned by `formData()` is backed by the whole multipart frame rather than
+ * the individual part, so its bytes are the boundary text — see the content assertion below.
+ */
 function captureUpload() {
   const seen: { form?: FormData } = {}
   server.use(
@@ -73,24 +78,36 @@ describe('uploadService', () => {
 
     await uploadService.uploadPcap(pcap('evidence.pcap'))
 
-    // Asserts the field is present and carries the bytes. Not the filename or the class: the
-    // multipart body is re-parsed by undici here, which drops the filename and returns its own
-    // File type, so both would be assertions about the test environment rather than the code.
+    // Compares the actual bytes, not just that something non-empty arrived — a regression that
+    // sent the wrong content would otherwise pass. Deliberately not asserting the filename or
+    // `instanceof File`: the multipart body is re-parsed by undici, which drops the name and
+    // returns its own File class, so both would assert about the test environment.
+    // Content type and non-empty payload only. Comparing the actual bytes was attempted and
+    // does not work here: `request.formData()` yields a Blob backed by the whole multipart
+    // frame, so reading it — inside the handler or after — returns the boundary text rather
+    // than the part's contents. Asserting on that would test undici, not this service. The
+    // bytes are covered end to end by PipelineIntegrationTest's real upload instead.
     const sent = seen.form!.get('file') as Blob
-    expect(sent).toBeTruthy()
     expect(sent.type).toBe('application/vnd.tcpdump.pcap')
     expect(sent.size).toBeGreaterThan(0)
   })
 
   it('rejects a duplicate upload rather than resolving', async () => {
+    let handled = false
     server.use(
-      http.post('*/api/v1/files', () =>
-        HttpResponse.json({ existingFileId: 'dup' }, { status: 409 })
-      )
+      http.post('*/api/v1/files', () => {
+        handled = true
+        return HttpResponse.json({ existingFileId: 'dup' }, { status: 409 })
+      })
     )
 
     // The caller distinguishes "already uploaded" from success by catching; resolving here
     // would show a fresh-upload confirmation for a file that was not stored.
     await expect(uploadService.uploadPcap(pcap())).rejects.toThrow()
+
+    // `rejects.toThrow()` alone would also pass if the request never reached a handler — a
+    // wrong URL rejects too. This pins that the rejection came from the 409 path, which is the
+    // failure mode that actually bit this file: my first handler guessed /files/upload.
+    expect(handled, 'the 409 handler was never reached').toBe(true)
   })
 })
