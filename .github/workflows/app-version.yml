@@ -81,6 +81,10 @@ jobs:
           fi
 
           BRANCH="chore/sync-version-${VERSION}"
+          # Export so the cleanup step below can reach it. The branch is pushed before the
+          # PR exists, so every failure between here and the merge would otherwise strand it
+          # on the remote with no PR — and with no PR, delete-branch-on-close.yml never fires.
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
@@ -128,3 +132,22 @@ jobs:
 
           echo "::error::Could not merge $PR_URL after 5 attempts — it needs a look."
           exit 1
+
+      # Only reached when the step above failed, which means the PR did not merge and
+      # `gh pr merge --delete-branch` never ran. Without this the branch is stranded on the
+      # remote: the merge path is the only thing that deletes it, and if the PR was never
+      # created there is no pull_request event for delete-branch-on-close.yml to act on
+      # either. This is the one branch-leak route neither of those covers.
+      - name: Remove the bump branch if it never merged
+        if: failure() && env.BRANCH != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Close any open PR first so it does not linger pointing at a deleted branch.
+          gh pr close "$BRANCH" --delete-branch 2>/dev/null && exit 0
+
+          if gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${BRANCH}"; then
+            echo "Removed stranded branch $BRANCH"
+          else
+            echo "Nothing to remove for $BRANCH."
+          fi

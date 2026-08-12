@@ -1,0 +1,47 @@
+name: Delete Branch On Close
+
+# The repo setting "Automatically delete head branches" only fires on **merge**. A PR
+# closed *without* merging keeps its branch forever, and nothing in the repo cleaned those
+# up. This covers that half.
+#
+# (The seven stale chore/sync-version-* branches removed alongside this workflow were a
+# different problem: they belonged to PRs that had merged before that setting was enabled
+# on 11 Aug. Merge-time deletion works and is untouched here.)
+#
+# Deleting is safe: GitHub keeps a "Restore branch" button on the closed PR, so a branch
+# removed here can be brought back from the PR page with one click.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  delete:
+    name: Delete the head branch
+    runs-on: ubuntu-latest
+
+    # Merged PRs are already handled by delete_branch_on_merge — acting on them too would
+    # race that setting and log spurious failures. Fork branches live in another repo and
+    # cannot be deleted with this token.
+    if: >-
+      github.event.pull_request.merged == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Delete the head branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          # A 422 here means the branch is protected, and a 404 means it is already gone
+          # (someone ticked "delete branch" in the UI first). Neither is a failure worth
+          # failing the run over, so report and move on.
+          if gh api -X DELETE "repos/${REPO}/git/refs/heads/${BRANCH}"; then
+            echo "Deleted ${BRANCH}"
+          else
+            echo "Could not delete ${BRANCH} — already removed, or protected. Leaving it."
+          fi
