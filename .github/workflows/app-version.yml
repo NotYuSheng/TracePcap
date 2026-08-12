@@ -102,10 +102,22 @@ jobs:
               --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest main commit. Opened by .github/workflows/app-version.yml.")
           fi
 
-          # Step off the bump branch: `gh pr merge --delete-branch` deletes the local
-          # branch too, and git refuses to delete the one that is checked out — which
-          # makes gh exit nonzero even when the remote merge succeeded.
+          # Step off the bump branch: git refuses to delete a checked-out branch.
           git checkout --detach
+
+          # Delete the remote branch ourselves rather than via `gh pr merge --delete-branch`.
+          # On a detached HEAD gh cannot resolve a current branch, so --delete-branch fails
+          # with "could not determine current branch: not on any branch" *after* the remote
+          # merge has already gone through. gh then exits nonzero, the loop below falls to
+          # its "already merged" check and returns 0 — with the branch still on the remote.
+          # That is how bump branches kept piling up (#663).
+          delete_bump_branch() {
+            if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH}" >/dev/null 2>&1; then
+              echo "Deleted ${BRANCH}"
+            else
+              echo "Branch ${BRANCH} already gone."
+            fi
+          }
 
           # Auto-merge only queues a merge behind pending requirements, and GitHub
           # rejects it outright for a PR that is already mergeable ("Pull request is
@@ -117,13 +129,13 @@ jobs:
           # blanket `|| gh pr merge --auto` would also mask a real failure (e.g. a
           # conflict against a moved main) as a green step that never lands the PR.
           for attempt in 1 2 3 4 5; do
-            if gh pr merge "$PR_URL" --squash --delete-branch; then
-              echo "Merged $PR_URL"
-              exit 0
-            fi
-            # Already merged by a concurrent run — nothing left to do.
+            gh pr merge "$PR_URL" --squash || true
+
+            # Ask GitHub rather than trusting gh's exit code: the merge frequently lands
+            # even when gh reports failure (see the note above).
             if [ "$(gh pr view "$PR_URL" --json state --jq .state)" = "MERGED" ]; then
-              echo "$PR_URL is already merged."
+              echo "Merged $PR_URL"
+              delete_bump_branch
               exit 0
             fi
             echo "Merge attempt $attempt failed; mergeability may still be computing. Retrying..."
@@ -133,20 +145,21 @@ jobs:
           echo "::error::Could not merge $PR_URL after 5 attempts — it needs a look."
           exit 1
 
-      # Only reached when the step above failed, which means the PR did not merge and
-      # `gh pr merge --delete-branch` never ran. Without this the branch is stranded on the
-      # remote: the merge path is the only thing that deletes it, and if the PR was never
-      # created there is no pull_request event for delete-branch-on-close.yml to act on
-      # either. This is the one branch-leak route neither of those covers.
+      # Only reached when the step above failed, which means the PR never reached MERGED and
+      # the branch was never deleted. Without this it is stranded on the remote: if the PR
+      # was never created there is no pull_request event for delete-branch-on-close.yml to
+      # act on either. This is the one branch-leak route neither of those covers.
       - name: Remove the bump branch if it never merged
         if: failure() && env.BRANCH != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Close any open PR first so it does not linger pointing at a deleted branch.
-          gh pr close "$BRANCH" --delete-branch 2>/dev/null && exit 0
+          # No --delete-branch: this job runs on a detached HEAD, where gh cannot resolve a
+          # current branch and the flag fails. Delete the ref through the API instead.
+          gh pr close "$BRANCH" 2>/dev/null || true
 
-          if gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${BRANCH}"; then
+          if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH}" >/dev/null 2>&1; then
             echo "Removed stranded branch $BRANCH"
           else
             echo "Nothing to remove for $BRANCH."
