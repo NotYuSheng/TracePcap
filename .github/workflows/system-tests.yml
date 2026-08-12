@@ -2,6 +2,12 @@ name: System Tests
 
 on:
   workflow_dispatch:
+  # Also on merge, not only per-PR. A PR run proves the branch was sound at the time; nothing
+  # re-checked main after it landed, so a semantic conflict between two independently-green
+  # PRs would go unnoticed until someone opened the next one (#659).
+  push:
+    branches:
+      - main
   pull_request:
     paths:
       - 'backend/**'

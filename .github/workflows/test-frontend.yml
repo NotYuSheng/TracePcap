@@ -2,6 +2,11 @@ name: Frontend Unit Tests
 
 on:
   workflow_dispatch:
+  # Also on merge, so main has a continuous coverage history rather than only per-PR
+  # readings. The ratchet in #659 needs a trustworthy floor measured from main.
+  push:
+    branches:
+      - main
   pull_request:
     paths:
       - 'frontend/**'
