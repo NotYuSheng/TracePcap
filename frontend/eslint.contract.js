@@ -33,8 +33,11 @@ export const noHardCodedApiUrls = [
 ]
 
 // directUrl.ts defines the prefix; the API tests and e2e specs assert on and intercept real
-// URLs; vite.config.ts's "/api" is a dev-proxy mount path, not a request URL.
+// URLs; vite.config.ts's "/api" is a dev-proxy mount path, not a request URL. The generated
+// schema is the contract itself — its "/api/v1/..." keys are the routes this rule checks
+// hand-written URLs against, so exempting it is the point, not an escape hatch.
 export const contractRuleExemptions = [
+  'src/services/api/generated/**',
   'src/services/api/directUrl.ts',
   'src/services/api/__tests__/**',
   'e2e/**',
