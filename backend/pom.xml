@@ -28,6 +28,7 @@
         <postgresql.version>42.7.2</postgresql.version>
         <tomcat.version>10.1.35</tomcat.version>
         <tika.version>3.2.2</tika.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <dependencies>
@@ -215,6 +216,49 @@
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>10.4.1</version>
+            </plugin>
+
+            <!-- Code Coverage.
+
+                 Report-only: no <check> rule is bound, so coverage cannot fail a build yet.
+                 The first task is to establish a truthful baseline (see #659); a threshold
+                 imposed before anyone knows the number just gets bypassed.
+
+                 There is no failsafe plugin: unit and Testcontainers integration tests alike
+                 run under surefire in the `test` phase, so a single prepare-agent execution
+                 covers both and the integration suites count toward the figure. The report is
+                 written at `verify`, once every test has run. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <excludes>
+                        <!-- Spring Boot entry point: no branches, exercised by every
+                             @SpringBootTest but meaningless as a coverage target. -->
+                        <exclude>com/tracepcap/TracePcapApplication.class</exclude>
+                        <!-- Persistence entities and transport DTOs are data carriers. With
+                             Lombok generation already annotated out, what remains is field
+                             declarations, so including them measures the mapper, not us. -->
+                        <exclude>com/tracepcap/**/entity/**</exclude>
+                        <exclude>com/tracepcap/**/dto/**</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Spotless Code Formatting -->
