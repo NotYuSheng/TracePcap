@@ -88,16 +88,22 @@ describe('useChangeEventFilters', () => {
     expect(result.current.eventPage).toBe(1)
   })
 
-  it('clamps the page down when the list shrinks beneath it', () => {
-    const events = [...many(25, { severity: 'INFO' }), ...many(3, { severity: 'CRITICAL' })]
-    const { result } = renderHook(() => useChangeEventFilters(events))
+  it('clamps the page down when the event list itself shrinks', () => {
+    const { result, rerender } = renderHook(({ events }) => useChangeEventFilters(events), {
+      initialProps: { events: many(25) },
+    })
 
     act(() => result.current.setEventPage(3))
-    act(() => result.current.selectSeverity('CRITICAL'))
+    expect(result.current.eventPage).toBe(3)
 
-    // selectSeverity already resets to 1, so the clamp effect is what protects a page set
-    // directly — e.g. restored from a link — against a list that cannot reach it.
-    expect(result.current.eventPage).toBeLessThanOrEqual(result.current.totalEventPages)
+    // Shrink the input rather than changing a filter. selectSeverity resets the page to 1 on
+    // its own, so routing through it would pass even with the clamp effect deleted — the
+    // reset would do the work and the effect would never be exercised.
+    rerender({ events: many(5) })
+
+    // Page 3 of a one-page list renders nothing at all.
+    expect(result.current.totalEventPages).toBe(1)
+    expect(result.current.eventPage).toBe(1)
   })
 
   it('reports at least one page even with nothing to show', () => {

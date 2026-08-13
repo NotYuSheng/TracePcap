@@ -138,13 +138,29 @@ describe('useFileUpload', () => {
     await waitFor(() => expect(result.current.uploads[0].progress).toBe(100))
   })
 
-  it('exposes isUploading only while work is outstanding', async () => {
-    mocked.uploadPcap.mockResolvedValue({ fileId: 'f1' } as never)
+  it('reports isUploading while a file is actually in flight', async () => {
+    // Held open so the flag can be observed mid-upload. Checking only before and after leaves
+    // isUploading trivially false at both ends — it would pass even if the flag were never
+    // set, which is exactly what the progress UI depends on.
+    let finishUpload: () => void = () => {}
+    mocked.uploadPcap.mockImplementation(
+      () => new Promise(res => { finishUpload = () => res({ fileId: 'f1' } as never) })
+    )
 
     const { result } = renderHook(() => useFileUpload())
     expect(result.current.isUploading).toBe(false)
 
-    await act(async () => { await result.current.uploadFiles([pcap('a.pcap')]) })
+    let pending!: Promise<void>
+    await act(async () => {
+      pending = result.current.uploadFiles([pcap('a.pcap')])
+    })
+
+    expect(result.current.isUploading).toBe(true)
+
+    await act(async () => {
+      finishUpload()
+      await pending
+    })
 
     expect(result.current.isUploading).toBe(false)
   })

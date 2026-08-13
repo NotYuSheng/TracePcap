@@ -134,14 +134,21 @@ describe('ChangeEventBadge', () => {
     expect(screen.getByText(/Snapshot 1: monday\.pcap/)).toBeInTheDocument()
   })
 
-  it('marks an event reviewed optimistically and persists it', async () => {
-    const onPatch = vi.fn().mockResolvedValue(undefined)
+  it('flips the state before the save resolves, not after', async () => {
+    // Deferred so the assertion lands while the request is still in flight. Asserting only
+    // after it resolves cannot tell an optimistic update from a pessimistic one — both end in
+    // the same place, and the difference is the whole point of the local state.
+    let resolvePatch: () => void = () => {}
+    const onPatch = vi.fn(() => new Promise<void>(res => { resolvePatch = () => res() }))
     renderBadge(event(), onPatch)
 
     await userEvent.click(screen.getByTitle('Mark as reviewed'))
 
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('e1', { reviewed: true }))
-    // The title flips because localReviewed did — that is the optimistic update landing.
+    expect(onPatch).toHaveBeenCalledWith('e1', { reviewed: true })
+    // Mid-flight: the row greys out immediately so a triage queue stays responsive.
+    expect(screen.getByTitle('Mark as unreviewed')).toBeInTheDocument()
+
+    resolvePatch()
     await waitFor(() => expect(screen.getByTitle('Mark as unreviewed')).toBeInTheDocument())
   })
 
