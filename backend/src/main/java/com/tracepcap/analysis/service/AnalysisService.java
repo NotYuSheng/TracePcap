@@ -135,7 +135,18 @@ public class AnalysisService {
   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
   private final HostnameClaimWriter hostnameClaimWriter;
 
-  @Transactional
+  /**
+   * Runs the capture through the pipeline (#512 slice 7).
+   *
+   * <p>This was one 290-line method with the stages marked by comments, which meant the stage
+   * boundaries were a claim rather than a fact: anything could read anything, and "which stage
+   * writes this?" was answered by scrolling. Each stage is now a method taking an explicit {@link
+   * Run}, so what a stage consumes and produces is in its signature.
+   *
+   * <p>What stays here is what genuinely belongs to the whole job: the guard against re-analysis,
+   * the temp file's lifetime, and the failure path — which has to mark the record FAILED in its own
+   * committed transaction, since the one being rolled back cannot record why it failed.
+   */
   public void analyzeFile(UUID fileId) {
     log.info("Starting analysis for file: {}", fileId);
 
@@ -159,246 +170,19 @@ public class AnalysisService {
 
     try {
       long analysisStart = System.currentTimeMillis();
+      Run run = new Run(fileId, file, plan, analysis);
 
-      // Stage 1: Download
-      reportStage(fileId, plan, 0);
-      long t = System.currentTimeMillis();
       File tempFile = File.createTempFile("pcap-", ".pcap");
+      run.pcap = tempFile;
       try {
-        storageService.downloadFileToLocal(file.getMinioPath(), tempFile);
-        log.info("[{}] [1/7] Download: {}ms", fileId, System.currentTimeMillis() - t);
-
-        // Stage 2: PCAP parse
-        reportStage(fileId, plan, 1);
-        t = System.currentTimeMillis();
-        PcapParserService.PcapAnalysisResult parseResult =
-            pcapParserService.analyzePcapFile(tempFile);
-        log.info(
-            "[{}] [2/7] PCAP parse: {}ms  ({} packets, {} conversations)",
-            fileId,
-            System.currentTimeMillis() - t,
-            parseResult.getPacketCount(),
-            parseResult.getConversations().size());
-
-        // Stage 3: Extract — every Extractor on the classpath, in turn.
-        //
-        // This block used to name each extractor, hold its enable flag, and record its manifest row
-        // by hand; adding one meant editing this method. It now names none of them: the runner
-        // discovers every Extractor, each decides for itself whether it applies to this capture,
-        // and the manifest row is automatic (#512).
-        reportStage(fileId, plan, 2);
-        t = System.currentTimeMillis();
-        extractorRunner.runAll(file, tempFile, parseResult.getConversations());
-        log.info("[{}] [3/7] Extract: {}ms", fileId, System.currentTimeMillis() - t);
-
-        // Stage 4: Signatures, device classification, geo-IP
-        reportStage(fileId, plan, 3);
-        t = System.currentTimeMillis();
-        Map<String, String> deviceOverrides =
-            signatureApplier.applySignatures(parseResult.getConversations());
-        // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
-        // (#512 slice 4); the adjudicator picks display winners with the same semantics the
-        // resolver used to apply at write time, so downstream behaviour is unchanged.
-        List<HostnameResolverService.Claim> hostnameClaims =
-            hostnameResolverService.resolve(tempFile);
-        try {
-          hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
-        } catch (Exception e) {
-          // Best-effort: the writer's REQUIRES_NEW tx rolled back alone; analysis continues.
-          log.warn(
-              "Failed to persist {} hostname claim(s) for file {}: {}",
-              hostnameClaims.size(),
-              fileId,
-              e.getMessage());
-        }
-        Map<String, HostnameResolverService.ResolvedHostname> hostnames =
-            hostnameAdjudicator.adjudicate(hostnameClaims);
-        // Per-host service activity logs (DNS today; web servers etc. later). Each extractor runs
-        // one tshark pass, persists its own rows, and reports which hosts serve its role + any
-        // suspicious ones. Runs before classification so a host's roles can drive its device type
-        // (e.g. a DNS responder → DNS_SERVER). Adding a role needs no change here.
-        ServiceLogOutcome serviceLogs = runServiceLogExtractors(file, tempFile);
-        List<HostClassificationEntity> hostClassifications =
-            hostClassifier.classify(
-                file,
-                parseResult.getConversations(),
-                parseResult.getHostTtls(),
-                parseResult.getHostMacs(),
-                deviceOverrides,
-                hostnames,
-                serviceLogs.rolesByIp());
-        applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
-        hostClassificationRepository.saveAll(hostClassifications);
-        try {
-          persistIpMacObservations(file, parseResult.getHostMacObservations());
-        } catch (Exception e) {
-          // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
-          log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
-        }
-        try {
-          Set<String> allIps =
-              parseResult.getConversations().stream()
-                  .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
-                  .collect(Collectors.toSet());
-          geoIpService.lookupExternal(allIps);
-        } catch (Exception e) {
-          log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
-        }
-        log.info(
-            "[{}] [4/7] Signatures + classification + geo-IP: {}ms",
-            fileId,
-            System.currentTimeMillis() - t);
-
-        // Stage 5: Persist analysis result
-        reportStage(fileId, plan, 4);
-        t = System.currentTimeMillis();
-        analysis.setPacketCount(parseResult.getPacketCount());
-        analysis.setTotalBytes(parseResult.getTotalBytes());
-        analysis.setStartTime(parseResult.getStartTime());
-        analysis.setEndTime(parseResult.getEndTime());
-        if (parseResult.getStartTime() != null && parseResult.getEndTime() != null) {
-          Duration duration =
-              Duration.between(parseResult.getStartTime(), parseResult.getEndTime());
-          analysis.setDurationMs(duration.toMillis());
-        }
-        Map<String, Object> protocolStats = new HashMap<>();
-        parseResult
-            .getProtocolCounts()
-            .forEach(
-                (protocol, count) -> {
-                  Map<String, Object> stat = new HashMap<>();
-                  stat.put("packetCount", count);
-                  stat.put("bytes", parseResult.getProtocolBytes().getOrDefault(protocol, 0L));
-                  stat.put(
-                      "percentage", (count.doubleValue() / parseResult.getPacketCount()) * 100);
-                  protocolStats.put(protocol, stat);
-                });
-        analysis.setProtocolStats(protocolStats);
-        analysis.setStatus(AnalysisResultEntity.AnalysisStatus.COMPLETED);
-        analysisResultRepository.save(analysis);
-        log.info("[{}] [5/7] Analysis result saved: {}ms", fileId, System.currentTimeMillis() - t);
-
-        // Stage 6: DB inserts (conversations + packets)
-        reportStage(fileId, plan, 5);
-        t = System.currentTimeMillis();
-        // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
-        // partition must exist before the first insert below or the row has nowhere to land.
-        packetPartitions.ensurePartition(fileId);
-        int convIndex = 0;
-        long packetsInserted = 0;
-        List<UUID> savedConversationIds = new ArrayList<>();
-        for (PcapParserService.ConversationInfo convInfo : parseResult.getConversations()) {
-          ConversationEntity conversation =
-              ConversationEntity.builder()
-                  .file(file)
-                  .srcIp(convInfo.getSrcIp())
-                  .srcPort(convInfo.getSrcPort())
-                  .dstIp(convInfo.getDstIp())
-                  .dstPort(convInfo.getDstPort())
-                  .protocol(convInfo.getProtocol())
-                  .initiatorIp(convInfo.getInitiatorIp())
-                  .initiatorPort(convInfo.getInitiatorPort())
-                  .appName(convInfo.getAppName())
-                  .tsharkProtocol(convInfo.getTsharkProtocol())
-                  .category(convInfo.getCategory())
-                  .hostname(convInfo.getHostname())
-                  .ja3Client(convInfo.getJa3Client())
-                  .ja3Server(convInfo.getJa3Server())
-                  .tlsIssuer(convInfo.getTlsIssuer())
-                  .tlsSubject(convInfo.getTlsSubject())
-                  .tlsNotBefore(convInfo.getTlsNotBefore())
-                  .tlsNotAfter(convInfo.getTlsNotAfter())
-                  .flowRisks(toNullableArray(convInfo.getFlowRisks()))
-                  .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
-                  .suricataAlerts(toNullableArray(convInfo.getSuricataAlerts()))
-                  .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
-                  .packetCount(convInfo.getPacketCount())
-                  .totalBytes(convInfo.getTotalBytes())
-                  .startTime(convInfo.getStartTime())
-                  .endTime(convInfo.getEndTime())
-                  .build();
-          ConversationEntity savedConversation = conversationRepository.save(conversation);
-          savedConversationIds.add(savedConversation.getId());
-
-          List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
-          if (!packetInfos.isEmpty()) {
-            for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
-              int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
-              List<PacketEntity> batch =
-                  packetInfos.subList(i, end).stream()
-                      .map(
-                          pktInfo ->
-                              PacketEntity.builder()
-                                  .file(file)
-                                  .conversation(savedConversation)
-                                  .packetNumber(pktInfo.getPacketNumber())
-                                  .timestamp(pktInfo.getTimestamp())
-                                  .srcIp(pktInfo.getSrcIp())
-                                  .srcPort(pktInfo.getSrcPort())
-                                  .dstIp(pktInfo.getDstIp())
-                                  .dstPort(pktInfo.getDstPort())
-                                  .protocol(pktInfo.getProtocol())
-                                  .packetSize(pktInfo.getPacketSize())
-                                  .info(pktInfo.getInfo())
-                                  .payload(pktInfo.getPayload())
-                                  .detectedFileType(pktInfo.getDetectedFileType())
-                                  .build())
-                      .collect(Collectors.toList());
-              packetRepository.saveAll(batch);
-              packetsInserted += batch.size();
-            }
-            packetInfos.clear();
-          }
-
-          if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
-            entityManager.flush();
-            entityManager.clear();
-            log.info(
-                "[{}] [6/7] DB insert progress: {}/{} conversations, {} packets",
-                fileId,
-                convIndex,
-                parseResult.getConversations().size(),
-                packetsInserted);
-          }
-        }
-        log.info(
-            "[{}] [6/7] DB inserts done: {}ms  ({} conversations, {} packets)",
-            fileId,
-            System.currentTimeMillis() - t,
-            parseResult.getConversations().size(),
-            packetsInserted);
-
-        // Stage 7: File extraction (only in the plan when enabled — index 6)
-        t = System.currentTimeMillis();
-        if (file.isEnableFileExtraction()) {
-          reportStage(fileId, plan, 6);
-          try {
-            fileExtractionStage.extractFiles(file, tempFile, savedConversationIds);
-            log.info("[{}] [7/7] File extraction: {}ms", fileId, System.currentTimeMillis() - t);
-          } catch (Exception e) {
-            log.warn(
-                "[{}] [7/7] File extraction failed ({}ms): {}",
-                fileId,
-                System.currentTimeMillis() - t,
-                e.getMessage());
-          }
-        } else {
-          log.info("[{}] [7/7] File extraction: skipped", fileId);
-        }
-
-        // Update file status
-        file.setStatus(com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED);
-        file.setPacketCount(
-            parseResult.getPacketCount() != null ? parseResult.getPacketCount().intValue() : null);
-        file.setTotalBytes(parseResult.getTotalBytes());
-        file.setStartTime(parseResult.getStartTime());
-        file.setEndTime(parseResult.getEndTime());
-        file.setDuration(analysis.getDurationMs());
-        fileRepository.save(file);
-
-        // AFTER_COMMIT listeners (identity adjudication in insights) fire once this tx lands —
-        // the pipeline never learns who is listening (#512 slice 5).
-        eventPublisher.publishEvent(new AnalysisCompletedEvent(fileId));
+        downloadCapture(run);
+        parseCapture(run);
+        runExtractors(run);
+        enrichAndClassify(run);
+        persistAnalysisResult(run);
+        persistConversationsAndPackets(run);
+        extractEmbeddedFiles(run);
+        completeFile(run);
 
         log.info(
             "[{}] Analysis complete: total {}ms",
@@ -430,6 +214,322 @@ public class AnalysisService {
 
       throw new RuntimeException("Failed to analyze file", e);
     }
+  }
+
+  /**
+   * State handed from one stage to the next.
+   *
+   * <p>Mutable and package-private on purpose: the stages genuinely form a chain, and pretending
+   * otherwise by threading a growing tuple of return values would obscure that. Fields are written
+   * by exactly one stage and read by later ones, which is the property worth having — and one that
+   * was not checkable at all while everything was a local variable in a single method.
+   */
+  private static final class Run {
+    final UUID fileId;
+    final FileEntity file;
+    final List<StageStep> plan;
+    final AnalysisResultEntity analysis;
+
+    /** Stage 1 writes; stages 2, 3, 4 and 7 read. Deleted by the caller's finally. */
+    File pcap;
+
+    /** Stage 2 writes; every later stage reads. */
+    PcapParserService.PcapAnalysisResult parseResult;
+
+    /** Stage 6 writes; stage 7 reads. */
+    List<UUID> savedConversationIds = List.of();
+
+    Run(UUID fileId, FileEntity file, List<StageStep> plan, AnalysisResultEntity analysis) {
+      this.fileId = fileId;
+      this.file = file;
+      this.plan = plan;
+      this.analysis = analysis;
+    }
+  }
+
+  // ── Stage 1: download ───────────────────────────────────────────────────────
+
+  private void downloadCapture(Run run) {
+    reportStage(run.fileId, run.plan, 0);
+    long t = System.currentTimeMillis();
+    storageService.downloadFileToLocal(run.file.getMinioPath(), run.pcap);
+    log.info("[{}] [1/7] Download: {}ms", run.fileId, System.currentTimeMillis() - t);
+  }
+
+  // ── Stage 2: parse ──────────────────────────────────────────────────────────
+
+  private void parseCapture(Run run) {
+    reportStage(run.fileId, run.plan, 1);
+    long t = System.currentTimeMillis();
+    run.parseResult = pcapParserService.analyzePcapFile(run.pcap);
+    log.info(
+        "[{}] [2/7] PCAP parse: {}ms  ({} packets, {} conversations)",
+        run.fileId,
+        System.currentTimeMillis() - t,
+        run.parseResult.getPacketCount(),
+        run.parseResult.getConversations().size());
+  }
+
+  // ── Stage 3: extract ────────────────────────────────────────────────────────
+
+  /**
+   * Every {@code Extractor} on the classpath, in turn.
+   *
+   * <p>This block used to name each extractor, hold its enable flag, and record its manifest row by
+   * hand; adding one meant editing this method. It now names none of them: the runner discovers
+   * every Extractor, each decides for itself whether it applies to this capture, and the manifest
+   * row is automatic (#512).
+   */
+  private void runExtractors(Run run) {
+    reportStage(run.fileId, run.plan, 2);
+    long t = System.currentTimeMillis();
+    extractorRunner.runAll(run.file, run.pcap, run.parseResult.getConversations());
+    log.info("[{}] [3/7] Extract: {}ms", run.fileId, System.currentTimeMillis() - t);
+  }
+
+  // ── Stage 4: signatures, classification, geo-IP ─────────────────────────────
+
+  private void enrichAndClassify(Run run) {
+    reportStage(run.fileId, run.plan, 3);
+    long t = System.currentTimeMillis();
+    UUID fileId = run.fileId;
+
+    Map<String, String> deviceOverrides =
+        signatureApplier.applySignatures(run.parseResult.getConversations());
+
+    // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
+    // (#512 slice 4); the adjudicator picks display winners with the same semantics the
+    // resolver used to apply at write time, so downstream behaviour is unchanged.
+    List<HostnameResolverService.Claim> hostnameClaims = hostnameResolverService.resolve(run.pcap);
+    try {
+      hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
+    } catch (Exception e) {
+      // Best-effort: the writer's REQUIRES_NEW tx rolled back alone; analysis continues.
+      log.warn(
+          "Failed to persist {} hostname claim(s) for file {}: {}",
+          hostnameClaims.size(),
+          fileId,
+          e.getMessage());
+    }
+    Map<String, HostnameResolverService.ResolvedHostname> hostnames =
+        hostnameAdjudicator.adjudicate(hostnameClaims);
+
+    // Per-host service activity logs (DNS today; web servers etc. later). Each extractor runs
+    // one tshark pass, persists its own rows, and reports which hosts serve its role + any
+    // suspicious ones. Runs before classification so a host's roles can drive its device type
+    // (e.g. a DNS responder → DNS_SERVER). Adding a role needs no change here.
+    ServiceLogOutcome serviceLogs = runServiceLogExtractors(run.file, run.pcap);
+
+    List<HostClassificationEntity> hostClassifications =
+        hostClassifier.classify(
+            run.file,
+            run.parseResult.getConversations(),
+            run.parseResult.getHostTtls(),
+            run.parseResult.getHostMacs(),
+            deviceOverrides,
+            hostnames,
+            serviceLogs.rolesByIp());
+    applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
+    hostClassificationRepository.saveAll(hostClassifications);
+
+    try {
+      persistIpMacObservations(run.file, run.parseResult.getHostMacObservations());
+    } catch (Exception e) {
+      // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
+      log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
+    }
+
+    try {
+      Set<String> allIps =
+          run.parseResult.getConversations().stream()
+              .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+              .collect(Collectors.toSet());
+      geoIpService.lookupExternal(allIps);
+    } catch (Exception e) {
+      log.warn("Geo enrichment pre-warm failed: {}", e.getMessage());
+    }
+
+    log.info(
+        "[{}] [4/7] Signatures + classification + geo-IP: {}ms",
+        fileId,
+        System.currentTimeMillis() - t);
+  }
+
+  // ── Stage 5: persist the analysis result ────────────────────────────────────
+
+  private void persistAnalysisResult(Run run) {
+    reportStage(run.fileId, run.plan, 4);
+    long t = System.currentTimeMillis();
+    AnalysisResultEntity analysis = run.analysis;
+    PcapParserService.PcapAnalysisResult parseResult = run.parseResult;
+
+    analysis.setPacketCount(parseResult.getPacketCount());
+    analysis.setTotalBytes(parseResult.getTotalBytes());
+    analysis.setStartTime(parseResult.getStartTime());
+    analysis.setEndTime(parseResult.getEndTime());
+    if (parseResult.getStartTime() != null && parseResult.getEndTime() != null) {
+      Duration duration = Duration.between(parseResult.getStartTime(), parseResult.getEndTime());
+      analysis.setDurationMs(duration.toMillis());
+    }
+
+    Map<String, Object> protocolStats = new HashMap<>();
+    parseResult
+        .getProtocolCounts()
+        .forEach(
+            (protocol, count) -> {
+              Map<String, Object> stat = new HashMap<>();
+              stat.put("packetCount", count);
+              stat.put("bytes", parseResult.getProtocolBytes().getOrDefault(protocol, 0L));
+              stat.put("percentage", (count.doubleValue() / parseResult.getPacketCount()) * 100);
+              protocolStats.put(protocol, stat);
+            });
+    analysis.setProtocolStats(protocolStats);
+    analysis.setStatus(AnalysisResultEntity.AnalysisStatus.COMPLETED);
+    analysisResultRepository.save(analysis);
+    log.info("[{}] [5/7] Analysis result saved: {}ms", run.fileId, System.currentTimeMillis() - t);
+  }
+
+  // ── Stage 6: conversation and packet inserts ────────────────────────────────
+
+  private void persistConversationsAndPackets(Run run) {
+    reportStage(run.fileId, run.plan, 5);
+    long t = System.currentTimeMillis();
+    UUID fileId = run.fileId;
+
+    // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
+    // partition must exist before the first insert below or the row has nowhere to land.
+    packetPartitions.ensurePartition(fileId);
+
+    int convIndex = 0;
+    long packetsInserted = 0;
+    List<UUID> savedConversationIds = new ArrayList<>();
+
+    for (PcapParserService.ConversationInfo convInfo : run.parseResult.getConversations()) {
+      ConversationEntity conversation =
+          ConversationEntity.builder()
+              .file(run.file)
+              .srcIp(convInfo.getSrcIp())
+              .srcPort(convInfo.getSrcPort())
+              .dstIp(convInfo.getDstIp())
+              .dstPort(convInfo.getDstPort())
+              .protocol(convInfo.getProtocol())
+              .initiatorIp(convInfo.getInitiatorIp())
+              .initiatorPort(convInfo.getInitiatorPort())
+              .appName(convInfo.getAppName())
+              .tsharkProtocol(convInfo.getTsharkProtocol())
+              .category(convInfo.getCategory())
+              .hostname(convInfo.getHostname())
+              .ja3Client(convInfo.getJa3Client())
+              .ja3Server(convInfo.getJa3Server())
+              .tlsIssuer(convInfo.getTlsIssuer())
+              .tlsSubject(convInfo.getTlsSubject())
+              .tlsNotBefore(convInfo.getTlsNotBefore())
+              .tlsNotAfter(convInfo.getTlsNotAfter())
+              .flowRisks(toNullableArray(convInfo.getFlowRisks()))
+              .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
+              .suricataAlerts(toNullableArray(convInfo.getSuricataAlerts()))
+              .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
+              .packetCount(convInfo.getPacketCount())
+              .totalBytes(convInfo.getTotalBytes())
+              .startTime(convInfo.getStartTime())
+              .endTime(convInfo.getEndTime())
+              .build();
+      ConversationEntity savedConversation = conversationRepository.save(conversation);
+      savedConversationIds.add(savedConversation.getId());
+
+      List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
+      if (!packetInfos.isEmpty()) {
+        for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
+          int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
+          List<PacketEntity> batch =
+              packetInfos.subList(i, end).stream()
+                  .map(
+                      pktInfo ->
+                          PacketEntity.builder()
+                              .file(run.file)
+                              .conversation(savedConversation)
+                              .packetNumber(pktInfo.getPacketNumber())
+                              .timestamp(pktInfo.getTimestamp())
+                              .srcIp(pktInfo.getSrcIp())
+                              .srcPort(pktInfo.getSrcPort())
+                              .dstIp(pktInfo.getDstIp())
+                              .dstPort(pktInfo.getDstPort())
+                              .protocol(pktInfo.getProtocol())
+                              .packetSize(pktInfo.getPacketSize())
+                              .info(pktInfo.getInfo())
+                              .payload(pktInfo.getPayload())
+                              .detectedFileType(pktInfo.getDetectedFileType())
+                              .build())
+                  .collect(Collectors.toList());
+          packetRepository.saveAll(batch);
+          packetsInserted += batch.size();
+        }
+        // Released as we go: a large capture's packet payloads do not all fit in heap at once.
+        packetInfos.clear();
+      }
+
+      if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
+        entityManager.flush();
+        entityManager.clear();
+        log.info(
+            "[{}] [6/7] DB insert progress: {}/{} conversations, {} packets",
+            fileId,
+            convIndex,
+            run.parseResult.getConversations().size(),
+            packetsInserted);
+      }
+    }
+
+    run.savedConversationIds = savedConversationIds;
+    log.info(
+        "[{}] [6/7] DB inserts done: {}ms  ({} conversations, {} packets)",
+        fileId,
+        System.currentTimeMillis() - t,
+        run.parseResult.getConversations().size(),
+        packetsInserted);
+  }
+
+  // ── Stage 7: carve embedded files ───────────────────────────────────────────
+
+  /** Optional, and never fatal: a capture with unreadable payloads is still a valid analysis. */
+  private void extractEmbeddedFiles(Run run) {
+    long t = System.currentTimeMillis();
+    if (!run.file.isEnableFileExtraction()) {
+      log.info("[{}] [7/7] File extraction: skipped", run.fileId);
+      return;
+    }
+    // Only in the plan when enabled — index 6.
+    reportStage(run.fileId, run.plan, 6);
+    try {
+      fileExtractionStage.extractFiles(run.file, run.pcap, run.savedConversationIds);
+      log.info("[{}] [7/7] File extraction: {}ms", run.fileId, System.currentTimeMillis() - t);
+    } catch (Exception e) {
+      log.warn(
+          "[{}] [7/7] File extraction failed ({}ms): {}",
+          run.fileId,
+          System.currentTimeMillis() - t,
+          e.getMessage());
+    }
+  }
+
+  // ── Completion ──────────────────────────────────────────────────────────────
+
+  private void completeFile(Run run) {
+    FileEntity file = run.file;
+    PcapParserService.PcapAnalysisResult parseResult = run.parseResult;
+
+    file.setStatus(com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED);
+    file.setPacketCount(
+        parseResult.getPacketCount() != null ? parseResult.getPacketCount().intValue() : null);
+    file.setTotalBytes(parseResult.getTotalBytes());
+    file.setStartTime(parseResult.getStartTime());
+    file.setEndTime(parseResult.getEndTime());
+    file.setDuration(run.analysis.getDurationMs());
+    fileRepository.save(file);
+
+    // AFTER_COMMIT listeners (identity adjudication in insights) fire once this tx lands —
+    // the pipeline never learns who is listening (#512 slice 5).
+    eventPublisher.publishEvent(new AnalysisCompletedEvent(run.fileId));
   }
 
   @Transactional(readOnly = true)
