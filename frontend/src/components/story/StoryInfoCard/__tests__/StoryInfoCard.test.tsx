@@ -116,3 +116,28 @@ describe('StoryInfoCard cap controls', () => {
     expect(input.value).toBe('')
   })
 })
+
+describe('StoryInfoCard keyboard access (#723)', () => {
+  it.each(['{Enter}', ' '])('expands with %s from the keyboard', async key => {
+    renderCard()
+    const header = screen.getByRole('button', { name: /How stories are generated/i })
+
+    header.focus()
+    await userEvent.keyboard(key)
+
+    // Card.Header renders a div, so without an explicit role, tabIndex and key handling the
+    // cap controls are unreachable without a pointer.
+    expect(screen.getAllByPlaceholderText(/Custom/).length).toBeGreaterThan(0)
+  })
+
+  it('is reachable by tab and reports its expanded state', async () => {
+    renderCard()
+    const header = screen.getByRole('button', { name: /How stories are generated/i })
+
+    await userEvent.tab()
+
+    expect(header).toHaveFocus()
+    // aria-expanded is what tells a screen reader the control toggles a region, and which way.
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+  })
+})

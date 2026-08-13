@@ -57,6 +57,9 @@ export const UploadProgress = ({
                   : 'bg-primary'
             }`}
             role="progressbar"
+            // Without a name a screen reader announces a bare percentage, and with several
+            // uploads in flight the announcements are indistinguishable (#723).
+            aria-label={`Upload progress for ${fileName}`}
             style={{ width: `${isProcessing ? 100 : progress}%` }}
             aria-valuenow={isProcessing ? 100 : progress}
             aria-valuemin={0}

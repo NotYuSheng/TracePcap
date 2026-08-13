@@ -105,6 +105,14 @@ describe('UploadProgress', () => {
     expect(screen.queryByText(/already been uploaded/)).not.toBeInTheDocument()
   })
 
+  it('names the file its progress belongs to (#723)', () => {
+    renderCard({ fileName: 'evidence.pcap', progress: 40 })
+
+    // Without a name a screen reader announces a bare percentage; with several uploads in
+    // flight the announcements are indistinguishable.
+    expect(screen.getByRole('progressbar', { name: /evidence\.pcap/ })).toBeInTheDocument()
+  })
+
   it('fills the bar during processing even though progress is indeterminate', () => {
     renderCard({ progress: 100, isUploading: true })
 
