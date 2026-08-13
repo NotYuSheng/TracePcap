@@ -1,0 +1,50 @@
+name: Shared Vocabulary
+
+# Some concepts are defined once or they drift. "Is this address local" had five
+# implementations that disagreed about fe80::/10 and about null (#694); "how big is this in
+# bytes" had nine, two of which rendered "1.0 undefined" past their last unit on captures the
+# production target reaches (#733). Each copy was individually reasonable — they were private
+# methods with different names, so the second author could not see the first, and could not
+# have found it by searching.
+#
+# You cannot mechanically detect "these two functions mean the same thing". But these concepts
+# are built from a small closed vocabulary of magic literals, and that is checkable. Two rounds
+# of manual searching missed the two formatters named formatFileSize rather than formatBytes;
+# this check found them on its first run.
+#
+# Static, so it runs in seconds. It asserts where a concept is *defined*; whether the
+# definition is correct is the unit tests' job.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/main/java/**'
+      - 'frontend/src/**'
+      - 'scripts/check_shared_vocabulary.py'
+      - '.github/workflows/shared-vocabulary.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/src/main/java/**'
+      - 'frontend/src/**'
+      - 'scripts/check_shared_vocabulary.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Shared concepts have one definition
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        # Pinned and without a persisted token: this job only reads source files.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Check shared concepts are not redefined per-module
+        run: python3 scripts/check_shared_vocabulary.py

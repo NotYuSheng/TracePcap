@@ -1,5 +1,6 @@
 import type { AnalysisSummary as AnalysisSummaryType } from '@/types';
 import './AnalysisSummary.css';
+import { formatBytes } from '@/utils/formatters';
 
 interface AnalysisSummaryProps {
   summary: AnalysisSummaryType;
@@ -7,13 +8,6 @@ interface AnalysisSummaryProps {
 }
 
 export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummaryProps) => {
-  const formatFileSize = (bytes: number | undefined | null): string => {
-    if (!bytes || bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
 
   const formatDuration = (
     start: number | undefined | null,
@@ -61,7 +55,7 @@ export const AnalysisSummary = ({ summary, extractedFilesCount }: AnalysisSummar
           </div>
           <div className="card-content">
             <div className="card-label">File Size</div>
-            <div className="card-value">{formatFileSize(summary.fileSize)}</div>
+            <div className="card-value">{formatBytes(summary.fileSize)}</div>
           </div>
         </div>
 
