@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import type { ProtocolStats } from '@/types';
 import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './ProtocolBreakdownChart.css';
+import { formatBytes } from '@/utils/formatters';
 
 interface ProtocolBreakdownChartProps {
   protocolStats: ProtocolStats[];
@@ -42,13 +43,6 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
     percentage: stat.percentage,
   }));
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
 
   // Legend rows depend on number of items; each row ≈ 24 px, ~3 items per row at typical widths.
   const chartHeight = Math.max(300, 240 + Math.ceil(chartData.length / 3) * 24);

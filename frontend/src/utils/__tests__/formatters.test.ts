@@ -30,6 +30,41 @@ describe('formatBytes', () => {
   });
 });
 
+describe('formatBytes at scale', () => {
+  // Seven implementations existed, each with its own ceiling. Two indexed past the end of
+  // their unit array; the rest silently topped out. Production captures reach tens of TB,
+  // so both failure modes were reachable on real data.
+  it('formats terabytes rather than thousands of gigabytes', () => {
+    expect(formatBytes(2 * 1024 ** 4)).toBe('2.00 TB')
+  })
+
+  it('formats the ~25TB production scale', () => {
+    expect(formatBytes(25.62 * 1024 ** 4)).toBe('25.62 TB')
+  })
+
+  it('formats petabytes', () => {
+    expect(formatBytes(3 * 1024 ** 5)).toBe('3.00 PB')
+  })
+
+  it('clamps beyond the largest unit instead of rendering "undefined"', () => {
+    // The actual bug: sizes[i] was undefined past the end of the array, so the UI showed
+    // "1.0 undefined". Clamping matters more than the unit list being long enough, because
+    // extending the list only moves the boundary.
+    const huge = formatBytes(1024 ** 7)
+    expect(huge).not.toContain('undefined')
+    expect(huge).toContain('PB')
+  })
+
+  it('never renders NaN or Infinity', () => {
+    expect(formatBytes(Number.NaN)).toBe('0 B')
+    expect(formatBytes(Number.POSITIVE_INFINITY)).toBe('0 B')
+  })
+
+  it('keeps the sign on a negative delta', () => {
+    expect(formatBytes(-1536)).toBe('-1.50 KB')
+  })
+})
+
 describe('formatDuration', () => {
   it('formats sub-second durations', () => {
     expect(formatDuration(500)).toBe('500ms');

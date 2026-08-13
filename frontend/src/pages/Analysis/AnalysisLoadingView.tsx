@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { formatBytes } from '@/utils/formatters';
 
 interface FileMetadata {
   fileName: string;
@@ -32,12 +33,6 @@ interface Props {
 const SECONDS_PER_MB = 0.5;
 const MIN_ESTIMATE_S = 10;
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${bytes} B`;
-}
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`;

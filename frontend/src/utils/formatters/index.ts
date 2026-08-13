@@ -1,17 +1,26 @@
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const;
+
 /**
- * Format bytes to human-readable format
- * @param bytes - Number of bytes
- * @returns Formatted string (e.g., "1.5 MB")
+ * Human-readable byte size. The single definition (#733).
+ *
+ * Seven of these existed, each with its own ceiling. Two indexed past the end of their unit
+ * array and rendered "1.0 undefined"; the others silently topped out, so a 2TB capture read
+ * as "2048.0 GB". Production captures reach tens of TB, so both were reachable.
+ *
+ * The index is clamped rather than the unit list merely extended: an exabyte would otherwise
+ * reintroduce the same bug at the next boundary.
  */
 export const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
+  if (!Number.isFinite(bytes)) return '0 B';
+  const magnitude = Math.abs(bytes);
+  if (magnitude === 0) return '0 B';
 
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  const value = bytes / Math.pow(k, i);
-  return `${i === 0 ? value : value.toFixed(2)} ${sizes[i]}`;
+  const i = Math.min(Math.floor(Math.log(magnitude) / Math.log(k)), BYTE_UNITS.length - 1);
+  const value = magnitude / Math.pow(k, i);
+  // Whole bytes have no fractional part worth showing; anything larger is a rounded figure.
+  const rendered = i === 0 ? String(value) : value.toFixed(2);
+  return `${bytes < 0 ? '-' : ''}${rendered} ${BYTE_UNITS[i]}`;
 };
 
 /**
