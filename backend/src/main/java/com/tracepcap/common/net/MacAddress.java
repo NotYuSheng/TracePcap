@@ -62,7 +62,9 @@ public final class MacAddress {
   public static String oui(String mac) {
     String normalised = normalise(mac);
     if (normalised == null) return null;
-    String hex = normalised.replace(":", "");
+    // Strip every separator, not just colons: normalise() only regroups a full 48-bit address,
+    // so a bare vendor prefix such as "AA-BB-CC" still carries the operator's separators here.
+    String hex = normalised.replace(":", "").replace("-", "").replace(".", "");
     if (hex.length() < 6 || !isHex(hex)) return null;
     return hex.substring(0, 2) + ":" + hex.substring(2, 4) + ":" + hex.substring(4, 6);
   }

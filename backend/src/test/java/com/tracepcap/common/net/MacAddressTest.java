@@ -73,6 +73,15 @@ class MacAddressTest {
     assertThat(MacAddress.oui(mac)).isEqualTo(oui);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"AA-BB-CC", "aa:bb:cc", "AABBCC", "aabb.cc"})
+  void aBareVendorPrefixResolvesWhateverSeparatorItWasWrittenWith(String prefix) {
+    // normalise() only regroups a full 48-bit address, so a 3-octet prefix arrives here still
+    // carrying its separators. Wireshark's manuf file is colon-form, but an OUI table in any
+    // other spelling would have silently loaded zero vendors.
+    assertThat(MacAddress.oui(prefix)).isEqualTo("aa:bb:cc");
+  }
+
   @Test
   void ouiIsNullWhenThereIsNotEnoughAddressToHaveOne() {
     assertThat(MacAddress.oui("aa:bb")).isNull();
