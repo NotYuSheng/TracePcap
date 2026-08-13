@@ -1,5 +1,7 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.common.net.MacAddress;
+
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.monitor.dto.BaselineDefinitionDto;
 import com.tracepcap.monitor.dto.CreateBaselineDefinitionRequest;
@@ -49,12 +51,27 @@ public class BaselineService {
         BaselineDefinitionEntity.builder()
             .network(network)
             .entryType(entryType)
-            .entityKey(request.getEntityKey().trim())
+            // Canonical form on write. Comparison normalises too, so rows predating this still
+            // match; this only stops new rows from being stored in a shape they were never
+            // compared in.
+            .entityKey(canonicalKey(entryType, request.getEntityKey()))
             .entityValue(request.getEntityValue())
             .notes(request.getNotes())
             .build();
 
     return toDto(baselineDefinitionRepository.save(entity));
+  }
+
+  /** MAC-keyed entries are stored canonically; everything else keeps the operator's text. */
+  private static String canonicalKey(BaselineEntryType entryType, String rawKey) {
+    String trimmed = rawKey.trim();
+    return switch (entryType) {
+      case DEVICE, IP_MAC_BINDING -> {
+        String normalised = MacAddress.normalise(trimmed);
+        yield normalised != null ? normalised : trimmed;
+      }
+      default -> trimmed;
+    };
   }
 
   public void deleteDefinition(UUID networkId, UUID definitionId) {

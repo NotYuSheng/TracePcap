@@ -1,6 +1,7 @@
 package com.tracepcap.monitor.service;
 
 import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.MacAddress;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.Facet;
@@ -178,11 +179,11 @@ public class ChangeDetectionService {
         baselineDefinitionRepository.findByNetworkIdOrderByCreatedAtAsc(networkId);
     if (definitions.isEmpty()) return List.of();
 
-    // Lowercase both sides. macMap keys by the raw MAC as captured, and captures and the UI
-    // disagree on MAC casing routinely — comparing them as-is would report a baselined device as
-    // absent from every snapshot it is actually in.
-    Map<String, HostFacts> byMac = lowerKeys(macMap(toFileId));
-    Map<String, String> macToIp = lowerKeys(macToIpMap(toFileId));
+    // Normalise both sides. Captures and the operator's typing disagree on both casing and
+    // separator style, and comparing them as-is reports a baselined device as absent from every
+    // snapshot it is actually in.
+    Map<String, HostFacts> byMac = normaliseKeys(macMap(toFileId));
+    Map<String, String> macToIp = normaliseKeys(macToIpMap(toFileId));
     // Every observed IP, not just those from macToIp: that map drops hosts with no MAC, and a
     // gateway seen by IP alone would otherwise be reported missing from a snapshot it is in.
     Set<String> seenIps =
@@ -199,8 +200,8 @@ public class ChangeDetectionService {
 
       switch (def.getEntryType()) {
         case DEVICE, IP_MAC_BINDING -> {
-          // Keyed by MAC. Casing varies between captures and the UI, so compare lowercased.
-          String mac = key.toLowerCase();
+          // Keyed by MAC; spelling varies between captures and the UI, so compare canonically.
+          String mac = MacAddress.normalise(key);
           HostFacts observed = byMac.get(mac);
           if (observed == null) {
             events.add(
@@ -238,9 +239,9 @@ public class ChangeDetectionService {
     return events;
   }
 
-  private static <V> Map<String, V> lowerKeys(Map<String, V> source) {
+  private static <V> Map<String, V> normaliseKeys(Map<String, V> source) {
     Map<String, V> result = new HashMap<>();
-    source.forEach((k, v) -> result.put(k == null ? null : k.toLowerCase(), v));
+    source.forEach((k, v) -> result.put(MacAddress.normalise(k), v));
     return result;
   }
 
