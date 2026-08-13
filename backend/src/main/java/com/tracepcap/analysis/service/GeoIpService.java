@@ -6,6 +6,7 @@ import com.maxmind.db.CHMCache;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.model.CityResponse;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.analysis.repository.IpGeoInfoRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -125,7 +126,7 @@ public class GeoIpService {
   public Map<String, GeoResult> lookupExternal(Set<String> ips) {
     if (!geoEnabled || ips == null || ips.isEmpty()) return Map.of();
 
-    List<String> external = ips.stream().filter(ip -> !isPrivate(ip)).collect(Collectors.toList());
+    List<String> external = ips.stream().filter(ip -> !shouldSkipLookup(ip)).collect(Collectors.toList());
     if (external.isEmpty()) return Map.of();
 
     Map<String, GeoResult> result = new HashMap<>();
@@ -367,25 +368,28 @@ public class GeoIpService {
     }
   }
 
-  /** Returns true if the IP is RFC1918, loopback, link-local, IPv6 ULA/loopback, or a MAC address. */
-  static boolean isPrivate(String ip) {
+  /**
+   * Whether to skip geo enrichment for this token (#733).
+   *
+   * <p>Named for the question it answers, not the shape it tests. It was called {@code isPrivate}
+   * and was the fifth implementation of "is this address local" — but it never was that predicate:
+   * it answers {@code true} for {@code null} and for MAC addresses, which are not private
+   * addresses, they are things there is no point looking up. Sharing a name with the range test
+   * while disagreeing with it on those inputs is what made the duplication invisible.
+   *
+   * <p>The range test now delegates to {@link IpLocality}, which fixes two defects the local copy
+   * had: {@code startsWith("fe80")} matched only that one hextet rather than {@code fe80::/10}, so
+   * {@code feb0::1} was sent to an external lookup; and nothing was lowercased, so {@code FC00::1}
+   * was too. Both leaked internal addressing to a third party when online, which is the failure
+   * mode that matters here rather than the wasted call.
+   */
+  static boolean shouldSkipLookup(String ip) {
+    // Not "private" — just nothing to look up. Kept here rather than pushed into IpLocality,
+    // which answers a question about addresses and should not grow opinions about placeholders.
     if (ip == null || ip.isBlank()) return true;
-    // MAC addresses (e.g. "00:11:22:33:44:55") — used as fallback IPs for non-IP packets
-    if (MAC_PATTERN.matcher(ip).matches()) return true;
-    String t = ip.trim();
-    if (t.equals("::1") || t.startsWith("fc") || t.startsWith("fd") || t.startsWith("fe80"))
-      return true;
-    if (t.startsWith("10.") || t.startsWith("127.") || t.startsWith("169.254.")
-        || t.startsWith("192.168.")) return true;
-    if (t.startsWith("172.")) {
-      String[] parts = t.split("\\.");
-      if (parts.length >= 2) {
-        try {
-          int second = Integer.parseInt(parts[1]);
-          if (second >= 16 && second <= 31) return true;
-        } catch (NumberFormatException ignored) {}
-      }
-    }
-    return false;
+    // MAC addresses stand in as IPs for non-IP packets.
+    if (MAC_PATTERN.matcher(ip.trim()).matches()) return true;
+    return IpLocality.isLocal(ip);
   }
+
 }
