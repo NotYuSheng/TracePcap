@@ -7,6 +7,7 @@ import type { AnalysisData, Packet } from '@/types';
 import { apiClient } from '@/services/api/client';
 import { filterService } from '@/features/filter/services/filterService';
 import { Pagination } from '@components/common/Pagination';
+import { formatBytes } from '@/utils/formatters';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -182,11 +183,6 @@ export const FilterGeneratorPage = () => {
     return new Date(timestamp).toLocaleString('en-GB');
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
 
   return (
     <div className="filter-generator-page">
