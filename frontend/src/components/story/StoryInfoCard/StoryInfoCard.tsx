@@ -108,7 +108,20 @@ export const StoryInfoCard = ({
           userSelect: 'none',
           borderBottom: collapsed ? 'none' : undefined,
         }}
+        // A clickable div is invisible to keyboard users: no focus, no Enter/Space (#723).
+        // CLAUDE.md requires role="button" *plus* tabIndex and key handling when an element
+        // cannot be a native <button> — Card.Header renders a div, so this is that case.
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-label={`How stories are generated — ${collapsed ? 'expand' : 'collapse'}`}
         onClick={() => setCollapsed(c => !c)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault(); // Space would otherwise scroll the page
+            setCollapsed(c => !c);
+          }
+        }}
       >
         <h6 className="mb-0">
           <i className="bi bi-info-circle me-2"></i>
