@@ -10,6 +10,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { parseDateTime } from '@/utils/dateUtils';
 import './FileList.css';
+import { formatBytes } from '@/utils/formatters';
 
 type MultiSelectAction = 'analyze' | 'merge';
 
@@ -165,13 +166,6 @@ export const FileList = () => {
     fetchFiles();
   }, [fetchFiles]);
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);
@@ -389,7 +383,7 @@ export const FileList = () => {
                                 })()}
                             </div>
                             <small className="text-muted">
-                              {formatFileSize(file.fileSize)} •{' '}
+                              {formatBytes(file.fileSize)} •{' '}
                               {formatDate(parseDateTime(file.uploadedAt))}
                               {!isCompleted && (
                                 <Badge
