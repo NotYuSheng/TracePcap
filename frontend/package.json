@@ -17,6 +17,7 @@
     "lint:css:fix": "stylelint \"src/**/*.css\" --fix",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "api:types": "openapi-typescript ../openapi/baseline.json -o src/services/api/generated/schema.d.ts",
     "test:watch": "vitest",
