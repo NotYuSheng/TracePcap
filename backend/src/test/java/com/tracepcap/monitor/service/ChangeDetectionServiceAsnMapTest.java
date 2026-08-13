@@ -22,7 +22,7 @@ class ChangeDetectionServiceAsnMapTest {
   /** asnMap touches none of the collaborators, so nulls are honest here. */
   private final ChangeDetectionService service =
       new ChangeDetectionService(
-          null, null, null, null, null, null, null, null, null, null, null);
+          null, null, null, null, null, null, null, null, null, null, null, null);
 
   private static Map<String, IpAttribution> geo(IpAttribution... entries) {
     Map<String, IpAttribution> m = new java.util.LinkedHashMap<>();

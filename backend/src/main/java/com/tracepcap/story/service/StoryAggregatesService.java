@@ -1,6 +1,7 @@
 package com.tracepcap.story.service;
 
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityPolicy;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.spi.ConversationLookup;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 public class StoryAggregatesService {
 
 
+  private final LocalityPolicy localityPolicy;
   private final ConversationLookup conversationLookup;
   private final ExtractionManifest extractionManifest;
   private final GeoOrgLookup geoOrgLookup;
@@ -95,16 +97,19 @@ public class StoryAggregatesService {
     // Group external IPs → total bytes (check both src and dst)
     Map<String, Long> ipBytes = new HashMap<>();
     Map<String, Long> ipFlows = new HashMap<>();
+    // Rules resolved once for the whole capture: currentRules() loads the operator's ranges, and
+    // this loop asks about every endpoint in every conversation.
+    LocalityRules locality = localityPolicy.currentRules();
     Map<String, Boolean> privateCache = new HashMap<>();
     for (ConversationFacts c : all) {
       String dst = c.flow().dstIp();
       String src = c.flow().srcIp();
       // Prefer dstIp as the "remote" endpoint; fall back to srcIp if dst is private/null
       String ip = null;
-      if (dst != null && !privateCache.computeIfAbsent(dst, StoryAggregatesService::isPrivate)) {
+      if (dst != null && !privateCache.computeIfAbsent(dst, locality::isLocal)) {
         ip = dst;
       } else if (src != null
-          && !privateCache.computeIfAbsent(src, StoryAggregatesService::isPrivate)) {
+          && !privateCache.computeIfAbsent(src, locality::isLocal)) {
         ip = src;
       }
       if (ip != null) {
@@ -152,9 +157,7 @@ public class StoryAggregatesService {
   }
 
   /** Delegates to the shared predicate so all four call sites agree (#694). */
-  private static boolean isPrivate(String ip) {
-    return IpLocality.isLocal(ip);
-  }
+
 
   // ── Protocol × Risk Matrix ─────────────────────────────────────────────────
 

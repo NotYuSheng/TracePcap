@@ -12,18 +12,21 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Characterisation tests for {@code NetworkIntelligenceService}'s address predicates (#659, phase
- * 4). Third slice, after {@code subnets.service} (#688) and {@code report} (#690).
+ * Characterisation tests for {@code NetworkIntelligenceService} (#659, phase 4).
  *
- * <p><b>The headline finding is the divergence.</b> This service and {@code SubnetService} both
- * answer "is this address private", and they answer differently. {@code SubnetService.isPrivate}
- * covers only the three RFC1918 blocks; the version here also accepts loopback and IPv6 unique-local
- * addresses. So the same host can count as internal on one code path and external on another, which
- * changes how a capture is summarised depending on which path produced the summary.
+ * <p><b>The address predicate that used to be pinned here is gone, on purpose.</b> This class was
+ * written to hold open a divergence: this service and {@code SubnetService} both answered "is this
+ * address private" and answered differently, so both behaviours were recorded rather than
+ * corrected, precisely so that reconciling them later would be a deliberate change with a visible
+ * diff instead of something that happened silently during an extraction.
  *
- * <p>Both behaviours are pinned — here and in {@code SubnetServiceCharacterisationTest} — precisely
- * so that reconciling them later is a deliberate change with a visible diff, rather than something
- * that silently happens during an extraction. Neither is corrected here.
+ * <p>That reconciliation has now happened (#694, then #733). The RFC ranges live in {@code
+ * IpLocality} and are tested in {@code IpLocalityTest}; the operator's overrides layered on top
+ * live in {@code CustomRangeLocalityPolicy} and are tested there. Keeping a copy of those
+ * assertions here would recreate in the tests the duplication the change removed from the code.
+ *
+ * <p>This is the characterisation test working as designed: it failed loudly when the surface it
+ * pinned moved, which is how the move got reviewed rather than noticed later.
  */
 class NetworkIntelligenceHeuristicsCharacterisationTest {
 
@@ -49,71 +52,6 @@ class NetworkIntelligenceHeuristicsCharacterisationTest {
       throw new IllegalStateException(
           name + " is gone or its signature changed — update this characterisation test", e);
     }
-  }
-
-  private static boolean isPrivateIp(String ip) {
-    return (boolean) invoke("isPrivateIp", String.class, ip);
-  }
-
-  // --- isPrivateIp -----------------------------------------------------------
-
-  @ParameterizedTest
-  @ValueSource(
-      strings = {"10.0.0.1", "192.168.1.1", "172.16.0.1", "172.31.255.255", "172.20.10.5"})
-  void isPrivateIp_acceptsTheRfc1918Blocks(String ip) {
-    assertThat(isPrivateIp(ip)).isTrue();
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"127.0.0.1", "127.255.255.254"})
-  void isPrivateIp_alsoAcceptsIpv4Loopback(String ip) {
-    // Diverges from SubnetService.isPrivate, which returns false for loopback (pinned in
-    // SubnetServiceCharacterisationTest). Recorded on both sides so reconciling them is a
-    // deliberate change rather than a silent one.
-    assertThat(isPrivateIp(ip)).isTrue();
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"::1", "fc00::1", "fd12:3456::1", "FD12::1", "FC00::1"})
-  void isPrivateIp_acceptsIpv6LoopbackAndUniqueLocal(String ip) {
-    // fc00::/7 is the IPv6 ULA range; the check is a case-insensitive "fc"/"fd" prefix.
-    assertThat(isPrivateIp(ip)).isTrue();
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"8.8.8.8", "172.15.0.1", "172.32.0.1", "100.64.0.1", "2001:db8::1"})
-  void isPrivateIp_rejectsPublicAndNearMissRanges(String ip) {
-    assertThat(isPrivateIp(ip)).isFalse();
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"169.254.1.1"})
-  void isPrivateIp_nowAcceptsIpv4LinkLocal(String ip) {
-    // Changed by #694. All four implementations previously agreed that 169.254/16 was public,
-    // which was consistently wrong rather than divergent: it is not routable off-link.
-    assertThat(isPrivateIp(ip)).isTrue();
-  }
-
-  @Test
-  void isPrivateIp_matchesFcAndFdByPrefixSoSomeGlobalAddressesCollide() {
-    // The prefix test is on the raw string, not a parsed address, so any address whose text
-    // starts with "fc"/"fd" is private — including "fcda::1" style addresses outside fc00::/7
-    // in a stricter reading. Pinned because a parsed implementation would answer differently.
-    assertThat(isPrivateIp("fcff::1")).isTrue();
-  }
-
-  @ParameterizedTest
-  @NullSource
-  void isPrivateIp_treatsNullAsNotPrivate(String ip) {
-    assertThat(isPrivateIp(ip)).isFalse();
-  }
-
-  @Test
-  void isPrivateIp_isCaseSensitiveForIpv4ButNotIpv6() {
-    // "10." and "192.168." are compared as-is while the IPv6 prefixes are lowercased first.
-    // Harmless for IPv4 (digits have no case) but worth pinning as the asymmetry it is.
-    assertThat(isPrivateIp("FD00::1")).isTrue();
-    assertThat(isPrivateIp("fd00::1")).isTrue();
   }
 
   // --- splitResolvedIps ------------------------------------------------------

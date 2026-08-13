@@ -11,7 +11,15 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Characterisation tests for {@code SubnetService}'s address arithmetic (#659, phase 4).
+ * <p><b>The locality assertions that were here have moved</b> (#733). This class recorded that
+ * {@code SubnetService.isPrivate} covered only the three RFC1918 blocks while other
+ * implementations also accepted loopback and IPv6 ULA — a divergence held open deliberately so
+ * that reconciling it would be a visible change rather than a silent one. It is reconciled: the
+ * RFC ranges are {@code IpLocalityTest} and the operator's overrides layered on top are
+ * {@code CustomRangeLocalityPolicyTest}. Re-asserting them here would put back into the tests the
+ * duplication the change took out of the code.
+ *
+ * <p>Characterisation tests for {@code SubnetService}'s address arithmetic (#659, phase 4).
  *
  * <p><b>These pin current behaviour, not desired behaviour.</b> {@code subnets.service} is the
  * least-covered package in the backend — 2,587 instructions at 1.0% — and its subnet detection
@@ -100,35 +108,9 @@ class SubnetServiceCharacterisationTest {
 
   // --- isPrivate -------------------------------------------------------------
 
-  @ParameterizedTest
-  @ValueSource(
-      strings = {"10.0.0.1", "10.255.255.255", "192.168.0.1", "172.16.0.1", "172.31.255.255"})
-  void isPrivate_acceptsTheThreeRfc1918Blocks(String ip) {
-    assertThat(invoke("isPrivate", String.class, ip)).isEqualTo(true);
-  }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"8.8.8.8", "172.15.0.1", "172.32.0.1", "192.169.0.1", "100.64.0.1"})
-  void isPrivate_rejectsPublicAndNearMissRanges(String ip) {
-    // 172.15/172.32 sit either side of the RFC1918 block, and 100.64 is CGNAT — near-misses
-    // that a looser prefix check would wrongly admit.
-    assertThat(invoke("isPrivate", String.class, ip)).isEqualTo(false);
-  }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"127.0.0.1", "169.254.1.1"})
-  void isPrivate_nowTreatsLoopbackAndLinkLocalAsLocal(String ip) {
-    // Changed by #694. This service used to answer false here while NetworkIntelligenceService
-    // answered true for loopback — the divergence that made the same host internal on one code
-    // path and external on another. Neither is routable off-host or off-link, so calling them
-    // external put them in the "talking to the outside world" bucket they cannot belong to.
-    assertThat(invoke("isPrivate", String.class, ip)).isEqualTo(true);
-  }
 
-  @Test
-  void isPrivate_treatsNullAsNotPrivate() {
-    assertThat(invoke("isPrivate", String.class, null)).isEqualTo(false);
-  }
 
   // --- normaliseCidr ---------------------------------------------------------
 

@@ -1,6 +1,7 @@
 package com.tracepcap.subnets.service;
 
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityPolicy;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.subnets.dto.SubnetDefinitionDto;
@@ -23,6 +24,7 @@ public class SubnetService {
   private static final int MIN_PREFIX = 20;
   private static final int MAX_PREFIX = 29;
 
+  private final LocalityPolicy localityPolicy;
   private final SubnetDefinitionRepository subnetRepo;
   private final HostClassificationLookup hostClassificationLookup;
   private final NetworkSnapshotRepository snapshotRepo;
@@ -97,10 +99,11 @@ public class SubnetService {
    * Does NOT persist.
    */
   public List<SubnetDefinitionDto> detectFromFile(UUID fileId) {
+    LocalityRules locality = localityPolicy.currentRules();
     List<Long> ipInts =
         hostClassificationLookup.classifiedHosts(fileId).stream()
             .map(h -> h.ip())
-            .filter(ip -> isPrivate(ip))
+            .filter(locality::isLocal)
             .map(ip -> parseIp(ip))
             .filter(v -> v != null && v >= 0)
             .distinct()
@@ -134,11 +137,12 @@ public class SubnetService {
     }
 
     // Re-run density scoring on the union of all IPs for final hostCount/densityScore
+    LocalityRules locality = localityPolicy.currentRules();
     List<Long> allIps =
         fileIds.stream()
             .flatMap(fid -> hostClassificationLookup.classifiedHosts(fid).stream())
             .map(h -> h.ip())
-            .filter(ip -> isPrivate(ip))
+            .filter(locality::isLocal)
             .map(ip -> parseIp(ip))
             .filter(v -> v != null && v >= 0)
             .distinct()
@@ -310,9 +314,7 @@ public class SubnetService {
   }
 
   /** Delegates to the shared predicate so all four call sites agree (#694). */
-  private static boolean isPrivate(String ip) {
-    return IpLocality.isLocal(ip);
-  }
+
 
   private static final java.util.regex.Pattern CIDR_PATTERN =
       java.util.regex.Pattern.compile(

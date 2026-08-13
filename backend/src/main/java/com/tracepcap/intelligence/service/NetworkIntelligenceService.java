@@ -1,6 +1,7 @@
 package com.tracepcap.intelligence.service;
 
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityPolicy;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
 import com.tracepcap.hostlog.entity.HttpEndpointLogEntity;
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class NetworkIntelligenceService {
 
+  private final LocalityPolicy localityPolicy;
   private final ConversationLookup conversationLookup;
   private final HostClassificationLookup hostClassificationLookup;
   private final GeoOrgLookup geoOrgLookup;
@@ -120,10 +122,14 @@ public class NetworkIntelligenceService {
         ? ipOrgRuleService.loadRules()
         : List.of();
 
+    // Resolved once, next to orgRules and for the same reason: the loop below asks about every
+    // IP in the capture, and currentRules() reads the operator's ranges from the database.
+    LocalityRules locality = localityPolicy.currentRules();
+
     // Map each IP to its cluster key
     Map<String, String> ipToCluster = new HashMap<>();
     for (String ip : allIps) {
-      String key = getClusterKey(ip, groupBy, geoByIp, deviceByIp, orgRules);
+      String key = getClusterKey(ip, groupBy, geoByIp, deviceByIp, orgRules, locality);
       ipToCluster.put(ip, key);
       // Build label alongside so we can look it up later from any IP in the cluster
       clusterLabels.putIfAbsent(key, buildLabel(ip, key, groupBy, geoByIp, deviceByIp, orgRules));
@@ -691,21 +697,22 @@ public class NetworkIntelligenceService {
   private String getClusterKey(String ip, String groupBy,
       Map<String, IpPlace> geoByIp,
       Map<String, HostFacts> deviceByIp,
-      List<IpOrgRuleEntity> orgRules) {
+      List<IpOrgRuleEntity> orgRules,
+      LocalityRules locality) {
     return switch (groupBy) {
       case "asn" -> {
         IpPlace geo = geoByIp.get(ip);
         if (geo != null && geo.asn() != null && !geo.asn().isBlank()) {
           yield "asn:" + geo.asn();
         }
-        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+        yield locality.isLocal(ip) ? "cluster:internal" : "cluster:unknown";
       }
       case "country" -> {
         IpPlace geo = geoByIp.get(ip);
         if (geo != null && geo.countryCode() != null && !geo.countryCode().isBlank()) {
           yield "country:" + geo.countryCode();
         }
-        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+        yield locality.isLocal(ip) ? "cluster:internal" : "cluster:unknown";
       }
       case "city" -> {
         IpPlace geo = geoByIp.get(ip);
@@ -713,7 +720,7 @@ public class NetworkIntelligenceService {
           String cc = geo.countryCode() != null ? geo.countryCode() : "XX";
           yield "city:" + cc + ":" + geo.city();
         }
-        yield isPrivateIp(ip) ? "cluster:internal" : "cluster:unknown";
+        yield locality.isLocal(ip) ? "cluster:internal" : "cluster:unknown";
       }
       case "subnet24" -> "subnet24:" + subnetPrefix(ip, 3);
       case "subnet16" -> "subnet16:" + subnetPrefix(ip, 2);
@@ -795,9 +802,7 @@ public class NetworkIntelligenceService {
   // ── Utilities ─────────────────────────────────────────────────────────────
 
   /** Delegates to the shared predicate so all four call sites agree (#694). */
-  private boolean isPrivateIp(String ip) {
-    return IpLocality.isLocal(ip);
-  }
+
 
   private String subnetPrefix(String ip, int octets) {
     if (ip == null) return "unknown";

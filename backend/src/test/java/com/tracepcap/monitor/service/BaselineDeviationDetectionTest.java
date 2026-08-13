@@ -47,7 +47,7 @@ class BaselineDeviationDetectionTest {
 
   private final ChangeDetectionService service =
       new ChangeDetectionService(
-          hosts, null, null, null, baselines, null, null, null, null, null, null);
+          hosts, null, null, null, baselines, null, null, null, null, null, null, null);
 
   private static HostFacts host(String ip, String mac) {
     return new HostFacts(ip, mac, null, null, null, null, null, 0, List.of());
@@ -103,6 +103,8 @@ class BaselineDeviationDetectionTest {
         mock(GeoOrgLookup.class),
         savingRepository(),
         baselines,
+        // The baseline detector does not classify addresses, so the policy is never consulted.
+        null,
         mock(CustomPrivateRangeService.class),
         mock(SnapshotSubnetOverrideRepository.class),
         mock(LabelStalenessCheck.class),
