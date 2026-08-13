@@ -1,6 +1,5 @@
 package com.tracepcap.extraction.entity;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -35,10 +34,16 @@ public class ExtractedFileEntity {
   @JoinColumn(name = "file_id", nullable = false)
   private FileEntity file;
 
-  @ToString.Exclude
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "conversation_id")
-  private ConversationEntity conversation;
+  /**
+   * The conversation this file was carved from, as an id rather than a JPA association (#512).
+   *
+   * <p>Same {@code conversation_id} column, so no migration: the association only ever existed to
+   * set the FK, and the writer already held the UUID and used {@code getReference} to turn it back
+   * into an entity. Holding the id keeps the extraction module off {@code analysis.entity} and
+   * removes that round trip.
+   */
+  @Column(name = "conversation_id")
+  private UUID conversationId;
 
   @Column(name = "filename", length = 500)
   private String filename;
