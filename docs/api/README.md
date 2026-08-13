@@ -117,7 +117,7 @@ Controller: `ConversationTracerController`
 
 ---
 
-## Network Intelligence — `/api/v1/network/intelligence`
+## Network Cluster — `/api/v1/network/intelligence`
 
 Controller: `NetworkIntelligenceController`
 

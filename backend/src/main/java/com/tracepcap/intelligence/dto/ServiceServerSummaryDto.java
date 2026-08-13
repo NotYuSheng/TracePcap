@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * Role-agnostic summary of a host acting as a service server, for the Network Intelligence
+ * Role-agnostic summary of a host acting as a service server, for the Network Cluster
  * per-service cards. DNS populates it today (#362); future roles (e.g. web/API servers) reuse the
  * same shape — {@code okCount}/{@code failedCount}/{@code anomalyRatio} are interpreted per role.
  */

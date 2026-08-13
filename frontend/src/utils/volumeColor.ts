@@ -7,7 +7,7 @@ import { scaleSequentialLog, interpolateRgbBasis } from 'd3';
  * Shared sequential colour scale for traffic **volume** (magnitude).
  *
  * One hue (blue), light→dark, used everywhere volume is encoded as colour:
- * the node-to-node heatmap, volume-coloured diagram edges, Network Intelligence
+ * the node-to-node heatmap, volume-coloured diagram edges, Network Cluster
  * cluster nodes and the country map. Previously each of those hand-rolled its own
  * linear `trafficColor` — this replaces them so a given shade always means the
  * same number across views.

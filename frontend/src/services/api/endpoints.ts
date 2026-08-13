@@ -67,7 +67,7 @@ export const API_ENDPOINTS = {
   EXTRACTED_FILE_PREVIEW: (fileId: string, extractionId: string) =>
     `/files/${fileId}/extractions/${extractionId}/preview`,
 
-  // Network Intelligence
+  // Network Cluster
   NETWORK_INTELLIGENCE_CLUSTERS: (fileId: string, groupBy: string) =>
     `/intelligence/${fileId}/clusters?groupBy=${groupBy}`,
   NETWORK_INTELLIGENCE_TOP_HOSTS: (fileId: string, sortBy: string, limit: number) =>

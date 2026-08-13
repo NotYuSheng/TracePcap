@@ -6176,7 +6176,7 @@
         },
         "summary": "Get clustered network topology",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -6212,7 +6212,7 @@
         },
         "summary": "List DNS servers and their resolution health",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -6253,7 +6253,7 @@
         },
         "summary": "Get the DNS query log for one DNS server",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -6295,7 +6295,7 @@
         },
         "summary": "Locate a packet by frame number",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -6347,7 +6347,7 @@
         },
         "summary": "Get top hosts by traffic volume",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -6383,7 +6383,7 @@
         },
         "summary": "List web/API servers and their HTTP health",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -6424,7 +6424,7 @@
         },
         "summary": "Get the HTTP endpoint log + detail for one web/API server",
         "tags": [
-          "Network Intelligence"
+          "Network Cluster"
         ]
       }
     },
@@ -8774,12 +8774,12 @@
       "name": "Network Annotations"
     },
     {
-      "description": "A human's final answer to an adjudicated question — outranks the machine vote",
-      "name": "Adjudication Overrides"
+      "description": "Large-scale network topology clustering and host analytics",
+      "name": "Network Cluster"
     },
     {
-      "description": "Large-scale network topology clustering and host analytics",
-      "name": "Network Intelligence"
+      "description": "A human's final answer to an adjudicated question — outranks the machine vote",
+      "name": "Adjudication Overrides"
     },
     {
       "description": "Packet-level conversation trace with AI explanations",

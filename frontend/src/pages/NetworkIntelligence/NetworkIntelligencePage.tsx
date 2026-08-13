@@ -259,7 +259,7 @@ export const NetworkIntelligencePage = () => {
   return (
     <div className="network-intelligence-page">
       <div className="mb-3">
-        <h4 className="mb-1">Network Intelligence</h4>
+        <h4 className="mb-1">Network Cluster</h4>
         <p className="text-muted small mb-0">
           Identify who your network is talking to, where the traffic is flowing, and where risks are concentrated —
           without reviewing individual conversations. Best suited for large captures with many hosts.

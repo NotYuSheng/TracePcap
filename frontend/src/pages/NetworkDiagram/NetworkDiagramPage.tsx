@@ -429,7 +429,7 @@ export const NetworkDiagramPage = () => {
         </h4>
         <p className="text-muted small mb-0">
           Visualise individual hosts and the connections between them. Best for captures with fewer than 50 hosts —
-          for larger captures, use the <strong>Network Intelligence</strong> tab for a cluster-level overview.
+          for larger captures, use the <strong>Network Cluster</strong> tab for a cluster-level overview.
         </p>
       </div>
 
