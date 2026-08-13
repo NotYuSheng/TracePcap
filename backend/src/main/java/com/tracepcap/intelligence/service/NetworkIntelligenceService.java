@@ -1,5 +1,6 @@
 package com.tracepcap.intelligence.service;
 
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
 import com.tracepcap.hostlog.entity.HttpEndpointLogEntity;
@@ -793,25 +794,9 @@ public class NetworkIntelligenceService {
 
   // ── Utilities ─────────────────────────────────────────────────────────────
 
+  /** Delegates to the shared predicate so all four call sites agree (#694). */
   private boolean isPrivateIp(String ip) {
-    if (ip == null) return false;
-    return ip.startsWith("10.")
-        || ip.startsWith("192.168.")
-        || ip.startsWith("127.")
-        || ip.equals("::1")
-        || isPrivate172(ip)
-        || ip.toLowerCase().startsWith("fc")
-        || ip.toLowerCase().startsWith("fd");
-  }
-
-  private boolean isPrivate172(String ip) {
-    if (!ip.startsWith("172.")) return false;
-    try {
-      int second = Integer.parseInt(ip.split("\\.")[1]);
-      return second >= 16 && second <= 31;
-    } catch (Exception e) {
-      return false;
-    }
+    return IpLocality.isLocal(ip);
   }
 
   private String subnetPrefix(String ip, int octets) {

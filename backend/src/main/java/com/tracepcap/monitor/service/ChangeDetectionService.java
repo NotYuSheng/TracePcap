@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.Facet;
@@ -47,12 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class ChangeDetectionService {
 
-  private static final Set<String> PRIVATE_PREFIXES =
-      Set.of("10.", "127.", "169.254.", "192.168.", "::1", "fc", "fd", "fe80");
 
   // 172.16.0.0/12 covers 172.16.x.x – 172.31.x.x (second octet 16–31)
-  private static final int PRIVATE_172_MIN = 16;
-  private static final int PRIVATE_172_MAX = 31;
 
   private final HostClassificationLookup hostClassificationLookup;
   private final ConversationLookup conversationLookup;
@@ -685,7 +682,10 @@ public class ChangeDetectionService {
       List<String> privateCidrs, List<CustomPrivateRangeEntity> globalOverrides) {}
 
   private boolean isPrivate(String ip, LocalityRules rules) {
-    if (ip == null) return true;
+    // Was `return true` — a row with no address counted as internal traffic. The other three
+    // implementations all treated an unclassifiable address as not-private, and this one is now
+    // aligned with them (#694).
+    if (ip == null) return false;
     // A global override wins over the RFC1918 heuristic, in either direction. This is what lets a
     // private-looking address be forced to PUBLIC (and vice versa for a public address).
     switch (customPrivateRangeService.overrideFor(ip, rules.globalOverrides())) {
@@ -699,20 +699,10 @@ public class ChangeDetectionService {
         // fall through to the range heuristics below
       }
     }
-    for (String prefix : PRIVATE_PREFIXES) {
-      if (ip.startsWith(prefix)) return true;
-    }
-    // 172.16.0.0/12: second octet must be 16–31
-    if (ip.startsWith("172.")) {
-      String[] parts = ip.split("\\.", 3);
-      if (parts.length >= 2) {
-        try {
-          int second = Integer.parseInt(parts[1]);
-          if (second >= PRIVATE_172_MIN && second <= PRIVATE_172_MAX) return true;
-        } catch (NumberFormatException ignored) {
-        }
-      }
-    }
+    // Shared predicate rather than a local prefix list (#694). Operator overrides above and the
+    // per-network private CIDRs below still apply — this replaces only the RFC-range heuristic,
+    // which is the part the four implementations disagreed on.
+    if (IpLocality.isLocal(ip)) return true;
     return customPrivateRangeService.isInCidrs(ip, rules.privateCidrs());
   }
 
