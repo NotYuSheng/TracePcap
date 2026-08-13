@@ -92,7 +92,11 @@ public class NetworkChangeEventEntity {
     VPN_DRIFT,
     SECURITY_ALERT_ADDED,
     SECURITY_ALERT_REMOVED,
-    LABEL_STALE
+    LABEL_STALE,
+    /** A baselined entity the operator declared should be present is absent from this snapshot. */
+    BASELINE_MISSING,
+    /** A baselined entity is present but bound to a different value than declared. */
+    BASELINE_MISMATCH
   }
 
   public enum EntityType {
