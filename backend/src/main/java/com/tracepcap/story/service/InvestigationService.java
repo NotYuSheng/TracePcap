@@ -1,18 +1,15 @@
 package com.tracepcap.story.service;
 
-import com.tracepcap.analysis.entity.ConversationEntity;
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.dto.ConversationFilterParams;
+import com.tracepcap.analysis.spi.ConversationLookup;
+import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.story.dto.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -20,7 +17,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class InvestigationService {
 
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
 
   public List<InvestigationStep> executeQueries(
       UUID fileId, List<InvestigationQuery> queries, List<Hypothesis> hypotheses) {
@@ -41,27 +38,24 @@ public class InvestigationService {
                 .findFirst()
                 .orElse(null);
 
-        Specification<ConversationEntity> spec = buildSpec(fileId, query);
-        var page =
-            conversationRepository.findAll(
-                spec, PageRequest.of(0, 10, Sort.by("totalBytes").descending()));
+        var page = conversationLookup.conversationPage(fileId, 1, 10, toFilter(query));
 
         List<ConversationEvidence> evidence =
-            page.getContent().stream().map(this::toEvidence).collect(Collectors.toList());
+            page.content().stream().map(this::toEvidence).collect(Collectors.toList());
 
         steps.add(
             InvestigationStep.builder()
                 .query(query)
                 .hypothesis(linked)
                 .conversations(evidence)
-                .conversationCount(page.getTotalElements())
+                .conversationCount(page.totalElements())
                 .build());
 
         log.info(
             "Query '{}' ({}): {} total matches, returning {}",
             query.getId(),
             query.getLabel(),
-            page.getTotalElements(),
+            page.totalElements(),
             evidence.size());
       } catch (Exception e) {
         log.error("Failed to execute investigation query '{}': {}", query.getId(), e.getMessage());
@@ -86,94 +80,71 @@ public class InvestigationService {
         && q.getMinFlows() == null;
   }
 
-  private Specification<ConversationEntity> buildSpec(UUID fileId, InvestigationQuery q) {
-    return (root, query, cb) -> {
-      List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+  /**
+   * Maps an LLM-produced query onto the shared conversation filter (#512 slice 6).
+   *
+   * <p>This used to be a JPA Specification built here, over {@code ConversationEntity} — a second
+   * definition of "filter conversations" living in the story module, free to drift from the one the
+   * conversations table uses. The filtering now happens behind the port, in SQL, which also keeps
+   * the aggregation off the heap.
+   */
+  // Package-private: the mapping is where this service's LLM-facing semantics live.
+  ConversationFilterParams toFilter(InvestigationQuery q) {
+    boolean appUnknown = isUnknownAppSentinel(q.getAppName());
+    // minBytes/maxBytes are per-conversation bounds. Dropped when srcIp or riskType is also set:
+    // in those cases the model tends to pass an aggregate total, which matches nothing.
+    boolean byteFilterSafe = q.getSrcIp() == null && q.getRiskType() == null;
 
-      predicates.add(cb.equal(root.get("file").get("id"), fileId));
-
-      if (q.getSrcIp() != null) predicates.add(cb.equal(root.get("srcIp"), q.getSrcIp()));
-      if (q.getDstIp() != null) predicates.add(cb.equal(root.get("dstIp"), q.getDstIp()));
-      if (q.getDstPort() != null) predicates.add(cb.equal(root.get("dstPort"), q.getDstPort()));
-      if (q.getProtocol() != null)
-        predicates.add(cb.equal(cb.upper(root.get("protocol")), q.getProtocol().toUpperCase()));
-      if (q.getAppName() != null) {
-        // Sentinel values the LLM uses to mean "unknown/null app" — map to IS NULL
-        if (q.getAppName().equalsIgnoreCase("UNKNOWN_APP")
-            || q.getAppName().equalsIgnoreCase("unknown")
-            || q.getAppName().equalsIgnoreCase("null")
-            || q.getAppName().isBlank()) {
-          predicates.add(cb.isNull(root.get("appName")));
-        } else {
-          predicates.add(cb.equal(root.get("appName"), q.getAppName()));
-        }
-      }
-      if (q.getCategory() != null) predicates.add(cb.equal(root.get("category"), q.getCategory()));
-      // minBytes/maxBytes are per-conversation filters. Drop them when srcIp or riskType is also
-      // set — in those cases the LLM tends to pass the aggregate total which would match nothing.
-      boolean byteFilterSafe = q.getSrcIp() == null && q.getRiskType() == null;
-      if (q.getMinBytes() != null && byteFilterSafe)
-        predicates.add(cb.greaterThanOrEqualTo(root.get("totalBytes"), q.getMinBytes()));
-      if (q.getMaxBytes() != null && byteFilterSafe)
-        predicates.add(cb.lessThanOrEqualTo(root.get("totalBytes"), q.getMaxBytes()));
-
-      if (Boolean.TRUE.equals(q.getHasRisks())) {
-        predicates.add(
-            cb.greaterThan(cb.function("cardinality", Integer.class, root.get("flowRisks")), 0));
-      }
-
-      if (Boolean.TRUE.equals(q.getHasTlsAnomaly())) {
-        predicates.add(cb.isNotNull(root.get("tlsIssuer")));
-      }
-
-      if (q.getRiskType() != null) {
-        // Match exact element in the PostgreSQL array text representation: {a,b,c}
-        // An element can appear as: {riskType,  {riskType}  ,riskType,  ,riskType}
-        String rt = q.getRiskType();
-        predicates.add(
-            cb.or(
-                cb.like(root.get("flowRisks").as(String.class), "{" + rt + ",%"),
-                cb.like(root.get("flowRisks").as(String.class), "%," + rt + ",%"),
-                cb.like(root.get("flowRisks").as(String.class), "%," + rt + "}"),
-                cb.equal(root.get("flowRisks").as(String.class), "{" + rt + "}")));
-      }
-
-      if (q.getMinFlows() != null) {
-        // Subquery: src IPs with at least minFlows conversations in this file
-        var subquery = query.subquery(String.class);
-        var subRoot = subquery.from(ConversationEntity.class);
-        subquery
-            .select(subRoot.get("srcIp"))
-            .where(cb.equal(subRoot.get("file").get("id"), fileId))
-            .groupBy(subRoot.get("srcIp"))
-            .having(cb.greaterThanOrEqualTo(cb.count(subRoot), (long) q.getMinFlows()));
-        predicates.add(root.get("srcIp").in(subquery));
-      }
-
-      return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-    };
+    return ConversationFilterParams.builder()
+        .srcIp(q.getSrcIp())
+        .dstIp(q.getDstIp())
+        .dstPort(q.getDstPort())
+        .protocols(q.getProtocol() == null ? List.of() : List.of(q.getProtocol().toUpperCase()))
+        .apps(q.getAppName() == null || appUnknown ? List.of() : List.of(q.getAppName()))
+        .appIsNull(appUnknown ? Boolean.TRUE : null)
+        .categories(q.getCategory() == null ? List.of() : List.of(q.getCategory()))
+        .hasRisks(Boolean.TRUE.equals(q.getHasRisks()) ? Boolean.TRUE : null)
+        .hasTlsAnomaly(Boolean.TRUE.equals(q.getHasTlsAnomaly()) ? Boolean.TRUE : null)
+        .riskTypes(q.getRiskType() == null ? List.of() : List.of(q.getRiskType()))
+        .minBytes(byteFilterSafe ? q.getMinBytes() : null)
+        .maxBytes(byteFilterSafe ? q.getMaxBytes() : null)
+        .minFlows(q.getMinFlows())
+        .sortBy("totalBytes")
+        .sortDir("desc")
+        .build();
   }
 
-  private ConversationEvidence toEvidence(ConversationEntity e) {
-    List<String> risks = e.getFlowRisks() != null ? Arrays.asList(e.getFlowRisks()) : List.of();
+  /** Sentinels the model uses to mean "no identified application". */
+  private static boolean isUnknownAppSentinel(String appName) {
+    if (appName == null) return false;
+    return appName.isBlank()
+        || appName.equalsIgnoreCase("UNKNOWN_APP")
+        || appName.equalsIgnoreCase("unknown")
+        || appName.equalsIgnoreCase("null");
+  }
+
+  private ConversationEvidence toEvidence(ConversationFacts f) {
+    var flow = f.flow();
+    var tls = f.tls();
+    var findings = f.findings();
 
     return ConversationEvidence.builder()
-        .srcIp(e.getSrcIp())
-        .srcPort(e.getSrcPort())
-        .dstIp(e.getDstIp())
-        .dstPort(e.getDstPort())
-        .protocol(e.getProtocol())
-        .appName(e.getAppName())
-        .category(e.getCategory())
-        .hostname(e.getHostname())
-        .totalBytes(e.getTotalBytes())
-        .packetCount(e.getPacketCount())
-        .startTime(e.getStartTime() != null ? e.getStartTime().toString() : null)
-        .endTime(e.getEndTime() != null ? e.getEndTime().toString() : null)
-        .flowRisks(risks)
-        .tlsIssuer(e.getTlsIssuer())
-        .tlsSubject(e.getTlsSubject())
-        .ja3Client(e.getJa3Client())
+        .srcIp(flow.srcIp())
+        .srcPort(flow.srcPort())
+        .dstIp(flow.dstIp())
+        .dstPort(flow.dstPort())
+        .protocol(flow.protocol())
+        .appName(findings.appName())
+        .category(findings.category())
+        .hostname(tls.hostname())
+        .totalBytes(flow.totalBytes())
+        .packetCount(flow.packetCount())
+        .startTime(flow.startTime() != null ? flow.startTime().toString() : null)
+        .endTime(flow.endTime() != null ? flow.endTime().toString() : null)
+        .flowRisks(findings.flowRisks() != null ? findings.flowRisks() : List.of())
+        .tlsIssuer(tls.tlsIssuer())
+        .tlsSubject(tls.tlsSubject())
+        .ja3Client(tls.ja3Client())
         .build();
   }
 }

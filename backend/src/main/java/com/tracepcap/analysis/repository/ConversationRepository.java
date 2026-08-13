@@ -449,6 +449,44 @@ public interface ConversationRepository
         return cb.and(predicates.toArray(new Predicate[0]));
       }
 
+      // ── Directional / range dimensions (#512 slice 6) ────────────────────────
+      // These moved here from InvestigationService, which built its own Specification over
+      // ConversationEntity from the story module — a seam bypass, and a second definition of
+      // "filter conversations" that could drift from this one.
+
+      if (params.getSrcIp() != null) {
+        predicates.add(cb.equal(root.get("srcIp"), params.getSrcIp()));
+      }
+      if (params.getDstIp() != null) {
+        predicates.add(cb.equal(root.get("dstIp"), params.getDstIp()));
+      }
+      if (params.getDstPort() != null) {
+        predicates.add(cb.equal(root.get("dstPort"), params.getDstPort()));
+      }
+      if (params.getMinBytes() != null) {
+        predicates.add(cb.greaterThanOrEqualTo(root.get("totalBytes"), params.getMinBytes()));
+      }
+      if (params.getMaxBytes() != null) {
+        predicates.add(cb.lessThanOrEqualTo(root.get("totalBytes"), params.getMaxBytes()));
+      }
+      if (Boolean.TRUE.equals(params.getHasTlsAnomaly())) {
+        predicates.add(cb.isNotNull(root.get("tlsIssuer")));
+      }
+      if (Boolean.TRUE.equals(params.getAppIsNull())) {
+        predicates.add(cb.isNull(root.get("appName")));
+      }
+      if (params.getMinFlows() != null) {
+        // Source addresses appearing in at least minFlows conversations in this file.
+        var fanOut = query.subquery(String.class);
+        var fanOutRoot = fanOut.from(ConversationEntity.class);
+        fanOut
+            .select(fanOutRoot.get("srcIp"))
+            .where(cb.equal(fanOutRoot.get("file").get("id"), fileId))
+            .groupBy(fanOutRoot.get("srcIp"))
+            .having(cb.greaterThanOrEqualTo(cb.count(fanOutRoot), (long) params.getMinFlows()));
+        predicates.add(root.get("srcIp").in(fanOut));
+      }
+
       // IP / hostname free-text
       if (params.getIp() != null && !params.getIp().isBlank()) {
         String pattern = "%" + params.getIp().trim().toLowerCase() + "%";
