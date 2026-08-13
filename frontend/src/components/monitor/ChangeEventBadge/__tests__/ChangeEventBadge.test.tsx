@@ -38,6 +38,53 @@ function renderBadge(e: ChangeEvent, onPatch = vi.fn().mockResolvedValue(undefin
 }
 
 describe('ChangeEventBadge', () => {
+  describe('baseline deviation wording', () => {
+    // Without these arms the switch falls through to `event.entityKey`, so a baseline
+    // deviation would render as a bare MAC address with no indication of what went wrong.
+    it('names the declared address when a baselined device is absent', () => {
+      renderBadge(
+        event({
+          changeType: 'BASELINE_MISSING',
+          entityKey: 'aa:bb:cc:dd:ee:ff',
+          newValue: { entryType: 'DEVICE', expected: '10.0.0.1' },
+        })
+      )
+
+      expect(
+        screen.getByText(/Baselined device not seen: aa:bb:cc:dd:ee:ff \(expected at 10\.0\.0\.1\)/)
+      ).toBeInTheDocument()
+    })
+
+    it('says gateway rather than device for a gateway entry', () => {
+      renderBadge(
+        event({
+          changeType: 'BASELINE_MISSING',
+          entityKey: '10.0.0.254',
+          newValue: { entryType: 'GATEWAY', expected: 'core router' },
+        })
+      )
+
+      expect(screen.getByText(/Baselined gateway not seen: 10\.0\.0\.254/)).toBeInTheDocument()
+    })
+
+    it('shows declared and observed side by side on a mismatch', () => {
+      renderBadge(
+        event({
+          changeType: 'BASELINE_MISMATCH',
+          severity: 'CRITICAL',
+          entityKey: 'aa:bb:cc:dd:ee:ff',
+          newValue: { entryType: 'IP_MAC_BINDING', expected: '10.0.0.1', observed: '10.0.0.99' },
+        })
+      )
+
+      // Both values have to be on screen: "mismatch" alone does not tell the operator
+      // whether they are looking at a re-addressed printer or a spoofed gateway.
+      expect(
+        screen.getByText(/declared 10\.0\.0\.1, observed 10\.0\.0\.99/)
+      ).toBeInTheDocument()
+    })
+  })
+
   describe('IP_MAC_DRIFT wording', () => {
     it('calls a changed MAC on a stable IP a potential ARP spoof', () => {
       renderBadge(

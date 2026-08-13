@@ -67,6 +67,12 @@ function describeEvent(event: ChangeEvent): string {
       return `${securityKindLabel(nv['signalKind'])} appeared: ${event.entityKey}`;
     case 'SECURITY_ALERT_REMOVED':
       return `${securityKindLabel(ov['signalKind'])} cleared: ${event.entityKey}`;
+    case 'BASELINE_MISSING': {
+      const what = nv['entryType'] === 'GATEWAY' ? 'gateway' : 'device';
+      return `Baselined ${what} not seen: ${event.entityKey}${nv['expected'] ? ` (expected at ${nv['expected']})` : ''}`;
+    }
+    case 'BASELINE_MISMATCH':
+      return `Baseline mismatch: ${event.entityKey} — declared ${nv['expected'] ?? '?'}, observed ${nv['observed'] ?? '?'}`;
     case 'LABEL_STALE': {
       const changes = Array.isArray(nv['changes']) ? (nv['changes'] as string[]).join(', ') : '';
       const label = nv['roleLabel'] ? ` (${nv['roleLabel']})` : '';

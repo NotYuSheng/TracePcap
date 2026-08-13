@@ -13,12 +13,14 @@ import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
 import com.tracepcap.intelligence.entity.CustomPrivateRangeEntity;
 import com.tracepcap.intelligence.entity.IpClassification;
 import com.tracepcap.intelligence.service.CustomPrivateRangeService;
+import com.tracepcap.monitor.entity.BaselineDefinitionEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.ChangeType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.EntityType;
 import com.tracepcap.monitor.entity.NetworkChangeEventEntity.Severity;
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.entity.SnapshotSubnetOverrideEntity;
+import com.tracepcap.monitor.repository.BaselineDefinitionRepository;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.monitor.repository.SnapshotSubnetOverrideRepository;
@@ -26,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +58,7 @@ public class ChangeDetectionService {
   private final ConversationLookup conversationLookup;
   private final GeoOrgLookup geoOrgLookup;
   private final NetworkChangeEventRepository changeEventRepository;
+  private final BaselineDefinitionRepository baselineDefinitionRepository;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
   private final LabelStalenessCheck labelStalenessCheck;
@@ -79,6 +83,7 @@ public class ChangeDetectionService {
     events.addAll(detectProtocolAppDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectSecurityDrift(fromFileId, toFileId, fromSnapshot, toSnapshot));
     events.addAll(detectStaleLabels(toFileId, fromSnapshot, toSnapshot));
+    events.addAll(detectBaselineDeviations(toFileId, fromSnapshot, toSnapshot));
 
     // Carry subnet labels forward onto this snapshot (inherited overrides), mirroring node roles.
     subnetOverrideCarryForwardService.carryForward(
@@ -132,6 +137,134 @@ public class ChangeDetectionService {
               Severity.WARNING));
     }
     return events;
+  }
+
+  // ── Signal 7: declared baseline vs observed inventory ───────────────────────
+
+  /**
+   * Compares the snapshot against the operator's declared baseline (#650).
+   *
+   * <p>Every other detector compares snapshot N against N-1, which answers "what changed". This
+   * answers a different question — "does reality match what was declared" — and it is the reason
+   * the baseline panel exists. Until this ran, definitions were stored, displayed back, and never
+   * checked: an operator who baselined a gateway saw no alerts and reasonably read that as
+   * "nothing wrong", when nothing had ever been compared.
+   *
+   * <p>Two cases are emitted, both unambiguous:
+   *
+   * <ul>
+   *   <li><b>Absent</b> — a declared entity does not appear in this snapshot. A baselined gateway
+   *       that stops answering is the case this exists for.
+   *   <li><b>Mismatch</b> — a declared entity is present but bound to a different value. An
+   *       IP↔MAC binding that contradicts the declaration is the highest-signal event here,
+   *       because that is what ARP spoofing looks like.
+   * </ul>
+   *
+   * <p>Deliberately <b>not</b> emitted: "present but not declared". That requires deciding whether
+   * a baseline is an allowlist (undeclared device ⇒ alert) or an expectation list (only absences
+   * and contradictions matter), and the answer may differ per entry type — GATEWAY is naturally
+   * exhaustive, APP is not. Guessing would either flood the review queue on a busy network or
+   * silently permit rogue devices, so it is left to an explicit decision.
+   *
+   * <p>PROTOCOL, APP and VPN_FINGERPRINT declarations are accepted by the UI but not evaluated
+   * here: those are drift signals already covered by detectProtocolAppDrift against the previous
+   * snapshot, and baselining them raises the same allowlist question.
+   */
+  private List<NetworkChangeEventEntity> detectBaselineDeviations(
+      UUID toFileId, NetworkSnapshotEntity fromSnapshot, NetworkSnapshotEntity toSnapshot) {
+
+    UUID networkId = toSnapshot.getNetwork().getId();
+    List<BaselineDefinitionEntity> definitions =
+        baselineDefinitionRepository.findByNetworkIdOrderByCreatedAtAsc(networkId);
+    if (definitions.isEmpty()) return List.of();
+
+    // Lowercase both sides. macMap keys by the raw MAC as captured, and captures and the UI
+    // disagree on MAC casing routinely — comparing them as-is would report a baselined device as
+    // absent from every snapshot it is actually in.
+    Map<String, HostFacts> byMac = lowerKeys(macMap(toFileId));
+    Map<String, String> macToIp = lowerKeys(macToIpMap(toFileId));
+    // An IP is "seen" if any observation binds it, whichever MAC claimed it.
+    Set<String> seenIps = new HashSet<>(macToIp.values());
+
+    List<NetworkChangeEventEntity> events = new ArrayList<>();
+    for (BaselineDefinitionEntity def : definitions) {
+      String key = def.getEntityKey() == null ? "" : def.getEntityKey().trim();
+      if (key.isEmpty()) continue;
+
+      switch (def.getEntryType()) {
+        case DEVICE, IP_MAC_BINDING -> {
+          // Keyed by MAC. Casing varies between captures and the UI, so compare lowercased.
+          String mac = key.toLowerCase();
+          HostFacts observed = byMac.get(mac);
+          if (observed == null) {
+            events.add(
+                baselineEvent(
+                    networkId, fromSnapshot, toSnapshot, ChangeType.BASELINE_MISSING,
+                    EntityType.DEVICE, key, def,
+                    Map.of("expected", orEmpty(def.getEntityValue()))));
+          } else if (contradicts(def.getEntityValue(), macToIp.get(mac))) {
+            events.add(
+                baselineEvent(
+                    networkId, fromSnapshot, toSnapshot, ChangeType.BASELINE_MISMATCH,
+                    EntityType.DEVICE, key, def,
+                    Map.of(
+                        "expected", orEmpty(def.getEntityValue()),
+                        "observed", orEmpty(macToIp.get(mac)))));
+          }
+        }
+        case GATEWAY -> {
+          // Keyed by IP: a declared gateway that no longer answers is the point of baselining it.
+          if (!seenIps.contains(key)) {
+            events.add(
+                baselineEvent(
+                    networkId, fromSnapshot, toSnapshot, ChangeType.BASELINE_MISSING,
+                    // ISP, matching the existing GATEWAY_CHANGE event — a gateway is keyed by
+                    // IP rather than MAC, and this is the type that already carries that shape.
+                    EntityType.ISP, key, def,
+                    Map.of("expected", orEmpty(def.getEntityValue()))));
+          }
+        }
+        default -> {
+          // PROTOCOL / APP / VPN_FINGERPRINT — see the allowlist note above.
+        }
+      }
+    }
+    return events;
+  }
+
+  private static <V> Map<String, V> lowerKeys(Map<String, V> source) {
+    Map<String, V> result = new HashMap<>();
+    source.forEach((k, v) -> result.put(k == null ? null : k.toLowerCase(), v));
+    return result;
+  }
+
+  /** A declared value contradicts the observed one only when both are present and differ. */
+  private static boolean contradicts(String declared, String observed) {
+    if (declared == null || declared.isBlank() || observed == null || observed.isBlank()) {
+      return false; // nothing declared to contradict, or nothing observed to compare against
+    }
+    return !declared.trim().equalsIgnoreCase(observed.trim());
+  }
+
+  private NetworkChangeEventEntity baselineEvent(
+      UUID networkId,
+      NetworkSnapshotEntity fromSnapshot,
+      NetworkSnapshotEntity toSnapshot,
+      ChangeType type,
+      EntityType entityType,
+      String entityKey,
+      BaselineDefinitionEntity def,
+      Map<String, Object> extra) {
+
+    Map<String, Object> newValue = new HashMap<>(extra);
+    newValue.put("entryType", def.getEntryType().name());
+    newValue.put("notes", orEmpty(def.getNotes()));
+    // A contradicted binding is what ARP spoofing looks like; a missing declared entity is a
+    // change worth reviewing but not on its own an attack signature.
+    Severity severity =
+        type == ChangeType.BASELINE_MISMATCH ? Severity.CRITICAL : Severity.WARNING;
+    return buildEvent(
+        networkId, fromSnapshot, toSnapshot, type, entityType, entityKey, null, newValue, severity);
   }
 
   /**

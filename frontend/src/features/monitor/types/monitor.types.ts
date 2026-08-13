@@ -56,7 +56,9 @@ export type ChangeType =
   | 'VPN_DRIFT'
   | 'SECURITY_ALERT_ADDED'
   | 'SECURITY_ALERT_REMOVED'
-  | 'LABEL_STALE';
+  | 'LABEL_STALE'
+  | 'BASELINE_MISSING'
+  | 'BASELINE_MISMATCH';
 
 export type EntityType =
   | 'DEVICE' | 'IP_MAC_BINDING' | 'ISP' | 'PROTOCOL' | 'APP' | 'SECURITY' | 'NODE_ROLE';

@@ -69,13 +69,15 @@ export const ChangeEventsSection = ({ changeEvents, snapshots, onPatchChange }: 
               <li className="mb-2">
                 <Badge bg="danger" className="me-1">CRITICAL</Badge>
                 <code>IP_MAC_DRIFT</code> — IP claimed by a different MAC (potential ARP spoofing)<br />
-                <code>GATEWAY_CHANGE</code> — default gateway IP changed
+                <code>GATEWAY_CHANGE</code> — default gateway IP changed<br />
+                <code>BASELINE_MISMATCH</code> — a baselined device is bound to a different IP than declared
               </li>
               <li className="mb-2">
                 <Badge bg="warning" text="dark" className="me-1">WARNING</Badge>
                 <code>MAC_ADDED</code> — new device appeared<br />
                 <code>IP_MAC_DRIFT</code> — known MAC moved to a new IP (DHCP drift)<br />
-                <code>LABEL_STALE</code> — a confirmed manual label's node has drifted (new MAC / protocol / external org)
+                <code>LABEL_STALE</code> — a confirmed manual label's node has drifted (new MAC / protocol / external org)<br />
+                <code>BASELINE_MISSING</code> — a device or gateway you baselined is absent from this snapshot
               </li>
               <li>
                 <Badge bg="info" text="dark" className="me-1">INFO</Badge>
