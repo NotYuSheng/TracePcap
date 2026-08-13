@@ -183,8 +183,14 @@ public class ChangeDetectionService {
     // absent from every snapshot it is actually in.
     Map<String, HostFacts> byMac = lowerKeys(macMap(toFileId));
     Map<String, String> macToIp = lowerKeys(macToIpMap(toFileId));
-    // An IP is "seen" if any observation binds it, whichever MAC claimed it.
-    Set<String> seenIps = new HashSet<>(macToIp.values());
+    // Every observed IP, not just those from macToIp: that map drops hosts with no MAC, and a
+    // gateway seen by IP alone would otherwise be reported missing from a snapshot it is in.
+    Set<String> seenIps =
+        hostClassificationLookup.hostFacts(toFileId).stream()
+            .map(HostFacts::ip)
+            .filter(ip -> ip != null && !ip.isBlank())
+            .map(String::trim)
+            .collect(Collectors.toCollection(HashSet::new));
 
     List<NetworkChangeEventEntity> events = new ArrayList<>();
     for (BaselineDefinitionEntity def : definitions) {

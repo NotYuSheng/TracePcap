@@ -219,6 +219,16 @@ class BaselineDeviationDetectionTest {
   }
 
   @Test
+  void aGatewaySeenByIpAloneIsNotReportedMissing() {
+    // Not every observed host carries a MAC. Deriving "seen" from the MAC-keyed map would
+    // report such a gateway absent from every snapshot it is actually in.
+    declared(def(BaselineEntryType.GATEWAY, "10.0.0.254", "core router"));
+    observed(host("10.0.0.254", null));
+
+    assertThat(detect()).isEmpty();
+  }
+
+  @Test
   void protocolAndAppDeclarations_areNotEvaluatedYet() {
     // Accepted by the UI but deliberately not evaluated: they raise the same allowlist question,
     // and drift against the previous snapshot already covers them.
