@@ -98,6 +98,12 @@ public class SuricataEngine {
     if (isResponsive()) return true;
 
     try {
+      // A daemon can be alive but unresponsive — wedged, or its socket gone. Starting a
+      // replacement without stopping it first would orphan a process holding a built rule engine
+      // (hundreds of MB) that nothing can reach afterwards. Same defect the startup-timeout path
+      // had; this is the restart path.
+      discardDaemon();
+
       Path socket = Path.of(socketPath);
       Files.createDirectories(socket.getParent());
       Files.deleteIfExists(socket);

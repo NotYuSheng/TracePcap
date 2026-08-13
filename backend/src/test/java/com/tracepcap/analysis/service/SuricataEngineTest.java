@@ -84,6 +84,19 @@ class SuricataEngineTest {
   }
 
   @Test
+  void aRestartDoesNotLeaveTheOldEngineRunning(@TempDir Path tmp) throws Exception {
+    // A daemon can be alive but unresponsive. Replacing it without stopping it would orphan a
+    // process holding a built rule engine that nothing can reach afterwards.
+    configure(true, tmp.resolve("suricata.sock").toString());
+    ReflectionTestUtils.setField(engine, "daemon", new ProcessBuilder("sleep", "300").start());
+    Process orphan = (Process) ReflectionTestUtils.getField(engine, "daemon");
+
+    engine.process(new File("a.pcap"), tmp);
+
+    assertThat(orphan.isAlive()).isFalse();
+  }
+
+  @Test
   void stoppingAnEngineThatNeverStartedIsHarmless(@TempDir Path tmp) {
     // @PreDestroy runs on every shutdown, including ones where no capture was ever analysed.
     configure(true, tmp.resolve("suricata.sock").toString());
