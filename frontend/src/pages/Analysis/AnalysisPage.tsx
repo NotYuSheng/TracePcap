@@ -514,7 +514,7 @@ export const AnalysisPage = () => {
             className={`nav-link ${activeTab === 'network-intelligence' ? 'active' : ''}`}
             onClick={() => handleTabChange('network-intelligence')}
           >
-            <i className="bi bi-globe-europe-africa me-2"></i>Network Intelligence
+            <i className="bi bi-globe-europe-africa me-2"></i>Network Cluster
           </button>
         </li>
         </ul>

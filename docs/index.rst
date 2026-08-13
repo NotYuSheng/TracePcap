@@ -27,7 +27,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
 
    features/pcap-upload
    features/network-visualization
-   features/network-intelligence
+   features/network-cluster
    features/comparison
    features/ndpi-analysis
    features/ids-threat-detection

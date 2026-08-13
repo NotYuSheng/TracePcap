@@ -1,7 +1,7 @@
-Network Intelligence
-====================
+Network Cluster
+===============
 
-The **Network Intelligence** tab presents a high-level cluster graph that
+The **Network Cluster** tab presents a high-level cluster graph that
 groups all IP addresses in a capture into named clusters, making it easier to
 understand traffic between organisations, countries, subnets, or device
 classes at a glance.
@@ -92,12 +92,12 @@ Clicking a cluster opens a panel on the right showing:
 - A per-IP breakdown sortable by **Traffic** (bytes), **Conversations**,
   **Risk flags**, or **Unique peers**.
 - A conversation list for the selected cluster, filtered by the active
-  Network Intelligence filters (same filter set as the Conversations tab).
+  Network Cluster filters (same filter set as the Conversations tab).
 
 Filters
 -------
 
-The Network Intelligence tab exposes the full conversation filter panel
+The Network Cluster tab exposes the full conversation filter panel
 (IP, port, protocol, application, country, device type, risk, custom
 signatures, etc.), identical to the Conversations tab. Filters apply to
 both the cluster graph and the side-panel conversation list.

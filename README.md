@@ -206,7 +206,7 @@ Changes are compared between consecutive snapshots (ordered by capture time):
 |-----------|------------|
 | **Backend** | Spring Boot 3.2.1, Java 21, Maven, Lombok, MapStruct |
 | **Frontend** | React 19, Vite, TypeScript, SGDS React |
-| **Visualization** | Sigma.js + graphology + ELK (network topology), React Flow (Network Intelligence cluster graph), Recharts, D3.js |
+| **Visualization** | Sigma.js + graphology + ELK (network topology), React Flow (Network Cluster cluster graph), Recharts, D3.js |
 | **Reverse Proxy** | Nginx |
 | **Packet Parsing** | tshark / Wireshark, nDPI v5 (deep packet inspection) |
 | **Database** | PostgreSQL 15 with Flyway migrations |
@@ -393,7 +393,7 @@ The [`sample-files/`](sample-files/) directory contains example PCAPs:
 - `atm_capture1.cap` — ATM network traffic sample
 - `free5gc.pcap` — 5G core network traffic sample
 - `demo_all_rules.pcap` — Triggers all 12 custom signature demo rules
-- `dns_demo.pcap` — Two LAN resolvers answering a variety of DNS record types (A, AAAA, CNAME, MX, TXT, PTR, SRV) for the Network Intelligence "DNS Servers" view. Regenerate with [`sample-files/gen_dns_demo.py`](sample-files/gen_dns_demo.py)
+- `dns_demo.pcap` — Two LAN resolvers answering a variety of DNS record types (A, AAAA, CNAME, MX, TXT, PTR, SRV) for the Network Cluster "DNS Servers" view. Regenerate with [`sample-files/gen_dns_demo.py`](sample-files/gen_dns_demo.py)
 - `http_demo.pcap` — A JSON API server, a plain website, and a host under endpoint enumeration (mostly 404s) — drives the web/API-server classification and the node-modal HTTP endpoint log. Regenerate with [`sample-files/gen_http_demo.py`](sample-files/gen_http_demo.py)
 - `monitor_large/` — 8 weekly snapshots of a simulated 550-node office network for testing the Network Monitor
 
