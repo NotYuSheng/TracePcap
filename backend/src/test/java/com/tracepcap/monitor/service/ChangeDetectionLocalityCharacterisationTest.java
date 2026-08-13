@@ -107,25 +107,19 @@ class ChangeDetectionLocalityCharacterisationTest {
 
   @ParameterizedTest
   @NullSource
-  void isPrivate_treatsNullAsPrivate_unlikeTheOtherTwoImplementations(String ip) {
-    // The sharpest divergence in #694: null is private here and public in both other
-    // implementations. A host with no recorded address is therefore internal on this path and
-    // external everywhere else.
-    assertThat(isPrivate(ip)).isTrue();
+  void isPrivate_nowTreatsNullAsNotPrivate_matchingTheOthers(String ip) {
+    // Changed by #694. This service alone answered true, so a row with no address counted as
+    // internal traffic. The other three all treated an unclassifiable address as not-private.
+    assertThat(isPrivate(ip)).isFalse();
   }
 
   @Test
-  void isPrivate_missesMostOfTheFe80Slash10LinkLocalRange() {
-    // fe80::/10 spans fe80:: through febf::, but the prefix set holds the literal string
-    // "fe80", so only the first sixteenth of the range matches. febf::1 is link-local and is
-    // classified as PUBLIC — a real gap, and the one place the string-prefix approach visibly
-    // breaks rather than merely being imprecise.
-    //
-    // Pinned, not fixed: correcting it here would change which hosts monitor mode reports as
-    // external, inside a PR whose whole purpose is to prove behaviour unchanged. Recorded on
-    // #694 with the other locality divergences.
+  void isPrivate_nowCoversTheWholeFe80Slash10LinkLocalRange() {
+    // Fixed by #694, and the clearest case for parsing over prefix matching: fe80::/10 spans
+    // fe80:: through febf::, but a literal "fe80" string prefix matched a sixteenth of it, so
+    // febf::1 — link-local — was classified as a public address.
     assertThat(isPrivate("fe80::1")).isTrue();
-    assertThat(isPrivate("febf::1")).isFalse();
+    assertThat(isPrivate("febf::1")).isTrue();
   }
 
   @Test

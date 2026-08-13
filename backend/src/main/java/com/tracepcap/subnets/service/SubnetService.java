@@ -1,5 +1,6 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.subnets.dto.SubnetDefinitionDto;
@@ -308,11 +309,9 @@ public class SubnetService {
     return ((ip >> 24) & 0xFF) + "." + ((ip >> 16) & 0xFF) + "." + ((ip >> 8) & 0xFF) + "." + (ip & 0xFF);
   }
 
+  /** Delegates to the shared predicate so all four call sites agree (#694). */
   private static boolean isPrivate(String ip) {
-    if (ip == null) return false;
-    return ip.startsWith("10.")
-        || ip.startsWith("192.168.")
-        || ip.matches("172\\.(1[6-9]|2\\d|3[01])\\..*");
+    return IpLocality.isLocal(ip);
   }
 
   private static final java.util.regex.Pattern CIDR_PATTERN =

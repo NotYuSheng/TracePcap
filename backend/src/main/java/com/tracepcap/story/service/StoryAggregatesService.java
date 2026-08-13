@@ -1,5 +1,6 @@
 package com.tracepcap.story.service;
 
+import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.entity.IpGeoInfoEntity;
 import com.tracepcap.analysis.spi.ConversationLookup;
@@ -30,8 +31,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class StoryAggregatesService {
 
-  private static final Set<String> PRIVATE_PREFIXES =
-      Set.of("10.", "127.", "169.254.", "::1", "fc", "fd", "fe80");
 
   private final ConversationLookup conversationLookup;
   private final ExtractionManifest extractionManifest;
@@ -152,24 +151,9 @@ public class StoryAggregatesService {
         .collect(Collectors.toList());
   }
 
+  /** Delegates to the shared predicate so all four call sites agree (#694). */
   private static boolean isPrivate(String ip) {
-    for (String prefix : PRIVATE_PREFIXES) {
-      if (ip.startsWith(prefix)) return true;
-    }
-    // 172.16.0.0/12
-    if (ip.startsWith("172.")) {
-      String[] parts = ip.split("\\.");
-      if (parts.length >= 2) {
-        try {
-          int second = Integer.parseInt(parts[1]);
-          if (second >= 16 && second <= 31) return true;
-        } catch (NumberFormatException ignored) {
-        }
-      }
-    }
-    // 192.168.x.x
-    if (ip.startsWith("192.168.")) return true;
-    return false;
+    return IpLocality.isLocal(ip);
   }
 
   // ── Protocol × Risk Matrix ─────────────────────────────────────────────────

@@ -88,10 +88,10 @@ class NetworkIntelligenceHeuristicsCharacterisationTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"169.254.1.1"})
-  void isPrivateIp_doesNotAcceptIpv4LinkLocal(String ip) {
-    // 169.254/16 is not routable off-link, so calling it public is arguable — but both this
-    // service and SubnetService agree here, so it is at least consistent. Pinned, not endorsed.
-    assertThat(isPrivateIp(ip)).isFalse();
+  void isPrivateIp_nowAcceptsIpv4LinkLocal(String ip) {
+    // Changed by #694. All four implementations previously agreed that 169.254/16 was public,
+    // which was consistently wrong rather than divergent: it is not routable off-link.
+    assertThat(isPrivateIp(ip)).isTrue();
   }
 
   @Test

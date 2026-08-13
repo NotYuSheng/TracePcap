@@ -117,11 +117,12 @@ class SubnetServiceCharacterisationTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"127.0.0.1", "169.254.1.1"})
-  void isPrivate_doesNotTreatLoopbackOrLinkLocalAsPrivate(String ip) {
-    // Pinned as a known limitation, not endorsed: neither is routable off-host, so classifying
-    // them as public is arguably wrong. Changing it would reclassify hosts in existing captures,
-    // so it belongs in its own change with its own reasoning — not smuggled in via a refactor.
-    assertThat(invoke("isPrivate", String.class, ip)).isEqualTo(false);
+  void isPrivate_nowTreatsLoopbackAndLinkLocalAsLocal(String ip) {
+    // Changed by #694. This service used to answer false here while NetworkIntelligenceService
+    // answered true for loopback — the divergence that made the same host internal on one code
+    // path and external on another. Neither is routable off-host or off-link, so calling them
+    // external put them in the "talking to the outside world" bucket they cannot belong to.
+    assertThat(invoke("isPrivate", String.class, ip)).isEqualTo(true);
   }
 
   @Test
