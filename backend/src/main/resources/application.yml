@@ -180,6 +180,21 @@ tracepcap:
     # analysis cost (#452), so disabling it here is the single biggest throughput lever. Defaults
     # to true to preserve threat detection; set SURICATA_ENABLED=false to turn it off across the board.
     enabled: ${SURICATA_ENABLED:true}
+    warm-engine:
+      # Keep one Suricata engine loaded across analyses instead of building the ~50,000-rule
+      # detection engine per file (#569). Measured 45.9s -> ~0.5s per capture, identical alerts.
+      # On by default: the cold path remains as an automatic fallback, so the worst case of a
+      # broken warm engine is today's behaviour, not lost threat detection.
+      enabled: ${SURICATA_WARM_ENGINE_ENABLED:true}
+      # Must be writable by the container's runtime user (the app runs as `spring`, and Suricata's
+      # packaged default log directory is root-owned).
+      socket: ${SURICATA_WARM_ENGINE_SOCKET:/tmp/tracepcap-suricata/suricata.sock}
+      startup-timeout-seconds: ${SURICATA_WARM_ENGINE_STARTUP_TIMEOUT:180}
+      run-timeout-seconds: ${SURICATA_WARM_ENGINE_RUN_TIMEOUT:600}
+      # Generous by design: falling back costs a full cold run, so waiting for the warm engine is
+      # nearly always the better trade. The bound only prevents an unbounded hang.
+      lock-wait-seconds: ${SURICATA_WARM_ENGINE_LOCK_WAIT:900}
+      command-timeout-seconds: ${SURICATA_WARM_ENGINE_COMMAND_TIMEOUT:30}
   cleanup:
     cron: "0 0 * * * ?"  # Run every hour at the top of the hour
     enabled: ${FILE_RETENTION_ENABLED:true}

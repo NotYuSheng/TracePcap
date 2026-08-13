@@ -174,6 +174,9 @@ services:
       # Global Suricata IDS kill-switch. false = skip Suricata for every file (biggest throughput
       # lever, ~94% of per-file analysis cost). See .env.example.
       SURICATA_ENABLED: ${SURICATA_ENABLED:-true}
+      # Warm Suricata engine (#569): builds the ruleset once instead of per file.
+      # ~45s -> ~0.5s per capture. Set false to return to a fresh subprocess per file.
+      SURICATA_WARM_ENGINE_ENABLED: ${SURICATA_WARM_ENGINE_ENABLED:-true}
       # Data retention. FILE_RETENTION_ENABLED=false is the master switch — it keeps
       # uploaded files forever, and the cleanup scheduler is then not registered at all, so
       # nothing below has any effect. NOTE 0 means "never" only for the MONITOR_ and PACKET_

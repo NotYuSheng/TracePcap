@@ -159,6 +159,9 @@ services:
       # could not tune analysis throughput or turn Suricata off (#641) — the deployment
       # most likely to want that, given it runs on whatever hardware is on site.
       SURICATA_ENABLED: ${SURICATA_ENABLED:-true}
+      # Warm Suricata engine (#569): builds the ruleset once instead of per file.
+      # ~45s -> ~0.5s per capture. Set false to return to a fresh subprocess per file.
+      SURICATA_WARM_ENGINE_ENABLED: ${SURICATA_WARM_ENGINE_ENABLED:-true}
       ASYNC_CORE_POOL_SIZE: ${ASYNC_CORE_POOL_SIZE:-5}
       ASYNC_MAX_POOL_SIZE: ${ASYNC_MAX_POOL_SIZE:-10}
       ASYNC_QUEUE_CAPACITY: ${ASYNC_QUEUE_CAPACITY:-100}

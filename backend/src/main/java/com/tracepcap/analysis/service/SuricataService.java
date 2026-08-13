@@ -152,7 +152,9 @@ public class SuricataService implements Extractor {
       // Warm engine first (#569): the ruleset build is ~45s and is otherwise paid per file, while
       // the packet processing itself is milliseconds. Identical alert output, measured 66x faster.
       if (engine.process(pcapFile, outDir)) {
-        parseEveJson(outDir.resolve(EVE_JSON), result);
+        // Warm output lives in its own subdirectory so an abandoned warm run cannot interleave
+        // with the cold fallback below.
+        parseEveJson(SuricataEngine.warmDir(outDir).resolve(EVE_JSON), result);
         log.debug("Suricata (warm) produced alerts for {} distinct flows", result.size());
         return result;
       }

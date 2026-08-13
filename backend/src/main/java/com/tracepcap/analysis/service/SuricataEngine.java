@@ -40,6 +40,7 @@ public class SuricataEngine {
 
   private static final String SURICATASC = "suricatasc";
   private static final String SURICATA = "suricata";
+  private static final String EVE_JSON = "eve.json";
 
   @Value("${tracepcap.suricata.warm-engine.enabled:true}")
   private boolean warmEngineEnabled;
@@ -56,8 +57,35 @@ public class SuricataEngine {
   @Value("${tracepcap.suricata.warm-engine.run-timeout-seconds:600}")
   private int runTimeoutSeconds;
 
+  /**
+   * How long a caller waits for the engine before giving up and using the per-file path.
+   *
+   * <p>Deliberately generous. Falling back is not cheap — it is a 45 s cold Suricata — so waiting
+   * for the warm engine is almost always the better trade. A short wait was measurably worse: with
+   * eight captures submitted together, every caller but one timed out of the lock and started its
+   * own cold Suricata, and the resulting contention pushed a single Extract stage to 430 s. The
+   * bound exists to stop an unbounded hang, not to prefer the slow path.
+   */
+  @Value("${tracepcap.suricata.warm-engine.lock-wait-seconds:900}")
+  private int lockWaitSeconds;
+
+  /** A socket command is a single short exchange; anything longer means the engine is wedged. */
+  @Value("${tracepcap.suricata.warm-engine.command-timeout-seconds:30}")
+  private int commandTimeoutSeconds;
+
   private final ReentrantLock lock = new ReentrantLock();
   private volatile Process daemon;
+
+  /** Where a warm run writes, kept apart from the caller's fallback output. */
+  public static Path warmDir(Path outDir) {
+    return outDir.resolve("warm");
+  }
+
+  private void discardDaemon() {
+    Process p = daemon;
+    daemon = null;
+    if (p != null && p.isAlive()) p.destroyForcibly();
+  }
 
   /**
    * Starts the engine if it is not already running, and waits for it to accept commands.
@@ -104,6 +132,7 @@ public class SuricataEngine {
       while (System.nanoTime() < deadline) {
         if (!daemon.isAlive()) {
           log.warn("Warm Suricata engine exited during startup — falling back to per-file runs");
+          discardDaemon();
           return false;
         }
         if (isResponsive()) {
@@ -113,6 +142,9 @@ public class SuricataEngine {
         Thread.sleep(1000);
       }
       log.warn("Warm Suricata engine did not become ready in {}s", startupTimeoutSeconds);
+      // Alive but unresponsive: without this the next attempt starts a second daemon and this
+      // one becomes unreachable, so stop() could never terminate it.
+      discardDaemon();
       return false;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -130,18 +162,38 @@ public class SuricataEngine {
    */
   public boolean process(File pcapFile, Path outDir) {
     if (!warmEngineEnabled) return false;
-    lock.lock();
+    // Bounded: while the engine builds its ruleset (~45s) other analyses should fall back to the
+    // per-file path rather than queue behind it.
+    try {
+      if (!lock.tryLock(lockWaitSeconds, TimeUnit.SECONDS)) return false;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
     try {
       if (!ensureStarted()) return false;
 
+      // Its own directory. If a warm run is abandoned on timeout it may still be writing, and the
+      // caller's fallback starts a cold Suricata immediately — pointed at the same directory,
+      // two processes would append to one eve.json and produce mixed or partial alerts.
+      Path warmDir = warmDir(outDir);
+      try {
+        Files.createDirectories(warmDir);
+      } catch (IOException e) {
+        return false;
+      }
+
       String submitted =
-          runCommand("pcap-file " + pcapFile.getAbsolutePath() + " " + outDir.toAbsolutePath());
+          runCommand("pcap-file " + pcapFile.getAbsolutePath() + " " + warmDir.toAbsolutePath());
       if (submitted == null || !submitted.contains("OK")) {
         log.warn("Warm Suricata engine rejected the capture ({}) — falling back", submitted);
         return false;
       }
 
-      // pcap-current reports the capture being processed, or "None" when the queue has drained.
+      // pcap-current reports the capture being processed, or "None" when the queue has drained —
+      // including in the window after the submission is accepted but before the engine dequeues
+      // it. Waiting for eve.json as well distinguishes "not started yet" from "finished".
+      Path eve = warmDir.resolve(EVE_JSON);
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(runTimeoutSeconds);
       while (System.nanoTime() < deadline) {
         String current = runCommand("pcap-current");
@@ -149,7 +201,7 @@ public class SuricataEngine {
           log.warn("Lost contact with the warm Suricata engine — falling back");
           return false;
         }
-        if (current.contains("None")) return true;
+        if (current.contains("None") && Files.exists(eve)) return true;
         Thread.sleep(100);
       }
       log.warn("Warm Suricata engine did not finish within {}s — falling back", runTimeoutSeconds);
@@ -174,11 +226,14 @@ public class SuricataEngine {
           new ProcessBuilder(List.of(SURICATASC, "-c", command, socketPath))
               .redirectErrorStream(true)
               .start();
-      String out = new String(p.getInputStream().readAllBytes());
-      if (!p.waitFor(30, TimeUnit.SECONDS)) {
+      // waitFor first: readAllBytes blocks until EOF, so a stalled socket command would hold the
+      // lock indefinitely and the caller could never fall back. suricatasc replies with a single
+      // short JSON line, well inside the pipe buffer, so nothing is lost by draining afterwards.
+      if (!p.waitFor(commandTimeoutSeconds, TimeUnit.SECONDS)) {
         p.destroyForcibly();
         return null;
       }
+      String out = new String(p.getInputStream().readAllBytes());
       return p.exitValue() == 0 ? out : null;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
