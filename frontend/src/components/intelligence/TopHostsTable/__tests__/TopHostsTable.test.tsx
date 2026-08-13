@@ -98,9 +98,11 @@ describe('TopHostsTable', () => {
 
     // Queueing a second sort before the first returns races two responses into one table.
     //
-    // Only the disabled state is asserted. The shared Spinner does not forward the `role`
-    // prop it is given, so there is no accessible status element to find — worth knowing, but
-    // an assertion about the spinner would be testing markup this component does not control.
+    // Only the disabled state is asserted. The shared Spinner *does* forward `role` — it
+    // defaults to "status" — but it also sets aria-hidden="true", which removes it from the
+    // accessibility tree, so getByRole('status') cannot reach it. That contradiction is pinned
+    // in Spinner's own tests; asserting it from here would test markup this component does not
+    // control.
     expect(screen.getByRole('button', { name: 'Packets' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Bytes' })).toBeDisabled()
   })
