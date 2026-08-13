@@ -77,6 +77,42 @@ public class ConversationFilterParams {
    * Field to sort by. Accepted values from frontend: {@code srcIp}, {@code dstIp}, {@code packets},
    * {@code bytes}, {@code duration}, {@code startTime}. Null or blank = default DB ordering.
    */
+  // ── Directional / range dimensions (#512 slice 6) ──────────────────────────
+  // Added so the investigation agent can express its queries through this descriptor instead of
+  // building its own Specification over ConversationEntity. Deliberately separate from `ip` and
+  // `port` above, which are free-text-contains and either-end matches: overloading those with
+  // exact directional semantics would silently change the conversations table's behaviour.
+
+  /** Exact match on the source address. Null = no filter. */
+  private final String srcIp;
+
+  /** Exact match on the destination address. Null = no filter. */
+  private final String dstIp;
+
+  /** Exact match on the destination port specifically (cf. {@code port}, which matches either). */
+  private final Integer dstPort;
+
+  /** Lower bound on a single conversation's totalBytes. Null = no filter. */
+  private final Long minBytes;
+
+  /** Upper bound on a single conversation's totalBytes. Null = no filter. */
+  private final Long maxBytes;
+
+  /** When true, only conversations carrying TLS certificate details are returned. */
+  private final Boolean hasTlsAnomaly;
+
+  /**
+   * Only conversations whose source address appears in at least this many conversations in the
+   * file — a fan-out filter, evaluated as a grouped subquery rather than in memory.
+   */
+  private final Integer minFlows;
+
+  /**
+   * When true, restricts to conversations with no identified application. Distinct from an empty
+   * {@code apps} list, which means "do not filter on application at all".
+   */
+  private final Boolean appIsNull;
+
   private final String sortBy;
 
   /** Sort direction: "asc" (default) or "desc". */
