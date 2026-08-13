@@ -162,6 +162,16 @@ class BaselineDeviationDetectionTest {
   }
 
   @Test
+  void aHyphenSeparatedDeclarationMatchesAColonSeparatedCapture() {
+    // #733: the panel accepts whatever the operator types. Comparing on casing alone meant a
+    // device present in every snapshot was reported missing from every snapshot.
+    declared(def(BaselineEntryType.DEVICE, "AA-BB-CC-DD-EE-FF", "10.0.0.1"));
+    observed(host("10.0.0.1", "aa:bb:cc:dd:ee:ff"));
+
+    assertThat(detect()).isEmpty();
+  }
+
+  @Test
   void macCasingDoesNotMakeADeclaredDeviceLookAbsent() {
     // Captures and the UI disagree on MAC casing routinely. Comparing as-is would report a
     // baselined device as missing from every snapshot it is actually in — a false alarm on

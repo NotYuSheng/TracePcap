@@ -1,5 +1,7 @@
 package com.tracepcap.hostclassification.service;
 
+import com.tracepcap.common.net.MacAddress;
+
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.service.HostnameResolverService;
 import com.tracepcap.analysis.service.PcapParserService;
@@ -300,18 +302,11 @@ public class DeviceClassifierService implements HostClassifier {
   }
 
   private String ouiKey(String mac) {
-    if (mac == null || mac.length() < 6) return null;
-    // Normalise to lower-case colon form "aa:bb:cc"
-    String norm = mac.toLowerCase().replace("-", ":").replace(".", ":");
-    // Accept "aa:bb:cc:dd:ee:ff" or "aabbccddeeff" etc.
-    if (norm.contains(":")) {
-      String[] parts = norm.split(":");
-      if (parts.length >= 3) return parts[0] + ":" + parts[1] + ":" + parts[2];
-    } else if (norm.length() >= 6) {
-      return norm.substring(0, 2) + ":" + norm.substring(2, 4) + ":" + norm.substring(4, 6);
-    }
-    return null;
+    // Shared with the baseline comparison (#733) so the OUI lookup and "is this the same device"
+    // cannot disagree about what an address spelling means.
+    return MacAddress.oui(mac);
   }
+
 
   /** Joins detected service roles into the comma-separated form stored on the host (null if none). */
   private String joinRoles(Set<String> roles) {
