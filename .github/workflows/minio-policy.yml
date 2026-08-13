@@ -1,0 +1,39 @@
+name: MinIO Bucket Policy
+
+# Catches a compose file making the capture bucket anonymously readable. Raw PCAPs are the most
+# sensitive artefact the system holds — credentials from cleartext protocols, session tokens,
+# internal topology — and they were downloadable with no credentials at all (#637). Object names
+# being UUIDs is obscurity, not access control: the bucket was listable, so they were enumerable
+# in one request.
+#
+# Static, so it runs in seconds without standing up a stack. It asserts the declaration; the live
+# policy is exercised by the system tests against a real MinIO.
+
+on:
+  pull_request:
+    paths:
+      - 'docker-compose*.yml'
+      - 'scripts/check_minio_policy.py'
+      - '.github/workflows/minio-policy.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker-compose*.yml'
+      - 'scripts/check_minio_policy.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Capture bucket is private
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check no compose file grants anonymous access
+        run: python3 scripts/check_minio_policy.py
