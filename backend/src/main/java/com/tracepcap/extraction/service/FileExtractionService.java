@@ -972,16 +972,10 @@ public class FileExtractionService implements FileExtractionStage {
 
     storageService.uploadBytes(data, minioPath, mimeType);
 
-    // Use getReference so we only set the FK without loading the full entity
-    ConversationEntity convRef =
-        conversationId != null
-            ? entityManager.getReference(ConversationEntity.class, conversationId)
-            : null;
-
     ExtractedFileEntity entity =
         ExtractedFileEntity.builder()
             .file(file)
-            .conversation(convRef)
+            .conversationId(conversationId)
             .filename(filename)
             .mimeType(mimeType)
             .fileSize((long) data.length)
@@ -996,15 +990,10 @@ public class FileExtractionService implements FileExtractionStage {
 
   private void recordSkippedFile(
       FileEntity file, UUID conversationId, String filename, long rawSize, String method) {
-    ConversationEntity convRef =
-        conversationId != null
-            ? entityManager.getReference(ConversationEntity.class, conversationId)
-            : null;
-
     ExtractedFileEntity entity =
         ExtractedFileEntity.builder()
             .file(file)
-            .conversation(convRef)
+            .conversationId(conversationId)
             .filename(filename)
             .fileSize(rawSize)
             .extractionMethod(method)

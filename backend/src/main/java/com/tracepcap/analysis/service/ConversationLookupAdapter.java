@@ -6,6 +6,8 @@ import com.tracepcap.analysis.repository.ConversationRepository;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -199,6 +201,17 @@ public class ConversationLookupAdapter implements ConversationLookup {
     return repository.findConversationsWithTlsByFileId(fileId, PageRequest.of(0, limit)).stream()
         .map(ConversationLookupAdapter::toFacts)
         .toList();
+  }
+
+  public Map<UUID, Long> securitySignalCounts(Collection<UUID> fileIds) {
+    if (fileIds == null || fileIds.isEmpty()) return Map.of();
+    Map<UUID, Long> result = new HashMap<>();
+    for (Object[] row : repository.countSecuritySignalsByFileIds(List.copyOf(fileIds))) {
+      result.put((UUID) row[0], ((Number) row[1]).longValue());
+    }
+    // Object[] stays behind the seam: the port hands back a typed map so callers cannot depend
+    // on the column order of a native query.
+    return result;
   }
 
   @Override

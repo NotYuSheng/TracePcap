@@ -1,6 +1,6 @@
 package com.tracepcap.monitor.service;
 
-import com.tracepcap.analysis.repository.ConversationRepository;
+import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.common.exception.InvalidFileException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.entity.FileEntity;
@@ -41,7 +41,7 @@ public class SnapshotService {
   private final InsightPresence insightPresence;
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
-  private final ConversationRepository conversationRepository;
+  private final ConversationLookup conversationLookup;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -321,10 +321,6 @@ public class SnapshotService {
   /** Batched fileId → distinct security-signal count. Files with no signals are absent from the map. */
   private Map<UUID, Long> securitySignalCounts(List<UUID> fileIds) {
     if (fileIds.isEmpty()) return Map.of();
-    Map<UUID, Long> result = new java.util.HashMap<>();
-    for (Object[] row : conversationRepository.countSecuritySignalsByFileIds(fileIds)) {
-      result.put((UUID) row[0], ((Number) row[1]).longValue());
-    }
-    return result;
+    return conversationLookup.securitySignalCounts(fileIds);
   }
 }

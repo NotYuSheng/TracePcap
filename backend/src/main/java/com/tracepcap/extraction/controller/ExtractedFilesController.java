@@ -76,7 +76,7 @@ public class ExtractedFilesController {
                     ExtractionWarningsResponse.SkippedFile.builder()
                         .id(e.getId())
                         .conversationId(
-                            e.getConversation() != null ? e.getConversation().getId() : null)
+                            e.getConversationId())
                         .filename(e.getFilename())
                         .fileSize(e.getFileSize())
                         .build())
@@ -207,7 +207,7 @@ public class ExtractedFilesController {
   private ExtractedFileResponse toResponse(ExtractedFileEntity e) {
     return ExtractedFileResponse.builder()
         .id(e.getId())
-        .conversationId(e.getConversation() != null ? e.getConversation().getId() : null)
+        .conversationId(e.getConversationId())
         .filename(e.getFilename())
         .mimeType(e.getMimeType())
         .fileSize(e.getFileSize())

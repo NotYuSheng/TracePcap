@@ -4,6 +4,7 @@ import com.tracepcap.analysis.dto.ConversationFilterParams;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -288,6 +289,16 @@ public interface ConversationLookup {
   long sumBytes(UUID fileId);
 
   /** One host and how widely it reached: distinct destinations, and flows in total. */
+  /**
+   * Distinct security-signal count per file — custom signatures, Suricata alerts and detected file
+   * types, counted once each per file.
+   *
+   * <p>Batched over several files because the monitor renders a column of snapshots at once and the
+   * per-file version of this was N queries. Files with no signals are absent from the map rather
+   * than present with zero, so callers must supply their own default.
+   */
+  Map<UUID, Long> securitySignalCounts(Collection<UUID> fileIds);
+
   record HostFanOut(String srcIp, long distinctDestinations, long totalFlows) {}
 
   /**
