@@ -16,11 +16,16 @@ import sys
 REPO = pathlib.Path(__file__).resolve().parent.parent
 COMPOSE = sorted(REPO.glob("docker-compose*.yml"))
 
-# `mc anonymous set <policy>` — anything other than `none` grants some anonymous access.
-ANON = re.compile(r"mc\s+anonymous\s+set\s+(\w+)")
-# Publishing the S3 API on the host widens who can reach object storage; the backend uses the
-# compose network. The console (9001) is fine.
-PORT_9000 = re.compile(r'^\s*-\s*"9000:9000"')
+# Any mc subcommand that can grant anonymous access, not just the one this repo used. `policy
+# set` is the older spelling and `anonymous set-json` takes a policy document — a guard that only
+# knew `anonymous set` would wave both through, which is the failure mode it exists to prevent.
+ANON = re.compile(r"mc\s+(?:anonymous|policy)\s+set(?:-json)?\s+(\S+)")
+ANON_SAFE = {"none"}
+
+# Any published mapping whose *target* is 9000, in either short or long syntax. Matching the
+# literal "9000:9000" would miss "127.0.0.1:9000:9000", "9000:9000/tcp" and the long form.
+PORT_SHORT = re.compile(r'^\s*-\s*["\']?(?:[\d.]+:)?(\d+):9000(?:/\w+)?["\']?\s*$')
+PORT_LONG_TARGET = re.compile(r'^\s*target:\s*9000\s*$')
 
 failures = []
 
@@ -30,13 +35,13 @@ for path in COMPOSE:
         if line.lstrip().startswith("#"):
             continue
         m = ANON.search(line)
-        if m and m.group(1) != "none":
+        if m and m.group(1) not in ANON_SAFE:
             failures.append(
                 f"{path.name}:{lineno} grants anonymous '{m.group(1)}' on the capture bucket."
                 f"\n    Use `mc anonymous set none` — it also revokes a policy set by an earlier"
                 f"\n    deploy, which simply deleting the line would not."
             )
-        if PORT_9000.match(line):
+        if PORT_SHORT.match(line) or PORT_LONG_TARGET.match(line):
             failures.append(
                 f"{path.name}:{lineno} publishes the MinIO S3 API on the host."
                 f"\n    The backend reaches MinIO over the compose network; a host mapping only"

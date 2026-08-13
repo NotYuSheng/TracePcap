@@ -65,8 +65,10 @@ services:
       TZ: Asia/Singapore
     ports:
       # 9000 (the S3 API) is deliberately NOT published. The backend reaches MinIO over the
-      # compose network, so a host mapping only widens who can reach object storage. Publish it
-      # locally with `docker compose port` or an override file if you need mc/s3 tooling (#637).
+      # compose network, so a host mapping only widens who can reach object storage. If you need
+      # mc/s3 tooling against it locally, add a compose override binding to loopback only:
+      #   services: {minio: {ports: ["127.0.0.1:9000:9000"]}}
+      # `docker compose port` only reports an existing binding; it cannot create one (#637).
       - "9001:9001"  # Console
     volumes:
       - minio_data:/data

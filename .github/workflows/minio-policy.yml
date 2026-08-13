@@ -33,7 +33,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        # Pinned to a commit and without a persisted token: this job reads compose files and
+        # needs no credentials, so leaving one in .git/config only widens what a compromised
+        # action could reach.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Check no compose file grants anonymous access
         run: python3 scripts/check_minio_policy.py
