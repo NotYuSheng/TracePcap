@@ -1,0 +1,21 @@
+package com.tracepcap.cluster.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class HostSummaryDto {
+  private String ip;
+  private String hostname;
+  private String hostnameSource;
+  private long totalBytes;
+  private long packetCount;
+  private long conversationCount;
+  private long riskCount;
+  private String deviceType;
+  private String country;
+  private String org;
+  private String role;
+  private String geoSource;
+}

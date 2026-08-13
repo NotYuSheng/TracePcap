@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
-import com.tracepcap.intelligence.service.CustomPrivateRangeService;
+import com.tracepcap.policy.service.CustomPrivateRangeService;
 import com.tracepcap.monitor.repository.NetworkChangeEventRepository;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.monitor.repository.SnapshotSubnetOverrideRepository;
