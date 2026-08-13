@@ -1,6 +1,7 @@
 package com.tracepcap.monitor.service;
 
-import com.tracepcap.common.net.IpLocality;
+import com.tracepcap.common.net.LocalityPolicy;
+import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.common.net.MacAddress;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
@@ -60,6 +61,7 @@ public class ChangeDetectionService {
   private final GeoOrgLookup geoOrgLookup;
   private final NetworkChangeEventRepository changeEventRepository;
   private final BaselineDefinitionRepository baselineDefinitionRepository;
+  private final LocalityPolicy localityPolicy;
   private final CustomPrivateRangeService customPrivateRangeService;
   private final SnapshotSubnetOverrideRepository snapshotSubnetOverrideRepository;
   private final LabelStalenessCheck labelStalenessCheck;
@@ -742,7 +744,7 @@ public class ChangeDetectionService {
     if (fileId == null) return Set.of();
     return conversationLookup.conversationFacts(fileId).stream()
         .flatMap(c -> Stream.of(c.flow().srcIp(), c.flow().dstIp()))
-        .filter(ip -> ip != null && !isPrivate(ip, rules))
+        .filter(ip -> ip != null && !rules.isLocal(ip))
         .collect(Collectors.toSet());
   }
 
@@ -778,8 +780,8 @@ public class ChangeDetectionService {
       String dst = c.flow().dstIp();
       String src = c.flow().srcIp();
       String external = null;
-      if (dst != null && !isPrivate(dst, rules) && geoMap.containsKey(dst)) external = dst;
-      else if (src != null && !isPrivate(src, rules) && geoMap.containsKey(src))
+      if (dst != null && !rules.isLocal(dst) && geoMap.containsKey(dst)) external = dst;
+      else if (src != null && !rules.isLocal(src) && geoMap.containsKey(src))
         external = src;
       if (external != null) {
         ipBytes.merge(external, c.flow().totalBytes(), Long::sum);
@@ -818,38 +820,21 @@ public class ChangeDetectionService {
    * Locality inputs for a file's classification: snapshot-scoped private CIDRs plus the global
    * classification overrides (which can force either PRIVATE or PUBLIC).
    */
-  private record LocalityRules(
-      List<String> privateCidrs, List<CustomPrivateRangeEntity> globalOverrides) {}
 
-  private boolean isPrivate(String ip, LocalityRules rules) {
-    // Was `return true` — a row with no address counted as internal traffic. The other three
-    // implementations all treated an unclassifiable address as not-private, and this one is now
-    // aligned with them (#694).
-    if (ip == null) return false;
-    // A global override wins over the RFC1918 heuristic, in either direction. This is what lets a
-    // private-looking address be forced to PUBLIC (and vice versa for a public address).
-    switch (customPrivateRangeService.overrideFor(ip, rules.globalOverrides())) {
-      case FORCE_PRIVATE -> {
-        return true;
-      }
-      case FORCE_PUBLIC -> {
-        return false;
-      }
-      case NONE -> {
-        // fall through to the range heuristics below
-      }
-    }
-    // Shared predicate rather than a local prefix list (#694). Operator overrides above and the
-    // per-network private CIDRs below still apply — this replaces only the RFC-range heuristic,
-    // which is the part the four implementations disagreed on.
-    if (IpLocality.isLocal(ip)) return true;
-    return customPrivateRangeService.isInCidrs(ip, rules.privateCidrs());
-  }
 
   /**
    * Returns the locality rules for a snapshot: its own subnet overrides as private CIDRs if any are
    * defined (otherwise the global private ranges), always paired with the global classification
    * overrides so force-public rules apply regardless of snapshot scope.
+   */
+  /**
+   * Locality for a snapshot: the operator's global configuration, plus this snapshot's own subnet
+   * definitions as extra internal ranges (#733).
+   *
+   * <p>The override precedence used to live here and nowhere else, which is why a range declared
+   * internal was honoured by change detection and ignored by the subnet view, the story narrative
+   * and the cluster graph. It now comes from the shared policy; only the per-snapshot CIDRs, which
+   * are genuinely local to the monitor, are still assembled here.
    */
   private LocalityRules effectiveCidrs(NetworkSnapshotEntity snapshot) {
     List<CustomPrivateRangeEntity> global = customPrivateRangeService.loadRanges();
@@ -861,7 +846,7 @@ public class ChangeDetectionService {
             overrides.stream()
                 .map(SnapshotSubnetOverrideEntity::getCidr)
                 .collect(Collectors.toList());
-        return new LocalityRules(snapshotCidrs, global);
+        return localityPolicy.currentRules(ip -> customPrivateRangeService.isInCidrs(ip, snapshotCidrs));
       }
     }
     List<String> globalPrivateCidrs =
@@ -869,7 +854,8 @@ public class ChangeDetectionService {
             .filter(e -> e.getClassification() == IpClassification.PRIVATE)
             .map(CustomPrivateRangeEntity::getCidr)
             .collect(Collectors.toList());
-    return new LocalityRules(globalPrivateCidrs, global);
+    return localityPolicy.currentRules(
+        ip -> customPrivateRangeService.isInCidrs(ip, globalPrivateCidrs));
   }
 
   private static String orEmpty(String s) {
