@@ -28,14 +28,10 @@ import { VolumeLegend } from '@/components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
 import { nodeIdentityKey } from '@/utils/deviceType';
+import { severityHex } from '@/utils/severityColors';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
-const HIGHLIGHT_COLORS: Record<string, string> = {
-  CRITICAL: '#e74c3c',
-  WARNING:  '#f39c12',
-  INFO:     '#2ecc71',
-};
 
 function labelForChange(changeType: string, oldValue: Record<string, unknown> | null, newValue: Record<string, unknown> | null): string {
   switch (changeType) {
@@ -59,7 +55,7 @@ function severityRank(s: string): number {
 function buildHighlightMap(events: ChangeEvent[], toSnapshotId: string): Map<string, NodeHighlight> {
   const map = new Map<string, NodeHighlight>();
   for (const e of events.filter(ev => ev.toSnapshotId === toSnapshotId)) {
-    const color = HIGHLIGHT_COLORS[e.severity] ?? HIGHLIGHT_COLORS.INFO;
+    const color = severityHex(e.severity);
     const label = labelForChange(e.changeType, e.oldValue, e.newValue);
     const addHl = (key: string, description?: string) => {
       const existing = map.get(key);
@@ -485,7 +481,7 @@ export const SnapshotDetailModal = ({
                     {snapshotEvents.length > 0 && (
                       <span className="badge rounded-pill ms-1" style={{
                         fontSize: '0.6rem',
-                        background: snapshotEvents.some(e => e.severity === 'CRITICAL') ? '#dc3545' : '#fd7e14',
+                        background: severityHex(snapshotEvents.some(e => e.severity === 'CRITICAL') ? 'CRITICAL' : 'WARNING'),
                         color: '#fff',
                       }}>
                         {snapshotEvents.length}

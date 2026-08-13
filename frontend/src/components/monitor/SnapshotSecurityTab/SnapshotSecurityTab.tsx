@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import type { GraphEdge } from '@/features/network/types';
+import { severityHex } from '@/utils/severityColors';
 
 /**
  * Absolute security posture of a single snapshot's capture. Aggregates the four analysis-mode
@@ -41,11 +42,6 @@ interface SignalSection {
   rows: SignalRow[];
 }
 
-const SEVERITY_COLOR: Record<Severity, string> = {
-  CRITICAL: '#dc3545',
-  WARNING: '#fd7e14',
-  INFO: '#6c757d',
-};
 
 /** Group one signal across all edges: value → distinct flows (deduped by label). */
 function aggregate(edges: GraphEdge[], pick: (e: GraphEdge) => string[] | undefined): SignalRow[] {
@@ -93,11 +89,11 @@ function SignalSectionView({
   return (
     <div className="mb-4">
       <div className="d-flex align-items-center gap-2 mb-1">
-        <i className={`bi ${section.icon}`} style={{ color: SEVERITY_COLOR[section.severity] }} />
+        <i className={`bi ${section.icon}`} style={{ color: severityHex(section.severity) }} />
         <span className="fw-semibold">{section.title}</span>
         <span
           className="badge rounded-pill"
-          style={{ fontSize: '0.7rem', background: SEVERITY_COLOR[section.severity], color: '#fff' }}
+          style={{ fontSize: '0.7rem', background: severityHex(section.severity), color: '#fff' }}
         >
           {section.rows.length}
         </span>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button, Form } from '@govtechsg/sgds-react';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { parseDateTime } from '@/utils/dateUtils';
+import { severityHex, severityIcon } from '@/utils/severityColors';
 
 interface ChangeEventBadgeProps {
   event: ChangeEvent;
@@ -10,17 +11,6 @@ interface ChangeEventBadgeProps {
   onPatch: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
 }
 
-const SEVERITY_CLASSES: Record<string, string> = {
-  CRITICAL: 'text-danger',
-  WARNING:  'text-warning',
-  INFO:     'text-info',
-};
-
-const SEVERITY_ICONS: Record<string, string> = {
-  CRITICAL: 'bi-exclamation-circle-fill',
-  WARNING:  'bi-exclamation-triangle-fill',
-  INFO:     'bi-info-circle-fill',
-};
 
 /** Human label for a security-drift signalKind payload value. */
 function securityKindLabel(kind: unknown): string {
@@ -132,7 +122,8 @@ export const ChangeEventBadge = ({ event, snapshots, onPatch }: ChangeEventBadge
       style={{ transition: 'opacity 0.2s' }}
     >
       <i
-        className={`bi ${SEVERITY_ICONS[event.severity] ?? 'bi-circle-fill'} ${SEVERITY_CLASSES[event.severity] ?? ''} flex-shrink-0 mt-1`}
+        className={`bi ${severityIcon(event.severity)} flex-shrink-0 mt-1`}
+        style={{ color: severityHex(event.severity) }}
       />
       <div className="flex-grow-1 min-w-0">
         <div className="text-break">{describeEvent(event)}</div>
