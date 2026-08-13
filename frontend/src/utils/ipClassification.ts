@@ -9,9 +9,15 @@ import type { CustomPrivateRange } from '@/features/intelligence/types/customPri
  *   - {@link isPrivateIp} — the heuristic, but a user's custom range override wins in either direction.
  */
 
-/** RFC 1918 / loopback / link-local / IPv6 ULA (fc00::/7) + link-local (fe80::) + loopback (::1). */
+/**
+ * RFC 1918 / loopback / link-local / IPv6 ULA (fc00::/7) + link-local (fe80::/10) + loopback (::1).
+ *
+ * Kept in step with the backend's IpLocality (#733 finding 3). The link-local alternative was
+ * `fe80:`, which is one hextet of a /10 — so feb0::1 read as public here and internal on the
+ * server, and the same host was classified differently depending on which side answered.
+ */
 export function isRfc1918(ip: string): boolean {
-  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:|::1$)/i.test(ip);
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:|::1$)/i.test(ip);
 }
 
 /** IPv4 dotted-quad → uint32. IPv4 only; callers guard IPv6 before calling. */

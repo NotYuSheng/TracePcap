@@ -48,10 +48,6 @@ RULES = [
             "frontend/src/utils/ipClassification.ts",
         },
         "exempt": {
-            # Finding 1 of #733: a fifth implementation, kept until the locality slice
-            # gives it somewhere to delegate to. It also answers a *different* question
-            # (should I skip the geo lookup) for null and for MAC addresses.
-            "backend/src/main/java/com/tracepcap/analysis/service/GeoIpService.java",
             # NEVER_CLUSTER_PREFIXES — a genuinely different concept (loopback,
             # link-local and multicast are not clusterable) built from the same
             # vocabulary. Candidate for the locality slice; not a copy of it.

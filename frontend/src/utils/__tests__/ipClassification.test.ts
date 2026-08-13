@@ -23,6 +23,19 @@ describe('isRfc1918', () => {
   });
 });
 
+describe('link-local matches the backend', () => {
+  // fe80::/10 spans fe80–febf. The regex used to test `fe80:`, one hextet of it, so feb0::1
+  // read as public here and internal in IpLocality — the same host classified differently
+  // depending on which side of the wire answered.
+  it.each(['fe80::1', 'fe90::1', 'fea0::1', 'febf::1', 'FEB0::1'])('treats %s as internal', ip => {
+    expect(isRfc1918(ip)).toBe(true)
+  })
+
+  it.each(['fec0::1', 'ff02::1', '2001:db8::1'])('leaves %s external', ip => {
+    expect(isRfc1918(ip)).toBe(false)
+  })
+})
+
 describe('ipInCidr', () => {
   it('matches inside an IPv4 CIDR and rejects outside', () => {
     expect(ipInCidr('10.0.1.5', '10.0.0.0/16')).toBe(true);
