@@ -31,7 +31,9 @@ import org.springframework.stereotype.Service;
  * detection over each uploaded PCAP, complementing nDPI: where nDPI answers <em>"what is this
  * traffic?"</em>, Suricata answers <em>"is this traffic a known threat?"</em>.
  *
- * <p>Uses: {@code suricata -r <file> -l <outdir>} with the bundled Emerging Threats Open ruleset.
+ * <p>Prefers a warm engine kept across analyses ({@link SuricataEngine}, #569) and falls back to
+ * {@code suricata -r <file> -l <outdir>} per file. Either way the bundled Emerging Threats Open
+ * ruleset is used and the output is the same eve.json.
  * Suricata writes one JSON object per line to {@code <outdir>/eve.json}; this service reads the
  * {@code alert} events and maps each back to a {@link PcapParserService.ConversationInfo} by its
  * 5-tuple.
@@ -54,6 +56,13 @@ public class SuricataService implements Extractor {
    */
   @Value("${tracepcap.suricata.enabled:true}")
   private boolean suricataEnabled;
+
+  /** Warm engine (#569). Falls back to the per-file subprocess below when unavailable. */
+  private final SuricataEngine engine;
+
+  public SuricataService(SuricataEngine engine) {
+    this.engine = engine;
+  }
 
   @Override
   public String name() {
@@ -140,6 +149,14 @@ public class SuricataService implements Extractor {
       //   on many-core hosts for a one-shot offline read.
       // --set unix-command.enabled=no: the non-root runtime user cannot bind the root-owned command
       //   socket, and it is not needed for offline pcap-read mode.
+      // Warm engine first (#569): the ruleset build is ~45s and is otherwise paid per file, while
+      // the packet processing itself is milliseconds. Identical alert output, measured 66x faster.
+      if (engine.process(pcapFile, outDir)) {
+        parseEveJson(outDir.resolve(EVE_JSON), result);
+        log.debug("Suricata (warm) produced alerts for {} distinct flows", result.size());
+        return result;
+      }
+
       ProcessBuilder pb =
           new ProcessBuilder(
               SURICATA_BINARY,
