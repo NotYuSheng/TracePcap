@@ -38,7 +38,7 @@ import com.tracepcap.cluster.dto.ClusterEdgeDto;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NetworkIntelligenceService {
+public class NetworkClusterService {
 
   private final LocalityPolicy localityPolicy;
   private final ConversationLookup conversationLookup;

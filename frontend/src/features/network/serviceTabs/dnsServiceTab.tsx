@@ -1,8 +1,8 @@
 import {
-  intelligenceService,
+  clusterApi,
   type DnsQueryLogResponse,
   type DnsQueryEntry,
-} from '@/features/intelligence/services/intelligenceService';
+} from '@/features/cluster/services/clusterApi';
 import type { ServiceTabConfig } from './types';
 
 const pct = (ratio: number) => Math.round(ratio * 100);
@@ -16,7 +16,7 @@ export const dnsServiceTab: ServiceTabConfig<DnsQueryLogResponse, DnsQueryEntry>
   label: 'DNS',
   icon: 'bi-hdd-network',
 
-  fetchDetail: (fileId, ip) => intelligenceService.getDnsQueryLog(fileId, ip),
+  fetchDetail: (fileId, ip) => clusterApi.getDnsQueryLog(fileId, ip),
   getRows: d => d.entries,
   getSummary: d =>
     `${d.resolvedCount} resolved / ${d.failedCount} failed (${pct(d.nxdomainRatio)}% NXDOMAIN)`,

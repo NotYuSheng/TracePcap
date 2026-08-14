@@ -14,8 +14,8 @@ import { conversationService } from '@/features/conversation/services/conversati
 import type { DeviceType, HostIdentityEvidence } from '@/types';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { isPrivateIp } from '@/utils/ipClassification';
-import { customPrivateRangeService } from '@/features/intelligence/services/customPrivateRangeService';
-import type { CustomPrivateRange } from '@/features/intelligence/types/customPrivateRange.types';
+import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
+import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 
 /** Predefined override/evidence label options for the Identity panel (matches NodeDetails). */
 const DEVICE_LABELS = DEVICE_TYPES.filter(t => t !== 'UNKNOWN').map(deviceTypeLabel);

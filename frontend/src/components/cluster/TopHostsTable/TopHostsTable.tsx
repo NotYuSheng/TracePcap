@@ -4,7 +4,7 @@ import { Badge, Button } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { formatBytes } from '@/utils/formatters';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
-import type { HostSummary, SortBy } from '@/features/intelligence/services/intelligenceService';
+import type { HostSummary, SortBy } from '@/features/cluster/services/clusterApi';
 
 const GEO_SOURCE_INFO = {
   ipinfo: {

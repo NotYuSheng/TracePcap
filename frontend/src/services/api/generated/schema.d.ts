@@ -55,6 +55,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clusters/{fileId}/dns-servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List DNS servers and their resolution health
+         * @description Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).
+         */
+        get: operations["getDnsServers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{fileId}/dns/{serverIp}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the DNS query log for one DNS server
+         * @description Returns the per-domain query log (hostname queried, response code, resolved IPs, query count, resolvable) for the given DNS server, plus summary counts and the suspicious verdict.
+         */
+        get: operations["getDnsQueryLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{fileId}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get clustered network topology
+         * @description Returns network hosts grouped into clusters by ASN, country, subnet, or device type. Supports the same conversation filters as the conversations endpoint to pre-filter traffic before clustering.
+         */
+        get: operations["getClusters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{fileId}/packet-location/{packetNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Locate a packet by frame number
+         * @description Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.
+         */
+        get: operations["locatePacket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{fileId}/top-hosts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get top hosts by traffic volume
+         * @description Returns the top N hosts ranked by bytes, packets, conversations, or risk count.
+         */
+        get: operations["getTopHosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{fileId}/web-servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List web/API servers and their HTTP health
+         * @description Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).
+         */
+        get: operations["getWebServers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{fileId}/web/{serverIp}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the HTTP endpoint log + detail for one web/API server
+         * @description Returns the per-endpoint log (method, path, status-class counts, content type) plus server software, content types and TLS metadata (cleartext HTTP only for endpoints; TLS detail for HTTPS).
+         */
+        get: operations["getWebServerDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/detail/{conversationId}": {
         parameters: {
             query?: never;
@@ -768,146 +908,6 @@ export interface paths {
          * @description Uses AI to convert a natural language query into a BPF filter expression
          */
         post: operations["generateFilter"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/clusters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get clustered network topology
-         * @description Returns network hosts grouped into clusters by ASN, country, subnet, or device type. Supports the same conversation filters as the conversations endpoint to pre-filter traffic before clustering.
-         */
-        get: operations["getClusters"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/dns-servers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List DNS servers and their resolution health
-         * @description Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).
-         */
-        get: operations["getDnsServers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/dns/{serverIp}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get the DNS query log for one DNS server
-         * @description Returns the per-domain query log (hostname queried, response code, resolved IPs, query count, resolvable) for the given DNS server, plus summary counts and the suspicious verdict.
-         */
-        get: operations["getDnsQueryLog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/packet-location/{packetNumber}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Locate a packet by frame number
-         * @description Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.
-         */
-        get: operations["locatePacket"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/top-hosts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get top hosts by traffic volume
-         * @description Returns the top N hosts ranked by bytes, packets, conversations, or risk count.
-         */
-        get: operations["getTopHosts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/web-servers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List web/API servers and their HTTP health
-         * @description Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).
-         */
-        get: operations["getWebServers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/intelligence/{fileId}/web/{serverIp}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get the HTTP endpoint log + detail for one web/API server
-         * @description Returns the per-endpoint log (method, path, status-class counts, content type) plus server software, content types and TLS metadata (cleartext HTTP only for endpoints; TLS detail for HTTPS).
-         */
-        get: operations["getWebServerDetail"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3073,6 +3073,196 @@ export interface operations {
             };
         };
     };
+    getDnsServers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ServiceServerSummaryDto"][];
+                };
+            };
+        };
+    };
+    getDnsQueryLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                serverIp: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DnsQueryLogResponse"];
+                };
+            };
+        };
+    };
+    getClusters: {
+        parameters: {
+            query?: {
+                groupBy?: string;
+                /** @description Filter by IP address or hostname */
+                ip?: string;
+                /** @description Filter by port number (src or dst) */
+                port?: number;
+                /** @description Comma-separated L4 protocols */
+                protocols?: string;
+                /** @description Comma-separated L7 protocols */
+                l7Protocols?: string;
+                /** @description Comma-separated application names */
+                apps?: string;
+                /** @description Comma-separated categories */
+                categories?: string;
+                /** @description Only conversations with flow risks */
+                hasRisks?: boolean;
+                /** @description Comma-separated detected file types */
+                fileTypes?: string;
+                /** @description Comma-separated nDPI risk types */
+                riskTypes?: string;
+                /** @description Comma-separated custom signature rule names */
+                customSignatures?: string;
+                /** @description Filter by payload content (ASCII or hex) */
+                payloadContains?: string;
+                /** @description Comma-separated device types */
+                deviceTypes?: string;
+                /** @description Comma-separated ISO 3166-1 alpha-2 country codes */
+                countries?: string;
+                /** @description Comma-separated network label names (e.g. 'Office,DMZ') */
+                networkLabels?: string;
+            };
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ClusterGraphResponse"];
+                };
+            };
+        };
+    };
+    locatePacket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                packetNumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PacketLocationResponse"];
+                };
+            };
+        };
+    };
+    getTopHosts: {
+        parameters: {
+            query?: {
+                sortBy?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TopHostsResponse"];
+                };
+            };
+        };
+    };
+    getWebServers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ServiceServerSummaryDto"][];
+                };
+            };
+        };
+    };
+    getWebServerDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                serverIp: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WebServerDetailResponse"];
+                };
+            };
+        };
+    };
     getConversationDetail: {
         parameters: {
             query?: never;
@@ -4294,196 +4484,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["FilterGenerationResponse"];
-                };
-            };
-        };
-    };
-    getClusters: {
-        parameters: {
-            query?: {
-                groupBy?: string;
-                /** @description Filter by IP address or hostname */
-                ip?: string;
-                /** @description Filter by port number (src or dst) */
-                port?: number;
-                /** @description Comma-separated L4 protocols */
-                protocols?: string;
-                /** @description Comma-separated L7 protocols */
-                l7Protocols?: string;
-                /** @description Comma-separated application names */
-                apps?: string;
-                /** @description Comma-separated categories */
-                categories?: string;
-                /** @description Only conversations with flow risks */
-                hasRisks?: boolean;
-                /** @description Comma-separated detected file types */
-                fileTypes?: string;
-                /** @description Comma-separated nDPI risk types */
-                riskTypes?: string;
-                /** @description Comma-separated custom signature rule names */
-                customSignatures?: string;
-                /** @description Filter by payload content (ASCII or hex) */
-                payloadContains?: string;
-                /** @description Comma-separated device types */
-                deviceTypes?: string;
-                /** @description Comma-separated ISO 3166-1 alpha-2 country codes */
-                countries?: string;
-                /** @description Comma-separated network label names (e.g. 'Office,DMZ') */
-                networkLabels?: string;
-            };
-            header?: never;
-            path: {
-                fileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ClusterGraphResponse"];
-                };
-            };
-        };
-    };
-    getDnsServers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ServiceServerSummaryDto"][];
-                };
-            };
-        };
-    };
-    getDnsQueryLog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fileId: string;
-                serverIp: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["DnsQueryLogResponse"];
-                };
-            };
-        };
-    };
-    locatePacket: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fileId: string;
-                packetNumber: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PacketLocationResponse"];
-                };
-            };
-        };
-    };
-    getTopHosts: {
-        parameters: {
-            query?: {
-                sortBy?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                fileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["TopHostsResponse"];
-                };
-            };
-        };
-    };
-    getWebServers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ServiceServerSummaryDto"][];
-                };
-            };
-        };
-    };
-    getWebServerDetail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fileId: string;
-                serverIp: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["WebServerDetailResponse"];
                 };
             };
         };

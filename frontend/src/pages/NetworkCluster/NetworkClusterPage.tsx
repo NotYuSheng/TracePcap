@@ -4,19 +4,19 @@ import { Button, Card, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import type { AnalysisData } from '@/types';
 import {
-  intelligenceService,
+  clusterApi,
   type GroupBy,
   type ClusterGraphResponse,
   type IntelClusterFilters,
   type ClusterNode,
   type HostSummary,
   type SortBy,
-} from '@/features/intelligence/services/intelligenceService';
+} from '@/features/cluster/services/clusterApi';
 import { conversationService } from '@/features/conversation/services/conversationService';
-import { ipOrgRuleService } from '@/features/intelligence/services/ipOrgRuleService';
-import { SummaryStatsBar } from '@components/intelligence/SummaryStatsBar/SummaryStatsBar';
-import { ClusterGraph } from '@components/intelligence/ClusterGraph/ClusterGraph';
-import { TopHostsTable } from '@components/intelligence/TopHostsTable/TopHostsTable';
+import { ipOrgRuleService } from '@/features/cluster/services/ipOrgRuleService';
+import { SummaryStatsBar } from '@components/cluster/SummaryStatsBar/SummaryStatsBar';
+import { ClusterGraph } from '@components/cluster/ClusterGraph/ClusterGraph';
+import { TopHostsTable } from '@components/cluster/TopHostsTable/TopHostsTable';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { toggleSet } from '@/features/network/constants';
 import { nodeIdentityKey } from '@/utils/deviceType';
@@ -26,7 +26,7 @@ interface AnalysisOutletContext {
   fileId: string;
 }
 
-export const NetworkIntelligencePage = () => {
+export const NetworkClusterPage = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
 
   const [groupBy, setGroupBy] = useState<GroupBy>('asn');
@@ -93,7 +93,7 @@ export const NetworkIntelligencePage = () => {
     let active = true;
     setTopHostsLoading(true);
     setTopHostsError(null);
-    intelligenceService
+    clusterApi
       .getTopHosts(fileId, topHostsSortBy, 100)
       .then(res => { if (active) setTopHosts(res.hosts); })
       .catch(err => {
@@ -231,7 +231,7 @@ export const NetworkIntelligencePage = () => {
     setClusterLoading(true);
     setClusterError(null);
     setClusterData(null);
-    intelligenceService
+    clusterApi
       .getClusters(fileId, groupBy, intelFilters)
       .then(result => {
         if (!active) return;
@@ -257,7 +257,7 @@ export const NetworkIntelligencePage = () => {
   }, [fileId, groupBy, intelFiltersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="network-intelligence-page">
+    <div className="network-cluster-page">
       <div className="mb-3">
         <h4 className="mb-1">Network Cluster</h4>
         <p className="text-muted small mb-0">

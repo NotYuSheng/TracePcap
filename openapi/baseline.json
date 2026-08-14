@@ -3619,6 +3619,425 @@
         ]
       }
     },
+    "/api/v1/clusters/{fileId}/dns-servers": {
+      "get": {
+        "description": "Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).",
+        "operationId": "getDnsServers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceServerSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List DNS servers and their resolution health",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
+    "/api/v1/clusters/{fileId}/dns/{serverIp}": {
+      "get": {
+        "description": "Returns the per-domain query log (hostname queried, response code, resolved IPs, query count, resolvable) for the given DNS server, plus summary counts and the suspicious verdict.",
+        "operationId": "getDnsQueryLog",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "serverIp",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DnsQueryLogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the DNS query log for one DNS server",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
+    "/api/v1/clusters/{fileId}/graph": {
+      "get": {
+        "description": "Returns network hosts grouped into clusters by ASN, country, subnet, or device type. Supports the same conversation filters as the conversations endpoint to pre-filter traffic before clustering.",
+        "operationId": "getClusters",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupBy",
+            "required": false,
+            "schema": {
+              "default": "asn",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by IP address or hostname",
+            "in": "query",
+            "name": "ip",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by port number (src or dst)",
+            "in": "query",
+            "name": "port",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated L4 protocols",
+            "in": "query",
+            "name": "protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated L7 protocols",
+            "in": "query",
+            "name": "l7Protocols",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated application names",
+            "in": "query",
+            "name": "apps",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated categories",
+            "in": "query",
+            "name": "categories",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only conversations with flow risks",
+            "in": "query",
+            "name": "hasRisks",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Comma-separated detected file types",
+            "in": "query",
+            "name": "fileTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated nDPI risk types",
+            "in": "query",
+            "name": "riskTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated custom signature rule names",
+            "in": "query",
+            "name": "customSignatures",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by payload content (ASCII or hex)",
+            "in": "query",
+            "name": "payloadContains",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated device types",
+            "in": "query",
+            "name": "deviceTypes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated ISO 3166-1 alpha-2 country codes",
+            "in": "query",
+            "name": "countries",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated network label names (e.g. 'Office,DMZ')",
+            "in": "query",
+            "name": "networkLabels",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClusterGraphResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get clustered network topology",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
+    "/api/v1/clusters/{fileId}/packet-location/{packetNumber}": {
+      "get": {
+        "description": "Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.",
+        "operationId": "locatePacket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "packetNumber",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketLocationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Locate a packet by frame number",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
+    "/api/v1/clusters/{fileId}/top-hosts": {
+      "get": {
+        "description": "Returns the top N hosts ranked by bytes, packets, conversations, or risk count.",
+        "operationId": "getTopHosts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "default": "bytes",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopHostsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get top hosts by traffic volume",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
+    "/api/v1/clusters/{fileId}/web-servers": {
+      "get": {
+        "description": "Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).",
+        "operationId": "getWebServers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceServerSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List web/API servers and their HTTP health",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
+    "/api/v1/clusters/{fileId}/web/{serverIp}": {
+      "get": {
+        "description": "Returns the per-endpoint log (method, path, status-class counts, content type) plus server software, content types and TLS metadata (cleartext HTTP only for endpoints; TLS detail for HTTPS).",
+        "operationId": "getWebServerDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "serverIp",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebServerDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get the HTTP endpoint log + detail for one web/API server",
+        "tags": [
+          "Network Cluster"
+        ]
+      }
+    },
     "/api/v1/conversations/detail/{conversationId}": {
       "get": {
         "operationId": "getConversationDetail",
@@ -6006,425 +6425,6 @@
         "summary": "Generate filter from natural language",
         "tags": [
           "Filter Generator"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/clusters": {
-      "get": {
-        "description": "Returns network hosts grouped into clusters by ASN, country, subnet, or device type. Supports the same conversation filters as the conversations endpoint to pre-filter traffic before clustering.",
-        "operationId": "getClusters",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "groupBy",
-            "required": false,
-            "schema": {
-              "default": "asn",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Filter by IP address or hostname",
-            "in": "query",
-            "name": "ip",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Filter by port number (src or dst)",
-            "in": "query",
-            "name": "port",
-            "required": false,
-            "schema": {
-              "format": "int32",
-              "maximum": 65535,
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "description": "Comma-separated L4 protocols",
-            "in": "query",
-            "name": "protocols",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated L7 protocols",
-            "in": "query",
-            "name": "l7Protocols",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated application names",
-            "in": "query",
-            "name": "apps",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated categories",
-            "in": "query",
-            "name": "categories",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Only conversations with flow risks",
-            "in": "query",
-            "name": "hasRisks",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "description": "Comma-separated detected file types",
-            "in": "query",
-            "name": "fileTypes",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated nDPI risk types",
-            "in": "query",
-            "name": "riskTypes",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated custom signature rule names",
-            "in": "query",
-            "name": "customSignatures",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Filter by payload content (ASCII or hex)",
-            "in": "query",
-            "name": "payloadContains",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated device types",
-            "in": "query",
-            "name": "deviceTypes",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated ISO 3166-1 alpha-2 country codes",
-            "in": "query",
-            "name": "countries",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Comma-separated network label names (e.g. 'Office,DMZ')",
-            "in": "query",
-            "name": "networkLabels",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClusterGraphResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Get clustered network topology",
-        "tags": [
-          "Network Cluster"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/dns-servers": {
-      "get": {
-        "description": "Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).",
-        "operationId": "getDnsServers",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ServiceServerSummaryDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "List DNS servers and their resolution health",
-        "tags": [
-          "Network Cluster"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/dns/{serverIp}": {
-      "get": {
-        "description": "Returns the per-domain query log (hostname queried, response code, resolved IPs, query count, resolvable) for the given DNS server, plus summary counts and the suspicious verdict.",
-        "operationId": "getDnsQueryLog",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "serverIp",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/DnsQueryLogResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Get the DNS query log for one DNS server",
-        "tags": [
-          "Network Cluster"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/packet-location/{packetNumber}": {
-      "get": {
-        "description": "Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.",
-        "operationId": "locatePacket",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "packetNumber",
-            "required": true,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/PacketLocationResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Locate a packet by frame number",
-        "tags": [
-          "Network Cluster"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/top-hosts": {
-      "get": {
-        "description": "Returns the top N hosts ranked by bytes, packets, conversations, or risk count.",
-        "operationId": "getTopHosts",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "sortBy",
-            "required": false,
-            "schema": {
-              "default": "bytes",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "format": "int32",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/TopHostsResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Get top hosts by traffic volume",
-        "tags": [
-          "Network Cluster"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/web-servers": {
-      "get": {
-        "description": "Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).",
-        "operationId": "getWebServers",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ServiceServerSummaryDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "List web/API servers and their HTTP health",
-        "tags": [
-          "Network Cluster"
-        ]
-      }
-    },
-    "/api/v1/intelligence/{fileId}/web/{serverIp}": {
-      "get": {
-        "description": "Returns the per-endpoint log (method, path, status-class counts, content type) plus server software, content types and TLS metadata (cleartext HTTP only for endpoints; TLS detail for HTTPS).",
-        "operationId": "getWebServerDetail",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "serverIp",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebServerDetailResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Get the HTTP endpoint log + detail for one web/API server",
-        "tags": [
-          "Network Cluster"
         ]
       }
     },

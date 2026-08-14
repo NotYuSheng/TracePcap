@@ -69,19 +69,19 @@ export const API_ENDPOINTS = {
 
   // Network Cluster
   NETWORK_INTELLIGENCE_CLUSTERS: (fileId: string, groupBy: string) =>
-    `/intelligence/${fileId}/clusters?groupBy=${groupBy}`,
+    `/clusters/${fileId}/graph?groupBy=${groupBy}`,
   NETWORK_INTELLIGENCE_TOP_HOSTS: (fileId: string, sortBy: string, limit: number) =>
-    `/intelligence/${fileId}/top-hosts?sortBy=${sortBy}&limit=${limit}`,
+    `/clusters/${fileId}/top-hosts?sortBy=${sortBy}&limit=${limit}`,
   NETWORK_INTELLIGENCE_DNS_SERVERS: (fileId: string) =>
-    `/intelligence/${fileId}/dns-servers`,
+    `/clusters/${fileId}/dns-servers`,
   NETWORK_INTELLIGENCE_DNS_LOG: (fileId: string, serverIp: string) =>
-    `/intelligence/${fileId}/dns/${encodeURIComponent(serverIp)}`,
+    `/clusters/${fileId}/dns/${encodeURIComponent(serverIp)}`,
   NETWORK_INTELLIGENCE_WEB_SERVERS: (fileId: string) =>
-    `/intelligence/${fileId}/web-servers`,
+    `/clusters/${fileId}/web-servers`,
   NETWORK_INTELLIGENCE_WEB_DETAIL: (fileId: string, serverIp: string) =>
-    `/intelligence/${fileId}/web/${encodeURIComponent(serverIp)}`,
+    `/clusters/${fileId}/web/${encodeURIComponent(serverIp)}`,
   NETWORK_INTELLIGENCE_PACKET_LOCATION: (fileId: string, packetNumber: number) =>
-    `/intelligence/${fileId}/packet-location/${packetNumber}`,
+    `/clusters/${fileId}/packet-location/${packetNumber}`,
 
   // Conversation Tracer
   TRACER_STEPS: (conversationId: string) => `/tracer/${conversationId}/steps`,

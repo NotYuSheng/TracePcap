@@ -11,7 +11,7 @@ import {
 import type { ColumnKey } from '@/features/conversation/constants';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
 import { conversationService } from '@/features/conversation/services/conversationService';
-import { intelligenceService } from '@/features/intelligence/services/intelligenceService';
+import { clusterApi } from '@/features/cluster/services/clusterApi';
 import { ConversationList } from '@components/conversation/ConversationList';
 import { ConversationDetail } from '@components/conversation/ConversationDetail';
 import { ConversationTracerModal } from '@components/conversation/ConversationTracer/ConversationTracerModal';
@@ -157,7 +157,7 @@ export const ConversationPage = () => {
     setSearchParams(next, { replace: true });
     if (!Number.isSafeInteger(frame) || frame <= 0) return;
     setDetailLoading(true);
-    intelligenceService
+    clusterApi
       .getPacketLocation(fileId, frame)
       .then(loc => {
         if (!loc) return undefined;

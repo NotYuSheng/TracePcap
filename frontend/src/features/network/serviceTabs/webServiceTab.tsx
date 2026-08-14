@@ -1,8 +1,8 @@
 import {
-  intelligenceService,
+  clusterApi,
   type WebServerDetail,
   type HttpEndpoint,
-} from '@/features/intelligence/services/intelligenceService';
+} from '@/features/cluster/services/clusterApi';
 import type { ServiceTabConfig, ServiceLogInfoField } from './types';
 
 const pct = (ratio: number) => Math.round(ratio * 100);
@@ -44,7 +44,7 @@ export const webServiceTab: ServiceTabConfig<WebServerDetail, HttpEndpoint> = {
   label: 'HTTP',
   icon: 'bi-globe',
 
-  fetchDetail: (fileId, ip) => intelligenceService.getWebServerDetail(fileId, ip),
+  fetchDetail: (fileId, ip) => clusterApi.getWebServerDetail(fileId, ip),
   getRows: d => d.endpoints,
   getSummary: d =>
     d.totalRequests === 0

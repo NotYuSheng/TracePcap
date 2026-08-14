@@ -150,7 +150,7 @@ export interface WebServerDetail {
   endpoints: HttpEndpoint[];
 }
 
-export const intelligenceService = {
+export const clusterApi = {
   async getClusters(fileId: string, groupBy: GroupBy, filters?: IntelClusterFilters): Promise<ClusterGraphResponse> {
     // Start from the canonical endpoint (includes ?groupBy=X) and append extra filter params
     const base = API_ENDPOINTS.NETWORK_INTELLIGENCE_CLUSTERS(fileId, groupBy);

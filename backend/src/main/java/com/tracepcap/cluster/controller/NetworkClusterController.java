@@ -7,7 +7,7 @@ import com.tracepcap.cluster.dto.PacketLocationResponse;
 import com.tracepcap.cluster.dto.ServiceServerSummaryDto;
 import com.tracepcap.cluster.dto.TopHostsResponse;
 import com.tracepcap.cluster.dto.WebServerDetailResponse;
-import com.tracepcap.cluster.service.NetworkIntelligenceService;
+import com.tracepcap.cluster.service.NetworkClusterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,14 +25,14 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Validated
 @RestController
-@RequestMapping("/intelligence")
+@RequestMapping("/clusters")
 @RequiredArgsConstructor
 @Tag(name = "Network Cluster", description = "Large-scale network topology clustering and host analytics")
-public class NetworkIntelligenceController {
+public class NetworkClusterController {
 
-  private final NetworkIntelligenceService intelligenceService;
+  private final NetworkClusterService clusterService;
 
-  @GetMapping("/{fileId}/clusters")
+  @GetMapping("/{fileId}/graph")
   @Operation(
       summary = "Get clustered network topology",
       description = "Returns network hosts grouped into clusters by ASN, country, subnet, or device type. Supports the same conversation filters as the conversations endpoint to pre-filter traffic before clustering.")
@@ -72,7 +72,7 @@ public class NetworkIntelligenceController {
         .countries(splitComma(countries))
         .build();
 
-    ClusterGraphResponse response = intelligenceService.computeClusters(fileId, groupBy, filterParams, splitComma(networkLabels));
+    ClusterGraphResponse response = clusterService.computeClusters(fileId, groupBy, filterParams, splitComma(networkLabels));
     return ResponseEntity.ok(response);
   }
 
@@ -92,7 +92,7 @@ public class NetworkIntelligenceController {
 
     log.info("GET /api/network/intelligence/{}/top-hosts?sortBy={}&limit={}", fileId, sortBy, limit);
     int safeLimit = Math.min(limit, 500);
-    TopHostsResponse response = intelligenceService.computeTopHosts(fileId, sortBy, safeLimit);
+    TopHostsResponse response = clusterService.computeTopHosts(fileId, sortBy, safeLimit);
     return ResponseEntity.ok(response);
   }
 
@@ -102,7 +102,7 @@ public class NetworkIntelligenceController {
       description = "Returns every host that answered DNS queries in the capture, with resolved vs. failed counts and an NXDOMAIN-based suspicious flag (possible DNS tunnelling / domain-generation algorithm).")
   public ResponseEntity<List<ServiceServerSummaryDto>> getDnsServers(@PathVariable UUID fileId) {
     log.info("GET /api/network/intelligence/{}/dns-servers", fileId);
-    return ResponseEntity.ok(intelligenceService.computeDnsServers(fileId));
+    return ResponseEntity.ok(clusterService.computeDnsServers(fileId));
   }
 
   @GetMapping("/{fileId}/dns/{serverIp}")
@@ -112,7 +112,7 @@ public class NetworkIntelligenceController {
   public ResponseEntity<DnsQueryLogResponse> getDnsQueryLog(
       @PathVariable UUID fileId, @PathVariable String serverIp) {
     log.info("GET /api/network/intelligence/{}/dns/{}", fileId, serverIp);
-    return ResponseEntity.ok(intelligenceService.computeDnsQueryLog(fileId, serverIp));
+    return ResponseEntity.ok(clusterService.computeDnsQueryLog(fileId, serverIp));
   }
 
   @GetMapping("/{fileId}/web-servers")
@@ -121,7 +121,7 @@ public class NetworkIntelligenceController {
       description = "Returns every host classified as a web/API server (includes HTTPS-only hosts), with success vs. error response counts and a 4xx-based suspicious flag (possible endpoint enumeration / scanning).")
   public ResponseEntity<List<ServiceServerSummaryDto>> getWebServers(@PathVariable UUID fileId) {
     log.info("GET /api/network/intelligence/{}/web-servers", fileId);
-    return ResponseEntity.ok(intelligenceService.computeWebServers(fileId));
+    return ResponseEntity.ok(clusterService.computeWebServers(fileId));
   }
 
   @GetMapping("/{fileId}/web/{serverIp}")
@@ -131,7 +131,7 @@ public class NetworkIntelligenceController {
   public ResponseEntity<WebServerDetailResponse> getWebServerDetail(
       @PathVariable UUID fileId, @PathVariable String serverIp) {
     log.info("GET /api/network/intelligence/{}/web/{}", fileId, serverIp);
-    return ResponseEntity.ok(intelligenceService.computeWebServerDetail(fileId, serverIp));
+    return ResponseEntity.ok(clusterService.computeWebServerDetail(fileId, serverIp));
   }
 
   @GetMapping("/{fileId}/packet-location/{packetNumber}")
@@ -140,7 +140,7 @@ public class NetworkIntelligenceController {
       description = "Returns the conversation that contains the given packet (frame number) so the UI can open and highlight it.")
   public ResponseEntity<PacketLocationResponse> locatePacket(
       @PathVariable UUID fileId, @PathVariable long packetNumber) {
-    PacketLocationResponse location = intelligenceService.locatePacket(fileId, packetNumber);
+    PacketLocationResponse location = clusterService.locatePacket(fileId, packetNumber);
     return location != null ? ResponseEntity.ok(location) : ResponseEntity.notFound().build();
   }
 }

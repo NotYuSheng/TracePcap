@@ -12,7 +12,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Characterisation tests for {@code NetworkIntelligenceService} (#659, phase 4).
+ * Characterisation tests for {@code NetworkClusterService} (#659, phase 4).
  *
  * <p><b>The address predicate that used to be pinned here is gone, on purpose.</b> This class was
  * written to hold open a divergence: this service and {@code SubnetService} both answered "is this
@@ -28,24 +28,24 @@ import org.junit.jupiter.params.provider.ValueSource;
  * <p>This is the characterisation test working as designed: it failed loudly when the surface it
  * pinned moved, which is how the move got reviewed rather than noticed later.
  */
-class NetworkIntelligenceHeuristicsCharacterisationTest {
+class NetworkClusterHeuristicsCharacterisationTest {
 
-  private static final NetworkIntelligenceService SERVICE = newServiceWithoutCollaborators();
+  private static final NetworkClusterService SERVICE = newServiceWithoutCollaborators();
 
-  private static NetworkIntelligenceService newServiceWithoutCollaborators() {
+  private static NetworkClusterService newServiceWithoutCollaborators() {
     try {
-      Constructor<?> ctor = NetworkIntelligenceService.class.getDeclaredConstructors()[0];
+      Constructor<?> ctor = NetworkClusterService.class.getDeclaredConstructors()[0];
       ctor.setAccessible(true);
-      return (NetworkIntelligenceService) ctor.newInstance(new Object[ctor.getParameterCount()]);
+      return (NetworkClusterService) ctor.newInstance(new Object[ctor.getParameterCount()]);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(
-          "NetworkIntelligenceService's constructor changed — update this test", e);
+          "NetworkClusterService's constructor changed — update this test", e);
     }
   }
 
   private static Object invoke(String name, Class<?> paramType, Object arg) {
     try {
-      Method m = NetworkIntelligenceService.class.getDeclaredMethod(name, paramType);
+      Method m = NetworkClusterService.class.getDeclaredMethod(name, paramType);
       m.setAccessible(true);
       return m.invoke(SERVICE, arg);
     } catch (ReflectiveOperationException e) {

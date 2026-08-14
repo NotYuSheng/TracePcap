@@ -8,8 +8,8 @@ import {
   ZoomableGroup,
 } from 'react-simple-maps';
 import { Button } from '@govtechsg/sgds-react';
-import type { ClusterGraphResponse, ClusterNode } from '@/features/intelligence/services/intelligenceService';
-import { intelligenceService } from '@/features/intelligence/services/intelligenceService';
+import type { ClusterGraphResponse, ClusterNode } from '@/features/cluster/services/clusterApi';
+import { clusterApi } from '@/features/cluster/services/clusterApi';
 import { formatBytes } from '@/utils/formatters';
 import { makeVolumeColor } from '@/utils/volumeColor';
 import { useResolvedDark } from '@/utils/useResolvedDark';
@@ -82,7 +82,7 @@ export function CountryMapView({
   useEffect(() => {
     if (!drilledCC) { setCityData(null); return; }
     setCityLoading(true);
-    intelligenceService.getClusters(fileId, 'city')
+    clusterApi.getClusters(fileId, 'city')
       .then(d => setCityData(d))
       .catch(() => setCityData(null))
       .finally(() => setCityLoading(false));

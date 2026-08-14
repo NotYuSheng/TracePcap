@@ -7,7 +7,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { HostSummary } from '@/features/intelligence/services/intelligenceService'
+import type { HostSummary } from '@/features/cluster/services/clusterApi'
 import { TopHostsTable } from '../TopHostsTable'
 
 /**

@@ -29,7 +29,7 @@ import ELK from 'elkjs';
 import { formatBytes } from '@/utils/formatters';
 import { makeVolumeColor, volumeTextColor, volumeRatio } from '@/utils/volumeColor';
 import { useResolvedDark } from '@/utils/useResolvedDark';
-import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } from '@/features/intelligence/services/intelligenceService';
+import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } from '@/features/cluster/services/clusterApi';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
 import { CountryMapView } from './CountryMapView';
