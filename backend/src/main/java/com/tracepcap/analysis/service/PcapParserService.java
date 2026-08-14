@@ -32,6 +32,8 @@ public class PcapParserService {
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
+    // Discarded with the parse; see pooled().
+    Map<String, String> stringPool = new HashMap<>();
 
     // Fields: epoch | len | ipv4.src | ipv4.dst | ipv6.src | ipv6.dst |
     //         tcp.sport | tcp.dport | udp.sport | udp.dport | protocol | info |
@@ -333,6 +335,7 @@ public class PcapParserService {
             conv.getPackets()
                 .add(
                     buildPacketInfo(
+                        stringPool,
                         frameNumber,
                         timestamp,
                         srcIp,
@@ -381,7 +384,26 @@ public class PcapParserService {
   // Helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Pool for the values every packet repeats (#779).
+   *
+   * <p>A capture has a few hundred distinct addresses and a handful of protocols, but millions of
+   * packets, and {@code split()} hands back a fresh String for each one. At ~776 bytes per
+   * PacketInfo, 1.7M packets need ~1.26 GB against a 1 GB heap — which is the OutOfMemoryError.
+   * Addresses and protocols are ~150 of those bytes and are almost entirely duplicates.
+   *
+   * <p>A local map rather than {@link String#intern()}: intern's table is JVM-wide and permanent,
+   * so a capture's addresses would outlive the analysis that read them. This is discarded with the
+   * parse.
+   */
+  private static String pooled(Map<String, String> pool, String value) {
+    if (value == null) return null;
+    String existing = pool.putIfAbsent(value, value);
+    return existing != null ? existing : value;
+  }
+
   private PacketInfo buildPacketInfo(
+      Map<String, String> pool,
       long packetNumber,
       LocalDateTime timestamp,
       String srcIp,
@@ -396,11 +418,11 @@ public class PcapParserService {
     PacketInfo pkt = new PacketInfo();
     pkt.setPacketNumber(packetNumber);
     pkt.setTimestamp(timestamp);
-    pkt.setSrcIp(srcIp);
+    pkt.setSrcIp(pooled(pool, srcIp));
     pkt.setSrcPort(srcPort);
-    pkt.setDstIp(dstIp);
+    pkt.setDstIp(pooled(pool, dstIp));
     pkt.setDstPort(dstPort);
-    pkt.setProtocol(protocol);
+    pkt.setProtocol(pooled(pool, protocol));
     pkt.setPacketSize(packetSize);
     pkt.setInfo(info);
     pkt.setPayload(payloadHex);
