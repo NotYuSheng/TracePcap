@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.stage.DetectionEngineStatus;
 import jakarta.annotation.PreDestroy;
 import java.io.File;
 import java.io.IOException;
@@ -36,7 +37,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class SuricataEngine {
+public class SuricataEngine implements DetectionEngineStatus {
 
   private static final String SURICATASC = "suricatasc";
   private static final String SURICATA = "suricata";
@@ -90,6 +91,7 @@ public class SuricataEngine {
    * <p>Progress estimation needs this because it is the difference between one stage taking 0.3 s
    * and taking 45 s, and no static weighting can describe both (#758).
    */
+  @Override
   public boolean isWarm() {
     return warm && daemon != null && daemon.isAlive();
   }

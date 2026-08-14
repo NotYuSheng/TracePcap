@@ -126,6 +126,22 @@ echo "  Native headroom      = $(( 100 - JVM_HEAP_PERCENT ))% for JVM non-heap +
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"
 echo "  Analysis timeout     = ${TIMEOUT} s"
 
+# Die on heap exhaustion instead of limping (#779).
+#
+# A capture larger than the heap threw OutOfMemoryError inside a request thread and killed Tomcat's
+# http-nio-8080-Poller. The container stayed "running" and healthy to `docker compose ps` while
+# serving nothing: every API call timed out, and recovery needed a human noticing and restarting it.
+# One oversized upload took the service down for everyone, silently.
+#
+# Exiting turns that into something the platform can act on — `restart: unless-stopped` is set on
+# this service, so the container comes back by itself. A JVM whose heap is exhausted has no
+# reliable path back to health anyway; the only question is whether the failure is visible.
+#
+# Deliberately no -XX:+HeapDumpOnOutOfMemoryError: the dump is roughly heap-sized (~1 GB at the
+# default budget) and would land on a volume that already has to hold captures. Enable it by hand
+# when actually diagnosing one.
+JVM_MEM_OPTS="${JVM_MEM_OPTS} -XX:+ExitOnOutOfMemoryError"
+
 # shellcheck disable=SC2086 # JVM_MEM_OPTS is intentionally word-split into separate flags
 exec gosu spring java \
   ${JVM_MEM_OPTS} \
