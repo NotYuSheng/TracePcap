@@ -18,6 +18,7 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - 'docker-compose*.yml'
       - 'scripts/check_minio_policy.py'

@@ -14,6 +14,15 @@ Only build a custom component if SGDS has no equivalent.
 - **Forms that create/edit a thing** (add evidence, override a label, add a snapshot) belong in an **SGDS `Modal`**, not an inline expanding panel — keep the surface uncluttered and the action focused.
 - Keep the copy inside these modals task-oriented: say what the thing is and how to act on it (e.g. "click a badge to inspect it and add evidence").
 
+## Branching
+
+- `dev` is the default and integration branch; `main` is the release branch.
+- Branch from `dev`, and open PRs **against `dev`**. Never open a PR against `main` except the
+  periodic `dev` -> `main` release PR, and never commit to `main` directly.
+- `dev` runs the same gates as `main` and is expected to be green.
+- See CONTRIBUTING.md for what runs where and how to cut a release.
+
+
 ## Stack
 
 - **Frontend**: React + TypeScript + Vite, served via nginx

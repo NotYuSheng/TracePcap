@@ -25,6 +25,7 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - 'backend/src/main/java/**'
       - 'frontend/src/**'
