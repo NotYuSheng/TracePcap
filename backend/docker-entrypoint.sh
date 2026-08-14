@@ -70,7 +70,12 @@ esac
 # the same effective budget keeps the 50/25 split coherent at any limit.
 #
 # Max upload = 25% of the effective budget, expressed in bytes
-MAX_UPLOAD_BYTES=$(( EFFECTIVE_MEM_MB * 25 / 100 * 1024 * 1024 ))
+# 16%, not 25%: stage 2 holds the whole capture in heap, so an accepted file must fit in a
+# third of it (#92's original rule). That held when the heap was 75%; #586 lowered it to 50%
+# for native subprocesses without revisiting this, and a 468MB capture was accepted and then
+# died of OutOfMemoryError 25 minutes into parsing (#779). scripts/check_memory_budget.py
+# now fails the build if these two drift apart again.
+MAX_UPLOAD_BYTES=$(( EFFECTIVE_MEM_MB * 16 / 100 * 1024 * 1024 ))
 
 # Analysis/proxy timeout: 45% of the effective budget, clamped to [300, 900] seconds
 TIMEOUT=$(( EFFECTIVE_MEM_MB * 45 / 100 ))
