@@ -9,6 +9,7 @@ on:
     paths:
       - 'backend/src/main/resources/application*.yml'
       - 'docker-compose*.yml'
+      - '.env.example'
       - 'scripts/check_env_passthrough.py'
       - '.github/workflows/env-passthrough.yml'
   workflow_dispatch:

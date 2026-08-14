@@ -28,6 +28,7 @@ Usage: python3 scripts/check_env_passthrough.py
 Exit:  0 clean, 1 unreachable variables found
 """
 
+import pathlib
 import re
 import sys
 from pathlib import Path
@@ -100,8 +101,33 @@ def vars_passed(compose_files):
     return passed
 
 
+# Internal wiring rather than operator knobs: compose builds these from variables .env.example
+# does document (DATABASE_URL from POSTGRES_DB, MINIO_ACCESS_KEY from MINIO_ROOT_USER, and so on).
+# Documenting the derived name would invite someone to set it and wonder why the source still won.
+INTERNAL_WIRING = {
+    "DATABASE_URL",
+    "DATABASE_USERNAME",
+    "DATABASE_PASSWORD",
+    "MINIO_ENDPOINT",
+    "MINIO_ACCESS_KEY",
+    "MINIO_SECRET_KEY",
+    "MINIO_BUCKET",
+    "TZ",
+}
+
+
+def documented_vars(path="\u002eenv.example"):
+    """Variables .env.example mentions, commented-out ones included.
+
+    A commented default still documents that the knob exists, which is the point — an operator
+    reads this file to learn what is tunable.
+    """
+    text = pathlib.Path(".env.example").read_text() if pathlib.Path(".env.example").exists() else ""
+    return set(re.findall(r"^#?\s*([A-Z_][A-Z0-9_]*)=", text, re.M))
+
+
 def main():
-    unreachable, dead = [], []
+    unreachable, dead, undocumented = [], [], []
     for stack, (compose_files, profile_files) in sorted(STACKS.items()):
         reachable = vars_passed(compose_files)
         read = vars_read(profile_files)
@@ -119,8 +145,28 @@ def main():
             if var not in EXEMPT and var not in read and var not in PASSTHROUGH
         )
 
-    if not unreachable and not dead:
-        print("OK — backend environment and Spring config agree in both directions.")
+    # Third edge of the same triangle: compose <-> application.yml was already checked, but a
+    # variable can be wired end to end and still be invisible, because nothing tells the operator
+    # it exists. .env.example is the only place they look.
+    documented = documented_vars()
+    for stack, (compose_files, _) in sorted(STACKS.items()):
+        if stack != "prod":
+            continue  # one representative stack; the others are supersets of the same names
+        undocumented.extend(
+            var
+            for var in sorted(vars_passed(compose_files))
+            if var not in EXEMPT and var not in INTERNAL_WIRING and var not in documented
+        )
+
+    if undocumented:
+        print("Passed to the backend but absent from .env.example:\n")
+        for var in undocumented:
+            print(f"  {var}")
+        print("\nAdd each with a short note on what it does and its default. A setting nobody")
+        print("knows about is not configurable.\n")
+
+    if not unreachable and not dead and not undocumented:
+        print("OK — compose, Spring config and .env.example all agree.")
         return 0
 
     if unreachable:
