@@ -147,6 +147,7 @@ public class AnalysisService {
    * the temp file's lifetime, and the failure path — which has to mark the record FAILED in its own
    * committed transaction, since the one being rolled back cannot record why it failed.
    */
+  @Transactional
   public void analyzeFile(UUID fileId) {
     log.info("Starting analysis for file: {}", fileId);
 
