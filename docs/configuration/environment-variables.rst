@@ -381,6 +381,14 @@ LLM
      - ``300``
      - HTTP timeout in seconds for LLM API requests. Local models can be slow —
        increase if you get timeout errors.
+   * - ``LLM_TOOL_CALLING``
+     - ``auto``
+     - Whether Story mode's investigation phase declares its query as a native
+       tool, so the server constrains generation to the real schema instead of
+       letting the model free-type JSON. ``auto`` offers tools once and
+       remembers whether the server accepted them; ``on`` always offers them;
+       ``off`` never does and uses the free-text JSON path. Support varies by
+       backend — leave on ``auto`` unless a server misreports its capabilities.
 
 Geolocation
 -----------

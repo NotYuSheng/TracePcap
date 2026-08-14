@@ -56,10 +56,32 @@ paired with **structured database queries** to investigate the most suspicious
 activity. Each query specifies filters such as ``srcIp``, ``dstIp``,
 ``dstPort``, ``protocol``, ``appName``, ``category``, ``hasRisks``,
 ``hasTlsAnomaly``, ``riskType``, ``minBytes``, ``maxBytes``, and ``minFlows``.
-Catch-all queries (no filters set) are automatically discarded. Note that
-``minBytes`` and ``maxBytes`` are per-conversation byte counts and are silently
-ignored by the backend when ``srcIp`` or ``riskType`` is also present in the
-same query.
+Catch-all queries (no filters set) are automatically discarded.
+
+How that query reaches the backend depends on what the inference server
+supports, and the difference matters:
+
+**Native tool calling** (default, ``LLM_TOOL_CALLING=auto``). The query is
+declared as a ``query_conversations`` tool with all 12 filter fields typed in a
+JSON schema, so a server that implements ``tools`` constrains generation to the
+real shape. One tool call is one hypothesis with the query that tests it, and
+the ``queryRef`` linking them is assigned by the backend rather than written by
+the model.
+
+**Free-text JSON** (fallback). Where the server does not implement ``tools``,
+rejects them, or ignores them, the same prompts are sent as an ordinary
+completion and the model's JSON is parsed as before. This path is not
+deprecated — it is what keeps Story Mode working against any OpenAI-compatible
+backend. It carries one extra repair: ``minBytes`` and ``maxBytes`` are
+per-conversation byte counts, and are silently dropped when ``srcIp`` or
+``riskType`` is also present, because models reliably pass an aggregate total
+there, which would match no individual conversation. Queries that arrive
+through the tool keep their byte bounds, since the schema states the semantics
+where the value is generated.
+
+On both paths, the strings models reach for to mean "nDPI could not identify
+this" (``UNKNOWN_APP``, ``unknown``, ``null``, blank) are mapped to an
+"app is null" match — a schema constrains a field's type, not its vocabulary.
 
 Phase 2 — Narrative generation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

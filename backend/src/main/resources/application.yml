@@ -153,6 +153,10 @@ llm:
     # the var is absent entirely (e.g. tests, minimal deployments).
     context-length: ${LLM_CONTEXT_LENGTH:}
     timeout-seconds: ${LLM_TIMEOUT:300}
+    # Native tool calling (#623): auto = try once and remember whether the server accepts it,
+    # on = always send tools, off = the free-text-JSON path. Without this line the property never
+    # binds and LLM_TOOL_CALLING is silently ignored — the env-passthrough gate caught exactly that.
+    tool-calling: ${LLM_TOOL_CALLING:auto}
   retry:
     max-attempts: 3
     backoff-ms: 1000
