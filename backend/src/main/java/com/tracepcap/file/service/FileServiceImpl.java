@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -43,7 +43,6 @@ import org.springframework.web.multipart.MultipartFile;
 /** Implementation of FileService */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class FileServiceImpl implements FileService {
 
   private final FileRepository fileRepository;
@@ -52,7 +51,29 @@ public class FileServiceImpl implements FileService {
   private final ApplicationEventPublisher eventPublisher;
 
   private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList(".pcap", ".pcapng", ".cap");
-  private static final long MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+  /**
+   * The largest capture we will accept, from {@code app.max-file-size} (#779).
+   *
+   * <p>Was a hardcoded 500 MB, which is how a 468 MB capture was accepted and then failed with an
+   * OutOfMemoryError 25 minutes into parsing. The value the entrypoint derives from the memory
+   * budget, and that {@code /system/limits} reports to the upload page, was never consulted here —
+   * so the number the user was shown and the number actually enforced were different numbers.
+   */
+  private final long maxFileSize;
+
+  public FileServiceImpl(
+      FileRepository fileRepository,
+      StorageService storageService,
+      FileMapper fileMapper,
+      ApplicationEventPublisher eventPublisher,
+      @Value("${app.max-file-size:536870912}") long maxFileSize) {
+    this.fileRepository = fileRepository;
+    this.storageService = storageService;
+    this.fileMapper = fileMapper;
+    this.eventPublisher = eventPublisher;
+    this.maxFileSize = maxFileSize;
+  }
+
 
   @Override
   @Transactional
@@ -211,8 +232,9 @@ public class FileServiceImpl implements FileService {
     }
 
     // Check file size
-    if (file.getSize() > MAX_FILE_SIZE) {
-      throw new InvalidFileException("File size exceeds maximum allowed size of 500MB");
+    if (file.getSize() > maxFileSize) {
+      throw new InvalidFileException(
+          "File size exceeds maximum allowed size of " + (maxFileSize / 1024 / 1024) + "MB");
     }
 
     // Check file extension (strip any Windows/Unix path prefix before checking)
