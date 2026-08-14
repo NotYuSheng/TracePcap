@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -25,12 +26,26 @@ class AnalysisTransactionBoundaryTest {
   void analyzeFileIsTransactional() throws Exception {
     Method analyze = AnalysisService.class.getMethod("analyzeFile", java.util.UUID.class);
 
-    assertThat(analyze.isAnnotationPresent(Transactional.class))
+    Transactional tx = analyze.getAnnotation(Transactional.class);
+
+    assertThat(tx)
         .as(
             "analyzeFile writes conversations and packets in a batch and calls "
                 + "EntityManager.flush() every %d conversations; without a transaction that throws "
                 + "on any capture large enough to reach the flush",
             50)
-        .isTrue();
+        .isNotNull();
+
+    // Presence alone is not the property. readOnly = true is a plausible copy-paste from the four
+    // read-only methods below this one, and NOT_SUPPORTED suspends the transaction outright —
+    // both would satisfy isAnnotationPresent while reproducing the bug exactly.
+    assertThat(tx.readOnly()).as("a read-only transaction cannot flush writes").isFalse();
+    assertThat(tx.propagation())
+        .as("the pipeline must run inside a real transaction, not with one suspended")
+        .isIn(Propagation.REQUIRED, Propagation.REQUIRES_NEW);
+
+    // AdjudicatorRunner listens for AnalysisCompletedEvent on AFTER_COMMIT. With no transaction
+    // there is no commit, so identity adjudication was skipped for every file — including the
+    // small ones that appeared to analyse fine.
   }
 }
