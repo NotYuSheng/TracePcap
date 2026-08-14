@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { MainLayout } from '@components/common/Layout';
 import { RouteErrorBoundary } from '@components/common/RouteErrorBoundary';
 import { UploadPage } from '@pages/Upload';
@@ -10,7 +10,7 @@ import { FilterGeneratorPage } from '@pages/FilterGenerator';
 import { NetworkDiagramPage } from '@pages/NetworkDiagram';
 import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { ComparePage } from '@pages/Compare/ComparePage';
-import { NetworkIntelligencePage } from '@pages/NetworkIntelligence';
+import { NetworkClusterPage } from '@pages/NetworkCluster';
 import { NotFoundPage } from '@pages/NotFound';
 import { MonitorPage } from '@pages/Monitor/MonitorPage';
 import { NetworkDetailPage } from '@pages/Monitor/NetworkDetailPage';
@@ -63,9 +63,15 @@ export const router = createBrowserRouter([
             errorElement: <RouteErrorBoundary />,
           },
           {
-            path: 'network-intelligence',
-            element: <NetworkIntelligencePage />,
+            path: 'network-cluster',
+            element: <NetworkClusterPage />,
             errorElement: <RouteErrorBoundary />,
+          },
+          {
+            path: 'network-intelligence',
+            // Renamed in #745. Kept as a redirect so links shared before the rename
+            // still land somewhere useful rather than on a 404.
+            element: <Navigate to="../network-cluster" replace />,
           },
         ],
       },

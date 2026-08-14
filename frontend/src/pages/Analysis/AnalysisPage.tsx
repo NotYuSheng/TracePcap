@@ -272,7 +272,7 @@ export const AnalysisPage = () => {
     else if (path.includes('/filter-generator')) setActiveTab('filter-generator');
     else if (path.includes('/network-diagram')) setActiveTab('network-diagram');
     else if (path.includes('/extracted-files')) setActiveTab('extracted-files');
-    else if (path.includes('/network-intelligence')) setActiveTab('network-intelligence');
+    else if (path.includes('/network-cluster')) setActiveTab('network-cluster');
     else setActiveTab('overview');
   }, [location.pathname]);
 
@@ -511,8 +511,8 @@ export const AnalysisPage = () => {
         <li className="nav-item">
           <button
             style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'network-intelligence' ? 'active' : ''}`}
-            onClick={() => handleTabChange('network-intelligence')}
+            className={`nav-link ${activeTab === 'network-cluster' ? 'active' : ''}`}
+            onClick={() => handleTabChange('network-cluster')}
           >
             <i className="bi bi-globe-europe-africa me-2"></i>Network Cluster
           </button>

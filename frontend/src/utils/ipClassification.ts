@@ -1,4 +1,4 @@
-import type { CustomPrivateRange } from '@/features/intelligence/types/customPrivateRange.types';
+import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 
 /**
  * Single source of truth for "is this address internal?" — previously copied (and already drifting)

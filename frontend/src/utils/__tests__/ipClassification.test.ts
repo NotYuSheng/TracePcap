@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isRfc1918, isPrivateIp, ipInCidr } from '../ipClassification';
-import type { CustomPrivateRange } from '@/features/intelligence/types/customPrivateRange.types';
+import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 
 describe('isRfc1918', () => {
   it('recognises RFC1918 / loopback / link-local IPv4', () => {

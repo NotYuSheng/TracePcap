@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { apiClient } from '@/services/api/client';
-import { ipOrgRuleService, type IpOrgRule } from '@/features/intelligence/services/ipOrgRuleService';
+import { ipOrgRuleService, type IpOrgRule } from '@/features/cluster/services/ipOrgRuleService';
 
 interface SignaturesModalProps {
   show: boolean;
