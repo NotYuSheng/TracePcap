@@ -53,7 +53,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  *       applied against the ASCII/UTF-8 decoded payload); supports optional {@code
  *       case_insensitive: true} per entry. Uses the same {@code match_all} flag as {@code
  *       payload_contains}. Payloads are capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes per
- *       packet to prevent catastrophic backtracking.
+ *       packet, which bounds the per-packet cost of a match.
  * </ul>
  */
 @Slf4j
@@ -390,7 +390,15 @@ public class CustomSignatureService implements SignatureApplier {
    *
    * <p>Each entry is a map with a required {@code pattern} key (standard Java regex) and an
    * optional {@code case_insensitive: true} flag. Payloads are decoded from hex to ASCII/UTF-8 and
-   * capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes per packet to prevent backtracking issues.
+   * capped at {@value #MAX_REGEX_PAYLOAD_BYTES} bytes per packet.
+   *
+   * <p>The cap bounds how much input any one match sees; it is <em>not</em> a guard against
+   * catastrophic backtracking, which is exponential in the pattern rather than linear in the
+   * input — a pathological pattern would blow up on far less than 64 KB. The distinction matters
+   * because these patterns are operator-supplied. In practice the classic catastrophic forms
+   * ({@code ^(a+)+$}, {@code (a|aa)+$}, {@code (.*a){20}}) were measured completing in
+   * milliseconds against this JDK's engine, so no timeout mechanism is imposed here; if that
+   * ceases to hold, the fix is an interruptible {@code CharSequence}, not a smaller cap.
    */
   private boolean payloadRegexMatch(
       List<PcapParserService.PacketInfo> packets,
