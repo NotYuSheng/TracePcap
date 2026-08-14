@@ -36,6 +36,21 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      # tshark, editcap and capinfos, because without them the tool-dependent tests pass while
+      # testing nothing (#701). Those services degrade gracefully by design, so a missing binary
+      # is not an error — the subprocess fails to start, the catch fires, the method returns
+      # early, and the assertions still hold. Verified by hiding tshark from PATH locally:
+      # DnsQueryLogExtractorTest reported 13 passed either way. The 4-point coverage gap between
+      # this job and a developer's machine was that, made visible.
+      #
+      # Suricata is deliberately not installed: it is ~700MB of ruleset and ~45s of engine build
+      # per run (#569), and the full-stack job already exercises it against a real container.
+      - name: Install packet-analysis tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends tshark
+          tshark --version | head -1
+
       # Testcontainers needs a Docker daemon; ubuntu-latest runners provide one.
       - name: Run unit + integration tests
         run: mvn -B clean verify
