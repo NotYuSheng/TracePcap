@@ -6,7 +6,16 @@ API rules, the offline requirement), see [`CLAUDE.md`](./CLAUDE.md).
 
 ## Branching
 
-`dev` is the integration branch and the default. `main` is the release branch.
+`dev` is the integration branch. `main` is the release branch, and stays the **default** — it is
+what a visitor to the repository sees and what a plain `git clone` checks out, so it should show
+the released state rather than work in progress.
+
+The cost of that choice is that `gh pr create` and the GitHub UI both default to `main`, which is
+**not** where everyday work goes. Pass the base explicitly:
+
+```bash
+gh pr create --base dev
+```
 
 ```
 feature/xyz ──PR──> dev ──PR──> main
@@ -15,8 +24,8 @@ feature/xyz ──PR──> dev ──PR──> main
                   lands here   (publishes images)
 ```
 
-**Everyday work targets `dev`.** Branch from it, open the PR against it, merge when the gates
-pass. `dev` is expected to be green at all times — it runs the same checks as `main`, so
+**Everyday work targets `dev`.** Branch from it, open the PR against it with `--base dev`, and
+merge when the gates pass. `dev` is expected to be green at all times — it runs the same checks as `main`, so
 "integration branch" does not mean "allowed to be broken".
 
 **`main` only ever receives a PR from `dev`,** cut when you want a release. Nothing else merges

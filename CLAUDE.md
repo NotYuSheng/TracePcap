@@ -16,7 +16,9 @@ Only build a custom component if SGDS has no equivalent.
 
 ## Branching
 
-- `dev` is the default and integration branch; `main` is the release branch.
+- `dev` is the integration branch; `main` is the release branch and remains the repo default.
+- **`gh pr create` defaults to `main`, which is wrong for everyday work — always pass
+  `--base dev` explicitly.**
 - Branch from `dev`, and open PRs **against `dev`**. Never open a PR against `main` except the
   periodic `dev` -> `main` release PR, and never commit to `main` directly.
 - `dev` runs the same gates as `main` and is expected to be green.
