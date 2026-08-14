@@ -4,6 +4,62 @@ Thanks for contributing! This guide covers workflows that aren't obvious from th
 code alone. For architecture and coding conventions (stack, UI components, REST
 API rules, the offline requirement), see [`CLAUDE.md`](./CLAUDE.md).
 
+## Branching
+
+`dev` is the integration branch. `main` is the release branch, and stays the **default** — it is
+what a visitor to the repository sees and what a plain `git clone` checks out, so it should show
+the released state rather than work in progress.
+
+The cost of that choice is that `gh pr create` and the GitHub UI both default to `main`, which is
+**not** where everyday work goes. Pass the base explicitly:
+
+```bash
+gh pr create --base dev
+```
+
+```
+feature/xyz ──PR──> dev ──PR──> main
+                     ▲            │
+                 everything    releases only
+                  lands here   (publishes images)
+```
+
+**Everyday work targets `dev`.** Branch from it, open the PR against it with `--base dev`, and
+merge when the gates pass. `dev` is expected to be green at all times — it runs the same checks as `main`, so
+"integration branch" does not mean "allowed to be broken".
+
+**`main` only ever receives a PR from `dev`,** cut when you want a release. Nothing else merges
+into it, and nothing is committed to it directly. That rule is what makes `main` mean something:
+if a commit is on `main`, it went through `dev` and a full CI run first.
+
+### Why the split
+
+`main` used to take every merge directly, which meant its history and "the current state of the
+work" were the same thing — there was no point at which you could say *this is a version we
+stand behind*. Releases publish container images from `main` (`publish-ghcr.yml`), so that
+distinction is not academic: whatever is on `main` is what someone can pull.
+
+### What runs where
+
+| | on a PR | on push to `dev` | on push to `main` |
+|---|---|---|---|
+| tests, lint, contract and vocabulary gates | yes | yes | yes |
+| version stamp (`app-version.yml`) | — | yes, PR into `dev` | — |
+| container publish (`publish-ghcr.yml`) | — | — | yes |
+
+The version stamp runs on `dev` deliberately. If its chore PR landed on `main`, `main` would
+drift ahead of `dev` and every later release would start from a diverged base. At release time
+`dev` and `main` are equal, so stamping from `dev` still records exactly the released commit.
+
+### Cutting a release
+
+```bash
+gh pr create --base main --head dev --title "release: <summary>"
+```
+
+Review the accumulated diff, let CI run, merge. The merge to `main` publishes the images.
+
+
 ## API Contract Workflow
 
 The REST API has a committed contract snapshot at

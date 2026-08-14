@@ -1,7 +1,7 @@
 name: Sync App Version
 
 # Keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest
-# main commit, so a plain `docker compose up -d --build` bakes in a real version
+# dev commit, so a plain `docker compose up -d --build` bakes in a real version
 # with no local setup. Compose only interpolates ${...} from the shell env and .env
 # (which is gitignored), so the value has to live in the compose file itself.
 #
@@ -15,7 +15,7 @@ name: Sync App Version
 on:
   push:
     branches:
-      - main
+      - dev
 
 # Serialise runs so two quick merges to main can't open competing bump PRs.
 concurrency:
@@ -96,10 +96,10 @@ jobs:
           PR_URL=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
           if [ -z "$PR_URL" ]; then
             PR_URL=$(gh pr create \
-              --base main \
+              --base dev \
               --head "$BRANCH" \
               --title "chore: sync app version to ${VERSION}" \
-              --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest main commit. Opened by .github/workflows/app-version.yml.")
+              --body "Automated: keeps the VITE_APP_VERSION default in docker-compose.yml pointing at the latest dev commit. Opened by .github/workflows/app-version.yml.")
           fi
 
           # Step off the bump branch: git refuses to delete a checked-out branch.
