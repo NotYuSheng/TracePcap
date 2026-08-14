@@ -31,6 +31,27 @@ BASE = {2, 4, 5, 6}      # parse + classify/geo + save + DB insert
 EXTRACT = {3}            # nDPI + Suricata
 FILE_EXTRACTION = {7}
 
+# Above this, the detection stage is building the ruleset rather than inspecting packets.
+COLD_ENGINE_THRESHOLD_S = 20.0
+
+
+
+def fit(points: list[tuple[int, float]]) -> tuple[float, float]:
+    """Least squares of seconds = fixed + per_kpkt * kpkt.
+
+    Returns (fixed_seconds, seconds_per_kpkt). Both terms matter: a model with only the second
+    one is what produced a 91-minute estimate for a 36-minute job and a 10-second estimate for a
+    49-second one — the same missing constant, in opposite directions.
+    """
+    n = len(points)
+    xs = [p / 1000.0 for p, _ in points]
+    ys = [s for _, s in points]
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    denom = sum((x - mx) ** 2 for x in xs)
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / denom if denom else 0.0
+    return my - slope * mx, slope
+
 
 def main() -> int:
     stages: dict[str, dict[int, int]] = defaultdict(dict)
@@ -52,6 +73,19 @@ def main() -> int:
         return 1
 
     runs.sort(key=lambda r: r[1])
+
+    # A cold-engine run is a different regime, not an outlier: Suricata's ruleset build is ~45s
+    # once per process, and mixing one into the fit drags the fixed term up and flattens the slope
+    # to zero. Detected by its own signature rather than a hardcoded file id.
+    cold = [r for r in runs if sum(r[2].get(i, 0) for i in EXTRACT) / 1000 > COLD_ENGINE_THRESHOLD_S]
+    runs = [r for r in runs if r not in cold]
+    if cold:
+        secs = [sum(r[2].get(i, 0) for i in EXTRACT) / 1000 for r in cold]
+        print(f"Excluded {len(cold)} cold-engine run(s) from the fit "
+              f"(detection stage {min(secs):.0f}-{max(secs):.0f}s — the one-time ruleset build).\n")
+    if not runs:
+        print("Only cold-engine runs found; nothing to fit.", file=sys.stderr)
+        return 1
     print(f"{'packets':>10} {'total s':>9} {'base':>8} {'extract':>9} {'file-ext':>9}   (s per 1000 packets)")
     agg = defaultdict(list)
     for _, pkts, st, total in runs:
@@ -76,6 +110,21 @@ def main() -> int:
         drift = (large_v / small_v) if small_v else float("inf")
         verdict = "looks per-packet" if 0.5 <= drift <= 2 else "NOT per-packet — fixed cost leaking in"
         print(f"  {key:>9}: {small_v:.3f} @ {small_n} -> {large_v:.3f} @ {large_n}  ({verdict})")
+    print("\nFitted model — seconds = fixed + per_kpkt * (packets/1000):\n")
+    absolute = defaultdict(list)
+    for _, pkts, st, _ in runs:
+        absolute["base"].append((pkts, sum(st.get(i, 0) for i in BASE) / 1000))
+        absolute["extract"].append((pkts, sum(st.get(i, 0) for i in EXTRACT) / 1000))
+        absolute["file-ext"].append((pkts, sum(st.get(i, 0) for i in FILE_EXTRACTION) / 1000))
+    for key, pts in absolute.items():
+        if len(pts) < 2:
+            print(f"  {key:>9}: needs at least two runs to fit")
+            continue
+        fixed, per = fit(pts)
+        print(f"  {key:>9}: fixed {max(fixed, 0.0):6.2f}s   per_kpkt {max(per, 0.0):6.3f}s"
+              f"   (from {len(pts)} runs, {pts[0][0]}..{pts[-1][0]} packets)")
+    print("\nA fit from clustered sizes extrapolates badly. Treat per_kpkt as trustworthy only")
+    print("across the range measured, and re-run this when a much larger capture completes.")
     return 0
 
 
