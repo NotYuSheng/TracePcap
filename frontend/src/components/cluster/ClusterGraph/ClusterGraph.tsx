@@ -29,6 +29,7 @@ import ELK from 'elkjs';
 import { formatBytes } from '@/utils/formatters';
 import { makeVolumeColor, volumeTextColor, volumeRatio } from '@/utils/volumeColor';
 import { useResolvedDark } from '@/utils/useResolvedDark';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import type { ClusterGraphResponse, ClusterNode as ClusterNodeData, GroupBy } from '@/features/cluster/services/clusterApi';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { Conversation } from '@/types';
@@ -55,7 +56,10 @@ const GEO_SOURCE_FALLBACK = GEO_SOURCE_INFO.mmdb;
 
 function GeoSourceBadge({ source }: { source?: string | null }) {
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const info = (source ? GEO_SOURCE_INFO[source] : undefined) ?? GEO_SOURCE_FALLBACK;
+
+  useEscapeLayer(() => setPopoverPos(null), { enabled: popoverPos !== null, ref: popoverRef });
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -81,6 +85,7 @@ function GeoSourceBadge({ source }: { source?: string | null }) {
       </span>
       {popoverPos && createPortal(
         <div
+          ref={popoverRef}
           style={{
             position: 'fixed',
             top: popoverPos.top,
@@ -475,10 +480,12 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
   const navigate = useNavigate();
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [convosLoading, setConvosLoading] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   type IpMetric = 'bytes' | 'conversations' | 'risks' | 'peers';
   const [ipMetric, setIpMetric] = useState<IpMetric>('bytes');
 
-  // Escape is handled by the parent page (so it can respect fullscreen priority).
+  // Escape closes this panel before it reaches fullscreen, which registers a layer underneath it.
+  useEscapeLayer(onClose, { ref: panelRef });
 
   useEffect(() => {
     if (!cluster.sampleIps.length) return;
@@ -500,6 +507,7 @@ function ClusterPanel({ cluster, fileId, onClose }: ClusterPanelProps) {
 
   return (
     <div
+      ref={panelRef}
       style={{
         position: 'fixed',
         top: '50%',

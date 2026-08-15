@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -29,6 +29,7 @@ import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { severityHex } from '@/utils/severityColors';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
@@ -144,6 +145,8 @@ export const SnapshotDetailModal = ({
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
   const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
+  const diagramFullscreenRef = useRef<HTMLDivElement>(null);
+  const heatmapFullscreenRef = useRef<HTMLDivElement>(null);
 
   // Filter state
   const [ipFilter, setIpFilter] = useState('');
@@ -264,28 +267,22 @@ export const SnapshotDetailModal = ({
     activeCustomSigs.length + activeFileTypes.length + activeCountries.length +
     (ipFilter ? 1 : 0) + (portFilter ? 1 : 0) + (hasRisksOnly ? 1 : 0);
 
+  // Either fullscreen owns Escape while it is open — both render above the dialog (z-index 1080),
+  // so without a layer the key would fall through and close the whole dialog instead of just
+  // leaving fullscreen. Arrow stepping stays enabled so snapshots can be paged through fullscreen.
+  useEscapeLayer(() => setIsHeatmapFullscreen(false), {
+    enabled: isHeatmapFullscreen,
+    ref: heatmapFullscreenRef,
+  });
+  useEscapeLayer(() => setIsDiagramFullscreen(false), {
+    enabled: isDiagramFullscreen,
+    ref: diagramFullscreenRef,
+  });
+
   // Keyboard left/right to navigate snapshots on diagram tab
   useEffect(() => {
     if (activeTab !== 'diagram') return;
     const handler = (e: KeyboardEvent) => {
-      // Heatmap fullscreen owns Escape while it is open — without this the key
-      // falls through to the dialog and closes the whole thing instead of just
-      // leaving fullscreen. Capture phase, so it runs before the modal's handler.
-      if (e.key === 'Escape' && isHeatmapFullscreen) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsHeatmapFullscreen(false);
-        return;
-      }
-      // Diagram fullscreen owns Escape too — exit fullscreen instead of closing
-      // the whole dialog. Arrow stepping stays enabled so snapshots can be paged
-      // through while fullscreen.
-      if (e.key === 'Escape' && isDiagramFullscreen) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDiagramFullscreen(false);
-        return;
-      }
       // Snapshot stepping would be disorienting while the matrix is fullscreen.
       if (isHeatmapFullscreen) return;
       if (e.key === 'ArrowLeft' && diagramIndex > 0) {
@@ -296,7 +293,7 @@ export const SnapshotDetailModal = ({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen, isDiagramFullscreen]);
+  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen]);
 
   // A fullscreen matrix/diagram is position:fixed outside the dialog's stacking
   // context, so it must not outlive a tab change that hides the diagram beneath it.
@@ -525,7 +522,7 @@ export const SnapshotDetailModal = ({
 
         {/* ── Network Diagram tab ── */}
         {activeTab === 'diagram' && (
-          <div className={isDiagramFullscreen ? 'nd-css-fullscreen-over-modal' : ''}>
+          <div ref={diagramFullscreenRef} className={isDiagramFullscreen ? 'nd-css-fullscreen-over-modal' : ''}>
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
               <div className="d-flex align-items-center gap-2">
                 <Button size="sm" variant="outline-secondary"
@@ -651,6 +648,7 @@ export const SnapshotDetailModal = ({
                 which in monitor mode already carries snapshot-change highlighting. */}
             {!graphLoading && (
               <div
+                ref={heatmapFullscreenRef}
                 className={
                   isHeatmapFullscreen
                     ? 'tp-heatmap-fullscreen-over-modal'

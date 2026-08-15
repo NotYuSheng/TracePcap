@@ -15,6 +15,7 @@ import {
 } from '@/utils/appColors';
 import { getProtocolColor } from '@/features/network/constants';
 import { deviceTypeLabel, deviceTypeColor, deviceTypeIcon } from '@/utils/deviceType';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { HexViewer } from '../HexViewer/HexViewer';
 import { SessionTab } from '../SessionTab/SessionTab';
@@ -60,7 +61,10 @@ const GEO_SOURCE_FALLBACK = GEO_SOURCE_INFO.mmdb;
 
 function GeoSourceBadge({ source }: { source?: string }) {
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const info = (source ? GEO_SOURCE_INFO[source] : undefined) ?? GEO_SOURCE_FALLBACK;
+
+  useEscapeLayer(() => setPopoverPos(null), { enabled: popoverPos !== null, ref: popoverRef });
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -86,6 +90,7 @@ function GeoSourceBadge({ source }: { source?: string }) {
       </Badge>
       {popoverPos && createPortal(
         <div
+          ref={popoverRef}
           style={{
             position: 'fixed',
             top: popoverPos.top,

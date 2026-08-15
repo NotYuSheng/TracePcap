@@ -302,16 +302,18 @@ export const ConversationPage = () => {
       openConversation(conversations[selectedIndex + 1], selectedIndex + 1);
   }, [selectedIndex, conversations, openConversation]);
 
+  // Escape is deliberately absent: the SGDS modal already closes itself through `onHide`, and a
+  // second handler here would also fire for a layer stacked above it (the tracer overlay, a host
+  // detail panel) and close the conversation out from under it (#535).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeModal();
       if (!selectedConversation) return;
       if (e.key === 'ArrowLeft') handlePrev();
       if (e.key === 'ArrowRight') handleNext();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [closeModal, selectedConversation, handlePrev, handleNext]);
+  }, [selectedConversation, handlePrev, handleNext]);
 
   useEffect(() => {
     document.body.style.overflow = selectedConversation ? 'hidden' : '';

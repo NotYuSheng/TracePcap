@@ -20,6 +20,7 @@ import { TopHostsTable } from '@components/cluster/TopHostsTable/TopHostsTable';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { toggleSet } from '@/features/network/constants';
 import { nodeIdentityKey } from '@/utils/deviceType';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -206,18 +207,10 @@ export const NetworkClusterPage = () => {
     activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNetLabels,
   ]);
 
-  // CSS fullscreen — lets us intercept Escape to close modals before exiting fullscreen
-  useEffect(() => {
-    if (!isFullscreen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (showFilterModal) { setShowFilterModal(false); return; }
-      if (selectedCluster) { setSelectedCluster(null); return; }
-      setIsFullscreen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isFullscreen, showFilterModal, selectedCluster]);
+  // CSS fullscreen is the bottom Escape layer on this page: the filter modal (an SGDS modal that
+  // stacks above the fullscreen card) and the cluster panel (its own layer) each take Escape first,
+  // so exiting fullscreen is what is left when nothing is open over it.
+  useEscapeLayer(() => setIsFullscreen(false), { enabled: isFullscreen, ref: graphCardRef });
 
   const [autoSelected, setAutoSelected] = useState(false);
 
