@@ -227,6 +227,7 @@ public class SuricataEngine implements DetectionEngineStatus {
         String current = runCommand("pcap-current");
         if (current == null) {
           log.warn("Lost contact with the warm Suricata engine — falling back");
+          discardDaemon();
           return false;
         }
         if (current.contains("None") && Files.exists(eve)) return true;

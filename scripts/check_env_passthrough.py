@@ -123,7 +123,10 @@ def documented_vars(path="\u002eenv.example"):
     A commented default still documents that the knob exists, which is the point — an operator
     reads this file to learn what is tunable.
     """
-    text = pathlib.Path(".env.example").read_text() if pathlib.Path(".env.example").exists() else ""
+    example = pathlib.Path(path)
+    if not example.is_absolute():
+        example = ROOT / example
+    text = example.read_text() if example.exists() else ""
     return set(re.findall(r"^#?\s*([A-Z_][A-Z0-9_]*)=", text, re.M))
 
 
@@ -150,14 +153,14 @@ def main():
     # variable can be wired end to end and still be invisible, because nothing tells the operator
     # it exists. .env.example is the only place they look.
     documented = documented_vars()
-    for stack, (compose_files, _) in sorted(STACKS.items()):
-        if stack != "prod":
-            continue  # one representative stack; the others are supersets of the same names
-        undocumented.extend(
-            var
-            for var in sorted(vars_passed(compose_files))
-            if var not in EXEMPT and var not in INTERNAL_WIRING and var not in documented
-        )
+    passed_by_any_stack = set()
+    for compose_files, _ in STACKS.values():
+        passed_by_any_stack |= vars_passed(compose_files)
+    undocumented.extend(
+        var
+        for var in sorted(passed_by_any_stack)
+        if var not in EXEMPT and var not in INTERNAL_WIRING and var not in documented
+    )
 
     if undocumented:
         print("Passed to the backend but absent from .env.example:\n")
