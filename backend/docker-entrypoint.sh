@@ -82,6 +82,19 @@ TIMEOUT=$(( EFFECTIVE_MEM_MB * 45 / 100 ))
 if [ "$TIMEOUT" -lt 300 ]; then TIMEOUT=300; fi
 if [ "$TIMEOUT" -gt 900 ]; then TIMEOUT=900; fi
 
+# Max length (chars) of a single JSON string value across the API — currently only reachable via
+# the PDF report's base64-encoded topology diagram, which a dense capture can inflate past
+# Jackson's own fixed 20MB default. That default doesn't know how much heap it's borrowing
+# against, so it's too generous on a small deployment and an arbitrary ceiling on a large one.
+# 2.5% of the effective budget, clamped to [8, 256] MB (#792). Unlike the upload path, parsing
+# one JSON string only needs a small multiple of its own size in transient buffer growth (no
+# whole-capture object graph held alongside it), so this stays well under the heap fraction the
+# upload cap uses — see MAX_UPLOAD_BYTES above.
+JACKSON_MAX_STRING_MB=$(( EFFECTIVE_MEM_MB / 40 ))
+if [ "$JACKSON_MAX_STRING_MB" -lt 8 ]; then JACKSON_MAX_STRING_MB=8; fi
+if [ "$JACKSON_MAX_STRING_MB" -gt 256 ]; then JACKSON_MAX_STRING_MB=256; fi
+JACKSON_MAX_STRING_BYTES=$(( JACKSON_MAX_STRING_MB * 1024 * 1024 ))
+
 # Ensure signatures.yml exists and is writable by the spring user.
 # Runs as root so it can fix ownership regardless of how the named volume was seeded.
 if [ ! -f /app/config/signatures.yml ] && [ -f /app/config-defaults/signatures.yml ]; then
@@ -125,6 +138,7 @@ echo "  JVM heap             = ${JVM_HEAP_MB} MB (${JVM_HEAP_PERCENT}% of budget
 echo "  Native headroom      = $(( 100 - JVM_HEAP_PERCENT ))% for JVM non-heap + tshark/ndpi/Suricata"
 echo "  Max upload size      = $(( MAX_UPLOAD_BYTES / 1024 / 1024 )) MB"
 echo "  Analysis timeout     = ${TIMEOUT} s"
+echo "  Max JSON string      = ${JACKSON_MAX_STRING_MB} MB (report topology diagram)"
 
 # Die on heap exhaustion instead of limping (#779).
 #
@@ -147,4 +161,5 @@ exec gosu spring java \
   ${JVM_MEM_OPTS} \
   -DMAX_UPLOAD_SIZE_BYTES=${MAX_UPLOAD_BYTES} \
   -DANALYSIS_TIMEOUT_SECONDS=${TIMEOUT} \
+  -DJACKSON_MAX_STRING_LENGTH=${JACKSON_MAX_STRING_BYTES} \
   -jar app.jar
