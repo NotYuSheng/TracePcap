@@ -332,4 +332,9 @@ tracepcap:
     # posts a base64-encoded topology diagram PNG in the request body, and a large/dense diagram
     # capture can push that string past the default, rejecting the request before it reaches the
     # controller. See JacksonConfig and #792.
-    max-string-length: ${JACKSON_MAX_STRING_LENGTH:52428800}
+    #
+    # 53477376 (51MB) matches what backend/docker-entrypoint.sh derives at its documented default
+    # (APP_MEMORY_MB=2048 -> EFFECTIVE_MEM_MB/40 = 51MB) — kept in sync so a run that bypasses the
+    # entrypoint (mvn spring-boot:run, an IDE run, a test) behaves the same as the real deployment
+    # at that default, instead of silently falling back to a different cap.
+    max-string-length: ${JACKSON_MAX_STRING_LENGTH:53477376}
