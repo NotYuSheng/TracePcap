@@ -64,6 +64,7 @@ STACKS = {
 EXEMPT = {
     "MAX_UPLOAD_SIZE_BYTES":   "passed as -D by backend/docker-entrypoint.sh, derived from the memory budget",
     "ANALYSIS_TIMEOUT_SECONDS": "passed as -D by backend/docker-entrypoint.sh, derived from the memory budget",
+    "JACKSON_MAX_STRING_LENGTH": "passed as -D by backend/docker-entrypoint.sh, derived from the memory budget",
     "SERVER_PORT":             "internal; fixed at 8080 behind nginx",
     "SPRING_PROFILES_ACTIVE":  "set per compose file to select the profile",
     "LOG_DIR":                 "set by backend/docker-entrypoint.sh",
