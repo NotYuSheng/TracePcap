@@ -327,3 +327,9 @@ tracepcap:
     iot-apps:
       - IPP
       - MDNS
+  jackson:
+    # Jackson's default max JSON string length (StreamReadConstraints) is 20MB. Report generation
+    # posts a base64-encoded topology diagram PNG in the request body, and a large/dense diagram
+    # capture can push that string past the default, rejecting the request before it reaches the
+    # controller. See JacksonConfig and #792.
+    max-string-length: ${JACKSON_MAX_STRING_LENGTH:52428800}
