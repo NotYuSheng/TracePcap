@@ -90,6 +90,9 @@ if [ "$TIMEOUT" -gt 900 ]; then TIMEOUT=900; fi
 # one JSON string only needs a small multiple of its own size in transient buffer growth (no
 # whole-capture object graph held alongside it), so this stays well under the heap fraction the
 # upload cap uses — see MAX_UPLOAD_BYTES above.
+#
+# GlobalExceptionHandler mirrors this formula (divisor 40, clamp 256) to recommend an
+# APP_MEMORY_MB when a request trips the cap — keep the two in sync if this changes.
 JACKSON_MAX_STRING_MB=$(( EFFECTIVE_MEM_MB / 40 ))
 if [ "$JACKSON_MAX_STRING_MB" -lt 8 ]; then JACKSON_MAX_STRING_MB=8; fi
 if [ "$JACKSON_MAX_STRING_MB" -gt 256 ]; then JACKSON_MAX_STRING_MB=256; fi

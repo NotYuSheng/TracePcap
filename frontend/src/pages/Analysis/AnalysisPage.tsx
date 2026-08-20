@@ -1,4 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { Alert } from '@components/common/Alert';
 import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
 import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
@@ -97,6 +98,11 @@ export const AnalysisPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [reportMemoryError, setReportMemoryError] = useState<{
+    message: string;
+    attemptedSizeMb: number;
+    recommendedAppMemoryMb: number | null;
+  } | null>(null);
   const [reportStep, setReportStep] = useState<string | null>(null);
 
   // ── Story generation state (lifted here so it survives tab switches) ──────
@@ -285,6 +291,7 @@ export const AnalysisPage = () => {
     if (!fileId) return;
     setReportLoading(true);
     setReportError(null);
+    setReportMemoryError(null);
     setReportStep('Rendering network diagrams…');
     try {
       const { filteredNodes, filteredEdges, nodeLimitNote: refNodeLimitNote } = networkGraphStateRef.current;
@@ -365,7 +372,33 @@ export const AnalysisPage = () => {
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Report generation failed', e);
-      setReportError('Report generation failed. Please try again.');
+
+      // This request uses responseType: 'blob' (it's a PDF on success), so axios applies that
+      // same responseType to an error body too — a JSON error comes back as a Blob, not a parsed
+      // object, and has to be read out explicitly before its fields are usable.
+      const raw = (e as { response?: { data?: unknown } })?.response?.data;
+      let data: Record<string, unknown> = {};
+      if (raw instanceof Blob) {
+        try {
+          data = JSON.parse(await raw.text());
+        } catch {
+          // Not a JSON body (e.g. an HTML error page from a proxy) — fall through below.
+        }
+      } else if (raw && typeof raw === 'object') {
+        data = raw as Record<string, unknown>;
+      }
+
+      if (data.errorCode === 'PAYLOAD_STRING_TOO_LARGE') {
+        setReportMemoryError({
+          message:
+            (data.message as string) ??
+            'The network topology diagram was too large to include in the report.',
+          attemptedSizeMb: (data.attemptedSizeMb as number) ?? 0,
+          recommendedAppMemoryMb: (data.recommendedAppMemoryMb as number | null) ?? null,
+        });
+      } else {
+        setReportError('Report generation failed. Please try again.');
+      }
     } finally {
       setReportLoading(false);
       setReportStep(null);
@@ -431,6 +464,30 @@ export const AnalysisPage = () => {
           {reportError && <small className="text-danger">{reportError}</small>}
         </div>
       </div>
+
+      {reportMemoryError && (
+        <Alert variant="danger" className="mb-3" onClose={() => setReportMemoryError(null)} dismissible>
+          <Alert.Heading>
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            Report Too Large for This Deployment
+          </Alert.Heading>
+          <p className="mb-2">
+            The network topology diagram was <strong>{reportMemoryError.attemptedSizeMb} MB</strong>,
+            over what this deployment currently accepts in a single request.
+          </p>
+          {reportMemoryError.recommendedAppMemoryMb ? (
+            <p className="mb-0">
+              Raise <code>APP_MEMORY_MB</code> to at least{' '}
+              <strong>{reportMemoryError.recommendedAppMemoryMb}</strong> in the backend's
+              environment and restart it, then try downloading the report again. (Everything else
+              in this app — the JVM heap, upload size, and analysis timeout — is derived from the
+              same setting, so this also gives the backend more headroom overall.)
+            </p>
+          ) : (
+            <p className="mb-0">{reportMemoryError.message}</p>
+          )}
+        </Alert>
+      )}
 
       {/* Navigation Tabs */}
       <div className="nav-tabs-scroll-wrapper">
