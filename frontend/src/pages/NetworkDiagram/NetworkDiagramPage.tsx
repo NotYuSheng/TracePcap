@@ -19,6 +19,7 @@ import { VolumeHeatmap } from '@components/network/VolumeHeatmap';
 import type { VolumePair } from '@components/network/VolumeHeatmap';
 import { VolumeLegend } from '@components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
@@ -102,35 +103,16 @@ export const NetworkDiagramPage = () => {
 
   const toggleFullscreen = () => setIsFullscreen(f => !f);
 
-  // When in CSS fullscreen, handle Escape ourselves:
-  // — filter modal open → close modal
-  // — node details open → close node details
-  // — otherwise → exit fullscreen
-  useEffect(() => {
-    if (!isFullscreen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (showLabelModal) { setShowLabelModal(false); return; }
-      if (showFilterModal) { setShowFilterModal(false); return; }
-      if (selectedNode) { setSelectedNode(null); return; }
-      setIsFullscreen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isFullscreen, showFilterModal, showLabelModal, selectedNode]);
+  // Fullscreen is the bottom Escape layer: the filter/label modals (SGDS modals, which stack above
+  // the fullscreen card) and the node detail panel (its own layer) each own Escape while open, so
+  // leaving fullscreen is what happens once nothing is stacked over it.
+  useEscapeLayer(() => setIsFullscreen(false), { enabled: isFullscreen, ref: graphCardRef });
 
-  // Escape exits heatmap fullscreen. Separate from the diagram's handler above so
-  // the two fullscreens never fight over the same key press.
-  useEffect(() => {
-    if (!isHeatmapFullscreen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (selectedNode) { setSelectedNode(null); return; }
-      setIsHeatmapFullscreen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isHeatmapFullscreen, selectedNode]);
+  // Same for the heatmap, whose fullscreen is a separate card — never both at once.
+  useEscapeLayer(() => setIsHeatmapFullscreen(false), {
+    enabled: isHeatmapFullscreen,
+    ref: heatmapCardRef,
+  });
 
   // ─── "Present" sets: only show options that exist in the data ───────────────
 

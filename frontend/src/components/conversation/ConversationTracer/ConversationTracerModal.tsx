@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { tracerService, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
+import { useEscapeLayer } from '@utils/useEscapeLayer';
 
 function AiExplanationInfoPopover() {
   const popover = (
@@ -105,6 +106,7 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const [dotT, setDotT] = useState(0);
 
   const playInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const rafStart = useRef<number | null>(null);
@@ -210,16 +212,19 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
 
   const togglePlay = useCallback(() => setIsPlaying(p => !p), []);
 
-  // Keyboard navigation
+  // Escape goes through the shared layer stack so it closes this overlay only — the conversation
+  // dialog underneath (an SGDS modal) must survive it.
+  useEscapeLayer(onClose, { ref: overlayRef });
+
+  // Step navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
       if (e.key === 'ArrowRight') { e.stopPropagation(); next(); }
       if (e.key === 'ArrowLeft') { e.stopPropagation(); prev(); }
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
-  }, [onClose, next, prev]);
+  }, [next, prev]);
 
   const step: TracerStep | undefined = tracer?.steps[currentStep];
 
@@ -246,6 +251,7 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   return (
     <>
       <div
+        ref={overlayRef}
         style={{
           position: 'fixed', inset: 0, zIndex: 1060,
           background: 'rgba(0,0,0,0.5)',

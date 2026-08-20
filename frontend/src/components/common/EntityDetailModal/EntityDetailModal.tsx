@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useEscapeLayer } from '@utils/useEscapeLayer';
 import { useEntityRole } from './hooks/useEntityRole';
 import { useEntityStats } from './hooks/useEntityStats';
 import { useEntityNote } from './hooks/useEntityNote';
@@ -37,6 +38,7 @@ export function EntityDetailModal({
 }: EntityDetailModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [nestedIp, setNestedIp] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const showRole = entityType === 'IP' || entityType === 'DEVICE';
 
@@ -58,14 +60,10 @@ export function EntityDetailModal({
   const { history, historyLoading, historyError } = useEntityHistory(entityType, entityKey);
   const { ipSnapHistory, ipHistoryLoading, reload: reloadIpHistory } = useIpSnapshotHistory(entityType, entityKey, snapshots);
 
-  // ESC closes — but not if a nested IP modal is open (let the nested one handle it first)
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !nestedIp) { e.stopImmediatePropagation(); onClose(); }
-    };
-    document.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [onClose, nestedIp]);
+  // ESC closes this panel — but only while it is the topmost layer. The shared stack defers to a
+  // nested EntityDetailModal (registered after this one) and to any SGDS modal opened from inside
+  // it (role help, evidence explainer, add evidence), which stack above via `tp-nested-modal`.
+  useEscapeLayer(onClose, { ref: dialogRef });
 
   // Lock background scroll
   useEffect(() => {
@@ -116,6 +114,7 @@ export function EntityDetailModal({
   return (
     <>
     <div
+      ref={dialogRef}
       className="modal fade show d-block"
       style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: zIndex ?? 1055 }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
