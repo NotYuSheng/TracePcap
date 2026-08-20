@@ -70,23 +70,53 @@ public class AnalysisService {
   private record StageStep(String label, int weight) {}
 
   /** Builds the ordered list of stages that will run for {@code file}, given its enabled options. */
-  private static List<StageStep> buildStagePlan(FileEntity file) {
-    boolean ndpi = file.isEnableNdpi();
-    // Weight only: the effective Suricata state (incl. the global kill-switch) is decided inside the
-    // extractor; using the per-file flag here is a close-enough heuristic for bar proportions.
+  /**
+   * Relative stage weights for the progress bar (#758).
+   *
+   * <p>The previous numbers were a reasonable guess that did not survive measurement: they put
+   * "Detecting applications & threats" at 35% of the job when it was 95%, so the bar sat at 23%
+   * for the whole of a 46-second analysis and then swept to 100% in under two seconds. A bar that
+   * is motionless for most of a job teaches people to ignore it, and an operator who cannot tell
+   * "working" from "hung" kills a job that was fine.
+   *
+   * <p>These are measured shares from real runs rather than estimates. Two profiles, because one
+   * vector cannot describe both: Suricata's detection engine costs ~45 s to build and ~0.3 s to
+   * use, so the first capture after a restart has a completely different shape from every capture
+   * after it (#569). {@link SuricataEngine#isWarm()} says which one we are in.
+   *
+   * <p>Still approximate for a different reason: parsing and the database writes scale with the
+   * capture while the rest does not, so these shares are right for a mid-sized capture and drift
+   * at the extremes. Re-weighting from the packet count once parsing has finished is the next step
+   * and is deliberately not attempted here.
+   */
+  private List<StageStep> buildStagePlan(FileEntity file) {
+    boolean extraction = file.isEnableFileExtraction();
+    // The per-file flag, not the effective state: the kill-switch is the extractor's business.
+    // Only the weighting depends on this, so being wrong costs a slightly misshapen bar.
     boolean suricata = file.isEnableSuricata();
+    boolean coldEngine = suricata && !suricataEngine.isWarm();
+
     List<StageStep> plan = new ArrayList<>();
     plan.add(new StageStep("Downloading capture", 3));
-    plan.add(new StageStep("Parsing packets", 20));
-    plan.add(new StageStep("Detecting applications & threats", 5 + (ndpi ? 10 : 0) + (suricata ? 20 : 0)));
-    plan.add(new StageStep("Classifying hosts & geo-locating", 12));
-    plan.add(new StageStep("Saving analysis summary", 2));
-    plan.add(new StageStep("Writing conversations & packets", 20));
-    if (file.isEnableFileExtraction()) {
-      plan.add(new StageStep("Extracting transferred files", 8));
+    plan.add(new StageStep("Parsing packets", coldEngine ? 2 : 21));
+    // The one stage whose cost is not about this capture at all: on a cold engine it is the
+    // ruleset build, which dwarfs everything else and is paid once per process.
+    // Labelled for what it is on a cold engine. The bar cannot move inside a stage, so this one
+    // stands still for ~45s however it is weighted; naming the wait as one-time setup is the
+    // difference between "hung" and "working on something known to be slow".
+    plan.add(
+        coldEngine
+            ? new StageStep("Building threat-detection ruleset (first run)", 90)
+            : new StageStep("Detecting applications & threats", 21));
+    plan.add(new StageStep("Classifying hosts & geo-locating", coldEngine ? 2 : 30));
+    plan.add(new StageStep("Saving analysis summary", 1));
+    plan.add(new StageStep("Writing conversations & packets", coldEngine ? 1 : 4));
+    if (extraction) {
+      plan.add(new StageStep("Extracting transferred files", coldEngine ? 1 : 22));
     }
     return plan;
   }
+
 
   /**
    * Publishes progress for the stage at {@code index} (0-based). {@code percent} is the weighted
@@ -134,6 +164,7 @@ public class AnalysisService {
   private final HostnameAdjudicator hostnameAdjudicator;
   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
   private final HostnameClaimWriter hostnameClaimWriter;
+  private final SuricataEngine suricataEngine;
 
   /**
    * Runs the capture through the pipeline (#512 slice 7).

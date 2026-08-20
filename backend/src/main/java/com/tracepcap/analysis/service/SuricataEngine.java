@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import com.tracepcap.common.stage.DetectionEngineStatus;
 import jakarta.annotation.PreDestroy;
 import java.io.File;
 import java.io.IOException;
@@ -36,7 +37,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class SuricataEngine {
+public class SuricataEngine implements DetectionEngineStatus {
 
   private static final String SURICATASC = "suricatasc";
   private static final String SURICATA = "suricata";
@@ -76,12 +77,32 @@ public class SuricataEngine {
   private final ReentrantLock lock = new ReentrantLock();
   private volatile Process daemon;
 
+  /**
+   * Whether the engine has finished building its ruleset.
+   *
+   * <p>A plain flag rather than a probe: callers ask this to size a progress bar, and shelling out
+   * to suricatasc to answer would cost more than the question is worth.
+   */
+  private volatile boolean warm;
+
+  /**
+   * Whether the next capture can skip the ~45 s detection-engine build (#569).
+   *
+   * <p>Progress estimation needs this because it is the difference between one stage taking 0.3 s
+   * and taking 45 s, and no static weighting can describe both (#758).
+   */
+  @Override
+  public boolean isWarm() {
+    return warm && daemon != null && daemon.isAlive();
+  }
+
   /** Where a warm run writes, kept apart from the caller's fallback output. */
   public static Path warmDir(Path outDir) {
     return outDir.resolve("warm");
   }
 
   private void discardDaemon() {
+    warm = false;
     Process p = daemon;
     daemon = null;
     if (p != null && p.isAlive()) p.destroyForcibly();
@@ -143,6 +164,7 @@ public class SuricataEngine {
         }
         if (isResponsive()) {
           log.info("Warm Suricata engine ready");
+          warm = true;
           return true;
         }
         Thread.sleep(1000);
@@ -205,6 +227,7 @@ public class SuricataEngine {
         String current = runCommand("pcap-current");
         if (current == null) {
           log.warn("Lost contact with the warm Suricata engine — falling back");
+          discardDaemon();
           return false;
         }
         if (current.contains("None") && Files.exists(eve)) return true;

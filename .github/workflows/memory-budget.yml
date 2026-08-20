@@ -1,0 +1,46 @@
+name: Memory Budget
+
+# Stage 2 of the analysis pipeline holds the whole capture in heap, so the largest file the app
+# accepts is bounded by the JVM heap. Those two numbers are derived separately in
+# backend/docker-entrypoint.sh, and nothing connected them: #92 set the upload cap at 25% when the
+# heap was 75%, #586 lowered the heap to 50% without revisiting the cap, and a 468MB capture was
+# then accepted and died of OutOfMemoryError 25 minutes into parsing (#779).
+#
+# Static and instant. It asserts the relationship between the limits, which is the thing that
+# drifted; whether the parser's real multiplier is a third of the heap is a separate question that
+# only a capacity test can answer.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/docker-entrypoint.sh'
+      - 'backend/src/main/java/com/tracepcap/file/service/FileServiceImpl.java'
+      - 'scripts/check_memory_budget.py'
+      - '.github/workflows/memory-budget.yml'
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'backend/docker-entrypoint.sh'
+      - 'backend/src/main/java/com/tracepcap/file/service/FileServiceImpl.java'
+      - 'scripts/check_memory_budget.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Upload cap fits the heap that parses it
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        # Pinned and without a persisted token: this job only reads two files.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Check the upload cap against the heap budget
+        run: python3 scripts/check_memory_budget.py

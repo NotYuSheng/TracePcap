@@ -51,6 +51,20 @@ The version stamp runs on `dev` deliberately. If its chore PR landed on `main`, 
 drift ahead of `dev` and every later release would start from a diverged base. At release time
 `dev` and `main` are equal, so stamping from `dev` still records exactly the released commit.
 
+### Why `dev` is a protected branch
+
+The repository has **"Automatically delete head branches"** enabled, which is what keeps merged
+feature branches from piling up. A release PR's head branch is `dev` — so the first `dev -> main`
+release deleted `dev` on merge. It came back from `main` with nothing lost, because the two are
+identical at exactly that moment, but every open PR based on `dev` would have been orphaned.
+
+`dev` is therefore protected with `allow_deletions: false`, matching `main`. GitHub will not
+delete a protected branch, so the setting keeps tidying feature branches and cannot touch either
+long-lived one.
+
+The `delete-branch-on-close.yml` workflow already treats a 422 as "protected, leave it", so it
+needs no exclusion list — the protection is the exclusion list.
+
 ### Cutting a release
 
 ```bash
