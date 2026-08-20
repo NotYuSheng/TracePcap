@@ -2,6 +2,7 @@ package com.tracepcap.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.core.exc.StreamConstraintsException;
 import com.tracepcap.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -10,9 +11,12 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -27,6 +31,24 @@ class GlobalExceptionHandlerTest {
 
   private static final GlobalExceptionHandler HANDLER = new GlobalExceptionHandler();
   private static final String PATH = "/api/v1/some/resource";
+
+  // Matches the default derived cap (APP_MEMORY_MB=2048 -> 51MB), same value application.yml
+  // falls back to when docker-entrypoint.sh isn't in the picture.
+  private static final long DEFAULT_MAX_STRING_LENGTH = 53_477_376L;
+
+  static {
+    ReflectionTestUtils.setField(HANDLER, "currentMaxStringLength", DEFAULT_MAX_STRING_LENGTH);
+  }
+
+  private static HttpMessageNotReadableException stringLengthExceeded(long attemptedBytes) {
+    return new HttpMessageNotReadableException(
+        "JSON parse error: String length (" + attemptedBytes + ") exceeds the maximum length ("
+            + DEFAULT_MAX_STRING_LENGTH + ")",
+        new StreamConstraintsException(
+            "String length (" + attemptedBytes + ") exceeds the maximum length ("
+                + DEFAULT_MAX_STRING_LENGTH + ")"),
+        null);
+  }
 
   private static HttpServletRequest request() {
     MockHttpServletRequest req = new MockHttpServletRequest();
@@ -113,6 +135,21 @@ class GlobalExceptionHandlerTest {
                 HANDLER.handleNoResourceFound(
                     new NoResourceFoundException(HttpMethod.GET, PATH), req)),
         new Case(
+            "HttpMessageNotReadable, unrelated cause -> 400",
+            400,
+            "Bad Request",
+            null,
+            req ->
+                HANDLER.handleHttpMessageNotReadable(
+                    new HttpMessageNotReadableException("garbled JSON", (HttpInputMessage) null),
+                    req)),
+        new Case(
+            "HttpMessageNotReadable, string-length cap -> 413",
+            413,
+            "Payload Too Large",
+            "PAYLOAD_STRING_TOO_LARGE",
+            req -> HANDLER.handleHttpMessageNotReadable(stringLengthExceeded(20_054_016L), req)),
+        new Case(
             "Unhandled -> 500",
             500,
             "Internal Server Error",
@@ -158,5 +195,41 @@ class GlobalExceptionHandlerTest {
     assertThat(body.getPromptTokens()).isEqualTo(9000);
     assertThat(body.getContextLength()).isEqualTo(8000);
     assertThat(body.getPromptText()).isEqualTo("the prompt");
+  }
+
+  @Test
+  void stringTooLarge_recommendsAnAppMemoryMbThatWouldActuallyFit() {
+    // The exact figures from the live report-download failure this handler exists for (#792):
+    // a 20,054,016-char diagram string against the old fixed 20MB Jackson default.
+    ResponseEntity<ErrorResponse> response =
+        HANDLER.handleHttpMessageNotReadable(stringLengthExceeded(20_054_016L), request());
+
+    ErrorResponse body = response.getBody();
+    assertThat(body).isNotNull();
+    assertThat(body.getErrorCode()).isEqualTo("PAYLOAD_STRING_TOO_LARGE");
+    assertThat(body.getAttemptedSizeMb()).isEqualTo(20);
+    // ceil(20 * 1.1) = 22MB needed cap -> 22 * 40 = 880MB budget -> rounded up to 1024MB.
+    assertThat(body.getRecommendedAppMemoryMb()).isEqualTo(1024);
+    assertThat(body.getMessage()).contains("APP_MEMORY_MB").contains("1024");
+
+    // The recommendation must actually mirror docker-entrypoint.sh's derivation: at the
+    // recommended budget, EFFECTIVE_MEM_MB / 40 must be >= the attempted size.
+    long derivedCapMbAtRecommendation = body.getRecommendedAppMemoryMb() / 40;
+    assertThat(derivedCapMbAtRecommendation).isGreaterThanOrEqualTo(body.getAttemptedSizeMb());
+  }
+
+  @Test
+  void stringTooLarge_pastTheHardCeiling_recommendsNothing() {
+    // 300MB is past JACKSON_CAP_MAX_MB (256) — no APP_MEMORY_MB raises the cap that high.
+    long attemptedBytes = 300L * 1024 * 1024;
+    ResponseEntity<ErrorResponse> response =
+        HANDLER.handleHttpMessageNotReadable(stringLengthExceeded(attemptedBytes), request());
+
+    ErrorResponse body = response.getBody();
+    assertThat(body).isNotNull();
+    assertThat(body.getErrorCode()).isEqualTo("PAYLOAD_STRING_TOO_LARGE");
+    assertThat(body.getAttemptedSizeMb()).isEqualTo(300);
+    assertThat(body.getRecommendedAppMemoryMb()).isNull();
+    assertThat(body.getMessage()).contains("regardless of memory settings");
   }
 }
