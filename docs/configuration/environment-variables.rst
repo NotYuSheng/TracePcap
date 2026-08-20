@@ -22,21 +22,22 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
      - Total RAM (in MB) allocated to the backend container — the default for
        the enforced container memory limit and the budget for derived settings.
        All derived values use the *effective* budget (the enforced cgroup limit
-       when one is set, else this value): JVM heap = 50%, max upload size = 25%,
-       nginx body limit = max upload + 50 MB multipart buffer, the max JSON
-       string length (report topology diagrams — see `Report Generation`_) =
-       2.5% clamped to 8-256 MB, and the proxy/analysis timeout scales with
-       memory (300–900 s). Examples:
-       ``2048`` → 512 MB max upload
-       (default), ``4096`` → 1 GB, ``8192`` → 2 GB. The heap is 50% rather than
-       75% because tshark/ndpi/Suricata allocate outside the JVM heap — see
+       when one is set, else this value): JVM heap = 50%, max upload size = 16%
+       (at most 1/3 of the heap — the parser holds the whole capture in memory,
+       see ``scripts/check_memory_budget.py``), nginx body limit = max upload +
+       50 MB multipart buffer, the max JSON string length (report topology
+       diagrams — see `Report Generation`_) = 2.5% clamped to 8-256 MB, and the
+       proxy/analysis timeout scales with memory (300–900 s). Examples:
+       ``2048`` → 327 MB max upload
+       (default), ``4096`` → 655 MB, ``8192`` → 1310 MB. The heap is 50% rather
+       than 75% because tshark/ndpi/Suricata allocate outside the JVM heap — see
        :doc:`../operations/production-hardening`.
    * - ``BACKEND_MEM_LIMIT``
      - ``APP_MEMORY_MB``
      - Enforced backend container memory limit. Tracks ``APP_MEMORY_MB`` by
        default. When set explicitly it becomes the **effective budget**: the JVM
        heap, max upload size and analysis timeout are all derived from it rather
-       than from ``APP_MEMORY_MB``, keeping the 50%/25% split coherent at any
+       than from ``APP_MEMORY_MB``, keeping the 50%/16% split coherent at any
        cap. Setting it lower therefore also lowers the max upload size.
    * - ``BACKEND_CPU_LIMIT``
      - ``4``
