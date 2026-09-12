@@ -19,8 +19,15 @@ jobs:
 
     # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
     # to 80. Pin it to 8888 to match the readiness check and the snapshot URL.
+    #
+    # DOCKERHUB_USERNAME/TOKEN are mirrored from secrets here because `if:` cannot reference the
+    # secrets context directly — GitHub rejects the whole workflow file at parse time if it does
+    # ("Unrecognized named-value: 'secrets'"). env: is one of the few places secrets IS allowed,
+    # and env context (unlike secrets context) is readable from if:.
     env:
       NGINX_PORT: '8888'
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -33,11 +40,11 @@ jobs:
       # Guarded so a fork PR without these secrets degrades to the previous behaviour rather than
       # failing outright.
       - name: Log in to Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
