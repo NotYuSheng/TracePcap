@@ -13,10 +13,15 @@ interface RoleSectionProps {
    * where roles are edited per-snapshot in the Snapshot History table below (#369).
    */
   readOnly?: boolean;
+  /**
+   * When set, the role help modal renders above a raised parent panel (monitor mode's NodeDetails
+   * is itself a modal, so a plain nested modal would hide behind it — modal-in-modal).
+   */
+  raisedModal?: boolean;
 }
 
 /** Role panel for IP/DEVICE entities — view, AI-suggest, accept/discard, manual edit. */
-export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
+export function RoleSection({ fileId, role: r, readOnly, raisedModal }: RoleSectionProps) {
   const [showRoleHelp, setShowRoleHelp] = useState(false);
   if (readOnly) {
     return (
@@ -111,8 +116,8 @@ export function RoleSection({ fileId, role: r, readOnly }: RoleSectionProps) {
         show={showRoleHelp}
         onHide={() => setShowRoleHelp(false)}
         centered
-        className="tp-nested-modal"
-        backdropClassName="tp-nested-modal-backdrop"
+        className={raisedModal ? 'tp-nested-modal' : undefined}
+        backdropClassName={raisedModal ? 'tp-nested-modal-backdrop' : undefined}
       >
         <Modal.Header closeButton>
           <Modal.Title style={{ fontSize: '1rem' }}>What is a role?</Modal.Title>

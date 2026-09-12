@@ -159,6 +159,8 @@ function toNodeData(ev: HostIdentityEvidence): NodeData {
 interface Props {
   fileId: string;
   ip: string;
+  /** Z-index of a surrounding raised modal, so the add-evidence popup stacks above it. */
+  zIndex?: number;
   /** Called after an override/evidence change, so a parent (e.g. the graph) can refresh its copy. */
   onChanged?: () => void;
 }
@@ -172,7 +174,7 @@ interface Props {
  * graph node all render the same explainable classification, so users see how a verdict was derived
  * and can correct or append to it everywhere, not only in the graph.
  */
-export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
+export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
   const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -243,6 +245,7 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
         entityKey={ip}
         title="Identity"
         labelOptions={DEVICE_LABELS}
+        zIndex={zIndex}
         verdict={{
           label: evidence.primaryLabel ?? 'Unknown',
           basis: evidence.basis,
@@ -336,11 +339,10 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
       {/* Geolocation — external-host country/ASN/org, restored from the old conversation modal. */}
       <GeoBlock ev={evidence} isPrivate={isPrivateIp(evidence.ip, customRanges)} />
 
-      {/* Explainer modal — how Identity and the evidence axes relate (#499). Only ever rendered
-          inside EntityDetailModal's hand-rolled overlay, so it always needs the raise. */}
+      {/* Explainer modal — how Identity and the evidence axes relate (#499). */}
       <Modal show={evidenceInfoOpen} onHide={() => setEvidenceInfoOpen(false)} centered
-        className="tp-nested-modal"
-        backdropClassName="tp-nested-modal-backdrop">
+        className={zIndex != null ? 'tp-nested-modal' : undefined}
+        backdropClassName={zIndex != null ? 'tp-nested-modal-backdrop' : undefined}>
         <Modal.Header closeButton>
           <Modal.Title style={{ fontSize: '1rem' }}>How this host is classified</Modal.Title>
         </Modal.Header>

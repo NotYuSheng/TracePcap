@@ -194,10 +194,10 @@ export function EntityDetailModal({
 
                 {/* Multi-snapshot context: role is edited per-snapshot in the history table below,
                     so the top card is a read-only present-day summary. */}
-                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
+                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} raisedModal={zIndex != null} />}
 
                 {entityType === 'IP' && fileId && (
-                  <HostIdentitySection fileId={fileId} ip={entityKey} />
+                  <HostIdentitySection fileId={fileId} ip={entityKey} zIndex={zIndex} />
                 )}
 
                 {/* Graph host detail: traffic counters, protocol chips, per-peer Connections table. */}

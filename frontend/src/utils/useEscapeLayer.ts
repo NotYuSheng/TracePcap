@@ -81,11 +81,6 @@ function foreignModalAbove(el: HTMLElement | null | undefined): boolean {
 function topLayer(): Layer | undefined {
   let top: Layer | undefined;
   for (const layer of layers) {
-    // A ref was requested but its element isn't mounted right now (e.g. a conditional branch
-    // unmounted it a tick before the layer's own `enabled` flag catches up) — skip it rather than
-    // let the "no element to compare" fallback below hand it an unconditional win over a layer
-    // that IS actually on screen.
-    if (layer.ref && !layer.ref.current) continue;
     const challenger = layer.ref?.current;
     const incumbent = top?.ref?.current;
     if (!top || !challenger || !incumbent || paintsAbove(challenger, incumbent)) top = layer;
