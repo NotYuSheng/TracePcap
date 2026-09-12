@@ -440,9 +440,7 @@ export const SnapshotDetailModal = ({
 
   return (
     <>
-    {/* enforceFocus off: the node-detail overlay (NodeDetails) renders on top of this
-        modal, and Bootstrap's focus trap would otherwise steal focus from its inputs. */}
-    <Modal show onHide={handleHide} centered size="xl" scrollable enforceFocus={false}>
+    <Modal show onHide={handleHide} centered size="xl" scrollable>
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-camera-reels me-2" />
@@ -954,7 +952,6 @@ export const SnapshotDetailModal = ({
         onNavigate={navigate}
         onClose={() => setSelectedNode(null)}
         changeHighlight={highlightedNodes.get(selectedNode.label ?? '') ?? highlightedNodes.get(selectedNode.data.ip ?? '') ?? highlightedNodes.get(selectedNode.data.mac ?? '')}
-        zIndex={1070}
       />
     )}
 
