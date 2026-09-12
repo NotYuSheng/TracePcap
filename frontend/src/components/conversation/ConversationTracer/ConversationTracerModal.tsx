@@ -1,9 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Modal, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { tracerService, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
-import { useEscapeLayer } from '@utils/useEscapeLayer';
 
 function AiExplanationInfoPopover() {
   const popover = (
@@ -106,7 +105,6 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   const [dotT, setDotT] = useState(0);
 
   const playInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const rafStart = useRef<number | null>(null);
@@ -212,10 +210,6 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
 
   const togglePlay = useCallback(() => setIsPlaying(p => !p), []);
 
-  // Escape goes through the shared layer stack so it closes this overlay only — the conversation
-  // dialog underneath (an SGDS modal) must survive it.
-  useEscapeLayer(onClose, { ref: overlayRef });
-
   // Step navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -249,27 +243,9 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   }, [step, activePeerIdx, peers.length, dotT]);
 
   return (
-    <>
-      <div
-        ref={overlayRef}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 1060,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 16,
-        }}
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      >
-        <div
-          style={{
-            background: 'var(--tp-surface)', borderRadius: 10,
-            width: '100%', maxWidth: 720,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
-            display: 'flex', flexDirection: 'column',
-            maxHeight: '90vh',
-          }}
-        >
-          {/* Header */}
+    <Modal show onHide={onClose} size="lg" centered>
+      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh', overflow: 'hidden' }}>
+        {/* Header */}
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="fw-semibold" style={{ fontSize: 14 }}>Conversation Tracer</div>
@@ -511,7 +487,6 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
             </>
           )}
         </div>
-      </div>
-    </>
+    </Modal>
   );
 };
