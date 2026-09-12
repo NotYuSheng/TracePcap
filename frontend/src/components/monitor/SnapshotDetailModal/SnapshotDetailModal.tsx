@@ -146,7 +146,6 @@ export const SnapshotDetailModal = ({
   const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
   const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
   const diagramFullscreenRef = useRef<HTMLDivElement>(null);
-  const heatmapFullscreenRef = useRef<HTMLDivElement>(null);
 
   // Filter state
   const [ipFilter, setIpFilter] = useState('');
@@ -267,13 +266,10 @@ export const SnapshotDetailModal = ({
     activeCustomSigs.length + activeFileTypes.length + activeCountries.length +
     (ipFilter ? 1 : 0) + (portFilter ? 1 : 0) + (hasRisksOnly ? 1 : 0);
 
-  // Either fullscreen owns Escape while it is open — both render above the dialog (z-index 1080),
-  // so without a layer the key would fall through and close the whole dialog instead of just
-  // leaving fullscreen. Arrow stepping stays enabled so snapshots can be paged through fullscreen.
-  useEscapeLayer(() => setIsHeatmapFullscreen(false), {
-    enabled: isHeatmapFullscreen,
-    ref: heatmapFullscreenRef,
-  });
+  // The diagram fullscreen pane renders above the dialog (z-index 1080) as a hand-rolled
+  // overlay, so without a layer the key would fall through and close the whole dialog
+  // instead of just leaving fullscreen. The heatmap fullscreen is a real Modal now and
+  // gets this for free from react-bootstrap's own Escape handling.
   useEscapeLayer(() => setIsDiagramFullscreen(false), {
     enabled: isDiagramFullscreen,
     ref: diagramFullscreenRef,
@@ -645,55 +641,17 @@ export const SnapshotDetailModal = ({
                 Unlike the analysis page this does not drive `highlightedNodes`,
                 which in monitor mode already carries snapshot-change highlighting. */}
             {!graphLoading && (
-              <div
-                ref={heatmapFullscreenRef}
-                className={
-                  isHeatmapFullscreen
-                    ? 'tp-heatmap-fullscreen-over-modal'
-                    : 'mt-3 border-top pt-3'
-                }
-              >
-                <div className="d-flex justify-content-between align-items-center">
-                  <strong className="small">
-                    Node-to-Node Volume
-                    <span className="text-muted fw-normal ms-2">
-                      Traffic between each pair of displayed hosts
-                    </span>
-                  </strong>
-                  <div className="d-flex align-items-center gap-3">
-                    {showHeatmap && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 text-muted"
-                        onClick={() => setIsHeatmapFullscreen(f => !f)}
-                        title={isHeatmapFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
-                      >
-                        <i
-                          className={`bi ${
-                            isHeatmapFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'
-                          }`}
-                        />
-                      </Button>
-                    )}
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0 text-muted"
-                      onClick={() => {
-                        // Collapsing while fullscreen would leave an empty shell.
-                        if (showHeatmap) setIsHeatmapFullscreen(false);
-                        setShowHeatmap(v => !v);
-                      }}
-                      aria-expanded={showHeatmap}
-                    >
-                      {showHeatmap ? 'Hide' : 'Show'}
-                      <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                    </Button>
-                  </div>
-                </div>
-                {showHeatmap && (
-                  <div className={isHeatmapFullscreen ? 'mt-2 tp-heatmap-body' : 'mt-2'}>
+              isHeatmapFullscreen ? (
+                <Modal show onHide={() => setIsHeatmapFullscreen(false)} fullscreen>
+                  <Modal.Header closeButton>
+                    <Modal.Title>
+                      Node-to-Node Volume
+                      <span className="text-muted fw-normal ms-2" style={{ fontSize: '1rem' }}>
+                        Traffic between each pair of displayed hosts
+                      </span>
+                    </Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body className="tp-heatmap-body">
                     <VolumeHeatmap
                       nodes={filteredNodes}
                       edges={filteredEdges}
@@ -703,9 +661,56 @@ export const SnapshotDetailModal = ({
                       onCellClick={setSelectedPair}
                       onHostClick={setSelectedNode}
                     />
+                  </Modal.Body>
+                </Modal>
+              ) : (
+                <div className="mt-3 border-top pt-3">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <strong className="small">
+                      Node-to-Node Volume
+                      <span className="text-muted fw-normal ms-2">
+                        Traffic between each pair of displayed hosts
+                      </span>
+                    </strong>
+                    <div className="d-flex align-items-center gap-3">
+                      {showHeatmap && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-muted"
+                          onClick={() => setIsHeatmapFullscreen(true)}
+                          title="Fullscreen"
+                        >
+                          <i className="bi bi-fullscreen" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-muted"
+                        onClick={() => setShowHeatmap(v => !v)}
+                        aria-expanded={showHeatmap}
+                      >
+                        {showHeatmap ? 'Hide' : 'Show'}
+                        <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
+                  {showHeatmap && (
+                    <div className="mt-2">
+                      <VolumeHeatmap
+                        nodes={filteredNodes}
+                        edges={filteredEdges}
+                        dark={isDark}
+                        focusedHost={selectedNode?.id ?? null}
+                        selectedPair={selectedPair}
+                        onCellClick={setSelectedPair}
+                        onHostClick={setSelectedNode}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
             )}
           </div>
         )}

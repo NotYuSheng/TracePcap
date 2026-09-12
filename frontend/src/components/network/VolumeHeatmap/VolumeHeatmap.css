@@ -65,33 +65,10 @@
   text-align: center;
 }
 
-/* ── Fullscreen ────────────────────────────────────────────────
-   Two entry points share these rules:
-     .nd-css-fullscreen                  — the card treatment used by the
-                                           topology diagram (analysis page).
-     .tp-heatmap-fullscreen-over-modal   — used from the monitor dialog. The
-                                           shared card class sits at z-index
-                                           1040, below Bootstrap's modal (~1055),
-                                           so fullscreening from inside the
-                                           dialog would render *behind* it. This
-                                           variant stacks above instead.
-   In both, the toolbar and readout keep their natural height and the matrix
-   takes the rest, so the legend stays visible while a large grid is on screen. */
-.tp-heatmap-fullscreen-over-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1080;
-  border-radius: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--tp-surface, #fff);
-  margin: 0;
-  padding: 1rem 1.25rem;
-  overflow: hidden;
-}
-
-.nd-css-fullscreen .tp-heatmap-body,
-.tp-heatmap-fullscreen-over-modal .tp-heatmap-body {
+/* ── Fullscreen (real SGDS Modal, fullscreen prop) ───────────────────────────
+   The toolbar and readout keep their natural height and the matrix takes the
+   rest, so the legend stays visible while a large grid is on screen. */
+.modal-fullscreen .tp-heatmap-body {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -99,14 +76,12 @@
   overflow: hidden;
 }
 
-.nd-css-fullscreen .tp-heatmap,
-.tp-heatmap-fullscreen-over-modal .tp-heatmap {
+.modal-fullscreen .tp-heatmap {
   flex: 1;
   min-height: 0;
 }
 
-.nd-css-fullscreen .tp-heatmap-scroll,
-.tp-heatmap-fullscreen-over-modal .tp-heatmap-scroll {
+.modal-fullscreen .tp-heatmap-scroll {
   flex: 1;
   min-height: 0;
 }
