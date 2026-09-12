@@ -14,8 +14,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
-import { useEscapeLayer } from '@/utils/useEscapeLayer';
+import { Badge, Button, Card, Form, Modal, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import './NetworkControls.css';
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: ReactNode }) {
@@ -169,10 +168,6 @@ export function NetworkControls({
 }: NetworkControlsProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   const [showColorInfo, setShowColorInfo] = useState(false);
-  const colorInfoRef = useRef<HTMLDivElement>(null);
-  // This explainer is a hand-rolled overlay nested inside the filter modal, so Escape has to be
-  // routed through the shared stack or it would close the filter modal along with it (#535).
-  useEscapeLayer(() => setShowColorInfo(false), { enabled: showColorInfo, ref: colorInfoRef });
 
   const [ipInput, setIpInput] = useState(ipFilter);
   const [portInput, setPortInput] = useState(portFilter);
@@ -244,9 +239,8 @@ export function NetworkControls({
             variant="link"
             className="p-0 text-muted"
             onClick={() => setShowColorInfo(true)}
-            title="How are node colours determined?"
           >
-            <i className="bi bi-info-circle me-1"></i>Node colours
+            <i className="bi bi-info-circle me-1" aria-hidden="true"></i>Node colours
           </Button>
         </div>
 
@@ -858,65 +852,44 @@ export function NetworkControls({
         )}
       </div>
 
-      {/* Node colour priority modal */}
-      {showColorInfo && (
-        <div
-          ref={colorInfoRef}
-          className="modal fade show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Node Colour Priority"
-          onClick={e => {
-            if (e.target === e.currentTarget) setShowColorInfo(false);
-          }}
-        >
-          <div className="modal-dialog modal-dialog-scrollable">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  <i className="bi bi-palette me-2" />
-                  Node Colour Priority
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowColorInfo(false)}
-                />
-              </div>
-              <div className="modal-body">
-                <p className="text-muted small mb-3">
-                  Each node's colour is determined by the first rule that matches, in order of
-                  priority:
-                </p>
-                <ol className="ps-3" style={{ lineHeight: '2' }}>
-                  <li>
-                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['dns-server'], color: '#fff' }}>DNS</Badge>
-                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['web-server'], color: '#fff' }}>Web</Badge>
-                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['router'], color: '#fff' }}>Router</Badge>
-                    <strong>Specific server role</strong> — the node's dominant inbound port identifies it as a known server type (DNS, web, SSH, FTP, mail, DHCP, NTP, database, router). Each type has a fixed colour.
-                  </li>
-                  <li>
-                    <Badge className="me-2" style={{ backgroundColor: deviceTypeColor('MOBILE'), color: '#fff' }}>Mobile</Badge>
-                    <Badge className="me-2" style={{ backgroundColor: deviceTypeColor('IOT'), color: '#fff' }}>IoT</Badge>
-                    <strong>Device classification</strong> — inferred from MAC OUI vendor lookup, TTL fingerprinting, and observed nDPI application profiles. Overrides generic node type when a non-unknown device type is detected.
-                  </li>
-                  <li>
-                    <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}>Client</Badge>
-                    <strong>Generic node type</strong> — nodes that only initiate outbound connections with no dominant inbound port are classified as clients and shown in blue.
-                  </li>
-                  <li>
-                    <Badge className="me-2" style={{ backgroundColor: '#2ecc71', color: '#fff' }}>Server</Badge>
-                    <Badge className="me-2" style={{ backgroundColor: '#9b59b6', color: '#fff' }}>Both</Badge>
-                    <Badge bg="secondary" className="me-2">Other</Badge>
-                    <strong>Traffic role fallback</strong> — if no type can be determined, nodes are coloured by their observed role: green if they only receive connections (server), purple if they both send and receive (both), grey otherwise.
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Node colour priority explainer */}
+      <Modal show={showColorInfo} onHide={() => setShowColorInfo(false)} scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-palette me-2" aria-hidden="true" />
+            Node Colour Priority
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-3">
+            Each node's colour is determined by the first rule that matches, in order of
+            priority:
+          </p>
+          <ol className="ps-3" style={{ lineHeight: '2' }}>
+            <li>
+              <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['dns-server'], color: '#fff' }}>DNS</Badge>
+              <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['web-server'], color: '#fff' }}>Web</Badge>
+              <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['router'], color: '#fff' }}>Router</Badge>
+              <strong>Specific server role</strong> — the node's dominant inbound port identifies it as a known server type (DNS, web, SSH, FTP, mail, DHCP, NTP, database, router). Each type has a fixed colour.
+            </li>
+            <li>
+              <Badge className="me-2" style={{ backgroundColor: deviceTypeColor('MOBILE'), color: '#fff' }}>Mobile</Badge>
+              <Badge className="me-2" style={{ backgroundColor: deviceTypeColor('IOT'), color: '#fff' }}>IoT</Badge>
+              <strong>Device classification</strong> — inferred from MAC OUI vendor lookup, TTL fingerprinting, and observed nDPI application profiles. Overrides generic node type when a non-unknown device type is detected.
+            </li>
+            <li>
+              <Badge className="me-2" style={{ backgroundColor: NODE_TYPE_COLORS['client'], color: '#fff' }}>Client</Badge>
+              <strong>Generic node type</strong> — nodes that only initiate outbound connections with no dominant inbound port are classified as clients and shown in blue.
+            </li>
+            <li>
+              <Badge className="me-2" style={{ backgroundColor: '#2ecc71', color: '#fff' }}>Server</Badge>
+              <Badge className="me-2" style={{ backgroundColor: '#9b59b6', color: '#fff' }}>Both</Badge>
+              <Badge bg="secondary" className="me-2">Other</Badge>
+              <strong>Traffic role fallback</strong> — if no type can be determined, nodes are coloured by their observed role: green if they only receive connections (server), purple if they both send and receive (both), grey otherwise.
+            </li>
+          </ol>
+        </Modal.Body>
+      </Modal>
     </>
   );
 }
