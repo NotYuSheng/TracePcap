@@ -63,8 +63,9 @@ class AnalysisEtaTest {
   @Test
   void doesNotUnderestimateASmallCapture() {
     // The failure seen live: a 45KB capture estimated at 10s took 49s. A tiny capture still pays
-    // the fixed costs, so the floor must not collapse toward zero.
-    assertThat(estimate(250, 45_760L, true)).isGreaterThanOrEqualTo(2);
+    // the fixed costs, so the floor must not collapse toward zero. FileMapper's MIN_ESTIMATE_SECONDS
+    // is 10 — assert that floor directly rather than a weaker bound a regression could slip under.
+    assertThat(estimate(250, 45_760L, true)).isGreaterThanOrEqualTo(10);
   }
 
   @Test

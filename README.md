@@ -41,7 +41,7 @@ This makes it well-suited for:
 
 | Feature | Description |
 |---------|-------------|
-| **PCAP Upload & Management** | Upload and manage PCAP/PCAPNG/CAP files (upload limit derived from `APP_MEMORY_MB`, 512MB by default) with MinIO object storage; duplicate detection and configurable upload limits |
+| **PCAP Upload & Management** | Upload and manage PCAP/PCAPNG/CAP files (upload limit derived from `APP_MEMORY_MB`, 327MB by default) with MinIO object storage; duplicate detection and configurable upload limits |
 | **Network Visualization** | Interactive network topology using Sigma.js (WebGL) + graphology with ForceAtlas2 / ELK layouts, a rich filter panel (IP, port, device type, protocol, risk), fullscreen toggle, layout controls, and clickable node detail panels |
 | **nDPI Security Detection** | Deep packet inspection via nDPI v5: application identification, traffic categories, risk/alert flags, JA3/JA3S TLS fingerprints, SNI extraction, and TLS certificate metadata per conversation |
 | **Conversation Tracking** | Paginated conversation list with advanced filtering (IP, port, protocol, app, risk, custom rules, device type, country, payload pattern), multi-column sorting, column picker, and bulk PCAP export |
@@ -89,11 +89,12 @@ or internet-hosted API.
 | Storage | 10GB (database, PCAP files, object storage) | 50GB+ for large PCAP collections | 100GB+ SSD |
 
 **Comfortable** assumes Suricata enabled and routine work on large captures. Raise the
-`.env` defaults to match — the shipped `APP_MEMORY_MB=2048` caps uploads at 512MB, since
-max upload is 25% of the backend budget:
+`.env` defaults to match — the shipped `APP_MEMORY_MB=2048` caps uploads at 327MB, since
+max upload is 16% of the backend budget (at most 1/3 of the 50% heap, since the parser
+holds the whole capture in memory):
 
 ```ini
-APP_MEMORY_MB=8192      # 4 GB heap, 2 GB max upload
+APP_MEMORY_MB=8192      # 4 GB heap, ~1.3 GB max upload
 BACKEND_CPU_LIMIT=6
 POSTGRES_MEM_LIMIT=2g
 MINIO_MEM_LIMIT=1g
@@ -117,8 +118,8 @@ cp .env.example .env
 **2. Configure `.env`:**
 ```env
 # Memory & Upload Configuration
-# Upload limits are derived from this single value (max upload = 25% of it).
-APP_MEMORY_MB=2048  # 512MB max upload (default)
+# Upload limits are derived from this single value (max upload = 16% of it).
+APP_MEMORY_MB=2048  # 327MB max upload (default)
 
 # Nginx Port Configuration
 NGINX_PORT=80  # Change if port 80 is already in use
@@ -171,7 +172,7 @@ The Network Monitor lets you build a picture of an unknown network from multiple
 
 ### Supported File Formats
 
-PCAP, PCAPNG, CAP (max 512MB default, derived from `APP_MEMORY_MB`)
+PCAP, PCAPNG, CAP (max 327MB default, derived from `APP_MEMORY_MB`)
 
 ## How Network Monitor Works
 

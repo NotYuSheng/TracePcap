@@ -1,5 +1,6 @@
 package com.tracepcap.common.exception;
 
+import com.fasterxml.jackson.core.exc.StreamConstraintsException;
 import com.tracepcap.common.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -7,9 +8,13 @@ import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -20,6 +25,24 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  private static final long BYTES_PER_MB = 1024L * 1024L;
+
+  // Mirrors backend/docker-entrypoint.sh's JACKSON_MAX_STRING_MB derivation exactly
+  // (EFFECTIVE_MEM_MB / 40, clamped to [8, 256]) so a recommended APP_MEMORY_MB actually produces
+  // a cap that fits the request that just failed. Keep these two in sync if that formula changes.
+  private static final int JACKSON_CAP_DIVISOR = 40;
+  private static final int JACKSON_CAP_MAX_MB = 256;
+
+  // Jackson's own message shape (StreamConstraintsException), e.g.
+  // "String length (20054016) exceeds the maximum length (20000000)". Stable across the
+  // jackson-core versions this app has used, but not a public API — a future upgrade could
+  // reword it, in which case this handler simply falls back to the generic message below.
+  private static final Pattern STRING_LENGTH_EXCEEDED =
+      Pattern.compile("String length \\((\\d+)\\) exceeds the maximum length \\((\\d+)\\)");
+
+  @Value("${tracepcap.jackson.max-string-length}")
+  private long currentMaxStringLength;
 
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
@@ -178,6 +201,83 @@ public class GlobalExceptionHandler {
             .build();
 
     return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(
+      HttpMessageNotReadableException ex, HttpServletRequest request) {
+    Throwable cause = ex.getMostSpecificCause();
+    Matcher matcher =
+        cause instanceof StreamConstraintsException
+            ? STRING_LENGTH_EXCEEDED.matcher(cause.getMessage() == null ? "" : cause.getMessage())
+            : null;
+
+    if (matcher != null && matcher.find()) {
+      log.warn("Request field exceeded the JSON string length cap: {}", cause.getMessage());
+      return stringTooLargeResponse(Long.parseLong(matcher.group(1)), request);
+    }
+
+    log.warn("Malformed request body: {}", ex.getMessage());
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+            .message("Malformed request body")
+            .path(request.getRequestURI())
+            .build();
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+  }
+
+  /**
+   * Builds the actionable response for a JSON string that exceeded {@link
+   * #currentMaxStringLength}: how big it was, and — unless it's past the derivation's own hard
+   * ceiling — what {@code APP_MEMORY_MB} would need to be for a request this size to fit.
+   */
+  private ResponseEntity<ErrorResponse> stringTooLargeResponse(
+      long attemptedBytes, HttpServletRequest request) {
+    long attemptedMb = ceilDiv(attemptedBytes, BYTES_PER_MB);
+    long currentCapMb = currentMaxStringLength / BYTES_PER_MB;
+
+    Integer recommendedAppMemoryMb = null;
+    String message;
+    if (attemptedMb > JACKSON_CAP_MAX_MB) {
+      message =
+          String.format(
+              "Request field is %d MB, past the %d MB maximum this deployment supports "
+                  + "regardless of memory settings. Reduce what's being sent (e.g. a "
+                  + "lower-resolution diagram capture) rather than raising APP_MEMORY_MB.",
+              attemptedMb, JACKSON_CAP_MAX_MB);
+    } else {
+      // +10% headroom so the same request doesn't land exactly on the new boundary, then round up
+      // to a clean step — operators think in round APP_MEMORY_MB numbers.
+      long withHeadroomMb = ceilDiv(attemptedMb * 11, 10);
+      long neededBudgetMb = withHeadroomMb * JACKSON_CAP_DIVISOR;
+      recommendedAppMemoryMb = (int) (ceilDiv(neededBudgetMb, 256) * 256);
+      message =
+          String.format(
+              "Request field is %d MB, over this deployment's current %d MB limit "
+                  + "(derived from APP_MEMORY_MB). Raise APP_MEMORY_MB to at least %d in "
+                  + "the backend's environment and restart it.",
+              attemptedMb, currentCapMb, recommendedAppMemoryMb);
+    }
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.PAYLOAD_TOO_LARGE.value())
+            .error(HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase())
+            .message(message)
+            .path(request.getRequestURI())
+            .errorCode("PAYLOAD_STRING_TOO_LARGE")
+            .attemptedSizeMb((int) attemptedMb)
+            .recommendedAppMemoryMb(recommendedAppMemoryMb)
+            .build();
+    return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+  }
+
+  private static long ceilDiv(long numerator, long denominator) {
+    return (numerator + denominator - 1) / denominator;
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

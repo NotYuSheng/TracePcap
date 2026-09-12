@@ -95,7 +95,11 @@ public class FileMapper {
             + (ndpi ? NDPI_SECONDS_PER_MB : 0)
             + (suricata ? SURICATA_SECONDS_PER_MB : 0)
             + (fileExtraction ? EXTRACTION_SECONDS_PER_MB : 0);
-    return Math.max(MIN_ESTIMATE_SECONDS, (int) Math.round(sizeMb * perMb));
+    double seconds = sizeMb * perMb;
+    if (suricata && !engineWarm) {
+      seconds += SURICATA_ENGINE_BUILD_SECONDS;
+    }
+    return Math.max(MIN_ESTIMATE_SECONDS, (int) Math.round(seconds));
   }
 
   public FileUploadResponse toUploadResponse(FileEntity entity) {
