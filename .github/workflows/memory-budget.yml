@@ -9,12 +9,18 @@ name: Memory Budget
 # Static and instant. It asserts the relationship between the limits, which is the thing that
 # drifted; whether the parser's real multiplier is a third of the heap is a separate question that
 # only a capacity test can answer.
+#
+# Also asserts that app.max-file-size (which FileServiceImpl actually reads) is bound to the same
+# MAX_UPLOAD_SIZE_BYTES value docker-entrypoint.sh computes and /system/limits advertises —
+# #780's fix went unbound in application.yml for a while with nothing catching it, so the number
+# shown to the user and the number enforced drifted apart again despite the code being "fixed".
 
 on:
   pull_request:
     paths:
       - 'backend/docker-entrypoint.sh'
       - 'backend/src/main/java/com/tracepcap/file/service/FileServiceImpl.java'
+      - 'backend/src/main/resources/application.yml'
       - 'scripts/check_memory_budget.py'
       - '.github/workflows/memory-budget.yml'
   push:
@@ -24,6 +30,7 @@ on:
     paths:
       - 'backend/docker-entrypoint.sh'
       - 'backend/src/main/java/com/tracepcap/file/service/FileServiceImpl.java'
+      - 'backend/src/main/resources/application.yml'
       - 'scripts/check_memory_budget.py'
   workflow_dispatch:
 

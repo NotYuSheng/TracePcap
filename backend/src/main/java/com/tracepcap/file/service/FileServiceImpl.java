@@ -331,6 +331,21 @@ public class FileServiceImpl implements FileService {
         throw new InvalidFileException("mergecap failed (exit " + exitCode + "): " + processOutput);
       }
 
+      // A merge is the other path onto the same analysis pipeline as an upload, and mergecap's
+      // output is unbounded — it is at least the sum of its inputs, each already validated
+      // individually but never checked together. Without this, two files just under maxFileSize
+      // merge into one well over it, sail past the only gate that exists (validateFile, which
+      // mergeFiles never calls), and hit analyzeFile exactly the way the original #779 capture
+      // did. Checked here, before the hash/upload/persist work below, rather than after.
+      if (tempOutput.length() > maxFileSize) {
+        throw new InvalidFileException(
+            "Merged file size ("
+                + (tempOutput.length() / 1024 / 1024)
+                + "MB) exceeds maximum allowed size of "
+                + (maxFileSize / 1024 / 1024)
+                + "MB");
+      }
+
       // Compute hash by streaming the merged file (avoids loading it fully into memory)
       String fileHash = computeSha256FromFile(tempOutput);
 

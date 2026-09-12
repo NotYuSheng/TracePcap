@@ -96,9 +96,15 @@ public class AnalysisService {
     boolean suricata = file.isEnableSuricata();
     boolean coldEngine = suricata && !suricataEngine.isWarm();
 
+    // Parsing now streams every conversation stub and packet to the database as it goes (#779)
+    // instead of stage 6 inserting them afterwards, so the weight that stage used to carry for
+    // packet writes belongs here instead. Stage 6 is left with only per-conversation UPDATEs, which
+    // is cheap enough that its old weight would now overstate it. These numbers are an estimate of
+    // the shift, not a re-measurement — re-run scripts/calibrate_analysis_eta.py once this has run
+    // against a real large capture, the same follow-up the streaming design itself called for.
     List<StageStep> plan = new ArrayList<>();
     plan.add(new StageStep("Downloading capture", 3));
-    plan.add(new StageStep("Parsing packets", coldEngine ? 2 : 21));
+    plan.add(new StageStep("Parsing packets", coldEngine ? 3 : 24));
     // The one stage whose cost is not about this capture at all: on a cold engine it is the
     // ruleset build, which dwarfs everything else and is paid once per process.
     // Labelled for what it is on a cold engine. The bar cannot move inside a stage, so this one
@@ -110,7 +116,7 @@ public class AnalysisService {
             : new StageStep("Detecting applications & threats", 21));
     plan.add(new StageStep("Classifying hosts & geo-locating", coldEngine ? 2 : 30));
     plan.add(new StageStep("Saving analysis summary", 1));
-    plan.add(new StageStep("Writing conversations & packets", coldEngine ? 1 : 4));
+    plan.add(new StageStep("Finalizing conversations", 1));
     if (extraction) {
       plan.add(new StageStep("Extracting transferred files", coldEngine ? 1 : 22));
     }
@@ -293,13 +299,118 @@ public class AnalysisService {
   private void parseCapture(Run run) {
     reportStage(run.fileId, run.plan, 1);
     long t = System.currentTimeMillis();
-    run.parseResult = pcapParserService.analyzePcapFile(run.pcap);
+
+    // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
+    // partition must exist before the streaming sink's first insert — parsing writes packets as it
+    // goes now, not stage 6, so this moved up from there.
+    packetPartitions.ensurePartition(run.fileId);
+
+    StreamingConversationSink sink =
+        new StreamingConversationSink(run.file, conversationRepository, packetRepository, entityManager);
+    run.parseResult = pcapParserService.analyzePcapFile(run.pcap, sink);
     log.info(
-        "[{}] [2/7] PCAP parse: {}ms  ({} packets, {} conversations)",
+        "[{}] [2/7] PCAP parse + stream: {}ms  ({} packets, {} conversations, {} DB flushes)",
         run.fileId,
         System.currentTimeMillis() - t,
         run.parseResult.getPacketCount(),
-        run.parseResult.getConversations().size());
+        run.parseResult.getConversations().size(),
+        sink.flushCount);
+  }
+
+  /**
+   * Streams conversation stubs and packets to the database as {@link PcapParserService} parses,
+   * instead of the parser accumulating the whole capture and handing it back in one object (#779).
+   *
+   * <p>Every new conversation is inserted the instant it is first seen — {@link
+   * #conversationStarted} — and its id handed back so its packets can be attributed to it. Packets
+   * are buffered up to {@link #PACKET_BATCH_SIZE} <em>across all conversations</em>, not per
+   * conversation — a single conversation with millions of packets must not itself become the
+   * unbounded buffer this class exists to avoid — then flushed and the persistence context cleared,
+   * which is what actually releases the managed entities' heap: {@code saveAll} alone leaves them
+   * live in the first-level cache for the rest of the (single, whole-pipeline) transaction.
+   *
+   * <p>Runs inside {@code analyzeFile}'s transaction, not a transaction of its own: a parse failure
+   * partway through must roll back everything already streamed, the same all-or-nothing guarantee
+   * the old accumulate-then-insert stage 6 gave for free. Streaming trades that "for free" for
+   * "still true, but now because nothing here opens its own transaction" — worth stating plainly
+   * given a silently-dropped {@code @Transactional} elsewhere in this codebase once cost a day to
+   * track down.
+   */
+  private static final class StreamingConversationSink implements PcapParserService.ParseSink {
+    private final FileEntity file;
+    private final ConversationRepository conversationRepository;
+    private final PacketRepository packetRepository;
+    private final EntityManager entityManager;
+    private final List<PacketEntity> buffer = new ArrayList<>(PACKET_BATCH_SIZE);
+    private int flushCount = 0;
+
+    StreamingConversationSink(
+        FileEntity file,
+        ConversationRepository conversationRepository,
+        PacketRepository packetRepository,
+        EntityManager entityManager) {
+      this.file = file;
+      this.conversationRepository = conversationRepository;
+      this.packetRepository = packetRepository;
+      this.entityManager = entityManager;
+    }
+
+    @Override
+    public UUID conversationStarted(PcapParserService.ConversationStub stub) {
+      ConversationEntity conversation =
+          ConversationEntity.builder()
+              .file(file)
+              .srcIp(stub.srcIp())
+              .srcPort(stub.srcPort())
+              .dstIp(stub.dstIp())
+              .dstPort(stub.dstPort())
+              .protocol(stub.protocol())
+              .startTime(stub.startTime())
+              .endTime(stub.startTime())
+              .packetCount(0L)
+              .totalBytes(0L)
+              .build();
+      return conversationRepository.save(conversation).getId();
+    }
+
+    @Override
+    public void packetParsed(UUID conversationId, PcapParserService.PacketInfo pkt) {
+      buffer.add(
+          PacketEntity.builder()
+              .file(file)
+              .conversation(entityManager.getReference(ConversationEntity.class, conversationId))
+              .packetNumber(pkt.getPacketNumber())
+              .timestamp(pkt.getTimestamp())
+              .srcIp(pkt.getSrcIp())
+              .srcPort(pkt.getSrcPort())
+              .dstIp(pkt.getDstIp())
+              .dstPort(pkt.getDstPort())
+              .protocol(pkt.getProtocol())
+              .packetSize(pkt.getPacketSize())
+              .info(pkt.getInfo())
+              .payload(pkt.getPayload())
+              .detectedFileType(pkt.getDetectedFileType())
+              .build());
+      if (buffer.size() >= PACKET_BATCH_SIZE) flush();
+    }
+
+    @Override
+    public void finish() {
+      flush();
+    }
+
+    private void flush() {
+      if (buffer.isEmpty()) return;
+      packetRepository.saveAll(buffer);
+      buffer.clear();
+      flushCount++;
+      // The clear is the point of this method, not the save: saveAll alone leaves every entity
+      // managed (and therefore resident) for the rest of the transaction. flush()+clear() forces
+      // the pending inserts to the database and detaches them, so this batch's heap is reclaimable
+      // before the next one is even built.
+      entityManager.flush();
+      entityManager.clear();
+    }
   }
 
   // ── Stage 3: extract ────────────────────────────────────────────────────────
@@ -421,104 +532,67 @@ public class AnalysisService {
     log.info("[{}] [5/7] Analysis result saved: {}ms", run.fileId, System.currentTimeMillis() - t);
   }
 
-  // ── Stage 6: conversation and packet inserts ────────────────────────────────
+  // ── Stage 6: finalize conversations ─────────────────────────────────────────
 
+  /**
+   * Updates each conversation row — already inserted as a stub during stage 2, with its packets
+   * already streamed there too (#779) — with the fields that were not known until later: the final
+   * aggregates (packet count, byte count, end time), the initiator once the opening SYN was seen,
+   * and every field stage 4 (signatures, classification, hostnames) filled in on the in-memory
+   * {@code ConversationInfo}. No packet writes happen here any more; the name is kept for the
+   * pipeline's benefit ("stage 6 of 7" in logs and progress) rather than renamed to something only
+   * this method's body would justify.
+   */
   private void persistConversationsAndPackets(Run run) {
     reportStage(run.fileId, run.plan, 5);
     long t = System.currentTimeMillis();
     UUID fileId = run.fileId;
 
-    // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
-    // partition must exist before the first insert below or the row has nowhere to land.
-    packetPartitions.ensurePartition(fileId);
-
     int convIndex = 0;
-    long packetsInserted = 0;
     List<UUID> savedConversationIds = new ArrayList<>();
 
     for (PcapParserService.ConversationInfo convInfo : run.parseResult.getConversations()) {
       ConversationEntity conversation =
-          ConversationEntity.builder()
-              .file(run.file)
-              .srcIp(convInfo.getSrcIp())
-              .srcPort(convInfo.getSrcPort())
-              .dstIp(convInfo.getDstIp())
-              .dstPort(convInfo.getDstPort())
-              .protocol(convInfo.getProtocol())
-              .initiatorIp(convInfo.getInitiatorIp())
-              .initiatorPort(convInfo.getInitiatorPort())
-              .appName(convInfo.getAppName())
-              .tsharkProtocol(convInfo.getTsharkProtocol())
-              .category(convInfo.getCategory())
-              .hostname(convInfo.getHostname())
-              .ja3Client(convInfo.getJa3Client())
-              .ja3Server(convInfo.getJa3Server())
-              .tlsIssuer(convInfo.getTlsIssuer())
-              .tlsSubject(convInfo.getTlsSubject())
-              .tlsNotBefore(convInfo.getTlsNotBefore())
-              .tlsNotAfter(convInfo.getTlsNotAfter())
-              .flowRisks(toNullableArray(convInfo.getFlowRisks()))
-              .customSignatures(toNullableArray(convInfo.getCustomSignatures()))
-              .suricataAlerts(toNullableArray(convInfo.getSuricataAlerts()))
-              .httpUserAgents(toNullableArray(convInfo.getHttpUserAgents()))
-              .packetCount(convInfo.getPacketCount())
-              .totalBytes(convInfo.getTotalBytes())
-              .startTime(convInfo.getStartTime())
-              .endTime(convInfo.getEndTime())
-              .build();
-      ConversationEntity savedConversation = conversationRepository.save(conversation);
-      savedConversationIds.add(savedConversation.getId());
+          entityManager.getReference(ConversationEntity.class, convInfo.getEntityId());
+      conversation.setInitiatorIp(convInfo.getInitiatorIp());
+      conversation.setInitiatorPort(convInfo.getInitiatorPort());
+      conversation.setAppName(convInfo.getAppName());
+      conversation.setTsharkProtocol(convInfo.getTsharkProtocol());
+      conversation.setCategory(convInfo.getCategory());
+      conversation.setHostname(convInfo.getHostname());
+      conversation.setJa3Client(convInfo.getJa3Client());
+      conversation.setJa3Server(convInfo.getJa3Server());
+      conversation.setTlsIssuer(convInfo.getTlsIssuer());
+      conversation.setTlsSubject(convInfo.getTlsSubject());
+      conversation.setTlsNotBefore(convInfo.getTlsNotBefore());
+      conversation.setTlsNotAfter(convInfo.getTlsNotAfter());
+      conversation.setFlowRisks(toNullableArray(convInfo.getFlowRisks()));
+      conversation.setCustomSignatures(toNullableArray(convInfo.getCustomSignatures()));
+      conversation.setSuricataAlerts(toNullableArray(convInfo.getSuricataAlerts()));
+      conversation.setHttpUserAgents(toNullableArray(convInfo.getHttpUserAgents()));
+      conversation.setPacketCount(convInfo.getPacketCount());
+      conversation.setTotalBytes(convInfo.getTotalBytes());
+      conversation.setEndTime(convInfo.getEndTime());
 
-      List<PcapParserService.PacketInfo> packetInfos = convInfo.getPackets();
-      if (!packetInfos.isEmpty()) {
-        for (int i = 0; i < packetInfos.size(); i += PACKET_BATCH_SIZE) {
-          int end = Math.min(i + PACKET_BATCH_SIZE, packetInfos.size());
-          List<PacketEntity> batch =
-              packetInfos.subList(i, end).stream()
-                  .map(
-                      pktInfo ->
-                          PacketEntity.builder()
-                              .file(run.file)
-                              .conversation(savedConversation)
-                              .packetNumber(pktInfo.getPacketNumber())
-                              .timestamp(pktInfo.getTimestamp())
-                              .srcIp(pktInfo.getSrcIp())
-                              .srcPort(pktInfo.getSrcPort())
-                              .dstIp(pktInfo.getDstIp())
-                              .dstPort(pktInfo.getDstPort())
-                              .protocol(pktInfo.getProtocol())
-                              .packetSize(pktInfo.getPacketSize())
-                              .info(pktInfo.getInfo())
-                              .payload(pktInfo.getPayload())
-                              .detectedFileType(pktInfo.getDetectedFileType())
-                              .build())
-                  .collect(Collectors.toList());
-          packetRepository.saveAll(batch);
-          packetsInserted += batch.size();
-        }
-        // Released as we go: a large capture's packet payloads do not all fit in heap at once.
-        packetInfos.clear();
-      }
+      savedConversationIds.add(convInfo.getEntityId());
 
       if (++convIndex % JPA_FLUSH_INTERVAL == 0) {
         entityManager.flush();
         entityManager.clear();
         log.info(
-            "[{}] [6/7] DB insert progress: {}/{} conversations, {} packets",
+            "[{}] [6/7] Finalize progress: {}/{} conversations",
             fileId,
             convIndex,
-            run.parseResult.getConversations().size(),
-            packetsInserted);
+            run.parseResult.getConversations().size());
       }
     }
 
     run.savedConversationIds = savedConversationIds;
     log.info(
-        "[{}] [6/7] DB inserts done: {}ms  ({} conversations, {} packets)",
+        "[{}] [6/7] Conversations finalized: {}ms  ({} conversations)",
         fileId,
         System.currentTimeMillis() - t,
-        run.parseResult.getConversations().size(),
-        packetsInserted);
+        run.parseResult.getConversations().size());
   }
 
   // ── Stage 7: carve embedded files ───────────────────────────────────────────
