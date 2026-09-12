@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Button, Card, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
@@ -41,7 +41,6 @@ export const NetworkClusterPage = () => {
   const [topHostsSortBy, setTopHostsSortBy] = useState<SortBy>('bytes');
   const [topHostsError, setTopHostsError] = useState<string | null>(null);
 
-  const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<ClusterNode | null>(null);
@@ -206,19 +205,6 @@ export const NetworkClusterPage = () => {
     activeRiskTypes, activeCustomSigs, activeFileTypes, activeCountries, activeNetLabels,
   ]);
 
-  // CSS fullscreen — lets us intercept Escape to close modals before exiting fullscreen
-  useEffect(() => {
-    if (!isFullscreen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (showFilterModal) { setShowFilterModal(false); return; }
-      if (selectedCluster) { setSelectedCluster(null); return; }
-      setIsFullscreen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isFullscreen, showFilterModal, selectedCluster]);
-
   const [autoSelected, setAutoSelected] = useState(false);
 
   // Stable serialised key — only changes when filter values actually differ
@@ -270,45 +256,78 @@ export const NetworkClusterPage = () => {
       <SummaryStatsBar data={data} />
 
       {/* Cluster graph */}
-      <Card className={`mb-4${isFullscreen ? ' nd-css-fullscreen' : ''}`} ref={graphCardRef}>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <div>
-            <h6 className="mb-0">
+      {isFullscreen ? (
+        <Modal show onHide={() => setIsFullscreen(false)} fullscreen>
+          <Modal.Header closeButton>
+            <Modal.Title>
               <i className="bi bi-diagram-3 me-2" />
               Network Cluster View
-            </h6>
-            <small className="text-muted">Click a cluster node to see its member IPs and statistics.</small>
-          </div>
-          <Button
-            variant="link"
-            size="sm"
-            className="p-0 text-muted"
-            onClick={() => setIsFullscreen(f => !f)}
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-          </Button>
-        </Card.Header>
-        <Card.Body className="intel-cluster-card-body">
-          {clusterError && (
-            <Alert variant="warning" className="py-2">
-              <i className="bi bi-exclamation-triangle me-2" />
-              {clusterError}
-            </Alert>
-          )}
-          <ClusterGraph
-            data={clusterData}
-            loading={clusterLoading}
-            groupBy={groupBy}
-            onGroupByChange={setGroupBy}
-            fileId={fileId}
-            onFilterClick={() => setShowFilterModal(true)}
-            activeFilterCount={activeFilterCount}
-            selectedCluster={selectedCluster}
-            onSelectedClusterChange={setSelectedCluster}
-          />
-        </Card.Body>
-      </Card>
+              <span className="text-muted small ms-2" style={{ fontWeight: 400 }}>
+                Click a cluster node to see its member IPs and statistics.
+              </span>
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="intel-cluster-card-body">
+            {clusterError && (
+              <Alert variant="warning" className="py-2">
+                <i className="bi bi-exclamation-triangle me-2" />
+                {clusterError}
+              </Alert>
+            )}
+            <ClusterGraph
+              data={clusterData}
+              loading={clusterLoading}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+              fileId={fileId}
+              onFilterClick={() => setShowFilterModal(true)}
+              activeFilterCount={activeFilterCount}
+              selectedCluster={selectedCluster}
+              onSelectedClusterChange={setSelectedCluster}
+            />
+          </Modal.Body>
+        </Modal>
+      ) : (
+        <Card className="mb-4">
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 className="mb-0">
+                <i className="bi bi-diagram-3 me-2" />
+                Network Cluster View
+              </h6>
+              <small className="text-muted">Click a cluster node to see its member IPs and statistics.</small>
+            </div>
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 text-muted"
+              onClick={() => setIsFullscreen(true)}
+              title="Fullscreen"
+            >
+              <i className="bi bi-fullscreen" />
+            </Button>
+          </Card.Header>
+          <Card.Body className="intel-cluster-card-body">
+            {clusterError && (
+              <Alert variant="warning" className="py-2">
+                <i className="bi bi-exclamation-triangle me-2" />
+                {clusterError}
+              </Alert>
+            )}
+            <ClusterGraph
+              data={clusterData}
+              loading={clusterLoading}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+              fileId={fileId}
+              onFilterClick={() => setShowFilterModal(true)}
+              activeFilterCount={activeFilterCount}
+              selectedCluster={selectedCluster}
+              onSelectedClusterChange={setSelectedCluster}
+            />
+          </Card.Body>
+        </Card>
+      )}
 
       {/* Top hosts table */}
       <Card className="mb-4">
@@ -332,7 +351,6 @@ export const NetworkClusterPage = () => {
       <Modal
         show={showFilterModal}
         onHide={() => setShowFilterModal(false)}
-        container={graphCardRef.current ?? undefined}
         size="lg"
       >
         <Modal.Header closeButton>

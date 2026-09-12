@@ -19,6 +19,7 @@ import { VolumeHeatmap } from '@components/network/VolumeHeatmap';
 import type { VolumePair } from '@components/network/VolumeHeatmap';
 import { VolumeLegend } from '@components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { NetworkControls } from '@components/network/NetworkControls';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
@@ -94,7 +95,6 @@ export const NetworkDiagramPage = () => {
   const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('transport');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
-  const heatmapCardRef = useRef<HTMLDivElement>(null);
   const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
 
   const graphCardRef = useRef<HTMLDivElement>(null);
@@ -102,35 +102,10 @@ export const NetworkDiagramPage = () => {
 
   const toggleFullscreen = () => setIsFullscreen(f => !f);
 
-  // When in CSS fullscreen, handle Escape ourselves:
-  // — filter modal open → close modal
-  // — node details open → close node details
-  // — otherwise → exit fullscreen
-  useEffect(() => {
-    if (!isFullscreen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (showLabelModal) { setShowLabelModal(false); return; }
-      if (showFilterModal) { setShowFilterModal(false); return; }
-      if (selectedNode) { setSelectedNode(null); return; }
-      setIsFullscreen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isFullscreen, showFilterModal, showLabelModal, selectedNode]);
-
-  // Escape exits heatmap fullscreen. Separate from the diagram's handler above so
-  // the two fullscreens never fight over the same key press.
-  useEffect(() => {
-    if (!isHeatmapFullscreen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (selectedNode) { setSelectedNode(null); return; }
-      setIsHeatmapFullscreen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isHeatmapFullscreen, selectedNode]);
+  // Fullscreen is the bottom Escape layer: the filter/label modals (SGDS modals, which stack above
+  // the fullscreen card) and the node detail panel (its own layer) each own Escape while open, so
+  // leaving fullscreen is what happens once nothing is stacked over it.
+  useEscapeLayer(() => setIsFullscreen(false), { enabled: isFullscreen, ref: graphCardRef });
 
   // ─── "Present" sets: only show options that exist in the data ───────────────
 
@@ -632,47 +607,17 @@ export const NetworkDiagramPage = () => {
       {/* Row 3: Node-to-node volume matrix.
           The diagram answers "who talks to whom"; this answers "how much", which a
           force-directed layout cannot show. Both read the same filtered edges. */}
-      <Card
-        className={`mt-3 ${isHeatmapFullscreen ? 'nd-css-fullscreen' : ''}`}
-        ref={heatmapCardRef}
-      >
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <div>
-            <strong>Node-to-Node Volume</strong>
-            <span className="text-muted small ms-2">
-              Traffic between each pair of displayed hosts
-            </span>
-          </div>
-          <div className="d-flex align-items-center gap-3">
-            {showHeatmap && (
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-muted"
-                onClick={() => setIsHeatmapFullscreen(f => !f)}
-                title={isHeatmapFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              >
-                <i className={`bi ${isHeatmapFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-              </Button>
-            )}
-            <Button
-              variant="link"
-              size="sm"
-              className="p-0 text-muted"
-              onClick={() => {
-                // Collapsing while fullscreen would leave an empty fullscreen shell.
-                if (showHeatmap) setIsHeatmapFullscreen(false);
-                setShowHeatmap(s => !s);
-              }}
-              aria-expanded={showHeatmap}
-            >
-              {showHeatmap ? 'Hide' : 'Show'}
-              <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-            </Button>
-          </div>
-        </Card.Header>
-        {showHeatmap && (
-          <Card.Body className="tp-heatmap-body">
+      {isHeatmapFullscreen ? (
+        <Modal show onHide={() => setIsHeatmapFullscreen(false)} fullscreen>
+          <Modal.Header closeButton>
+            <Modal.Title>
+              <strong>Node-to-Node Volume</strong>
+              <span className="text-muted small ms-2">
+                Traffic between each pair of displayed hosts
+              </span>
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="tp-heatmap-body">
             <VolumeHeatmap
               nodes={filteredNodes}
               edges={filteredEdges}
@@ -682,9 +627,56 @@ export const NetworkDiagramPage = () => {
               onCellClick={setSelectedPair}
               onHostClick={setSelectedNode}
             />
-          </Card.Body>
-        )}
-      </Card>
+          </Modal.Body>
+        </Modal>
+      ) : (
+        <Card className="mt-3">
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>Node-to-Node Volume</strong>
+              <span className="text-muted small ms-2">
+                Traffic between each pair of displayed hosts
+              </span>
+            </div>
+            <div className="d-flex align-items-center gap-3">
+              {showHeatmap && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 text-muted"
+                  onClick={() => setIsHeatmapFullscreen(true)}
+                  title="Fullscreen"
+                >
+                  <i className="bi bi-fullscreen" />
+                </Button>
+              )}
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-muted"
+                onClick={() => setShowHeatmap(s => !s)}
+                aria-expanded={showHeatmap}
+              >
+                {showHeatmap ? 'Hide' : 'Show'}
+                <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+              </Button>
+            </div>
+          </Card.Header>
+          {showHeatmap && (
+            <Card.Body className="tp-heatmap-body">
+              <VolumeHeatmap
+                nodes={filteredNodes}
+                edges={filteredEdges}
+                dark={isDark}
+                focusedHost={selectedNode?.id ?? null}
+                selectedPair={selectedPair}
+                onCellClick={setSelectedPair}
+                onHostClick={setSelectedNode}
+              />
+            </Card.Body>
+          )}
+        </Card>
+      )}
 
       {selectedNode && (
         <EntityDetailModal

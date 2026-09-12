@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -29,6 +29,7 @@ import { useResolvedDark } from '@/utils/useResolvedDark';
 import { parseDateTime } from '@/utils/dateUtils';
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { severityHex } from '@/utils/severityColors';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 
 type Tab = 'diagram' | 'changes' | 'security' | 'context' | 'subnets' | 'insights';
 
@@ -144,6 +145,7 @@ export const SnapshotDetailModal = ({
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
   const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
+  const diagramFullscreenRef = useRef<HTMLDivElement>(null);
 
   // Filter state
   const [ipFilter, setIpFilter] = useState('');
@@ -264,28 +266,19 @@ export const SnapshotDetailModal = ({
     activeCustomSigs.length + activeFileTypes.length + activeCountries.length +
     (ipFilter ? 1 : 0) + (portFilter ? 1 : 0) + (hasRisksOnly ? 1 : 0);
 
+  // The diagram fullscreen pane renders above the dialog (z-index 1080) as a hand-rolled
+  // overlay, so without a layer the key would fall through and close the whole dialog
+  // instead of just leaving fullscreen. The heatmap fullscreen is a real Modal now and
+  // gets this for free from react-bootstrap's own Escape handling.
+  useEscapeLayer(() => setIsDiagramFullscreen(false), {
+    enabled: isDiagramFullscreen,
+    ref: diagramFullscreenRef,
+  });
+
   // Keyboard left/right to navigate snapshots on diagram tab
   useEffect(() => {
     if (activeTab !== 'diagram') return;
     const handler = (e: KeyboardEvent) => {
-      // Heatmap fullscreen owns Escape while it is open — without this the key
-      // falls through to the dialog and closes the whole thing instead of just
-      // leaving fullscreen. Capture phase, so it runs before the modal's handler.
-      if (e.key === 'Escape' && isHeatmapFullscreen) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsHeatmapFullscreen(false);
-        return;
-      }
-      // Diagram fullscreen owns Escape too — exit fullscreen instead of closing
-      // the whole dialog. Arrow stepping stays enabled so snapshots can be paged
-      // through while fullscreen.
-      if (e.key === 'Escape' && isDiagramFullscreen) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDiagramFullscreen(false);
-        return;
-      }
       // Snapshot stepping would be disorienting while the matrix is fullscreen.
       if (isHeatmapFullscreen) return;
       if (e.key === 'ArrowLeft' && diagramIndex > 0) {
@@ -296,7 +289,7 @@ export const SnapshotDetailModal = ({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen, isDiagramFullscreen]);
+  }, [activeTab, diagramIndex, sorted, isHeatmapFullscreen]);
 
   // A fullscreen matrix/diagram is position:fixed outside the dialog's stacking
   // context, so it must not outlive a tab change that hides the diagram beneath it.
@@ -443,9 +436,7 @@ export const SnapshotDetailModal = ({
 
   return (
     <>
-    {/* enforceFocus off: the node-detail overlay (NodeDetails) renders on top of this
-        modal, and Bootstrap's focus trap would otherwise steal focus from its inputs. */}
-    <Modal show onHide={handleHide} centered size="xl" scrollable enforceFocus={false}>
+    <Modal show onHide={handleHide} centered size="xl" scrollable>
       <Modal.Header closeButton>
         <Modal.Title>
           <i className="bi bi-camera-reels me-2" />
@@ -525,7 +516,7 @@ export const SnapshotDetailModal = ({
 
         {/* ── Network Diagram tab ── */}
         {activeTab === 'diagram' && (
-          <div className={isDiagramFullscreen ? 'nd-css-fullscreen-over-modal' : ''}>
+          <div ref={diagramFullscreenRef} className={isDiagramFullscreen ? 'nd-css-fullscreen-over-modal' : ''}>
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
               <div className="d-flex align-items-center gap-2">
                 <Button size="sm" variant="outline-secondary"
@@ -650,54 +641,17 @@ export const SnapshotDetailModal = ({
                 Unlike the analysis page this does not drive `highlightedNodes`,
                 which in monitor mode already carries snapshot-change highlighting. */}
             {!graphLoading && (
-              <div
-                className={
-                  isHeatmapFullscreen
-                    ? 'tp-heatmap-fullscreen-over-modal'
-                    : 'mt-3 border-top pt-3'
-                }
-              >
-                <div className="d-flex justify-content-between align-items-center">
-                  <strong className="small">
-                    Node-to-Node Volume
-                    <span className="text-muted fw-normal ms-2">
-                      Traffic between each pair of displayed hosts
-                    </span>
-                  </strong>
-                  <div className="d-flex align-items-center gap-3">
-                    {showHeatmap && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 text-muted"
-                        onClick={() => setIsHeatmapFullscreen(f => !f)}
-                        title={isHeatmapFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
-                      >
-                        <i
-                          className={`bi ${
-                            isHeatmapFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'
-                          }`}
-                        />
-                      </Button>
-                    )}
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0 text-muted"
-                      onClick={() => {
-                        // Collapsing while fullscreen would leave an empty shell.
-                        if (showHeatmap) setIsHeatmapFullscreen(false);
-                        setShowHeatmap(v => !v);
-                      }}
-                      aria-expanded={showHeatmap}
-                    >
-                      {showHeatmap ? 'Hide' : 'Show'}
-                      <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                    </Button>
-                  </div>
-                </div>
-                {showHeatmap && (
-                  <div className={isHeatmapFullscreen ? 'mt-2 tp-heatmap-body' : 'mt-2'}>
+              isHeatmapFullscreen ? (
+                <Modal show onHide={() => setIsHeatmapFullscreen(false)} fullscreen>
+                  <Modal.Header closeButton>
+                    <Modal.Title>
+                      Node-to-Node Volume
+                      <span className="text-muted fw-normal ms-2" style={{ fontSize: '1rem' }}>
+                        Traffic between each pair of displayed hosts
+                      </span>
+                    </Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body className="tp-heatmap-body">
                     <VolumeHeatmap
                       nodes={filteredNodes}
                       edges={filteredEdges}
@@ -707,9 +661,56 @@ export const SnapshotDetailModal = ({
                       onCellClick={setSelectedPair}
                       onHostClick={setSelectedNode}
                     />
+                  </Modal.Body>
+                </Modal>
+              ) : (
+                <div className="mt-3 border-top pt-3">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <strong className="small">
+                      Node-to-Node Volume
+                      <span className="text-muted fw-normal ms-2">
+                        Traffic between each pair of displayed hosts
+                      </span>
+                    </strong>
+                    <div className="d-flex align-items-center gap-3">
+                      {showHeatmap && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-muted"
+                          onClick={() => setIsHeatmapFullscreen(true)}
+                          title="Fullscreen"
+                        >
+                          <i className="bi bi-fullscreen" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-muted"
+                        onClick={() => setShowHeatmap(v => !v)}
+                        aria-expanded={showHeatmap}
+                      >
+                        {showHeatmap ? 'Hide' : 'Show'}
+                        <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
+                  {showHeatmap && (
+                    <div className="mt-2">
+                      <VolumeHeatmap
+                        nodes={filteredNodes}
+                        edges={filteredEdges}
+                        dark={isDark}
+                        focusedHost={selectedNode?.id ?? null}
+                        selectedPair={selectedPair}
+                        onCellClick={setSelectedPair}
+                        onHostClick={setSelectedNode}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
             )}
           </div>
         )}
@@ -956,7 +957,6 @@ export const SnapshotDetailModal = ({
         onNavigate={navigate}
         onClose={() => setSelectedNode(null)}
         changeHighlight={highlightedNodes.get(selectedNode.label ?? '') ?? highlightedNodes.get(selectedNode.data.ip ?? '') ?? highlightedNodes.get(selectedNode.data.mac ?? '')}
-        zIndex={1070}
       />
     )}
 

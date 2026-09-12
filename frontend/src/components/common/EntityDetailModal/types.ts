@@ -59,7 +59,6 @@ export interface EntityDetailModalProps {
   /** Monitor snapshots — when provided for IP type, shows per-snapshot MAC/device history */
   snapshots?: NetworkSnapshot[];
   onClose: () => void;
-  zIndex?: number;
 
   // ── Graph context (network-diagram surfaces) ─────────────────────────────────
   // When `graphNode` is supplied, the modal renders the network-graph host detail: measured traffic

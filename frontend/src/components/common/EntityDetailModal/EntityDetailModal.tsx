@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Modal } from '@govtechsg/sgds-react';
 import { useEntityRole } from './hooks/useEntityRole';
 import { useEntityStats } from './hooks/useEntityStats';
 import { useEntityNote } from './hooks/useEntityNote';
@@ -29,7 +30,6 @@ export function EntityDetailModal({
   onViewConversations,
   snapshots,
   onClose,
-  zIndex,
   graphNode,
   graphEdges,
   changeHighlight,
@@ -57,21 +57,6 @@ export function EntityDetailModal({
   const note = useEntityNote(entityType, entityKey);
   const { history, historyLoading, historyError } = useEntityHistory(entityType, entityKey);
   const { ipSnapHistory, ipHistoryLoading, reload: reloadIpHistory } = useIpSnapshotHistory(entityType, entityKey, snapshots);
-
-  // ESC closes — but not if a nested IP modal is open (let the nested one handle it first)
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !nestedIp) { e.stopImmediatePropagation(); onClose(); }
-    };
-    document.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => document.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [onClose, nestedIp]);
-
-  // Lock background scroll
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
 
   // If the active service tab is no longer offered (modal reused for a node without that role),
   // fall back to Details so the body never goes blank.
@@ -115,24 +100,14 @@ export function EntityDetailModal({
 
   return (
     <>
-    <div
-      className="modal fade show d-block"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: zIndex ?? 1055 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="entity-detail-title"
-    >
-      <div className="modal-dialog modal-lg modal-dialog-scrollable">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 id="entity-detail-title" className="modal-title d-flex align-items-center gap-2 flex-wrap">
+    <Modal show onHide={onClose} size="lg" scrollable>
+      <Modal.Header closeButton closeLabel="Close (Esc)">
+            <Modal.Title as="h5" className="d-flex align-items-center gap-2 flex-wrap">
               {displayName}
               {badge}
               {statusBadge}
-            </h5>
-            <button type="button" className="btn-close ms-3" onClick={onClose} title="Close (Esc)" />
-          </div>
+            </Modal.Title>
+      </Modal.Header>
 
           {/* Tabs — graph context adds a History tab (cross-capture role trail) and service-role tabs. */}
           <div className="modal-header py-0 border-bottom-0">
@@ -176,7 +151,7 @@ export function EntityDetailModal({
             </ul>
           </div>
 
-          <div className="modal-body">
+          <Modal.Body>
 
             {/* ── DETAILS TAB ──────────────────────────────────────── */}
             {activeTab === 'details' && (
@@ -195,10 +170,10 @@ export function EntityDetailModal({
 
                 {/* Multi-snapshot context: role is edited per-snapshot in the history table below,
                     so the top card is a read-only present-day summary. */}
-                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} raisedModal={zIndex != null} />}
+                {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
                 {entityType === 'IP' && fileId && (
-                  <HostIdentitySection fileId={fileId} ip={entityKey} zIndex={zIndex} />
+                  <HostIdentitySection fileId={fileId} ip={entityKey} />
                 )}
 
                 {/* Graph host detail: traffic counters, protocol chips, per-peer Connections table. */}
@@ -291,10 +266,8 @@ export function EntityDetailModal({
                 onDelete={note.remove}
               />
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </Modal.Body>
+    </Modal>
 
     {nestedIp && (
       <EntityDetailModal
@@ -303,7 +276,6 @@ export function EntityDetailModal({
         displayName={nestedIp}
         fileId={fileId}
         onClose={() => setNestedIp(null)}
-        zIndex={(zIndex ?? 1055) + 10}
       />
     )}
     </>

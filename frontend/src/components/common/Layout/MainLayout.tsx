@@ -9,6 +9,7 @@ import { getAccessToken } from '@/auth/tokenStore';
 import { env } from '@/config/env';
 import { directApiUrl } from '@/services/api/directUrl';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { useEscapeLayerRoot } from '@/utils/useEscapeLayer';
 import { useStore } from '@/store';
 import type { ThemeMode } from '@/store';
 
@@ -89,6 +90,9 @@ export const MainLayout = () => {
   const isDark = useResolvedDark(themeMode);
   const location = useLocation();
   const isMonitorActive = location.pathname.startsWith('/monitor');
+
+  // Keeps the shared Escape coordinator alive for the whole session (#535).
+  useEscapeLayerRoot();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');

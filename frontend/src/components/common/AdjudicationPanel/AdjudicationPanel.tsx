@@ -42,11 +42,6 @@ interface Props {
    * these options plus "Other…" (free text); when omitted they stay free-text. (#499)
    */
   labelOptions?: string[];
-  /**
-   * Z-index of the surrounding panel/modal, so the add-evidence modal can render above it. Needed in
-   * monitor mode where NodeDetails is itself a raised modal (modal-in-modal).
-   */
-  zIndex?: number;
 }
 
 /** A label input that is a dropdown of known options + "Other…" free-text, or plain text if none. */
@@ -104,7 +99,7 @@ function LabelField({
  * by `question`, so the same component serves host-identity today and any future adjudicated
  * question with no changes.
  */
-export function AdjudicationPanel({ fileId, question, entityKey, title, verdict, onChanged, labelOptions, zIndex }: Props) {
+export function AdjudicationPanel({ fileId, question, entityKey, title, verdict, onChanged, labelOptions }: Props) {
   const [override, setOverride] = useState<AdjudicationOverride | null>(null);
   const [evidence, setEvidence] = useState<AdjudicationEvidence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -509,14 +504,11 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
 
           </div>
 
-          {/* Add-evidence popup — shared by Identity and every per-axis panel (#499). Raised above
-              the parent panel's z-index so it shows in monitor mode (modal-in-modal). */}
+          {/* Add-evidence popup — shared by Identity and every per-axis panel (#499). */}
           <Modal
             show={addingEvidence}
             onHide={() => !busy && resetEvidenceForm()}
             centered
-            className={zIndex != null ? 'tp-nested-modal' : undefined}
-            backdropClassName={zIndex != null ? 'tp-nested-modal-backdrop' : undefined}
           >
             <Modal.Header closeButton={!busy}>
               <Modal.Title style={{ fontSize: '1rem' }}>
