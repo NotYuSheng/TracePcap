@@ -456,6 +456,24 @@ export interface HostIdentity {
 }
 
 /**
+ * Adjudicated Windows identity of one host (#809) — who is logged in, derived from Kerberos AS-REQ
+ * and/or LDAP directory lookups. Sibling to {@link HostIdentity} ("what is this host?"), answering
+ * a different question ("who is this host?"); a host with no Kerberos/LDAP claim simply has none.
+ */
+export interface WindowsIdentity {
+  ip: string;
+  /** The one answer to "who is this?" — a username/real name, or the analyst's label verbatim. */
+  primaryLabel: string;
+  /** HUMAN (override) or MACHINE (Kerberos/LDAP claim). */
+  basis: 'HUMAN' | 'MACHINE';
+  confidence: number;
+  /** True when multiple distinct usernames were claimed for this IP (e.g. a shared kiosk). */
+  contested: boolean;
+  /** Corroborating/competing candidates — source is kerberos_as_req, ldap_dn, or human-override. */
+  candidates?: { label: string; source: string; score: number; reasons?: string[] }[] | null;
+}
+
+/**
  * The full explainable classification for one host (#556 follow-up): the adjudicated verdict plus
  * the measured evidence axes, fetchable from just fileId+ip so every host-inspection surface renders
  * the same "verdict, and why" experience.

@@ -874,6 +874,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/windows-identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Adjudicated Windows identity per host for a file (winner-or-contested) */
+        get: operations["getWindowsIdentities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/filter/{fileId}/execute": {
         parameters: {
             query?: never;
@@ -2998,6 +3015,17 @@ export interface components {
             /** Format: int64 */
             totalRequests?: number;
         };
+        WindowsIdentityDto: {
+            basis?: string;
+            candidates?: {
+                [key: string]: Record<string, never>;
+            }[];
+            /** Format: int32 */
+            confidence?: number;
+            contested?: boolean;
+            ip?: string;
+            primaryLabel?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -4429,6 +4457,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ConversationResponse"][];
+                };
+            };
+        };
+    };
+    getWindowsIdentities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WindowsIdentityDto"][];
                 };
             };
         };

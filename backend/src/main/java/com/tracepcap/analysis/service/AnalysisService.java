@@ -171,6 +171,8 @@ public class AnalysisService {
   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
   private final HostnameClaimWriter hostnameClaimWriter;
   private final SuricataEngine suricataEngine;
+  private final WindowsIdentityResolverService windowsIdentityResolverService;
+  private final WindowsIdentityClaimWriter windowsIdentityClaimWriter;
 
   /**
    * Runs the capture through the pipeline (#512 slice 7).
@@ -454,6 +456,21 @@ public class AnalysisService {
           fileId,
           e.getMessage());
     }
+
+    // Same best-effort discipline as hostname claims (#809): resolve() never throws, and a
+    // persistence failure here must not fail the whole analysis.
+    List<WindowsIdentityResolverService.Claim> windowsIdentityClaims =
+        windowsIdentityResolverService.resolve(run.pcap);
+    try {
+      windowsIdentityClaimWriter.replaceForFile(fileId, windowsIdentityClaims);
+    } catch (Exception e) {
+      log.warn(
+          "Failed to persist {} windows-identity claim(s) for file {}: {}",
+          windowsIdentityClaims.size(),
+          fileId,
+          e.getMessage());
+    }
+
     Map<String, HostnameResolverService.ResolvedHostname> hostnames =
         hostnameAdjudicator.adjudicate(hostnameClaims);
 
