@@ -118,6 +118,9 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
       case 'hostname':
         value = node.data.hostname;
         break;
+      case 'loggedInUser':
+        value = node.data.loggedInUser;
+        break;
       case 'mac':
         value = node.data.mac;
         break;
