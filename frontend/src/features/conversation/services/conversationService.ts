@@ -12,7 +12,6 @@ import type {
   HostClassification,
   HostIdentity,
   HostIdentityEvidence,
-  WindowsIdentity,
 } from '@/types';
 import type { ConversationFilters } from '../types';
 
@@ -387,16 +386,6 @@ export const conversationService = {
   /** Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). */
   getHostIdentities: async (fileId: string): Promise<HostIdentity[]> => {
     const response = await apiClient.get<HostIdentity[]>(API_ENDPOINTS.HOST_IDENTITIES(fileId));
-    return response.data;
-  },
-
-  /**
-   * Adjudicated per-host Windows identities for a file (#809) — who is logged in, from Kerberos/
-   * LDAP claims. A separate bulk read from {@link getHostIdentities}: it answers a different
-   * question ("who?" vs "what?"), and a host with no claim simply has no entry here.
-   */
-  getWindowsIdentities: async (fileId: string): Promise<WindowsIdentity[]> => {
-    const response = await apiClient.get<WindowsIdentity[]>(API_ENDPOINTS.WINDOWS_IDENTITIES(fileId));
     return response.data;
   },
 

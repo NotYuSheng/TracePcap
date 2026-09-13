@@ -1,6 +1,5 @@
 package com.tracepcap.analysis.service;
 
-import com.tracepcap.analysis.spi.WindowsIdentityClaimLookup;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -35,9 +34,9 @@ import org.springframework.stereotype.Service;
  *       the current user's display name) in the common case, but nothing in the wire protocol
  *       guarantees the query is about the querying host's own identity rather than someone else's
  *       (an admin/helpdesk tool, for instance) — so it corroborates a Kerberos claim rather than
- *       standing alone with equal weight. That priority is applied by {@code
- *       com.tracepcap.insights.service.WindowsIdentityService}, the adjudicator that consumes
- *       these claims; this class only records what it saw, conflict-preserving.
+ *       standing alone with equal weight. That priority is applied by {@code WindowsDomainAuthSignal}
+ *       (the device-classification signal that consumes these claims); this class only records what
+ *       it saw, conflict-preserving.
  * </ul>
  *
  * <p><b>Filtering by LDAP attribute name is deliberately not done.</b> An earlier design considered
@@ -66,6 +65,12 @@ import org.springframework.stereotype.Service;
 public class WindowsIdentityResolverService {
 
   private static final int USERNAME_MAX_LENGTH = 255;
+
+  /** A Kerberos AS-REQ named this principal — the client authenticated as it. MEASURED-grade. */
+  public static final String SOURCE_KERBEROS_AS_REQ = "kerberos_as_req";
+
+  /** An LDAP directory lookup queried this account's DN. REPORTED-grade (weaker, see class doc). */
+  public static final String SOURCE_LDAP_DN = "ldap_dn";
 
   /** AS-REQ, per the RFC 4120 message-type registry — the only Kerberos message this class reads. */
   private static final String KERBEROS_MSG_TYPE_AS_REQ = "10";
@@ -201,7 +206,7 @@ public class WindowsIdentityResolverService {
     if (baseObject != null) {
       String personName = personNameFromDn(baseObject);
       if (personName != null) {
-        record(result, firstValue(f[1]), personName, WindowsIdentityClaimLookup.SOURCE_LDAP_DN);
+        record(result, firstValue(f[1]), personName, SOURCE_LDAP_DN);
       }
       return;
     }
@@ -209,7 +214,7 @@ public class WindowsIdentityResolverService {
     if (KERBEROS_MSG_TYPE_AS_REQ.equals(trimToNull(f[4]))) {
       String principal = trimToNull(f[5]);
       if (principal != null && !isMachineAccount(principal)) {
-        record(result, firstValue(f[1]), principal, WindowsIdentityClaimLookup.SOURCE_KERBEROS_AS_REQ);
+        record(result, firstValue(f[1]), principal, SOURCE_KERBEROS_AS_REQ);
       }
     }
   }

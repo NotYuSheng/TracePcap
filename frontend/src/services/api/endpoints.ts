@@ -20,8 +20,6 @@ export const API_ENDPOINTS = {
   /** Full explainable classification (verdict + evidence axes) for one host. */
   HOST_IDENTITY_EVIDENCE: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/identity`,
-  /** Adjudicated Windows identity (Kerberos/LDAP) per host — who is logged in, not what it is (#809). */
-  WINDOWS_IDENTITIES: (fileId: string) => `/files/${fileId}/windows-identities`,
 
   // Adjudication overrides + evidence (generic: any question, keyed by Adjudicator.question())
   ADJUDICATION_OVERRIDE: (fileId: string, question: string, entityKey: string) =>

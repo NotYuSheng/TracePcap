@@ -1638,6 +1638,12 @@
           "ip": {
             "type": "string"
           },
+          "loggedInUser": {
+            "type": "string"
+          },
+          "loggedInUserSource": {
+            "type": "string"
+          },
           "mac": {
             "type": "string"
           },
@@ -3511,36 +3517,6 @@
           "totalRequests": {
             "format": "int64",
             "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "WindowsIdentityDto": {
-        "properties": {
-          "basis": {
-            "type": "string"
-          },
-          "candidates": {
-            "items": {
-              "additionalProperties": {
-                "type": "object"
-              },
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "confidence": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "contested": {
-            "type": "boolean"
-          },
-          "ip": {
-            "type": "string"
-          },
-          "primaryLabel": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -6354,41 +6330,6 @@
         ]
       }
     },
-    "/api/v1/files/{fileId}/windows-identities": {
-      "get": {
-        "operationId": "getWindowsIdentities",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "fileId",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/WindowsIdentityDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Adjudicated Windows identity per host for a file (winner-or-contested)",
-        "tags": [
-          "Windows Identities"
-        ]
-      }
-    },
     "/api/v1/filter/{fileId}/execute": {
       "post": {
         "description": "Applies a BPF filter to a PCAP file and returns matching packets with pagination support",
@@ -8833,10 +8774,6 @@
     {
       "description": "APIs for PCAP file upload, download, and management",
       "name": "File Management"
-    },
-    {
-      "description": "Adjudicated per-file Windows identities (Kerberos/LDAP) — one answer per host with a claim, or an explicit contest",
-      "name": "Windows Identities"
     },
     {
       "description": "Free-text annotations on a monitored network",

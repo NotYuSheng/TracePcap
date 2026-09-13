@@ -11,7 +11,7 @@ import {
 import type { NodeData, NodeType } from '@/features/network/types';
 import { DEVICE_TYPES, deviceTypeLabel } from '@/utils/deviceType';
 import { conversationService } from '@/features/conversation/services/conversationService';
-import type { DeviceType, HostIdentityEvidence, WindowsIdentity } from '@/types';
+import type { DeviceType, HostIdentityEvidence } from '@/types';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { isPrivateIp } from '@/utils/ipClassification';
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
@@ -176,10 +176,6 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
   const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Windows identity (#809) is a separate bulk read, not part of the evidence DTO above — it
-  // answers a different question ("who?" vs "what?") and a host with no Kerberos/LDAP claim simply
-  // has no entry, which is a legitimate empty state rather than an error.
-  const [windowsIdentity, setWindowsIdentity] = useState<WindowsIdentity | null>(null);
   const [expandedAxis, setExpandedAxis] = useState<AxisKey | null>(null);
   const [evidenceInfoOpen, setEvidenceInfoOpen] = useState(false);
   // Custom private-range overrides, so the "why no geo" message agrees with how the rest of the app
@@ -198,10 +194,6 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
   const load = () => {
     setLoading(true);
     setError(null);
-    // Reset before fetching: this is an independent request from the evidence one above and isn't
-    // gated by `loading`, so a stale value here would render under the wrong host if this fetch is
-    // still in flight when the (faster) evidence fetch resolves and clears the spinner.
-    setWindowsIdentity(null);
     conversationService
       .getHostIdentityEvidence(fileId, ip)
       .then(ev => {
@@ -214,18 +206,6 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
       })
       .finally(() => {
         if (ip === currentIpRef.current) setLoading(false);
-      });
-    // Independent of the evidence load above: a failure here should not block the rest of the
-    // section from rendering, so errors are swallowed to "no Windows identity" rather than surfaced.
-    conversationService
-      .getWindowsIdentities(fileId)
-      .then(list => {
-        if (ip !== currentIpRef.current) return;
-        setWindowsIdentity(list.find(w => w.ip === ip) ?? null);
-      })
-      .catch(() => {
-        if (ip !== currentIpRef.current) return;
-        setWindowsIdentity(null);
       });
   };
 
@@ -272,27 +252,6 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
         }}
         onChanged={handleChanged}
       />
-
-      {/* Windows identity (#809) — who is logged in, from Kerberos/LDAP claims. Only rendered when
-          a claim (or an override) actually exists for this IP; most hosts (routers, IoT, external
-          servers) have none, which is a legitimate empty state, not an error to display. */}
-      {windowsIdentity && (
-        <AdjudicationPanel
-          fileId={fileId}
-          question="windows-identity"
-          entityKey={ip}
-          title="Windows Identity"
-          verdict={{
-            label: windowsIdentity.primaryLabel,
-            basis: windowsIdentity.basis,
-            confidence: windowsIdentity.confidence,
-            contested: windowsIdentity.contested,
-            candidates: windowsIdentity.candidates ?? undefined,
-          }}
-          onChanged={handleChanged}
-          // labelOptions intentionally omitted — a username is free text, not a fixed enum.
-        />
-      )}
 
       {/* Evidence weighed — the independent measured signals behind the verdict. */}
       <div className="mb-4">
