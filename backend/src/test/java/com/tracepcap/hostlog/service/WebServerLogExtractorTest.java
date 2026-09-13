@@ -12,9 +12,14 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link WebServerLogExtractor#parseHttpFrame} (request→response correlation) and the
- * api/web heuristic. tshark {@code http} fields are pipe-split:
- * {@code tcp.stream | ip.src | ip.dst | method | uri | status | content_type | server}.
+ * Unit tests for {@link WebServerLogExtractor#parseHttpFrame} — request→response correlation and
+ * the per-server tallies it populates. tshark {@code http} fields are pipe-split: {@code
+ * tcp.stream | ip.src | ip.dst | method | uri | status | content_type | server}.
+ *
+ * <p>The api/web role decision itself ({@code isApiLike}) moved to {@link WebServerRoleScanner}
+ * (#512 criterion 8); several tests here still assert through it as the clearest way to check that
+ * {@code parseHttpFrame} populated {@code WebServerStats} correctly, but {@link
+ * WebServerRoleScannerTest} is where that decision's own behaviour is covered.
  */
 class WebServerLogExtractorTest {
 
@@ -53,7 +58,7 @@ class WebServerLogExtractorTest {
     assertThat(agg.statusCounts).containsEntry(200, 1);
     assertThat(agg.contentType).isEqualTo("application/json");
     assertThat(agg.serverSoftware).isEqualTo("nginx/1.18.0");
-    assertThat(WebServerLogExtractor.isApiLike(serverStats.get("10.0.0.1"))).isTrue();
+    assertThat(WebServerRoleScanner.isApiLike(serverStats.get("10.0.0.1"))).isTrue();
   }
 
   @Test
@@ -89,7 +94,7 @@ class WebServerLogExtractorTest {
     exchange("10.0.0.10", "10.0.0.2", "GET", "/", "200", "text/html", "Apache");
     exchange("10.0.0.10", "10.0.0.2", "GET", "/about", "200", "text/html", "Apache");
 
-    assertThat(WebServerLogExtractor.isApiLike(serverStats.get("10.0.0.2"))).isFalse();
+    assertThat(WebServerRoleScanner.isApiLike(serverStats.get("10.0.0.2"))).isFalse();
   }
 
   @Test
@@ -97,7 +102,7 @@ class WebServerLogExtractorTest {
     exchange("10.0.0.10", "10.0.0.3", "DELETE", "/things/1", "204", "", "");
 
     assertThat(serverStats.get("10.0.0.3").hasWriteVerb).isTrue();
-    assertThat(WebServerLogExtractor.isApiLike(serverStats.get("10.0.0.3"))).isTrue();
+    assertThat(WebServerRoleScanner.isApiLike(serverStats.get("10.0.0.3"))).isTrue();
   }
 
   @Test
@@ -105,7 +110,7 @@ class WebServerLogExtractorTest {
     exchange("10.0.0.10", "10.0.0.4", "GET", "/api/health", "200", "text/plain", "");
 
     assertThat(serverStats.get("10.0.0.4").hasApiPath).isTrue();
-    assertThat(WebServerLogExtractor.isApiLike(serverStats.get("10.0.0.4"))).isTrue();
+    assertThat(WebServerRoleScanner.isApiLike(serverStats.get("10.0.0.4"))).isTrue();
   }
 
   @Test
@@ -118,17 +123,6 @@ class WebServerLogExtractorTest {
 
     assertThat(endpoints.get("10.0.0.5||/orphan")).isNotNull();
     assertThat(serverStats.get("10.0.0.5").totalResponses).isEqualTo(1);
-  }
-
-  @Test
-  void tlsServerHello_countsOnlyOnWebFacingPorts() {
-    // #496 AC #3 — TLS is port-qualified: 443/4433/8443 are web-facing; SIP-TLS/IMAPS and null are not.
-    assertThat(WebServerLogExtractor.isWebFacingTlsPort(443)).isTrue();
-    assertThat(WebServerLogExtractor.isWebFacingTlsPort(8443)).isTrue();
-    assertThat(WebServerLogExtractor.isWebFacingTlsPort(4433)).isTrue();
-    assertThat(WebServerLogExtractor.isWebFacingTlsPort(5061)).isFalse(); // SIP-TLS
-    assertThat(WebServerLogExtractor.isWebFacingTlsPort(993)).isFalse(); // IMAPS
-    assertThat(WebServerLogExtractor.isWebFacingTlsPort(null)).isFalse();
   }
 
   @Test
