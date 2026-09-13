@@ -143,11 +143,21 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     Map<String, String> roleByServerIp =
         WebServerRoleScanner.assignRoles(serverStats, tlsHandshakePortsByIp);
 
+    // Web-facing only, matching what the log line has always meant: before this class stopped
+    // filtering by port itself, tlsServers only ever held IPs with a ServerHello on a web-facing
+    // port. Counting tlsHandshakePortsByIp directly here would silently fold in TLS on unrelated
+    // ports (SIP-TLS, IMAPS, ...), which carry no web evidence at all — a log-only regression code
+    // review caught, since no test asserts on this line's wording.
+    long webFacingTlsServers =
+        tlsHandshakePortsByIp.values().stream()
+            .filter(ports -> ports.stream().anyMatch(WebServerRoleScanner::isWebFacingTlsPort))
+            .count();
+
     log.info(
         "HTTP endpoint log: {} endpoint row(s) across {} HTTP server(s); {} TLS server(s)",
         endpoints.size(),
         serverStats.size(),
-        tlsHandshakePortsByIp.size());
+        webFacingTlsServers);
     // Web suspicion (4xx enumeration) is computed at read time from the persisted rows.
     return new HostServiceLogResult(roleByServerIp, List.of());
   }
