@@ -171,6 +171,7 @@ public class AnalysisService {
   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
   private final HostnameClaimWriter hostnameClaimWriter;
   private final SuricataEngine suricataEngine;
+  private final WindowsIdentityResolverService windowsIdentityResolverService;
 
   /**
    * Runs the capture through the pipeline (#512 slice 7).
@@ -454,6 +455,17 @@ public class AnalysisService {
           fileId,
           e.getMessage());
     }
+
+    // Windows sign-in identity (#809): who is logged into each host, from Kerberos AS-REQ / LDAP.
+    // Same best-effort discipline as hostname claims — resolve() never throws. Grouped by IP and
+    // handed to the classifier, where WindowsDomainAuthSignal votes it toward LAPTOP_DESKTOP and the
+    // primary principal is recorded as the host's signed-in-user attribute (no separate table).
+    Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp =
+        new LinkedHashMap<>();
+    for (WindowsIdentityResolverService.Claim claim : windowsIdentityResolverService.resolve(run.pcap)) {
+      windowsIdentityClaimsByIp.computeIfAbsent(claim.ip(), k -> new ArrayList<>()).add(claim);
+    }
+
     Map<String, HostnameResolverService.ResolvedHostname> hostnames =
         hostnameAdjudicator.adjudicate(hostnameClaims);
 
@@ -471,8 +483,10 @@ public class AnalysisService {
             run.parseResult.getHostMacs(),
             deviceOverrides,
             hostnames,
-            serviceLogs.rolesByIp());
+            serviceLogs.rolesByIp(),
+            windowsIdentityClaimsByIp);
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
+    applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
     hostClassificationRepository.saveAll(hostClassifications);
 
     try {
@@ -1036,5 +1050,41 @@ public class AnalysisService {
       }
       // Future roles: else if (HttpEndpointLogExtractor.ROLE.equals(s.role())) host.setWebSuspicious(true);
     }
+  }
+
+  /**
+   * Records the signed-in Windows user on each host from its Kerberos/LDAP claims (#809). Done here,
+   * in the analysis module, rather than inside the classifier: mutating {@link
+   * HostClassificationEntity} is this module's own concern, and keeping it out of {@code
+   * hostclassification} avoids a cross-module entity dependency there. The classifier still receives
+   * the claims to vote the host toward LAPTOP_DESKTOP; this only fills the display attribute.
+   *
+   * <p>Trust ordering matches {@code WindowsDomainAuthSignal}: a Kerberos AS-REQ principal (the
+   * client authenticated as it) outranks an LDAP-DN lookup name. When several principals of the
+   * winning source appear (a shared machine), the first observed is recorded; the full set stays
+   * visible in the classification evidence.
+   */
+  private void applyWindowsSignIn(
+      List<HostClassificationEntity> hostClassifications,
+      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
+    if (windowsIdentityClaimsByIp.isEmpty()) return;
+    for (HostClassificationEntity host : hostClassifications) {
+      WindowsIdentityResolverService.Claim primary =
+          primaryWindowsClaim(windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of()));
+      if (primary != null) {
+        host.setLoggedInUser(primary.username());
+        host.setLoggedInUserSource(primary.source());
+      }
+    }
+  }
+
+  private WindowsIdentityResolverService.Claim primaryWindowsClaim(
+      List<WindowsIdentityResolverService.Claim> claims) {
+    WindowsIdentityResolverService.Claim ldap = null;
+    for (WindowsIdentityResolverService.Claim c : claims) {
+      if (WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source())) return c;
+      if (ldap == null && WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source())) ldap = c;
+    }
+    return ldap;
   }
 }

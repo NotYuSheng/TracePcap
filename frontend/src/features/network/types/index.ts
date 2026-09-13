@@ -35,6 +35,10 @@ export interface NodeData {
   hostname?: string;
   /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
   hostnameSource?: string;
+  /** Windows sign-in username observed from this host (Kerberos AS-REQ / LDAP); person-level (#809). */
+  loggedInUser?: string;
+  /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
+  loggedInUserSource?: string;
   packetsSent: number;
   packetsReceived: number;
   bytesSent: number;

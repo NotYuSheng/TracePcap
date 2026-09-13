@@ -50,7 +50,7 @@ class BaselineDeviationDetectionTest {
           hosts, null, null, null, baselines, null, null, null, null, null, null, null);
 
   private static HostFacts host(String ip, String mac) {
-    return new HostFacts(ip, mac, null, null, null, null, null, 0, List.of());
+    return new HostFacts(ip, mac, null, null, null, null, null, null, null, 0, List.of());
   }
 
   private static BaselineDefinitionEntity def(BaselineEntryType type, String key, String value) {

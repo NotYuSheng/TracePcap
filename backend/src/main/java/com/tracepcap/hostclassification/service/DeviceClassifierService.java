@@ -5,6 +5,7 @@ import com.tracepcap.common.net.MacAddress;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.service.HostnameResolverService;
 import com.tracepcap.analysis.service.PcapParserService;
+import com.tracepcap.analysis.service.WindowsIdentityResolverService.Claim;
 import com.tracepcap.analysis.spi.HostClassifier;
 import com.tracepcap.hostclassification.service.classifier.DeviceClassificationSignal;
 import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
@@ -145,6 +146,9 @@ public class DeviceClassifierService implements HostClassifier {
    * @param hostnames IP → passively-discovered hostname/source (may be empty)
    * @param serviceRolesByIp IP → service roles the host was detected serving, e.g. {@code "dns"}
    *     (may be empty); feeds role-aware signals and is recorded on each host
+   * @param windowsIdentityClaimsByIp IP → Windows sign-in claims (Kerberos/LDAP) observed from the
+   *     host (may be empty); feeds {@code WindowsDomainAuthSignal} and sets the signed-in-user
+   *     attribute
    * @return one HostClassificationEntity per unique IP
    */
   @Override
@@ -155,7 +159,8 @@ public class DeviceClassifierService implements HostClassifier {
       Map<String, String> hostMacs,
       Map<String, String> deviceOverrides,
       Map<String, HostnameResolverService.ResolvedHostname> hostnames,
-      Map<String, Set<String>> serviceRolesByIp) {
+      Map<String, Set<String>> serviceRolesByIp,
+      Map<String, List<Claim>> windowsIdentityClaimsByIp) {
 
     // Build per-host profiles from all conversations
     Map<String, HostProfile> profiles = new LinkedHashMap<>();
@@ -174,6 +179,7 @@ public class DeviceClassifierService implements HostClassifier {
       String manufacturer = resolveManufacturer(mac);
       String ouiHint = resolveOuiHint(mac);
       Set<String> roles = serviceRolesByIp.getOrDefault(ip, Set.of());
+      List<Claim> windowsIdentityClaims = windowsIdentityClaimsByIp.getOrDefault(ip, List.of());
 
       // Check YAML device_type override first
       if (deviceOverrides.containsKey(ip)) {
@@ -192,7 +198,8 @@ public class DeviceClassifierService implements HostClassifier {
       }
 
       // Run every registered signal into a shared score board; the highest-scoring type wins.
-      HostContext ctx = new HostContext(ip, profile, ttl, mac, manufacturer, ouiHint, null, roles);
+      HostContext ctx =
+          new HostContext(ip, profile, ttl, mac, manufacturer, ouiHint, null, roles, windowsIdentityClaims);
       ScoreBoard board = new ScoreBoard();
       for (DeviceClassificationSignal signal : signals) {
         try {
