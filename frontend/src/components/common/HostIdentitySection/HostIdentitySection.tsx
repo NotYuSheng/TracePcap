@@ -320,7 +320,7 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
                 tabIndex={0}
                 aria-expanded={expanded}
                 title={`Inspect ${meta.label} — ${meta.caption}`}
-                className="d-flex align-items-center gap-2"
+                className="d-flex align-items-start gap-2"
                 style={{ fontSize: '0.8rem', cursor: 'pointer' }}
                 onClick={e => {
                   e.stopPropagation();
@@ -336,7 +336,11 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
               >
                 <span className="text-muted" style={{ minWidth: '100px' }}>{meta.label}</span>
                 {facts.length > 0 ? (
-                  <span className="flex-grow-1">{facts.join(' · ')}</span>
+                  <ul className="list-unstyled mb-0 flex-grow-1">
+                    {facts.map((fact, i) => (
+                      <li key={i}>{fact}</li>
+                    ))}
+                  </ul>
                 ) : (
                   <span className="text-muted fst-italic flex-grow-1">Nothing observed</span>
                 )}

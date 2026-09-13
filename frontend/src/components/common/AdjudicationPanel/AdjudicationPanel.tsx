@@ -530,8 +530,14 @@ export function AdjudicationPanel({ fileId, question, entityKey, title, verdict,
                 max={100}
                 value={evWeight}
                 onChange={e => setEvWeight(Number(e.target.value))}
-                className="form-range mb-3"
+                className="form-range mb-1"
               />
+              <div className="text-muted mb-3" style={{ fontSize: '0.7rem' }}>
+                Scale it against the scores in “Why” above: a weak or secondhand hint is usually
+                under 20, a solid single observation (comparable to one machine signal) is around
+                40–60, and 70+ should mean you are about as sure as the strongest signal already
+                shown.
+              </div>
               <Form.Label className="small mb-1">Reason (required)</Form.Label>
               <Form.Control
                 as="textarea"
