@@ -1,5 +1,7 @@
 package com.tracepcap.insights.controller;
 
+import com.tracepcap.analysis.spi.WindowsIdentityClaimLookup;
+import com.tracepcap.common.adjudication.HumanOverrideRepository;
 import com.tracepcap.insights.dto.WindowsIdentityDto;
 import com.tracepcap.insights.repository.WindowsIdentityRepository;
 import com.tracepcap.insights.service.WindowsIdentityService;
@@ -28,6 +30,8 @@ public class WindowsIdentitiesController {
 
   private final WindowsIdentityRepository windowsIdentityRepository;
   private final WindowsIdentityService windowsIdentityService;
+  private final WindowsIdentityClaimLookup windowsIdentityClaimLookup;
+  private final HumanOverrideRepository humanOverrideRepository;
 
   @GetMapping("/{fileId}/windows-identities")
   @Operation(summary = "Adjudicated Windows identity per host for a file (winner-or-contested)")
@@ -35,7 +39,13 @@ public class WindowsIdentitiesController {
     // Lazy backfill (matches HostIdentitiesController): files analysed before this adjudicator
     // existed have claims but no adjudicated rows yet. Adjudicate on first read instead of forcing
     // every existing file through a migration/backfill job. Idempotent — safe to repeat.
-    if (windowsIdentityRepository.findByFileId(fileId).isEmpty()) {
+    //
+    // Unlike host-identity, an empty result here is a *legitimate terminal state* — most files have
+    // no Kerberos/LDAP traffic at all, so "no rows yet" and "adjudicated, nothing to say" are
+    // indistinguishable by row-count alone. Re-running adjudicateFile on every such GET would be
+    // silent no-op work forever. Gate the backfill on there being actual signal (a claim or a human
+    // override) still unreflected in the table, not merely on the table being empty.
+    if (windowsIdentityRepository.findByFileId(fileId).isEmpty() && hasUnadjudicatedSignal(fileId)) {
       try {
         windowsIdentityService.adjudicateFile(fileId);
       } catch (DataIntegrityViolationException raced) {
@@ -63,5 +73,13 @@ public class WindowsIdentitiesController {
                         .build())
             .toList();
     return ResponseEntity.ok(result);
+  }
+
+  /** True when there is a claim or a human override this file's adjudicated rows haven't seen. */
+  private boolean hasUnadjudicatedSignal(UUID fileId) {
+    return !windowsIdentityClaimLookup.claimsForFile(fileId).isEmpty()
+        || !humanOverrideRepository
+            .findByQuestionAndFileId(windowsIdentityService.question(), fileId)
+            .isEmpty();
   }
 }

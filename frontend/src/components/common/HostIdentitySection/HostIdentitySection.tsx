@@ -198,6 +198,10 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
   const load = () => {
     setLoading(true);
     setError(null);
+    // Reset before fetching: this is an independent request from the evidence one above and isn't
+    // gated by `loading`, so a stale value here would render under the wrong host if this fetch is
+    // still in flight when the (faster) evidence fetch resolves and clears the spinner.
+    setWindowsIdentity(null);
     conversationService
       .getHostIdentityEvidence(fileId, ip)
       .then(ev => {

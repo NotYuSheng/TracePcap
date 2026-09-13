@@ -62,4 +62,15 @@ class WindowsIdentityResolverServiceTest {
   void humanPrincipal_isNotExcluded() {
     assertThat(WindowsIdentityResolverService.isMachineAccount("ccollier")).isFalse();
   }
+
+  @Test
+  void personDn_withRfc4514EscapedComma_extractsTheFullCn() {
+    // RFC 4514: a literal comma inside a CN value is backslash-escaped so it isn't read as the
+    // attribute separator. A naive [^,]+ group would truncate at the escaped comma; the group must
+    // consume the escape pair instead.
+    assertThat(
+            WindowsIdentityResolverService.personNameFromDn(
+                "CN=Collier\\, Clark,CN=Users,DC=wiresharkworkshop,DC=online"))
+        .isEqualTo("Collier\\, Clark");
+  }
 }

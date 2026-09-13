@@ -70,9 +70,14 @@ public class WindowsIdentityResolverService {
   /** AS-REQ, per the RFC 4120 message-type registry — the only Kerberos message this class reads. */
   private static final String KERBEROS_MSG_TYPE_AS_REQ = "10";
 
-  /** Active Directory person objects live under CN=Users; infrastructure objects do not (see class doc). */
+  /**
+   * Active Directory person objects live under CN=Users; infrastructure objects do not (see class
+   * doc). The capture group uses {@code (?:[^,\\]|\\.)+} rather than {@code [^,]+} so an RFC 4514
+   * backslash-escaped comma inside the CN value (e.g. {@code CN=Collier\, Clark,CN=Users,DC=...})
+   * doesn't prematurely end the match.
+   */
   private static final Pattern PERSON_DN =
-      Pattern.compile("^CN=([^,]+),CN=Users,DC=.*$", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("^CN=((?:[^,\\\\]|\\\\.)+),CN=Users,DC=.*$", Pattern.CASE_INSENSITIVE);
 
   /** One claim: {@code source} asserted that {@code ip}'s logged-in/queried identity is {@code username}. */
   public record Claim(String ip, String username, String source) {}
@@ -84,10 +89,12 @@ public class WindowsIdentityResolverService {
 
     // Fields (pipe-separated, first occurrence only):
     //   0 frame.number  1 ip.src  2 ip.dst
-    //   3 ldap.baseObject  4 ldap.AttributeDescription
-    //   5 kerberos.msg_type  6 kerberos.CNameString
-    // AttributeDescription is read but deliberately not filtered on (see class doc) — kept only
-    // because dropping it would need re-deriving nothing useful from a second pass.
+    //   3 ldap.baseObject
+    //   4 kerberos.msg_type  5 kerberos.CNameString
+    // ldap.AttributeDescription is required by the -Y filter below (restricts baseObject matches to
+    // searchRequests, which carry an attribute list, over other LDAP message types that don't) but
+    // is not itself extracted — nothing in parseRow reads it, see class doc on why attribute names
+    // aren't used for discrimination.
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
@@ -110,8 +117,6 @@ public class WindowsIdentityResolverService {
             "ip.dst",
             "-e",
             "ldap.baseObject",
-            "-e",
-            "ldap.AttributeDescription",
             "-e",
             "kerberos.msg_type",
             "-e",
@@ -190,7 +195,7 @@ public class WindowsIdentityResolverService {
   // ── Row parsing ─────────────────────────────────────────────────────────────
 
   private void parseRow(String[] f, Map<Claim, Boolean> result) {
-    if (f.length < 7) return;
+    if (f.length < 6) return;
 
     String baseObject = trimToNull(f[3]);
     if (baseObject != null) {
@@ -201,8 +206,8 @@ public class WindowsIdentityResolverService {
       return;
     }
 
-    if (KERBEROS_MSG_TYPE_AS_REQ.equals(trimToNull(f[5]))) {
-      String principal = trimToNull(f[6]);
+    if (KERBEROS_MSG_TYPE_AS_REQ.equals(trimToNull(f[4]))) {
+      String principal = trimToNull(f[5]);
       if (principal != null && !isMachineAccount(principal)) {
         record(result, firstValue(f[1]), principal, WindowsIdentityClaimLookup.SOURCE_KERBEROS_AS_REQ);
       }
