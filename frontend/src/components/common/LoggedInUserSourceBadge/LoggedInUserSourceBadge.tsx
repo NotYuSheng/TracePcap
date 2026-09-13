@@ -1,4 +1,6 @@
-const SOURCE_INFO: Record<string, { label: string; tooltip: string; color: string }> = {
+import { SourceBadge, type SourceInfo } from '@components/common/SourceBadge/SourceBadge';
+
+const SOURCE_INFO: Record<string, SourceInfo> = {
   kerberos_as_req: {
     label: 'Kerberos',
     tooltip:
@@ -18,26 +20,6 @@ interface LoggedInUserSourceBadgeProps {
 }
 
 /** Small coloured chip showing how a host's signed-in user was discovered (Kerberos vs LDAP). */
-export const LoggedInUserSourceBadge = ({ source }: LoggedInUserSourceBadgeProps) => {
-  if (!source) return null;
-  const info = SOURCE_INFO[source];
-  if (!info) return null;
-  return (
-    <span
-      title={info.tooltip}
-      style={{
-        fontSize: 9,
-        fontWeight: 600,
-        color: '#fff',
-        background: info.color,
-        borderRadius: 3,
-        padding: '1px 4px',
-        cursor: 'help',
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-      }}
-    >
-      {info.label}
-    </span>
-  );
-};
+export const LoggedInUserSourceBadge = ({ source }: LoggedInUserSourceBadgeProps) => (
+  <SourceBadge source={source} info={SOURCE_INFO} />
+);

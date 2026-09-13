@@ -64,13 +64,22 @@ class WindowsIdentityResolverServiceTest {
   }
 
   @Test
-  void personDn_withRfc4514EscapedComma_extractsTheFullCn() {
+  void personDn_withRfc4514EscapedComma_extractsTheUnescapedName() {
     // RFC 4514: a literal comma inside a CN value is backslash-escaped so it isn't read as the
-    // attribute separator. A naive [^,]+ group would truncate at the escaped comma; the group must
-    // consume the escape pair instead.
+    // attribute separator. The group must consume the escape pair (not truncate at it), and the
+    // returned value must be the human-readable name without the wire-format backslash.
     assertThat(
             WindowsIdentityResolverService.personNameFromDn(
                 "CN=Collier\\, Clark,CN=Users,DC=wiresharkworkshop,DC=online"))
-        .isEqualTo("Collier\\, Clark");
+        .isEqualTo("Collier, Clark");
+  }
+
+  @Test
+  void personDn_withRfc4514HexEscape_isDecoded() {
+    // \20 is an escaped space; the decoded name is "Van Damme", not "Van\20Damme".
+    assertThat(
+            WindowsIdentityResolverService.personNameFromDn(
+                "CN=Van\\20Damme,CN=Users,DC=example,DC=com"))
+        .isEqualTo("Van Damme");
   }
 }

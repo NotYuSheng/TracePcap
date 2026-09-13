@@ -96,18 +96,19 @@ public class WindowsIdentityResolverService {
     //   0 frame.number  1 ip.src  2 ip.dst
     //   3 ldap.baseObject
     //   4 kerberos.msg_type  5 kerberos.CNameString
-    // ldap.AttributeDescription is required by the -Y filter below (restricts baseObject matches to
-    // searchRequests, which carry an attribute list, over other LDAP message types that don't) but
-    // is not itself extracted — nothing in parseRow reads it, see class doc on why attribute names
-    // aren't used for discrimination.
+    // The filter keys on ldap.baseObject alone — it is a searchRequest field, so it already selects
+    // the right message type. It deliberately does NOT also require ldap.AttributeDescription: a
+    // searchRequest asking for all attributes carries an empty attribute list and no
+    // AttributeDescription, and requiring it would silently drop those person lookups — the exact
+    // recall gap #808/#809 exists to close. The DN-shape regex (see class doc) is what filters
+    // person objects from infrastructure, not the presence of an attribute list.
     ProcessBuilder pb =
         new ProcessBuilder(
             "tshark",
             "-r",
             pcapFile.getAbsolutePath(),
             "-Y",
-            "(ldap.baseObject and ldap.AttributeDescription)"
-                + " || (kerberos.msg_type==10 and kerberos.CNameString)",
+            "ldap.baseObject || (kerberos.msg_type==10 and kerberos.CNameString)",
             "-T",
             "fields",
             "-E",
@@ -232,11 +233,44 @@ public class WindowsIdentityResolverService {
   /**
    * Extracts the person's name from an AD distinguished name's leading CN component, when the DN
    * shape indicates a person object ({@code CN=Users} container) — see class doc for why this is
-   * the discriminator rather than which attributes were requested.
+   * the discriminator rather than which attributes were requested. The captured CN value is
+   * RFC 4514-unescaped so a name like {@code CN=Collier\, Clark,...} is returned as the human-
+   * readable {@code "Collier, Clark"}, not with its wire-format escape backslashes.
    */
   static String personNameFromDn(String baseObject) {
     Matcher m = PERSON_DN.matcher(baseObject.trim());
-    return m.matches() ? m.group(1).trim() : null;
+    return m.matches() ? unescapeRfc4514(m.group(1)).trim() : null;
+  }
+
+  /**
+   * Undoes RFC 4514 attribute-value escaping: a backslash before a special character escapes it
+   * literally ({@code \,} → {@code ,}), and a backslash before two hex digits is that byte
+   * ({@code \20} → space). Names rarely use the hex form, but both are handled so the displayed
+   * value is what a human would read, never the on-the-wire escape sequence.
+   */
+  static String unescapeRfc4514(String s) {
+    if (s == null || s.indexOf('\\') < 0) return s;
+    StringBuilder out = new StringBuilder(s.length());
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (c == '\\' && i + 1 < s.length()) {
+        char n1 = s.charAt(i + 1);
+        if (i + 2 < s.length() && isHex(n1) && isHex(s.charAt(i + 2))) {
+          out.append((char) Integer.parseInt(s.substring(i + 1, i + 3), 16));
+          i += 2;
+        } else {
+          out.append(n1);
+          i += 1;
+        }
+      } else {
+        out.append(c);
+      }
+    }
+    return out.toString();
+  }
+
+  private static boolean isHex(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
   }
 
   /** Machine-account principals end in '$', which has no case, so this needs no case-folding. */

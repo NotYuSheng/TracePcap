@@ -299,11 +299,14 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
               >
                 <span className="text-muted" style={{ minWidth: '100px' }}>{meta.label}</span>
                 {facts.length > 0 ? (
-                  <ul className="list-unstyled mb-0 flex-grow-1">
+                  // Plain spans in a flex column, not a <ul>: this sits inside a role="button"
+                  // element, where list semantics are an invalid content model and confuse the
+                  // button's accessible-name computation. One fact per line, no list role.
+                  <span className="flex-grow-1 d-flex flex-column">
                     {facts.map((fact, i) => (
-                      <li key={i}>{fact}</li>
+                      <span key={i}>{fact}</span>
                     ))}
-                  </ul>
+                  </span>
                 ) : (
                   <span className="text-muted fst-italic flex-grow-1">Nothing observed</span>
                 )}

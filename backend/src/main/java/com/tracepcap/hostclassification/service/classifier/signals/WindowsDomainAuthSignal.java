@@ -23,8 +23,10 @@ import org.springframework.stereotype.Component;
  *   <li><b>Kerberos AS-REQ</b> — MEASURED: the client itself authenticated as this principal. Strong
  *       laptop/desktop evidence, weighted comparably to a matching OUI vendor.
  *   <li><b>LDAP directory lookup</b> — REPORTED and weaker: the host queried an account's directory
- *       entry, which is a Windows-workstation behaviour but not proof of who is signed in. Lower
- *       weight, and only counted on its own when no Kerberos claim was seen.
+ *       entry, which is a Windows-workstation behaviour but not proof of who is signed in. It adds a
+ *       smaller corroborating vote. Both signals vote additively when both are present (each is
+ *       independent evidence the host does domain activity, and the ScoreBoard stacks signals) —
+ *       LDAP is not suppressed by a Kerberos claim, it just weighs less.
  * </ul>
  *
  * <p>The resolver already excludes machine-account principals and never attributes a KDC's own IP,
