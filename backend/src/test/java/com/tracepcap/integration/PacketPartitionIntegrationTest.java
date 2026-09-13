@@ -34,9 +34,13 @@ class PacketPartitionIntegrationTest {
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"));
 
+  // Pulled from quay.io, not Docker Hub: minio/minio was pulled from Docker Hub entirely around
+  // September 2025 ("repository does not exist" even when authenticated — mistaken at first for
+  // a Docker Hub rate limit). quay.io/minio/minio is MinIO's own replacement registry and mirrors
+  // the same release tags, this one included.
   @Container
   static final GenericContainer<?> MINIO =
-      new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2024-01-28T22-35-53Z"))
+      new GenericContainer<>(DockerImageName.parse("quay.io/minio/minio:RELEASE.2024-01-28T22-35-53Z"))
           .withEnv("MINIO_ROOT_USER", "minioadmin")
           .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
           .withCommand("server", "/data")

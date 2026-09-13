@@ -49,8 +49,12 @@ services:
       - tracepcap-network
 
   # MinIO Object Storage
+  # Pulled from quay.io, not Docker Hub: minio/minio was pulled from Docker Hub entirely around
+  # September 2025 ("repository does not exist" even when authenticated — this was mistaken for a
+  # Docker Hub rate limit before the actual cause was found). quay.io/minio/minio is MinIO's own
+  # replacement registry and mirrors the same release tags.
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: tracepcap-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -83,7 +87,8 @@ services:
   # MinIO Client (mc) - Create bucket on startup
   # One-shot bucket bootstrap: it is *meant* to exit 0, so no restart policy here.
   minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Same registry move as the minio service above — minio/mc is gone from Docker Hub too.
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     container_name: tracepcap-minio-init
     deploy:
       resources:

@@ -1,6 +1,7 @@
 package com.tracepcap.signatures.service;
 
 import com.tracepcap.analysis.service.PcapParserService;
+import com.tracepcap.analysis.spi.PacketLookup;
 import com.tracepcap.analysis.spi.SignatureApplier;
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -58,11 +60,19 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class CustomSignatureService implements SignatureApplier {
 
   static final int MAX_REGEX_PAYLOAD_BYTES = 65536;
 
   private final Map<String, Pattern> patternCache = new ConcurrentHashMap<>();
+
+  // Payloads are read from the database rather than held in memory by ConversationInfo — parsing
+  // streams packets straight to the database now (#779), so by the time signature matching runs
+  // (stage 4, after parsing) every packet already has a home there. Nullable in practice only for
+  // the reflective unit tests exercising payloadContainsMatch/payloadRegexMatch directly, which
+  // never reach the lines that use it.
+  private final PacketLookup packetLookup;
 
   @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
   private String signaturesPath;
@@ -94,6 +104,10 @@ public class CustomSignatureService implements SignatureApplier {
 
     int matchCount = 0;
     for (PcapParserService.ConversationInfo conv : conversations) {
+      // Fetched at most once per conversation, only if some rule actually needs it — most
+      // deployments have no payload_contains/payload_regex rules at all, and this is a database
+      // round trip now that payloads live there instead of on ConversationInfo (#779).
+      List<String> payloads = null;
       for (Map<String, Object> rule : rules) {
         String name = (String) rule.get("name");
         if (name == null || name.isBlank()) continue;
@@ -121,12 +135,16 @@ public class CustomSignatureService implements SignatureApplier {
 
         boolean matchAll = Boolean.TRUE.equals(rule.get("match_all"));
 
+        if (hasPayload || hasRegex) {
+          if (payloads == null) payloads = packetLookup.payloadsInConversation(conv.getEntityId());
+        }
+
         if (hasPayload) {
-          if (!payloadContainsMatch(conv.getPackets(), payloadContains, matchAll)) continue;
+          if (!payloadContainsMatch(payloads, payloadContains, matchAll)) continue;
         }
 
         if (hasRegex) {
-          if (!payloadRegexMatch(conv.getPackets(), payloadRegex, matchAll)) continue;
+          if (!payloadRegexMatch(payloads, payloadRegex, matchAll)) continue;
         }
 
         if (!conv.getCustomSignatures().contains(name)) {
@@ -338,9 +356,7 @@ public class CustomSignatureService implements SignatureApplier {
    * against the packet's lowercase hex payload string.
    */
   private boolean payloadContainsMatch(
-      List<PcapParserService.PacketInfo> packets,
-      List<Map<String, Object>> patterns,
-      boolean matchAll) {
+      List<String> payloads, List<Map<String, Object>> patterns, boolean matchAll) {
     for (Map<String, Object> pattern : patterns) {
       String hexNeedle = null;
       if (pattern.containsKey("ascii")) {
@@ -355,7 +371,7 @@ public class CustomSignatureService implements SignatureApplier {
 
       final String needle = hexNeedle;
       boolean found =
-          packets.stream().anyMatch(p -> p.getPayload() != null && p.getPayload().contains(needle));
+          payloads.stream().anyMatch(payload -> payload != null && payload.contains(needle));
 
       if (matchAll && !found) return false;
       if (!matchAll && found) return true;
@@ -401,11 +417,9 @@ public class CustomSignatureService implements SignatureApplier {
    * ceases to hold, the fix is an interruptible {@code CharSequence}, not a smaller cap.
    */
   private boolean payloadRegexMatch(
-      List<PcapParserService.PacketInfo> packets,
-      List<Map<String, Object>> patterns,
-      boolean matchAll) {
+      List<String> payloads, List<Map<String, Object>> patterns, boolean matchAll) {
     // Lazily decoded payloads — populated on first access for each packet index
-    String[] decoded = new String[packets.size()];
+    String[] decoded = new String[payloads.size()];
     for (Map<String, Object> entry : patterns) {
       Object patternObj = entry.get("pattern");
       if (patternObj == null) {
@@ -438,8 +452,8 @@ public class CustomSignatureService implements SignatureApplier {
       }
 
       boolean found = false;
-      for (int i = 0; i < packets.size(); i++) {
-        String payloadHex = packets.get(i).getPayload();
+      for (int i = 0; i < payloads.size(); i++) {
+        String payloadHex = payloads.get(i);
         if (payloadHex == null || payloadHex.isEmpty()) continue;
         if (decoded[i] == null) decoded[i] = hexToAscii(payloadHex);
         if (compiled.matcher(decoded[i]).find()) {

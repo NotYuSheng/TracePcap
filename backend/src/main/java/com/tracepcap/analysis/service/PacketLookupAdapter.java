@@ -29,6 +29,11 @@ public class PacketLookupAdapter implements PacketLookup {
   }
 
   @Override
+  public List<String> payloadsInConversation(UUID conversationId) {
+    return repository.findPayloadsByConversationId(conversationId);
+  }
+
+  @Override
   public List<UUID> conversationIdsWithReplyFromPeer(UUID fileId, String hostIp) {
     return repository.findConversationIdsWithReplyFromPeer(fileId, hostIp);
   }

@@ -70,4 +70,46 @@ class PacketStringPoolingTest {
 
     assertThat(pool).hasSize(11);
   }
+
+  @Test
+  void thePoolItselfStopsGrowingPastTheCap() {
+    // #797: an unbounded pool reproduces #779's failure shape one level down — a capture with
+    // enough distinct addresses (spoofed-source flood, a scan of the whole internet, malformed
+    // traffic) would otherwise let the "fix" grow without limit. 60,000 distinct values against a
+    // 50,000 cap must not leave 60,000 entries in the map.
+    Map<String, String> pool = new HashMap<>();
+    for (int i = 0; i < 60_000; i++) {
+      pooled(pool, new String("10.0." + (i / 256) + "." + (i % 256)));
+    }
+
+    assertThat(pool.size()).isLessThanOrEqualTo(50_000);
+  }
+
+  @Test
+  void valuesPooledBeforeTheCapKeepDeduplicatingAfterItIsReached() {
+    // Past the cap, new values stop being added — but a value that made it into the pool before
+    // the cap was hit must still come back as the same object, not silently start allocating a
+    // fresh String every time.
+    Map<String, String> pool = new HashMap<>();
+    String early = pooled(pool, new String("10.0.0.1"));
+    for (int i = 0; i < 60_000; i++) {
+      pooled(pool, new String("10.1." + (i / 256) + "." + (i % 256)));
+    }
+
+    assertThat(pooled(pool, new String("10.0.0.1"))).isSameAs(early);
+  }
+
+  @Test
+  void valuesPastTheCapAreReturnedUnpooledRatherThanDropped() {
+    // A value that arrives after the pool is full must not become null or throw — it is simply not
+    // deduplicated, which costs memory proportional to itself again rather than growing the pool.
+    Map<String, String> pool = new HashMap<>();
+    for (int i = 0; i < 50_000; i++) {
+      pooled(pool, new String("10.0." + (i / 256) + "." + (i % 256)));
+    }
+
+    String overflow = new String("203.0.113.42");
+    assertThat(pooled(pool, overflow)).isEqualTo("203.0.113.42");
+    assertThat(pool).doesNotContainKey("203.0.113.42");
+  }
 }

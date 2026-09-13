@@ -2,7 +2,6 @@ package com.tracepcap.signatures.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tracepcap.analysis.service.PcapParserService;
 import java.lang.reflect.Method;
 import java.util.HexFormat;
 import java.util.List;
@@ -18,12 +17,12 @@ import org.junit.jupiter.api.Test;
  */
 class PayloadRegexMatchingTest {
 
-  private final CustomSignatureService service = new CustomSignatureService();
+  // No PacketLookup needed: these tests exercise payloadRegexMatch directly, below the point
+  // where a conversation's payloads would be fetched from the database (#779).
+  private final CustomSignatureService service = new CustomSignatureService(null);
 
-  private static PcapParserService.PacketInfo packet(String ascii) {
-    PcapParserService.PacketInfo p = new PcapParserService.PacketInfo();
-    p.setPayload(HexFormat.of().formatHex(ascii.getBytes()));
-    return p;
+  private static String packet(String ascii) {
+    return HexFormat.of().formatHex(ascii.getBytes());
   }
 
   private static Map<String, Object> pattern(String regex) {
@@ -36,15 +35,13 @@ class PayloadRegexMatchingTest {
 
   @SuppressWarnings("unchecked")
   private boolean matches(
-      List<PcapParserService.PacketInfo> packets,
-      List<Map<String, Object>> patterns,
-      boolean matchAll) {
+      List<String> payloads, List<Map<String, Object>> patterns, boolean matchAll) {
     try {
       Method m =
           CustomSignatureService.class.getDeclaredMethod(
               "payloadRegexMatch", List.class, List.class, boolean.class);
       m.setAccessible(true);
-      return (boolean) m.invoke(service, packets, patterns, matchAll);
+      return (boolean) m.invoke(service, payloads, patterns, matchAll);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException("payloadRegexMatch changed — update this test", e);
     }
@@ -110,8 +107,9 @@ class PayloadRegexMatchingTest {
 
   @Test
   void aPacketWithNoPayloadIsSkipped() {
-    PcapParserService.PacketInfo empty = new PcapParserService.PacketInfo();
-    assertThat(matches(List.of(empty), List.of(pattern(".*")), false)).isFalse();
+    // The repository query behind payloadsInConversation excludes null payloads, so an empty
+    // string is what an unrecorded/empty payload looks like by the time it reaches this method.
+    assertThat(matches(List.of(""), List.of(pattern(".*")), false)).isFalse();
   }
 
   @Test
