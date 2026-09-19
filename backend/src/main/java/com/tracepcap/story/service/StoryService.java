@@ -453,6 +453,7 @@ public class StoryService {
             - Narrative: "summary" section first covering overall picture, then "detail" sections per major finding cluster, "conclusion" last with recommendations.
             - Write for a technical security analyst. Reference specific IPs, ports, counts, and ratios from the findings.
             - The aggregates section provides full-dataset context — use it to frame the scale of findings.
+            - FORMAT each section's "content" as readable Markdown, never one long paragraph: keep paragraphs to 2-3 sentences, separate them with a blank line (\\n\\n), and use "- " bullet lists for enumerations or key facts (one item per line). You may bold a key term with **like this**. Do NOT use headings inside content.
             """;
   }
 

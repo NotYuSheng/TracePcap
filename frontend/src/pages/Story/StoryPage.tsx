@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
-import type { TimelineDataPoint } from '@/types';
+import type { Answer, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
+import { storyService } from '@/features/story/services/storyService';
 import {
   AUTO_GRANULARITY_INTERVAL,
   AUTO_GRANULARITY_MAX_DATAPOINTS,
@@ -12,6 +13,7 @@ import {
 import { NarrativeView } from '@components/story/NarrativeView';
 import { StoryTimeline } from '@components/story/StoryTimeline';
 import { StorySectionNav, type StorySection } from '@components/story/StorySectionNav/StorySectionNav';
+import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
 import { AggregatesPanel } from '@components/story/AggregatesPanel';
@@ -75,6 +77,16 @@ export const StoryPage = () => {
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [loadingTimeline, setLoadingTimeline] = useState(true);
+  const [answers, setAnswers] = useState<Answer[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    storyService
+      .getAnswers(fileId)
+      .then(a => { if (alive) setAnswers(a); })
+      .catch(() => { if (alive) setAnswers([]); });
+    return () => { alive = false; };
+  }, [fileId]);
 
 
   useEffect(() => {
@@ -220,7 +232,9 @@ export const StoryPage = () => {
   const hasAggregates = !!story.aggregates;
   const hasFindings = !!story.findings && story.findings.length > 0;
   const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
+  const hasAnswers = answers.length > 0;
   const navSections: StorySection[] = [
+    ...(hasAnswers ? [{ id: 'story-confirmed', label: 'Confirmed findings', icon: 'bi-clipboard2-check' }] : []),
     { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
     { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
     ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
@@ -277,6 +291,15 @@ export const StoryPage = () => {
 
         {/* Story content */}
         <div className="col-lg-9 col-xl-10">
+      {/* Confirmed findings — deterministic answers (#813) */}
+      {hasAnswers && (
+        <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
+          <div className="col-12">
+            <ConfirmedFindingsPanel answers={answers} />
+          </div>
+        </div>
+      )}
+
       {/* How stories are generated */}
       <div className="row mb-4" id="story-info" style={sectionAnchor}>
         <div className="col-12">

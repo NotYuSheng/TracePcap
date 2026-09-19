@@ -3,7 +3,7 @@ package com.tracepcap.common.exception;
 /** Exception thrown when the LLM service is unreachable or returns an error */
 public class LlmException extends RuntimeException {
 
-  public enum ErrorCode { LLM_UNREACHABLE, LLM_TIMEOUT }
+  public enum ErrorCode { LLM_UNREACHABLE, LLM_TIMEOUT, OUTPUT_TRUNCATED }
 
   private final ErrorCode errorCode;
 

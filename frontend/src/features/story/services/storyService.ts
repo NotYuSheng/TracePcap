@@ -1,8 +1,17 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import type { Story } from '@/types';
+import type { Answer, Story } from '@/types';
 
 export const storyService = {
+  /**
+   * Deterministic answers to the standard investigation questions for a file (#813) — victim, C2,
+   * malware, signed-in user. The same conclusions that feed the narrative, surfaced directly.
+   */
+  getAnswers: async (fileId: string): Promise<Answer[]> => {
+    const response = await apiClient.get<Answer[]>(API_ENDPOINTS.ANSWERS(fileId));
+    return response.data;
+  },
+
   /**
    * Generate a story/narrative for a PCAP file
    */
