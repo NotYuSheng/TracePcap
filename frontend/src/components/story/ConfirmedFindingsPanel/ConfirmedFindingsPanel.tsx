@@ -1,8 +1,44 @@
-import { Card } from '@govtechsg/sgds-react';
+import { Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import type { Answer } from '@/types';
 
 interface ConfirmedFindingsPanelProps {
   answers: Answer[];
+}
+
+/** Click-toggled help behind the header's info icon — app convention (no native title tooltip). */
+function InvestigationSummaryInfoPopover() {
+  const popover = (
+    <Popover id="info-investigation-summary" style={{ maxWidth: '340px' }}>
+      <Popover.Header>Investigation Summary — How it works</Popover.Header>
+      <Popover.Body className="small">
+        <p className="mb-2">
+          These are deterministic answers to the standard investigation questions — who the victim
+          is, the C2, the malware, the signed-in user — reached by checks over the extracted evidence
+          (IDS signatures, protocol parsing, identity resolution), <strong>not</strong> by the LLM.
+          They are the ground truth the narrative is built on.
+        </p>
+        <p className="mb-0">
+          Each answer is labelled with how directly it is known:{' '}
+          <strong>Measured</strong> (the traffic exhibited it), <strong>Reported</strong> (a party
+          asserted it on the wire), or <strong>Inferred</strong> (a tool judged it) — so it is never
+          presented as certain.
+        </p>
+      </Popover.Body>
+    </Popover>
+  );
+  return (
+    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+      <Button
+        type="button"
+        variant="link"
+        className="p-0 text-muted ms-2"
+        style={{ lineHeight: 1 }}
+        aria-label="About Investigation Summary"
+      >
+        <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }} aria-hidden="true"></i>
+      </Button>
+    </OverlayTrigger>
+  );
 }
 
 /** Friendly label + icon per standard-question key; unknown keys fall back to the raw key. */
@@ -35,6 +71,7 @@ export const ConfirmedFindingsPanel = ({ answers }: ConfirmedFindingsPanelProps)
         <h5 className="mb-1 d-flex align-items-center">
           <i className="bi bi-clipboard2-check me-2" aria-hidden="true" />
           Investigation Summary
+          <InvestigationSummaryInfoPopover />
         </h5>
         <p className="text-muted small mb-3">
           Deterministic answers to the standard questions, drawn from the evidence — each labelled
