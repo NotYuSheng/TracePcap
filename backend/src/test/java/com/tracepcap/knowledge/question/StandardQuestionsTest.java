@@ -56,6 +56,21 @@ class StandardQuestionsTest {
   }
 
   @Test
+  void c2_includesGeoAttribution_whenTheExternalEntityCarriesIt() {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("141.98.10.79");
+    EntityRef strrat = EntityRef.malware("STRRAT");
+    b.addEntity(c2, java.util.Map.of("country", "LT", "org", "UAB Host Baltic"));
+    b.addRelationship(Relationship.of(c2, "c2-of", strrat, Grade.INFERRED, "suricata"));
+
+    List<Answer> a = new C2Question().answer(b.build());
+    assertThat(a).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).contains("LT · UAB Host Baltic");
+      assertThat(ans.attributes()).containsEntry("country", "LT").containsEntry("org", "UAB Host Baltic");
+    });
+  }
+
+  @Test
   void malware_listsTheNamedFamily() {
     List<Answer> a = new MalwareQuestion().answer(strratBoard());
     assertThat(a).singleElement().satisfies(ans -> assertThat(ans.attributes()).containsEntry("family", "STRRAT"));

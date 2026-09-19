@@ -45,10 +45,15 @@ public class C2Question implements StandardQuestion {
       Map<String, Object> attrs = new LinkedHashMap<>();
       attrs.put("address", c2.key());
       attrs.put("malware", families.size() == 1 ? families.get(0) : families);
+      // Geo attribution (posted by GeoOrgContributor) if present — names where the C2 is hosted.
+      String place = geoAttribution(board, c2, attrs);
       answers.add(
           new Answer(
               QUESTION,
-              c2.key() + " — C2 for " + String.join(", ", families),
+              c2.key()
+                  + (place != null ? " (" + place + ")" : "")
+                  + " — C2 for "
+                  + String.join(", ", families),
               Grade.INFERRED,
               subjects,
               alertSummaries(board, c2),
@@ -64,4 +69,22 @@ public class C2Question implements StandardQuestion {
         .map(Finding::summary)
         .toList();
   }
+
+  /**
+   * Reads the geo attributes another contributor posted on this external entity, copies them into
+   * the answer's attributes, and returns a short "country · org" label for the headline (or null).
+   */
+  private String geoAttribution(CaseKnowledge board, EntityRef external, Map<String, Object> attrs) {
+    var entity = board.entity(external).orElse(null);
+    if (entity == null) return null;
+    Object country = entity.attributes().get("country");
+    Object org = entity.attributes().get("org");
+    if (country != null) attrs.put("country", country);
+    if (org != null) attrs.put("org", org);
+    if (country != null && org != null) return country + " · " + org;
+    if (org != null) return org.toString();
+    if (country != null) return country.toString();
+    return null;
+  }
 }
+
