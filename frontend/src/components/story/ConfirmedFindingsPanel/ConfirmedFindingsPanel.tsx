@@ -3,6 +3,7 @@ import type { Answer } from '@/types';
 
 interface ConfirmedFindingsPanelProps {
   answers: Answer[];
+  loading?: boolean;
 }
 
 /** Click-toggled help behind the header's info icon — app convention (no native title tooltip). */
@@ -62,9 +63,7 @@ const GRADE_STYLE: Record<string, { bg: string; label: string; tip: string }> = 
  * only through the LLM narrative. This is the same data that feeds the narrative's ground-truth
  * block. Renders nothing when there are no answers (a capture with no such findings).
  */
-export const ConfirmedFindingsPanel = ({ answers }: ConfirmedFindingsPanelProps) => {
-  if (answers.length === 0) return null;
-
+export const ConfirmedFindingsPanel = ({ answers, loading = false }: ConfirmedFindingsPanelProps) => {
   return (
     <Card>
       <Card.Body>
@@ -78,6 +77,20 @@ export const ConfirmedFindingsPanel = ({ answers }: ConfirmedFindingsPanelProps)
           with how directly it is known (measured, reported, or inferred), not asserted as certain.
         </p>
 
+        {loading ? (
+          <div className="text-muted small d-flex align-items-center gap-2 py-2">
+            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+            Deriving answers…
+          </div>
+        ) : answers.length === 0 ? (
+          <div className="text-center text-muted py-4">
+            <i className="bi bi-clipboard-x d-block mb-2" style={{ fontSize: '1.6rem' }} aria-hidden="true" />
+            <div className="small">
+              No deterministic answers for this capture — nothing matched the standard questions
+              (victim, C2, malware, signed-in user). The narrative below still summarises the traffic.
+            </div>
+          </div>
+        ) : (
         <div className="d-flex flex-column gap-2">
           {answers.map((a, i) => {
             const meta = QUESTION_META[a.question] ?? { label: a.question, icon: 'bi-dot' };
@@ -116,6 +129,7 @@ export const ConfirmedFindingsPanel = ({ answers }: ConfirmedFindingsPanelProps)
             );
           })}
         </div>
+        )}
       </Card.Body>
     </Card>
   );

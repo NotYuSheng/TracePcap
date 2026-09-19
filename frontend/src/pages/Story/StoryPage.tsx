@@ -78,13 +78,16 @@ export const StoryPage = () => {
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [answersLoaded, setAnswersLoaded] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    setAnswersLoaded(false);
     storyService
       .getAnswers(fileId)
       .then(a => { if (alive) setAnswers(a); })
-      .catch(() => { if (alive) setAnswers([]); });
+      .catch(() => { if (alive) setAnswers([]); })
+      .finally(() => { if (alive) setAnswersLoaded(true); });
     return () => { alive = false; };
   }, [fileId]);
 
@@ -215,10 +218,9 @@ export const StoryPage = () => {
   const hasAggregates = !!story.aggregates;
   const hasFindings = !!story.findings && story.findings.length > 0;
   const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
-  const hasAnswers = answers.length > 0;
   const navSections: StorySection[] = [
     { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
-    ...(hasAnswers ? [{ id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' }] : []),
+    { id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' },
     { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
     ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
     ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
@@ -291,13 +293,11 @@ export const StoryPage = () => {
       </div>
 
       {/* Investigation summary — deterministic answers (#813) */}
-      {hasAnswers && (
-        <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
-          <div className="col-12">
-            <ConfirmedFindingsPanel answers={answers} />
-          </div>
+      <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
+        <div className="col-12">
+          <ConfirmedFindingsPanel answers={answers} loading={!answersLoaded} />
         </div>
-      )}
+      </div>
 
       {/* Story Q&A */}
       <div className="row mb-4" id="story-chat" style={sectionAnchor}>
