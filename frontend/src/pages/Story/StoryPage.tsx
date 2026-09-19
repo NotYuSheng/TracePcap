@@ -11,6 +11,7 @@ import {
 } from '@/features/timeline/constants';
 import { NarrativeView } from '@components/story/NarrativeView';
 import { StoryTimeline } from '@components/story/StoryTimeline';
+import { StorySectionNav, type StorySection } from '@components/story/StorySectionNav/StorySectionNav';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
 import { AggregatesPanel } from '@components/story/AggregatesPanel';
@@ -213,6 +214,26 @@ export const StoryPage = () => {
     );
   }
 
+  // Build the in-page nav from the sections actually rendered below, so it never lists a section
+  // the page conditionally hid (no timeline data, no findings, etc.).
+  const hasTraffic = !loadingTimeline && timelineData.length > 0;
+  const hasAggregates = !!story.aggregates;
+  const hasFindings = !!story.findings && story.findings.length > 0;
+  const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
+  const navSections: StorySection[] = [
+    { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
+    { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
+    ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
+    ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
+    ...(hasFindings ? [{ id: 'story-findings', label: 'Deterministic findings', icon: 'bi-shield-check' }] : []),
+    ...(hasInvestigation ? [{ id: 'story-investigation', label: 'LLM investigation', icon: 'bi-search' }] : []),
+    { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
+  ];
+
+  // Clear the sticky app header (~112px) so a jumped-to section and the sticky sidebar aren't
+  // hidden underneath it.
+  const sectionAnchor = { scrollMarginTop: '124px' } as const;
+
   return (
     <div className="story-page">
       {/* Header */}
@@ -246,8 +267,18 @@ export const StoryPage = () => {
         </div>
       )}
 
+      <div className="row">
+        {/* In-page section navigation (sticky below the app header) */}
+        <div className="col-lg-3 col-xl-2 d-none d-lg-block">
+          <div className="sticky-top" style={{ top: '124px' }}>
+            <StorySectionNav sections={navSections} />
+          </div>
+        </div>
+
+        {/* Story content */}
+        <div className="col-lg-9 col-xl-10">
       {/* How stories are generated */}
-      <div className="row mb-4">
+      <div className="row mb-4" id="story-info" style={sectionAnchor}>
         <div className="col-12">
           <StoryInfoCard
             additionalContext={additionalContext}
@@ -263,15 +294,15 @@ export const StoryPage = () => {
       </div>
 
       {/* Story Q&A */}
-      <div className="row mb-4">
+      <div className="row mb-4" id="story-chat" style={sectionAnchor}>
         <div className="col-12">
           <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} />
         </div>
       </div>
 
       {/* Traffic Timeline Visualization */}
-      {!loadingTimeline && timelineData.length > 0 && (
-        <div className="row mb-4">
+      {hasTraffic && (
+        <div className="row mb-4" id="story-traffic" style={sectionAnchor}>
           <div className="col-12">
             <Card>
               <Card.Body>
@@ -288,7 +319,7 @@ export const StoryPage = () => {
 
       {/* Aggregates Panel — pre-computed full-dataset analytics */}
       {story.aggregates && (
-        <div className="row mb-4">
+        <div className="row mb-4" id="story-aggregates" style={sectionAnchor}>
           <div className="col-12">
             <AggregatesPanel aggregates={story.aggregates} />
           </div>
@@ -297,7 +328,7 @@ export const StoryPage = () => {
 
       {/* Findings Panel — deterministic detector output */}
       {story.findings && story.findings.length > 0 && (
-        <div className="row mb-4">
+        <div className="row mb-4" id="story-findings" style={sectionAnchor}>
           <div className="col-12">
             <FindingsPanel findings={story.findings} />
           </div>
@@ -306,7 +337,7 @@ export const StoryPage = () => {
 
       {/* Investigation Panel — LLM-directed retrieval results */}
       {story.investigationSteps && story.investigationSteps.length > 0 && (
-        <div className="row mb-4">
+        <div className="row mb-4" id="story-investigation" style={sectionAnchor}>
           <div className="col-12">
             <InvestigationPanel steps={story.investigationSteps} />
           </div>
@@ -314,7 +345,7 @@ export const StoryPage = () => {
       )}
 
       {/* Narrative and Event Timeline */}
-      <div className="row">
+      <div className="row" id="story-narrative" style={sectionAnchor}>
         {/* Narrative Section */}
         <div className="col-lg-8">
           <h5 className="mb-3 d-flex align-items-center">
@@ -338,6 +369,8 @@ export const StoryPage = () => {
           </Card>
         </div>
       </div>
+        </div>{/* /col-lg-10 story content */}
+      </div>{/* /row two-column layout */}
     </div>
   );
 };
