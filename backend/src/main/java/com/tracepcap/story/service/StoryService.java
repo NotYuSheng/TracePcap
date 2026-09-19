@@ -46,6 +46,7 @@ public class StoryService {
   private final InvestigationTools investigationTools;
   private final TimelineService timelineService;
   private final com.tracepcap.knowledge.service.StandardQuestionService standardQuestionService;
+  private final com.tracepcap.knowledge.service.CaseKnowledgeService caseKnowledgeService;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -344,6 +345,7 @@ public class StoryService {
 
     StringBuilder userPrompt = new StringBuilder();
     appendConfirmedFindings(userPrompt, story.getFileId());
+    appendKnowledgeBoard(userPrompt, story.getFileId());
     userPrompt.append("## Story Data\n").append(story.getContent()).append("\n\n");
 
     if (history != null && !history.isEmpty()) {
@@ -501,6 +503,57 @@ public class StoryService {
           .append(" [").append(a.grade()).append("]\n");
     }
     prompt.append("\n");
+  }
+
+  /** Cap on entities rendered into the Q&A board digest, so a big capture can't bloat the prompt. */
+  private static final int BOARD_ENTITY_LIMIT = 60;
+
+  /**
+   * Appends a compact digest of the whole knowledge board (#813) — entities, relationships, and
+   * findings — so ad-hoc Q&A can reason over the full structured facts, not only the distilled
+   * answers. Used for Q&A only (the narrative already gets the answers); best-effort. The board is
+   * small, so it is injected wholesale rather than exposed as a query tool — a tool loop would only
+   * be worth it if the board grew too large to fit.
+   */
+  private void appendKnowledgeBoard(StringBuilder prompt, UUID fileId) {
+    com.tracepcap.knowledge.spi.CaseKnowledge board;
+    try {
+      board = caseKnowledgeService.assemble(fileId);
+    } catch (Exception e) {
+      log.warn("Knowledge board context unavailable for file {}: {}", fileId, e.getMessage());
+      return;
+    }
+    if (board.entities().isEmpty() && board.findings().isEmpty()) return;
+
+    prompt.append("## Knowledge Board (structured facts, deterministic)\n");
+
+    prompt.append("Entities:\n");
+    board.entities().stream()
+        .limit(BOARD_ENTITY_LIMIT)
+        .forEach(
+            e -> {
+              prompt.append("- ").append(e.type()).append(' ').append(e.key());
+              if (!e.attributes().isEmpty()) prompt.append(' ').append(e.attributes());
+              prompt.append('\n');
+            });
+    if (board.entities().size() > BOARD_ENTITY_LIMIT) {
+      prompt.append("- … and ").append(board.entities().size() - BOARD_ENTITY_LIMIT).append(" more\n");
+    }
+
+    if (!board.relationships().isEmpty()) {
+      prompt.append("Relationships:\n");
+      board.relationships().forEach(
+          r -> prompt.append("- ").append(r.from().key()).append(' ').append(r.predicate())
+              .append(' ').append(r.to().key()).append(" (").append(r.grade()).append(")\n"));
+    }
+
+    if (!board.findings().isEmpty()) {
+      prompt.append("Findings:\n");
+      board.findings().forEach(
+          f -> prompt.append("- [").append(f.severity()).append("] ").append(f.category())
+              .append(": ").append(f.summary()).append('\n'));
+    }
+    prompt.append('\n');
   }
 
   private String buildBasePromptContext(
