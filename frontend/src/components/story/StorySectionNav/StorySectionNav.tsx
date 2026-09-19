@@ -44,9 +44,6 @@ export function StorySectionNav({ sections }: StorySectionNavProps) {
 
   return (
     <nav aria-label="Story sections">
-      <div className="text-muted text-uppercase fw-semibold mb-2" style={{ fontSize: '0.68rem', letterSpacing: '0.03em' }}>
-        On this page
-      </div>
       {/* Reuses the app's nav-link styling (same as the Analysis page tabs), laid out vertically. */}
       <ul className="nav nav-pills flex-column">
         {sections.map(s => (
