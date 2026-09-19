@@ -1,0 +1,19 @@
+# Ground truth for the evaluation harness (#819, Workstream A).
+# Sourced from the exercise's published answer key — NOT from TracePcap's own output.
+case_id: 2024-07-30-strrat
+title: "Wireshark Workshop — You Dirty RAT! (STRRAT)"
+source: https://www.malware-traffic-analysis.net/2024/07/30/index.html
+
+victim:
+  ip: 172.16.1.66
+  mac: "00:1e:64:ec:f3:08"
+  hostname: DESKTOP-SKBR25F
+user:
+  account: ccollier
+  real_name: Clark Collier      # from the LDAP person-DN; TracePcap does not surface this yet
+malware:
+  family: STRRAT
+c2:
+  - ip: 141.98.10.79
+    port: 12132                 # raw TCP beacon; port/proto are informational (not scored today)
+    proto: TCP
