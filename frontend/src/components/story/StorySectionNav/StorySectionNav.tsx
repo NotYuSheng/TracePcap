@@ -47,28 +47,21 @@ export function StorySectionNav({ sections }: StorySectionNavProps) {
       <div className="text-muted text-uppercase fw-semibold mb-2" style={{ fontSize: '0.68rem', letterSpacing: '0.03em' }}>
         On this page
       </div>
-      <ul className="nav flex-column">
-        {sections.map(s => {
-          const active = s.id === activeId;
-          return (
-            <li className="nav-item" key={s.id}>
-              <button
-                type="button"
-                onClick={() => jump(s.id)}
-                className={`btn btn-link text-start w-100 d-flex align-items-center px-2 py-1 text-decoration-none ${active ? 'fw-semibold' : 'text-muted'}`}
-                style={{
-                  fontSize: '0.8rem',
-                  borderLeft: `2px solid ${active ? 'var(--bs-primary, #0d6efd)' : 'transparent'}`,
-                  color: active ? 'var(--bs-primary, #0d6efd)' : undefined,
-                  borderRadius: 0,
-                }}
-              >
-                <i className={`bi ${s.icon} me-2`} aria-hidden="true" />
-                <span className="text-truncate">{s.label}</span>
-              </button>
-            </li>
-          );
-        })}
+      {/* Reuses the app's nav-link styling (same as the Analysis page tabs), laid out vertically. */}
+      <ul className="nav nav-pills flex-column">
+        {sections.map(s => (
+          <li className="nav-item" key={s.id}>
+            <button
+              type="button"
+              onClick={() => jump(s.id)}
+              className={`nav-link text-start w-100 d-flex align-items-center ${s.id === activeId ? 'active' : ''}`}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              <i className={`bi ${s.icon} me-2`} aria-hidden="true" />
+              <span className="text-truncate">{s.label}</span>
+            </button>
+          </li>
+        ))}
       </ul>
     </nav>
   );
