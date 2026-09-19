@@ -50,7 +50,9 @@ class StandardQuestionsTest {
   void c2_isTheExternalEndpoint_withMalwareFamily() {
     List<Answer> a = new C2Question().answer(strratBoard());
     assertThat(a).singleElement().satisfies(ans -> {
-      assertThat(ans.attributes()).containsEntry("address", "141.98.10.79").containsEntry("malware", "STRRAT");
+      assertThat(ans.attributes())
+          .containsEntry("address", "141.98.10.79")
+          .containsEntry("malware", List.of("STRRAT")); // always a list, single family included
       assertThat(ans.subjects()).contains(EntityRef.external("141.98.10.79"), EntityRef.malware("STRRAT"));
     });
   }
@@ -83,7 +85,7 @@ class StandardQuestionsTest {
     List<Answer> a = new C2Question().answer(b.build());
     assertThat(a).singleElement().satisfies(ans -> {
       assertThat(ans.headline()).contains("C2 for STRRAT").doesNotContain("STRRAT, STRRAT");
-      assertThat(ans.attributes()).containsEntry("malware", "STRRAT");
+      assertThat(ans.attributes()).containsEntry("malware", List.of("STRRAT"));
       assertThat(ans.subjects()).containsExactly(c2, strrat);
     });
   }
@@ -149,6 +151,8 @@ class StandardQuestionsTest {
     assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Kaws Networks"))).hasSize(1);
     // "Level 3 Communications" is backbone/CDN transit — excluded despite the embedded space.
     assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Level 3 Communications"))).isEmpty();
+    // A VPS/IaaS host (DigitalOcean) is NOT a CDN — it routinely fronts C2/exfil, so it must surface.
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "DigitalOcean, LLC"))).hasSize(1);
   }
 
   @Test

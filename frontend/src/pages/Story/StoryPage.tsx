@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
@@ -218,7 +218,9 @@ export const StoryPage = () => {
   const hasAggregates = !!story.aggregates;
   const hasFindings = !!story.findings && story.findings.length > 0;
   const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
-  const navSections: StorySection[] = [
+  // Memoized so StorySectionNav's IntersectionObserver isn't torn down and rebuilt on every
+  // StoryPage re-render (answers/timeline/granularity state) — which would flicker the active id.
+  const navSections: StorySection[] = useMemo(() => [
     { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
     { id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' },
     { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
@@ -227,7 +229,7 @@ export const StoryPage = () => {
     ...(hasFindings ? [{ id: 'story-findings', label: 'Deterministic findings', icon: 'bi-shield-check' }] : []),
     ...(hasInvestigation ? [{ id: 'story-investigation', label: 'LLM investigation', icon: 'bi-search' }] : []),
     { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
-  ];
+  ], [hasTraffic, hasAggregates, hasFindings, hasInvestigation]);
 
   // Clear the sticky app header (~112px) so a jumped-to section and the sticky sidebar aren't
   // hidden underneath it.

@@ -476,12 +476,6 @@ public class StoryService {
           "signed-in-user", "Signed-in user");
 
   /**
-   * Prepends the deterministic answers (#813) as an authoritative ground-truth block, so the
-   * narrative names the malware, the C2, and the signed-in user the deterministic layers already
-   * established — instead of re-deriving a weaker picture from traffic metrics alone (the exact gap
-   * the STRRAT demo exposed). Best-effort: a knowledge-layer failure never blocks story generation.
-   */
-  /**
    * Q&A context: assemble the knowledge board <em>once</em> and derive both the confirmed-findings
    * block and the board digest from it. Previously each appender assembled independently, running
    * every contributor (and its full conversation load) twice per question — a real cost on large

@@ -33,17 +33,25 @@ public class IdsAlertContributor implements KnowledgeContributor {
   static final String COMMUNICATES_WITH = "communicates-with";
   static final String C2_OF = "c2-of";
 
-  /** "ET MALWARE STRRAT CnC Checkin (sid:2030358 sev:1)" → captures the family token after MALWARE. */
+  /**
+   * The token(s) after "MALWARE" in an ET rule name. Group 1 is an all-caps lead token (a family
+   * like {@code STRRAT}, or a platform prefix like {@code MSIL}/{@code ELF}); group 2, when the lead
+   * is a {@code platform/family} form, is the family after the slash ({@code MSIL/Ramnit} → Ramnit).
+   */
   private static final Pattern MALWARE_FAMILY =
-      Pattern.compile("\\bMALWARE\\s+([A-Z0-9_]{2,})\\b");
+      Pattern.compile("\\bMALWARE\\s+([A-Z0-9_]{2,})(?:/([A-Za-z0-9_]{2,}))?\\b");
 
   /**
-   * All-caps tokens that follow "MALWARE" in ET rule names but are protocols/categories, not family
-   * names (e.g. "ET MALWARE DNS Query ...", "ET MALWARE ABUSE.CH ..."). Without this, the greedy
+   * All-caps lead tokens that follow "MALWARE" in ET rule names but are protocols/categories, not
+   * family names (e.g. "ET MALWARE DNS Query ...", "ET MALWARE ABUSE.CH ..."). Without this, the
    * capture would mint a bogus malware entity and a {@code c2-of} edge, turning a benign server into
-   * a C2 and its peer into a victim — the exact false positive this layer exists to avoid. (Mixed-case
-   * families such as "Cobalt Strike" are not captured by design; a false family is worse than a
-   * missed one here.)
+   * a C2 and its peer into a victim — the exact false positive this layer exists to avoid.
+   *
+   * <p>This is a heuristic, not a family registry: it suppresses the known-generic lead tokens and
+   * extracts the real family from a {@code platform/family} rule, but a novel all-caps generic token
+   * or a lowercase platform prefix ("Win32/Foo") is not perfectly handled. A false family is worse
+   * than a missed one here, so anything ambiguous is dropped rather than guessed. A rule-semantics
+   * classifier (CnC/Checkin ⇒ C2 vs. informational) is the root-cause follow-up.
    */
   private static final java.util.Set<String> NON_FAMILY_TOKENS =
       java.util.Set.of(
@@ -120,8 +128,9 @@ public class IdsAlertContributor implements KnowledgeContributor {
     if (alert == null) return null;
     Matcher m = MALWARE_FAMILY.matcher(alert);
     while (m.find()) {
-      String token = m.group(1);
-      if (!NON_FAMILY_TOKENS.contains(token)) return token;
+      // Prefer the family after a platform prefix ("MSIL/Ramnit" → Ramnit); else the lead token.
+      String family = m.group(2) != null ? m.group(2) : m.group(1);
+      if (!NON_FAMILY_TOKENS.contains(family.toUpperCase(java.util.Locale.ROOT))) return family;
     }
     return null;
   }

@@ -88,6 +88,20 @@ class IdsAlertContributorTest {
   }
 
   @Test
+  void platformPrefixedFamily_extractsTheFamilyAfterTheSlash() {
+    // "ET MALWARE MSIL/Ramnit ..." is a real malware C2 — keep the c2-of edge, but the family is
+    // "Ramnit" (after the platform prefix), not the platform token "MSIL".
+    CaseKnowledge k =
+        run(conv("172.16.1.66", "141.98.10.79",
+            List.of("ET MALWARE MSIL/Ramnit CnC Checkin (sid:9 sev:1)")));
+
+    assertThat(k.entitiesOfType(EntityType.MALWARE)).singleElement()
+        .satisfies(e -> assertThat(e.key()).isEqualTo("Ramnit"));
+    assertThat(k.relationshipsWithPredicate("c2-of")).singleElement()
+        .satisfies(r -> assertThat(r.from()).isEqualTo(EntityRef.external("141.98.10.79")));
+  }
+
+  @Test
   void internalToInternalAlert_recordsFindingButNoC2Direction() {
     // An IDS hit on internal↔internal traffic (both endpoints local) has no host↔external C2 pair —
     // it must not invent a communicates-with / c2-of edge (which would make one internal host a

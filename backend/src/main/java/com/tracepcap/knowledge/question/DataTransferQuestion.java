@@ -37,10 +37,12 @@ public class DataTransferQuestion implements StandardQuestion {
    * Distinctive brand substrings safe to match anywhere in the org name (checked against the org and
    * its de-spaced form, so "Level 3 Communications" → "level3" hits).
    */
+  // NB: no VPS/IaaS-only providers here (e.g. DigitalOcean) — those routinely host C2 and exfil
+  // endpoints, so a bulk transfer to one must still surface for review, not be excluded as "a CDN".
   private static final List<String> CDN_BRAND_SUBSTRINGS =
       List.of(
           "cloudflare", "cloudfront", "fastly", "akamai", "edgecast", "limelight", "cachefly",
-          "incapsula", "stackpath", "cdn77", "digitalocean", "level3");
+          "incapsula", "stackpath", "cdn77", "level3");
 
   /**
    * Short / ambiguous org tokens matched only as whole words — never as substrings — so "aws" no

@@ -47,7 +47,8 @@ public class C2Question implements StandardQuestion {
       families.forEach(f -> subjects.add(EntityRef.malware(f)));
       Map<String, Object> attrs = new LinkedHashMap<>();
       attrs.put("address", c2.key());
-      attrs.put("malware", families.size() == 1 ? families.iterator().next() : new ArrayList<>(families));
+      // Always a list, so the attribute's JSON type is stable whether one family or several.
+      attrs.put("malware", new ArrayList<>(families));
       // Geo attribution (posted by GeoOrgContributor) if present — names where the C2 is hosted.
       String place = geoAttribution(board, c2, attrs);
       answers.add(
