@@ -39,11 +39,12 @@ public class VictimQuestion implements StandardQuestion {
     }
     if (c2s.isEmpty()) return List.of();
 
-    // victim host -> the C2s it was seen contacting
-    Map<EntityRef, List<String>> victims = new LinkedHashMap<>();
+    // victim host -> the C2s it was seen contacting (deduped: several communicates-with edges — one
+    // per alerted conversation plus the aggregated traffic edge — can name the same C2)
+    Map<EntityRef, Set<String>> victims = new LinkedHashMap<>();
     for (Relationship comm : board.relationshipsWithPredicate("communicates-with")) {
       if (comm.from().type() == EntityType.HOST && c2s.contains(comm.to())) {
-        victims.computeIfAbsent(comm.from(), k -> new ArrayList<>())
+        victims.computeIfAbsent(comm.from(), k -> new LinkedHashSet<>())
             .add("contacted C2 " + comm.to().key());
       }
     }
@@ -58,7 +59,8 @@ public class VictimQuestion implements StandardQuestion {
           host.key()
               + " — contacted a known malware C2"
               + (user != null ? " (signed in as " + user + ")" : "");
-      answers.add(new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), basis, attrs));
+      answers.add(
+          new Answer(QUESTION, headline, Grade.INFERRED, List.of(host), new ArrayList<>(basis), attrs));
     });
     return answers;
   }

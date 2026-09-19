@@ -9,10 +9,13 @@ import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,13 +33,24 @@ public class DataTransferQuestion implements StandardQuestion {
   /** Only transfers of at least this size are worth surfacing. */
   static final long BULK_THRESHOLD_BYTES = 5_000_000L;
 
-  /** Org-name substrings that mark ordinary CDN / cloud infrastructure — excluded from the finding. */
-  private static final List<String> CDN_CLOUD_ORGS =
+  /**
+   * Distinctive brand substrings safe to match anywhere in the org name (checked against the org and
+   * its de-spaced form, so "Level 3 Communications" → "level3" hits).
+   */
+  private static final List<String> CDN_BRAND_SUBSTRINGS =
       List.of(
-          "fastly", "cloudflare", "akamai", "amazon", "aws", "google", "microsoft", "azure",
-          "github", "apple", "edgecast", "limelight", "cachefly", "cloudfront", "netflix", "meta",
-          "facebook", "incapsula", "stackpath", "cdn77", "lumen", "level 3", "verizon", "digital ocean",
-          "digitalocean", "oracle", "cdn");
+          "cloudflare", "cloudfront", "fastly", "akamai", "edgecast", "limelight", "cachefly",
+          "incapsula", "stackpath", "cdn77", "digitalocean", "level3");
+
+  /**
+   * Short / ambiguous org tokens matched only as whole words — never as substrings — so "aws" no
+   * longer swallows "Kaws Networks" and "meta" no longer swallows "Metatel", which would silently
+   * drop a genuine exfil destination from review.
+   */
+  private static final Set<String> CDN_CLOUD_TOKENS =
+      Set.of(
+          "aws", "amazon", "google", "microsoft", "azure", "github", "apple", "netflix", "meta",
+          "facebook", "lumen", "verizon", "oracle", "cdn");
 
   @Override
   public String question() {
@@ -96,7 +110,12 @@ public class DataTransferQuestion implements StandardQuestion {
   private boolean isCdnOrCloud(String org) {
     if (org == null) return false; // unattributed — do NOT assume benign; surface it
     String lower = org.toLowerCase(Locale.ROOT);
-    return CDN_CLOUD_ORGS.stream().anyMatch(lower::contains);
+    String despaced = lower.replace(" ", "");
+    for (String brand : CDN_BRAND_SUBSTRINGS) {
+      if (lower.contains(brand) || despaced.contains(brand)) return true;
+    }
+    Set<String> tokens = new HashSet<>(Arrays.asList(lower.split("[^a-z0-9]+")));
+    return tokens.stream().anyMatch(CDN_CLOUD_TOKENS::contains);
   }
 
   private String megabytes(long bytes) {

@@ -71,6 +71,24 @@ class StandardQuestionsTest {
   }
 
   @Test
+  void c2_dedupesAFamilyNamedByMultipleRules() {
+    // Two rules on one conversation both name STRRAT → two identical c2-of edges. The answer must
+    // list the family once, not "STRRAT, STRRAT" with a duplicate subject.
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("141.98.10.79");
+    EntityRef strrat = EntityRef.malware("STRRAT");
+    b.addRelationship(Relationship.of(c2, "c2-of", strrat, Grade.INFERRED, "suricata"));
+    b.addRelationship(Relationship.of(c2, "c2-of", strrat, Grade.INFERRED, "suricata"));
+
+    List<Answer> a = new C2Question().answer(b.build());
+    assertThat(a).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).contains("C2 for STRRAT").doesNotContain("STRRAT, STRRAT");
+      assertThat(ans.attributes()).containsEntry("malware", "STRRAT");
+      assertThat(ans.subjects()).containsExactly(c2, strrat);
+    });
+  }
+
+  @Test
   void malware_listsTheNamedFamily() {
     List<Answer> a = new MalwareQuestion().answer(strratBoard());
     assertThat(a).singleElement().satisfies(ans -> assertThat(ans.attributes()).containsEntry("family", "STRRAT"));
@@ -122,6 +140,15 @@ class StandardQuestionsTest {
     // The exact false positive the LLM made on the demo: a big Fastly CDN transfer is NOT a finding.
     assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Fastly, Inc."))).isEmpty();
     assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Amazon.com, Inc."))).isEmpty();
+  }
+
+  @Test
+  void dataTransfer_cdnExclusionMatchesWholeWordsNotSubstrings() {
+    // "Kaws Networks" contains the substring "aws" but is not AWS — a genuine destination that must
+    // still be surfaced, not silently dropped by an over-broad substring match.
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Kaws Networks"))).hasSize(1);
+    // "Level 3 Communications" is backbone/CDN transit — excluded despite the embedded space.
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Level 3 Communications"))).isEmpty();
   }
 
   @Test

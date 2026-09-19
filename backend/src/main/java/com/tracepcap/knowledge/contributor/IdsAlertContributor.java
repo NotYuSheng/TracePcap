@@ -37,6 +37,20 @@ public class IdsAlertContributor implements KnowledgeContributor {
   private static final Pattern MALWARE_FAMILY =
       Pattern.compile("\\bMALWARE\\s+([A-Z0-9_]{2,})\\b");
 
+  /**
+   * All-caps tokens that follow "MALWARE" in ET rule names but are protocols/categories, not family
+   * names (e.g. "ET MALWARE DNS Query ...", "ET MALWARE ABUSE.CH ..."). Without this, the greedy
+   * capture would mint a bogus malware entity and a {@code c2-of} edge, turning a benign server into
+   * a C2 and its peer into a victim — the exact false positive this layer exists to avoid. (Mixed-case
+   * families such as "Cobalt Strike" are not captured by design; a false family is worse than a
+   * missed one here.)
+   */
+  private static final java.util.Set<String> NON_FAMILY_TOKENS =
+      java.util.Set.of(
+          "DNS", "HTTP", "HTTPS", "TLS", "SSL", "TCP", "UDP", "SMB", "SMTP", "FTP", "IRC", "RDP",
+          "URI", "URL", "UA", "CNC", "C2", "GET", "POST", "JA3", "OS", "IP", "ABUSE", "WIN32",
+          "WIN64", "X86", "X64", "PDF", "JS", "VBS", "PS1", "APT", "CVE", "USER");
+
   private final ConversationLookup conversationLookup;
 
   @Override
@@ -56,14 +70,7 @@ public class IdsAlertContributor implements KnowledgeContributor {
       EntityRef dstRef = endpointRef(dstIp);
       if (srcRef == null || dstRef == null) continue;
 
-      // The external party is the non-local endpoint; direct the C2 edge internal → external.
-      boolean srcLocal = IpLocality.isLocal(srcIp);
-      EntityRef internal = srcLocal ? srcRef : dstRef;
-      EntityRef external = srcLocal ? dstRef : srcRef;
-
-      board.addRelationship(
-          Relationship.of(internal, COMMUNICATES_WITH, external, Grade.MEASURED, name()));
-
+      // The alert itself is a real observation regardless of direction — always record it.
       for (String alert : alerts) {
         board.addFinding(
             new Finding(
@@ -75,7 +82,22 @@ public class IdsAlertContributor implements KnowledgeContributor {
                 List.of(srcRef, dstRef),
                 List.of(conv.id().toString()),
                 Map.of("srcIp", srcIp, "dstIp", dstIp)));
+      }
 
+      // C2 attribution needs an unambiguous internal → external direction. If both endpoints are
+      // local (an IDS hit on internal/lateral traffic) or both routable, there is no host↔C2 pair
+      // to assert — record only the finding above, never a bogus communicates-with / c2-of edge.
+      boolean srcLocal = IpLocality.isLocal(srcIp);
+      boolean dstLocal = IpLocality.isLocal(dstIp);
+      if (srcLocal == dstLocal) continue;
+
+      EntityRef internal = srcLocal ? srcRef : dstRef;
+      EntityRef external = srcLocal ? dstRef : srcRef;
+
+      board.addRelationship(
+          Relationship.of(internal, COMMUNICATES_WITH, external, Grade.MEASURED, name()));
+
+      for (String alert : alerts) {
         String family = malwareFamily(alert);
         if (family != null) {
           EntityRef malwareRef = EntityRef.malware(family);
@@ -97,6 +119,10 @@ public class IdsAlertContributor implements KnowledgeContributor {
   private String malwareFamily(String alert) {
     if (alert == null) return null;
     Matcher m = MALWARE_FAMILY.matcher(alert);
-    return m.find() ? m.group(1) : null;
+    while (m.find()) {
+      String token = m.group(1);
+      if (!NON_FAMILY_TOKENS.contains(token)) return token;
+    }
+    return null;
   }
 }

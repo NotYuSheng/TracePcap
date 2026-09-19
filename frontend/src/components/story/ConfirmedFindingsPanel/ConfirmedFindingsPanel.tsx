@@ -102,8 +102,9 @@ export const ConfirmedFindingsPanel = ({ answers, loading = false }: ConfirmedFi
                 <div className="flex-grow-1 min-w-0">
                   <div className="d-flex align-items-center gap-2 flex-wrap">
                     <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>{meta.label}</span>
+                    {/* Grade meaning is explained once in the header info popover — no native
+                        title= tooltip here (CLAUDE.md: title= is unreliable/inaccessible). */}
                     <span
-                      title={grade.tip}
                       style={{
                         fontSize: 9,
                         fontWeight: 600,
@@ -111,7 +112,6 @@ export const ConfirmedFindingsPanel = ({ answers, loading = false }: ConfirmedFi
                         background: grade.bg,
                         borderRadius: 3,
                         padding: '1px 5px',
-                        cursor: grade.tip ? 'help' : undefined,
                       }}
                     >
                       {grade.label}

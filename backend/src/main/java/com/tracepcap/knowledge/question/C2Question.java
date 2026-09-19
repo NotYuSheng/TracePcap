@@ -9,8 +9,10 @@ import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
@@ -31,10 +33,11 @@ public class C2Question implements StandardQuestion {
 
   @Override
   public List<Answer> answer(CaseKnowledge board) {
-    // external C2 -> the malware families it serves
-    Map<EntityRef, List<String>> c2ToMalware = new LinkedHashMap<>();
+    // external C2 -> the malware families it serves (deduped: the same family can be named by
+    // several rules on one conversation, or recur across conversations)
+    Map<EntityRef, Set<String>> c2ToMalware = new LinkedHashMap<>();
     for (Relationship c2of : board.relationshipsWithPredicate("c2-of")) {
-      c2ToMalware.computeIfAbsent(c2of.from(), k -> new ArrayList<>()).add(c2of.to().key());
+      c2ToMalware.computeIfAbsent(c2of.from(), k -> new LinkedHashSet<>()).add(c2of.to().key());
     }
 
     List<Answer> answers = new ArrayList<>();
@@ -44,7 +47,7 @@ public class C2Question implements StandardQuestion {
       families.forEach(f -> subjects.add(EntityRef.malware(f)));
       Map<String, Object> attrs = new LinkedHashMap<>();
       attrs.put("address", c2.key());
-      attrs.put("malware", families.size() == 1 ? families.get(0) : families);
+      attrs.put("malware", families.size() == 1 ? families.iterator().next() : new ArrayList<>(families));
       // Geo attribution (posted by GeoOrgContributor) if present — names where the C2 is hosted.
       String place = geoAttribution(board, c2, attrs);
       answers.add(

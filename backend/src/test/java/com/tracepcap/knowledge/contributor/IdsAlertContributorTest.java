@@ -74,6 +74,35 @@ class IdsAlertContributorTest {
   }
 
   @Test
+  void genericMalwareToken_doesNotMintABogusFamilyOrC2() {
+    // "ET MALWARE DNS Query ..." must NOT capture "DNS" as a malware family (which would create a
+    // spurious malware entity + c2-of edge, mislabelling a benign server as a C2). The finding is
+    // still recorded; there is just no family/C2 attribution.
+    CaseKnowledge k =
+        run(conv("172.16.1.66", "8.8.8.8",
+            List.of("ET MALWARE DNS Query to a Suspicious Domain (sid:1 sev:2)")));
+
+    assertThat(k.findingsOfCategory("ids-alert")).hasSize(1);
+    assertThat(k.entitiesOfType(EntityType.MALWARE)).isEmpty();
+    assertThat(k.relationshipsWithPredicate("c2-of")).isEmpty();
+  }
+
+  @Test
+  void internalToInternalAlert_recordsFindingButNoC2Direction() {
+    // An IDS hit on internal↔internal traffic (both endpoints local) has no host↔external C2 pair —
+    // it must not invent a communicates-with / c2-of edge (which would make one internal host a
+    // "victim" of another internal host wrongly tagged a C2).
+    CaseKnowledge k =
+        run(conv("172.16.1.66", "172.16.1.4",
+            List.of("ET MALWARE STRRAT CnC Checkin (sid:2030358 sev:1)")));
+
+    assertThat(k.findingsOfCategory("ids-alert")).hasSize(1); // the alert itself is still recorded
+    assertThat(k.relationshipsWithPredicate("communicates-with")).isEmpty();
+    assertThat(k.relationshipsWithPredicate("c2-of")).isEmpty();
+    assertThat(k.entitiesOfType(EntityType.MALWARE)).isEmpty();
+  }
+
+  @Test
   void conversationWithoutSuricataAlert_addsNothing() {
     CaseKnowledge k = run(conv("172.16.1.66", "8.8.8.8", List.of()));
     assertThat(k.findings()).isEmpty();

@@ -344,8 +344,7 @@ public class StoryService {
         """;
 
     StringBuilder userPrompt = new StringBuilder();
-    appendConfirmedFindings(userPrompt, story.getFileId());
-    appendKnowledgeBoard(userPrompt, story.getFileId());
+    appendKnowledgeContext(userPrompt, story.getFileId());
     userPrompt.append("## Story Data\n").append(story.getContent()).append("\n\n");
 
     if (history != null && !history.isEmpty()) {
@@ -482,6 +481,25 @@ public class StoryService {
    * established — instead of re-deriving a weaker picture from traffic metrics alone (the exact gap
    * the STRRAT demo exposed). Best-effort: a knowledge-layer failure never blocks story generation.
    */
+  /**
+   * Q&A context: assemble the knowledge board <em>once</em> and derive both the confirmed-findings
+   * block and the board digest from it. Previously each appender assembled independently, running
+   * every contributor (and its full conversation load) twice per question — a real cost on large
+   * captures. Best-effort: a knowledge failure degrades to no context, never blocks the answer.
+   */
+  private void appendKnowledgeContext(StringBuilder prompt, UUID fileId) {
+    com.tracepcap.knowledge.spi.CaseKnowledge board;
+    try {
+      board = caseKnowledgeService.assemble(fileId);
+    } catch (Exception e) {
+      log.warn("Knowledge context unavailable for file {}: {}", fileId, e.getMessage());
+      return;
+    }
+    appendConfirmedFindings(prompt, standardQuestionService.answer(board));
+    appendKnowledgeBoard(prompt, board);
+  }
+
+  /** Narrative path: resolve the answers for this file, then render them. */
   private void appendConfirmedFindings(StringBuilder prompt, UUID fileId) {
     List<com.tracepcap.knowledge.spi.Answer> answers;
     try {
@@ -490,6 +508,12 @@ public class StoryService {
       log.warn("Confirmed-findings context unavailable for file {}: {}", fileId, e.getMessage());
       return;
     }
+    appendConfirmedFindings(prompt, answers);
+  }
+
+  /** Renders already-resolved answers (the Q&A path reuses one assembled board). */
+  private void appendConfirmedFindings(
+      StringBuilder prompt, List<com.tracepcap.knowledge.spi.Answer> answers) {
     if (answers.isEmpty()) return;
 
     prompt.append("## Confirmed Findings (deterministic — treat as authoritative ground truth)\n");
@@ -515,14 +539,7 @@ public class StoryService {
    * small, so it is injected wholesale rather than exposed as a query tool — a tool loop would only
    * be worth it if the board grew too large to fit.
    */
-  private void appendKnowledgeBoard(StringBuilder prompt, UUID fileId) {
-    com.tracepcap.knowledge.spi.CaseKnowledge board;
-    try {
-      board = caseKnowledgeService.assemble(fileId);
-    } catch (Exception e) {
-      log.warn("Knowledge board context unavailable for file {}: {}", fileId, e.getMessage());
-      return;
-    }
+  private void appendKnowledgeBoard(StringBuilder prompt, com.tracepcap.knowledge.spi.CaseKnowledge board) {
     if (board.entities().isEmpty() && board.findings().isEmpty()) return;
 
     prompt.append("## Knowledge Board (structured facts, deterministic)\n");
