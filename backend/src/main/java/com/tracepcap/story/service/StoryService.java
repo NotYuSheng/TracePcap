@@ -45,6 +45,7 @@ public class StoryService {
   private final InvestigationService investigationService;
   private final InvestigationTools investigationTools;
   private final TimelineService timelineService;
+  private final com.tracepcap.knowledge.service.StandardQuestionService standardQuestionService;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -462,6 +463,43 @@ public class StoryService {
   private static final int DEFAULT_MAX_FINDINGS = 20;
   private static final int DEFAULT_MAX_RISK_MATRIX = 15;
 
+  /** Friendly labels for the deterministic standard-question keys, for the prompt's ground-truth block. */
+  private static final Map<String, String> CONFIRMED_LABELS =
+      Map.of(
+          "victim", "Victim host",
+          "c2", "Command-and-control",
+          "malware", "Malware",
+          "signed-in-user", "Signed-in user");
+
+  /**
+   * Prepends the deterministic answers (#813) as an authoritative ground-truth block, so the
+   * narrative names the malware, the C2, and the signed-in user the deterministic layers already
+   * established — instead of re-deriving a weaker picture from traffic metrics alone (the exact gap
+   * the STRRAT demo exposed). Best-effort: a knowledge-layer failure never blocks story generation.
+   */
+  private void appendConfirmedFindings(StringBuilder prompt, UUID fileId) {
+    List<com.tracepcap.knowledge.spi.Answer> answers;
+    try {
+      answers = standardQuestionService.answer(fileId);
+    } catch (Exception e) {
+      log.warn("Confirmed-findings context unavailable for file {}: {}", fileId, e.getMessage());
+      return;
+    }
+    if (answers.isEmpty()) return;
+
+    prompt.append("## Confirmed Findings (deterministic — treat as authoritative ground truth)\n");
+    prompt.append(
+        "These were established by deterministic checks over the capture (IDS signatures, protocol"
+            + " extraction, identity resolution), not by inference. Name them explicitly in your"
+            + " narrative and do not contradict them.\n");
+    for (com.tracepcap.knowledge.spi.Answer a : answers) {
+      String label = CONFIRMED_LABELS.getOrDefault(a.question(), a.question());
+      prompt.append("- ").append(label).append(": ").append(a.headline())
+          .append(" [").append(a.grade()).append("]\n");
+    }
+    prompt.append("\n");
+  }
+
   private String buildBasePromptContext(
       FileEntity file, CaptureSummary analysis, String additionalContext,
       StoryAggregates agg, List<Finding> findings,
@@ -473,6 +511,8 @@ public class StoryService {
     StringBuilder prompt = new StringBuilder();
     prompt.append(
         "Analyze this network traffic capture and write a narrative from the findings below:\n\n");
+
+    appendConfirmedFindings(prompt, fileId);
 
     prompt.append("## File Information\n");
     prompt.append(String.format("- Filename: %s\n", file.getFileName()));
