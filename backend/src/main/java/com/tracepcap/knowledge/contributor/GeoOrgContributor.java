@@ -17,11 +17,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * Attribution for the external endpoints that carry an IDS alert (#813): country, ASN, and org from
- * the offline GeoIP database. Bounded to alerted externals so the board stays focused; the geo
- * attributes merge onto the same {@code EXTERNAL_SERVICE} entities the IDS contributor posts, so a
- * check answering "what is the C2?" can name where it is hosted. All INFERRED — a third party's
- * opinion about who owns a range.
+ * Attribution for the external endpoints the capture talked to (#813): country, ASN, and org from
+ * the offline GeoIP database. The geo attributes merge onto the same {@code EXTERNAL_SERVICE}
+ * entities other contributors post, so a check can name where a C2 is hosted, and a data-transfer
+ * check can tell a real destination from ordinary CDN traffic by its org. All INFERRED — a third
+ * party's opinion about who owns a range.
  */
 @Component
 @RequiredArgsConstructor
@@ -39,8 +39,6 @@ public class GeoOrgContributor implements KnowledgeContributor {
   public void contribute(UUID fileId, CaseKnowledgeBuilder board) {
     Set<String> externals = new LinkedHashSet<>();
     for (ConversationFacts conv : conversationLookup.conversationFacts(fileId)) {
-      var alerts = conv.findings().suricataAlerts();
-      if (alerts == null || alerts.isEmpty()) continue;
       addExternal(externals, conv.flow().srcIp());
       addExternal(externals, conv.flow().dstIp());
     }

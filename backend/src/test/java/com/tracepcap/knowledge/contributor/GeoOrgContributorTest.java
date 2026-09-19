@@ -60,13 +60,18 @@ class GeoOrgContributorTest {
   }
 
   @Test
-  void conversationsWithoutAlertsAreIgnored() {
+  void enrichesAllExternalsEvenWithoutAnAlert() {
+    // Broadened (#813): geo is generally useful, so every external the capture talked to is
+    // enriched — not only the alerted ones.
     when(conversationLookup.conversationFacts(FILE))
         .thenReturn(List.of(conv("172.16.1.66", "8.8.8.8", List.of())));
+    when(geoOrgLookup.attributionFor(any()))
+        .thenReturn(Map.of("8.8.8.8", new IpAttribution("8.8.8.8", "AS15169", "Google LLC", "US")));
 
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
     new GeoOrgContributor(conversationLookup, geoOrgLookup).contribute(FILE, board);
 
-    assertThat(board.build().entities()).isEmpty();
+    assertThat(board.build().entity(EntityRef.external("8.8.8.8"))).isPresent().get()
+        .satisfies(e -> assertThat(e.attributes()).containsEntry("org", "Google LLC"));
   }
 }

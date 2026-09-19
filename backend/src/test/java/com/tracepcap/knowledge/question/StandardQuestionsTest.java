@@ -97,6 +97,38 @@ class StandardQuestionsTest {
         .containsExactlyInAnyOrder("victim", "c2", "malware", "signed-in-user");
   }
 
+  /** A host→external communicates-with edge with a byte count and the external's org on the board. */
+  private CaseKnowledge transferBoard(long bytes, String org) {
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef host = EntityRef.host("172.16.1.66");
+    EntityRef ext = EntityRef.external("199.232.196.209");
+    b.addEntity(ext, java.util.Map.of("org", org, "country", "US"));
+    b.addRelationship(new Relationship(host, "communicates-with", ext, Grade.MEASURED, "traffic",
+        java.util.Map.of("bytes", bytes)));
+    return b.build();
+  }
+
+  @Test
+  void dataTransfer_flagsBulkTransferToNonCdnExternal() {
+    List<Answer> a = new DataTransferQuestion().answer(transferBoard(8_000_000L, "UAB Host Baltic"));
+    assertThat(a).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).contains("199.232.196.209").contains("8.0 MB").contains("UAB Host Baltic");
+      assertThat(ans.attributes()).containsEntry("bytes", 8_000_000L);
+    });
+  }
+
+  @Test
+  void dataTransfer_excludesCdnAndCloudOrgs() {
+    // The exact false positive the LLM made on the demo: a big Fastly CDN transfer is NOT a finding.
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Fastly, Inc."))).isEmpty();
+    assertThat(new DataTransferQuestion().answer(transferBoard(8_000_000L, "Amazon.com, Inc."))).isEmpty();
+  }
+
+  @Test
+  void dataTransfer_ignoresTransfersBelowTheBulkThreshold() {
+    assertThat(new DataTransferQuestion().answer(transferBoard(1_000_000L, "UAB Host Baltic"))).isEmpty();
+  }
+
   @Test
   void emptyBoard_yieldsNoAnswers() {
     CaseKnowledge empty = new CaseKnowledgeBuilder(UUID.randomUUID()).build();
@@ -104,5 +136,6 @@ class StandardQuestionsTest {
     assertThat(new C2Question().answer(empty)).isEmpty();
     assertThat(new MalwareQuestion().answer(empty)).isEmpty();
     assertThat(new SignedInUserQuestion().answer(empty)).isEmpty();
+    assertThat(new DataTransferQuestion().answer(empty)).isEmpty();
   }
 }
