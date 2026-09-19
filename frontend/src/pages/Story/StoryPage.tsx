@@ -13,6 +13,7 @@ import {
 import { NarrativeView } from '@components/story/NarrativeView';
 import { StoryTimeline } from '@components/story/StoryTimeline';
 import { StorySectionNav, type StorySection } from '@components/story/StorySectionNav/StorySectionNav';
+import { StoryProgress } from '@components/story/StoryProgress/StoryProgress';
 import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
@@ -20,7 +21,6 @@ import { AggregatesPanel } from '@components/story/AggregatesPanel';
 import { FindingsPanel } from '@components/story/FindingsPanel';
 import { InvestigationPanel } from '@components/story/InvestigationPanel';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
-import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 
 function NarrativeInfoPopover() {
@@ -115,26 +115,9 @@ export const StoryPage = () => {
   }, [fileId, granularity]);
 
   if (generating && !story) {
-    const minutes = Math.floor(elapsedSeconds / 60);
-    const seconds = elapsedSeconds % 60;
-    const elapsed =
-      minutes > 0 ? `${minutes}m ${seconds.toString().padStart(2, '0')}s` : `${seconds}s`;
     const timeoutSec = Math.round(llmTimeoutMs / 1000);
     const timeoutLabel = timeoutSec < 60 ? `${timeoutSec}s` : `${Math.round(timeoutSec / 60)} min`;
-    return (
-      <div className="text-center py-5">
-        <LoadingSpinner
-          size="large"
-          message="Generating narrative story... This may take a few moments."
-        />
-        <p className="text-muted mt-3">
-          AI is analyzing the network traffic and creating a comprehensive narrative...
-        </p>
-        <p className="text-muted small mt-1">
-          Elapsed: <strong>{elapsed}</strong> &nbsp;|&nbsp; Timeout: {timeoutLabel}
-        </p>
-      </div>
-    );
+    return <StoryProgress elapsedSeconds={elapsedSeconds} timeoutLabel={timeoutLabel} />;
   }
 
   if (contextError && !story) {
@@ -234,7 +217,7 @@ export const StoryPage = () => {
   const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
   const hasAnswers = answers.length > 0;
   const navSections: StorySection[] = [
-    ...(hasAnswers ? [{ id: 'story-confirmed', label: 'Confirmed findings', icon: 'bi-clipboard2-check' }] : []),
+    ...(hasAnswers ? [{ id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' }] : []),
     { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
     { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
     ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),

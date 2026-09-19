@@ -34,11 +34,11 @@ export const ConfirmedFindingsPanel = ({ answers }: ConfirmedFindingsPanelProps)
       <Card.Body>
         <h5 className="mb-1 d-flex align-items-center">
           <i className="bi bi-clipboard2-check me-2" aria-hidden="true" />
-          Confirmed Findings
+          Investigation Summary
         </h5>
         <p className="text-muted small mb-3">
-          Deterministic conclusions drawn from the evidence — the ground truth the narrative is built
-          on. Each carries the grade of the strongest signal behind it.
+          Deterministic answers to the standard questions, drawn from the evidence — each labelled
+          with how directly it is known (measured, reported, or inferred), not asserted as certain.
         </p>
 
         <div className="d-flex flex-column gap-2">
