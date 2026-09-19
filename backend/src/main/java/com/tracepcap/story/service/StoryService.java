@@ -323,9 +323,10 @@ public class StoryService {
         You are a cybersecurity analyst expert. You have already generated a network traffic
         analysis story for a PCAP file. The story is provided to you as structured JSON below.
 
-        Answer the user's question concisely and accurately, drawing only from the story data
-        provided. If the answer cannot be determined from the available data, say so clearly.
-        Do NOT invent details that are not present in the story.
+        Answer the user's question concisely and accurately, drawing from the confirmed findings and
+        story data provided. The confirmed findings are deterministic ground truth — prefer them and
+        never contradict them. If the answer cannot be determined from the available data, say so
+        clearly. Do NOT invent details that are not present.
 
         You must respond ONLY with valid JSON in this exact format:
         {
@@ -342,6 +343,7 @@ public class StoryService {
         """;
 
     StringBuilder userPrompt = new StringBuilder();
+    appendConfirmedFindings(userPrompt, story.getFileId());
     userPrompt.append("## Story Data\n").append(story.getContent()).append("\n\n");
 
     if (history != null && !history.isEmpty()) {
