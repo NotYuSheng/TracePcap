@@ -1638,6 +1638,12 @@
           "ip": {
             "type": "string"
           },
+          "loggedInUser": {
+            "type": "string"
+          },
+          "loggedInUserSource": {
+            "type": "string"
+          },
           "mac": {
             "type": "string"
           },

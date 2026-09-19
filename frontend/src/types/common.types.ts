@@ -434,6 +434,10 @@ export interface HostClassification {
   hostname?: string;
   /** How `hostname` was discovered: reverse_dns | mdns | nbns | dhcp | manual. */
   hostnameSource?: HostnameSource;
+  /** Windows sign-in username observed from this host (Kerberos AS-REQ / LDAP); person-level (#809). */
+  loggedInUser?: string;
+  /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
+  loggedInUserSource?: string;
   ttl?: number;
   deviceType: DeviceType;
   confidence: number;

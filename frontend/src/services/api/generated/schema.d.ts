@@ -2302,6 +2302,8 @@ export interface components {
             hostname?: string;
             hostnameSource?: string;
             ip?: string;
+            loggedInUser?: string;
+            loggedInUserSource?: string;
             mac?: string;
             manufacturer?: string;
             serviceRoles?: string[];

@@ -57,7 +57,8 @@ public interface HostClassificationLookup {
    *   <li><b>Never null, may be empty:</b> {@code serviceRoles} — already split from its stored
    *       comma-joined form, and immutable.
    *   <li><b>Nullable:</b> {@code mac}, {@code manufacturer}, {@code hostname}, {@code
-   *       hostnameSource}, {@code ttl} — the capture may simply not reveal these.
+   *       hostnameSource}, {@code loggedInUser}, {@code loggedInUserSource}, {@code ttl} — the
+   *       capture may simply not reveal these.
    * </ul>
    */
   record HostFacts(
@@ -66,6 +67,8 @@ public interface HostClassificationLookup {
       String manufacturer,
       String hostname,
       String hostnameSource,
+      String loggedInUser,
+      String loggedInUserSource,
       Integer ttl,
       String deviceType,
       int confidence,

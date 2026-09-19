@@ -60,6 +60,21 @@ public class HostClassificationEntity {
   @Column(name = "hostname_source", length = 20)
   private String hostnameSource;
 
+  /**
+   * Windows sign-in username observed for this host (#809), from a Kerberos AS-REQ principal or an
+   * LDAP directory lookup — e.g. {@code "ccollier"} / {@code "Clark Collier"}. Null when no domain
+   * sign-in was seen. A person-level identity, distinct from the machine-level {@link #hostname}.
+   */
+  @Column(name = "logged_in_user", length = 255)
+  private String loggedInUser;
+
+  /**
+   * How {@link #loggedInUser} was discovered: {@code kerberos_as_req} (authenticated, stronger) or
+   * {@code ldap_dn} (directory lookup, weaker). Null when no signed-in user is set.
+   */
+  @Column(name = "logged_in_user_source", length = 20)
+  private String loggedInUserSource;
+
   /** First-seen IP TTL value (may be null for non-IP traffic). */
   @Column(name = "ttl")
   private Integer ttl;

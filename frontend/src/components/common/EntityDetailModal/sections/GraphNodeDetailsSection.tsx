@@ -3,6 +3,7 @@ import { Badge } from '@govtechsg/sgds-react';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor } from '@/features/network/constants';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
+import { LoggedInUserSourceBadge } from '@components/common/LoggedInUserSourceBadge/LoggedInUserSourceBadge';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { Alert } from '@components/common/Alert';
 import { formatBytes, formatNumber } from '../format';
@@ -113,6 +114,15 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
                 <dd className="col-7 mb-1 d-flex align-items-center gap-1">
                   <span>{node.data.hostname}</span>
                   <HostnameSourceBadge source={node.data.hostnameSource} />
+                </dd>
+              </>
+            )}
+            {node.data.loggedInUser && (
+              <>
+                <dt className="col-5 text-muted">Signed-in user</dt>
+                <dd className="col-7 mb-1 d-flex align-items-center gap-1">
+                  <span>{node.data.loggedInUser}</span>
+                  <LoggedInUserSourceBadge source={node.data.loggedInUserSource} />
                 </dd>
               </>
             )}
