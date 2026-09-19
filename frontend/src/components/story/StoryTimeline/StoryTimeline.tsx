@@ -70,7 +70,20 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
     return icons[type] || 'bi-circle';
   };
 
-  const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
+  // The LLM often leaves an event's timestamp null (the prompt template defaults it so), and a null
+  // renders as "1 Jan 1970" via new Date(0). Treat only a real positive epoch as a usable time:
+  // events keep their given order when unstamped, and no fake date is shown.
+  const hasTime = (t: number | null | undefined): t is number =>
+    typeof t === 'number' && Number.isFinite(t) && t > 0;
+
+  const sortedEvents = [...events].sort((a, b) => {
+    const at = hasTime(a.timestamp);
+    const bt = hasTime(b.timestamp);
+    if (at && bt) return a.timestamp - b.timestamp;
+    if (at) return -1; // stamped events first, unstamped keep their relative order after
+    if (bt) return 1;
+    return 0;
+  });
 
   return (
     <div className="story-timeline">
@@ -93,7 +106,9 @@ export const StoryTimeline = ({ events }: StoryTimelineProps) => {
                   >
                     {event.title}
                   </h6>
-                  <small className="text-muted">{formatTimestamp(event.timestamp)}</small>
+                  {hasTime(event.timestamp) && (
+                    <small className="text-muted">{formatTimestamp(event.timestamp)}</small>
+                  )}
                 </div>
                 <p className="mb-2 text-muted">{event.description}</p>
                 {event.relatedData && (
