@@ -45,6 +45,8 @@ public class StoryService {
   private final InvestigationService investigationService;
   private final InvestigationTools investigationTools;
   private final TimelineService timelineService;
+  private final com.tracepcap.knowledge.service.StandardQuestionService standardQuestionService;
+  private final com.tracepcap.knowledge.service.CaseKnowledgeService caseKnowledgeService;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -322,9 +324,10 @@ public class StoryService {
         You are a cybersecurity analyst expert. You have already generated a network traffic
         analysis story for a PCAP file. The story is provided to you as structured JSON below.
 
-        Answer the user's question concisely and accurately, drawing only from the story data
-        provided. If the answer cannot be determined from the available data, say so clearly.
-        Do NOT invent details that are not present in the story.
+        Answer the user's question concisely and accurately, drawing from the confirmed findings and
+        story data provided. The confirmed findings are deterministic ground truth — prefer them and
+        never contradict them. If the answer cannot be determined from the available data, say so
+        clearly. Do NOT invent details that are not present.
 
         You must respond ONLY with valid JSON in this exact format:
         {
@@ -341,6 +344,7 @@ public class StoryService {
         """;
 
     StringBuilder userPrompt = new StringBuilder();
+    appendKnowledgeContext(userPrompt, story.getFileId());
     userPrompt.append("## Story Data\n").append(story.getContent()).append("\n\n");
 
     if (history != null && !history.isEmpty()) {
@@ -452,6 +456,7 @@ public class StoryService {
             - Narrative: "summary" section first covering overall picture, then "detail" sections per major finding cluster, "conclusion" last with recommendations.
             - Write for a technical security analyst. Reference specific IPs, ports, counts, and ratios from the findings.
             - The aggregates section provides full-dataset context — use it to frame the scale of findings.
+            - FORMAT each section's "content" as readable Markdown, never one long paragraph: keep paragraphs to 2-3 sentences, separate them with a blank line (\\n\\n), and use "- " bullet lists for enumerations or key facts (one item per line). You may bold a key term with **like this**. Do NOT use headings inside content.
             """;
   }
 
@@ -461,6 +466,106 @@ public class StoryService {
    */
   private static final int DEFAULT_MAX_FINDINGS = 20;
   private static final int DEFAULT_MAX_RISK_MATRIX = 15;
+
+  /** Friendly labels for the deterministic standard-question keys, for the prompt's ground-truth block. */
+  private static final Map<String, String> CONFIRMED_LABELS =
+      Map.of(
+          "victim", "Victim host",
+          "c2", "Command-and-control",
+          "malware", "Malware",
+          "signed-in-user", "Signed-in user");
+
+  /**
+   * Q&A context: assemble the knowledge board <em>once</em> and derive both the confirmed-findings
+   * block and the board digest from it. Previously each appender assembled independently, running
+   * every contributor (and its full conversation load) twice per question — a real cost on large
+   * captures. Best-effort: a knowledge failure degrades to no context, never blocks the answer.
+   */
+  private void appendKnowledgeContext(StringBuilder prompt, UUID fileId) {
+    com.tracepcap.knowledge.spi.CaseKnowledge board;
+    try {
+      board = caseKnowledgeService.assemble(fileId);
+    } catch (Exception e) {
+      log.warn("Knowledge context unavailable for file {}: {}", fileId, e.getMessage());
+      return;
+    }
+    appendConfirmedFindings(prompt, standardQuestionService.answer(board));
+    appendKnowledgeBoard(prompt, board);
+  }
+
+  /** Narrative path: resolve the answers for this file, then render them. */
+  private void appendConfirmedFindings(StringBuilder prompt, UUID fileId) {
+    List<com.tracepcap.knowledge.spi.Answer> answers;
+    try {
+      answers = standardQuestionService.answer(fileId);
+    } catch (Exception e) {
+      log.warn("Confirmed-findings context unavailable for file {}: {}", fileId, e.getMessage());
+      return;
+    }
+    appendConfirmedFindings(prompt, answers);
+  }
+
+  /** Renders already-resolved answers (the Q&A path reuses one assembled board). */
+  private void appendConfirmedFindings(
+      StringBuilder prompt, List<com.tracepcap.knowledge.spi.Answer> answers) {
+    if (answers.isEmpty()) return;
+
+    prompt.append("## Confirmed Findings (deterministic — treat as authoritative ground truth)\n");
+    prompt.append(
+        "These were established by deterministic checks over the capture (IDS signatures, protocol"
+            + " extraction, identity resolution), not by inference. Name them explicitly in your"
+            + " narrative and do not contradict them.\n");
+    for (com.tracepcap.knowledge.spi.Answer a : answers) {
+      String label = CONFIRMED_LABELS.getOrDefault(a.question(), a.question());
+      prompt.append("- ").append(label).append(": ").append(a.headline())
+          .append(" [").append(a.grade()).append("]\n");
+    }
+    prompt.append("\n");
+  }
+
+  /** Cap on entities rendered into the Q&A board digest, so a big capture can't bloat the prompt. */
+  private static final int BOARD_ENTITY_LIMIT = 60;
+
+  /**
+   * Appends a compact digest of the whole knowledge board (#813) — entities, relationships, and
+   * findings — so ad-hoc Q&A can reason over the full structured facts, not only the distilled
+   * answers. Used for Q&A only (the narrative already gets the answers); best-effort. The board is
+   * small, so it is injected wholesale rather than exposed as a query tool — a tool loop would only
+   * be worth it if the board grew too large to fit.
+   */
+  private void appendKnowledgeBoard(StringBuilder prompt, com.tracepcap.knowledge.spi.CaseKnowledge board) {
+    if (board.entities().isEmpty() && board.findings().isEmpty()) return;
+
+    prompt.append("## Knowledge Board (structured facts, deterministic)\n");
+
+    prompt.append("Entities:\n");
+    board.entities().stream()
+        .limit(BOARD_ENTITY_LIMIT)
+        .forEach(
+            e -> {
+              prompt.append("- ").append(e.type()).append(' ').append(e.key());
+              if (!e.attributes().isEmpty()) prompt.append(' ').append(e.attributes());
+              prompt.append('\n');
+            });
+    if (board.entities().size() > BOARD_ENTITY_LIMIT) {
+      prompt.append("- … and ").append(board.entities().size() - BOARD_ENTITY_LIMIT).append(" more\n");
+    }
+
+    if (!board.relationships().isEmpty()) {
+      prompt.append("Relationships:\n");
+      board.relationships().forEach(
+          r -> prompt.append("- ").append(r.from().key()).append(' ').append(r.predicate())
+              .append(' ').append(r.to().key()).append(" (").append(r.grade()).append(")\n"));
+    }
+
+    if (!board.findings().isEmpty()) {
+      prompt.append("Findings:\n");
+      board.findings().forEach(
+          f -> prompt.append("- [").append(f.severity()).append("] ").append(f.category())
+              .append(": ").append(f.summary()).append('\n'));
+    }
+    prompt.append('\n');
+  }
 
   private String buildBasePromptContext(
       FileEntity file, CaptureSummary analysis, String additionalContext,
@@ -473,6 +578,8 @@ public class StoryService {
     StringBuilder prompt = new StringBuilder();
     prompt.append(
         "Analyze this network traffic capture and write a narrative from the findings below:\n\n");
+
+    appendConfirmedFindings(prompt, fileId);
 
     prompt.append("## File Information\n");
     prompt.append(String.format("- Filename: %s\n", file.getFileName()));

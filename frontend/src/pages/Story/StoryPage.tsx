@@ -1,23 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
-import type { TimelineDataPoint } from '@/types';
+import type { Answer, TimelineDataPoint } from '@/types';
 import type { AnalysisOutletContext } from '@/pages/Analysis/AnalysisPage';
 import { timelineService } from '@/features/timeline/services/timelineService';
+import { storyService } from '@/features/story/services/storyService';
 import {
   AUTO_GRANULARITY_INTERVAL,
   AUTO_GRANULARITY_MAX_DATAPOINTS,
 } from '@/features/timeline/constants';
 import { NarrativeView } from '@components/story/NarrativeView';
 import { StoryTimeline } from '@components/story/StoryTimeline';
+import { StorySectionNav, type StorySection } from '@components/story/StorySectionNav/StorySectionNav';
+import { StoryProgress } from '@components/story/StoryProgress/StoryProgress';
+import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
 import { StoryInfoCard } from '@components/story/StoryInfoCard';
 import { StoryChat } from '@components/story/StoryChat';
 import { AggregatesPanel } from '@components/story/AggregatesPanel';
 import { FindingsPanel } from '@components/story/FindingsPanel';
 import { InvestigationPanel } from '@components/story/InvestigationPanel';
 import { TrafficTimeline } from '@components/timeline/TrafficTimeline';
-import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 
 function NarrativeInfoPopover() {
@@ -74,6 +77,19 @@ export const StoryPage = () => {
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [loadingTimeline, setLoadingTimeline] = useState(true);
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [answersLoaded, setAnswersLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setAnswersLoaded(false);
+    storyService
+      .getAnswers(fileId)
+      .then(a => { if (alive) setAnswers(a); })
+      .catch(() => { if (alive) setAnswers([]); })
+      .finally(() => { if (alive) setAnswersLoaded(true); });
+    return () => { alive = false; };
+  }, [fileId]);
 
 
   useEffect(() => {
@@ -102,26 +118,9 @@ export const StoryPage = () => {
   }, [fileId, granularity]);
 
   if (generating && !story) {
-    const minutes = Math.floor(elapsedSeconds / 60);
-    const seconds = elapsedSeconds % 60;
-    const elapsed =
-      minutes > 0 ? `${minutes}m ${seconds.toString().padStart(2, '0')}s` : `${seconds}s`;
     const timeoutSec = Math.round(llmTimeoutMs / 1000);
     const timeoutLabel = timeoutSec < 60 ? `${timeoutSec}s` : `${Math.round(timeoutSec / 60)} min`;
-    return (
-      <div className="text-center py-5">
-        <LoadingSpinner
-          size="large"
-          message="Generating narrative story... This may take a few moments."
-        />
-        <p className="text-muted mt-3">
-          AI is analyzing the network traffic and creating a comprehensive narrative...
-        </p>
-        <p className="text-muted small mt-1">
-          Elapsed: <strong>{elapsed}</strong> &nbsp;|&nbsp; Timeout: {timeoutLabel}
-        </p>
-      </div>
-    );
+    return <StoryProgress elapsedSeconds={elapsedSeconds} timeoutLabel={timeoutLabel} />;
   }
 
   if (contextError && !story) {
@@ -213,6 +212,29 @@ export const StoryPage = () => {
     );
   }
 
+  // Build the in-page nav from the sections actually rendered below, so it never lists a section
+  // the page conditionally hid (no timeline data, no findings, etc.).
+  const hasTraffic = !loadingTimeline && timelineData.length > 0;
+  const hasAggregates = !!story.aggregates;
+  const hasFindings = !!story.findings && story.findings.length > 0;
+  const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
+  // Memoized so StorySectionNav's IntersectionObserver isn't torn down and rebuilt on every
+  // StoryPage re-render (answers/timeline/granularity state) — which would flicker the active id.
+  const navSections: StorySection[] = useMemo(() => [
+    { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
+    { id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' },
+    { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
+    ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
+    ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
+    ...(hasFindings ? [{ id: 'story-findings', label: 'Deterministic findings', icon: 'bi-shield-check' }] : []),
+    ...(hasInvestigation ? [{ id: 'story-investigation', label: 'LLM investigation', icon: 'bi-search' }] : []),
+    { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
+  ], [hasTraffic, hasAggregates, hasFindings, hasInvestigation]);
+
+  // Clear the sticky app header (~112px) so a jumped-to section and the sticky sidebar aren't
+  // hidden underneath it.
+  const sectionAnchor = { scrollMarginTop: '124px' } as const;
+
   return (
     <div className="story-page">
       {/* Header */}
@@ -246,8 +268,18 @@ export const StoryPage = () => {
         </div>
       )}
 
+      <div className="row">
+        {/* In-page section navigation (sticky below the app header) */}
+        <div className="col-lg-3 col-xl-2 d-none d-lg-block">
+          <div className="sticky-top" style={{ top: '124px' }}>
+            <StorySectionNav sections={navSections} />
+          </div>
+        </div>
+
+        {/* Story content */}
+        <div className="col-lg-9 col-xl-10">
       {/* How stories are generated */}
-      <div className="row mb-4">
+      <div className="row mb-4" id="story-info" style={sectionAnchor}>
         <div className="col-12">
           <StoryInfoCard
             additionalContext={additionalContext}
@@ -262,16 +294,23 @@ export const StoryPage = () => {
         </div>
       </div>
 
+      {/* Investigation summary — deterministic answers (#813) */}
+      <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
+        <div className="col-12">
+          <ConfirmedFindingsPanel answers={answers} loading={!answersLoaded} />
+        </div>
+      </div>
+
       {/* Story Q&A */}
-      <div className="row mb-4">
+      <div className="row mb-4" id="story-chat" style={sectionAnchor}>
         <div className="col-12">
           <StoryChat storyId={story.id} suggestedQuestions={story.suggestedQuestions} />
         </div>
       </div>
 
       {/* Traffic Timeline Visualization */}
-      {!loadingTimeline && timelineData.length > 0 && (
-        <div className="row mb-4">
+      {hasTraffic && (
+        <div className="row mb-4" id="story-traffic" style={sectionAnchor}>
           <div className="col-12">
             <Card>
               <Card.Body>
@@ -288,7 +327,7 @@ export const StoryPage = () => {
 
       {/* Aggregates Panel — pre-computed full-dataset analytics */}
       {story.aggregates && (
-        <div className="row mb-4">
+        <div className="row mb-4" id="story-aggregates" style={sectionAnchor}>
           <div className="col-12">
             <AggregatesPanel aggregates={story.aggregates} />
           </div>
@@ -297,7 +336,7 @@ export const StoryPage = () => {
 
       {/* Findings Panel — deterministic detector output */}
       {story.findings && story.findings.length > 0 && (
-        <div className="row mb-4">
+        <div className="row mb-4" id="story-findings" style={sectionAnchor}>
           <div className="col-12">
             <FindingsPanel findings={story.findings} />
           </div>
@@ -306,7 +345,7 @@ export const StoryPage = () => {
 
       {/* Investigation Panel — LLM-directed retrieval results */}
       {story.investigationSteps && story.investigationSteps.length > 0 && (
-        <div className="row mb-4">
+        <div className="row mb-4" id="story-investigation" style={sectionAnchor}>
           <div className="col-12">
             <InvestigationPanel steps={story.investigationSteps} />
           </div>
@@ -314,7 +353,7 @@ export const StoryPage = () => {
       )}
 
       {/* Narrative and Event Timeline */}
-      <div className="row">
+      <div className="row" id="story-narrative" style={sectionAnchor}>
         {/* Narrative Section */}
         <div className="col-lg-8">
           <h5 className="mb-3 d-flex align-items-center">
@@ -338,6 +377,8 @@ export const StoryPage = () => {
           </Card>
         </div>
       </div>
+        </div>{/* /col-lg-10 story content */}
+      </div>{/* /row two-column layout */}
     </div>
   );
 };

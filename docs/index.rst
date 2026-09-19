@@ -20,6 +20,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    architecture/layers
    architecture/enforcement
    architecture/adjudication-explainability
+   architecture/knowledge-layer
 
 .. toctree::
    :maxdepth: 2

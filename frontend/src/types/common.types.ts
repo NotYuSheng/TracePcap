@@ -522,3 +522,23 @@ export interface FilterExecutionResponse {
   pageSize?: number;
   totalPages?: number;
 }
+
+/** A reference to an entity on the knowledge board (#813). */
+export interface AnswerEntityRef {
+  type: string;
+  key: string;
+}
+
+/**
+ * A deterministic answer to a standard investigation question (#813) — e.g. victim, C2, malware.
+ * Distinct from the LLM narrative: these are conclusions deterministic checks drew from the
+ * knowledge board, each with the grade it inherits and the basis behind it.
+ */
+export interface Answer {
+  question: string;
+  headline: string;
+  grade: 'MEASURED' | 'REPORTED' | 'INFERRED' | string;
+  subjects: AnswerEntityRef[];
+  basis: string[];
+  attributes: Record<string, unknown>;
+}
