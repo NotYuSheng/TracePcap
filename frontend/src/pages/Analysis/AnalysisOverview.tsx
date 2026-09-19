@@ -13,8 +13,11 @@ import {
 } from '@/utils/appColors';
 import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
+import { storyService } from '@/features/story/services/storyService';
 import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
 import { EntityDetailModal } from '@components/common/EntityDetailModal';
+import { ConfirmedFindingsPanel } from '@components/story/ConfirmedFindingsPanel/ConfirmedFindingsPanel';
+import type { Answer } from '@/types';
 
 interface AnalysisOutletContext {
   data: AnalysisData;
@@ -115,6 +118,7 @@ export const AnalysisOverview = () => {
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
+  const [answers, setAnswers] = useState<Answer[]>([]);
 
   // Entity detail modal
   type EntityModalState = { type: 'PROTOCOL' | 'APPLICATION'; key: string; name: string } | null;
@@ -137,6 +141,11 @@ export const AnalysisOverview = () => {
     getExtractedFiles(fileId)
       .then(files => setExtractedFilesCount(files.length))
       .catch(() => setExtractedFilesCount(undefined));
+
+    storyService
+      .getAnswers(fileId)
+      .then(setAnswers)
+      .catch(() => setAnswers([]));
   }, [fileId]);
 
   const detectedApps = data.detectedApplications ?? [];
@@ -144,6 +153,14 @@ export const AnalysisOverview = () => {
   return (
     <div className="analysis-overview">
       <AnalysisSummary summary={data} extractedFilesCount={extractedFilesCount} />
+
+      {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4).
+          Only shown when there are answers; the dashboard stays clean for benign captures. */}
+      {answers.length > 0 && (
+        <div className="mt-4">
+          <ConfirmedFindingsPanel answers={answers} />
+        </div>
+      )}
 
       {detectedApps.length > 0 && (
         <div className="mt-4">
