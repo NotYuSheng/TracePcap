@@ -1,6 +1,8 @@
 package com.tracepcap.knowledge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.tracepcap.knowledge.question.C2Question;
 import com.tracepcap.knowledge.question.MalwareQuestion;
@@ -14,6 +16,7 @@ import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Goal;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.InvestigationReport;
+import com.tracepcap.knowledge.spi.InvestigativePivot;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.Severity;
 import java.util.List;
@@ -28,7 +31,7 @@ class InvestigationOrchestratorTest {
 
   private static final UUID FILE = UUID.randomUUID();
 
-  private final InvestigationOrchestrator service = new InvestigationOrchestrator(null, null);
+  private final InvestigationOrchestrator service = new InvestigationOrchestrator(null, null, List.of());
   private final StandardQuestionService questions =
       new StandardQuestionService(
           null, List.of(new VictimQuestion(), new C2Question(), new MalwareQuestion(),
@@ -86,6 +89,43 @@ class InvestigationOrchestratorTest {
     assertThat(report.openGoals()).containsExactlyInAnyOrder(Goal.VICTIM, Goal.MALWARE, Goal.C2);
     assertThat(outcome(report, Goal.MALWARE).headline()).isNull();
     assertThat(outcome(report, Goal.MALWARE).confidence()).isZero();
+  }
+
+  @Test
+  void investigate_runsAPivotToCloseGoalsTheProducersCouldNot() {
+    // assemble() yields a board with a suspected beacon but NO c2-of — C2/MALWARE/VICTIM unclosable.
+    EntityRef host = EntityRef.host("172.16.1.66");
+    EntityRef ext = EntityRef.external("141.98.10.79");
+    CaseKnowledgeBuilder seed = new CaseKnowledgeBuilder(FILE);
+    seed.addRelationship(Relationship.of(host, "communicates-with", ext, Grade.MEASURED, "beacon"));
+    seed.addFinding(new Finding("suspected-beacon", "shape", Severity.HIGH, Grade.INFERRED, "beacon",
+        List.of(host, ext), List.of(UUID.randomUUID().toString()), null));
+
+    CaseKnowledgeService cks = mock(CaseKnowledgeService.class);
+    when(cks.assemble(FILE)).thenReturn(seed.build());
+    StandardQuestionService sqs = new StandardQuestionService(cks,
+        List.of(new VictimQuestion(), new C2Question(), new MalwareQuestion(), new SignedInUserQuestion()));
+
+    // stand-in classifier: turns the beacon's external into a STRRAT C2 (as the real one does from the stream)
+    InvestigativePivot classifier = new InvestigativePivot() {
+      public String name() { return "test-classifier"; }
+      public boolean appliesTo(CaseKnowledge b) {
+        return !b.findingsOfCategory("suspected-beacon").isEmpty()
+            && b.relationshipsWithPredicate("c2-of").isEmpty();
+      }
+      public void pivot(CaseKnowledge b, CaseKnowledgeBuilder out) {
+        out.addRelationship(
+            Relationship.of(ext, "c2-of", EntityRef.malware("STRRAT"), Grade.INFERRED, "test-classifier"));
+      }
+    };
+
+    InvestigationReport report =
+        new InvestigationOrchestrator(cks, sqs, List.of(classifier)).investigate(FILE);
+
+    assertThat(outcome(report, Goal.C2).answered()).isTrue();
+    assertThat(outcome(report, Goal.MALWARE).answered()).isTrue();
+    assertThat(outcome(report, Goal.VICTIM).answered()).isTrue();
+    assertThat(report.openGoals()).containsExactly(Goal.USER); // no Kerberos on this board
   }
 
   private static InvestigationReport.GoalOutcome outcome(InvestigationReport r, Goal g) {
