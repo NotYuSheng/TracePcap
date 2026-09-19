@@ -230,7 +230,9 @@ export const StoryPage = () => {
     { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
   ];
 
-  const sectionAnchor = { scrollMarginTop: '80px' } as const;
+  // Clear the sticky app header (~112px) so a jumped-to section and the sticky sidebar aren't
+  // hidden underneath it.
+  const sectionAnchor = { scrollMarginTop: '124px' } as const;
 
   return (
     <div className="story-page">
@@ -266,15 +268,15 @@ export const StoryPage = () => {
       )}
 
       <div className="row">
-        {/* In-page section navigation (sticky) */}
-        <div className="col-lg-2 d-none d-lg-block">
-          <div className="sticky-top" style={{ top: '16px' }}>
+        {/* In-page section navigation (sticky below the app header) */}
+        <div className="col-lg-3 col-xl-2 d-none d-lg-block">
+          <div className="sticky-top" style={{ top: '124px' }}>
             <StorySectionNav sections={navSections} />
           </div>
         </div>
 
         {/* Story content */}
-        <div className="col-lg-10">
+        <div className="col-lg-9 col-xl-10">
       {/* How stories are generated */}
       <div className="row mb-4" id="story-info" style={sectionAnchor}>
         <div className="col-12">

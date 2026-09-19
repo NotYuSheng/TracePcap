@@ -54,11 +54,10 @@ export function StorySectionNav({ sections }: StorySectionNavProps) {
             <button
               type="button"
               onClick={() => jump(s.id)}
-              className={`nav-link text-start w-100 d-flex align-items-center ${s.id === activeId ? 'active' : ''}`}
-              style={{ whiteSpace: 'nowrap' }}
+              className={`nav-link text-start w-100 d-flex align-items-start ${s.id === activeId ? 'active' : ''}`}
             >
               <i className={`bi ${s.icon} me-2`} aria-hidden="true" />
-              <span className="text-truncate">{s.label}</span>
+              <span>{s.label}</span>
             </button>
           </li>
         ))}
