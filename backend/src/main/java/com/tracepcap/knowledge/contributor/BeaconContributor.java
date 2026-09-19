@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class BeaconDetector implements KnowledgeContributor {
+public class BeaconContributor implements KnowledgeContributor {
 
   static final String SUSPECTED_BEACON = "suspected-beacon";
   static final String COMMUNICATES_WITH = "communicates-with";

@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * Follows a {@link com.tracepcap.knowledge.contributor.BeaconDetector suspected beacon}, reads the
+ * Follows a {@link com.tracepcap.knowledge.contributor.BeaconContributor suspected beacon}, reads the
  * conversation's stream, and names the malware family from its command-and-control protocol — with
  * <b>no IDS signature involved</b> (#819, L2). This is the pivot that proves the thesis: STRRAT
  * beacons a cleartext, pipe-delimited check-in ({@code ping|STRRAT|<id>|<host>|<user>|<os>|…}) that

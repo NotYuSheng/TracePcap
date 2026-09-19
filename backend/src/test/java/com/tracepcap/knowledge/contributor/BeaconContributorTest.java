@@ -21,7 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class BeaconDetectorTest {
+class BeaconContributorTest {
 
   private static final UUID FILE = UUID.randomUUID();
   private static final TlsFacts NO_TLS = new TlsFacts(null, null, null, null, null, null, null);
@@ -44,7 +44,7 @@ class BeaconDetectorTest {
   private CaseKnowledge run(ConversationFacts... convs) {
     when(conversationLookup.conversationFacts(FILE)).thenReturn(List.of(convs));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new BeaconDetector(conversationLookup).contribute(FILE, board);
+    new BeaconContributor(conversationLookup).contribute(FILE, board);
     return board.build();
   }
 
