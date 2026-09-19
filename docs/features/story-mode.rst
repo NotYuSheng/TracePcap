@@ -5,6 +5,12 @@ Story Mode combines **deterministic detectors** with an **LLM narrative
 generator** to produce a rich, structured analysis of the network activity
 captured in a PCAP file.
 
+It is grounded in TracePcap's :doc:`../architecture/knowledge-layer`: the
+deterministic answers to the standard investigation questions (victim,
+command-and-control, malware, signed-in user) are shown directly and fed to the
+LLM as authoritative ground truth, so the narrative names what the deterministic
+layers already established rather than re-deriving a weaker picture from metrics.
+
 Requirements
 ------------
 
@@ -103,6 +109,16 @@ auto-built prompt for the analyst to trim before resubmitting. On retry, the
 edited prompt is sent directly to the LLM (Phase 1 is re-run to preserve
 investigation steps, but the narrative prompt itself is not rebuilt).
 
+Output-truncation handling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the model's *response* hits its output-token cap and is cut off (a
+``finish_reason`` of ``length``), generation fails deliberately with a clear
+``OUTPUT_TRUNCATED`` error — "the response exceeded the output token budget and
+was cut off; raise ``LLM_MAX_TOKENS`` or reduce the amount to narrate" — rather
+than letting the truncated JSON surface later as a cryptic parse error. This is
+distinct from the *prompt*-too-large case above, which is caught before the call.
+
 Known analysis limitations (embedded in every prompt)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -118,6 +134,20 @@ What Story Mode Produces
 ------------------------
 
 Story Mode returns a response containing several components:
+
+Investigation Summary
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The **Investigation Summary** panel surfaces the deterministic answers to the
+standard investigation questions — **victim**, **command-and-control**,
+**malware**, and **signed-in user** — from the :doc:`../architecture/knowledge-layer`,
+each labelled with its :ref:`grade <knowledge-grade>` (measured, reported, or
+inferred). These are conclusions deterministic checks drew from the evidence, not
+the LLM, and they are the ground truth the narrative and Q&A are built on. The
+same panel also appears on the Analysis **Overview** tab when a capture has any
+such findings, so the key answers are visible without opening Story Mode. When a
+capture matches none of the questions (a benign DNS capture, say), the panel shows
+an explicit empty state rather than disappearing.
 
 Deterministic Findings
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -258,8 +288,10 @@ Interactive LLM Q&A Chat
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After the narrative is generated, a **chat panel** allows follow-up questions
-about the PCAP. The LLM answers using the full story JSON as context and
-returns 3 suggested follow-up questions with each answer.
+about the PCAP. The LLM answers using the full story JSON **and** the
+Investigation Summary's deterministic answers as context — the answers are the
+authoritative ground truth it must prefer and must not contradict — and returns 3
+suggested follow-up questions with each answer.
 
 Investigation Panel
 ~~~~~~~~~~~~~~~~~~~
