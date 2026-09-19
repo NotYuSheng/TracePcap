@@ -217,8 +217,8 @@ export const StoryPage = () => {
   const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
   const hasAnswers = answers.length > 0;
   const navSections: StorySection[] = [
-    ...(hasAnswers ? [{ id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' }] : []),
     { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
+    ...(hasAnswers ? [{ id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' }] : []),
     { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
     ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
     ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
@@ -274,15 +274,6 @@ export const StoryPage = () => {
 
         {/* Story content */}
         <div className="col-lg-9 col-xl-10">
-      {/* Confirmed findings — deterministic answers (#813) */}
-      {hasAnswers && (
-        <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
-          <div className="col-12">
-            <ConfirmedFindingsPanel answers={answers} />
-          </div>
-        </div>
-      )}
-
       {/* How stories are generated */}
       <div className="row mb-4" id="story-info" style={sectionAnchor}>
         <div className="col-12">
@@ -298,6 +289,15 @@ export const StoryPage = () => {
           />
         </div>
       </div>
+
+      {/* Investigation summary — deterministic answers (#813) */}
+      {hasAnswers && (
+        <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
+          <div className="col-12">
+            <ConfirmedFindingsPanel answers={answers} />
+          </div>
+        </div>
+      )}
 
       {/* Story Q&A */}
       <div className="row mb-4" id="story-chat" style={sectionAnchor}>
