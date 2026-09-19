@@ -820,6 +820,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/investigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Autonomous investigation report for a file
+         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).
+         */
+        get: operations["getInvestigation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/ip-mac-observations": {
         parameters: {
             query?: never;
@@ -2354,6 +2374,16 @@ export interface components {
             geoSource?: string;
             org?: string;
         };
+        GoalOutcomeDto: {
+            answered?: boolean;
+            basis?: string[];
+            /** Format: int32 */
+            confidence?: number;
+            goal?: string;
+            grade?: string;
+            headline?: string;
+            subjects?: components["schemas"]["EntityRefDto"][];
+        };
         Highlight: {
             description?: string;
             id?: string;
@@ -2503,6 +2533,11 @@ export interface components {
             protocol?: string;
             riskType?: string;
             srcIp?: string;
+        };
+        InvestigationReportResponse: {
+            coverage?: string[];
+            goals?: components["schemas"]["GoalOutcomeDto"][];
+            unknowns?: string[];
         };
         InvestigationStep: {
             /** Format: int64 */
@@ -4443,6 +4478,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["HostIdentityEvidenceDto"];
+                };
+            };
+        };
+    };
+    getInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvestigationReportResponse"];
                 };
             };
         };

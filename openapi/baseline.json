@@ -1703,6 +1703,39 @@
         },
         "type": "object"
       },
+      "GoalOutcomeDto": {
+        "properties": {
+          "answered": {
+            "type": "boolean"
+          },
+          "basis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRefDto"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "Highlight": {
         "properties": {
           "description": {
@@ -2093,6 +2126,29 @@
           },
           "srcIp": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvestigationReportResponse": {
+        "properties": {
+          "coverage": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalOutcomeDto"
+            },
+            "type": "array"
+          },
+          "unknowns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -6361,6 +6417,39 @@
         "summary": "Adjudicated identity plus evidence axes for one host",
         "tags": [
           "Host Identities"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/investigation": {
+      "get": {
+        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).",
+        "operationId": "getInvestigation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvestigationReportResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Autonomous investigation report for a file",
+        "tags": [
+          "Knowledge"
         ]
       }
     },
