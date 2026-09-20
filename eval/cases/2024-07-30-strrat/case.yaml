@@ -1,10 +1,11 @@
-# Fetch manifest for the pcap (kept out of git — see eval/.gitignore).
-# The runner resolves the capture by: an already-analyzed file of this name on the server,
-# else a local copy (eval/pcaps/ or backend/target/ctf-demo/), else it fetches by source_url.
+# Where to get this case's capture, and the hash it must match (the pcap itself is kept out of git,
+# see eval/.gitignore). The runner does NOT download it: it finds an analyzed file of this name on
+# the server, or -- with --upload-missing -- uploads a local copy from eval/pcaps/ or
+# backend/target/ctf-demo/ after checking it against `sha256` below.
 case_id: 2024-07-30-strrat
 pcap: 2024-07-30-traffic-analysis-exercise.pcap
 source_url: https://www.malware-traffic-analysis.net/2024/07/30/2024-07-30-traffic-analysis-exercise.pcap.zip
 sha256: c48854c24223cf7b4e9880ea72a21a877e4138e4ce36df7b7656e5c6c4043f68
 notes: >
-  Zip is password-protected with the standard MTA password ("infected"). Download and unzip manually
-  into eval/pcaps/ for a from-scratch run; the analysed copy already lives in the running stack.
+  The zip is password-protected with the standard MTA password ("infected"). Download and unzip it
+  by hand into eval/pcaps/ for a from-scratch run.

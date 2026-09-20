@@ -1,6 +1,7 @@
 {
   "summary": {
     "cases": 1,
+    "cases_scored": 1,
     "scored_fields": 7,
     "correct": 6,
     "missed": 1,
@@ -10,7 +11,6 @@
   "cases": [
     {
       "case_id": "2024-07-30-strrat",
-      "file_id": "86959db8-02b5-4bfd-bef8-9743baf044a1",
       "status": "scored",
       "fields": [
         {
@@ -48,7 +48,12 @@
           "status": "correct",
           "detail": "141.98.10.79"
         }
-      ]
+      ],
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": null
+      }
     }
   ]
 }

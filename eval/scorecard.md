@@ -2,12 +2,14 @@
 
 Baseline of TracePcap's **deterministic** conclusions vs. published answer keys (#819, Workstream A). Regenerate with `python3 eval/run_eval.py`.
 
-- Cases: **1**
+- Cases scored: **1** of 1
 - Correct: **6** / 7 (accuracy 0.857)
 - Missed: **1**
 - Confidently wrong: **0** ✅
 
 ## 2024-07-30-strrat
+Analysis: Suricata **on**, nDPI on.
+
 | Field | Status | Detail |
 |---|---|---|
 | victim.ip | ✅ correct | 172.16.1.66 |

@@ -3,3 +3,4 @@ pcaps/
 *.pcap
 *.pcapng
 *.pcap.zip
+__pycache__/
