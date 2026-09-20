@@ -524,6 +524,9 @@ public class StoryService {
       String label = CONFIRMED_LABELS.getOrDefault(a.question(), a.question());
       prompt.append("- ").append(label).append(": ").append(a.headline())
           .append(" [").append(a.grade()).append("]\n");
+      // Say what the conclusion rests on, so the narrative describes its basis correctly instead of
+      // guessing — e.g. it once claimed payloads were unavailable for a C2 read from a cleartext stream.
+      a.basis().stream().limit(2).forEach(b -> prompt.append("    basis: ").append(b).append('\n'));
     }
     prompt.append("\n");
   }

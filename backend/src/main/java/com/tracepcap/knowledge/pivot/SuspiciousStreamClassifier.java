@@ -9,7 +9,9 @@ import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.InvestigativePivot;
 import com.tracepcap.knowledge.spi.Relationship;
+import com.tracepcap.knowledge.spi.Severity;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -37,6 +39,7 @@ public class SuspiciousStreamClassifier implements InvestigativePivot {
 
   private static final String SUSPECTED_BEACON = "suspected-beacon";
   private static final String C2_OF = "c2-of";
+  private static final String C2_CLASSIFICATION = "c2-classification";
   /** Bound the decode so a chatty conversation can't blow up heap (#779 line of work). */
   private static final int MAX_DECODED_CHARS = 64 * 1024;
 
@@ -81,6 +84,20 @@ public class SuspiciousStreamClassifier implements InvestigativePivot {
           EntityRef malware = EntityRef.malware(fp.family());
           out.addEntity(malware);
           out.addRelationship(Relationship.of(external.get(), C2_OF, malware, Grade.INFERRED, name()));
+          // The conclusion must carry its evidence: without this the C2/malware answers have no
+          // basis, and anything reading them (the panel, the narrative) cannot say *why* — it would
+          // even claim the payloads were unavailable when this stage read them.
+          out.addFinding(
+              new Finding(
+                  C2_CLASSIFICATION,
+                  fp.family() + " C2 identified from the beacon's cleartext check-in (matched the "
+                      + fp.family() + " protocol fingerprint in the stream to " + external.get().key() + ")",
+                  Severity.HIGH,
+                  Grade.INFERRED,
+                  name(),
+                  List.of(external.get(), malware),
+                  beacon.evidence(),
+                  Map.of("family", fp.family(), "method", "stream-fingerprint")));
           break; // one family per beacon
         }
       }

@@ -66,6 +66,19 @@ class SuspiciousStreamClassifierTest {
   }
 
   @Test
+  void theConclusionCarriesItsEvidence_aFindingCitingTheBeaconConversation() {
+    when(packetLookup.payloadsInConversation(CONV)).thenReturn(List.of(hex("ping|STRRAT|1BE8292C|HOST|user|Win")));
+
+    CaseKnowledge k = pivot(boardWithBeacon());
+
+    assertThat(k.findingsOfCategory("c2-classification")).singleElement().satisfies(f -> {
+      assertThat(f.summary()).contains("STRRAT").contains("141.98.10.79").contains("cleartext");
+      assertThat(f.concerns()).contains(EXT, EntityRef.malware("STRRAT"));
+      assertThat(f.evidence()).containsExactly(CONV.toString()); // cites the stream it read
+    });
+  }
+
+  @Test
   void leavesAnUnrecognizedStreamUnattributed() {
     when(packetLookup.payloadsInConversation(CONV))
         .thenReturn(List.of(hex("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")));
