@@ -31,8 +31,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Deliberately conservative to keep the false-positive rate low (the point of a deterministic
  * check over the LLM's volume-based guessing): TLS sessions are excluded (a real beacon on a raw port
- * carries no SNI/JA3), so are ordinary service ports and bulk transfers, and the local host must have
- * opened the connection where that is known. Periodicity — the strongest beacon signal — needs
+ * carries no SNI/JA3), so are flows nDPI recognised as a known application, ordinary service ports
+ * and bulk transfers, and the local host must have opened the connection where that is known. Periodicity — the strongest beacon signal — needs
  * per-packet timing this port does not yet expose; until then this is a suspicion, graded INFERRED,
  * for confirmation downstream, not an assertion.
  */
@@ -78,6 +78,9 @@ public class BeaconContributor implements KnowledgeContributor {
       Integer extPort = srcLocal ? f.dstPort() : f.srcPort();
 
       if (isTls(conv.tls())) continue;                                  // raw beacon carries no TLS
+      // A protocol nDPI recognised (SSH on 2222, MySQL, Redis, XMPP, a VPN…) is a known service on
+      // an unusual port, not an unexplained channel. Only flows nDPI could not name are suspect.
+      if (!isUnidentified(conv.findings() == null ? null : conv.findings().appName())) continue;
       if (extPort == null || WELL_KNOWN_PORTS.contains(extPort)) continue; // ordinary service
       if (f.initiatorIp() != null && !f.initiatorIp().equals(hostIp)) continue; // outbound only
 
@@ -96,7 +99,8 @@ public class BeaconContributor implements KnowledgeContributor {
               SUSPECTED_BEACON,
               hostIp + " → " + extIp + ":" + extPort + " — sustained low-throughput raw-TCP session ("
                   + packets + " pkts / " + durationSec + "s, ~" + avgBytes + " B/pkt), no TLS: a beacon shape",
-              Severity.HIGH,
+              // MEDIUM: a shape-only suspicion. The classifier's confirmed finding is the HIGH one.
+              Severity.MEDIUM,
               Grade.INFERRED,
               name(),
               List.of(host, external),
@@ -104,6 +108,14 @@ public class BeaconContributor implements KnowledgeContributor {
               Map.of("dstPort", extPort, "packets", packets,
                   "durationSec", durationSec, "avgBytesPerPacket", avgBytes)));
     }
+  }
+
+  /**
+   * nDPI leaves a flow's application blank (or "Unknown") when it could not identify it — 285 of 426
+   * conversations in the STRRAT capture, including the beacon itself.
+   */
+  private static boolean isUnidentified(String appName) {
+    return appName == null || appName.isBlank() || "unknown".equalsIgnoreCase(appName.trim());
   }
 
   /** A TLS session announces itself (SNI, a JA3 fingerprint, or a cert subject) — not a raw beacon. */

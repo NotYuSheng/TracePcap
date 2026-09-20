@@ -9,9 +9,12 @@ import com.tracepcap.knowledge.spi.InvestigationReport;
 import com.tracepcap.knowledge.spi.InvestigationReport.GoalOutcome;
 import com.tracepcap.knowledge.spi.InvestigativePivot;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,8 +52,14 @@ public class InvestigationOrchestrator {
   /**
    * The board after the pivot loop — the full picture, including what pivots derived (a classified
    * C2, say) that plain {@code assemble} does not carry. Consumers that want the complete knowledge
-   * (the narrative's ground truth, the Q&A digest) read this rather than {@code /answers}, which is
-   * producer-only and cheap; the pivots' stream-following cost is paid here, not on every read.
+   * (the narrative's ground truth, the Q&A digest, the Investigation Summary) read this rather than
+   * {@code /answers}, which is producer-only.
+   *
+   * <p><b>Cost.</b> Beyond the {@code assemble} that {@code /answers} also pays, this adds one
+   * bounded read (a LIMITed payload query) per suspected beacon followed, capped per pass — usually
+   * zero, since most captures have no suspected beacon. Nothing is cached: the board is derived from
+   * facts that human overrides and re-analysis can change, and a stale conclusion here would be worse
+   * than a cheap recompute. Caching is a separate decision (#816).
    */
   public CaseKnowledge investigatedBoard(UUID fileId) {
     return runPivots(fileId, caseKnowledgeService.assemble(fileId));
@@ -69,8 +78,12 @@ public class InvestigationOrchestrator {
 
       CaseKnowledgeBuilder out = new CaseKnowledgeBuilder(fileId).addAll(current);
       for (InvestigativePivot pivot : applicable) {
+        // Each pivot writes to its own scratch builder and is merged only if it completes, so one
+        // that throws midway leaves nothing half-applied on the shared board.
+        CaseKnowledgeBuilder scratch = new CaseKnowledgeBuilder(fileId);
         try {
-          pivot.pivot(current, out);
+          pivot.pivot(current, scratch);
+          out.addAll(scratch.build());
         } catch (Exception e) {
           log.warn("Pivot '{}' failed for file {}: {}", pivot.name(), fileId, e.getMessage());
         }
@@ -86,6 +99,9 @@ public class InvestigationOrchestrator {
     try {
       return pivot.appliesTo(board);
     } catch (Exception e) {
+      // Logged: silently dropping a pivot would make the investigation look like it simply had no
+      // lead to follow, with nothing to say otherwise.
+      log.warn("Pivot '{}' appliesTo failed, skipping it: {}", pivot.name(), e.getMessage());
       return false;
     }
   }
@@ -101,20 +117,22 @@ public class InvestigationOrchestrator {
     for (Answer a : answers) byQuestion.putIfAbsent(a.question(), a);
 
     List<GoalOutcome> outcomes = new ArrayList<>();
+    Set<Answer> representing = Collections.newSetFromMap(new IdentityHashMap<>());
     for (Goal goal : Goal.values()) {
       Answer a = byQuestion.get(goal.questionKey());
       if (a == null) {
         outcomes.add(new GoalOutcome(goal, false, null, null, 0, List.of(), List.of()));
       } else {
+        representing.add(a);
         outcomes.add(new GoalOutcome(
             goal, true, a.headline(), a.grade(), confidenceFor(a.grade()), a.basis(), a.subjects()));
       }
     }
-    // Answers that aren't one of the standing goals (e.g. a bulk data transfer to review) still
-    // belong in the report — the panel renders from here, so dropping them would hide real findings.
-    java.util.Set<String> goalKeys =
-        java.util.Arrays.stream(Goal.values()).map(Goal::questionKey).collect(java.util.stream.Collectors.toSet());
-    List<Answer> additional = answers.stream().filter(a -> !goalKeys.contains(a.question())).toList();
+    // Every answer that is not the one representing a goal still belongs in the report: a non-goal
+    // answer (a bulk transfer to review), but equally the 2nd..nth answer for a goal — a second C2,
+    // a second malware family, another victim host. The panel renders from here, so dropping them
+    // would hide real findings that /answers and the narrative both show.
+    List<Answer> additional = answers.stream().filter(a -> !representing.contains(a)).toList();
     return new InvestigationReport(fileId, outcomes, additional, coverage(board));
   }
 

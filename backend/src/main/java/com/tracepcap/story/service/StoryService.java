@@ -515,11 +515,15 @@ public class StoryService {
       StringBuilder prompt, List<com.tracepcap.knowledge.spi.Answer> answers) {
     if (answers.isEmpty()) return;
 
-    prompt.append("## Confirmed Findings (deterministic — treat as authoritative ground truth)\n");
+    prompt.append("## Investigation Findings (deterministic checks — each carries a grade)\n");
     prompt.append(
-        "These were established by deterministic checks over the capture (IDS signatures, protocol"
-            + " extraction, identity resolution), not by inference. Name them explicitly in your"
-            + " narrative and do not contradict them.\n");
+        "These come from deterministic checks over the capture, not from a language model. Each is"
+            + " graded: MEASURED = the traffic itself exhibited it; REPORTED = a party on the wire"
+            + " asserted it; INFERRED = a tool or heuristic judged it, and it may be wrong. Name these"
+            + " findings in your narrative and do not contradict them, but state an INFERRED finding"
+            + " as such (\"appears to be\", \"is attributed to\") — never as certain or"
+            + " high-confidence. The basis lines say what each rests on; describe that basis as"
+            + " given.\n");
     for (com.tracepcap.knowledge.spi.Answer a : answers) {
       String label = CONFIRMED_LABELS.getOrDefault(a.question(), a.question());
       prompt.append("- ").append(label).append(": ").append(a.headline())

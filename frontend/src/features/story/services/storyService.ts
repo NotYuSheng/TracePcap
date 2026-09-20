@@ -10,6 +10,9 @@ const GOAL_QUESTION: Record<string, string> = {
   C2: 'c2',
 };
 
+/** Answers that indicate an incident (as opposed to context such as who is signed in). */
+const INCIDENT_QUESTIONS = new Set(['victim', 'c2', 'malware']);
+
 /** What the Investigation Summary renders: the conclusions, and the goals still unknown. */
 export interface InvestigationSummary {
   answers: Answer[];
@@ -29,7 +32,12 @@ export function investigationToSummary(report: InvestigationReport): Investigati
       basis: g.basis,
       attributes: {},
     }));
-  return { answers: [...goalAnswers, ...report.additional], unknowns: report.unknowns };
+  const answers = [...goalAnswers, ...report.additional];
+  // "Not established" is only meaningful once there is an incident to be incomplete about. On a
+  // capture whose only answer is, say, a signed-in user, listing victim/malware/C2 as unestablished
+  // reads like a failure on a benign capture — there was never a lead to follow.
+  const incidentLead = answers.some((a) => INCIDENT_QUESTIONS.has(a.question));
+  return { answers, unknowns: incidentLead ? report.unknowns : [] };
 }
 
 export const storyService = {

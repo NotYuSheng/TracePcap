@@ -1,6 +1,7 @@
 package com.tracepcap.knowledge.pivot;
 
 import com.tracepcap.analysis.spi.PacketLookup;
+import com.tracepcap.common.TsharkHexUtil;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
@@ -10,6 +11,7 @@ import com.tracepcap.knowledge.spi.Grade;
 import com.tracepcap.knowledge.spi.InvestigativePivot;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.Severity;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,8 +42,11 @@ public class SuspiciousStreamClassifier implements InvestigativePivot {
   private static final String SUSPECTED_BEACON = "suspected-beacon";
   private static final String C2_OF = "c2-of";
   private static final String C2_CLASSIFICATION = "c2-classification";
-  /** Bound the decode so a chatty conversation can't blow up heap (#779 line of work). */
-  private static final int MAX_DECODED_CHARS = 64 * 1024;
+  /** How much of a stream's opening is read — a fingerprint sits in the first few packets. */
+  private static final int MAX_PAYLOADS_READ = 64;
+  private static final int MAX_BYTES_PER_PAYLOAD = 512;
+  /** Beacons followed per pass; each is a DB read, and this runs on user-facing requests. */
+  private static final int MAX_BEACONS_PER_PASS = 8;
 
   /**
    * Known C2-protocol fingerprints, matched against the decoded stream. Each is a family plus a
@@ -71,16 +76,22 @@ public class SuspiciousStreamClassifier implements InvestigativePivot {
 
   @Override
   public void pivot(CaseKnowledge board, CaseKnowledgeBuilder out) {
-    Set<EntityRef> alreadyC2 = classifiedExternals(board);
+    // Externals already classified — from earlier rounds AND from this pass, so several beacons to
+    // one C2 (different source ports) classify it once rather than posting duplicate edges/findings.
+    Set<EntityRef> classified = new HashSet<>(classifiedExternals(board));
+    int followed = 0;
     for (Finding beacon : board.findingsOfCategory(SUSPECTED_BEACON)) {
       Optional<EntityRef> external = externalOf(beacon);
-      if (external.isEmpty() || alreadyC2.contains(external.get())) continue; // idempotent
+      if (external.isEmpty() || classified.contains(external.get())) continue; // idempotent
       if (beacon.evidence().isEmpty()) continue;
+      // Bound the work one request can trigger: each followed beacon is a DB read.
+      if (followed++ >= MAX_BEACONS_PER_PASS) break;
 
-      String stream = decode(beacon.evidence().get(0));
+      String stream = readOpening(beacon.evidence().get(0));
       if (stream == null) continue;
       for (Fingerprint fp : FINGERPRINTS) {
         if (fp.pattern().matcher(stream).find()) {
+          classified.add(external.get());
           EntityRef malware = EntityRef.malware(fp.family());
           out.addEntity(malware);
           out.addRelationship(Relationship.of(external.get(), C2_OF, malware, Grade.INFERRED, name()));
@@ -118,8 +129,13 @@ public class SuspiciousStreamClassifier implements InvestigativePivot {
         .findFirst();
   }
 
-  /** Reads and decodes the conversation's payloads (hex → printable ASCII), bounded. */
-  private String decode(String conversationId) {
+  /**
+   * Reads how the conversation's stream <em>opens</em> — its first few payloads, hex → printable
+   * ASCII. Bounded at the query (a LIMIT), not after the fact: a check-in fingerprint is in the
+   * opening of a stream, and materialising every payload of a long-lived flow would be an OOM risk
+   * for no gain.
+   */
+  private String readOpening(String conversationId) {
     UUID convId;
     try {
       convId = UUID.fromString(conversationId);
@@ -127,15 +143,9 @@ public class SuspiciousStreamClassifier implements InvestigativePivot {
       return null;
     }
     StringBuilder sb = new StringBuilder();
-    for (String hex : packetLookup.payloadsInConversation(convId)) {
+    for (String hex : packetLookup.firstPayloadsInConversation(convId, MAX_PAYLOADS_READ)) {
       if (hex == null) continue;
-      String clean = hex.replaceAll("[^0-9a-fA-F]", "");
-      for (int i = 0; i + 1 < clean.length() && sb.length() < MAX_DECODED_CHARS; i += 2) {
-        int b = Integer.parseInt(clean.substring(i, i + 2), 16);
-        sb.append(b >= 0x20 && b < 0x7f ? (char) b : '.');
-      }
-      sb.append('\n');
-      if (sb.length() >= MAX_DECODED_CHARS) break;
+      sb.append(TsharkHexUtil.toAscii(hex, MAX_BYTES_PER_PAYLOAD)).append('\n');
     }
     return sb.toString();
   }

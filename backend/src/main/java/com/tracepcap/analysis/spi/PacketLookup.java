@@ -63,6 +63,17 @@ public interface PacketLookup {
   List<String> payloadsInConversation(UUID conversationId);
 
   /**
+   * At most {@code limit} non-null payloads from the <em>start</em> of a conversation, in packet
+   * order.
+   *
+   * <p>For a reader that only needs how a stream opens — a C2 check-in fingerprint, say. Unlike
+   * {@link #payloadsInConversation}, it never materialises the whole conversation, so its cost is
+   * bounded by {@code limit} however long-lived the flow is. A non-positive limit yields an empty
+   * list.
+   */
+  List<String> firstPayloadsInConversation(UUID conversationId, int limit);
+
+  /**
    * Ids of the conversations in which {@code hostIp}'s peer sent at least one packet back — i.e.
    * the peer responded rather than staying silent.
    *

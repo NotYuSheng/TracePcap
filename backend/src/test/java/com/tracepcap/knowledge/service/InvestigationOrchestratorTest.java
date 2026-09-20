@@ -146,6 +146,47 @@ class InvestigationOrchestratorTest {
   }
 
   @Test
+  void secondAnswerForAGoal_isCarriedAsAdditional_notDropped() {
+    // Two C2 endpoints: the first represents the goal, the second must not vanish from the report —
+    // /answers and the narrative both show it, so the panel (rendered from here) must too.
+    Answer first = new Answer("c2", "141.98.10.79 — C2 for STRRAT", Grade.INFERRED,
+        List.of(EntityRef.external("141.98.10.79")), List.of(), null);
+    Answer second = new Answer("c2", "203.0.113.7 — C2 for OTHER", Grade.INFERRED,
+        List.of(EntityRef.external("203.0.113.7")), List.of(), null);
+
+    InvestigationReport report =
+        service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), List.of(first, second));
+
+    assertThat(outcome(report, Goal.C2).headline()).contains("141.98.10.79");
+    assertThat(report.additional()).singleElement()
+        .satisfies(a -> assertThat(a.headline()).contains("203.0.113.7"));
+  }
+
+  @Test
+  void aPivotThatThrowsMidway_leavesNothingHalfApplied() {
+    EntityRef ext = EntityRef.external("141.98.10.79");
+    CaseKnowledgeService cks = mock(CaseKnowledgeService.class);
+    when(cks.assemble(FILE)).thenReturn(new CaseKnowledgeBuilder(FILE).build());
+    StandardQuestionService sqs = new StandardQuestionService(cks, List.of(new C2Question()));
+
+    InvestigativePivot bad = new InvestigativePivot() {
+      public String name() { return "bad-pivot"; }
+      public boolean appliesTo(CaseKnowledge b) { return true; }
+      public void pivot(CaseKnowledge b, CaseKnowledgeBuilder out) {
+        // posts a C2 edge, THEN fails — if that write survived, the C2 goal would wrongly close
+        out.addRelationship(
+            Relationship.of(ext, "c2-of", EntityRef.malware("X"), Grade.INFERRED, "bad-pivot"));
+        throw new IllegalStateException("boom");
+      }
+    };
+
+    InvestigationReport report =
+        new InvestigationOrchestrator(cks, sqs, List.of(bad)).investigate(FILE);
+
+    assertThat(outcome(report, Goal.C2).answered()).isFalse();
+  }
+
+  @Test
   void emptyBoard_leavesEveryGoalOpen() {
     List<Answer> none = List.of();
     InvestigationReport report = service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), none);

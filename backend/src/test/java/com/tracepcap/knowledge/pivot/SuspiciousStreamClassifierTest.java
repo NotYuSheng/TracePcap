@@ -1,6 +1,9 @@
 package com.tracepcap.knowledge.pivot;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.tracepcap.analysis.spi.PacketLookup;
@@ -52,7 +55,7 @@ class SuspiciousStreamClassifierTest {
 
   @Test
   void namesStrratFromTheCleartextCheckin() {
-    when(packetLookup.payloadsInConversation(CONV)).thenReturn(List.of(hex(
+    when(packetLookup.firstPayloadsInConversation(eq(CONV), anyInt())).thenReturn(List.of(hex(
         "ping|STRRAT|1BE8292C|DESKTOP-SKBR25F|ccollier|Microsoft Windows 11 Pro|64-bit|Windows Defender||1.6|US:United States|Not Installed|1 Sec")));
 
     CaseKnowledge k = pivot(boardWithBeacon());
@@ -67,7 +70,7 @@ class SuspiciousStreamClassifierTest {
 
   @Test
   void theConclusionCarriesItsEvidence_aFindingCitingTheBeaconConversation() {
-    when(packetLookup.payloadsInConversation(CONV)).thenReturn(List.of(hex("ping|STRRAT|1BE8292C|HOST|user|Win")));
+    when(packetLookup.firstPayloadsInConversation(eq(CONV), anyInt())).thenReturn(List.of(hex("ping|STRRAT|1BE8292C|HOST|user|Win")));
 
     CaseKnowledge k = pivot(boardWithBeacon());
 
@@ -79,8 +82,32 @@ class SuspiciousStreamClassifierTest {
   }
 
   @Test
+  void severalBeaconsToOneC2_classifyItOnce_notOncePerBeacon() {
+    // A host holding several sustained connections to the same C2 (different source ports) yields
+    // several suspected-beacon findings for one external. The pass must not post the c2-of edge or
+    // the classification finding once per beacon.
+    UUID conv2 = UUID.randomUUID();
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    b.addRelationship(Relationship.of(HOST, "communicates-with", EXT, Grade.MEASURED, "beacon"));
+    for (UUID c : List.of(CONV, conv2)) {
+      b.addFinding(new Finding("suspected-beacon", "beacon shape", Severity.MEDIUM, Grade.INFERRED,
+          "beacon", List.of(HOST, EXT), List.of(c.toString()), null));
+    }
+    String checkin = hex("ping|STRRAT|1BE8292C|HOST|user|Win");
+    when(packetLookup.firstPayloadsInConversation(eq(CONV), anyInt())).thenReturn(List.of(checkin));
+    // lenient: the second beacon is (correctly) skipped, so this stub goes unused — but it must
+    // still return the check-in, so a regression that classifies twice would be caught.
+    lenient().when(packetLookup.firstPayloadsInConversation(eq(conv2), anyInt())).thenReturn(List.of(checkin));
+
+    CaseKnowledge k = pivot(b.build());
+
+    assertThat(k.relationshipsWithPredicate("c2-of")).hasSize(1);
+    assertThat(k.findingsOfCategory("c2-classification")).hasSize(1);
+  }
+
+  @Test
   void leavesAnUnrecognizedStreamUnattributed() {
-    when(packetLookup.payloadsInConversation(CONV))
+    when(packetLookup.firstPayloadsInConversation(eq(CONV), anyInt()))
         .thenReturn(List.of(hex("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")));
 
     CaseKnowledge k = pivot(boardWithBeacon());

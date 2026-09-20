@@ -65,6 +65,34 @@ class BeaconContributorTest {
   }
 
   @Test
+  void ignoresFlowsNdpiRecognisedAsAKnownApplication() {
+    // Beacon-shaped (sustained, small packets, raw TCP, odd port, no TLS metadata) — but nDPI named
+    // it MySQL. That is a database on a non-default port, not an unexplained channel.
+    LocalDateTime start = LocalDateTime.now();
+    ConversationFacts mysql = new ConversationFacts(
+        UUID.randomUUID(), FILE,
+        new FlowIdentity("172.16.1.66", 49754, "203.0.113.9", 3307, "172.16.1.66", 49754, "TCP",
+            206L, 40_000L, start, start.plusSeconds(300)),
+        NO_TLS,
+        new Findings("MySQL", null, null, List.of(), List.of(), List.of(), List.of()));
+
+    assertThat(run(mysql).findings()).isEmpty();
+  }
+
+  @Test
+  void treatsAnUnknownApplicationAsUnidentified_soStillFlagsIt() {
+    LocalDateTime start = LocalDateTime.now();
+    ConversationFacts unknown = new ConversationFacts(
+        UUID.randomUUID(), FILE,
+        new FlowIdentity("172.16.1.66", 49754, "141.98.10.79", 12132, "172.16.1.66", 49754, "TCP",
+            206L, 40_000L, start, start.plusSeconds(300)),
+        NO_TLS,
+        new Findings("Unknown", null, null, List.of(), List.of(), List.of(), List.of()));
+
+    assertThat(run(unknown).findingsOfCategory("suspected-beacon")).hasSize(1);
+  }
+
+  @Test
   void ignoresTlsSessions() {
     // Same shape, but it's TLS (has a JA3) → ordinary HTTPS on an odd port, not a raw beacon.
     TlsFacts tls = new TlsFacts("cdn.example.com", null, null, null, null, "ja3abc", null);
