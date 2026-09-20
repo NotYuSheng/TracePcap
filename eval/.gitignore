@@ -1,0 +1,6 @@
+# Captures are large and malware-adjacent — never commit them. Fetch locally per case.yaml.
+pcaps/
+*.pcap
+*.pcapng
+*.pcap.zip
+__pycache__/
