@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -66,9 +67,15 @@ public class C2Question implements StandardQuestion {
     return answers;
   }
 
-  /** The IDS alert summaries that concern this external endpoint, as the answer's basis. */
+  /**
+   * The evidence behind this C2 as the answer's basis: IDS alerts that concern the endpoint, and the
+   * stream classifier's finding when the C2 was identified from the beacon's own protocol (which is
+   * the only basis when no IDS rule fired).
+   */
   private List<String> alertSummaries(CaseKnowledge board, EntityRef external) {
-    return board.findingsOfCategory("ids-alert").stream()
+    return Stream.concat(
+            board.findingsOfCategory("ids-alert").stream(),
+            board.findingsOfCategory("c2-classification").stream())
         .filter(f -> f.concerns().contains(external))
         .map(Finding::summary)
         .toList();

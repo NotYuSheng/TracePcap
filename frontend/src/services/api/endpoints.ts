@@ -18,6 +18,8 @@ export const API_ENDPOINTS = {
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   /** Deterministic answers to the standard investigation questions (#813). */
   ANSWERS: (fileId: string) => `/files/${fileId}/answers`,
+  /** Goal-driven autonomous investigation report — producers plus pivots (#819). */
+  INVESTIGATION: (fileId: string) => `/files/${fileId}/investigation`,
   HOST_IDENTITIES: (fileId: string) => `/files/${fileId}/host-identities`,
   /** Full explainable classification (verdict + evidence axes) for one host. */
   HOST_IDENTITY_EVIDENCE: (fileId: string, ip: string) =>

@@ -1,15 +1,64 @@
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
-import type { Answer, Story } from '@/types';
+import type { Answer, InvestigationReport, Story } from '@/types';
+
+/** Goal → the standard-question key the panel already has a label and icon for. */
+const GOAL_QUESTION: Record<string, string> = {
+  VICTIM: 'victim',
+  USER: 'signed-in-user',
+  MALWARE: 'malware',
+  C2: 'c2',
+};
+
+/** Answers that indicate an incident (as opposed to context such as who is signed in). */
+const INCIDENT_QUESTIONS = new Set(['victim', 'c2', 'malware']);
+
+/** What the Investigation Summary renders: the conclusions, and the goals still unknown. */
+export interface InvestigationSummary {
+  answers: Answer[];
+  /** Goals no technique could close on this capture, e.g. ['C2', 'MALWARE']. */
+  unknowns: string[];
+}
+
+/** Flattens a report into panel answers: each answered goal, then any non-goal answers. */
+export function investigationToSummary(report: InvestigationReport): InvestigationSummary {
+  const goalAnswers: Answer[] = report.goals
+    .filter((g) => g.answered && g.headline)
+    .map((g) => ({
+      question: GOAL_QUESTION[g.goal] ?? g.goal.toLowerCase(),
+      headline: g.headline as string,
+      grade: g.grade ?? 'INFERRED',
+      subjects: g.subjects,
+      basis: g.basis,
+      attributes: {},
+    }));
+  const answers = [...goalAnswers, ...report.additional];
+  // "Not established" is only meaningful once there is an incident to be incomplete about. On a
+  // capture whose only answer is, say, a signed-in user, listing victim/malware/C2 as unestablished
+  // reads like a failure on a benign capture — there was never a lead to follow.
+  const incidentLead = answers.some((a) => INCIDENT_QUESTIONS.has(a.question));
+  return { answers, unknowns: incidentLead ? report.unknowns : [] };
+}
 
 export const storyService = {
   /**
    * Deterministic answers to the standard investigation questions for a file (#813) — victim, C2,
-   * malware, signed-in user. The same conclusions that feed the narrative, surfaced directly.
+   * malware, signed-in user. Producer-only and cheap; the pivots' conclusions are NOT here, so
+   * surfaces that present the investigation read {@link storyService.getInvestigation} instead.
    */
   getAnswers: async (fileId: string): Promise<Answer[]> => {
     const response = await apiClient.get<Answer[]>(API_ENDPOINTS.ANSWERS(fileId));
     return response.data;
+  },
+
+  /**
+   * The autonomous investigation for a file (#819): the standard answers plus what following leads
+   * uncovered (a beacon classified as a C2 with no IDS rule), and the goals still unknown. This is
+   * what the Investigation Summary should show — it is the same board the narrative is built from.
+   */
+  getInvestigation: async (fileId: string): Promise<InvestigationSummary> => {
+    const response = await apiClient.get<InvestigationReport>(API_ENDPOINTS.INVESTIGATION(fileId));
+    return investigationToSummary(response.data);
   },
 
   /**

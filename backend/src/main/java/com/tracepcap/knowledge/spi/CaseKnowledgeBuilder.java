@@ -24,6 +24,18 @@ public final class CaseKnowledgeBuilder {
     this.fileId = fileId;
   }
 
+  /**
+   * Seeds this builder with everything already on an assembled board — for a stage that <em>augments</em>
+   * a board (the pivot loop, #819) rather than assembling from scratch. Entities merge by ref as usual.
+   */
+  public CaseKnowledgeBuilder addAll(CaseKnowledge board) {
+    if (board == null) return this;
+    board.entities().forEach(e -> addEntity(e.ref(), e.attributes()));
+    board.relationships().forEach(this::addRelationship);
+    board.findings().forEach(this::addFinding);
+    return this;
+  }
+
   /** Records (or merges into) an entity node. Null-safe: a null ref is ignored. */
   public CaseKnowledgeBuilder addEntity(EntityRef ref, Map<String, Object> attributes) {
     if (ref == null) return this;
