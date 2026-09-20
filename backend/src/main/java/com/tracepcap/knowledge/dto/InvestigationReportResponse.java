@@ -7,11 +7,15 @@ import java.util.List;
 
 /** API view of an autonomous investigation report (#819, L2). */
 public record InvestigationReportResponse(
-    List<GoalOutcomeDto> goals, List<String> unknowns, List<String> coverage) {
+    List<GoalOutcomeDto> goals,
+    List<AnswerResponse> additional,
+    List<String> unknowns,
+    List<String> coverage) {
 
   public static InvestigationReportResponse from(InvestigationReport report) {
     return new InvestigationReportResponse(
         report.outcomes().stream().map(GoalOutcomeDto::from).toList(),
+        report.additional().stream().map(AnswerResponse::from).toList(),
         report.openGoals().stream().map(Goal::name).toList(),
         report.coverage());
   }

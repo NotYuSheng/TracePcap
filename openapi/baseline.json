@@ -2132,6 +2132,12 @@
       },
       "InvestigationReportResponse": {
         "properties": {
+          "additional": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerResponse"
+            },
+            "type": "array"
+          },
           "coverage": {
             "items": {
               "type": "string"

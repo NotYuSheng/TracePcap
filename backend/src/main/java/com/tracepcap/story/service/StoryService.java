@@ -47,6 +47,7 @@ public class StoryService {
   private final TimelineService timelineService;
   private final com.tracepcap.knowledge.service.StandardQuestionService standardQuestionService;
   private final com.tracepcap.knowledge.service.CaseKnowledgeService caseKnowledgeService;
+  private final com.tracepcap.knowledge.service.InvestigationOrchestrator investigationOrchestrator;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -484,7 +485,7 @@ public class StoryService {
   private void appendKnowledgeContext(StringBuilder prompt, UUID fileId) {
     com.tracepcap.knowledge.spi.CaseKnowledge board;
     try {
-      board = caseKnowledgeService.assemble(fileId);
+      board = investigationOrchestrator.investigatedBoard(fileId);
     } catch (Exception e) {
       log.warn("Knowledge context unavailable for file {}: {}", fileId, e.getMessage());
       return;
@@ -493,11 +494,15 @@ public class StoryService {
     appendKnowledgeBoard(prompt, board);
   }
 
-  /** Narrative path: resolve the answers for this file, then render them. */
+  /**
+   * Narrative path: resolve the answers over the <em>investigated</em> board (producers + pivots) so
+   * the ground truth includes what following a lead uncovered — e.g. a beacon classified as STRRAT's
+   * C2 with no IDS rule — not only what the producers alone could answer.
+   */
   private void appendConfirmedFindings(StringBuilder prompt, UUID fileId) {
     List<com.tracepcap.knowledge.spi.Answer> answers;
     try {
-      answers = standardQuestionService.answer(fileId);
+      answers = standardQuestionService.answer(investigationOrchestrator.investigatedBoard(fileId));
     } catch (Exception e) {
       log.warn("Confirmed-findings context unavailable for file {}: {}", fileId, e.getMessage());
       return;

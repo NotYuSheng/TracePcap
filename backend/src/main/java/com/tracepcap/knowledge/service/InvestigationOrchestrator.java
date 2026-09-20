@@ -42,8 +42,18 @@ public class InvestigationOrchestrator {
   private final List<InvestigativePivot> pivots;
 
   public InvestigationReport investigate(UUID fileId) {
-    CaseKnowledge board = runPivots(fileId, caseKnowledgeService.assemble(fileId));
+    CaseKnowledge board = investigatedBoard(fileId);
     return report(fileId, board, standardQuestionService.answer(board));
+  }
+
+  /**
+   * The board after the pivot loop — the full picture, including what pivots derived (a classified
+   * C2, say) that plain {@code assemble} does not carry. Consumers that want the complete knowledge
+   * (the narrative's ground truth, the Q&A digest) read this rather than {@code /answers}, which is
+   * producer-only and cheap; the pivots' stream-following cost is paid here, not on every read.
+   */
+  public CaseKnowledge investigatedBoard(UUID fileId) {
+    return runPivots(fileId, caseKnowledgeService.assemble(fileId));
   }
 
   /**
@@ -100,7 +110,12 @@ public class InvestigationOrchestrator {
             goal, true, a.headline(), a.grade(), confidenceFor(a.grade()), a.basis(), a.subjects()));
       }
     }
-    return new InvestigationReport(fileId, outcomes, coverage(board));
+    // Answers that aren't one of the standing goals (e.g. a bulk data transfer to review) still
+    // belong in the report — the panel renders from here, so dropping them would hide real findings.
+    java.util.Set<String> goalKeys =
+        java.util.Arrays.stream(Goal.values()).map(Goal::questionKey).collect(java.util.stream.Collectors.toSet());
+    List<Answer> additional = answers.stream().filter(a -> !goalKeys.contains(a.question())).toList();
+    return new InvestigationReport(fileId, outcomes, additional, coverage(board));
   }
 
   /** Confidence follows the evidence grade — how directly the conclusion is known. */

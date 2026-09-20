@@ -133,6 +133,19 @@ class InvestigationOrchestratorTest {
   }
 
   @Test
+  void nonGoalAnswers_areCarriedAsAdditional_notDropped() {
+    // A data-transfer answer isn't one of the four goals, but the panel renders from the report, so
+    // it must still be there.
+    Answer transfer = new Answer("data-transfer", "172.16.1.66 sent 8.0 MB to X", Grade.INFERRED,
+        List.of(EntityRef.host("172.16.1.66")), List.of(), null);
+    InvestigationReport report = service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), List.of(transfer));
+
+    assertThat(report.additional()).singleElement()
+        .satisfies(a -> assertThat(a.question()).isEqualTo("data-transfer"));
+    assertThat(report.openGoals()).containsExactly(Goal.values()); // and it closed no goal
+  }
+
+  @Test
   void emptyBoard_leavesEveryGoalOpen() {
     List<Answer> none = List.of();
     InvestigationReport report = service.report(FILE, new CaseKnowledgeBuilder(FILE).build(), none);

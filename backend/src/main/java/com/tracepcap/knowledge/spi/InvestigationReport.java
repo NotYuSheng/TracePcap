@@ -10,10 +10,11 @@ import java.util.UUID;
  * makes "what we still don't know" a first-class, honest part of the answer, not an omission.
  */
 public record InvestigationReport(
-    UUID fileId, List<GoalOutcome> outcomes, List<String> coverage) {
+    UUID fileId, List<GoalOutcome> outcomes, List<Answer> additional, List<String> coverage) {
 
   public InvestigationReport {
     outcomes = outcomes == null ? List.of() : List.copyOf(outcomes);
+    additional = additional == null ? List.of() : List.copyOf(additional);
     coverage = coverage == null ? List.of() : List.copyOf(coverage);
   }
 

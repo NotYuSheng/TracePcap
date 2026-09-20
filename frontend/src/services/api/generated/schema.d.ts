@@ -2535,6 +2535,7 @@ export interface components {
             srcIp?: string;
         };
         InvestigationReportResponse: {
+            additional?: components["schemas"]["AnswerResponse"][];
             coverage?: string[];
             goals?: components["schemas"]["GoalOutcomeDto"][];
             unknowns?: string[];
