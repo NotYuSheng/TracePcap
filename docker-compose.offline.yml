@@ -49,15 +49,21 @@ services:
       - tracepcap-network
 
   # MinIO Object Storage
-  # Pulled from quay.io, not Docker Hub: minio/minio was pulled from Docker Hub entirely around
-  # September 2025 ("repository does not exist" even when authenticated — this was mistaken for a
-  # Docker Hub rate limit before the actual cause was found). quay.io/minio/minio is MinIO's own
-  # replacement registry and mirrors the same release tags.
+  # bitnamilegacy/minio, NOT the official minio image. MinIO deleted its community images from
+  # Docker Hub (Sept 2025) and then from quay.io (Sept 2026, anonymous pulls return 401) as it
+  # deprecates the free community edition in favour of paid AIStor — the images this stack used to
+  # pin are gone from both registries for good. Broadcom's `bitnamilegacy` archive is the last
+  # third party still publishing the community releases (frozen, no updates). For an air-gapped
+  # deploy, pre-pull/save this pinned image as with every other; if it is ever delisted too, mirror
+  # it into a registry we control (e.g. GHCR).
+  #
+  # Bitnami's image is NOT a drop-in for the official one: its entrypoint runs the server itself (so
+  # no explicit `command:`), stores data under /bitnami/minio/data (not /data), and defaults the web
+  # console off (MINIO_BROWSER=on re-enables it). MINIO_ROOT_USER/PASSWORD are unchanged.
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     container_name: tracepcap-minio
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     deploy:
       resources:
         limits:
@@ -66,6 +72,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Bitnami disables the console by default; turn it on so the published :9001 port serves it.
+      MINIO_BROWSER: "on"
       TZ: Asia/Singapore
     ports:
       # 9000 (the S3 API) is deliberately NOT published. The backend reaches MinIO over the
@@ -75,7 +83,9 @@ services:
       # `docker compose port` only reports an existing binding; it cannot create one (#637).
       - "9001:9001"  # Console
     volumes:
-      - minio_data:/data
+      # Bitnami's data dir is /bitnami/minio/data, not /data. An existing deployment's minio_data
+      # volume holds objects under /data that Bitnami won't see — see MIGRATION note in the PR.
+      - minio_data:/bitnami/minio/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -87,8 +97,10 @@ services:
   # MinIO Client (mc) - Create bucket on startup
   # One-shot bucket bootstrap: it is *meant* to exit 0, so no restart policy here.
   minio-init:
-    # Same registry move as the minio service above — minio/mc is gone from Docker Hub too.
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Same registry move as the minio service above — minio/mc is gone from Docker Hub and quay.io.
+    # bitnamilegacy/minio-client ships mc at /opt/bitnami/minio-client/bin/mc, which is on PATH, so
+    # the entrypoint below calls `mc` bare rather than the official image's /usr/bin/mc.
+    image: bitnamilegacy/minio-client:2025.7.21-debian-12-r3
     container_name: tracepcap-minio-init
     deploy:
       resources:
@@ -114,9 +126,9 @@ services:
     entrypoint: >
       /bin/sh -c "
       sleep 5;
-      /usr/bin/mc alias set myminio http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\";
-      /usr/bin/mc mb myminio/tracepcap-files --ignore-existing;
-      /usr/bin/mc anonymous set none myminio/tracepcap-files;
+      mc alias set myminio http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\";
+      mc mb myminio/tracepcap-files --ignore-existing;
+      mc anonymous set none myminio/tracepcap-files;
       exit 0;
       "
     networks:
