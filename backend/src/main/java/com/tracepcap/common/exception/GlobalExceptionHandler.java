@@ -79,6 +79,29 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
   }
 
+  @ExceptionHandler(PacketCountExceededException.class)
+  public ResponseEntity<ErrorResponse> handlePacketCountExceededException(
+      PacketCountExceededException ex, HttpServletRequest request) {
+    if (ex.getPacketCount() == PacketCountExceededException.UNKNOWN_COUNT) {
+      log.warn("Capture rejected: packet count unverifiable, over provisioned limit {}",
+          ex.getMaxPackets());
+    } else {
+      log.warn("Capture rejected: {} packets over provisioned limit {}",
+          ex.getPacketCount(), ex.getMaxPackets());
+    }
+
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.PAYLOAD_TOO_LARGE.value())
+            .error(HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase())
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+  }
+
   @ExceptionHandler(InvalidFileException.class)
   public ResponseEntity<ErrorResponse> handleInvalidFileException(
       InvalidFileException ex, HttpServletRequest request) {
