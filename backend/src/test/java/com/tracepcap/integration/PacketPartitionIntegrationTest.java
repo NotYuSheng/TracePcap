@@ -34,16 +34,17 @@ class PacketPartitionIntegrationTest {
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"));
 
-  // Pulled from quay.io, not Docker Hub: minio/minio was pulled from Docker Hub entirely around
-  // September 2025 ("repository does not exist" even when authenticated — mistaken at first for
-  // a Docker Hub rate limit). quay.io/minio/minio is MinIO's own replacement registry and mirrors
-  // the same release tags, this one included.
+  // bitnamilegacy/minio, NOT the official image: MinIO deleted its community images from Docker Hub
+  // (Sept 2025) and then from quay.io (Sept 2026, anonymous pulls 401). Broadcom's bitnamilegacy
+  // archive is the last third party publishing the community releases (frozen). Its entrypoint runs
+  // the server itself, so no withCommand("server", ...) — that would conflict; the ephemeral
+  // container needs no volume, so Bitnami's /bitnami/minio/data path is irrelevant here. Health and
+  // the S3 API stay on 9000. See docker-compose.yml for the fuller rationale.
   @Container
   static final GenericContainer<?> MINIO =
-      new GenericContainer<>(DockerImageName.parse("quay.io/minio/minio:RELEASE.2024-01-28T22-35-53Z"))
+      new GenericContainer<>(DockerImageName.parse("bitnamilegacy/minio:2025.7.23-debian-12-r5"))
           .withEnv("MINIO_ROOT_USER", "minioadmin")
           .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
-          .withCommand("server", "/data")
           .withExposedPorts(9000)
           .waitingFor(Wait.forHttp("/minio/health/ready").forPort(9000));
 
