@@ -117,7 +117,8 @@ public class FileServiceImpl implements FileService {
    * @param fileSizeBytes the capture's size, used only for the size-gated fail-closed decision
    * @param label capture name for the rejection log line
    */
-  private void enforcePacketLimit(Long packetCount, long fileSizeBytes, String label) {
+  // Package-private for direct unit testing of the gate branches (see FileServiceImplTest, #827).
+  void enforcePacketLimit(Long packetCount, long fileSizeBytes, String label) {
     if (maxPackets <= 0) {
       return;
     }
@@ -130,6 +131,12 @@ public class FileServiceImpl implements FileService {
       return;
     }
     // Unknown count: fail closed only for large files, where an unverifiable size is suspicious.
+    // A fraction >= 1.0 means "never fail closed" (pure fail-open); handle it explicitly rather than
+    // via the threshold, since validateFile admits a file exactly at maxFileSize (its check is
+    // strictly greater-than) and that would otherwise still trip a threshold of maxFileSize.
+    if (maxPacketsVerifyFraction >= 1.0) {
+      return;
+    }
     long verifyThreshold = (long) (maxFileSize * maxPacketsVerifyFraction);
     if (fileSizeBytes >= verifyThreshold) {
       log.warn(
