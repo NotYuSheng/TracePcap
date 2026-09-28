@@ -15,6 +15,7 @@ const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
 export const UploadPage = () => {
   const { uploadFiles, uploads, clearUploads, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
+  const [maxUploadPackets, setMaxUploadPackets] = useState<number>(0);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [analysisOptions, setAnalysisOptions] = useState<AnalysisOptions>({
     enableNdpi: true,
@@ -30,9 +31,10 @@ export const UploadPage = () => {
   useEffect(() => {
     // Use the shared apiClient so the auth token is attached when auth is enabled.
     apiClient
-      .get<{ maxUploadBytes?: number }>('/system/limits')
+      .get<{ maxUploadBytes?: number; maxUploadPackets?: number }>('/system/limits')
       .then(({ data }) => {
         if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes);
+        if (typeof data.maxUploadPackets === 'number') setMaxUploadPackets(data.maxUploadPackets);
       })
       .catch(err => {
         console.error('Failed to fetch upload limits, using default.', err);
@@ -82,6 +84,7 @@ export const UploadPage = () => {
                 onFileSelect={handleFileSelect}
                 disabled={isUploading}
                 maxSize={maxUploadBytes}
+                maxPackets={maxUploadPackets}
                 acceptedFileTypes={acceptedTypes}
               />
             </Col>

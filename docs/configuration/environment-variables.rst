@@ -46,6 +46,31 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
    * - ``POSTGRES_MEM_LIMIT`` / ``POSTGRES_CPU_LIMIT``
      - ``1g`` / ``2``
      - Postgres container limits.
+   * - ``MAX_UPLOAD_PACKETS``
+     - ``2000000``
+     - Most packets accepted in a single capture. A **provisioning contract**, not
+       a hard technical ceiling: packet count is the dominant driver of database
+       row counts, and those drive how much parallel-query shared memory Postgres
+       needs in ``/dev/shm``. Over-limit captures are rejected gracefully at upload
+       (HTTP 413) rather than failing mid-analysis. Set ``0`` to disable the check.
+       Raise it **together with** ``POSTGRES_SHM_SIZE`` / ``POSTGRES_WORK_MEM``
+       below to support larger captures.
+   * - ``POSTGRES_SHM_SIZE``
+     - ``256m``
+     - Size of the Postgres container's ``/dev/shm`` (parallel-query shared
+       memory). Docker's default of 64 MB is too small: a large parallel query can
+       fail with ``could not resize shared memory segment ... No space left on
+       device`` even when the host has ample RAM and disk. Must exceed the
+       worst-case per-query demand set by the three knobs below.
+   * - ``POSTGRES_WORK_MEM`` / ``POSTGRES_HASH_MEM_MULTIPLIER`` / ``POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER``
+     - ``32MB`` / ``2.0`` / ``2``
+     - Postgres per-query memory knobs, pinned so a query's ``/dev/shm`` demand is
+       **bounded** rather than "whatever the planner picks". Worst case for one
+       query is roughly
+       ``work_mem × hash_mem_multiplier × (1 + max_parallel_workers_per_gather)``
+       — with the defaults, ``32MB × 2 × 3 ≈ 192 MB``, which stays under
+       ``POSTGRES_SHM_SIZE``. If you raise ``POSTGRES_WORK_MEM``, raise
+       ``POSTGRES_SHM_SIZE`` to keep it above that product.
    * - ``MINIO_MEM_LIMIT`` / ``MINIO_CPU_LIMIT``
      - ``1g`` / ``2``
      - MinIO container limits.

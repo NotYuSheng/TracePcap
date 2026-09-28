@@ -2,6 +2,7 @@ package com.tracepcap.file.service;
 
 import com.tracepcap.common.exception.DuplicateFileException;
 import com.tracepcap.common.exception.InvalidFileException;
+import com.tracepcap.common.exception.PacketCountExceededException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
@@ -61,17 +62,30 @@ public class FileServiceImpl implements FileService {
    */
   private final long maxFileSize;
 
+  /**
+   * The most packets we will accept in a single capture, from {@code app.max-packets}
+   * (env {@code MAX_UPLOAD_PACKETS}). A provisioning contract rather than a hard technical ceiling:
+   * packet count is the dominant driver of database row counts, and therefore of the parallel-query
+   * shared memory Postgres needs in {@code /dev/shm}. Raising it means also raising the Postgres
+   * {@code shm_size}/{@code work_mem} budget in the compose files — see {@code .env.example}. A
+   * non-positive value disables the check. Enforced against the {@code capinfos} count, which is an
+   * upper bound on rows actually inserted, so the gate never lets through more than it advertises.
+   */
+  private final long maxPackets;
+
   public FileServiceImpl(
       FileRepository fileRepository,
       StorageService storageService,
       FileMapper fileMapper,
       ApplicationEventPublisher eventPublisher,
-      @Value("${app.max-file-size:536870912}") long maxFileSize) {
+      @Value("${app.max-file-size:536870912}") long maxFileSize,
+      @Value("${app.max-packets:2000000}") long maxPackets) {
     this.fileRepository = fileRepository;
     this.storageService = storageService;
     this.fileMapper = fileMapper;
     this.eventPublisher = eventPublisher;
     this.maxFileSize = maxFileSize;
+    this.maxPackets = maxPackets;
   }
 
 
@@ -101,6 +115,25 @@ public class FileServiceImpl implements FileService {
       throw new DuplicateFileException(existing.get().getId());
     }
 
+    // Count packets up front (best-effort) so the loading view can show a packet-based time
+    // estimate immediately, before analysis has run. Overwritten with the exact count on completion.
+    // Done before the MinIO upload so an over-limit capture is rejected without first storing it.
+    Integer packetCount = countPackets(file);
+
+    // Provisioning gate: reject captures larger than this instance is sized for, before spending any
+    // upload/analysis work on them. Packet count drives DB row counts and thus Postgres parallel-query
+    // shared memory; a capture past the limit risks the `/dev/shm` "No space left on device" failure.
+    // Fail-open when the count is unknown (capinfos best-effort returned null) — a broken measurement
+    // must not block a legitimate small file. See maxPackets javadoc for how to raise the limit.
+    if (maxPackets > 0 && packetCount != null && packetCount > maxPackets) {
+      log.warn(
+          "Upload rejected: {} has {} packets, over the provisioned limit of {}",
+          originalFilename,
+          packetCount,
+          maxPackets);
+      throw new PacketCountExceededException(packetCount, maxPackets);
+    }
+
     // Generate unique ID and file name
     UUID fileId = UUID.randomUUID();
     String fileName = fileId.toString() + getFileExtension(originalFilename);
@@ -110,10 +143,6 @@ public class FileServiceImpl implements FileService {
       // Upload to MinIO
       String minioPath = storageService.uploadFile(file, fileName);
       log.info("DEBUG: Returned minioPath: {}", minioPath);
-
-      // Count packets up front (best-effort) so the loading view can show a packet-based time
-      // estimate immediately, before analysis has run. Overwritten with the exact count on completion.
-      Integer packetCount = countPackets(file);
 
       // Save metadata to database
       FileEntity fileEntity =
@@ -355,6 +384,18 @@ public class FileServiceImpl implements FileService {
         throw new DuplicateFileException(existing.get().getId());
       }
 
+      // Same provisioning gate as a direct upload — a merge is the other path onto the analysis
+      // pipeline, so two under-limit captures must not merge into one over-limit capture and slip
+      // past it. Checked here, before the upload/persist work below. Fail-open on an unknown count.
+      Integer mergedPacketCount = countPackets(tempOutput);
+      if (maxPackets > 0 && mergedPacketCount != null && mergedPacketCount > maxPackets) {
+        log.warn(
+            "Merge rejected: merged capture has {} packets, over the provisioned limit of {}",
+            mergedPacketCount,
+            maxPackets);
+        throw new PacketCountExceededException(mergedPacketCount, maxPackets);
+      }
+
       // Use caller-supplied name or auto-generate from source names
       String mergedName =
           (mergedFileName != null && !mergedFileName.isBlank())
@@ -372,7 +413,7 @@ public class FileServiceImpl implements FileService {
               .id(newFileId)
               .fileName(mergedName)
               .fileSize(tempOutput.length())
-              .packetCount(countPackets(tempOutput))
+              .packetCount(mergedPacketCount)
               .minioPath(storedName)
               .uploadedAt(LocalDateTime.now())
               .status(FileEntity.FileStatus.PROCESSING)
@@ -390,7 +431,7 @@ public class FileServiceImpl implements FileService {
 
       return fileMapper.toUploadResponse(fileEntity);
 
-    } catch (InvalidFileException | DuplicateFileException e) {
+    } catch (InvalidFileException | DuplicateFileException | PacketCountExceededException e) {
       throw e;
     } catch (Exception e) {
       log.error("Failed to merge PCAP files", e);
