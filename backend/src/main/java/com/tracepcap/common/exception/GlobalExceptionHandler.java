@@ -82,10 +82,13 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(PacketCountExceededException.class)
   public ResponseEntity<ErrorResponse> handlePacketCountExceededException(
       PacketCountExceededException ex, HttpServletRequest request) {
-    log.warn(
-        "Capture rejected: {} packets over provisioned limit {}",
-        ex.getPacketCount(),
-        ex.getMaxPackets());
+    if (ex.getPacketCount() == PacketCountExceededException.UNKNOWN_COUNT) {
+      log.warn("Capture rejected: packet count unverifiable, over provisioned limit {}",
+          ex.getMaxPackets());
+    } else {
+      log.warn("Capture rejected: {} packets over provisioned limit {}",
+          ex.getPacketCount(), ex.getMaxPackets());
+    }
 
     ErrorResponse error =
         ErrorResponse.builder()

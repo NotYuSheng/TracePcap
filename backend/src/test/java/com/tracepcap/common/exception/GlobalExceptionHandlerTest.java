@@ -135,6 +135,14 @@ class GlobalExceptionHandlerTest {
                 HANDLER.handlePacketCountExceededException(
                     new PacketCountExceededException(3_000_000L, 2_000_000L), req)),
         new Case(
+            "PacketCountUnverifiable -> 413",
+            413,
+            "Payload Too Large",
+            null,
+            req ->
+                HANDLER.handlePacketCountExceededException(
+                    new PacketCountExceededException(2_000_000L), req)),
+        new Case(
             "NoResourceFound -> 404",
             404,
             "Not Found",
@@ -204,6 +212,20 @@ class GlobalExceptionHandlerTest {
     // far over they are and what to raise MAX_UPLOAD_PACKETS to.
     assertThat(body.getMessage()).contains("3,000,000").contains("2,000,000");
     assertThat(body.getMessage()).contains("MAX_UPLOAD_PACKETS");
+  }
+
+  @Test
+  void packetCountUnverifiable_messageSaysRetryAndNamesLimit() {
+    ResponseEntity<ErrorResponse> response =
+        HANDLER.handlePacketCountExceededException(
+            new PacketCountExceededException(2_000_000L), request());
+
+    ErrorResponse body = response.getBody();
+    assertThat(body).isNotNull();
+    // Distinct from the definitively-over-limit case: tells the operator to retry a transient
+    // capinfos failure, and still names the provisioned limit.
+    assertThat(body.getMessage()).contains("could not be verified").contains("Retry");
+    assertThat(body.getMessage()).contains("2,000,000").contains("MAX_UPLOAD_PACKETS");
   }
 
   @Test

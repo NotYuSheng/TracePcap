@@ -70,6 +70,11 @@ app:
   # with POSTGRES_SHM_SIZE / POSTGRES_WORK_MEM in the compose files — see .env.example. 0 disables.
   max-packets: ${MAX_UPLOAD_PACKETS:2000000}
 
+  # When capinfos can't produce a packet count (timeout/error), the gate fails CLOSED for files at or
+  # above this fraction of max-file-size (an unverifiable large capture is suspicious) and fails OPEN
+  # for smaller ones (which can't hold a dangerous packet count). Set >= 1.0 for pure fail-open.
+  max-packets-verify-fraction: ${MAX_UPLOAD_PACKETS_VERIFY_FRACTION:0.5}
+
   # Jackson Configuration
   jackson:
     serialization:

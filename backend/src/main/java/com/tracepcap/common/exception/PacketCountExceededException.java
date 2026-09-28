@@ -13,6 +13,9 @@ import lombok.Getter;
 @Getter
 public class PacketCountExceededException extends RuntimeException {
 
+  /** Sentinel for {@link #packetCount} when the count could not be verified (capinfos failed). */
+  public static final long UNKNOWN_COUNT = -1L;
+
   private final long packetCount;
   private final long maxPackets;
 
@@ -24,6 +27,23 @@ public class PacketCountExceededException extends RuntimeException {
                 + "shared-memory settings) to analyse larger captures.",
             packetCount, maxPackets));
     this.packetCount = packetCount;
+    this.maxPackets = maxPackets;
+  }
+
+  /**
+   * The count could not be determined and the file is too large to accept unverified. Distinct
+   * message so the operator knows to retry (a transient capinfos failure) rather than that the file
+   * is definitively over the limit.
+   */
+  public PacketCountExceededException(long maxPackets) {
+    super(
+        String.format(
+            "This capture's packet count could not be verified, and it is too large to accept "
+                + "without a count against the provisioned limit of %,d packets. Retry the upload, "
+                + "or ask an administrator to raise MAX_UPLOAD_PACKETS (and the matching Postgres "
+                + "shared-memory settings).",
+            maxPackets));
+    this.packetCount = UNKNOWN_COUNT;
     this.maxPackets = maxPackets;
   }
 }
