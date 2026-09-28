@@ -31,18 +31,25 @@ public class PacketCountExceededException extends RuntimeException {
   }
 
   /**
-   * The count could not be determined and the file is too large to accept unverified. Distinct
-   * message so the operator knows to retry (a transient capinfos failure) rather than that the file
-   * is definitively over the limit.
+   * The count could not be determined and the file is too large to accept unverified.
+   *
+   * @param maxPackets the provisioned limit, named in the message
+   * @param retryable whether retrying could plausibly succeed. {@code true} for a direct upload (a
+   *     transient capinfos failure may clear on retry); {@code false} for a merge, where the merged
+   *     file is deterministic so capinfos will fail identically every time — retrying is a dead end,
+   *     so the message points at the config knob instead.
    */
-  public PacketCountExceededException(long maxPackets) {
+  public PacketCountExceededException(long maxPackets, boolean retryable) {
     super(
         String.format(
             "This capture's packet count could not be verified, and it is too large to accept "
-                + "without a count against the provisioned limit of %,d packets. Retry the upload, "
-                + "or ask an administrator to raise MAX_UPLOAD_PACKETS (and the matching Postgres "
-                + "shared-memory settings).",
-            maxPackets));
+                + "without a count against the provisioned limit of %,d packets. %s",
+            maxPackets,
+            retryable
+                ? "Retry the upload, or ask an administrator to raise MAX_UPLOAD_PACKETS (and the "
+                    + "matching Postgres shared-memory settings), or MAX_UPLOAD_PACKETS_VERIFY_FRACTION."
+                : "Ask an administrator to raise MAX_UPLOAD_PACKETS (and the matching Postgres "
+                    + "shared-memory settings), or MAX_UPLOAD_PACKETS_VERIFY_FRACTION."));
     this.packetCount = UNKNOWN_COUNT;
     this.maxPackets = maxPackets;
   }

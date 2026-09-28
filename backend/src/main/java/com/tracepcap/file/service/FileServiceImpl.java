@@ -116,9 +116,12 @@ public class FileServiceImpl implements FileService {
    * @param packetCount the capinfos count, or {@code null} if it could not be determined
    * @param fileSizeBytes the capture's size, used only for the size-gated fail-closed decision
    * @param label capture name for the rejection log line
+   * @param retryable whether an unverifiable-count rejection should tell the operator to retry —
+   *     {@code true} for a direct upload (a transient capinfos failure may clear), {@code false} for
+   *     a merge (the merged file is deterministic, so capinfos fails identically on retry)
    */
   // Package-private for direct unit testing of the gate branches (see FileServiceImplTest, #827).
-  void enforcePacketLimit(Long packetCount, long fileSizeBytes, String label) {
+  void enforcePacketLimit(Long packetCount, long fileSizeBytes, String label, boolean retryable) {
     if (maxPackets <= 0) {
       return;
     }
@@ -143,7 +146,7 @@ public class FileServiceImpl implements FileService {
           "Upload rejected: could not verify packet count for {} ({} bytes >= {} threshold); "
               + "too large to accept unverified against the {}-packet limit",
           label, fileSizeBytes, verifyThreshold, maxPackets);
-      throw new PacketCountExceededException(maxPackets);
+      throw new PacketCountExceededException(maxPackets, retryable);
     }
   }
 
@@ -182,7 +185,7 @@ public class FileServiceImpl implements FileService {
     // Provisioning gate: reject captures larger than this instance is sized for, before spending any
     // upload/analysis work on them (see enforcePacketLimit — including the size-gated fail-closed
     // behaviour when capinfos couldn't produce a count).
-    enforcePacketLimit(packetCount, file.getSize(), originalFilename);
+    enforcePacketLimit(packetCount, file.getSize(), originalFilename, /* retryable= */ true);
 
     // Generate unique ID and file name
     UUID fileId = UUID.randomUUID();
@@ -444,7 +447,8 @@ public class FileServiceImpl implements FileService {
       // pipeline, so two under-limit captures must not merge into one over-limit capture and slip
       // past it. Checked here, before the upload/persist work below.
       Long mergedPacketCount = countPackets(tempOutput);
-      enforcePacketLimit(mergedPacketCount, tempOutput.length(), mergedName);
+      // retryable=false: the merged file is deterministic, so a capinfos failure will recur on retry.
+      enforcePacketLimit(mergedPacketCount, tempOutput.length(), mergedName, /* retryable= */ false);
 
       // Stream-upload the merged file to MinIO (avoids loading it fully into memory)
       UUID newFileId = UUID.randomUUID();

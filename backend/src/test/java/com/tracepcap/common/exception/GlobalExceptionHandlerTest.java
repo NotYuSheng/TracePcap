@@ -141,7 +141,7 @@ class GlobalExceptionHandlerTest {
             null,
             req ->
                 HANDLER.handlePacketCountExceededException(
-                    new PacketCountExceededException(2_000_000L), req)),
+                    new PacketCountExceededException(2_000_000L, true), req)),
         new Case(
             "NoResourceFound -> 404",
             404,
@@ -215,10 +215,10 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
-  void packetCountUnverifiable_messageSaysRetryAndNamesLimit() {
+  void packetCountUnverifiable_retryable_messageSaysRetryAndNamesLimit() {
     ResponseEntity<ErrorResponse> response =
         HANDLER.handlePacketCountExceededException(
-            new PacketCountExceededException(2_000_000L), request());
+            new PacketCountExceededException(2_000_000L, true), request());
 
     ErrorResponse body = response.getBody();
     assertThat(body).isNotNull();
