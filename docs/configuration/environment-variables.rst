@@ -55,6 +55,13 @@ directly. Set ``APP_MEMORY_MB`` and everything else scales automatically.
        (HTTP 413) rather than failing mid-analysis. Set ``0`` to disable the check.
        Raise it **together with** ``POSTGRES_SHM_SIZE`` / ``POSTGRES_WORK_MEM``
        below to support larger captures.
+   * - ``MAX_UPLOAD_PACKETS_VERIFY_FRACTION``
+     - ``0.5``
+     - Behaviour when ``capinfos`` can't produce a packet count (timeout/error).
+       The gate fails **closed** (rejects) for files at or above this fraction of
+       the max upload size — an unverifiable large capture is exactly the case the
+       gate exists to stop — and fails **open** (allows) for smaller files, which
+       can't hold a dangerous packet count. Set ``>= 1.0`` for pure fail-open.
    * - ``POSTGRES_SHM_SIZE``
      - ``256m``
      - Size of the Postgres container's ``/dev/shm`` (parallel-query shared
