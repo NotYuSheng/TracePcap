@@ -19,6 +19,11 @@ public class SystemController {
   @Value("${MAX_UPLOAD_SIZE_BYTES:536870912}")
   private long maxUploadSizeBytes;
 
+  // Same property FileServiceImpl enforces (app.max-packets), so the advertised and enforced packet
+  // limits are one number. 0 (or negative) means "no packet limit" — reported as such to the UI.
+  @Value("${app.max-packets:2000000}")
+  private long maxUploadPackets;
+
   @Value("${ANALYSIS_TIMEOUT_SECONDS:300}")
   private int analysisTimeoutSeconds;
 
@@ -46,6 +51,9 @@ public class SystemController {
             maxUploadSizeBytes,
             "maxUploadMb",
             maxUploadSizeBytes / 1024 / 1024,
+            // 0 (or negative) means no packet limit is enforced; the UI treats it as unlimited.
+            "maxUploadPackets",
+            Math.max(maxUploadPackets, 0),
             "analysisTimeoutMs",
             (long) analysisTimeoutSeconds * 1000,
             "llmTimeoutMs",

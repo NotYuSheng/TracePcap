@@ -17,6 +17,24 @@ services:
     image: postgres:15-alpine
     container_name: tracepcap-postgres
     restart: unless-stopped
+    # Pin the memory knobs that drive parallel-query shared-memory use so a query's /dev/shm demand
+    # is BOUNDED rather than "whatever the planner picks" — the worst case is roughly
+    # work_mem × hash_mem_multiplier × (1 + max_parallel_workers_per_gather). With the defaults
+    # below (32MB × 2 × 3 ≈ 192MB) that stays under shm_size. Raise these together with
+    # POSTGRES_SHM_SIZE and MAX_UPLOAD_PACKETS to provision for larger captures — see .env.example.
+    command:
+      - "postgres"
+      - "-c"
+      - "work_mem=${POSTGRES_WORK_MEM:-32MB}"
+      - "-c"
+      - "hash_mem_multiplier=${POSTGRES_HASH_MEM_MULTIPLIER:-2.0}"
+      - "-c"
+      - "max_parallel_workers_per_gather=${POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER:-2}"
+    # Postgres puts parallel-query shared memory (parallel hash joins/sorts, etc.) in /dev/shm.
+    # Docker's default 64MB /dev/shm is far too small — a single parallel query can try to
+    # allocate 100MB+ and fail with `could not resize shared memory segment ... No space left
+    # on device` even when the host has ample RAM and disk. Raise the cap. Override via .env.
+    shm_size: ${POSTGRES_SHM_SIZE:-256m}
     deploy:
       resources:
         limits:
