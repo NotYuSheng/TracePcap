@@ -127,9 +127,9 @@ knowledge board — not the LLM — and each answer carries a **grade** recordin
      - Grade
      - From
    * - Signed-in user
-     - ``ccollier`` signed in on ``172.16.1.66``
+     - ``ccollier`` (Clark Collier) signed in on ``172.16.1.66``
      - MEASURED
-     - Kerberos AS-REQ
+     - Kerberos AS-REQ + LDAP
    * - Victim host
      - ``172.16.1.66`` — contacted a known malware C2 (signed in as ``ccollier``)
      - INFERRED
