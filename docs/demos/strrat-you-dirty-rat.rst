@@ -1,6 +1,14 @@
 STRRAT infection — "You dirty rat!"
 ====================================
 
+.. note::
+
+   **Captured against TracePcap** ``v0.1.1`` **(dev, 17 October 2026).** TracePcap changes quickly, so
+   this walkthrough is a point-in-time record. The deterministic conclusions — victim, signed-in user,
+   malware, and command-and-control — are stable across versions; screenshots, exact packet and host
+   counts, and UI details reflect *that* build, and a later one may differ. Re-verify against the
+   current build before quoting a specific figure.
+
 This walkthrough runs a real, publicly available network-forensics incident through TracePcap's
 *existing* features, end to end. It works the way an analyst would: from the captured traffic alone,
 with no prior knowledge of the network, and cross-checks every result against the exercise's own
