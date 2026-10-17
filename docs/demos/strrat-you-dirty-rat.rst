@@ -89,8 +89,8 @@ the victim.
    :alt: TracePcap analysis overview for the STRRAT capture
    :width: 100%
 
-   The Overview tab: inventory, protocol distribution (note KRB5 and LDAP), detected applications, and
-   nDPI risk alerts.
+   The Overview tab: inventory, the Investigation Summary (covered next), protocol distribution (note
+   KRB5 and LDAP), detected applications, and nDPI risk alerts.
 
 Step 3 — The investigation summary: the incident report, answered
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,6 +100,15 @@ answers the exercise's questions. It is produced by deterministic checks that re
 knowledge board — not the LLM — and each answer carries a **grade** recording how directly it is known:
 ``MEASURED`` (the traffic itself exhibited it), ``REPORTED`` (a party asserted it on the wire), or
 ``INFERRED`` (a tool or heuristic judged it).
+
+.. figure:: images/investigation-summary.png
+   :alt: The Investigation Summary panel: graded answers for victim, user, malware, and C2
+   :width: 100%
+
+   The Investigation Summary on the Overview tab. Each standing question is answered and badged with
+   its grade: the signed-in user ``ccollier`` is **Measured** (the host authenticated as it), while the
+   victim, the malware (**STRRAT**), and the C2 (``141.98.10.79``, LT · UAB Host Baltic) are
+   **Inferred**, each with the evidence it rests on.
 
 .. list-table::
    :header-rows: 1
