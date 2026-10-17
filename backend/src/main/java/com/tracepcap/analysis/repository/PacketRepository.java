@@ -37,6 +37,18 @@ public interface PacketRepository extends JpaRepository<PacketEntity, UUID> {
   List<String> findPayloadsByConversationId(@Param("conversationId") UUID conversationId);
 
   /**
+   * The first payloads of a conversation, in packet order, bounded by {@code pageable}. For a
+   * reader that only needs the opening of a stream (a C2 check-in fingerprint) — the unbounded
+   * variant above materialises every payload of a possibly enormous conversation.
+   */
+  @Query(
+      "SELECT p.payload FROM PacketEntity p"
+          + " WHERE p.conversation.id = :conversationId AND p.payload IS NOT NULL"
+          + " ORDER BY p.packetNumber ASC")
+  List<String> findPayloadsByConversationId(
+      @Param("conversationId") UUID conversationId, org.springframework.data.domain.Pageable pageable);
+
+  /**
    * For the given file, returns the ids of conversations involving {@code hostIp} that contain at
    * least one packet sent by the peer (a host other than {@code hostIp}) — i.e. the peer
    * transmitted back, so it "responded". Used by the conversation tracer to distinguish responding

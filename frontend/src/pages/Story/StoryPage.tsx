@@ -78,15 +78,19 @@ export const StoryPage = () => {
   const [granularity, setGranularity] = useState<number | 'auto'>('auto');
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [unknowns, setUnknowns] = useState<string[]>([]);
   const [answersLoaded, setAnswersLoaded] = useState(false);
 
+  // The investigation (producers + pivots), not the producer-only /answers — so a conclusion reached
+  // by following a lead (a beacon classified as a C2 with no IDS rule) shows up here too, and the
+  // panel matches the ground truth the narrative is built from.
   useEffect(() => {
     let alive = true;
     setAnswersLoaded(false);
     storyService
-      .getAnswers(fileId)
-      .then(a => { if (alive) setAnswers(a); })
-      .catch(() => { if (alive) setAnswers([]); })
+      .getInvestigation(fileId)
+      .then(s => { if (alive) { setAnswers(s.answers); setUnknowns(s.unknowns); } })
+      .catch(() => { if (alive) { setAnswers([]); setUnknowns([]); } })
       .finally(() => { if (alive) setAnswersLoaded(true); });
     return () => { alive = false; };
   }, [fileId]);
@@ -297,7 +301,7 @@ export const StoryPage = () => {
       {/* Investigation summary — deterministic answers (#813) */}
       <div className="row mb-4" id="story-confirmed" style={sectionAnchor}>
         <div className="col-12">
-          <ConfirmedFindingsPanel answers={answers} loading={!answersLoaded} />
+          <ConfirmedFindingsPanel answers={answers} loading={!answersLoaded} unknowns={unknowns} />
         </div>
       </div>
 

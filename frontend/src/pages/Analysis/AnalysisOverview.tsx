@@ -119,6 +119,7 @@ export const AnalysisOverview = () => {
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [unknowns, setUnknowns] = useState<string[]>([]);
 
   // Entity detail modal
   type EntityModalState = { type: 'PROTOCOL' | 'APPLICATION'; key: string; name: string } | null;
@@ -143,9 +144,9 @@ export const AnalysisOverview = () => {
       .catch(() => setExtractedFilesCount(undefined));
 
     storyService
-      .getAnswers(fileId)
-      .then(setAnswers)
-      .catch(() => setAnswers([]));
+      .getInvestigation(fileId)
+      .then(s => { setAnswers(s.answers); setUnknowns(s.unknowns); })
+      .catch(() => { setAnswers([]); setUnknowns([]); });
   }, [fileId]);
 
   const detectedApps = data.detectedApplications ?? [];
@@ -158,7 +159,7 @@ export const AnalysisOverview = () => {
           Only shown when there are answers; the dashboard stays clean for benign captures. */}
       {answers.length > 0 && (
         <div className="mt-4">
-          <ConfirmedFindingsPanel answers={answers} />
+          <ConfirmedFindingsPanel answers={answers} unknowns={unknowns} />
         </div>
       )}
 

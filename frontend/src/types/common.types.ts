@@ -542,3 +542,27 @@ export interface Answer {
   basis: string[];
   attributes: Record<string, unknown>;
 }
+
+/** One standing goal's outcome in the autonomous investigation (#819). */
+export interface GoalOutcome {
+  goal: 'VICTIM' | 'USER' | 'MALWARE' | 'C2' | string;
+  answered: boolean;
+  headline: string | null;
+  grade: 'MEASURED' | 'REPORTED' | 'INFERRED' | string | null;
+  confidence: number;
+  basis: string[];
+  subjects: AnswerEntityRef[];
+}
+
+/**
+ * The autonomous investigation report (#819) — the goal-driven view over the knowledge board,
+ * including what the pivots derived (a beacon classified as a C2, say) that the raw /answers do not
+ * carry. Names the goals still open as first-class unknowns, and the techniques that contributed.
+ */
+export interface InvestigationReport {
+  goals: GoalOutcome[];
+  /** Answers that aren't a standing goal (e.g. a bulk data transfer to review). */
+  additional: Answer[];
+  unknowns: string[];
+  coverage: string[];
+}

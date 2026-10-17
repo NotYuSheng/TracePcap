@@ -4,7 +4,17 @@ import type { Answer } from '@/types';
 interface ConfirmedFindingsPanelProps {
   answers: Answer[];
   loading?: boolean;
+  /** Goals the investigation could not close on this capture (e.g. 'C2'), shown as honest gaps. */
+  unknowns?: string[];
 }
+
+/** Human labels for the standing investigation goals, for the "not established" line. */
+const GOAL_LABEL: Record<string, string> = {
+  VICTIM: 'victim host',
+  USER: 'signed-in user',
+  MALWARE: 'malware',
+  C2: 'command & control',
+};
 
 /** Click-toggled help behind the header's info icon — app convention (no native title tooltip). */
 function InvestigationSummaryInfoPopover() {
@@ -64,7 +74,11 @@ const GRADE_STYLE: Record<string, { bg: string; label: string; tip: string }> = 
  * only through the LLM narrative. This is the same data that feeds the narrative's ground-truth
  * block. Renders nothing when there are no answers (a capture with no such findings).
  */
-export const ConfirmedFindingsPanel = ({ answers, loading = false }: ConfirmedFindingsPanelProps) => {
+export const ConfirmedFindingsPanel = ({
+  answers,
+  loading = false,
+  unknowns = [],
+}: ConfirmedFindingsPanelProps) => {
   return (
     <Card>
       <Card.Body>
@@ -129,6 +143,15 @@ export const ConfirmedFindingsPanel = ({ answers, loading = false }: ConfirmedFi
               </div>
             );
           })}
+          {unknowns.length > 0 && (
+            <div className="text-muted small d-flex align-items-start gap-2 px-1 pt-1">
+              <i className="bi bi-question-circle mt-1" aria-hidden="true" />
+              <span>
+                Not established for this capture:{' '}
+                {unknowns.map((u) => GOAL_LABEL[u] ?? u.toLowerCase()).join(', ')}.
+              </span>
+            </div>
+          )}
         </div>
         )}
       </Card.Body>

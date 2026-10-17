@@ -47,6 +47,7 @@ public class StoryService {
   private final TimelineService timelineService;
   private final com.tracepcap.knowledge.service.StandardQuestionService standardQuestionService;
   private final com.tracepcap.knowledge.service.CaseKnowledgeService caseKnowledgeService;
+  private final com.tracepcap.knowledge.service.InvestigationOrchestrator investigationOrchestrator;
 
   /**
    * Generate a story for a PCAP file using LLM
@@ -484,7 +485,7 @@ public class StoryService {
   private void appendKnowledgeContext(StringBuilder prompt, UUID fileId) {
     com.tracepcap.knowledge.spi.CaseKnowledge board;
     try {
-      board = caseKnowledgeService.assemble(fileId);
+      board = investigationOrchestrator.investigatedBoard(fileId);
     } catch (Exception e) {
       log.warn("Knowledge context unavailable for file {}: {}", fileId, e.getMessage());
       return;
@@ -493,11 +494,15 @@ public class StoryService {
     appendKnowledgeBoard(prompt, board);
   }
 
-  /** Narrative path: resolve the answers for this file, then render them. */
+  /**
+   * Narrative path: resolve the answers over the <em>investigated</em> board (producers + pivots) so
+   * the ground truth includes what following a lead uncovered — e.g. a beacon classified as STRRAT's
+   * C2 with no IDS rule — not only what the producers alone could answer.
+   */
   private void appendConfirmedFindings(StringBuilder prompt, UUID fileId) {
     List<com.tracepcap.knowledge.spi.Answer> answers;
     try {
-      answers = standardQuestionService.answer(fileId);
+      answers = standardQuestionService.answer(investigationOrchestrator.investigatedBoard(fileId));
     } catch (Exception e) {
       log.warn("Confirmed-findings context unavailable for file {}: {}", fileId, e.getMessage());
       return;
@@ -510,15 +515,22 @@ public class StoryService {
       StringBuilder prompt, List<com.tracepcap.knowledge.spi.Answer> answers) {
     if (answers.isEmpty()) return;
 
-    prompt.append("## Confirmed Findings (deterministic — treat as authoritative ground truth)\n");
+    prompt.append("## Investigation Findings (deterministic checks — each carries a grade)\n");
     prompt.append(
-        "These were established by deterministic checks over the capture (IDS signatures, protocol"
-            + " extraction, identity resolution), not by inference. Name them explicitly in your"
-            + " narrative and do not contradict them.\n");
+        "These come from deterministic checks over the capture, not from a language model. Each is"
+            + " graded: MEASURED = the traffic itself exhibited it; REPORTED = a party on the wire"
+            + " asserted it; INFERRED = a tool or heuristic judged it, and it may be wrong. Name these"
+            + " findings in your narrative and do not contradict them, but state an INFERRED finding"
+            + " as such (\"appears to be\", \"is attributed to\") — never as certain or"
+            + " high-confidence. The basis lines say what each rests on; describe that basis as"
+            + " given.\n");
     for (com.tracepcap.knowledge.spi.Answer a : answers) {
       String label = CONFIRMED_LABELS.getOrDefault(a.question(), a.question());
       prompt.append("- ").append(label).append(": ").append(a.headline())
           .append(" [").append(a.grade()).append("]\n");
+      // Say what the conclusion rests on, so the narrative describes its basis correctly instead of
+      // guessing — e.g. it once claimed payloads were unavailable for a C2 read from a cleartext stream.
+      a.basis().stream().limit(2).forEach(b -> prompt.append("    basis: ").append(b).append('\n'));
     }
     prompt.append("\n");
   }

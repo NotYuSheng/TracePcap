@@ -91,6 +91,24 @@ class StandardQuestionsTest {
   }
 
   @Test
+  void c2AndMalware_useTheStreamClassificationAsBasis_whenNoIdsAlertFired() {
+    // Suricata off: the only evidence is the classifier's finding. The answers must still say why.
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef c2 = EntityRef.external("141.98.10.79");
+    EntityRef strrat = EntityRef.malware("STRRAT");
+    b.addRelationship(Relationship.of(c2, "c2-of", strrat, Grade.INFERRED, "stream-classifier"));
+    b.addFinding(new Finding("c2-classification",
+        "STRRAT C2 identified from the beacon's cleartext check-in (matched the STRRAT protocol fingerprint in the stream to 141.98.10.79)",
+        Severity.HIGH, Grade.INFERRED, "stream-classifier", List.of(c2, strrat), List.of("conv-1"), null));
+    CaseKnowledge board = b.build();
+
+    assertThat(new C2Question().answer(board)).singleElement()
+        .satisfies(ans -> assertThat(ans.basis()).singleElement().satisfies(s -> assertThat(s).contains("cleartext")));
+    assertThat(new MalwareQuestion().answer(board)).singleElement()
+        .satisfies(ans -> assertThat(ans.basis()).singleElement().satisfies(s -> assertThat(s).contains("STRRAT")));
+  }
+
+  @Test
   void malware_listsTheNamedFamily() {
     List<Answer> a = new MalwareQuestion().answer(strratBoard());
     assertThat(a).singleElement().satisfies(ans -> assertThat(ans.attributes()).containsEntry("family", "STRRAT"));
