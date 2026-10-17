@@ -72,6 +72,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    :caption: Demo & Sample Data
 
    sample-files
+   demos/strrat-you-dirty-rat
 
 .. toctree::
    :maxdepth: 1
