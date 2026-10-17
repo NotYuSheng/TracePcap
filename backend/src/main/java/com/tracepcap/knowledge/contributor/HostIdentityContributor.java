@@ -42,7 +42,13 @@ public class HostIdentityContributor implements KnowledgeContributor {
       String user = host.loggedInUser();
       if (user != null && !user.isBlank()) {
         String source = host.loggedInUserSource();
-        board.addEntity(EntityRef.user(user), Map.of("source", nullToUnknown(source)));
+        Map<String, Object> userAttrs = new LinkedHashMap<>();
+        userAttrs.put("source", nullToUnknown(source));
+        // The person's real name from the LDAP directory lookup (REPORTED), if the capture named it —
+        // what the account is, beside the principal it authenticated as.
+        String realName = host.loggedInUserRealName();
+        if (realName != null && !realName.isBlank()) userAttrs.put("realName", realName);
+        board.addEntity(EntityRef.user(user), userAttrs);
         board.addRelationship(
             Relationship.of(hostRef, SIGNED_IN_AS, EntityRef.user(user), gradeForSource(source), name()));
       }
