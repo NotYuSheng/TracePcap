@@ -115,6 +115,22 @@ class StandardQuestionsTest {
   }
 
   @Test
+  void signedInUser_includesTheLdapRealName_whenTheUserEntityCarriesIt() {
+    // host-identity posts the LDAP display name as a USER attribute; the answer names both.
+    CaseKnowledgeBuilder b = new CaseKnowledgeBuilder(UUID.randomUUID());
+    EntityRef host = EntityRef.host("172.16.1.66");
+    EntityRef user = EntityRef.user("ccollier");
+    b.addEntity(user, java.util.Map.of("realName", "Clark Collier"));
+    b.addRelationship(Relationship.of(host, "signed-in-as", user, Grade.MEASURED, "host-identity"));
+
+    assertThat(new SignedInUserQuestion().answer(b.build())).singleElement().satisfies(ans -> {
+      assertThat(ans.headline()).isEqualTo("ccollier (Clark Collier) signed in on 172.16.1.66");
+      assertThat(ans.attributes())
+          .containsEntry("user", "ccollier").containsEntry("realName", "Clark Collier");
+    });
+  }
+
+  @Test
   void signedInUser_carriesTheEdgeGrade() {
     List<Answer> a = new SignedInUserQuestion().answer(strratBoard());
     assertThat(a).singleElement().satisfies(ans -> {

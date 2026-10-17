@@ -4,6 +4,7 @@ import com.tracepcap.knowledge.spi.Answer;
 import com.tracepcap.knowledge.spi.CaseKnowledge;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.StandardQuestion;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -26,19 +27,34 @@ public class SignedInUserQuestion implements StandardQuestion {
   @Override
   public List<Answer> answer(CaseKnowledge board) {
     return board.relationshipsWithPredicate("signed-in-as").stream()
-        .map(this::toAnswer)
+        .map(signedIn -> toAnswer(board, signedIn))
         .toList();
   }
 
-  private Answer toAnswer(Relationship signedIn) {
+  private Answer toAnswer(CaseKnowledge board, Relationship signedIn) {
     String host = signedIn.from().key();
     String user = signedIn.to().key();
+    // The person's real name, if a directory lookup named it (posted on the USER entity by the
+    // host-identity contributor) — "ccollier (Clark Collier)" rather than the principal alone.
+    String realName =
+        board.entity(signedIn.to())
+            .map(e -> e.attributes().get("realName"))
+            .filter(v -> v != null && !v.toString().isBlank())
+            .map(Object::toString)
+            .orElse(null);
+    String who = realName != null ? user + " (" + realName + ")" : user;
+
+    Map<String, Object> attrs = new LinkedHashMap<>();
+    attrs.put("user", user);
+    attrs.put("host", host);
+    if (realName != null) attrs.put("realName", realName);
+
     return new Answer(
         QUESTION,
-        user + " signed in on " + host,
+        who + " signed in on " + host,
         signedIn.grade(),
         List.of(signedIn.to(), signedIn.from()),
         List.of("from " + signedIn.source() + " (" + signedIn.grade() + ")"),
-        Map.of("user", user, "host", host));
+        attrs);
   }
 }

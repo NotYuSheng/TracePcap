@@ -57,9 +57,13 @@ public interface HostClassificationLookup {
    *   <li><b>Never null, may be empty:</b> {@code serviceRoles} — already split from its stored
    *       comma-joined form, and immutable.
    *   <li><b>Nullable:</b> {@code mac}, {@code manufacturer}, {@code hostname}, {@code
-   *       hostnameSource}, {@code loggedInUser}, {@code loggedInUserSource}, {@code ttl} — the
-   *       capture may simply not reveal these.
+   *       hostnameSource}, {@code loggedInUser}, {@code loggedInUserSource},
+   *       {@code loggedInUserRealName}, {@code ttl} — the capture may simply not reveal these.
    * </ul>
+   *
+   * <p>{@code loggedInUserRealName} is the person's display name from the LDAP person-DN — who the
+   * {@code loggedInUser} account <em>is</em> ({@code ccollier} → {@code Clark Collier}) — and is null
+   * unless a directory lookup named the account.
    */
   record HostFacts(
       String ip,
@@ -69,6 +73,7 @@ public interface HostClassificationLookup {
       String hostnameSource,
       String loggedInUser,
       String loggedInUserSource,
+      String loggedInUserRealName,
       Integer ttl,
       String deviceType,
       int confidence,

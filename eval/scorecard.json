@@ -3,15 +3,20 @@
     "cases": 1,
     "cases_scored": 1,
     "scored_fields": 7,
-    "correct": 6,
-    "missed": 1,
+    "correct": 7,
+    "missed": 0,
     "confidently_wrong": 0,
-    "accuracy": 0.857
+    "accuracy": 1.0
   },
   "cases": [
     {
       "case_id": "2024-07-30-strrat",
       "status": "scored",
+      "analysis": {
+        "suricata": true,
+        "ndpi": true,
+        "fileExtraction": true
+      },
       "fields": [
         {
           "field": "victim.ip",
@@ -35,8 +40,8 @@
         },
         {
           "field": "user.real_name",
-          "status": "missed",
-          "detail": null
+          "status": "correct",
+          "detail": "Clark Collier"
         },
         {
           "field": "malware.family",
@@ -48,12 +53,7 @@
           "status": "correct",
           "detail": "141.98.10.79"
         }
-      ],
-      "analysis": {
-        "suricata": true,
-        "ndpi": true,
-        "fileExtraction": null
-      }
+      ]
     }
   ]
 }

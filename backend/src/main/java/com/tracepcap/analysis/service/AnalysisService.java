@@ -1069,12 +1069,21 @@ public class AnalysisService {
       Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
     if (windowsIdentityClaimsByIp.isEmpty()) return;
     for (HostClassificationEntity host : hostClassifications) {
-      WindowsIdentityResolverService.Claim primary =
-          primaryWindowsClaim(windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of()));
+      List<WindowsIdentityResolverService.Claim> claims =
+          windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of());
+      WindowsIdentityResolverService.Claim primary = primaryWindowsClaim(claims);
       if (primary != null) {
         host.setLoggedInUser(primary.username());
         host.setLoggedInUserSource(primary.source());
       }
+      // The LDAP-DN claim carries the person's display name (the CN), which the Kerberos principal
+      // does not — record it alongside, whichever claim won the primary slot.
+      claims.stream()
+          .filter(c -> WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source()))
+          .map(WindowsIdentityResolverService.Claim::username)
+          .filter(name -> name != null && !name.isBlank())
+          .findFirst()
+          .ifPresent(host::setLoggedInUserRealName);
     }
   }
 

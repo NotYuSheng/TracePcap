@@ -75,6 +75,15 @@ public class HostClassificationEntity {
   @Column(name = "logged_in_user_source", length = 20)
   private String loggedInUserSource;
 
+  /**
+   * The person's display name from the LDAP person-DN (the {@code CN} of
+   * {@code CN=<name>,CN=Users,DC=...}), distinct from the Kerberos principal in {@link #loggedInUser}:
+   * {@code ccollier} authenticates, {@code Clark Collier} is who that account is. Null when no LDAP-DN
+   * lookup named the signed-in account.
+   */
+  @Column(name = "logged_in_user_real_name", length = 255)
+  private String loggedInUserRealName;
+
   /** First-seen IP TTL value (may be null for non-IP traffic). */
   @Column(name = "ttl")
   private Integer ttl;
