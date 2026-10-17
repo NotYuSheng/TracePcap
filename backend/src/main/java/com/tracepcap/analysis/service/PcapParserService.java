@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /** Service for parsing PCAP/pcapng files using tshark. */
@@ -17,7 +18,29 @@ import org.springframework.stereotype.Service;
 @Service
 public class PcapParserService {
 
-  public PcapAnalysisResult analyzePcapFile(File pcapFile) {
+  /**
+   * Ceiling on distinct conversations held in memory for one parse (#779).
+   *
+   * <p>Streaming (see {@link ParseSink}) made a capture's packets bounded-memory — they are
+   * flushed to the database and never accumulate. {@code conversationMap} is not: every distinct
+   * 5-tuple gets one small {@link ConversationInfo}, held for the entire parse and released only
+   * at the very end. Normal traffic has far fewer distinct conversations than packets, so this
+   * rarely matters — but nothing stops a capture from being mostly distinct 5-tuples (a port scan,
+   * a SYN flood with spoofed sources, a scan of the whole internet), and that shape reintroduces an
+   * unbounded parse-time allocation, just a different one than the packet list this class used to
+   * hold.
+   *
+   * <p>Deliberately not derived from {@code APP_MEMORY_MB} the way the upload cap is: unlike
+   * bytes-per-packet, there is no honest fixed cost-per-conversation to build a ratio from — it
+   * depends on how many of its enrichment fields end up populated, which happens after this class
+   * is done. This is a coarse, configurable backstop against a pathological shape of input, not a
+   * calibrated heap-fit calculation; operators who need it lower (a smaller deployment) or higher
+   * (verified their traffic is legitimately this scan-shaped) can override it.
+   */
+  @Value("${app.max-conversations-per-analysis:2000000}")
+  private int maxConversations;
+
+  public PcapAnalysisResult analyzePcapFile(File pcapFile, ParseSink sink) {
     log.info("Starting PCAP analysis for file: {}", pcapFile.getName());
 
     PcapAnalysisResult result = new PcapAnalysisResult();
@@ -271,6 +294,15 @@ public class PcapParserService {
             final LocalDateTime fTs = timestamp;
 
             String convKey = createConversationKey(srcIp, srcPort, dstIp, dstPort, protocol);
+            if (!conversationMap.containsKey(convKey) && conversationMap.size() >= maxConversations) {
+              throw new RuntimeException(
+                  "Capture exceeds "
+                      + maxConversations
+                      + " distinct conversations in a single analysis — this deployment's memory"
+                      + " budget cannot hold that many conversation records for one parse."
+                      + " Increase app.max-conversations-per-analysis if this traffic is"
+                      + " legitimately this scan-shaped, or split the capture.");
+            }
             ConversationInfo conv =
                 conversationMap.computeIfAbsent(
                     convKey,
@@ -285,6 +317,15 @@ public class PcapParserService {
                       c.setEndTime(fTs);
                       c.setPacketCount(0L);
                       c.setTotalBytes(0L);
+                      // Persisted immediately (#779): the conversation row exists in the database
+                      // from the moment it is first seen, so its packets can stream to the database
+                      // as they are parsed instead of waiting in heap for a later stage to insert
+                      // them. Only the aggregates below (packetCount, totalBytes, endTime) and the
+                      // stage-4 enrichment fields are still finalised after the parse.
+                      c.setEntityId(
+                          sink.conversationStarted(
+                              new ConversationStub(
+                                  fSrcIp, fSrcPort, fDstIp, fDstPort, fProtocol, fTs)));
                       return c;
                     });
             conv.setPacketCount(conv.getPacketCount() + 1);
@@ -332,20 +373,23 @@ public class PcapParserService {
                 // keep counter fallback
               }
             }
-            conv.getPackets()
-                .add(
-                    buildPacketInfo(
-                        stringPool,
-                        frameNumber,
-                        timestamp,
-                        srcIp,
-                        srcPort,
-                        dstIp,
-                        dstPort,
-                        protocol,
-                        packetSize,
-                        info,
-                        payloadHex));
+            // Handed to the sink immediately rather than appended to an in-memory list (#779): a
+            // capture's packets are the bulk of what OOM'd the parser, and nothing downstream reads
+            // them back off ConversationInfo — see ConversationInfo.packets removal below.
+            sink.packetParsed(
+                conv.getEntityId(),
+                buildPacketInfo(
+                    stringPool,
+                    frameNumber,
+                    timestamp,
+                    srcIp,
+                    srcPort,
+                    dstIp,
+                    dstPort,
+                    protocol,
+                    packetSize,
+                    info,
+                    payloadHex));
           }
         }
       }
@@ -364,6 +408,11 @@ public class PcapParserService {
     } catch (Exception e) {
       throw new RuntimeException("tshark parsing failed: " + e.getMessage(), e);
     }
+
+    // Flush whatever the sink is still holding buffered. Only reached on the success path: a
+    // failed parse throws above and the whole analysis transaction rolls back, so there is nothing
+    // to reconcile with a partially-flushed buffer on that path.
+    sink.finish();
 
     result.setPacketCount(packetNumber);
     result.setConversations(new ArrayList<>(conversationMap.values()));
@@ -395,9 +444,23 @@ public class PcapParserService {
    * <p>A local map rather than {@link String#intern()}: intern's table is JVM-wide and permanent,
    * so a capture's addresses would outlive the analysis that read them. This is discarded with the
    * parse.
+   *
+   * <p>Capped at {@link #MAX_POOL_SIZE} distinct entries (#797). Nothing stops a capture from
+   * containing more distinct addresses than a normal network does — a spoofed-source flood, a
+   * scan of the whole internet, malformed traffic — and an unbounded pool would then reproduce the
+   * exact failure it exists to prevent, just moved from one Java object per packet to one entry
+   * per distinct value. Past the cap, already-pooled values keep deduplicating (a cheap map read);
+   * new ones stop being added and are returned unpooled, so cardinality above the cap costs memory
+   * proportional to itself again rather than growing the pool without limit.
    */
+  private static final int MAX_POOL_SIZE = 50_000;
+
   private static String pooled(Map<String, String> pool, String value) {
     if (value == null) return null;
+    if (pool.size() >= MAX_POOL_SIZE) {
+      String existing = pool.get(value);
+      return existing != null ? existing : value;
+    }
     String existing = pool.putIfAbsent(value, value);
     return existing != null ? existing : value;
   }
@@ -528,8 +591,62 @@ public class PcapParserService {
     private Long totalBytes;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
-    private List<PacketInfo> packets = new ArrayList<>();
+
+    /**
+     * This conversation's persisted row id, assigned by {@link ParseSink#conversationStarted} the
+     * moment the conversation is first seen (#779). There is deliberately no in-memory packet list
+     * here any more — packets are handed to the sink as they are parsed and never held on this
+     * object, which is what makes a capture's size independent of the parser's heap use. A stage
+     * that needs this conversation's packets (e.g. custom-signature payload matching) reads them
+     * back from the database by this id instead.
+     */
+    private UUID entityId;
   }
+
+  // ---------------------------------------------------------------------------
+  // Streaming sink (#779)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * What {@link #analyzePcapFile} hands each conversation and packet to as it parses, instead of
+   * accumulating the whole capture and returning it in one object.
+   *
+   * <p>The parser stays free of persistence concerns — it calls this interface and nothing else —
+   * while the caller (which owns the database dependencies and the transaction) decides how and
+   * when writes actually happen: buffering, batching, flushing, all live on the sink's side.
+   */
+  public interface ParseSink {
+
+    /**
+     * Called once, the moment a 5-tuple is first seen. Implementations persist a stub row (the
+     * 5-tuple and start time — everything known this early) and return its id, which every later
+     * packet on this conversation is attributed to.
+     */
+    UUID conversationStarted(ConversationStub stub);
+
+    /**
+     * Called once per packet, immediately after it is parsed. Implementations are expected to
+     * buffer and batch rather than write one row per call; whatever the buffering scheme, it must
+     * not retain packets beyond what a bounded buffer needs, or this defeats the point.
+     */
+    void packetParsed(UUID conversationId, PacketInfo packet);
+
+    /**
+     * Called once, after the last packet of a successful parse, so the sink can flush anything
+     * still buffered. Not called if parsing fails — see the call site's comment.
+     */
+    void finish();
+  }
+
+  /** The fields of a conversation known the instant it is first seen — before any aggregate has
+   * accumulated a single packet. */
+  public record ConversationStub(
+      String srcIp,
+      Integer srcPort,
+      String dstIp,
+      Integer dstPort,
+      String protocol,
+      LocalDateTime startTime) {}
 
   @lombok.Data
   public static class PacketInfo {

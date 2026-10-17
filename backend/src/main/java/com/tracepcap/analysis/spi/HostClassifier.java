@@ -3,6 +3,7 @@ package com.tracepcap.analysis.spi;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.service.HostnameResolverService;
 import com.tracepcap.analysis.service.PcapParserService;
+import com.tracepcap.analysis.service.WindowsIdentityResolverService;
 import com.tracepcap.file.entity.FileEntity;
 import java.util.List;
 import java.util.Map;
@@ -26,5 +27,6 @@ public interface HostClassifier {
       Map<String, String> hostMacs,
       Map<String, String> deviceOverrides,
       Map<String, HostnameResolverService.ResolvedHostname> hostnames,
-      Map<String, Set<String>> serviceRolesByIp);
+      Map<String, Set<String>> serviceRolesByIp,
+      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp);
 }

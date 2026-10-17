@@ -159,8 +159,6 @@ function toNodeData(ev: HostIdentityEvidence): NodeData {
 interface Props {
   fileId: string;
   ip: string;
-  /** Z-index of a surrounding raised modal, so the add-evidence popup stacks above it. */
-  zIndex?: number;
   /** Called after an override/evidence change, so a parent (e.g. the graph) can refresh its copy. */
   onChanged?: () => void;
 }
@@ -174,7 +172,7 @@ interface Props {
  * graph node all render the same explainable classification, so users see how a verdict was derived
  * and can correct or append to it everywhere, not only in the graph.
  */
-export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
+export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
   const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -245,7 +243,6 @@ export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
         entityKey={ip}
         title="Identity"
         labelOptions={DEVICE_LABELS}
-        zIndex={zIndex}
         verdict={{
           label: evidence.primaryLabel ?? 'Unknown',
           basis: evidence.basis,
@@ -286,7 +283,7 @@ export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
                 tabIndex={0}
                 aria-expanded={expanded}
                 title={`Inspect ${meta.label} — ${meta.caption}`}
-                className="d-flex align-items-center gap-2"
+                className="d-flex align-items-start gap-2"
                 style={{ fontSize: '0.8rem', cursor: 'pointer' }}
                 onClick={e => {
                   e.stopPropagation();
@@ -302,7 +299,14 @@ export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
               >
                 <span className="text-muted" style={{ minWidth: '100px' }}>{meta.label}</span>
                 {facts.length > 0 ? (
-                  <span className="flex-grow-1">{facts.join(' · ')}</span>
+                  // Plain spans in a flex column, not a <ul>: this sits inside a role="button"
+                  // element, where list semantics are an invalid content model and confuse the
+                  // button's accessible-name computation. One fact per line, no list role.
+                  <span className="flex-grow-1 d-flex flex-column">
+                    {facts.map((fact, i) => (
+                      <span key={i}>{fact}</span>
+                    ))}
+                  </span>
                 ) : (
                   <span className="text-muted fst-italic flex-grow-1">Nothing observed</span>
                 )}
@@ -340,9 +344,7 @@ export function HostIdentitySection({ fileId, ip, zIndex, onChanged }: Props) {
       <GeoBlock ev={evidence} isPrivate={isPrivateIp(evidence.ip, customRanges)} />
 
       {/* Explainer modal — how Identity and the evidence axes relate (#499). */}
-      <Modal show={evidenceInfoOpen} onHide={() => setEvidenceInfoOpen(false)} centered
-        className={zIndex != null ? 'tp-nested-modal' : undefined}
-        backdropClassName={zIndex != null ? 'tp-nested-modal-backdrop' : undefined}>
+      <Modal show={evidenceInfoOpen} onHide={() => setEvidenceInfoOpen(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title style={{ fontSize: '1rem' }}>How this host is classified</Modal.Title>
         </Modal.Header>

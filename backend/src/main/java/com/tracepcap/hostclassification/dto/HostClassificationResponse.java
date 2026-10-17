@@ -12,6 +12,10 @@ public class HostClassificationResponse {
   String manufacturer;
   String hostname;
   String hostnameSource;
+  /** Windows sign-in username observed for this host (#809); null when no domain sign-in was seen. */
+  String loggedInUser;
+  /** How {@code loggedInUser} was discovered: {@code kerberos_as_req} or {@code ldap_dn}; null if unset. */
+  String loggedInUserSource;
   Integer ttl;
   String deviceType;
   int confidence;

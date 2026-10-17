@@ -422,6 +422,8 @@ export function buildNetworkGraph(
         nodeMap[ip].data.deviceConfidence = c.confidence;
         nodeMap[ip].data.manufacturer = c.manufacturer;
         nodeMap[ip].data.ttl = c.ttl;
+        nodeMap[ip].data.loggedInUser = c.loggedInUser;
+        nodeMap[ip].data.loggedInUserSource = c.loggedInUserSource;
         if (c.mac && !nodeMap[ip].data.mac) nodeMap[ip].data.mac = c.mac;
         // The classifier's hostname identifies the host itself (DHCP/mDNS/NBNS/reverse
         // DNS) and is more authoritative than the SNI-derived conversation hostname.

@@ -143,15 +143,8 @@
   height: 6px !important;
 }
 
-/* ── Fullscreen ────────────────────────────────────────────────────────────── */
-.card:fullscreen {
-  display: flex;
-  flex-direction: column;
-  border-radius: 0;
-  background: var(--tp-surface, #fff);
-}
-
-.card:fullscreen .intel-cluster-card-body {
+/* ── Fullscreen (real SGDS Modal, fullscreen prop) ───────────────────────────── */
+.modal-fullscreen .intel-cluster-card-body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -159,8 +152,8 @@
   flex-direction: column;
 }
 
-/* The ClusterGraph wrapper div fills all remaining card-body space */
-.card:fullscreen .intel-cluster-card-body .intel-cluster-graph-wrapper {
+/* The ClusterGraph wrapper div fills all remaining modal-body space */
+.modal-fullscreen .intel-cluster-card-body .intel-cluster-graph-wrapper {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -168,7 +161,7 @@
 }
 
 /* The graph canvas fills the wrapper below the controls bar */
-.card:fullscreen .intel-cluster-card-body .intel-cluster-graph-wrapper .intel-graph-container {
+.modal-fullscreen .intel-cluster-card-body .intel-cluster-graph-wrapper .intel-graph-container {
   flex: 1;
   height: auto;
 }

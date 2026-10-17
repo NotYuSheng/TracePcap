@@ -1,6 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Badge, Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Modal, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { tracerService, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
 
@@ -210,16 +210,15 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
 
   const togglePlay = useCallback(() => setIsPlaying(p => !p), []);
 
-  // Keyboard navigation
+  // Step navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
       if (e.key === 'ArrowRight') { e.stopPropagation(); next(); }
       if (e.key === 'ArrowLeft') { e.stopPropagation(); prev(); }
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
-  }, [onClose, next, prev]);
+  }, [next, prev]);
 
   const step: TracerStep | undefined = tracer?.steps[currentStep];
 
@@ -244,26 +243,9 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
   }, [step, activePeerIdx, peers.length, dotT]);
 
   return (
-    <>
-      <div
-        style={{
-          position: 'fixed', inset: 0, zIndex: 1060,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 16,
-        }}
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      >
-        <div
-          style={{
-            background: 'var(--tp-surface)', borderRadius: 10,
-            width: '100%', maxWidth: 720,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
-            display: 'flex', flexDirection: 'column',
-            maxHeight: '90vh',
-          }}
-        >
-          {/* Header */}
+    <Modal show onHide={onClose} size="lg" centered>
+      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '85vh', overflow: 'hidden' }}>
+        {/* Header */}
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="fw-semibold" style={{ fontSize: 14 }}>Conversation Tracer</div>
@@ -505,7 +487,6 @@ export const ConversationTracerModal = ({ conversationId, onClose }: Conversatio
             </>
           )}
         </div>
-      </div>
-    </>
+    </Modal>
   );
 };

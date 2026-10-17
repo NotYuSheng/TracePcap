@@ -1,6 +1,7 @@
 import type { HostnameSource } from '@/types';
+import { SourceBadge, type SourceInfo } from '@components/common/SourceBadge/SourceBadge';
 
-const SOURCE_INFO: Record<HostnameSource, { label: string; tooltip: string; color: string }> = {
+const SOURCE_INFO: Record<HostnameSource, SourceInfo> = {
   dhcp: {
     label: 'DHCP',
     tooltip: 'Hostname advertised by the host in a DHCP request (option 12).',
@@ -33,26 +34,6 @@ interface HostnameSourceBadgeProps {
 }
 
 /** Small coloured chip showing how a host's name was discovered (DHCP, mDNS, NBNS, rDNS). */
-export const HostnameSourceBadge = ({ source }: HostnameSourceBadgeProps) => {
-  if (!source) return null;
-  const info = SOURCE_INFO[source as HostnameSource];
-  if (!info) return null;
-  return (
-    <span
-      title={info.tooltip}
-      style={{
-        fontSize: 9,
-        fontWeight: 600,
-        color: '#fff',
-        background: info.color,
-        borderRadius: 3,
-        padding: '1px 4px',
-        cursor: 'help',
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-      }}
-    >
-      {info.label}
-    </span>
-  );
-};
+export const HostnameSourceBadge = ({ source }: HostnameSourceBadgeProps) => (
+  <SourceBadge source={source} info={SOURCE_INFO} />
+);

@@ -15,6 +15,46 @@ interface StoryInfoCardProps {
 const DEFAULT_MAX_FINDINGS = 20;
 const DEFAULT_MAX_RISK_MATRIX = 15;
 
+/** The four pipeline stages, 1–3 deterministic (ground truth), 4 the LLM narrating on top. */
+const PIPELINE_STAGES = [
+  { icon: 'bi-cpu', title: 'Deterministic analysis', sub: 'Suricata · nDPI · host & identity', llm: false },
+  { icon: 'bi-diagram-3', title: 'Knowledge board', sub: 'entities · relationships · findings', llm: false },
+  { icon: 'bi-clipboard2-check', title: 'Confirmed answers', sub: 'victim · C2 · malware · user', llm: false },
+  { icon: 'bi-robot', title: 'LLM: investigate & narrate', sub: 'names the answers, cannot override', llm: true },
+];
+
+/** Dependency-free, theme-aware pipeline diagram: stages as boxes joined by arrows (stacks on mobile). */
+function PipelineDiagram() {
+  return (
+    <div>
+      <div className="d-flex flex-column flex-md-row align-items-stretch">
+        {PIPELINE_STAGES.map((s, i) => (
+          <div key={s.title} className="d-flex flex-column flex-md-row align-items-stretch flex-fill">
+            <div
+              className={`border rounded p-2 flex-fill text-center ${s.llm ? 'border-info' : 'border-success'}`}
+              style={{ minWidth: 0 }}
+            >
+              <i className={`bi ${s.icon} ${s.llm ? 'text-info' : 'text-success'}`} aria-hidden="true" />
+              <div className="fw-semibold" style={{ fontSize: '0.78rem' }}>{s.title}</div>
+              <div className="text-muted" style={{ fontSize: '0.68rem' }}>{s.sub}</div>
+            </div>
+            {i < PIPELINE_STAGES.length - 1 && (
+              <div className="d-flex align-items-center justify-content-center text-muted px-1 py-1">
+                <i className="bi bi-arrow-down d-md-none" aria-hidden="true" />
+                <i className="bi bi-arrow-right d-none d-md-inline" aria-hidden="true" />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="text-muted mt-1" style={{ fontSize: '0.68rem' }}>
+        <span className="text-success">■</span> deterministic ground truth &nbsp;·&nbsp;
+        <span className="text-info">■</span> LLM narrates on top
+      </div>
+    </div>
+  );
+}
+
 function CapControl({
   label,
   value,
@@ -132,9 +172,23 @@ export const StoryInfoCard = ({
       {!collapsed && (
         <Card.Body>
           <p className="text-muted small mb-2">
-            The following data is sent to the configured LLM to generate the narrative:
+            The story is built in stages. Deterministic analysis runs first and produces the ground
+            truth; the LLM only investigates and narrates <em>on top of</em> those findings — it does
+            not detect, and is instructed never to contradict them.
+          </p>
+
+          <PipelineDiagram />
+
+          <p className="text-muted small mb-2 mt-3">
+            The following data is sent to the configured LLM (for both the investigation and the
+            narrative) to ground it in what was already established deterministically:
           </p>
           <ul className="small text-muted mb-3">
+            <li>
+              <strong>Confirmed findings</strong> — the deterministic answers to the standard
+              investigation questions (victim, C2, malware, signed-in user), each with its confidence
+              grade. Sent as authoritative ground truth the model must name and must not contradict.
+            </li>
             <li>File metadata, traffic summary, protocol breakdown, category distribution</li>
             <li>
               <strong>Deterministic findings (full dataset)</strong> — pre-computed by 8 detectors

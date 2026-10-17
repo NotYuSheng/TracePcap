@@ -15,6 +15,7 @@ import {
 } from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
 import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import './NetworkControls.css';
 
 function InfoPopover({ id, title, body }: { id: string; title: string; body: ReactNode }) {
@@ -168,6 +169,11 @@ export function NetworkControls({
 }: NetworkControlsProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   const [showColorInfo, setShowColorInfo] = useState(false);
+  const colorInfoRef = useRef<HTMLDivElement>(null);
+  // This explainer is a hand-rolled overlay nested inside the filter modal, so Escape has to be
+  // routed through the shared stack or it would close the filter modal along with it (#535).
+  useEscapeLayer(() => setShowColorInfo(false), { enabled: showColorInfo, ref: colorInfoRef });
+
   const [ipInput, setIpInput] = useState(ipFilter);
   const [portInput, setPortInput] = useState(portFilter);
   const ipDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -855,8 +861,12 @@ export function NetworkControls({
       {/* Node colour priority modal */}
       {showColorInfo && (
         <div
+          ref={colorInfoRef}
           className="modal fade show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Node Colour Priority"
           onClick={e => {
             if (e.target === e.currentTarget) setShowColorInfo(false);
           }}

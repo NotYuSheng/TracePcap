@@ -53,6 +53,16 @@ spring:
       max-request-size: ${MAX_UPLOAD_SIZE_BYTES:536870912}
       file-size-threshold: 10MB
 
+# The one place `app.max-file-size` is bound (#779/#780). FileServiceImpl.validateFile enforces
+# this; SystemController's /system/limits advertises the same MAX_UPLOAD_SIZE_BYTES system
+# property directly. Without this entry, FileServiceImpl's @Value default (512MB) silently wins
+# over docker-entrypoint.sh's heap-derived MAX_UPLOAD_BYTES (327MB at the 2048MB default) — two
+# numbers again, and the enforced one looser than the advertised, heap-safe one. This is exactly
+# the failure shape #780 set out to close; scripts/check_memory_budget.py now asserts this binding
+# exists so it cannot silently drop out again.
+app:
+  max-file-size: ${MAX_UPLOAD_SIZE_BYTES:536870912}
+
   # Jackson Configuration
   jackson:
     serialization:

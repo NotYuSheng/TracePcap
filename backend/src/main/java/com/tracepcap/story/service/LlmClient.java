@@ -400,6 +400,18 @@ public class LlmClient {
 
         var choice = response.getBody().getChoices().get(0);
         if (choice.getMessage() == null) throw new LlmException("Empty response from LLM API");
+        // Deliberate guard: a "length" finish_reason means the model hit its output cap and the
+        // response is truncated. Fail here with a clear, typed error instead of letting the partial
+        // (invalid) JSON blow up later as a cryptic parse failure.
+        if ("length".equalsIgnoreCase(choice.getFinishReason())) {
+          throw new LlmException(
+              "The model's response exceeded the output token budget ("
+                  + getEffectiveMaxTokens()
+                  + " tokens) and was cut off before the story was complete. Raise LLM_MAX_TOKENS,"
+                  + " or reduce the amount to narrate (lower maxFindings / maxRiskMatrix).",
+              null,
+              LlmException.ErrorCode.OUTPUT_TRUNCATED);
+        }
         return choice.getMessage();
       }
 
@@ -545,6 +557,10 @@ public class LlmClient {
   @Data
   private static class Choice {
     private Message message;
+
+    /** Why generation stopped: {@code "stop"} = complete, {@code "length"} = hit the token cap. */
+    @JsonProperty("finish_reason")
+    private String finishReason;
   }
 
   /** Models list response */

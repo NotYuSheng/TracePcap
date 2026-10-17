@@ -28,8 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Detects web/API-server hosts and logs the cleartext HTTP endpoints they served (#362 follow-up) —
- * the web/API counterpart of {@code DnsQueryLogExtractor}.
+ * Extracts the HTTP/TLS facts behind web/API-server detection: runs the tshark passes, tallies
+ * per-server observations, and logs the cleartext HTTP endpoints served (#362 follow-up) — the
+ * web/API counterpart of {@code DnsQueryLogExtractor}.
  *
  * <p>Two read-only tshark passes:
  *
@@ -37,14 +38,20 @@ import org.springframework.stereotype.Service;
  *   <li><b>HTTP</b> ({@code http.response}): aggregates per {@code (serverIp, method, path)} into
  *       {@link HttpEndpointLogEntity} rows — request count, status-class counts (2xx/3xx vs 4xx vs
  *       5xx), representative content type and {@code Server} header software.
- *   <li><b>TLS</b> ({@code tls.handshake.type==2}, ServerHello): records hosts that served TLS, so
- *       HTTPS-only servers are still classified as web servers (their endpoints are encrypted, but
- *       their TLS metadata is surfaced at read time from the existing conversation TLS fields).
+ *   <li><b>TLS</b> ({@code tls.handshake.type==2}, ServerHello): records every port each IP
+ *       completed a TLS handshake on, so HTTPS-only servers are still classified as web servers
+ *       (their endpoints are encrypted, but their TLS metadata is surfaced at read time from the
+ *       existing conversation TLS fields).
  * </ul>
  *
- * <p>Each server is tagged {@code "api"} when its responses look API-like (JSON content type, REST
- * write verbs, or {@code /api}-style paths) or {@code "web"} otherwise; TLS-only servers default to
- * {@code "web"}. Degrades gracefully and never throws.
+ * <p><b>Extraction only — the role judgment lives in {@link WebServerRoleScanner}.</b> This class
+ * used to decide "api" vs "web" vs "tls" inline; that decision is a Scan-stage conclusion drawn
+ * from these facts, not itself an observation, so it moved out (#512 criterion 8, #496). This class
+ * still calls the scanner from {@link #extractAndPersist} to fill {@link
+ * com.tracepcap.analysis.spi.HostServiceLogResult#roleByServerIp}, since {@link
+ * com.tracepcap.analysis.spi.HostServiceLogExtractor}'s contract is one method returning both the
+ * persisted facts' side effects and the role verdict — but the judgment logic itself, and its
+ * tests, now live with the scanner. Degrades gracefully and never throws.
  *
  * <p>Note: HTTP endpoint/Server-header data is only visible for <b>cleartext HTTP/1.x</b> — HTTPS
  * request contents are encrypted.
@@ -54,17 +61,8 @@ import org.springframework.stereotype.Service;
 public class WebServerLogExtractor implements HostServiceLogExtractor {
 
   private static final String ROLE_WEB = ServiceLogRoles.WEB;
-  private static final String ROLE_API = ServiceLogRoles.API;
-  private static final String ROLE_TLS = ServiceLogRoles.TLS;
 
   private static final int PATH_MAX_LENGTH = 2048;
-
-  /**
-   * TLS server ports that count as web-facing. A ServerHello on one of these is evidence toward a web
-   * role; a ServerHello on any other port (SIP-TLS 5061, IMAPS 993, …) is a TLS service but not a web
-   * server, so it contributes no web evidence at all (#496 AC #3 — port-qualified, not "any port").
-   */
-  private static final Set<Integer> WEB_TLS_PORTS = Set.of(443, 4433, 8443);
 
   private final HttpEndpointLogRepository httpEndpointLogRepository;
 
@@ -90,7 +88,11 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     Long responseFrame; // frame.number of the first response
   }
 
-  /** Per-server bookkeeping for the api/web decision and the read-side enumeration check. */
+  /**
+   * Per-server observation tallies. Read by {@link WebServerRoleScanner#assignRoles} to make the
+   * api/web decision, and at read time for the enumeration-suspicion check — this class only
+   * populates it from what tshark reported.
+   */
   static final class WebServerStats {
     int totalResponses;
     int jsonResponses;
@@ -103,7 +105,9 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
   public HostServiceLogResult extractAndPersist(FileEntity file, File pcap) {
     Map<String, EndpointAgg> endpoints = new LinkedHashMap<>(); // key: serverIp|method|path
     Map<String, WebServerStats> serverStats = new LinkedHashMap<>();
-    Set<String> tlsServers = new LinkedHashSet<>();
+    // Every port each IP completed a TLS ServerHello on — unfiltered. Which of those ports mean
+    // "web" is a judgment, not an observation, so that filtering happens in the scanner, not here.
+    Map<String, Set<Integer>> tlsHandshakePortsByIp = new LinkedHashMap<>();
 
     // HTTP pass — requests carry the method, responses carry the status/content-type/Server header;
     // tshark surfaces the request URI on the response but not the method, so we correlate request →
@@ -120,9 +124,8 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
         },
         f -> parseHttpFrame(f, endpoints, serverStats, pendingByStream));
 
-    // TLS pass — ServerHello source IP:port is the TLS server. Port-qualified: only ServerHellos on
-    // web-facing ports (WEB_TLS_PORTS) count as web evidence; TLS on other ports is a different
-    // service and is ignored here (#496 AC #3).
+    // TLS pass — ServerHello source IP:port is the TLS server. Records the raw (ip, port)
+    // observation; the scanner decides which ports count as web evidence (#496 AC #3).
     runPass(
         pcap,
         "tls.handshake.type==2",
@@ -130,25 +133,31 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
         f -> {
           String ip = trimToNull(f[0]);
           Integer port = f.length > 1 ? parseIntOrNull(firstValue(f[1])) : null;
-          if (ip != null && isWebFacingTlsPort(port)) tlsServers.add(ip);
+          if (ip != null && port != null) {
+            tlsHandshakePortsByIp.computeIfAbsent(ip, k -> new LinkedHashSet<>()).add(port);
+          }
         });
 
     persist(file, endpoints);
 
-    // Assign each server a role: api-like HTTP servers → "api", other HTTP servers → "web"
-    // (authoritative — they served HTTP). TLS-only servers get the weaker "tls" role: real evidence
-    // toward a web role, but not proof that outranks contrary hardware evidence (#496 AC #4/#6).
-    Map<String, String> roleByServerIp = new LinkedHashMap<>();
-    for (Map.Entry<String, WebServerStats> e : serverStats.entrySet()) {
-      roleByServerIp.put(e.getKey(), isApiLike(e.getValue()) ? ROLE_API : ROLE_WEB);
-    }
-    for (String ip : tlsServers) roleByServerIp.putIfAbsent(ip, ROLE_TLS);
+    Map<String, String> roleByServerIp =
+        WebServerRoleScanner.assignRoles(serverStats, tlsHandshakePortsByIp);
+
+    // Web-facing only, matching what the log line has always meant: before this class stopped
+    // filtering by port itself, tlsServers only ever held IPs with a ServerHello on a web-facing
+    // port. Counting tlsHandshakePortsByIp directly here would silently fold in TLS on unrelated
+    // ports (SIP-TLS, IMAPS, ...), which carry no web evidence at all — a log-only regression code
+    // review caught, since no test asserts on this line's wording.
+    long webFacingTlsServers =
+        tlsHandshakePortsByIp.values().stream()
+            .filter(ports -> ports.stream().anyMatch(WebServerRoleScanner::isWebFacingTlsPort))
+            .count();
 
     log.info(
         "HTTP endpoint log: {} endpoint row(s) across {} HTTP server(s); {} TLS server(s)",
         endpoints.size(),
         serverStats.size(),
-        tlsServers.size());
+        webFacingTlsServers);
     // Web suspicion (4xx enumeration) is computed at read time from the persisted rows.
     return new HostServiceLogResult(roleByServerIp, List.of());
   }
@@ -266,20 +275,6 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     if (agg.serverSoftware == null && serverSoftware != null) agg.serverSoftware = serverSoftware;
     if (agg.requestFrame == null && requestFrame != null) agg.requestFrame = requestFrame;
     if (agg.responseFrame == null && responseFrame != null) agg.responseFrame = responseFrame;
-  }
-
-  /**
-   * Whether a TLS ServerHello on this port counts as web evidence (#496 AC #3). Only web-facing TLS
-   * ports qualify; a null port or a non-web port (SIP-TLS, IMAPS, …) is not a web server.
-   */
-  static boolean isWebFacingTlsPort(Integer port) {
-    return port != null && WEB_TLS_PORTS.contains(port);
-  }
-
-  /** A server is "API-like" when JSON dominates its responses, or it uses REST write verbs / api paths. */
-  static boolean isApiLike(WebServerStats s) {
-    boolean jsonDominant = s.jsonResponses > 0 && s.jsonResponses >= s.htmlResponses;
-    return jsonDominant || s.hasApiPath || s.hasWriteVerb;
   }
 
   // ── tshark pass plumbing ─────────────────────────────────────────────────────

@@ -55,6 +55,7 @@ class DeviceClassifierServiceTest {
                 Map.of(),
                 Map.of(),
                 Map.of(),
+                Map.of(),
                 Map.of());
     return results.stream().filter(h -> ip.equals(h.getIp())).findFirst().orElseThrow();
   }

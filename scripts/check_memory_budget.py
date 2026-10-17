@@ -27,6 +27,7 @@ from pathlib import Path
 
 ENTRYPOINT = Path("backend/docker-entrypoint.sh")
 FILE_SERVICE = Path("backend/src/main/java/com/tracepcap/file/service/FileServiceImpl.java")
+APPLICATION_YML = Path("backend/src/main/resources/application.yml")
 
 # A capture must be at most this fraction of the heap. From #92's original design: 25% upload
 # against a 75% heap. It is a headroom rule, not a measurement — the parser's real multiplier
@@ -73,6 +74,21 @@ def main() -> int:
                 f"{FILE_SERVICE} hardcodes a maximum file size.\n"
                 f"    It must read app.max-file-size, or the number shown to the user by\n"
                 f"    /system/limits and the number actually enforced will drift apart again."
+            )
+
+    # The property FileServiceImpl reads must actually be bound to the value docker-entrypoint.sh
+    # computes and /system/limits advertises. This is exactly how #780's fix silently went unbound:
+    # FileServiceImpl read app.max-file-size, but nothing ever set that property, so its @Value
+    # default (512MB) was what actually got enforced — a capture inside 512MB but over the real,
+    # heap-derived cap was accepted and could still OOM, precisely the original #779 failure.
+    if APPLICATION_YML.exists():
+        yml = APPLICATION_YML.read_text()
+        if not re.search(r"^app:\s*\n\s*max-file-size:\s*\$\{MAX_UPLOAD_SIZE_BYTES", yml, re.MULTILINE):
+            failures.append(
+                f"{APPLICATION_YML} does not bind app.max-file-size to ${{MAX_UPLOAD_SIZE_BYTES}}.\n"
+                f"    {FILE_SERVICE} reads app.max-file-size, but if nothing sets it, its @Value\n"
+                f"    default (512MB) is what is actually enforced — regardless of what\n"
+                f"    docker-entrypoint.sh computes or what /system/limits advertises."
             )
 
     if failures:

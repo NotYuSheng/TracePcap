@@ -20,6 +20,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    architecture/layers
    architecture/enforcement
    architecture/adjudication-explainability
+   architecture/knowledge-layer
 
 .. toctree::
    :maxdepth: 2
@@ -36,6 +37,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/file-extraction
    features/geolocation
    features/mac-lookup
+   features/windows-identity
    features/timeline-analysis
    features/ai-filter-generator
    features/story-mode
@@ -70,6 +72,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    :caption: Demo & Sample Data
 
    sample-files
+   demos/strrat-you-dirty-rat
 
 .. toctree::
    :maxdepth: 1

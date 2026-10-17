@@ -19,6 +19,7 @@ const PREVIEW_VALUES: Record<string, string> = {
   roleLabel: 'Finance DB',
   ip: '192.168.1.42',
   hostname: 'Johns-MacBook.local',
+  loggedInUser: 'jsmith',
   mac: 'a4:83:e7:1a:2b:3c',
   deviceType: 'Laptop / Desktop',
   manufacturer: 'Apple',

@@ -1,13 +1,21 @@
 import type { StateCreator } from 'zustand';
 
 /** A field on a host that can be shown as a line of text below its graph node. */
-export type NodeLabelField = 'roleLabel' | 'ip' | 'hostname' | 'mac' | 'deviceType' | 'manufacturer';
+export type NodeLabelField =
+  | 'roleLabel'
+  | 'ip'
+  | 'hostname'
+  | 'loggedInUser'
+  | 'mac'
+  | 'deviceType'
+  | 'manufacturer';
 
 /** Human-readable name for each selectable field (shown in the settings modal). */
 export const NODE_LABEL_FIELD_META: Record<NodeLabelField, { label: string; icon: string }> = {
   roleLabel: { label: 'Role (analyst-assigned)', icon: 'bi-person-check' },
   ip: { label: 'IP address', icon: 'bi-hdd-network' },
   hostname: { label: 'Hostname', icon: 'bi-tag' },
+  loggedInUser: { label: 'Signed-in user', icon: 'bi-person-badge' },
   mac: { label: 'MAC address', icon: 'bi-ethernet' },
   deviceType: { label: 'Device type', icon: 'bi-pc-display' },
   manufacturer: { label: 'Manufacturer', icon: 'bi-building' },
@@ -31,6 +39,7 @@ export const DEFAULT_NODE_LABEL_CONFIG: NodeLabelConfig = {
     { field: 'roleLabel', enabled: true },
     { field: 'hostname', enabled: true },
     { field: 'ip', enabled: true },
+    { field: 'loggedInUser', enabled: false },
     { field: 'mac', enabled: false },
     { field: 'deviceType', enabled: true },
     { field: 'manufacturer', enabled: false },

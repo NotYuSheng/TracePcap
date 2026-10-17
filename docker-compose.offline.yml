@@ -49,8 +49,18 @@ services:
       - tracepcap-network
 
   # MinIO Object Storage
+  # Image source: Chainguard (cgr.dev/chainguard/minio), NOT Docker Hub or quay.io. In 2026 MinIO
+  # removed its community images from every public registry — `minio/minio` was deleted from Docker
+  # Hub and the quay.io/minio repos were made private (every tag now returns "unauthorized"), which
+  # breaks `docker compose up` on any machine without a cached copy. Chainguard publishes a drop-in
+  # MinIO server that pulls anonymously. The `-dev` variant ships the shell + wget the distroless
+  # `:latest` lacks (the healthcheck below needs wget), and the floating tag is used rather than a
+  # digest pin because Chainguard's free tier serves only `:latest`/`:latest-dev` and garbage-collects
+  # older digests. For a truly air-gapped install, `docker save` this image (and minio-client below)
+  # at bundle time on a connected host, then `docker load` on the target — the floating tag is
+  # resolved once, at save time.
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: cgr.dev/chainguard/minio:latest-dev
     container_name: tracepcap-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -73,7 +83,9 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # The Chainguard image has no curl; its `-dev` variant ships wget. `--spider` makes a HEAD-only
+      # request and exits non-zero unless the endpoint returns 200, which is what a healthcheck needs.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -83,7 +95,10 @@ services:
   # MinIO Client (mc) - Create bucket on startup
   # One-shot bucket bootstrap: it is *meant* to exit 0, so no restart policy here.
   minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Same registry move as the minio service above — MinIO's mc is gone from the public registries.
+    # Chainguard's minio-client `-dev` variant provides mc (at /usr/bin/mc) plus the /bin/sh the
+    # folded entrypoint below needs; the distroless `:latest` has neither.
+    image: cgr.dev/chainguard/minio-client:latest-dev
     container_name: tracepcap-minio-init
     deploy:
       resources:

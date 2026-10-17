@@ -52,6 +52,28 @@ public interface PacketLookup {
   List<PacketFacts> packetsInConversation(UUID conversationId);
 
   /**
+   * Every non-null payload in a conversation, in packet order (#779).
+   *
+   * <p>Payloads only, not whole packets: the one consumer is content matching (custom-signature
+   * {@code payload_contains}/{@code payload_regex} rules), which reads nothing else. Since parsing
+   * now streams packets to the database instead of holding a file's whole capture in heap, this is
+   * how a stage running after parsing reads a conversation's payloads back — the packets are already
+   * persisted by the time signature matching runs, so this is a lookup, not a re-parse.
+   */
+  List<String> payloadsInConversation(UUID conversationId);
+
+  /**
+   * At most {@code limit} non-null payloads from the <em>start</em> of a conversation, in packet
+   * order.
+   *
+   * <p>For a reader that only needs how a stream opens — a C2 check-in fingerprint, say. Unlike
+   * {@link #payloadsInConversation}, it never materialises the whole conversation, so its cost is
+   * bounded by {@code limit} however long-lived the flow is. A non-positive limit yields an empty
+   * list.
+   */
+  List<String> firstPayloadsInConversation(UUID conversationId, int limit);
+
+  /**
    * Ids of the conversations in which {@code hostIp}'s peer sent at least one packet back — i.e.
    * the peer responded rather than staying silent.
    *

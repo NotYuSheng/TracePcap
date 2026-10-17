@@ -162,6 +162,38 @@
         },
         "type": "object"
       },
+      "AnswerResponse": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "basis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRefDto"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "AsnEntry": {
         "properties": {
           "asn": {
@@ -246,6 +278,29 @@
           },
           "srcIp": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CaseKnowledgeResponse": {
+        "properties": {
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityDto"
+            },
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingDto"
+            },
+            "type": "array"
+          },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipDto"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -1120,6 +1175,23 @@
         },
         "type": "object"
       },
+      "EntityDto": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "EntityHistoryEntry": {
         "properties": {
           "endTime": {
@@ -1164,6 +1236,17 @@
           },
           "updatedAt": {
             "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EntityRefDto": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         },
@@ -1525,6 +1608,44 @@
         },
         "type": "object"
       },
+      "FindingDto": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "category": {
+            "type": "string"
+          },
+          "concerns": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRefDto"
+            },
+            "type": "array"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GenerateInsightRequest": {
         "properties": {
           "audience": {
@@ -1578,6 +1699,39 @@
           },
           "org": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GoalOutcomeDto": {
+        "properties": {
+          "answered": {
+            "type": "boolean"
+          },
+          "basis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRefDto"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -1636,6 +1790,12 @@
             "type": "string"
           },
           "ip": {
+            "type": "string"
+          },
+          "loggedInUser": {
+            "type": "string"
+          },
+          "loggedInUserSource": {
             "type": "string"
           },
           "mac": {
@@ -1966,6 +2126,35 @@
           },
           "srcIp": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InvestigationReportResponse": {
+        "properties": {
+          "additional": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerResponse"
+            },
+            "type": "array"
+          },
+          "coverage": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalOutcomeDto"
+            },
+            "type": "array"
+          },
+          "unknowns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -2684,6 +2873,32 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RelationshipDto": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "from": {
+            "$ref": "#/components/schemas/EntityRefDto"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "to": {
+            "$ref": "#/components/schemas/EntityRefDto"
           }
         },
         "type": "object"
@@ -5874,6 +6089,41 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/answers": {
+      "get": {
+        "operationId": "getAnswers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnswerResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Deterministic answers to the standard investigation questions for a file",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/download": {
       "get": {
         "description": "Download a PCAP file",
@@ -6176,6 +6426,39 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/investigation": {
+      "get": {
+        "description": "Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).",
+        "operationId": "getInvestigation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvestigationReportResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Autonomous investigation report for a file",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/ip-mac-observations": {
       "get": {
         "operationId": "getIpMacObservations",
@@ -6208,6 +6491,38 @@
         "summary": "List distinct source MACs observed per IP in a file",
         "tags": [
           "Host Classifications"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/knowledge": {
+      "get": {
+        "operationId": "getKnowledge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseKnowledgeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Assembled knowledge board (entities, relationships, findings) for a file",
+        "tags": [
+          "Knowledge"
         ]
       }
     },
@@ -8768,6 +9083,10 @@
     {
       "description": "APIs for PCAP file upload, download, and management",
       "name": "File Management"
+    },
+    {
+      "description": "The assembled knowledge board for a file — entities, relationships, and findings",
+      "name": "Knowledge"
     },
     {
       "description": "Free-text annotations on a monitored network",

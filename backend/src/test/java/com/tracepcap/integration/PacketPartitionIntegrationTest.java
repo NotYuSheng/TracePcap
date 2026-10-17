@@ -34,9 +34,16 @@ class PacketPartitionIntegrationTest {
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"));
 
+  // Image source: Chainguard, NOT Docker Hub or quay.io. MinIO removed its community images from
+  // every public registry in 2026 (Docker Hub deleted minio/minio; the quay.io/minio repos were made
+  // private and now return "unauthorized"), so the old tags no longer pull on a clean CI runner.
+  // cgr.dev/chainguard/minio is a drop-in server that pulls anonymously. The distroless `:latest` is
+  // enough here — Testcontainers polls /minio/health/ready over HTTP from the host, so no in-container
+  // curl/shell is needed (the compose stack uses the `-dev` variant for its own healthcheck). Floating
+  // tag, not a digest: Chainguard's free tier serves only `:latest` and garbage-collects old digests.
   @Container
   static final GenericContainer<?> MINIO =
-      new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2024-01-28T22-35-53Z"))
+      new GenericContainer<>(DockerImageName.parse("cgr.dev/chainguard/minio:latest"))
           .withEnv("MINIO_ROOT_USER", "minioadmin")
           .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
           .withCommand("server", "/data")

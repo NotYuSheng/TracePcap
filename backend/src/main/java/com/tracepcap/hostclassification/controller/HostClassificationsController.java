@@ -36,6 +36,8 @@ public class HostClassificationsController {
                         .manufacturer(h.manufacturer())
                         .hostname(h.hostname())
                         .hostnameSource(h.hostnameSource())
+                        .loggedInUser(h.loggedInUser())
+                        .loggedInUserSource(h.loggedInUserSource())
                         .ttl(h.ttl())
                         .deviceType(h.deviceType())
                         .confidence(h.confidence())

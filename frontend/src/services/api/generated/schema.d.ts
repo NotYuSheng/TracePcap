@@ -661,6 +661,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deterministic answers to the standard investigation questions for a file */
+        get: operations["getAnswers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/download": {
         parameters: {
             query?: never;
@@ -803,6 +820,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/investigation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Autonomous investigation report for a file
+         * @description Every standing goal (victim, user, malware, C2) as answered-or-open, with confidence, the goals still unknown, and the techniques that contributed (#819).
+         */
+        get: operations["getInvestigation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/ip-mac-observations": {
         parameters: {
             query?: never;
@@ -812,6 +849,23 @@ export interface paths {
         };
         /** List distinct source MACs observed per IP in a file */
         get: operations["getIpMacObservations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assembled knowledge board (entities, relationships, findings) for a file */
+        get: operations["getKnowledge"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1755,6 +1809,16 @@ export interface components {
             severity?: string;
             title?: string;
         };
+        AnswerResponse: {
+            attributes?: {
+                [key: string]: Record<string, never>;
+            };
+            basis?: string[];
+            grade?: string;
+            headline?: string;
+            question?: string;
+            subjects?: components["schemas"]["EntityRefDto"][];
+        };
         AsnEntry: {
             asn?: string;
             /** Format: int64 */
@@ -1791,6 +1855,11 @@ export interface components {
             flowCount?: number;
             protocol?: string;
             srcIp?: string;
+        };
+        CaseKnowledgeResponse: {
+            entities?: components["schemas"]["EntityDto"][];
+            findings?: components["schemas"]["FindingDto"][];
+            relationships?: components["schemas"]["RelationshipDto"][];
         };
         CategoryStat: {
             /** Format: int64 */
@@ -2113,6 +2182,13 @@ export interface components {
             serverIp?: string;
             suspicious?: boolean;
         };
+        EntityDto: {
+            attributes?: {
+                [key: string]: Record<string, never>;
+            };
+            key?: string;
+            type?: string;
+        };
         EntityHistoryEntry: {
             /** Format: date-time */
             endTime?: string;
@@ -2133,6 +2209,10 @@ export interface components {
             note?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        EntityRefDto: {
+            key?: string;
+            type?: string;
         };
         EntityStatsResponse: {
             /** Format: int64 */
@@ -2261,6 +2341,18 @@ export interface components {
             /** @enum {string} */
             type?: "NDPI_RISK" | "BEACON" | "TLS_ANOMALY" | "VOLUME" | "FAN_OUT" | "LONG_SESSION" | "UNKNOWN_APP" | "PORT_PROTOCOL_MISMATCH" | "COVERAGE_GAP";
         };
+        FindingDto: {
+            attributes?: {
+                [key: string]: Record<string, never>;
+            };
+            category?: string;
+            concerns?: components["schemas"]["EntityRefDto"][];
+            evidence?: string[];
+            grade?: string;
+            severity?: string;
+            source?: string;
+            summary?: string;
+        };
         GenerateInsightRequest: {
             audience?: string;
             focus?: string;
@@ -2282,6 +2374,16 @@ export interface components {
             geoSource?: string;
             org?: string;
         };
+        GoalOutcomeDto: {
+            answered?: boolean;
+            basis?: string[];
+            /** Format: int32 */
+            confidence?: number;
+            goal?: string;
+            grade?: string;
+            headline?: string;
+            subjects?: components["schemas"]["EntityRefDto"][];
+        };
         Highlight: {
             description?: string;
             id?: string;
@@ -2302,6 +2404,8 @@ export interface components {
             hostname?: string;
             hostnameSource?: string;
             ip?: string;
+            loggedInUser?: string;
+            loggedInUserSource?: string;
             mac?: string;
             manufacturer?: string;
             serviceRoles?: string[];
@@ -2429,6 +2533,12 @@ export interface components {
             protocol?: string;
             riskType?: string;
             srcIp?: string;
+        };
+        InvestigationReportResponse: {
+            additional?: components["schemas"]["AnswerResponse"][];
+            coverage?: string[];
+            goals?: components["schemas"]["GoalOutcomeDto"][];
+            unknowns?: string[];
         };
         InvestigationStep: {
             /** Format: int64 */
@@ -2702,6 +2812,16 @@ export interface components {
         RelatedData: {
             conversations?: string[];
             packets?: string[];
+        };
+        RelationshipDto: {
+            attributes?: {
+                [key: string]: Record<string, never>;
+            };
+            from?: components["schemas"]["EntityRefDto"];
+            grade?: string;
+            predicate?: string;
+            source?: string;
+            to?: components["schemas"]["EntityRefDto"];
         };
         ReportRequest: {
             activeFilters?: string[];
@@ -4160,6 +4280,28 @@ export interface operations {
             };
         };
     };
+    getAnswers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AnswerResponse"][];
+                };
+            };
+        };
+    };
     downloadFile: {
         parameters: {
             query?: never;
@@ -4341,6 +4483,28 @@ export interface operations {
             };
         };
     };
+    getInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvestigationReportResponse"];
+                };
+            };
+        };
+    };
     getIpMacObservations: {
         parameters: {
             query?: never;
@@ -4359,6 +4523,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["IpMacObservationsResponse"][];
+                };
+            };
+        };
+    };
+    getKnowledge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CaseKnowledgeResponse"];
                 };
             };
         };
