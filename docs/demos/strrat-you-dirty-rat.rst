@@ -9,9 +9,10 @@ official answer key.
 .. note::
 
    Nearly everything here comes from TracePcap's **deterministic** layers — Suricata, nDPI, the host
-   classifier, and the Kerberos/LDAP identity extractor. The LLM "Story mode" narrative appears last,
-   as a layer *on top* of those findings, not the source of them. That distinction is the point of the
-   demo: the ground truth is deterministic and reproducible.
+   classifier, the Kerberos/LDAP identity extractor, and the knowledge layer that folds them into one
+   graded **investigation**. The LLM "Story mode" narrative comes last, *grounded in* those findings
+   rather than being their source. That distinction is the point of the demo: the ground truth is
+   deterministic, graded, and reproducible.
 
 
 The exercise
@@ -72,8 +73,9 @@ Step 1 — Upload and analyse
 
 Upload the ``.pcap`` through the normal :doc:`upload flow </features/pcap-upload>`. A single
 deterministic pipeline runs on ingest — packet dissection, nDPI application identification, Suricata
-(Emerging Threats ruleset), host classification, and the Kerberos/LDAP identity extraction. No LLM is
-involved in any of it. When analysis completes, every view below is populated.
+(Emerging Threats ruleset), host classification, and the Kerberos/LDAP identity extraction — and a
+knowledge layer assembles the results into a graded :doc:`investigation </architecture/knowledge-layer>`.
+No LLM is involved in any of it. When analysis completes, every view below is populated.
 
 Step 2 — Overview: the shape of the capture
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -90,8 +92,56 @@ the victim.
    The Overview tab: inventory, protocol distribution (note KRB5 and LDAP), detected applications, and
    nDPI risk alerts.
 
-Step 3 — Threat detection: naming the malware and its C2
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 3 — The investigation summary: the incident report, answered
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before touching a single packet, the **Investigation Summary** (on the Overview and Story tabs) already
+answers the exercise's questions. It is produced by deterministic checks that read the assembled
+knowledge board — not the LLM — and each answer carries a **grade** recording how directly it is known:
+``MEASURED`` (the traffic itself exhibited it), ``REPORTED`` (a party asserted it on the wire), or
+``INFERRED`` (a tool or heuristic judged it).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 50 14 16
+
+   * - Goal
+     - Answer
+     - Grade
+     - From
+   * - Signed-in user
+     - ``ccollier`` signed in on ``172.16.1.66``
+     - MEASURED
+     - Kerberos AS-REQ
+   * - Victim host
+     - ``172.16.1.66`` — contacted a known malware C2 (signed in as ``ccollier``)
+     - INFERRED
+     - contacted the C2 below
+   * - Malware
+     - ``STRRAT``
+     - INFERRED
+     - IDS + stream fingerprint
+   * - Command & control
+     - ``141.98.10.79`` (LT · UAB Host Baltic) — C2 for STRRAT
+     - INFERRED
+     - IDS + beacon + GeoIP
+
+The summary names *who, what, and where* at a glance, and it is honest about certainty: the signed-in
+user is ``MEASURED`` (the host authenticated as that principal), while the malware and C2 are
+``INFERRED`` (a signature and a protocol fingerprint judged them). The rest of this walkthrough is the
+evidence beneath each of those answers.
+
+.. admonition:: It does not depend on the IDS being present
+   :class: tip
+
+   Re-run the same capture with Suricata switched **off** and the investigation still names STRRAT and
+   the C2. The host's sustained, low-throughput, raw-TCP session to ``141.98.10.79:12132`` is flagged
+   as a **beacon** from its traffic shape alone, and following that stream recovers STRRAT's cleartext
+   check-in (``ping|STRRAT|…|ccollier|…``). A conclusion in TracePcap is not held up by any single
+   library being installed.
+
+Step 4 — Threat detection: the C2 conversation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 TracePcap runs Suricata automatically, so the family is named without any manual pcap digging. In the
 **Conversations** tab, filtering to the destination ``141.98.10.79`` leaves a single flow — and its IDS
@@ -104,10 +154,11 @@ Alerts column already carries the verdict:
    One conversation, ``172.16.1.66:49754 → 141.98.10.79:12132``, flagged **"ET MALWARE STRRAT CnC
    Checkin"** (sid 2030358).
 
-So from the capture alone we already have the malware family (**STRRAT**), the **C2 endpoint**
-(``141.98.10.79:12132``), and the infected host (``172.16.1.66``).
+That single signature anchors the malware family (**STRRAT**), the **C2 endpoint**
+(``141.98.10.79:12132``), and the infected host (``172.16.1.66``) — and it is the evidence behind the
+``INFERRED`` malware and C2 answers in the summary above.
 
-Step 4 — Conversation detail: the full picture of the C2 channel
+Step 5 — Conversation detail: the full picture of the C2 channel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Opening that conversation shows both endpoints in context: the client ``172.16.1.66`` classified as a
@@ -121,12 +172,12 @@ offline GeoIP database — the C2's location.
    The C2 channel in full: the STRRAT security signal, GeoIP placing ``141.98.10.79`` in Lithuania
    (UAB Host Baltic), and the raw packet list.
 
-Step 5 — Host identity: recovering the person at the keyboard
+Step 6 — Host identity: recovering the person at the keyboard
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Clicking the victim host opens its identity panel — and this is the capability the demo motivated
-(see :doc:`/features/windows-identity`). The exercise's own answer key recovers the user's identity by
-hand, filtering LDAP for a ``givenName`` attribute. TracePcap now does it automatically: it reads the
+Clicking the victim host opens its identity panel — the capability this demo motivated (see
+:doc:`/features/windows-identity`). The exercise's own answer key recovers the user's identity by
+hand, filtering LDAP for a ``givenName`` attribute. TracePcap does it automatically: it reads the
 client's own **Kerberos AS-REQ** (``ccollier`` authenticating) and the **LDAP directory lookup** of
 that account (``CN=Clark Collier,CN=Users,DC=…``), and folds both into the host's classification
 evidence.
@@ -139,51 +190,47 @@ evidence.
    sign-in as "ccollier" (Kerberos AS-REQ) → +40** and **Directory lookup of "Clark Collier" (LDAP)
    → +15**.
 
-The Kerberos claim is the stronger of the two — the client authenticated *as* that principal — so it
-weighs more than the LDAP directory lookup, which merely names an account someone queried. The domain
-controller (``172.16.1.4``) is deliberately **not** credited with a signed-in user, and machine
-accounts (``DESKTOP-SKBR25F$``) are excluded, so no computer object is ever mistaken for a person.
+The Kerberos claim is the stronger of the two — the client authenticated *as* that principal — so the
+signed-in-user answer is graded ``MEASURED`` and weighs more than the LDAP directory lookup, which
+merely names an account someone queried. The domain controller (``172.16.1.4``) is deliberately
+**not** credited with a signed-in user, and machine accounts (``DESKTOP-SKBR25F$``) are excluded, so no
+computer object is ever mistaken for a person.
 
-.. tip::
+Step 7 — Behaviour: the beacon, the top-talker, and an honest gap
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   The same sign-in also appears as a **Signed-in user** attribute on the host in the Network
-   Visualization view, next to its passively-discovered hostname, with a badge showing whether the
-   name came from Kerberos or LDAP.
+Behavioural analysis adds shape to the picture, independent of any signature:
 
-Step 6 — Behaviour: the beacon and the top-talker
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-TracePcap's behavioural analysis adds shape to the picture, independent of any signature:
-
-- **A textbook beacon.** A CRITICAL periodic-connection finding fires on
-  ``172.16.1.66 → 172.16.1.4:139`` (SMB/NetBIOS): five flows, ~30,023 ms average interval, coefficient
-  of variation **0.000** — zero jitter, a machine keeping time, not a human.
+- **The C2 beacon, by shape alone.** The host's session to ``141.98.10.79:12132`` is flagged as a
+  suspected beacon purely from its traffic shape — a sustained, low-throughput, raw-TCP channel to an
+  external host on a non-standard port, carried over hundreds of packets. This is the same endpoint the
+  Suricata rule named, reached independently; it is what lets the investigation stand up with the IDS
+  off.
+- **Not the domain controller.** The host also exchanges perfectly regular NetBIOS keepalives with the
+  DC (``172.16.1.4:139``) — periodic to the millisecond. TracePcap deliberately does **not** call that
+  a beacon: regular traffic to an internal service port is ordinary Windows behaviour, not
+  command-and-control. (Flagging it was a real false positive; see issue #823.)
 - **Top-talker and fan-out.** ``172.16.1.66`` initiated 368 flows to 46 distinct destinations and
   produced **97.1%** of all bytes in the capture.
 - **An honest visibility gap.** 66.9% of conversations (285 of 426) could not be classified by nDPI —
-  TracePcap surfaces this as a HIGH finding rather than pretending to full coverage.
+  surfaced as a HIGH finding rather than pretending to full coverage.
 
-Step 7 — Story mode: a narrative layer, and its limits
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 8 — Story mode: a grounded narrative
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-With a local LLM configured (see :doc:`/configuration/llm-setup`), Story mode writes a SOC-style
-narrative from the analysis, and even runs its own follow-up investigation queries to confirm each
-hypothesis against the data.
-
-.. figure:: images/story-narrative.png
-   :alt: Story mode narrative and its investigation queries
-   :width: 100%
-
-   Story mode: the LLM's investigation queries (q2–q5) and the generated narrative, grounded in the
-   deterministic findings.
+With a local LLM configured (see :doc:`/configuration/llm-setup`), **Story mode** writes a SOC-style
+narrative. It is built *on* the investigation above: the graded answers are handed to the model as
+ground truth it must name and must not contradict, and the prose cites the evidence beneath each one
+(the Suricata signature, the Kerberos sign-in, the beacon's cleartext check-in). The model narrates and
+answers follow-up questions; it does not detect.
 
 .. important::
 
-   The narrative correctly centres the investigation on ``172.16.1.66``, the SMB beacon, the 9.3 MB TLS
-   burst, and the directory-service access — but, working from traffic *metrics*, it never named the
-   actual STRRAT C2 (``141.98.10.79``) or the victim ``ccollier``. Those came only from the
-   deterministic layers. This is the demo's closing point: the LLM is a helpful narrator, not the
-   detector — anchor conclusions in the signature hits and extracted facts beneath it.
+   Story mode is the one layer that needs the LLM, and it is deliberately last. Everything above —
+   the investigation summary, the signature hit, the recovered identity, the beacon — is produced by
+   the deterministic pipeline and stands on its own, offline and reproducible. The narrative's job is
+   to make those findings readable, and each claim it makes is tagged with the grade of the finding it
+   rests on, so an ``INFERRED`` attribution is never dressed up as certainty.
 
 
 Artifacts recovered
@@ -203,16 +250,16 @@ From one upload, with no prior knowledge of the network, TracePcap surfaced:
      - Kerberos AS-REQ + LDAP directory lookup (host identity)
    * - What?
      - STRRAT (Java RAT)
-     - Suricata: "ET MALWARE STRRAT CnC Checkin"
+     - Suricata "ET MALWARE STRRAT CnC Checkin"; corroborated by the beacon's cleartext check-in
    * - Where (C2)?
      - ``141.98.10.79:12132`` (Lithuania)
-     - Suricata signature + offline GeoIP
+     - Suricata signature + beaconing shape + offline GeoIP
    * - Which host?
      - ``172.16.1.66`` — Windows laptop/desktop, ``DESKTOP-SKBR25F``, Intel NIC
      - Host classification (TTL, OUI, apps, sign-in)
    * - How does it behave?
-     - 30-second zero-jitter beacon; 97.1%-of-bytes top-talker
-     - Behavioural / periodicity analysis
+     - A beacon to the C2 on ``:12132``; 97.1%-of-bytes top-talker
+     - Behavioural / beacon analysis
 
 .. tip::
 
@@ -225,7 +272,9 @@ What this demonstrates
 ----------------------
 
 The most forensically valuable answers — *who, what, where, and how it behaves* — came from
-deterministic analysis, reproducibly and offline, from a single upload. The Kerberos/LDAP identity
-extraction closes the one gap the exercise's answer key had to fill by hand. And the LLM narrative,
-useful as a readable summary, is shown to be exactly that: a layer on top whose conclusions must be
-checked against the deterministic evidence beneath it.
+deterministic analysis, reproducibly and offline, from a single upload, and the investigation summary
+presents them already graded by how directly each is known. The Kerberos/LDAP identity extraction
+closes the one gap the exercise's answer key had to fill by hand. The beaconing and stream analysis
+mean the C2 and the malware family are recovered even with the IDS turned off. And the LLM narrative,
+useful as a readable summary, is exactly that: a layer on top whose every claim is anchored to — and
+graded by — the deterministic evidence beneath it.
