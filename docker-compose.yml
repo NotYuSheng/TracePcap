@@ -46,12 +46,17 @@ services:
       - tracepcap-network
 
   # MinIO Object Storage
-  # Pulled from quay.io, not Docker Hub: minio/minio was pulled from Docker Hub entirely around
-  # September 2025 ("repository does not exist" even when authenticated — this was mistaken for a
-  # Docker Hub rate limit before the actual cause was found). quay.io/minio/minio is MinIO's own
-  # replacement registry and mirrors the same release tags.
+  # Image source: Chainguard (cgr.dev/chainguard/minio), NOT Docker Hub or quay.io. In 2026 MinIO
+  # removed its community images from every public registry — `minio/minio` was deleted from Docker
+  # Hub and the quay.io/minio repos were made private (every tag now returns "unauthorized"), which
+  # breaks `docker compose up` on any machine without a cached copy. Chainguard publishes a drop-in
+  # MinIO server that pulls anonymously. We use the `-dev` variant because it ships the shell + wget
+  # the distroless `:latest` lacks and the healthcheck below needs, and the floating tag rather than
+  # a digest pin: Chainguard's free tier serves only `:latest`/`:latest-dev` and garbage-collects
+  # older digests, so a pinned digest would 404 once a newer build is published. For offline use the
+  # image is snapshotted at bundle time (see docker-compose.offline.yml).
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: cgr.dev/chainguard/minio:latest-dev
     container_name: tracepcap-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -74,7 +79,9 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # The Chainguard image has no curl; its `-dev` variant ships wget. `--spider` makes a HEAD-only
+      # request and exits non-zero unless the endpoint returns 200, which is what a healthcheck needs.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -85,8 +92,10 @@ services:
   # One-shot bucket bootstrap: it is *meant* to exit 0, so it gets no restart policy
   # (`unless-stopped` would restart it forever) and needs only a nominal memory cap.
   minio-init:
-    # Same registry move as the minio service above — minio/mc is gone from Docker Hub too.
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Same registry move as the minio service above — MinIO's mc is gone from the public registries.
+    # Chainguard's minio-client `-dev` variant provides mc (at /usr/bin/mc) plus the /bin/sh the
+    # folded entrypoint below needs; the distroless `:latest` has neither.
+    image: cgr.dev/chainguard/minio-client:latest-dev
     container_name: tracepcap-minio-init
     deploy:
       resources:
@@ -241,7 +250,7 @@ services:
         # The default below is rewritten on every merge to main by
         # .github/workflows/app-version.yml — it is the version local builds bake in.
         # Export APP_VERSION to override (CI passes the live `git describe` for GHCR images).
-        VITE_APP_VERSION: ${APP_VERSION:-v0.1.1-435-g6f1e117}
+        VITE_APP_VERSION: ${APP_VERSION:-v0.1.1-446-g1112379}
     container_name: tracepcap-nginx
     restart: unless-stopped
     deploy:
