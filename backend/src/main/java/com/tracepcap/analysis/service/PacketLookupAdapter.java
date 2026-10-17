@@ -34,6 +34,13 @@ public class PacketLookupAdapter implements PacketLookup {
   }
 
   @Override
+  public List<String> firstPayloadsInConversation(UUID conversationId, int limit) {
+    if (limit <= 0) return List.of();
+    return repository.findPayloadsByConversationId(
+        conversationId, org.springframework.data.domain.PageRequest.of(0, limit));
+  }
+
+  @Override
   public List<UUID> conversationIdsWithReplyFromPeer(UUID fileId, String hostIp) {
     return repository.findConversationIdsWithReplyFromPeer(fileId, hostIp);
   }

@@ -13,8 +13,7 @@ import com.tracepcap.story.dto.StoryAggregates.BeaconCandidate;
 import com.tracepcap.story.dto.StoryAggregates.Coverage;
 import com.tracepcap.story.dto.StoryAggregates.ProtocolRiskEntry;
 import com.tracepcap.story.dto.StoryAggregates.TlsAnomalySummary;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+import com.tracepcap.story.service.detector.BeaconAnalysis;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -219,73 +218,28 @@ public class StoryAggregatesService {
 
   // ── Beacon Candidates ──────────────────────────────────────────────────────
 
+  /**
+   * The Traffic-intelligence panel's beacon candidates (and the prompt's). Delegates to
+   * {@link BeaconAnalysis}, the same analysis the beacon detector uses (#823): this used to be a
+   * second copy of the algorithm with the same flaws, so a domain controller's NetBIOS keepalive was
+   * listed here as a beacon candidate — once per protocol view — even after the detector stopped
+   * reporting it. External candidates come first, then the most regular; top 5.
+   */
   private List<BeaconCandidate> computeBeaconCandidates(UUID fileId) {
-    List<ConversationFacts> rows = conversationLookup.conversationFacts(fileId);
-
-    // Group by (srcIp, dstIp, dstPort, protocol)
-    record FlowKey(String src, String dst, String port, String proto, String app) {}
-    Map<FlowKey, List<LocalDateTime>> groups = new HashMap<>();
-    for (ConversationFacts row : rows) {
-      FlowKey key =
-          new FlowKey(
-              row.flow().srcIp(),
-              row.flow().dstIp() != null ? row.flow().dstIp() : "",
-              row.flow().dstPort() != null ? String.valueOf(row.flow().dstPort()) : "",
-              row.flow().protocol(),
-              row.findings().appName());
-      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(row.flow().startTime());
-    }
-    // The old query pre-sorted by start time; grouping in Java must sort explicitly, since the
-    // interval maths below is meaningless on unordered timestamps.
-    groups.values().forEach(java.util.Collections::sort);
-
-    List<BeaconCandidate> candidates = new ArrayList<>();
-    for (Map.Entry<FlowKey, List<LocalDateTime>> e : groups.entrySet()) {
-      List<LocalDateTime> times = e.getValue();
-      if (times.size() < 3) continue;
-
-      // Compute inter-arrival intervals in milliseconds
-      List<Long> intervals = new ArrayList<>();
-      for (int i = 1; i < times.size(); i++) {
-        long ms = java.time.Duration.between(times.get(i - 1), times.get(i)).toMillis();
-        if (ms >= 0) intervals.add(ms);
-      }
-      if (intervals.isEmpty()) continue;
-
-      double mean = intervals.stream().mapToLong(Long::longValue).average().orElse(0);
-      if (mean < 1000) continue; // ignore sub-second intervals (not beaconing)
-
-      double variance =
-          intervals.stream().mapToDouble(v -> Math.pow(v - mean, 2)).average().orElse(0);
-      double stddev = Math.sqrt(variance);
-      double cv = stddev / mean;
-
-      if (cv < 0.3) {
-        FlowKey k = e.getKey();
-        candidates.add(
-            BeaconCandidate.builder()
-                .srcIp(k.src())
-                .dstIp(k.dst().isEmpty() ? null : k.dst())
-                .dstPort(k.port().isEmpty() ? null : parsePort(k.port()))
-                .protocol(k.proto())
-                .appName(k.app())
-                .flowCount(times.size())
-                .avgIntervalMs(Math.round(mean))
-                .cv(Math.round(cv * 1000.0) / 1000.0)
-                .build());
-      }
-    }
-
-    // Sort by CV ascending (lowest jitter = most suspicious), return top 5
-    candidates.sort((a, b) -> Double.compare(a.getCv(), b.getCv()));
-    return candidates.stream().limit(5).collect(Collectors.toList());
-  }
-
-  private static Integer parsePort(String s) {
-    try {
-      return Integer.parseInt(s);
-    } catch (NumberFormatException e) {
-      return null;
-    }
+    return BeaconAnalysis.analyse(conversationLookup.conversationFacts(fileId)).stream()
+        .limit(5)
+        .map(
+            c ->
+                BeaconCandidate.builder()
+                    .srcIp(c.client())
+                    .dstIp(c.server())
+                    .dstPort(c.serverPort())
+                    .protocol(String.join("/", c.protocols().stream().filter(p -> !p.isEmpty()).toList()))
+                    .appName(c.appName())
+                    .flowCount(c.flows())
+                    .avgIntervalMs(Math.round(c.meanMs()))
+                    .cv(Math.round(c.cv() * 1000.0) / 1000.0)
+                    .build())
+        .collect(Collectors.toList());
   }
 }
