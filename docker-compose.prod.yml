@@ -21,7 +21,7 @@
 # Default demo login (change for any real deployment): analyst / analyst
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.7.5
     container_name: tracepcap-keycloak
     restart: unless-stopped
     command: ["start-dev", "--import-realm"]

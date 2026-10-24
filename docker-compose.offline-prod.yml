@@ -27,7 +27,7 @@
 # be set in .env or this overlay aborts before starting anything.
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.7.5
     container_name: tracepcap-keycloak
     restart: unless-stopped
     command: ["start-dev", "--import-realm"]
