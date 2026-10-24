@@ -49,6 +49,11 @@ services:
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      # Pin the embedded H2 store's credentials to the values Keycloak 26.0 created it with.
+      # Newer releases changed the dev-mode defaults, so without this an existing keycloak_data
+      # volume fails to open ("Wrong user name or password") after upgrading and Keycloak crash-loops.
+      KC_DB_USERNAME: sa
+      KC_DB_PASSWORD: password
       TZ: Asia/Singapore
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
