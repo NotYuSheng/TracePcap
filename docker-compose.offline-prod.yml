@@ -27,10 +27,10 @@
 # be set in .env or this overlay aborts before starting anything.
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.7.5
     container_name: tracepcap-keycloak
     restart: unless-stopped
-    command: ["start-dev", "--import-realm"]
+    command: ["start", "--import-realm"]
     # Keycloak is a JVM app too: 1g covers its heap plus the embedded H2 store at this scale.
     # See docs/operations/production-hardening.rst (Container Resource Limits).
     deploy:
@@ -49,12 +49,20 @@ services:
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      # Production mode (`start`) keeps the embedded H2 store from the start-dev era, so existing
+      # keycloak_data volumes upgrade in place.
+      KC_DB: dev-file
+      # Pin the H2 credentials to the values Keycloak 26.0 created the store with. Newer releases
+      # changed the defaults, so without this an existing keycloak_data volume fails to open
+      # ("Wrong user name or password") after upgrading and Keycloak crash-loops.
+      KC_DB_USERNAME: sa
+      KC_DB_PASSWORD: password
       TZ: Asia/Singapore
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
       # Persist Keycloak's embedded H2 store so accounts/credentials created at
       # runtime in the admin console survive container restart/recreate. (The
-      # online prod overlay is ephemeral by the same start-dev design; persistence
+      # online prod overlay persists it the same way; persistence
       # matters more offline, where re-provisioning users is manual.)
       - keycloak_data:/opt/keycloak/data
     networks:

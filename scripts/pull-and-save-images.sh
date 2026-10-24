@@ -4,7 +4,7 @@
 # Run this on an internet-connected machine BEFORE transferring to the offline host.
 #
 # What it does:
-#   1. Pulls all third-party images from Docker Hub
+#   1. Pulls all third-party images (Docker Hub, quay.io)
 #   2. Builds the backend and nginx images locally
 #   3. Saves every image as a .tar file under ./images/
 #
@@ -60,7 +60,7 @@ echo "=== [1/3] Pulling third-party images ==="
 # Parse third-party image tags directly from the offline compose file so that
 # the script and the compose file never get out of sync.
 OFFLINE_COMPOSE="$ROOT_DIR/docker-compose.offline.yml"
-mapfile -t DOCKERHUB_IMAGES < <(
+mapfile -t THIRD_PARTY_IMAGES < <(
   grep '^[[:space:]]*image:' "$OFFLINE_COMPOSE" | \
   sed -E 's/^[[:space:]]*image:[[:space:]]*"?([^" #]+)"?.*/\1/' | \
   grep -v '^tracepcap-' | \
@@ -70,7 +70,7 @@ mapfile -t DOCKERHUB_IMAGES < <(
 # Optionally include Keycloak, for an authenticated offline deployment. The image
 # tag is read from docker-compose.offline-prod.yml — the SAME file the offline host
 # starts — so the saved image can never drift from what the offline stack expects.
-# Appending to DOCKERHUB_IMAGES means the pull and save loops below both pick it
+# Appending to THIRD_PARTY_IMAGES means the pull and save loops below both pick it
 # up automatically. Set INCLUDE_KEYCLOAK=true|false to skip the prompt (e.g. CI).
 OFFLINE_PROD_COMPOSE="$ROOT_DIR/docker-compose.offline-prod.yml"
 KEYCLOAK_IMAGE="$(
@@ -98,12 +98,12 @@ want_keycloak() {
 SAVE_KEYCLOAK=0
 if want_keycloak; then
   echo "  Including Keycloak: $KEYCLOAK_IMAGE"
-  DOCKERHUB_IMAGES+=("$KEYCLOAK_IMAGE")
+  THIRD_PARTY_IMAGES+=("$KEYCLOAK_IMAGE")
   SAVE_KEYCLOAK=1
 fi
 
-for img in "${DOCKERHUB_IMAGES[@]}"; do
-  echo "  Pulling $img (Docker Hub)..."
+for img in "${THIRD_PARTY_IMAGES[@]}"; do
+  echo "  Pulling $img..."
   docker pull "$img"
 done
 
@@ -156,7 +156,7 @@ fi
 echo ""
 echo "=== [3/3] Saving images to images/ ==="
 
-for img in "${DOCKERHUB_IMAGES[@]}"; do
+for img in "${THIRD_PARTY_IMAGES[@]}"; do
   filename="$(echo "$img" | tr '/:' '_').tar"
   save_image "$img" "$filename"
 done

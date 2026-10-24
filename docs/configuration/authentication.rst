@@ -85,8 +85,8 @@ is rejected.
 HTTPS / TLS
 -----------
 
-Keycloak runs in ``start-dev`` mode (HTTP, no TLS) for offline use or where TLS
-is terminated by an upstream reverse proxy. nginx strips Keycloak's HSTS header
+Keycloak runs in production mode (``start``) over plain HTTP behind nginx, for
+offline use or where TLS is terminated by an upstream reverse proxy. nginx strips Keycloak's HSTS header
 so it cannot poison a plain-HTTP origin into HTTPS-only. For internet-facing
 deployments, terminate TLS in front of nginx and set ``PUBLIC_URL`` to the
 ``https://`` origin. See :doc:`../operations/production-hardening`.
