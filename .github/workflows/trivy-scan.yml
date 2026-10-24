@@ -22,12 +22,27 @@ jobs:
         include:
           - name: tracepcap-backend
           - name: tracepcap-nginx
+          # Third-party image we ship in the prod overlays. Its tag comes from the compose file
+          # (not image_tag), so the scan always matches what we actually deploy.
+          - name: keycloak
+            compose_image: quay.io/keycloak/keycloak
 
     steps:
+      - name: Check out compose files
+        if: matrix.compose_image
+        uses: actions/checkout@v4
+
       - name: Resolve image reference
+        env:
+          COMPOSE_IMAGE: ${{ matrix.compose_image }}
         run: |
-          REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_OWNER_LOWER}/${{ matrix.name }}:${{ github.event.inputs.image_tag }}"
+          if [ -n "$COMPOSE_IMAGE" ]; then
+            IMAGE=$(grep -oE "${COMPOSE_IMAGE}:[^[:space:]\"]+" docker-compose.prod.yml | head -1)
+            [ -n "$IMAGE" ] || { echo "::error::$COMPOSE_IMAGE not found in docker-compose.prod.yml"; exit 1; }
+          else
+            REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            IMAGE="ghcr.io/${REPO_OWNER_LOWER}/${{ matrix.name }}:${{ github.event.inputs.image_tag }}"
+          fi
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
@@ -67,7 +82,7 @@ jobs:
       - name: Write results to job summary
         if: always()
         run: |
-          echo "## Trivy Scan — \`${{ matrix.name }}:${{ github.event.inputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "## Trivy Scan — \`${{ env.IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat trivy-${{ matrix.name }}-summary.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

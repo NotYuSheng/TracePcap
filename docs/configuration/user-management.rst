@@ -88,7 +88,7 @@ Seeding users in the realm export (optional)
 
 To ship a deployment with users **pre-created** on first boot, add them to
 ``keycloak/realm-export.json``. The realm is imported automatically on startup
-(``start-dev --import-realm``). This is how the default ``analyst`` demo user is
+(``start --import-realm``). This is how the default ``analyst`` demo user is
 provided.
 
 Add an entry to the ``users`` array of that file:
@@ -125,7 +125,7 @@ container, so re-import requires recreating it:
      up -d --build --force-recreate keycloak
 
 .. note::
-   ``--force-recreate`` on the bundled ``start-dev`` Keycloak resets its
+   ``--force-recreate`` on the bundled Keycloak resets its
    in-container state, so any users you created through the admin console will
    be lost and the realm re-seeded from the export. Back up first if needed —
    see :doc:`../operations/backup-restore`.
