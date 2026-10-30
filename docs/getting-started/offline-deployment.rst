@@ -48,6 +48,12 @@ locally-hosted LLM server, if configured — see below).
 Overview
 --------
 
+.. note::
+
+   Images saved by ``pull-and-save-images.sh`` match the architecture of the
+   machine that ran it. For an air-gapped arm64 host, run it on an
+   internet-connected arm64 machine. See :doc:`supported-architectures`.
+
 1. On an **internet-connected** machine: pull all images and save them as
    ``.tar`` files.
 2. **Transfer** the tarballs (plus a few scripts) to the offline machine.

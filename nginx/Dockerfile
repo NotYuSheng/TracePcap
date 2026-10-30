@@ -1,5 +1,7 @@
 # Stage 1: Build the React application
-FROM node:22-alpine AS builder
+# Runs on the build machine's architecture: the static bundle is portable, so there is nothing to
+# gain from compiling it under emulation during a cross-architecture build.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 
