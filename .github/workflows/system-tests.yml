@@ -100,6 +100,16 @@ jobs:
           docker compose exec -T backend ndpiReader -i /tmp/ftp.pcap -v 2 | tee /tmp/ndpi.out
           grep -q 'FTP' /tmp/ndpi.out
 
+      # The system test disables Suricata for speed. Same flags as SuricataService, which also
+      # proves the arch-specific package loads the bundled ruleset and writes eve.json.
+      - name: Check Suricata runs the ruleset
+        run: |
+          docker compose exec -T backend sh -ec '
+            mkdir -p /tmp/suricata-check
+            suricata -r /tmp/ftp.pcap -l /tmp/suricata-check --runmode single --set unix-command.enabled=no
+            test -s /tmp/suricata-check/eve.json
+          '
+
       - name: Tear down
         if: always()
         run: docker compose down -v
