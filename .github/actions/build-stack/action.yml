@@ -14,15 +14,16 @@ runs:
     # entry. Compose's bake definition has no image names, so the tags are set here and have to match
     # what `compose up` looks for. --no-build below makes a mismatch fail rather than silently rebuild.
     #
-    # main builds without reading the cache. A cached apt or git layer can't notice that an upstream
-    # package moved or broke, so this proves each release still builds from scratch.
+    # Release PRs build without reading the cache. A cached apt or git layer can't notice that an
+    # upstream package moved or broke. It has to be the PR into main rather than the push: the push
+    # runs alongside publish-ghcr.yml, which doesn't wait for it, so a failure there comes too late.
     - name: Build images
       uses: docker/bake-action@v6
       with:
         source: .
         files: docker-compose.yml
         load: true
-        no-cache: ${{ github.ref == 'refs/heads/main' }}
+        no-cache: ${{ github.base_ref == 'main' }}
         set: |
           backend.tags=tracepcap-backend:latest
           backend.cache-from=type=gha,scope=backend-${{ runner.arch }}
