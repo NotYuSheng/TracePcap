@@ -19,8 +19,8 @@ RUN mvn clean package -DskipTests -B
 # it into /out. On amd64 this stage is a no-op and /out is empty.
 # Any other architecture stops here with a clear error: see docs/getting-started/supported-architectures.rst.
 #
-# NDPI_BRANCH is a branch rather than a commit so a rebuild picks up upstream's security fixes,
-# matching the rolling ntop package on amd64. Move it when ntop's package moves to a new major.
+# NDPI_BRANCH is a branch rather than a commit so a no-cache rebuild picks up upstream's security
+# fixes, matching the rolling ntop package on amd64. Move it when ntop's package moves to a new major.
 FROM eclipse-temurin:21-jre-jammy AS ndpi
 ARG TARGETARCH
 ARG NDPI_BRANCH=6.0-stable
