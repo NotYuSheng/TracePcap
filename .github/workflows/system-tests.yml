@@ -21,8 +21,20 @@ permissions:
 
 jobs:
   system:
-    name: Analysis pipeline (full stack)
-    runs-on: ubuntu-latest
+    name: Analysis pipeline (full stack, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+
+    # Both supported architectures, on native runners: arm64 installs nDPI differently (see
+    # docs/getting-started/supported-architectures.rst), and an amd64-only run can't see it break.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
     # to 80. Pin it to 8888 to match the readiness check and the test base URL.
@@ -80,6 +92,13 @@ jobs:
       - name: Run system tests against the running stack
         working-directory: backend
         run: mvn -B -Dtest=AnalysisCompletionSystemTest -DfailIfNoTests=false test
+
+      # NdpiService degrades gracefully, so the test above passes even with nDPI missing or broken.
+      - name: Check nDPI classifies traffic
+        run: |
+          docker compose cp backend/src/test/resources/fixtures/ftp.pcap backend:/tmp/ftp.pcap
+          docker compose exec -T backend ndpiReader -i /tmp/ftp.pcap -v 2 | tee /tmp/ndpi.out
+          grep -q 'FTP' /tmp/ndpi.out
 
       - name: Tear down
         if: always()

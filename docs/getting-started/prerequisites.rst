@@ -21,6 +21,9 @@ Software Requirements
      - Any OpenAI-compatible API
      - AI filter generation and Story Mode (e.g. LM Studio, Ollama)
 
+CPU architecture: **amd64** (x86-64) or **arm64** (aarch64). See
+:doc:`supported-architectures`.
+
 Hardware Requirements
 ---------------------
 
