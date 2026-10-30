@@ -968,7 +968,7 @@ public class FileExtractionService implements FileExtractionStage {
       String method) {
 
     String minioPath =
-        String.format("extracted/%s/%s/%s", file.getId(), UUID.randomUUID(), sanitize(filename));
+        StorageService.extractedPrefix(file.getId()) + UUID.randomUUID() + "/" + sanitize(filename);
 
     storageService.uploadBytes(data, minioPath, mimeType);
 

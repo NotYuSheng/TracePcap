@@ -4,12 +4,17 @@ import com.tracepcap.common.exception.StorageException;
 import com.tracepcap.config.MinioConfig;
 import io.minio.*;
 import io.minio.http.Method;
+import io.minio.messages.DeleteError;
+import io.minio.messages.DeleteObject;
+import io.minio.messages.Item;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,6 +78,74 @@ public class StorageServiceImpl implements StorageService {
     } catch (Exception e) {
       log.error("Failed to delete file: {}", fileName, e);
       throw new StorageException("Failed to delete file from storage", e);
+    }
+  }
+
+  @Override
+  public int deleteByPrefix(String prefix) {
+    requireFolderPrefix(prefix);
+    try {
+      List<DeleteObject> objects = new ArrayList<>();
+      for (Result<Item> item :
+          minioClient.listObjects(
+              ListObjectsArgs.builder()
+                  .bucket(minioConfig.getBucket())
+                  .prefix(prefix)
+                  .recursive(true)
+                  .build())) {
+        objects.add(new DeleteObject(item.get().objectName()));
+      }
+
+      // removeObjects is lazy: nothing is deleted until the results are iterated.
+      int failed = 0;
+      for (Result<DeleteError> result :
+          minioClient.removeObjects(
+              RemoveObjectsArgs.builder()
+                  .bucket(minioConfig.getBucket())
+                  .objects(objects)
+                  .build())) {
+        DeleteError error = result.get();
+        log.error("Failed to delete object {}: {}", error.objectName(), error.message());
+        failed++;
+      }
+      if (failed > 0) {
+        throw new StorageException("Failed to delete " + failed + " objects under " + prefix);
+      }
+
+      log.info("Deleted {} objects under {} from MinIO", objects.size(), prefix);
+      return objects.size();
+    } catch (StorageException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("Failed to delete objects under: {}", prefix, e);
+      throw new StorageException("Failed to delete objects from storage", e);
+    }
+  }
+
+  @Override
+  public List<String> listFolders(String prefix) {
+    requireFolderPrefix(prefix);
+    try {
+      List<String> folders = new ArrayList<>();
+      for (Result<Item> result :
+          minioClient.listObjects(
+              ListObjectsArgs.builder().bucket(minioConfig.getBucket()).prefix(prefix).build())) {
+        Item item = result.get();
+        if (item.isDir()) {
+          String name = item.objectName().substring(prefix.length());
+          folders.add(name.substring(0, name.length() - 1));
+        }
+      }
+      return folders;
+    } catch (Exception e) {
+      log.error("Failed to list folders under: {}", prefix, e);
+      throw new StorageException("Failed to list objects in storage", e);
+    }
+  }
+
+  private static void requireFolderPrefix(String prefix) {
+    if (!prefix.endsWith("/")) {
+      throw new IllegalArgumentException("Expected a folder prefix ending in /: " + prefix);
     }
   }
 
