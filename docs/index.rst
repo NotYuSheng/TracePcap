@@ -10,6 +10,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    :caption: Getting Started
 
    getting-started/prerequisites
+   getting-started/supported-architectures
    getting-started/installation
    getting-started/offline-deployment
 

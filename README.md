@@ -96,6 +96,8 @@ TracePcap's capabilities fall into five pillars. Each links to its full page in 
 | Docker Compose | Latest | Multi-container orchestration |
 | LLM Server | Any OpenAI-compatible API, self- or LAN-hosted | AI features (e.g. LM Studio, Ollama) — optional |
 
+**CPU architecture:** amd64 (x86-64) or arm64 (aarch64), including Apple Silicon. See [Supported CPU Architectures](docs/getting-started/supported-architectures.rst).
+
 **Minimum hardware** (sizes the TracePcap stack only; the LLM, if self-hosted, is extra):
 
 | | Minimum | Recommended | Comfortable |

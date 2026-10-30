@@ -1,6 +1,8 @@
 # Multi-stage build for Spring Boot application
 # Stage 1: Build the application
-FROM maven:3.9-eclipse-temurin-21-alpine AS build
+# Runs on the build machine's architecture: the JAR is portable, so there is nothing to gain from
+# compiling it under emulation during a cross-architecture build.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21-alpine AS build
 
 WORKDIR /app
 
@@ -12,14 +14,55 @@ RUN mvn dependency:go-offline -B
 COPY src ./src
 RUN mvn clean package -DskipTests -B
 
-# Stage 2: Runtime
+# Stage 2: nDPI for architectures ntop publishes no package for
+# ntop's apt repo is x64-only, so arm64 compiles the same stable branch from source and installs
+# it into /out. On amd64 this stage is a no-op and /out is empty.
+# Any other architecture stops here with a clear error: see docs/getting-started/supported-architectures.rst.
+#
+# NDPI_BRANCH is a branch rather than a commit so a no-cache rebuild picks up upstream's security
+# fixes, matching the rolling ntop package on amd64. Move it when ntop's package moves to a new major.
+FROM eclipse-temurin:21-jre-jammy AS ndpi
+ARG TARGETARCH
+ARG NDPI_BRANCH=6.0-stable
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    mkdir -p /out/opt && \
+    case "$TARGETARCH" in \
+        amd64) exit 0 ;; \
+        arm64) ;; \
+        *) echo "Unsupported architecture '$TARGETARCH': TracePcap supports amd64 and arm64." >&2; exit 1 ;; \
+    esac && \
+    DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        autoconf \
+        automake \
+        build-essential \
+        ca-certificates \
+        git \
+        libpcap-dev \
+        libtool \
+        pkg-config && \
+    git clone --depth 1 --branch "$NDPI_BRANCH" https://github.com/ntop/nDPI.git /tmp/nDPI && \
+    cd /tmp/nDPI && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr && \
+    make -j"$(nproc)" && \
+    make install DESTDIR=/out && \
+    rm -rf /out/usr/include /out/usr/lib/pkgconfig /out/usr/lib/libndpi.a && \
+    find /out/usr -type f \( -name ndpiReader -o -name 'libndpi.so*' \) -exec strip {} + && \
+    printf '%s-%s' "$NDPI_BRANCH" "$(git rev-parse --short HEAD)" > /out/opt/ndpi-version
+
+# Stage 3: Runtime
 FROM eclipse-temurin:21-jre-jammy
+
+ARG TARGETARCH
 
 WORKDIR /app
 
 # Install runtime dependencies:
 #   tshark    — PCAP/pcapng parser
-#   ndpi      — ndpiReader for application-layer DPI (latest from ntop apt repo)
+#   ndpi      — ndpiReader for application-layer DPI (latest from ntop apt repo on amd64,
+#               compiled in the `ndpi` stage on arm64)
 #   suricata  — offline IDS engine for signature-based threat detection (eve.json)
 #   tzdata    — timezone data
 #   gosu      — privilege-drop helper for entrypoint
@@ -34,6 +77,7 @@ WORKDIR /app
 # (offline: run pull-and-save-images.sh, transfer tracepcap-backend.tar, load-images.sh).
 #
 # BuildKit cache mounts keep downloaded apt packages cached across rebuilds.
+COPY --from=ndpi /out/ /
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     DEBIAN_FRONTEND=noninteractive apt-get update && \
@@ -41,18 +85,24 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ca-certificates \
         curl \
         gnupg && \
-    curl -fsSL https://packages.ntop.org/apt-stable/ntop.key \
-        | gpg --dearmor -o /usr/share/keyrings/ntop-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/ntop-keyring.gpg] https://packages.ntop.org/apt-stable/22.04/ x64/" \
-        > /etc/apt/sources.list.d/ntop.list && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        curl -fsSL https://packages.ntop.org/apt-stable/ntop.key \
+            | gpg --dearmor -o /usr/share/keyrings/ntop-keyring.gpg && \
+        echo "deb [signed-by=/usr/share/keyrings/ntop-keyring.gpg] https://packages.ntop.org/apt-stable/22.04/ x64/" \
+            > /etc/apt/sources.list.d/ntop.list && \
+        NDPI_PACKAGES="ndpi"; \
+    else \
+        NDPI_PACKAGES="libpcap0.8"; \
+    fi && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         tshark \
         tzdata \
         gosu \
         suricata \
-        ndpi && \
-    dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version && \
+        $NDPI_PACKAGES && \
+    { [ "$TARGETARCH" != "amd64" ] || dpkg-query -W -f='${Version}' ndpi > /opt/ndpi-version; } && \
+    ldconfig && \
     dpkg-query -W -f='${Version}' suricata > /opt/suricata-version && \
     apt-get purge -y --auto-remove gnupg curl
 
