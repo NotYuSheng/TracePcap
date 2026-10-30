@@ -195,6 +195,18 @@ deliberately not configured — a trade for a single-server deployment whose
 primary data is re-importable. See `issue #379
 <https://github.com/NotYuSheng/TracePcap/issues/379>`_.
 
+Deleted Files in Backups
+------------------------
+
+Deleting a file doesn't touch existing backups. Its capture and extracted
+content stay in any backup taken while it existed, until
+``BACKUP_RETENTION_DAYS`` rotates that backup out. If captures are sensitive,
+set that value to match your retention policy.
+
+Keep the backend stopped during a manual restore, and restore PostgreSQL before
+MinIO. A running backend sweeps away extracted content that has no matching file
+row. ``scripts/restore.sh`` already restores in this order.
+
 What Is Not Covered
 -------------------
 

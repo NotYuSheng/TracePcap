@@ -136,6 +136,12 @@ That is sufficient on its own, and it is the **master switch**: the cleanup
 scheduler is not registered at all, so none of the settings below do anything
 while it is ``false``.
 
+Deleting a file, by hand or through expiry, removes the original capture, its
+analysis results and any content extracted from it. An hourly sweep also removes
+extracted content left behind by a failed delete or by an older version. The
+sweep runs even with ``FILE_RETENTION_ENABLED=false``, because it only touches
+content whose file has already been deleted.
+
 .. danger::
 
    ``0`` does **not** mean "never" for ``FILE_RETENTION_HOURS``. It means *delete

@@ -1,10 +1,26 @@
 package com.tracepcap.file.service;
 
 import java.io.InputStream;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.web.multipart.MultipartFile;
 
 /** Service interface for file storage operations (MinIO) */
 public interface StorageService {
+
+  /** Root of everything extracted from captures; each file's objects sit under its own id. */
+  String EXTRACTED_ROOT = "extracted/";
+
+  /**
+   * The prefix holding everything extracted from a file. Ends in a slash so one id can never match
+   * another that merely starts with it.
+   *
+   * @param fileId the file the content was extracted from
+   * @return the storage prefix
+   */
+  static String extractedPrefix(UUID fileId) {
+    return EXTRACTED_ROOT + fileId + "/";
+  }
 
   /**
    * Upload a file to storage
@@ -29,6 +45,23 @@ public interface StorageService {
    * @param fileName the name of the file to delete
    */
   void deleteFile(String fileName);
+
+  /**
+   * Delete every object under a prefix
+   *
+   * @param prefix the prefix to delete; must end in a slash, so a blank or partial value can't
+   *     match more than one folder
+   * @return the number of objects deleted
+   */
+  int deleteByPrefix(String prefix);
+
+  /**
+   * List the folders directly under a prefix, without descending into them
+   *
+   * @param prefix the prefix to list; must end in a slash
+   * @return the folder names, without the prefix or a trailing slash
+   */
+  List<String> listFolders(String prefix);
 
   /**
    * Check if a file exists in storage
