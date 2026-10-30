@@ -10,6 +10,9 @@ interface FileUploadZoneProps {
   onFileSelect: (files: File[]) => void;
   disabled?: boolean;
   maxSize?: number;
+  // Packet-count provisioning limit for informational display only. Packet count can't be measured
+  // in the browser, so it's enforced server-side (capinfos); 0/undefined means no limit is shown.
+  maxPackets?: number;
   acceptedFileTypes?: string[];
 }
 
@@ -17,6 +20,7 @@ export const FileUploadZone = ({
   onFileSelect,
   disabled = false,
   maxSize = 500 * 1024 * 1024, // 500MB default
+  maxPackets,
   acceptedFileTypes = ['.pcap', '.pcapng', '.cap'],
 }: FileUploadZoneProps) => {
   const onDrop = useCallback(
@@ -65,6 +69,9 @@ export const FileUploadZone = ({
               </p>
               <small className="text-muted">
                 {acceptedFileTypes.join(', ')} &middot; up to {Math.round(maxSize / 1024 / 1024)} MB
+                {maxPackets && maxPackets > 0
+                  ? ` and ${maxPackets.toLocaleString()} packets`
+                  : ''}{' '}
                 each &middot; multiple files
               </small>
             </>
