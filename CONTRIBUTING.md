@@ -44,8 +44,12 @@ distinction is not academic: whatever is on `main` is what someone can pull.
 | | on a PR | on push to `dev` | on push to `main` |
 |---|---|---|---|
 | tests, lint, contract and vocabulary gates | yes | yes | yes |
+| arm64 system test (`system-tests-arm64.yml`) | when the build changes | yes | yes |
 | version stamp (`app-version.yml`) | — | yes, PR into `dev` | — |
 | container publish (`publish-ghcr.yml`) | — | — | yes |
+
+Stack builds use a Docker layer cache through `.github/actions/build-stack`, except on `main`, which
+builds from scratch so a cached layer can't hide an upstream package breaking.
 
 The version stamp runs on `dev` deliberately. If its chore PR landed on `main`, `main` would
 drift ahead of `dev` and every later release would start from a diverged base. At release time

@@ -1,0 +1,36 @@
+name: Build and start the stack
+description: >-
+  Builds the compose images with a Docker layer cache, then starts them. Replaces
+  `docker compose up -d --build`, which rebuilds everything from scratch on every run because a
+  fresh runner has no layers.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Each image gets its own scope per architecture: sharing one, they overwrite each other's cache
+    # entry. Compose's bake definition has no image names, so the tags are set here and have to match
+    # what `compose up` looks for. --no-build below makes a mismatch fail rather than silently rebuild.
+    #
+    # main builds without reading the cache. A cached apt or git layer can't notice that an upstream
+    # package moved or broke, so this proves each release still builds from scratch.
+    - name: Build images
+      uses: docker/bake-action@v6
+      with:
+        source: .
+        files: docker-compose.yml
+        load: true
+        no-cache: ${{ github.ref == 'refs/heads/main' }}
+        set: |
+          backend.tags=tracepcap-backend:latest
+          backend.cache-from=type=gha,scope=backend-${{ runner.arch }}
+          backend.cache-to=type=gha,mode=max,ignore-error=true,scope=backend-${{ runner.arch }}
+          nginx.tags=tracepcap-nginx:latest
+          nginx.cache-from=type=gha,scope=nginx-${{ runner.arch }}
+          nginx.cache-to=type=gha,mode=max,ignore-error=true,scope=nginx-${{ runner.arch }}
+
+    - name: Start the stack
+      shell: bash
+      run: docker compose up -d --no-build

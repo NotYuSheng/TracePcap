@@ -8,6 +8,7 @@ on:
       - 'scripts/openapi-snapshot.mjs'
       - 'openapi/baseline.json'
       - '.github/workflows/api-schema-drift.yml'
+      - '.github/actions/build-stack/**'
 
 permissions:
   contents: read
@@ -52,7 +53,7 @@ jobs:
           node-version: 22
 
       - name: Build and start the stack
-        run: docker compose up -d --build
+        uses: ./.github/actions/build-stack
 
       - name: Wait for app to be ready
         # Use 127.0.0.1, not localhost: Docker publishes the port on IPv4 only,
