@@ -92,8 +92,10 @@ jobs:
             ghcr.io/${{ env.REPO_OWNER_LOWER }}/${{ matrix.name }}:${{ env.SHA_TAG }}
           build-args: |
             VITE_APP_VERSION=${{ env.APP_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scoped per image: unscoped, the two matrix legs overwrite each other's cache, and a
+          # cold arm64 backend build under QEMU is the slow path timeout-minutes has to cover.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
       - name: Log out of GitHub Container Registry
         if: always()
