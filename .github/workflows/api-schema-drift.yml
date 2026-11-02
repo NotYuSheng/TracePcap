@@ -17,6 +17,7 @@ jobs:
   schema-drift:
     name: OpenAPI contract snapshot
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
     # to 80. Pin it to 8888 to match the readiness check and the snapshot URL.
