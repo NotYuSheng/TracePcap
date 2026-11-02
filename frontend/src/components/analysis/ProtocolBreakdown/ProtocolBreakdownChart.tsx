@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { ProtocolStats } from '@/types';
-import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import './ProtocolBreakdownChart.css';
 import { formatBytes } from '@/utils/formatters';
@@ -42,6 +42,8 @@ const COLORS = [
 
 export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChartProps) => {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   const sortedStats = useMemo(
     () => [...protocolStats].sort((a, b) => b.count - a.count),
@@ -55,12 +57,13 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
   const colorOf = (protocol: string) =>
     sliceColors.get(protocol) ?? sliceColors.get(OTHER_SLICE) ?? COLORS[MAX_PIE_PROTOCOLS];
 
-  const totalPages = Math.ceil(sortedStats.length / TABLE_PAGE_SIZE);
+  const query = search.trim().toLowerCase();
+  const matches = sortedStats.filter(stat => stat.protocol.toLowerCase().includes(query));
+  const totalPages = Math.ceil(matches.length / TABLE_PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(1, totalPages));
-  const pageStats = sortedStats.slice(
-    (currentPage - 1) * TABLE_PAGE_SIZE,
-    currentPage * TABLE_PAGE_SIZE
-  );
+  const pageStats = showAll
+    ? matches
+    : matches.slice((currentPage - 1) * TABLE_PAGE_SIZE, currentPage * TABLE_PAGE_SIZE);
 
   // Legend rows depend on number of items; each row ≈ 24 px, ~3 items per row at typical widths.
   const chartHeight = Math.max(300, 280 + Math.ceil(chartData.length / 3) * 24);
@@ -107,6 +110,20 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
         </div>
 
         <div className="breakdown-table">
+          {sortedStats.length > TABLE_PAGE_SIZE && (
+            <Form.Control
+              type="search"
+              size="sm"
+              className="mb-2"
+              placeholder="Search protocols…"
+              aria-label="Search protocols"
+              value={search}
+              onChange={e => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          )}
           <table className="table">
             <thead>
               <tr>
@@ -117,6 +134,13 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
               </tr>
             </thead>
             <tbody>
+              {matches.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-muted text-center">
+                    No protocols match your search.
+                  </td>
+                </tr>
+              )}
               {pageStats.map(stat => (
                 <tr key={stat.protocol}>
                   <td>
@@ -144,16 +168,27 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
               ))}
             </tbody>
           </table>
-          {totalPages > 1 && (
+          {!showAll && totalPages > 1 && (
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={sortedStats.length}
+              totalItems={matches.length}
               pageSize={TABLE_PAGE_SIZE}
               onPageChange={setPage}
               showPageSizeSelector={false}
               compact
             />
+          )}
+          {totalPages > 1 && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="p-0 mt-2"
+              onClick={() => setShowAll(all => !all)}
+            >
+              {showAll ? 'Show fewer' : `Show all ${matches.length}`}
+            </Button>
           )}
         </div>
       </div>

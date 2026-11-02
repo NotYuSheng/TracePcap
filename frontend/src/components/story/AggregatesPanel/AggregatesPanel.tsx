@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import type { StoryAggregates, AsnEntry, ProtocolRiskEntry, BeaconCandidate } from '@/types';
 
@@ -158,17 +158,34 @@ function TopAsnsTable({ entries }: { entries: AsnEntry[] }) {
 
 function ProtocolRiskTable({ entries }: { entries: ProtocolRiskEntry[] }) {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   if (entries.length === 0) return null;
 
-  const totalPages = Math.ceil(entries.length / PROTOCOL_RISK_PAGE_SIZE);
-  const currentPage = Math.min(page, totalPages);
-  const pageEntries = entries.slice(
+  const query = search.trim().toLowerCase();
+  const matches = entries.filter(e => e.protocol.toLowerCase().includes(query));
+  const totalPages = Math.ceil(matches.length / PROTOCOL_RISK_PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const pageEntries = matches.slice(
     (currentPage - 1) * PROTOCOL_RISK_PAGE_SIZE,
     currentPage * PROTOCOL_RISK_PAGE_SIZE
   );
 
   return (
     <>
+      {entries.length > PROTOCOL_RISK_PAGE_SIZE && (
+        <Form.Control
+          type="search"
+          size="sm"
+          className="mb-2"
+          placeholder="Search protocols…"
+          aria-label="Search protocols"
+          value={search}
+          onChange={e => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+      )}
       <table className="table table-sm table-hover mb-0 small">
         <thead>
           <tr>
@@ -179,6 +196,13 @@ function ProtocolRiskTable({ entries }: { entries: ProtocolRiskEntry[] }) {
           </tr>
         </thead>
         <tbody>
+          {matches.length === 0 && (
+            <tr>
+              <td colSpan={4} className="text-muted text-center">
+                No protocols match your search.
+              </td>
+            </tr>
+          )}
           {pageEntries.map((e, i) => {
             const pct = e.total > 0 ? (e.atRisk / e.total) * 100 : 0;
             return (
@@ -207,7 +231,7 @@ function ProtocolRiskTable({ entries }: { entries: ProtocolRiskEntry[] }) {
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={entries.length}
+          totalItems={matches.length}
           pageSize={PROTOCOL_RISK_PAGE_SIZE}
           onPageChange={setPage}
           showPageSizeSelector={false}
