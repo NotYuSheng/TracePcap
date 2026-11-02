@@ -156,9 +156,15 @@ public class ConversationTracerService {
       llmResponse = llmClient.generateCompletion(systemPrompt, userPrompt);
     } catch (LlmException e) {
       log.warn("LLM call failed for tracer {}: {}", conversationId, e.getMessage());
-      String errorMsg = e.getErrorCode() == com.tracepcap.common.exception.LlmException.ErrorCode.LLM_TIMEOUT
-          ? "AI explanation unavailable — the language model took too long to respond."
-          : "AI explanation unavailable — could not reach the language model. Check your LLM configuration.";
+      String errorMsg =
+          switch (e.getErrorCode()) {
+            case LLM_TIMEOUT ->
+                "AI explanation unavailable — the language model took too long to respond.";
+            case LLM_UNREACHABLE ->
+                "AI explanation unavailable — could not reach the language model."
+                    + " Check your LLM configuration.";
+            default -> "AI explanation unavailable — " + e.getMessage();
+          };
       return TracerExplainResponse.builder()
           .conversationId(conversationId.toString())
           .explanations(Collections.emptyList())
