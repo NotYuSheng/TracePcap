@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { BACKEND_UNREACHABLE_MESSAGE, isBackendUnreachable } from '@utils/llmError';
+import { describeLlmError } from '@utils/llmError';
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Badge, Button, Card, Form, Modal } from '@govtechsg/sgds-react';
@@ -107,23 +107,14 @@ export const FilterGeneratorPage = () => {
       setTotalMatches(0);
       setExecutionTime(null);
     } catch (err) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
-      const errorMsg = (data.message as string) || (err instanceof Error ? err.message : String(err));
-      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
-      if (isBackendUnreachable(status, data.errorCode)) {
-        setError(BACKEND_UNREACHABLE_MESSAGE);
-      } else if (data.errorCode === 'LLM_UNREACHABLE') {
-        setError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
-      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
-        const totalSeconds = Math.round(llmTimeoutMs / 1000);
-        const timeoutLabel = totalSeconds < 60
-          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
-          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
-        setError(`Filter generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or simplify your query.`);
-      } else {
-        setError(`Error: ${errorMsg || 'Failed to generate filter'}`);
-      }
+      setError(
+        describeLlmError(err, {
+          subject: 'Filter generation',
+          timeoutMs: llmTimeoutMs,
+          timeoutHint: 'simplify your query',
+          fallback: 'Failed to generate filter',
+        })
+      );
     } finally {
       setGenerating(false);
     }
