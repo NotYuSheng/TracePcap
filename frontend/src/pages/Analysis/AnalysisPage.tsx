@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { BACKEND_UNREACHABLE_MESSAGE, isBackendUnreachable } from '@utils/llmError';
+import { describeLlmError } from '@utils/llmError';
 import { Alert } from '@components/common/Alert';
 import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
@@ -171,11 +171,7 @@ export const AnalysisPage = () => {
       if (generated.findings?.length) setTotalFindings(generated.findings.length);
       if (generated.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(generated.aggregates.protocolRiskMatrix.length);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const status = (err as { response?: { status?: number } })?.response?.status;
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
-      const serverMsg: string = (data.message as string) ?? '';
-      const isClientTimeout = (err as { code?: string })?.code === 'ECONNABORTED';
       if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
         setStoryContextError({
           promptText: (data.promptText as string) ?? '',
@@ -183,18 +179,15 @@ export const AnalysisPage = () => {
           contextLength: (data.contextLength as number) ?? 0,
         });
         setStoryEditablePrompt((data.promptText as string) ?? '');
-      } else if (isBackendUnreachable(status, data.errorCode)) {
-        setStoryError(BACKEND_UNREACHABLE_MESSAGE);
-      } else if (data.errorCode === 'LLM_UNREACHABLE') {
-        setStoryError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
-      } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
-        const totalSeconds = Math.round(llmTimeoutMs / 1000);
-        const timeoutLabel = totalSeconds < 60
-          ? `${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}`
-          : `${Math.round(totalSeconds / 60)} minute${Math.round(totalSeconds / 60) !== 1 ? 's' : ''}`;
-        setStoryError(`Story generation timed out after ${timeoutLabel}. The LLM is responding but took too long — try again or reduce the capture size.`);
       } else {
-        setStoryError(serverMsg || msg || 'Failed to generate story');
+        setStoryError(
+          describeLlmError(err, {
+            subject: 'Story generation',
+            timeoutMs: llmTimeoutMs,
+            timeoutHint: 'reduce the capture size',
+            fallback: 'Failed to generate story',
+          })
+        );
       }
     } finally {
       setStoryGenerating(false);
