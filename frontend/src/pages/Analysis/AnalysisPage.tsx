@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { isLlmUnreachable } from '@utils/llmError';
+import { BACKEND_UNREACHABLE_MESSAGE, isBackendUnreachable } from '@utils/llmError';
 import { Alert } from '@components/common/Alert';
 import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
@@ -183,7 +183,9 @@ export const AnalysisPage = () => {
           contextLength: (data.contextLength as number) ?? 0,
         });
         setStoryEditablePrompt((data.promptText as string) ?? '');
-      } else if (isLlmUnreachable(status, data.errorCode)) {
+      } else if (isBackendUnreachable(status, data.errorCode)) {
+        setStoryError(BACKEND_UNREACHABLE_MESSAGE);
+      } else if (data.errorCode === 'LLM_UNREACHABLE') {
         setStoryError('The LLM server is not responding. Make sure the LLM service is running and reachable, then try again.');
       } else if (data.errorCode === 'LLM_TIMEOUT' || isClientTimeout) {
         const totalSeconds = Math.round(llmTimeoutMs / 1000);

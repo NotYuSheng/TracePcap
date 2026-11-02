@@ -1,24 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { isLlmUnreachable } from '../llmError';
+import { isBackendUnreachable } from '../llmError';
 
-describe('isLlmUnreachable', () => {
-  it('treats the backend unreachable code as unreachable', () => {
-    expect(isLlmUnreachable(502, 'LLM_UNREACHABLE')).toBe(true);
+describe('isBackendUnreachable', () => {
+  it('treats a 502 with no code as the backend being down', () => {
+    expect(isBackendUnreachable(502, undefined)).toBe(true);
   });
 
-  it('treats a 502 with no code as unreachable', () => {
-    expect(isLlmUnreachable(502, undefined)).toBe(true);
-  });
-
-  it.each(['OUTPUT_TRUNCATED', 'LLM_TIMEOUT', 'LLM_BAD_RESPONSE'])(
-    'keeps a 502 with %s distinct, so its own message reaches the user',
+  it.each(['LLM_UNREACHABLE', 'OUTPUT_TRUNCATED', 'LLM_TIMEOUT', 'LLM_BAD_RESPONSE'])(
+    'leaves a 502 with %s to the LLM error handling',
     errorCode => {
-      expect(isLlmUnreachable(502, errorCode)).toBe(false);
+      expect(isBackendUnreachable(502, errorCode)).toBe(false);
     }
   );
 
   it('ignores other failures', () => {
-    expect(isLlmUnreachable(500, undefined)).toBe(false);
-    expect(isLlmUnreachable(undefined, undefined)).toBe(false);
+    expect(isBackendUnreachable(500, undefined)).toBe(false);
+    expect(isBackendUnreachable(undefined, undefined)).toBe(false);
   });
 });

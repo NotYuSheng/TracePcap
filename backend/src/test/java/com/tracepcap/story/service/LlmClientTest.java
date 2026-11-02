@@ -251,7 +251,35 @@ class LlmClientTest {
         .andRespond(withSuccess("{\"choices\":[]}", MediaType.APPLICATION_JSON));
 
     assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
-        .isInstanceOf(LlmException.class);
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
     server.verify();
+  }
+
+  @Test
+  void rejectedCompletionIsNotAnOutage() {
+    server
+        .expect(requestTo(COMPLETIONS_URL))
+        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+    assertThatThrownBy(() -> client.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
+    server.verify();
+  }
+
+  @Test
+  void rejectedHealthCheckIsNotAnOutage() {
+    RestTemplate healthRestTemplate = new RestTemplate();
+    MockRestServiceServer rejectingHealthServer =
+        MockRestServiceServer.createServer(healthRestTemplate);
+    rejectingHealthServer
+        .expect(requestTo(MODELS_URL))
+        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+    LlmClient rejectedClient = new LlmClient(config, restTemplate, healthRestTemplate);
+
+    assertThatThrownBy(() -> rejectedClient.generateCompletion("sys", "user"))
+        .isInstanceOf(LlmException.class)
+        .hasFieldOrPropertyWithValue("errorCode", LlmException.ErrorCode.LLM_BAD_RESPONSE);
   }
 }

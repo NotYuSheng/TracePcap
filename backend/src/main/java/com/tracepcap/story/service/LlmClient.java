@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 /** Client for communicating with OpenAI-compatible LLM APIs */
@@ -176,6 +177,12 @@ public class LlmClient {
       HttpEntity<Void> entity = new HttpEntity<>(headers);
       llmHealthCheckRestTemplate.exchange(url, HttpMethod.GET, entity, String.class);
       log.debug("LLM health check passed");
+    } catch (HttpStatusCodeException e) {
+      log.warn("LLM pre-flight health check rejected: {}", e.getMessage());
+      throw new LlmException(
+          "LLM server rejected the request: " + e.getMessage(),
+          e,
+          LlmException.ErrorCode.LLM_BAD_RESPONSE);
     } catch (Exception e) {
       log.warn("LLM pre-flight health check failed: {}", e.getMessage());
       throw new LlmException(
@@ -407,8 +414,8 @@ public class LlmClient {
           throw new LlmException(
               "The model's response exceeded the output token budget ("
                   + getEffectiveMaxTokens()
-                  + " tokens) and was cut off before the story was complete. Raise LLM_MAX_TOKENS,"
-                  + " or reduce the amount to narrate (lower maxFindings / maxRiskMatrix).",
+                  + " tokens) and was cut off before it was complete. Raise LLM_MAX_TOKENS, or for a"
+                  + " story, reduce the amount to narrate (lower maxFindings / maxRiskMatrix).",
               null,
               LlmException.ErrorCode.OUTPUT_TRUNCATED);
         }
@@ -449,6 +456,13 @@ public class LlmClient {
         log.warn("LLM returned HTTP 400 — likely context length or bad request: {}", msg);
       } else {
         log.error("Error calling LLM API", e);
+      }
+      // The server answered, so this is not an outage (bad key, unknown model, server error)
+      if (e instanceof HttpStatusCodeException) {
+        throw new LlmException(
+            "LLM server rejected the request: " + msg,
+            e,
+            LlmException.ErrorCode.LLM_BAD_RESPONSE);
       }
       // Distinguish read/generation timeouts from connection failures
       Throwable cause = e.getCause() != null ? e.getCause() : e;

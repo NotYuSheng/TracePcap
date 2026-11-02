@@ -106,11 +106,19 @@ class GlobalExceptionHandlerTest {
                 HANDLER.handleContextLengthExceededException(
                     new ContextLengthExceededException(9000, 8000, "prompt"), req)),
         new Case(
-            "Llm -> 502",
+            "Llm unusable response -> 502",
+            502,
+            "Bad Gateway",
+            "LLM_BAD_RESPONSE",
+            req -> HANDLER.handleLlmException(new LlmException("empty"), req)),
+        new Case(
+            "Llm unreachable -> 502",
             502,
             "Bad Gateway",
             "LLM_UNREACHABLE",
-            req -> HANDLER.handleLlmException(new LlmException("unreachable"), req)),
+            req ->
+                HANDLER.handleLlmException(
+                    new LlmException("down", null, LlmException.ErrorCode.LLM_UNREACHABLE), req)),
         new Case(
             "IllegalArgument -> 400",
             400,
