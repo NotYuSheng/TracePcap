@@ -8,6 +8,7 @@ on:
       - 'scripts/openapi-snapshot.mjs'
       - 'openapi/baseline.json'
       - '.github/workflows/api-schema-drift.yml'
+      - '.github/actions/build-stack/**'
 
 permissions:
   contents: read
@@ -16,6 +17,7 @@ jobs:
   schema-drift:
     name: OpenAPI contract snapshot
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     # No .env file in CI (it's gitignored), so compose would default NGINX_PORT
     # to 80. Pin it to 8888 to match the readiness check and the snapshot URL.
@@ -52,7 +54,7 @@ jobs:
           node-version: 22
 
       - name: Build and start the stack
-        run: docker compose up -d --build
+        uses: ./.github/actions/build-stack
 
       - name: Wait for app to be ready
         # Use 127.0.0.1, not localhost: Docker publishes the port on IPv4 only,

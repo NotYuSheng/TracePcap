@@ -1,0 +1,34 @@
+name: System Tests (arm64)
+
+# arm64 installs nDPI differently (see docs/getting-started/supported-architectures.rst), so an
+# amd64-only run can't see it break. On a PR this only runs when something that affects the build
+# changes, which is what differs between architectures. Every push to dev and main still runs it.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    paths:
+      - 'backend/Dockerfile'
+      - 'backend/docker-entrypoint.sh'
+      - 'backend/pom.xml'
+      - 'nginx/**'
+      - 'frontend/package-lock.json'
+      - 'docker-compose.yml'
+      - '.github/actions/build-stack/**'
+      - '.github/workflows/system-tests-arm64.yml'
+      - '.github/workflows/system-tests-run.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  system:
+    uses: ./.github/workflows/system-tests-run.yml
+    with:
+      arch: arm64
+      runner: ubuntu-24.04-arm
+    secrets: inherit
