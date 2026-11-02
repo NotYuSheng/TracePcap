@@ -212,8 +212,7 @@ public class LlmClient {
 
     Message message =
         post(buildRequest(systemPrompt, userPrompt, null, null), systemPrompt, userPrompt);
-    String content = message.getContent();
-    if (content == null) throw new LlmException("Empty response from LLM API");
+    String content = requireContent(message);
     log.info("Successfully received LLM response, length: {}", content.length());
     return content;
   }
@@ -255,7 +254,7 @@ public class LlmClient {
       // not to call one). Remember it, and use whatever text came back.
       log.warn("LLM accepted tools but returned no tool_calls — falling back to free-text parsing");
       if (isAutoToolCalling()) toolCallingSupported = Boolean.FALSE;
-      return message.getContent() != null
+      return hasContent(message)
           ? LlmToolResponse.freeText(message.getContent())
           : LlmToolResponse.freeText(sendForContent(systemPrompt, userPrompt));
 
@@ -289,11 +288,22 @@ public class LlmClient {
     return post(buildRequest(systemPrompt, userPrompt, wireTools, "auto"), systemPrompt, userPrompt);
   }
 
-  /** Plain completion that tolerates a null message content (used on fallback paths). */
+  /** Plain completion, used on the paths that fall back from tool calling. */
   private String sendForContent(String systemPrompt, String userPrompt) {
-    Message message =
-        post(buildRequest(systemPrompt, userPrompt, null, null), systemPrompt, userPrompt);
-    if (message.getContent() == null) throw new LlmException("Empty response from LLM API");
+    return requireContent(
+        post(buildRequest(systemPrompt, userPrompt, null, null), systemPrompt, userPrompt));
+  }
+
+  private static boolean hasContent(Message message) {
+    return message.getContent() != null && !message.getContent().isBlank();
+  }
+
+  /**
+   * The reply's text, or a typed failure. Blank counts as empty: some servers send {@code ""} rather
+   * than {@code null}, which would otherwise surface later as a parse failure in the caller.
+   */
+  private static String requireContent(Message message) {
+    if (!hasContent(message)) throw new LlmException("Empty response from LLM API");
     return message.getContent();
   }
 
@@ -406,7 +416,6 @@ public class LlmClient {
           && !response.getBody().getChoices().isEmpty()) {
 
         var choice = response.getBody().getChoices().get(0);
-        if (choice.getMessage() == null) throw new LlmException("Empty response from LLM API");
         // Deliberate guard: a "length" finish_reason means the model hit its output cap and the
         // response is truncated. Fail here with a clear, typed error instead of letting the partial
         // (invalid) JSON blow up later as a cryptic parse failure.
@@ -419,6 +428,8 @@ public class LlmClient {
               null,
               LlmException.ErrorCode.OUTPUT_TRUNCATED);
         }
+        // Checked after the cap: a model that spends its budget reasoning can stop with no message.
+        if (choice.getMessage() == null) throw new LlmException("Empty response from LLM API");
         return choice.getMessage();
       }
 
