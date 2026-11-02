@@ -121,6 +121,27 @@ export const StoryPage = () => {
     }
   }, [fileId, granularity]);
 
+  // Build the in-page nav from the sections actually rendered below, so it never lists a section
+  // the page conditionally hid (no timeline data, no findings, etc.). This stays above the early
+  // returns: story is null until generation finishes, and a hook that first runs on that render
+  // crashes the page (React error #310).
+  const hasTraffic = !loadingTimeline && timelineData.length > 0;
+  const hasAggregates = !!story?.aggregates;
+  const hasFindings = !!story?.findings && story.findings.length > 0;
+  const hasInvestigation = !!story?.investigationSteps && story.investigationSteps.length > 0;
+  // Memoized so StorySectionNav's IntersectionObserver isn't torn down and rebuilt on every
+  // StoryPage re-render (answers/timeline/granularity state) — which would flicker the active id.
+  const navSections: StorySection[] = useMemo(() => [
+    { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
+    { id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' },
+    { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
+    ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
+    ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
+    ...(hasFindings ? [{ id: 'story-findings', label: 'Deterministic findings', icon: 'bi-shield-check' }] : []),
+    ...(hasInvestigation ? [{ id: 'story-investigation', label: 'LLM investigation', icon: 'bi-search' }] : []),
+    { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
+  ], [hasTraffic, hasAggregates, hasFindings, hasInvestigation]);
+
   if (generating && !story) {
     const timeoutSec = Math.round(llmTimeoutMs / 1000);
     const timeoutLabel = timeoutSec < 60 ? `${timeoutSec}s` : `${Math.round(timeoutSec / 60)} min`;
@@ -215,25 +236,6 @@ export const StoryPage = () => {
       </div>
     );
   }
-
-  // Build the in-page nav from the sections actually rendered below, so it never lists a section
-  // the page conditionally hid (no timeline data, no findings, etc.).
-  const hasTraffic = !loadingTimeline && timelineData.length > 0;
-  const hasAggregates = !!story.aggregates;
-  const hasFindings = !!story.findings && story.findings.length > 0;
-  const hasInvestigation = !!story.investigationSteps && story.investigationSteps.length > 0;
-  // Memoized so StorySectionNav's IntersectionObserver isn't torn down and rebuilt on every
-  // StoryPage re-render (answers/timeline/granularity state) — which would flicker the active id.
-  const navSections: StorySection[] = useMemo(() => [
-    { id: 'story-info', label: 'How it works', icon: 'bi-info-circle' },
-    { id: 'story-confirmed', label: 'Investigation summary', icon: 'bi-clipboard2-check' },
-    { id: 'story-chat', label: 'Ask the LLM', icon: 'bi-chat-dots' },
-    ...(hasTraffic ? [{ id: 'story-traffic', label: 'Traffic over time', icon: 'bi-graph-up' }] : []),
-    ...(hasAggregates ? [{ id: 'story-aggregates', label: 'Traffic intelligence', icon: 'bi-diagram-3' }] : []),
-    ...(hasFindings ? [{ id: 'story-findings', label: 'Deterministic findings', icon: 'bi-shield-check' }] : []),
-    ...(hasInvestigation ? [{ id: 'story-investigation', label: 'LLM investigation', icon: 'bi-search' }] : []),
-    { id: 'story-narrative', label: 'Narrative', icon: 'bi-journal-text' },
-  ], [hasTraffic, hasAggregates, hasFindings, hasInvestigation]);
 
   // Clear the sticky app header (~112px) so a jumped-to section and the sticky sidebar aren't
   // hidden underneath it.
