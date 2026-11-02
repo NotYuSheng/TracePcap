@@ -1,8 +1,13 @@
+import { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { ProtocolStats } from '@/types';
 import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import './ProtocolBreakdownChart.css';
 import { formatBytes } from '@/utils/formatters';
+import { MAX_PIE_PROTOCOLS, OTHER_SLICE, toPieSlices } from './protocolPie';
+
+const TABLE_PAGE_SIZE = 10;
 
 interface ProtocolBreakdownChartProps {
   protocolStats: ProtocolStats[];
@@ -36,16 +41,29 @@ const COLORS = [
 ];
 
 export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChartProps) => {
-  // Format data for the pie chart
-  const chartData = protocolStats.map(stat => ({
-    name: stat.protocol,
-    value: stat.count,
-    percentage: stat.percentage,
-  }));
+  const [page, setPage] = useState(1);
 
+  const sortedStats = useMemo(
+    () => [...protocolStats].sort((a, b) => b.count - a.count),
+    [protocolStats]
+  );
+  const chartData = useMemo(() => toPieSlices(sortedStats), [sortedStats]);
+  const sliceColors = useMemo(
+    () => new Map(chartData.map((slice, index) => [slice.name, COLORS[index % COLORS.length]])),
+    [chartData]
+  );
+  const colorOf = (protocol: string) =>
+    sliceColors.get(protocol) ?? sliceColors.get(OTHER_SLICE) ?? COLORS[MAX_PIE_PROTOCOLS];
+
+  const totalPages = Math.ceil(sortedStats.length / TABLE_PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const pageStats = sortedStats.slice(
+    (currentPage - 1) * TABLE_PAGE_SIZE,
+    currentPage * TABLE_PAGE_SIZE
+  );
 
   // Legend rows depend on number of items; each row ≈ 24 px, ~3 items per row at typical widths.
-  const chartHeight = Math.max(300, 240 + Math.ceil(chartData.length / 3) * 24);
+  const chartHeight = Math.max(300, 280 + Math.ceil(chartData.length / 3) * 24);
 
   return (
     <div className="protocol-breakdown">
@@ -78,8 +96,8 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
                 fill="#8884d8"
                 dataKey="value"
               >
-                {chartData.map((_item, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                {chartData.map(slice => (
+                  <Cell key={slice.name} fill={colorOf(slice.name)} />
                 ))}
               </Pie>
               <Tooltip formatter={value => [`${value?.toLocaleString() || 0} packets`]} />
@@ -99,12 +117,12 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
               </tr>
             </thead>
             <tbody>
-              {protocolStats.map((stat, index) => (
+              {pageStats.map(stat => (
                 <tr key={stat.protocol}>
                   <td>
                     <span
                       className="protocol-indicator"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      style={{ backgroundColor: colorOf(stat.protocol) }}
                     ></span>
                     {stat.protocol}
                   </td>
@@ -116,7 +134,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
                         className="percentage-fill"
                         style={{
                           width: `${stat.percentage}%`,
-                          backgroundColor: COLORS[index % COLORS.length],
+                          backgroundColor: colorOf(stat.protocol),
                         }}
                       ></div>
                       <span className="percentage-text">{stat.percentage.toFixed(1)}%</span>
@@ -126,6 +144,17 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={sortedStats.length}
+              pageSize={TABLE_PAGE_SIZE}
+              onPageChange={setPage}
+              showPageSizeSelector={false}
+              compact
+            />
+          )}
         </div>
       </div>
     </div>
