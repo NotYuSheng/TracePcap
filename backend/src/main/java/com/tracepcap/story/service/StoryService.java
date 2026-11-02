@@ -1010,14 +1010,17 @@ public class StoryService {
     } catch (Exception e) {
       log.error("Failed to parse LLM response: {}", e.getMessage(), e);
       log.debug("LLM response content: {}", content);
-      throw new RuntimeException("Failed to parse LLM response: " + e.getMessage(), e);
+      throw new LlmException(
+          "The LLM's story could not be read: " + e.getMessage(),
+          e,
+          LlmException.ErrorCode.LLM_BAD_RESPONSE);
     }
   }
 
   /** Extract JSON from LLM response */
   private String extractJson(String content) {
     if (content == null || content.trim().isEmpty()) {
-      throw new RuntimeException("Empty LLM response");
+      throw new LlmException("Empty LLM response");
     }
 
     // Remove markdown code blocks if present
