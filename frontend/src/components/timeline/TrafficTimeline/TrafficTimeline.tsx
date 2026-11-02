@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { TimelineDataPoint } from '@/types';
 import { formatTimestamp, formatBytes, formatNumber } from '@/utils/formatters';
+import { OTHER_SERIES, selectProtocolSeries, toProtocolCounts } from './protocolSeries';
 
 const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
   { label: '1s', seconds: 1 },
@@ -26,7 +27,7 @@ const GRANULARITY_OPTIONS: { label: string; seconds: number }[] = [
   { label: '1d', seconds: 86400 },
 ];
 
-// Distinct colours for protocols — cycles if more than 12
+// Distinct colours for protocols, indexed by rank up to MAX_CHART_PROTOCOLS
 const PROTOCOL_COLORS = [
   '#0d6efd',
   '#198754',
@@ -38,13 +39,9 @@ const PROTOCOL_COLORS = [
   '#20c997',
   '#d63384',
   '#6c757d',
-  '#0dcaf0',
-  '#adb5bd',
 ];
 
-function protocolColor(index: number): string {
-  return PROTOCOL_COLORS[index % PROTOCOL_COLORS.length];
-}
+const OTHER_COLOR = '#adb5bd';
 
 /** Derive the effective bin interval (seconds) from the returned data. */
 function effectiveInterval(data: TimelineDataPoint[]): number | null {
@@ -117,18 +114,7 @@ export const TrafficTimeline = ({
     return secs !== null ? `Auto (${formatInterval(secs)})` : 'Auto';
   }, [data]);
 
-  // Collect all protocols across all bins, ordered by total packets descending
-  const allProtocols = useMemo(() => {
-    const totals: Record<string, number> = {};
-    data.forEach(point => {
-      Object.entries(point.protocols ?? {}).forEach(([proto, count]) => {
-        totals[proto] = (totals[proto] ?? 0) + count;
-      });
-    });
-    return Object.entries(totals)
-      .sort((a, b) => b[1] - a[1])
-      .map(([proto]) => proto);
-  }, [data]);
+  const protocolSeries = useMemo(() => selectProtocolSeries(data), [data]);
 
   // Build chart data: each bin gets a key per protocol (packets mode) or total bytes
   const chartData = useMemo(
@@ -136,15 +122,13 @@ export const TrafficTimeline = ({
       data.map(point => {
         const entry: Record<string, number | string> = { timestamp: point.timestamp };
         if (viewMode === 'packets') {
-          allProtocols.forEach(proto => {
-            entry[proto] = point.protocols?.[proto] ?? 0;
-          });
+          Object.assign(entry, toProtocolCounts(point, protocolSeries));
         } else {
           entry['bytes'] = point.bytes;
         }
         return entry;
       }),
-    [data, viewMode, allProtocols]
+    [data, viewMode, protocolSeries]
   );
 
   const xAxisTickFormatter = useMemo(() => {
@@ -224,15 +208,23 @@ export const TrafficTimeline = ({
           {viewMode === 'packets' ? (
             <>
               <Legend />
-              {allProtocols.map((proto, i) => (
+              {protocolSeries.protocols.map((proto, i) => (
                 <Bar
                   key={proto}
                   dataKey={proto}
                   stackId="a"
-                  fill={protocolColor(i)}
+                  fill={PROTOCOL_COLORS[i]}
                   isAnimationActive={false}
                 />
               ))}
+              {protocolSeries.hasOther && (
+                <Bar
+                  dataKey={OTHER_SERIES}
+                  stackId="a"
+                  fill={OTHER_COLOR}
+                  isAnimationActive={false}
+                />
+              )}
             </>
           ) : (
             <Bar dataKey="bytes" fill="#0d6efd" isAnimationActive={false}>
@@ -247,7 +239,8 @@ export const TrafficTimeline = ({
       <div className="mt-3">
         <small className="text-muted">
           <strong>Tip:</strong> Hover over a bar to see the protocol breakdown for that time window.
-          Each colour represents a distinct protocol. Use granularity to zoom in or out.
+          Each colour represents a protocol, with the less common ones grouped as Other. Use
+          granularity to zoom in or out.
         </small>
       </div>
     </div>

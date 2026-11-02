@@ -1,5 +1,10 @@
-import { Badge, Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { useState } from 'react';
+import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import type { StoryAggregates, AsnEntry, ProtocolRiskEntry, BeaconCandidate } from '@/types';
+
+// A row per protocol, so a capture with many unknown ethertypes can produce hundreds of rows.
+const PROTOCOL_RISK_PAGE_SIZE = 10;
 
 function InfoPopover() {
   const popover = (
@@ -152,43 +157,88 @@ function TopAsnsTable({ entries }: { entries: AsnEntry[] }) {
 }
 
 function ProtocolRiskTable({ entries }: { entries: ProtocolRiskEntry[] }) {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   if (entries.length === 0) return null;
 
+  const query = search.trim().toLowerCase();
+  const matches = entries.filter(e => e.protocol.toLowerCase().includes(query));
+  const totalPages = Math.ceil(matches.length / PROTOCOL_RISK_PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const pageEntries = matches.slice(
+    (currentPage - 1) * PROTOCOL_RISK_PAGE_SIZE,
+    currentPage * PROTOCOL_RISK_PAGE_SIZE
+  );
+
   return (
-    <table className="table table-sm table-hover mb-0 small">
-      <thead>
-        <tr>
-          <th>Protocol</th>
-          <th className="text-end">Total</th>
-          <th className="text-end">At Risk</th>
-          <th style={{ width: '35%' }}></th>
-        </tr>
-      </thead>
-      <tbody>
-        {entries.map((e, i) => {
-          const pct = e.total > 0 ? (e.atRisk / e.total) * 100 : 0;
-          return (
-            <tr key={i}>
-              <td className="fw-medium">{e.protocol}</td>
-              <td className="text-end">{e.total.toLocaleString()}</td>
-              <td className={`text-end ${e.atRisk > 0 ? 'text-danger fw-semibold' : 'text-muted'}`}>
-                {e.atRisk.toLocaleString()}
-              </td>
-              <td>
-                {e.atRisk > 0 && (
-                  <div className="progress" style={{ height: '6px' }}>
-                    <div
-                      className={`progress-bar ${pct > 30 ? 'bg-danger' : 'bg-warning'}`}
-                      style={{ width: `${Math.min(pct, 100)}%` }}
-                    />
-                  </div>
-                )}
+    <>
+      {entries.length > PROTOCOL_RISK_PAGE_SIZE && (
+        <Form.Control
+          type="search"
+          size="sm"
+          className="mb-2"
+          placeholder="Search protocols…"
+          aria-label="Search protocols"
+          value={search}
+          onChange={e => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+      )}
+      <table className="table table-sm table-hover mb-0 small">
+        <thead>
+          <tr>
+            <th>Protocol</th>
+            <th className="text-end">Total</th>
+            <th className="text-end">At Risk</th>
+            <th style={{ width: '35%' }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {matches.length === 0 && (
+            <tr>
+              <td colSpan={4} className="text-muted text-center">
+                No protocols match your search.
               </td>
             </tr>
-          );
-        })}
-      </tbody>
-    </table>
+          )}
+          {pageEntries.map((e, i) => {
+            const pct = e.total > 0 ? (e.atRisk / e.total) * 100 : 0;
+            return (
+              <tr key={i}>
+                <td className="fw-medium">{e.protocol}</td>
+                <td className="text-end">{e.total.toLocaleString()}</td>
+                <td className={`text-end ${e.atRisk > 0 ? 'text-danger fw-semibold' : 'text-muted'}`}>
+                  {e.atRisk.toLocaleString()}
+                </td>
+                <td>
+                  {e.atRisk > 0 && (
+                    <div className="progress" style={{ height: '6px' }}>
+                      <div
+                        className={`progress-bar ${pct > 30 ? 'bg-danger' : 'bg-warning'}`}
+                        style={{ width: `${Math.min(pct, 100)}%` }}
+                      />
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={matches.length}
+          pageSize={PROTOCOL_RISK_PAGE_SIZE}
+          onPageChange={setPage}
+          showPageSizeSelector={false}
+          compact
+        />
+      )}
+    </>
   );
 }
 
