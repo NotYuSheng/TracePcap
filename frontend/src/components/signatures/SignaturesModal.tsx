@@ -1,8 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect } from 'react';
 import { Button, ButtonGroup, Form, Modal } from '@govtechsg/sgds-react';
-import { Alert } from '@components/common/Alert';
-import { apiClient } from '@/services/api/client';
+import { Link } from 'react-router-dom';
 import { ipOrgRuleService, type IpOrgRule } from '@/features/cluster/services/ipOrgRuleService';
 
 interface SignaturesModalProps {
@@ -12,44 +11,6 @@ interface SignaturesModalProps {
 
 export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
   const [activeTab, setActiveTab] = useState<'rules' | 'labels'>('rules');
-
-  // ── Detection Rules tab state ─────────────────────────────────────────────
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (!show || activeTab !== 'rules') return;
-    setLoading(true);
-    setError(null);
-    setSaved(false);
-    apiClient
-      .get<{ content: string }>('/signatures')
-      .then(r => setContent(r.data.content))
-      .catch(() => setError('Failed to load signatures file.'))
-      .finally(() => setLoading(false));
-  }, [show, activeTab]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
-    try {
-      const res = await apiClient.put<{ status?: string; error?: string }>('/signatures', { content });
-      if (res.data.error) {
-        setError(res.data.error);
-      } else {
-        setSaved(true);
-      }
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr?.response?.data?.error ?? 'Failed to save signatures file.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   // ── Network Labels tab state ──────────────────────────────────────────────
   const [rules, setRules] = useState<IpOrgRule[]>([]);
@@ -63,7 +24,8 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
   useEffect(() => {
     if (!show || activeTab !== 'labels') return;
     setRulesLoading(true);
-    ipOrgRuleService.list()
+    ipOrgRuleService
+      .list()
       .then(setRules)
       .catch(() => setAddError('Failed to load network labels.'))
       .finally(() => setRulesLoading(false));
@@ -134,40 +96,17 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
 
         {/* ── Detection Rules tab ─────────────────────────────────────── */}
         {activeTab === 'rules' && (
-          <>
-            <p className="text-muted small mb-3">
-              Edit <code>signatures.yml</code> to define custom detection rules. Matched rules appear as
-              risk flags alongside nDPI's built-in detections. Changes take effect on the next file
-              analysis — no restart required.
-              Use <code>payload_contains</code> for exact byte/ASCII matches, or{' '}
-              <code>payload_regex</code> for regular expression patterns (supports{' '}
-              <code>case_insensitive: true</code> per entry). Regex syntax errors are caught on save.
+          <div className="small">
+            <p>
+              Detection rules flag conversations that match them, alongside nDPI's built-in risk
+              flags. They now live in the database and are edited with a form, with a record of who
+              changed what, on the System page.
             </p>
-
-            {loading ? (
-              <div className="text-center py-4 text-muted">
-                <Spinner animation="border" size="sm" className="me-2" role="status" />
-                Loading…
-              </div>
-            ) : (
-              <Form.Control
-                as="textarea"
-                className="font-monospace"
-                rows={20}
-                value={content}
-                onChange={e => { setContent(e.target.value); setSaved(false); }}
-                spellCheck={false}
-                style={{ fontSize: '0.82rem', resize: 'vertical' }}
-              />
-            )}
-
-            {error && <Alert variant="danger" className="mt-2 py-2 small mb-0">{error}</Alert>}
-            {saved && (
-              <Alert variant="success" className="mt-2 py-2 small mb-0">
-                <i className="bi bi-check-circle me-1"></i>Saved — rules will apply on the next analysis.
-              </Alert>
-            )}
-          </>
+            <Link to="/system?tab=rules" className="btn btn-primary btn-sm" onClick={handleHide}>
+              <i className="bi bi-shield-check me-1" aria-hidden="true" />
+              Open detection rules
+            </Link>
+          </div>
         )}
 
         {/* ── Network Labels tab ──────────────────────────────────────── */}
@@ -187,7 +126,10 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                 Loading…
               </div>
             ) : rules.length === 0 ? (
-              <div className="text-muted small text-center py-3 border rounded mb-3" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}>
+              <div
+                className="text-muted small text-center py-3 border rounded mb-3"
+                style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}
+              >
                 No network labels defined yet. Add one below.
               </div>
             ) : (
@@ -203,7 +145,9 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                   {rules.map(r => (
                     <tr key={r.id}>
                       <td>{r.label}</td>
-                      <td><code>{r.cidr}</code></td>
+                      <td>
+                        <code>{r.cidr}</code>
+                      </td>
                       <td>
                         <Button
                           size="sm"
@@ -213,9 +157,15 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                           disabled={deletingId === r.id}
                           title="Delete"
                         >
-                          {deletingId === r.id
-                            ? <Spinner animation="border" size="sm" style={{ width: 12, height: 12 }} />
-                            : <i className="bi bi-trash" />}
+                          {deletingId === r.id ? (
+                            <Spinner
+                              animation="border"
+                              size="sm"
+                              style={{ width: 12, height: 12 }}
+                            />
+                          ) : (
+                            <i className="bi bi-trash" />
+                          )}
                         </Button>
                       </td>
                     </tr>
@@ -225,7 +175,10 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
             )}
 
             {/* Add form */}
-            <div className="border rounded p-3" style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}>
+            <div
+              className="border rounded p-3"
+              style={{ background: 'var(--tp-bg-subtle, #f8f9fa)' }}
+            >
               <div className="row g-2 align-items-end">
                 <div className="col">
                   <Form.Label className="small mb-1">Label</Form.Label>
@@ -234,7 +187,10 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                     type="text"
                     placeholder="e.g. Engineering Team"
                     value={newLabel}
-                    onChange={e => { setNewLabel(e.target.value); setAddError(null); }}
+                    onChange={e => {
+                      setNewLabel(e.target.value);
+                      setAddError(null);
+                    }}
                     onKeyDown={e => e.key === 'Enter' && handleAdd()}
                   />
                 </div>
@@ -245,20 +201,23 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
                     type="text"
                     placeholder="e.g. 10.0.1.0/24 or 10.0.1.5"
                     value={newCidr}
-                    onChange={e => { setNewCidr(e.target.value); setAddError(null); }}
+                    onChange={e => {
+                      setNewCidr(e.target.value);
+                      setAddError(null);
+                    }}
                     onKeyDown={e => e.key === 'Enter' && handleAdd()}
                   />
                 </div>
                 <div className="col-auto">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={handleAdd}
-                    disabled={adding}
-                  >
-                    {adding
-                      ? <Spinner animation="border" size="sm" />
-                      : <><i className="bi bi-plus-lg me-1" />Add</>}
+                  <Button size="sm" variant="primary" onClick={handleAdd} disabled={adding}>
+                    {adding ? (
+                      <Spinner animation="border" size="sm" />
+                    ) : (
+                      <>
+                        <i className="bi bi-plus-lg me-1" />
+                        Add
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -272,19 +231,6 @@ export function SignaturesModal({ show, onHide }: SignaturesModalProps) {
         <Button variant="outline-secondary" onClick={handleHide}>
           Close
         </Button>
-        {activeTab === 'rules' && (
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={loading || saving}
-          >
-            {saving ? (
-              <><Spinner animation="border" size="sm" className="me-1" role="status" />Saving…</>
-            ) : (
-              <><i className="bi bi-floppy me-1"></i>Save</>
-            )}
-          </Button>
-        )}
       </Modal.Footer>
     </Modal>
   );

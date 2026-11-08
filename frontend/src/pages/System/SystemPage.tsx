@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Container } from '@govtechsg/sgds-react';
 import { SystemSettingsTab } from '@components/settings/SettingsModal/SystemSettingsTab';
 import { env } from '@/config/env';
 import { useMe } from '@/features/me/useMe';
 import { AuditLogPanel } from './AuditLogPanel';
+import { DetectionRulesPanel } from './DetectionRulesPanel';
 import { PermissionsPanel } from './PermissionsPanel';
 
 /** The Keycloak admin console's user list for this realm. Keycloak is proxied same-origin by default. */
@@ -19,6 +20,7 @@ function keycloakUsersUrl(): string {
  */
 const TABS = [
   { key: 'settings', title: 'Settings' },
+  { key: 'rules', title: 'Detection rules' },
   { key: 'permissions', title: 'Permissions' },
   { key: 'audit', title: 'Audit log' },
   { key: 'users', title: 'Users' },
@@ -29,7 +31,12 @@ export function SystemPage() {
   const me = useMe();
   // Plain Bootstrap nav-tabs in the card header, as elsewhere in the app: the SGDS Tabs nav
   // doesn't render visibly in this theme.
-  const [tab, setTab] = useState<TabKey>('settings');
+  // The tab is in the URL (?tab=rules), so other pages can link straight to it.
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('tab');
+  const tab: TabKey = TABS.some(t => t.key === requested) ? (requested as TabKey) : 'settings';
+  const setTab = (key: TabKey) =>
+    setParams(key === 'settings' ? {} : { tab: key }, { replace: true });
   return (
     <Container className="py-4">
       <h2 className="mb-1">System</h2>
@@ -66,6 +73,7 @@ export function SystemPage() {
         </div>
         <Card.Body role="tabpanel" id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
           {tab === 'settings' && <SystemSettingsTab />}
+          {tab === 'rules' && <DetectionRulesPanel />}
           {tab === 'permissions' && <PermissionsPanel />}
           {tab === 'audit' && <AuditLogPanel />}
           {tab === 'users' &&

@@ -111,4 +111,15 @@ class RuleCodecTest {
     assertThat(RuleCodec.parseYaml("")).isEmpty();
     assertThat(RuleCodec.parseYaml("signatures:\n")).isEmpty();
   }
+
+  @Test
+  void theRepositorysSampleRulesFileImportsCleanly() throws Exception {
+    // docs/sample-files.rst tells people to import it; it must pass the editor's validation.
+    String sample = java.nio.file.Files.readString(java.nio.file.Path.of("..", "signatures.sample.yml"));
+    var parsed = RuleCodec.parseYaml(sample);
+    assertThat(parsed).isNotEmpty();
+    for (var p : parsed) {
+      assertThat(RuleCodec.validate(p.rule())).as(p.rule().getName()).isEmpty();
+    }
+  }
 }

@@ -217,32 +217,34 @@ Standard values: ``ROUTER``, ``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``,
 
 Custom strings are accepted (e.g. ``"PLC"``, ``"CCTV Camera"``).
 
-Editing Rules at Runtime
--------------------------
+Editing Rules
+-------------
 
-Rules can be edited without restarting TracePcap:
+Rules live in the database and are edited on the **System** page, under
+**Detection rules**, with a form rather than YAML (see
+:doc:`../features/custom-signatures`). The YAML format on this page is what
+**Export** writes and **Import** reads, so rules can be kept in version
+control or moved between air-gapped installs. A changed rule applies from
+the next analysis.
 
-1. Navigate to **Custom Detection Rules** in the navbar.
-2. Edit the YAML in the browser editor.
-3. Click **Save**.
-4. Re-analyse or upload a new PCAP — the updated rules are applied immediately.
-
-Alternatively, edit ``/app/config/signatures.yml`` directly inside the backend
-container. The file is read fresh on every analysis run.
+Besides the fields above, an exported rule carries ``enabled: false`` when
+it's switched off.
 
 Validating Rules
 ----------------
 
-The browser editor performs two levels of validation on save:
+The editor and **Import** check every rule before saving:
 
-1. **YAML syntax** — the file must be valid YAML.
-2. **Regex syntax** — every ``payload_regex`` pattern is compiled and any
-   invalid pattern returns an inline error identifying the rule name and
-   pattern index (e.g. ``Rule "my_rule": invalid regex at payload_regex[0]: …``).
+- a rule needs at least one match field or payload pattern;
+- ``severity`` is ``low``, ``medium``, ``high`` or ``critical``;
+- ``ip`` and ``cidr`` are valid IPv4 or IPv6 addresses and ranges;
+- ports are 0 to 65535, and a JA3 hash is 32 hex characters;
+- each ``payload_contains`` entry has exactly one of ``ascii`` or ``hex``, and
+  hex is whole bytes;
+- every ``payload_regex`` pattern compiles.
 
-Semantic errors (e.g. invalid severity, malformed CIDR) are reported in the
-backend logs:
+Each problem is reported against its field, for example
+``payloadRegex[0].pattern``, or, for an import,
+``rules[3] (my_rule).payloadRegex[0].pattern``. An import with any problem
+imports nothing.
 
-.. code-block:: bash
-
-   docker compose logs -f tracepcap-backend

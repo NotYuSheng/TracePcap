@@ -6,7 +6,10 @@ TracePcap holds three things that cannot be regenerated:
 - **PostgreSQL** — analysis results, conversations, monitor snapshots, and every
   human-entered label or override.
 - **MinIO** — the raw PCAP objects.
-- **config volume** — ``signatures.yml``, your custom detection rules.
+- **config volume** — only the old ``signatures.yml``, if you upgraded from a
+  version that kept detection rules there. Rules now live in PostgreSQL.
+  Restoring an old ``signatures.yml`` doesn't re-import it; use **Import** on
+  the System page's **Detection rules** tab.
 
 ``scripts/backup.sh`` captures all three into one timestamped archive, and
 ``scripts/restore.sh`` puts them back.
@@ -234,8 +237,9 @@ The individual commands, if you need to do something the scripts do not cover:
    docker exec tracepcap-minio mc mirror minio/tracepcap-files ./backup-pcaps/
    docker exec tracepcap-minio mc mirror ./backup-pcaps/ minio/tracepcap-files
 
-   # Signature rules
-   docker cp tracepcap-backend:/app/config/signatures.yml ./signatures.yml.bak
+   # Detection rules are in PostgreSQL (above). For a portable copy, use
+   # System > Detection rules > Export, or:
+   curl -o detection-rules.yml http://localhost/api/v1/detection-rules/export
 
 Export Options
 --------------

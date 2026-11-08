@@ -112,6 +112,10 @@ export const API_ENDPOINTS = {
   PERMISSIONS: '/permissions',
   PERMISSION: (action: string) => `/permissions/${action}`,
   AUDIT_LOG: '/audit-log',
+  DETECTION_RULES: '/detection-rules',
+  DETECTION_RULE: (id: string) => `/detection-rules/${id}`,
+  DETECTION_RULES_EXPORT: '/detection-rules/export',
+  DETECTION_RULES_IMPORT: '/detection-rules/import',
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,

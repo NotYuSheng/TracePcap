@@ -1,7 +1,7 @@
 Custom Signature Rules
 ======================
 
-TracePcap supports user-defined YAML detection rules that are matched against
+TracePcap supports user-defined detection rules that are matched against
 every conversation after nDPI analysis. Matched rule names appear as
 color-coded badges in the Conversations tab and Overview, alongside nDPI's
 built-in detections.
@@ -9,24 +9,56 @@ built-in detections.
 How It Works
 ------------
 
-Rules are stored inside a Docker named volume (``config_data``) at
-``/app/config/signatures.yml`` inside the backend container. The file is
-reloaded on every analysis run — **no restart is required** after editing.
+Rules are stored in the **database**, as global rules that apply to every
+capture. They're edited on the **System** page, under **Detection rules**
+(the **Custom Detection Rules** button in the header links there too).
 
-Click **Custom Detection Rules** in the navbar to open a modal with two tabs:
+- **Add rule** opens a form: name, severity, description, the match fields,
+  and payload patterns. Fields are checked as you type, and anything the
+  server rejects (a CIDR that isn't one, a regex that doesn't compile) is
+  shown next to its field.
+- Each rule has an **on/off switch**, so a rule can be paused without losing
+  it, and shows who last changed it, when, and its version.
+- Edits take effect on the **next analysis**. Captures that were already
+  analysed keep the matches they had; re-applying rules to them is coming
+  in #925.
+- **Who can edit** is a permission (*Edit global detection rules*, analysts by
+  default; see :ref:`settings-permissions`). Everyone can view the rules.
+- Every create, edit and delete is recorded in the **audit log**, with the
+  rule before and after.
 
-- **Detection Rules** — the built-in YAML editor for ``signatures.yml``.
-  Changes are saved immediately and take effect on the next analysis run.
-- **Network Labels** — define CIDR-to-label mappings used in the Network
-  Visualization grouping mode (see `Network Labels`_ below).
+**Export** downloads every rule as a YAML file, in the format below.
+**Import** reads such a file, or an old ``signatures.yml``: rules are matched
+to existing ones by name, and *Replace* also deletes rules the file doesn't
+contain. If any rule in the file is invalid, nothing is imported, and every
+problem is listed. Export and import are for backups and for moving rules
+between installs; the database is what TracePcap uses.
+
+**Upgrading from ``signatures.yml``.** Earlier versions kept the rules in a
+file in the ``config_data`` volume. On the first start after upgrading,
+TracePcap imports that file once. A rule the editor would reject (for
+example a regex that doesn't compile) is imported **disabled**, with the
+reason in its description, so nothing is lost and nothing starts matching
+differently. The audit log records the import. If you had pointed
+``SIGNATURES_PATH`` at a different file, import it with **Import** instead.
+
+The **Network Labels** tab of the **Custom Detection Rules** dialog defines
+CIDR-to-label mappings used in the Network Visualization grouping mode (see
+`Network Labels`_ below).
 
 .. _Network Labels:
 
 .. tip::
 
-   ``signatures.sample.yml`` in the repository root is a reference template
-   covering every match field with annotated examples. Paste it into the
-   browser editor to get started, then modify to suit your environment.
+   ``signatures.sample.yml`` in the repository root covers every match field
+   with annotated examples. Import it from **Detection rules** to get
+   started, then adjust the rules to your environment.
+
+.. note::
+
+   ``device_type`` (setting a matched host's device type) is still honoured
+   for existing rules, but can't be set in the editor any more. Device types
+   are moving to classification signals (#926).
 
 Rule Format
 -----------
@@ -253,7 +285,7 @@ For a deep-dive rule authoring guide, see :doc:`../configuration/signature-rules
 Network Labels
 --------------
 
-The **Network Labels** tab (in the same **Custom Detection Rules** modal) maps
+The **Network Labels** tab (in the **Custom Detection Rules** dialog) maps
 individual IP addresses or CIDR ranges to human-readable organisation labels.
 These labels are used as a grouping strategy in the **Network Visualization**
 — enabling you to cluster nodes by network segment rather than by ASN or
