@@ -48,6 +48,38 @@ services:
     networks:
       - tracepcap-network
 
+  # One-shot volume-ownership repair (#854). The Chainguard image runs MinIO as UID 65532, but a
+  # minio_data volume created by the old quay.io image (any install from before #838) is owned by
+  # root, so MinIO cannot write to it and crash-loops with "file access denied". This runs as root
+  # before minio starts and hands the volume to 65532 — only when something in it is not already
+  # owned that way, so on a healthy volume it is a read-only walk. It reuses the minio image so an
+  # air-gapped host needs nothing beyond the offline bundle. `network_mode: none`: it touches only
+  # the volume.
+  minio-volume-perms:
+    image: cgr.dev/chainguard/minio:latest-dev
+    container_name: tracepcap-minio-volume-perms
+    user: "0:0"
+    network_mode: none
+    deploy:
+      resources:
+        limits:
+          cpus: ${MINIO_INIT_CPU_LIMIT:-0.5}
+          memory: ${MINIO_INIT_MEM_LIMIT:-128m}
+    volumes:
+      - minio_data:/data
+    # `$$` escapes `$` from Compose interpolation so the container's shell expands it.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        if [ -n "$$(find /data \( ! -user 65532 -o ! -group 65532 \) -print | head -n 1)" ]; then
+          echo "minio_data has entries not owned by 65532:65532 (fresh volume, or one from the pre-#838 image); fixing"
+          chown -R 65532:65532 /data
+        else
+          echo "minio_data ownership OK"
+        fi
+
   # MinIO Object Storage
   # Image source: Chainguard (cgr.dev/chainguard/minio), NOT Docker Hub or quay.io. In 2026 MinIO
   # removed its community images from every public registry — `minio/minio` was deleted from Docker
@@ -64,6 +96,9 @@ services:
     container_name: tracepcap-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
+    depends_on:
+      minio-volume-perms:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
