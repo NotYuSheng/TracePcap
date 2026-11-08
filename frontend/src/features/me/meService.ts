@@ -45,6 +45,23 @@ export interface AuditLogEntry {
   after?: Record<string, unknown> | null;
 }
 
+/** Mirrors PagedResponse. */
+export interface Paged<T> {
+  data: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 export const meService = {
   getMe: async (): Promise<Me> => (await apiClient.get<Me>(API_ENDPOINTS.ME)).data,
+  setPermissionLevel: async (action: PermissionAction, level: PermissionLevel): Promise<Permission> =>
+    (await apiClient.put<Permission>(API_ENDPOINTS.PERMISSION(action), { level })).data,
+  getAuditLog: async (page: number, pageSize: number, search?: string): Promise<Paged<AuditLogEntry>> =>
+    (
+      await apiClient.get<Paged<AuditLogEntry>>(API_ENDPOINTS.AUDIT_LOG, {
+        params: { page, pageSize, ...(search ? { search } : {}) },
+      })
+    ).data,
 };

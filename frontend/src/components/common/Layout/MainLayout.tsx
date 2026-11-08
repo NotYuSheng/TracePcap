@@ -95,6 +95,7 @@ export const MainLayout = () => {
   const isDark = useResolvedDark(themeMode);
   const location = useLocation();
   const isMonitorActive = location.pathname.startsWith('/monitor');
+  const isSystemActive = location.pathname.startsWith('/system');
 
   // Keeps the shared Escape coordinator alive for the whole session (#535).
   useEscapeLayerRoot();
@@ -116,7 +117,7 @@ export const MainLayout = () => {
       </div>
     );
 
-  const isAnalyseActive = !isMonitorActive;
+  const isAnalyseActive = !isMonitorActive && !isSystemActive;
 
   return (
     <div className="main-layout">
@@ -141,6 +142,9 @@ export const MainLayout = () => {
                 </Nav.Link>
                 <Nav.Link as={Link} to="/monitor" active={isMonitorActive}>
                   <i className="bi bi-activity me-1"></i>Monitor
+                </Nav.Link>
+                <Nav.Link as={Link} to="/system" active={isSystemActive}>
+                  <i className="bi bi-sliders me-1" aria-hidden="true"></i>System
                 </Nav.Link>
               </Nav>
 
