@@ -608,10 +608,11 @@ rebuild (``docker compose up -d --build``).
        **disables** the cap and loads every conversation — this may cause
        browser slowdowns or out-of-memory errors on large captures.
    * - ``APP_VERSION``
-     - ``dev``
+     - the ``APP_VERSION`` file
      - Version string rendered in the app footer (passed as the
-       ``VITE_APP_VERSION`` build arg). In CI this is set from
-       ``git describe --tags``.
+       ``VITE_APP_VERSION`` build arg). When unset, the build reads the
+       ``APP_VERSION`` file at the repo root, which CI rewrites on every merge
+       to ``dev``. GHCR images set it from ``git describe --tags``.
 
 Database Configuration (internal)
 ----------------------------------
