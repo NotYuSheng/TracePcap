@@ -44,9 +44,18 @@ public class SubnetService {
    */
   public List<SubnetDefinitionDto> list(UUID networkId) {
     if (networkId == null) return list();
+    java.util.Set<String> defaultCidrs =
+        subnetRepo.findByNetworkIdIsNullOrderByCidr().stream().map(SubnetDefinitionEntity::getCidr).collect(Collectors.toSet());
     return effective(networkId).stream()
         .sorted(Comparator.comparing(SubnetDefinitionEntity::getCidr))
-        .map(e -> toDto(e, networkId))
+        .map(e -> {
+          SubnetDefinitionDto d = toDto(e, networkId);
+          // Where the row comes from, so a network's views edit the right layer.
+          boolean own = networkId.equals(e.getNetworkId());
+          d.setScope(own ? "network" : "default");
+          d.setOverridesDefault(own && defaultCidrs.contains(e.getCidr()));
+          return d;
+        })
         .toList();
   }
 
@@ -66,16 +75,20 @@ public class SubnetService {
     return subnetRepo.findById(id);
   }
 
-  /** Creates or updates a subnet of the shared default. */
+  /** Creates or updates a subnet of the shared default. Needs ADDRESS_DEFAULTS; audited. */
   @Transactional
   public SubnetDefinitionDto upsert(UpsertSubnetRequest req) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     String cidr = normaliseCidr(req.getCidr());
     SubnetDefinitionEntity entity =
         subnetRepo
             .findByCidrAndNetworkIdIsNull(cidr)
             .orElseGet(
                 () -> SubnetDefinitionEntity.builder().cidr(cidr).source("MANUAL").build());
-    return save(entity, req);
+    SubnetDefinitionDto before = entity.getId() == null ? null : toDto(entity, null);
+    SubnetDefinitionDto after = save(entity, req);
+    auditLog.record("subnet.default.set", "subnet", cidr, before, after);
+    return after;
   }
 
   private SubnetDefinitionDto save(SubnetDefinitionEntity entity, UpsertSubnetRequest req) {
@@ -109,9 +122,10 @@ public class SubnetService {
     return toDto(entity, networkId);
   }
 
-  /** Persists an auto-detected subnet into the shared default. */
+  /** Persists an auto-detected subnet into the shared default. Needs ADDRESS_DEFAULTS; audited. */
   @Transactional
   public SubnetDefinitionDto saveDetected(UpsertSubnetRequest req) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     String cidr = normaliseCidr(req.getCidr());
     SubnetDefinitionEntity entity =
         subnetRepo
@@ -120,13 +134,26 @@ public class SubnetService {
     if (req.getLabel() != null) entity.setLabel(req.getLabel());
     if (req.getDescription() != null) entity.setDescription(req.getDescription());
     entity.setConfirmed(req.isConfirmed());
-    return toDto(subnetRepo.save(entity), req.getNetworkId());
+    SubnetDefinitionDto saved = toDto(subnetRepo.save(entity), req.getNetworkId());
+    auditLog.record("subnet.default.set", "subnet", cidr, null, saved);
+    return saved;
   }
 
-  /** Deletes a subnet of the shared default. A network's entries are removed through the network. */
+  /**
+   * Deletes a subnet of the shared default (a network's entries are removed through the network).
+   * Needs ADDRESS_DEFAULTS; audited.
+   */
   @Transactional
   public void delete(Long id) {
-    subnetRepo.findById(id).filter(e -> e.getNetworkId() == null).ifPresent(subnetRepo::delete);
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
+    subnetRepo
+        .findById(id)
+        .filter(e -> e.getNetworkId() == null)
+        .ifPresent(e -> {
+          SubnetDefinitionDto before = toDto(e, null);
+          subnetRepo.delete(e);
+          auditLog.record("subnet.default.delete", "subnet", e.getCidr(), before, null);
+        });
   }
 
   // ── A network's entries (#915 phase 4) ──────────────────────────────────────

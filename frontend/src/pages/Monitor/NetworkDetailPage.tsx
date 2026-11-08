@@ -10,6 +10,7 @@ import { IpDriftPanel } from '@/components/monitor/IpDriftPanel/IpDriftPanel';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import { NetworkSettingsModal } from '@/components/monitor/NetworkSettingsModal/NetworkSettingsModal';
 import { NetworkRulesModal } from '@/features/detectionRules/NetworkRulesModal';
+import { NetworkAddressConfigModal } from '@/features/networkAddress/NetworkAddressConfigModal';
 import { SubnetsPanel } from '@/components/monitor/SubnetsPanel/SubnetsPanel';
 import { BaselineDefinitionPanel } from '@/components/monitor/BaselineDefinitionPanel/BaselineDefinitionPanel';
 import { ExternalEventsPanel } from '@/components/monitor/ExternalEventsPanel/ExternalEventsPanel';
@@ -37,6 +38,7 @@ export const NetworkDetailPage = () => {
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAddresses, setShowAddresses] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
   const navSections: SectionDef[] = [
@@ -113,6 +115,14 @@ export const NetworkDetailPage = () => {
               onClick={() => setShowRules(true)}
             >
               <i className="bi bi-shield-check me-1" aria-hidden="true"></i>Detection rules
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => setShowAddresses(true)}
+            >
+              <i className="bi bi-diagram-3 me-1" aria-hidden="true"></i>Addresses
             </Button>
             <Button
               type="button"
@@ -219,7 +229,7 @@ export const NetworkDetailPage = () => {
                   </h6>
                 </Card.Header>
                 <Card.Body style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                  <IpDriftPanel snapshots={snapshots} subnets={subnets} settings={network.settings} />
+                  <IpDriftPanel networkId={networkId} snapshots={snapshots} subnets={subnets} settings={network.settings} />
                 </Card.Body>
               </Card>
             </Col>
@@ -306,6 +316,7 @@ export const NetworkDetailPage = () => {
                 snapshots={snapshots}
                 onSaved={data.handleSubnetSaved}
                 onDeleted={data.handleSubnetDeleted}
+                onChanged={() => reload(false)}
               />
             </Card.Body>
           </Card>
@@ -407,6 +418,15 @@ export const NetworkDetailPage = () => {
           networkId={network.id}
           networkName={network.name}
           onHide={() => setShowRules(false)}
+        />
+      )}
+      {network && (
+        <NetworkAddressConfigModal
+          show={showAddresses}
+          networkId={network.id}
+          networkName={network.name}
+          onHide={() => setShowAddresses(false)}
+          onChanged={() => reload(false)}
         />
       )}
       <NetworkSettingsModal

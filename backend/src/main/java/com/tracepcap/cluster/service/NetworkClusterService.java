@@ -67,6 +67,15 @@ public class NetworkClusterService {
   // ── Public API ────────────────────────────────────────────────────────────
 
   public ClusterGraphResponse computeClusters(UUID fileId, String groupBy, ConversationFilterParams filterParams, List<String> networkLabels) {
+    return computeClusters(fileId, groupBy, filterParams, networkLabels, null);
+  }
+
+  /**
+   * As above, viewed in a network (#915 phase 4b): that network's IP-org rules and private/public
+   * ranges (its own entries layered on the default). A null network uses the default.
+   */
+  public ClusterGraphResponse computeClusters(
+      UUID fileId, String groupBy, ConversationFilterParams filterParams, List<String> networkLabels, UUID networkId) {
     log.info("Computing {} clusters for file {}", groupBy, fileId);
     List<ConversationFacts> conversations =
         conversationLookup.conversationFacts(
@@ -80,7 +89,7 @@ public class NetworkClusterService {
     Set<String> labelledIps = new HashSet<>();
     List<IpOrgRuleEntity> netLabelRules = List.of();
     if (networkLabels != null && !networkLabels.isEmpty()) {
-      List<IpOrgRuleEntity> allRules = ipOrgRuleService.loadRules();
+      List<IpOrgRuleEntity> allRules = ipOrgRuleService.loadRules(networkId);
       netLabelRules = allRules.stream()
           .filter(r -> networkLabels.contains(r.getLabel()))
           .collect(Collectors.toList());
@@ -122,12 +131,12 @@ public class NetworkClusterService {
       hostClassificationLookup.hostFacts(fileId).forEach(h -> deviceByIp.put(h.ip(), h));
     }
     List<IpOrgRuleEntity> orgRules = "customOrg".equals(groupBy)
-        ? ipOrgRuleService.loadRules()
+        ? ipOrgRuleService.loadRules(networkId)
         : List.of();
 
     // Resolved once, next to orgRules and for the same reason: the loop below asks about every
     // IP in the capture, and currentRules() reads the operator's ranges from the database.
-    LocalityRules locality = localityPolicy.currentRules();
+    LocalityRules locality = localityPolicy.currentRules(networkId, null);
 
     // Map each IP to its cluster key
     Map<String, String> ipToCluster = new HashMap<>();

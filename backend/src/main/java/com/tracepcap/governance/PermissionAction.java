@@ -14,6 +14,8 @@ public enum PermissionAction {
       "Rules that apply to a single capture."),
   HOST_OCCUPANCY(PermissionLevel.ANALYST, "Split or merge a host's devices",
       "Correct where one device ends and the next begins on an address in a capture."),
+  ADDRESS_DEFAULTS(PermissionLevel.ANALYST, "Edit address defaults",
+      "The shared subnet labels, internal/external ranges and organisations every network starts from."),
   NETWORK_SETTINGS(PermissionLevel.ANALYST, "Edit network settings",
       "Per-network settings such as when a device counts as no longer seen."),
   ANALYSIS_POLICY(PermissionLevel.ANALYST, "Edit analysis policy",

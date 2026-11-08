@@ -151,7 +151,13 @@ export interface WebServerDetail {
 }
 
 export const clusterApi = {
-  async getClusters(fileId: string, groupBy: GroupBy, filters?: IntelClusterFilters): Promise<ClusterGraphResponse> {
+  /** {@code networkId}: view in that network, with its IP-org rules and ranges (#915 phase 4). */
+  async getClusters(
+    fileId: string,
+    groupBy: GroupBy,
+    filters?: IntelClusterFilters,
+    networkId?: string,
+  ): Promise<ClusterGraphResponse> {
     // Start from the canonical endpoint (includes ?groupBy=X) and append extra filter params
     const base = API_ENDPOINTS.NETWORK_INTELLIGENCE_CLUSTERS(fileId, groupBy);
     const params = new URLSearchParams();
@@ -170,6 +176,7 @@ export const clusterApi = {
       if (filters.countries?.length) params.set('countries', filters.countries.join(','));
       if (filters.networkLabels?.length) params.set('networkLabels', filters.networkLabels.join(','));
     }
+    if (networkId) params.set('networkId', networkId);
     const qs = params.toString();
     const res = await apiClient.get<ClusterGraphResponse>(qs ? `${base}&${qs}` : base);
     return res.data;

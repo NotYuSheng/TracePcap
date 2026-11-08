@@ -20,6 +20,13 @@ export const API_ENDPOINTS = {
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   WINDOWS_LOGONS: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/windows-logons`,
+  /** A network's own address entries layered on the default (#915 phase 4). */
+  NETWORK_SUBNETS: (networkId: string) => `/monitor/networks/${networkId}/subnets`,
+  NETWORK_SUBNET: (networkId: string, subnetId: number) => `/monitor/networks/${networkId}/subnets/${subnetId}`,
+  NETWORK_PRIVATE_RANGES: (networkId: string) => `/monitor/networks/${networkId}/custom-private-ranges`,
+  NETWORK_PRIVATE_RANGE: (networkId: string, id: number) => `/monitor/networks/${networkId}/custom-private-ranges/${id}`,
+  NETWORK_ORG_RULES: (networkId: string) => `/monitor/networks/${networkId}/ip-org-rules`,
+  NETWORK_ORG_RULE: (networkId: string, id: number) => `/monitor/networks/${networkId}/ip-org-rules/${id}`,
   /** Which devices held an address when, and the analyst's split/merge decisions (#918). */
   HOST_OCCUPANCIES: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancies`,

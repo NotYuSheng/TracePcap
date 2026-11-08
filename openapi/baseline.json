@@ -3330,6 +3330,7 @@
               "DETECTION_RULES_NETWORK",
               "DETECTION_RULES_CAPTURE",
               "HOST_OCCUPANCY",
+              "ADDRESS_DEFAULTS",
               "NETWORK_SETTINGS",
               "ANALYSIS_POLICY",
               "RETENTION"
@@ -5117,6 +5118,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "View in this network: its IP-org rules and private/public ranges layered on the default (#915 phase 4)",
+            "in": "query",
+            "name": "networkId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6362,6 +6373,7 @@
         ]
       },
       "post": {
+        "description": "Adds it, or changes the classification of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "create_6",
         "requestBody": {
           "content": {
@@ -6385,7 +6397,7 @@
             "description": "OK"
           }
         },
-        "summary": "Add a custom private range",
+        "summary": "Set a custom private range in the shared default",
         "tags": [
           "Custom Private Ranges"
         ]
@@ -6393,6 +6405,7 @@
     },
     "/api/v1/custom-private-ranges/{id}": {
       "delete": {
+        "description": "Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "delete_8",
         "parameters": [
           {
@@ -6410,7 +6423,7 @@
             "description": "OK"
           }
         },
-        "summary": "Delete a custom private range",
+        "summary": "Delete a custom private range from the shared default",
         "tags": [
           "Custom Private Ranges"
         ]
@@ -8651,6 +8664,7 @@
         ]
       },
       "post": {
+        "description": "Adds it, or changes the label of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "create_3",
         "requestBody": {
           "content": {
@@ -8674,7 +8688,7 @@
             "description": "OK"
           }
         },
-        "summary": "Add an IP organization rule",
+        "summary": "Set an IP organization rule in the shared default",
         "tags": [
           "IP Org Rules"
         ]
@@ -8682,6 +8696,7 @@
     },
     "/api/v1/ip-org-rules/{id}": {
       "delete": {
+        "description": "Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "delete_4",
         "parameters": [
           {
@@ -8699,7 +8714,7 @@
             "description": "OK"
           }
         },
-        "summary": "Delete an IP organization rule",
+        "summary": "Delete an IP organization rule from the shared default",
         "tags": [
           "IP Org Rules"
         ]
@@ -10661,6 +10676,7 @@
                 "DETECTION_RULES_NETWORK",
                 "DETECTION_RULES_CAPTURE",
                 "HOST_OCCUPANCY",
+                "ADDRESS_DEFAULTS",
                 "NETWORK_SETTINGS",
                 "ANALYSIS_POLICY",
                 "RETENTION"
@@ -11006,6 +11022,7 @@
         ]
       },
       "post": {
+        "description": "Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "upsert_2",
         "requestBody": {
           "content": {
@@ -11029,7 +11046,7 @@
             "description": "OK"
           }
         },
-        "summary": "Create or update a subnet definition",
+        "summary": "Create or update a subnet in the shared default",
         "tags": [
           "Subnets"
         ]
@@ -11107,6 +11124,7 @@
     },
     "/api/v1/subnets/detected": {
       "post": {
+        "description": "Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "saveDetected",
         "requestBody": {
           "content": {
@@ -11130,7 +11148,7 @@
             "description": "OK"
           }
         },
-        "summary": "Persist an auto-detected subnet",
+        "summary": "Persist an auto-detected subnet in the shared default",
         "tags": [
           "Subnets"
         ]
@@ -11174,6 +11192,7 @@
     },
     "/api/v1/subnets/{id}": {
       "delete": {
+        "description": "Needs ADDRESS_DEFAULTS. Audited.",
         "operationId": "delete",
         "parameters": [
           {
@@ -11191,7 +11210,7 @@
             "description": "OK"
           }
         },
-        "summary": "Delete a subnet definition",
+        "summary": "Delete a subnet from the shared default",
         "tags": [
           "Subnets"
         ]

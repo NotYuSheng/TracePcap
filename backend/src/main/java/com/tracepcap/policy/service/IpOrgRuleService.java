@@ -56,24 +56,44 @@ public class IpOrgRuleService {
     return cidr;
   }
 
-  /** Adds a rule to the shared default. */
+  /**
+   * Sets the shared default's rule for a CIDR (adding it, or changing its label). Needs
+   * ADDRESS_DEFAULTS; audited.
+   */
+  @org.springframework.transaction.annotation.Transactional
   public IpOrgRuleDto create(IpOrgRuleDto dto) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     String cidr = validCidr(dto.getCidr());
     if (dto.getLabel() == null || dto.getLabel().isBlank()) throw new IllegalArgumentException("A label is required");
-    int prefixLength = parsePrefixLength(cidr);
-    IpOrgRuleEntity entity = IpOrgRuleEntity.builder()
-        .label(dto.getLabel().trim())
-        .cidr(cidr)
-        .prefixLength(prefixLength)
-        .createdAt(LocalDateTime.now())
-        .build();
+    IpOrgRuleEntity entity =
+        loadRules().stream()
+            .filter(e -> e.getCidr().equals(cidr))
+            .findFirst()
+            .orElseGet(() -> IpOrgRuleEntity.builder().cidr(cidr).build());
+    IpOrgRuleDto before = entity.getId() == null ? null : toDto(entity);
+    entity.setLabel(dto.getLabel().trim());
+    entity.setPrefixLength(parsePrefixLength(cidr));
+    entity.setCreatedAt(LocalDateTime.now());
     entity = repository.save(entity);
-    return IpOrgRuleDto.builder().id(entity.getId()).label(entity.getLabel()).cidr(entity.getCidr()).build();
+    IpOrgRuleDto after = toDto(entity);
+    auditLog.record("ip-org-rule.default.set", "ip-org-rule", cidr, before, after);
+    return after;
   }
 
-  /** Deletes a rule of the shared default. A network's entries are removed through the network. */
+  /**
+   * Deletes a rule of the shared default (a network's entries are removed through the network).
+   * Needs ADDRESS_DEFAULTS; audited.
+   */
+  @org.springframework.transaction.annotation.Transactional
   public void delete(Long id) {
-    repository.findById(id).filter(e -> e.getNetworkId() == null).ifPresent(repository::delete);
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
+    repository
+        .findById(id)
+        .filter(e -> e.getNetworkId() == null)
+        .ifPresent(e -> {
+          repository.delete(e);
+          auditLog.record("ip-org-rule.default.delete", "ip-org-rule", e.getCidr(), toDto(e), null);
+        });
   }
 
   /** The shared default, most specific first. Call once and pass the result to matchIp. */

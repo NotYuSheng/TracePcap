@@ -86,18 +86,28 @@ public class CustomPrivateRangeService {
     return cidr;
   }
 
-  /** Adds an entry to the shared default. */
+  /**
+   * Sets the shared default's entry for a CIDR (adding it, or changing its classification). Needs
+   * ADDRESS_DEFAULTS; audited.
+   */
+  @org.springframework.transaction.annotation.Transactional
   public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     String cidr = normaliseCidr(dto.getCidr());
     IpClassification classification = parseClassification(dto.getClassification());
-    CustomPrivateRangeEntity entity = CustomPrivateRangeEntity.builder()
-        .cidr(cidr)
-        .classification(classification)
-        .createdAt(LocalDateTime.now())
-        .build();
+    CustomPrivateRangeEntity entity =
+        loadRanges().stream()
+            .filter(e -> e.getCidr().equals(cidr))
+            .findFirst()
+            .orElseGet(() -> CustomPrivateRangeEntity.builder().cidr(cidr).build());
+    CustomPrivateRangeDto before = entity.getId() == null ? null : toDto(entity);
+    entity.setClassification(classification);
+    entity.setCreatedAt(LocalDateTime.now());
     entity = repository.save(entity);
     cidrCache.clear();
-    return toDto(entity);
+    CustomPrivateRangeDto after = toDto(entity);
+    auditLog.record("private-range.default.set", "private-range", cidr, before, after);
+    return after;
   }
 
   /** Defaults to PRIVATE for backward compatibility; rejects anything else. */
@@ -110,12 +120,20 @@ public class CustomPrivateRangeService {
     }
   }
 
-  /** Deletes an entry of the shared default. A network's entries are removed through the network. */
+  /**
+   * Deletes an entry of the shared default (a network's entries are removed through the network).
+   * Needs ADDRESS_DEFAULTS; audited.
+   */
+  @org.springframework.transaction.annotation.Transactional
   public void delete(Long id) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.ADDRESS_DEFAULTS);
     repository
         .findById(id)
         .filter(e -> e.getNetworkId() == null)
-        .ifPresent(repository::delete);
+        .ifPresent(e -> {
+          repository.delete(e);
+          auditLog.record("private-range.default.delete", "private-range", e.getCidr(), toDto(e), null);
+        });
     cidrCache.clear();
   }
 

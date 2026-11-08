@@ -52,7 +52,9 @@ public class NetworkClusterController {
       @Parameter(description = "Filter by payload content (ASCII or hex)") @RequestParam(required = false) String payloadContains,
       @Parameter(description = "Comma-separated device types") @RequestParam(required = false) String deviceTypes,
       @Parameter(description = "Comma-separated ISO 3166-1 alpha-2 country codes") @RequestParam(required = false) String countries,
-      @Parameter(description = "Comma-separated network label names (e.g. 'Office,DMZ')") @RequestParam(required = false) String networkLabels) {
+      @Parameter(description = "Comma-separated network label names (e.g. 'Office,DMZ')") @RequestParam(required = false) String networkLabels,
+      @Parameter(description = "View in this network: its IP-org rules and private/public ranges layered on the default (#915 phase 4)")
+          @RequestParam(required = false) UUID networkId) {
 
     log.info("GET /api/network/intelligence/{}/clusters?groupBy={}", fileId, groupBy);
 
@@ -72,7 +74,7 @@ public class NetworkClusterController {
         .countries(splitComma(countries))
         .build();
 
-    ClusterGraphResponse response = clusterService.computeClusters(fileId, groupBy, filterParams, splitComma(networkLabels));
+    ClusterGraphResponse response = clusterService.computeClusters(fileId, groupBy, filterParams, splitComma(networkLabels), networkId);
     return ResponseEntity.ok(response);
   }
 

@@ -708,6 +708,23 @@ class PipelineIntegrationTest {
       JsonNode reverted = find(rest.getForEntity(base + "/custom-private-ranges", JsonNode.class).getBody(), "10.250.0.0/16");
       assertThat(reverted.get("scope").asText()).isEqualTo("default");
       assertThat(reverted.get("classification").asText()).isEqualTo("PRIVATE");
+
+      // Default edits (#915 phase 4c) are audited, set-by-CIDR, and gated by ADDRESS_DEFAULTS.
+      assertThat(jdbc.queryForObject(
+              "SELECT count(*) FROM audit_log WHERE action = 'private-range.default.set' AND target_id = '10.250.0.0/16'",
+              Integer.class))
+          .isEqualTo(1);
+      JsonNode reset = rest.postForEntity("/api/v1/custom-private-ranges",
+          json("{\"cidr\":\"10.250.0.0/16\",\"classification\":\"PUBLIC\"}"), JsonNode.class).getBody();
+      assertThat(reset.get("id").asLong()).isEqualTo(rangeId); // updated, not duplicated
+      jdbc.update("INSERT INTO permissions (action, level, updated_by) VALUES ('ADDRESS_DEFAULTS', 'ADMIN', 'itest')");
+      try {
+        assertThat(rest.postForEntity("/api/v1/ip-org-rules",
+            json("{\"cidr\":\"10.252.0.0/16\",\"label\":\"X\"}"), JsonNode.class).getStatusCode())
+            .isEqualTo(HttpStatus.FORBIDDEN);
+      } finally {
+        jdbc.update("DELETE FROM permissions WHERE action = 'ADDRESS_DEFAULTS'");
+      }
     } finally {
       rest.delete("/api/v1/monitor/networks/" + net);
       rest.delete("/api/v1/custom-private-ranges/" + rangeId);

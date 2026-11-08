@@ -53,19 +53,19 @@ public class SubnetController {
   }
 
   @PostMapping
-  @Operation(summary = "Create or update a subnet definition")
+  @Operation(summary = "Create or update a subnet in the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<SubnetDefinitionDto> upsert(@RequestBody UpsertSubnetRequest req) {
     return ResponseEntity.ok(subnetService.upsert(req));
   }
 
   @PostMapping("/detected")
-  @Operation(summary = "Persist an auto-detected subnet")
+  @Operation(summary = "Persist an auto-detected subnet in the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<SubnetDefinitionDto> saveDetected(@RequestBody UpsertSubnetRequest req) {
     return ResponseEntity.ok(subnetService.saveDetected(req));
   }
 
   @DeleteMapping("/{id}")
-  @Operation(summary = "Delete a subnet definition")
+  @Operation(summary = "Delete a subnet from the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     subnetService.delete(id);
     return ResponseEntity.noContent().build();

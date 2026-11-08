@@ -7,6 +7,7 @@ import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import type { NetworkSnapshot, AbsentEntity } from '@/features/monitor/types/monitor.types';
 import type { SubnetDefinition } from '@/features/subnets/types/subnet.types';
+import { networkAddressService, type AddressEntry } from '@/features/networkAddress/networkAddressService';
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
 import type { CustomPrivateRange, IpClassification } from '@/features/cluster/types/customPrivateRange.types';
 import { isPrivateIp, ipInCidr, ipToInt } from '@/utils/ipClassification';
@@ -14,6 +15,8 @@ import { EntityDetailModal } from '@components/common/EntityDetailModal';
 import { Pagination } from '@components/common/Pagination/Pagination';
 
 interface IpDriftPanelProps {
+  /** The network: its ranges (own entries layered on the default, #915 phase 4) sort internal/external. */
+  networkId?: string;
   snapshots: NetworkSnapshot[];
   /** The network's inactivity rule (#488); defaults to today's behaviour. */
   settings?: NetworkSettings;
@@ -135,14 +138,25 @@ function IpBadgeGroup({
   );
 }
 
+/** A network's range entry as the drift panel's range shape, keeping where it comes from. */
+function toRange(e: AddressEntry): ScopedRange {
+  return { id: e.id, cidr: e.cidr, classification: e.classification ?? 'PRIVATE', scope: e.scope, overridesDefault: e.overridesDefault };
+}
+
+type ScopedRange = CustomPrivateRange & { scope?: 'default' | 'network'; overridesDefault?: boolean };
+
 function PrivateOverridesSection({
+  networkId,
   customRanges,
   onSaved,
   onDeleted,
+  onChanged,
 }: {
-  customRanges: CustomPrivateRange[];
+  networkId?: string;
+  customRanges: ScopedRange[];
   onSaved: (r: CustomPrivateRange) => void;
   onDeleted: (id: number) => void;
+  onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [cidr, setCidr] = useState('');
@@ -156,8 +170,13 @@ function PrivateOverridesSection({
     setAdding(true);
     setAddError(null);
     try {
-      const created = await customPrivateRangeService.create(trimmed, classification);
-      onSaved(created);
+      if (networkId) {
+        // In a network, this network's own entry (#915 phase 4); defaults are set in the System console.
+        await networkAddressService.put(networkId, 'custom-private-ranges', { cidr: trimmed, classification });
+        onChanged();
+      } else {
+        onSaved(await customPrivateRangeService.create(trimmed, classification));
+      }
       setCidr('');
       setClassification('PRIVATE');
     } catch (e: unknown) {
@@ -168,10 +187,19 @@ function PrivateOverridesSection({
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (r: ScopedRange) => {
     try {
-      await customPrivateRangeService.delete(id);
-      onDeleted(id);
+      if (!networkId) {
+        await customPrivateRangeService.delete(r.id);
+        onDeleted(r.id);
+      } else if (r.scope === 'network') {
+        await networkAddressService.revert(networkId, 'custom-private-ranges', r.id);
+        onChanged();
+      } else {
+        // The default's override: switch it off in this network only.
+        await networkAddressService.put(networkId, 'custom-private-ranges', { cidr: r.cidr, hidden: true });
+        onChanged();
+      }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: unknown } })?.response?.data;
       setAddError(typeof msg === 'string' ? msg : 'Failed to delete range');
@@ -202,6 +230,7 @@ function PrivateOverridesSection({
             Force an IP or CIDR to be treated as internal or external, overriding the automatic
             RFC1918 sort (e.g. a public address used by a private terminal, or a private range that
             is actually reached over the internet).
+            {networkId && <> Changes here apply to this network only; overrides for every network are set in the System console's address defaults.</>}
           </p>
           {customRanges.length > 0 && (
             <table className="table table-sm table-borderless mb-2">
@@ -217,13 +246,22 @@ function PrivateOverridesSection({
                         <i className={`bi bi-${r.classification === 'PUBLIC' ? 'globe' : 'house'} me-1`}></i>
                         {r.classification === 'PUBLIC' ? 'Public' : 'Private'}
                       </span>
+                      {r.scope === 'network' && (
+                        <span className="badge bg-primary ms-1" style={{ fontSize: '0.62rem' }}>
+                          {r.overridesDefault ? 'overridden here' : 'this network'}
+                        </span>
+                      )}
                     </td>
                     <td className="text-end py-1 pe-0">
                       <button
                         type="button"
                         className="btn btn-link btn-sm p-0 text-danger"
-                        onClick={() => handleDelete(r.id)}
-                        title="Remove override"
+                        onClick={() => handleDelete(r)}
+                        aria-label={
+                          !networkId || r.scope === 'network'
+                            ? `Remove the override for ${r.cidr}`
+                            : `Switch off the default override for ${r.cidr} in this network`
+                        }
                       >
                         <i className="bi bi-trash"></i>
                       </button>
@@ -270,7 +308,7 @@ function PrivateOverridesSection({
   );
 }
 
-export const IpDriftPanel = ({ snapshots, subnets = [], settings }: IpDriftPanelProps) => {
+export const IpDriftPanel = ({ networkId, snapshots, subnets = [], settings }: IpDriftPanelProps) => {
   const [selectedAbsent, setSelectedAbsent] = useState<AbsentEntity | null>(null);
   const [selectedIp, setSelectedIp] = useState<SelectedIp>(null);
   const [privateIps, setPrivateIps] = useState<EntityGroup>({ active: [], absent: [] });
@@ -284,9 +322,19 @@ export const IpDriftPanel = ({ snapshots, subnets = [], settings }: IpDriftPanel
   const latestFileId = latestSnap?.fileId ?? '';
   const latestStartTime = latestSnap?.startTime as unknown as string | null ?? null;
 
+  const [rangesKey, setRangesKey] = useState(0);
   useEffect(() => {
-    customPrivateRangeService.list().then(setCustomRanges).catch(() => {});
-  }, []);
+    let alive = true;
+    (networkId
+      ? networkAddressService
+          .list(networkId, 'custom-private-ranges')
+          .then(rows => networkAddressService.visible(rows).map(toRange))
+      : customPrivateRangeService.list()
+    )
+      .then(r => { if (alive) setCustomRanges(r); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [networkId, rangesKey]);
 
   useEffect(() => {
     if (sorted.length === 0) return;
@@ -478,9 +526,11 @@ export const IpDriftPanel = ({ snapshots, subnets = [], settings }: IpDriftPanel
         </small>
       )}
       <PrivateOverridesSection
+        networkId={networkId}
         customRanges={customRanges}
         onSaved={r => setCustomRanges(prev => [r, ...prev.filter(x => x.cidr !== r.cidr)])}
         onDeleted={id => setCustomRanges(prev => prev.filter(r => r.id !== id))}
+        onChanged={() => setRangesKey(k => k + 1)}
       />
       {selectedAbsent && (
         <EntityDetailModal

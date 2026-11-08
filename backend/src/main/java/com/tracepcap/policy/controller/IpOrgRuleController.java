@@ -25,7 +25,7 @@ public class IpOrgRuleController {
   }
 
   @PostMapping
-  @Operation(summary = "Add an IP organization rule")
+  @Operation(summary = "Set an IP organization rule in the shared default", description = "Adds it, or changes the label of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<?> create(@RequestBody IpOrgRuleDto dto) {
     if (dto.getLabel() == null || dto.getLabel().isBlank()) {
       return ResponseEntity.badRequest().body("Label is required");
@@ -41,7 +41,7 @@ public class IpOrgRuleController {
   }
 
   @DeleteMapping("/{id}")
-  @Operation(summary = "Delete an IP organization rule")
+  @Operation(summary = "Delete an IP organization rule from the shared default", description = "Needs ADDRESS_DEFAULTS. Audited.")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     service.delete(id);
     return ResponseEntity.noContent().build();

@@ -3,6 +3,7 @@ import { Card, Container } from '@govtechsg/sgds-react';
 import { SystemSettingsTab } from '@components/settings/SettingsModal/SystemSettingsTab';
 import { env } from '@/config/env';
 import { useMe } from '@/features/me/useMe';
+import { AddressDefaultsPanel } from './AddressDefaultsPanel';
 import { AuditLogPanel } from './AuditLogPanel';
 import { DetectionRulesPanel } from './DetectionRulesPanel';
 import { PermissionsPanel } from './PermissionsPanel';
@@ -21,6 +22,7 @@ function keycloakUsersUrl(): string {
 const TABS = [
   { key: 'settings', title: 'Settings' },
   { key: 'rules', title: 'Detection rules' },
+  { key: 'addresses', title: 'Address defaults' },
   { key: 'permissions', title: 'Permissions' },
   { key: 'audit', title: 'Audit log' },
   { key: 'users', title: 'Users' },
@@ -74,6 +76,7 @@ export function SystemPage() {
         <Card.Body role="tabpanel" id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
           {tab === 'settings' && <SystemSettingsTab />}
           {tab === 'rules' && <DetectionRulesPanel />}
+          {tab === 'addresses' && <AddressDefaultsPanel />}
           {tab === 'permissions' && <PermissionsPanel />}
           {tab === 'audit' && <AuditLogPanel />}
           {tab === 'users' &&
