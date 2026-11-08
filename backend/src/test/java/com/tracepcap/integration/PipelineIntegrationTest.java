@@ -824,6 +824,101 @@ class PipelineIntegrationTest {
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
   }
 
+  /**
+   * Rule sync (#925 phase 2): analysis records what it checked, a rule edit makes the capture
+   * stale, Re-apply brings it up to date, switching a rule off / renaming / deleting relabels at
+   * once, and a payload rule on a capture whose packets were pruned is "couldn't re-check".
+   */
+  @Test
+  void ruleSync_staleAfterEdit_reapplyFixes_labelsFollowRuleChanges() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "sync-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String r1 = createRule("{\"name\":\"" + tag + "-a\",\"severity\":\"high\",\"match\":{\"dstPort\":5999},"
+        + "\"payloadContains\":[{\"ascii\":\"" + tag + "\"}]}");
+
+    String fileId = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    assertThat(labels(fileId)).containsExactly(tag + "-a");
+    assertThat(ruleStatus(fileId).get("staleRules")).isEmpty();
+
+    // Editing what a rule matches leaves the old matches shown, but marks the capture stale.
+    putRule(r1, "{\"name\":\"" + tag + "-a\",\"severity\":\"critical\",\"match\":{\"dstPort\":5999},"
+        + "\"payloadContains\":[{\"ascii\":\"" + tag + "\"}]}");
+    String r2 = createRule("{\"name\":\"" + tag + "-b\",\"severity\":\"low\",\"match\":{\"protocol\":\"UDP\",\"dstPort\":5999}}");
+    JsonNode stale = ruleStatus(fileId);
+    assertThat(stale.get("staleRules").toString()).contains(tag + "-a").contains(tag + "-b");
+    assertThat(labels(fileId)).containsExactly(tag + "-a");
+    assertThat(rest.getForEntity("/api/v1/detection-rules/status", JsonNode.class).getBody().get("staleCaptures").asInt())
+        .isGreaterThanOrEqualTo(1);
+
+    // Re-apply to this capture.
+    ResponseEntity<JsonNode> job =
+        rest.postForEntity("/api/v1/rule-reapply-jobs", json("{\"fileId\":\"" + fileId + "\"}"), JsonNode.class);
+    assertThat(job.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(awaitJob(job.getBody().get("id").asText()).get("status").asText()).isEqualTo("DONE");
+    assertThat(ruleStatus(fileId).get("staleRules")).isEmpty();
+    assertThat(labels(fileId)).containsExactlyInAnyOrder(tag + "-a", tag + "-b");
+
+    // Switching a rule off hides its matches at once; on brings them back.
+    putRule(r2, "{\"name\":\"" + tag + "-b\",\"severity\":\"low\",\"enabled\":false,\"match\":{\"protocol\":\"UDP\",\"dstPort\":5999}}");
+    assertThat(labels(fileId)).containsExactly(tag + "-a");
+    // Renaming relabels at once (and, being an edit, makes it stale again).
+    putRule(r1, "{\"name\":\"" + tag + "-renamed\",\"severity\":\"critical\",\"match\":{\"dstPort\":5999},"
+        + "\"payloadContains\":[{\"ascii\":\"" + tag + "\"}]}");
+    assertThat(labels(fileId)).containsExactly(tag + "-renamed");
+
+    // Retention deleted the packets: the payload rule can't be re-checked, so its match is dropped.
+    jdbc.update("UPDATE files SET packets_pruned_at = now() WHERE id = ?::uuid", fileId);
+    awaitJob(
+        rest.postForEntity("/api/v1/rule-reapply-jobs", json("{\"fileId\":\"" + fileId + "\"}"), JsonNode.class)
+            .getBody().get("id").asText());
+    JsonNode afterPrune = ruleStatus(fileId);
+    assertThat(afterPrune.get("staleRules")).isEmpty();
+    assertThat(afterPrune.get("uncheckableRules").toString()).contains(tag + "-renamed");
+    assertThat(labels(fileId)).isEmpty();
+
+    // Deleting a rule removes its matches and its label.
+    putRule(r2, "{\"name\":\"" + tag + "-b\",\"severity\":\"low\",\"enabled\":true,\"match\":{\"protocol\":\"UDP\",\"dstPort\":5999}}");
+    assertThat(labels(fileId)).containsExactly(tag + "-b");
+    rest.exchange("/api/v1/detection-rules/" + r2, HttpMethod.DELETE, null, Void.class);
+    assertThat(labels(fileId)).isEmpty();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM rule_matches WHERE file_id = ?::uuid", Long.class, fileId)).isZero();
+
+    jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
+  private String createRule(String body) {
+    ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
+    assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    return r.getBody().get("id").asText();
+  }
+
+  private void putRule(String id, String body) {
+    assertThat(rest.exchange("/api/v1/detection-rules/" + id, HttpMethod.PUT, json(body), JsonNode.class).getStatusCode())
+        .isEqualTo(HttpStatus.OK);
+  }
+
+  private java.util.List<String> labels(String fileId) {
+    java.util.List<String> out = new java.util.ArrayList<>();
+    rest.getForEntity("/api/v1/conversations/" + fileId + "/custom-signatures", JsonNode.class)
+        .getBody()
+        .forEach(n -> out.add(n.asText()));
+    return out;
+  }
+
+  private JsonNode ruleStatus(String fileId) {
+    return rest.getForEntity("/api/v1/files/" + fileId + "/rule-status", JsonNode.class).getBody();
+  }
+
+  private JsonNode awaitJob(String jobId) throws InterruptedException {
+    for (int i = 0; i < 120; i++) {
+      JsonNode j = rest.getForEntity("/api/v1/rule-reapply-jobs/" + jobId, JsonNode.class).getBody();
+      if (!"RUNNING".equals(j.get("status").asText())) return j;
+      Thread.sleep(250);
+    }
+    throw new AssertionError("re-apply job " + jobId + " didn't finish");
+  }
+
   /** A one-packet pcap (UDP 10.99.0.1:40000 → 10.99.0.2:5999) whose payload is {@code payload}. */
   private static byte[] udpPcap(String payload) {
     byte[] data = payload.getBytes(java.nio.charset.StandardCharsets.US_ASCII);

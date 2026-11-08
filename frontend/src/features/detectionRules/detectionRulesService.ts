@@ -58,6 +58,29 @@ export interface RuleImportResult {
   duplicates: string[];
 }
 
+/** Mirrors RuleSyncStatusDto (#925 phase 2). */
+export interface RuleSyncStatus {
+  captures: number;
+  staleCaptures: number;
+  uncheckableCaptures: number;
+  staleRules: string[];
+  uncheckableRules: string[];
+}
+
+/** Mirrors RuleReapplyJobDto. */
+export interface ReapplyJob {
+  id: string;
+  fileId?: string | null;
+  status: 'RUNNING' | 'DONE' | 'FAILED' | 'INTERRUPTED';
+  total: number;
+  done: number;
+  failed: number;
+  error?: string | null;
+  requestedBy: string;
+  createdAt: string;
+  finishedAt?: string | null;
+}
+
 export function toInput(r: DetectionRule): DetectionRuleInput {
   return {
     name: r.name,
@@ -105,4 +128,16 @@ export const detectionRulesService = {
         mode,
       })
     ).data,
+  status: async (): Promise<RuleSyncStatus> =>
+    (await apiClient.get<RuleSyncStatus>(API_ENDPOINTS.DETECTION_RULES_STATUS)).data,
+  fileStatus: async (fileId: string): Promise<RuleSyncStatus> =>
+    (await apiClient.get<RuleSyncStatus>(API_ENDPOINTS.FILE_RULE_STATUS(fileId))).data,
+  /** Starts Re-apply for one capture, or every out-of-date one. Returns the running job if one is. */
+  startReapply: async (fileId?: string): Promise<ReapplyJob> =>
+    (await apiClient.post<ReapplyJob>(API_ENDPOINTS.RULE_REAPPLY_JOBS, fileId ? { fileId } : {}))
+      .data,
+  getJob: async (id: string): Promise<ReapplyJob> =>
+    (await apiClient.get<ReapplyJob>(API_ENDPOINTS.RULE_REAPPLY_JOB(id))).data,
+  recentJobs: async (): Promise<ReapplyJob[]> =>
+    (await apiClient.get<ReapplyJob[]>(API_ENDPOINTS.RULE_REAPPLY_JOBS)).data,
 };

@@ -499,7 +499,7 @@ public class AnalysisService {
     UUID fileId = run.fileId;
 
     Map<String, String> deviceOverrides =
-        signatureApplier.applySignatures(run.parseResult.getConversations());
+        signatureApplier.applySignatures(fileId, run.parseResult.getConversations());
 
     // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
     // (#512 slice 4); the adjudicator picks display winners with the same semantics the

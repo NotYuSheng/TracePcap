@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -72,6 +73,7 @@ public class CustomSignatureService implements SignatureApplier {
 
   // Nullable only for the reflective unit tests of the payload matchers, which never load rules.
   private final DetectionRuleRepository ruleRepository;
+  private final RuleSync ruleSync;
 
   /**
    * Evaluates all loaded rules against each conversation in a single pass: appends matched rule
@@ -94,19 +96,55 @@ public class CustomSignatureService implements SignatureApplier {
    *     device_type}; empty if there are none
    */
   @Override
-  public Map<String, String> applySignatures(List<PcapParserService.ConversationInfo> conversations) {
-    List<Map<String, Object>> rules = loadRules();
-    if (rules.isEmpty() || conversations.isEmpty()) return Map.of();
+  public Map<String, String> applySignatures(
+      UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
+    List<DetectionRuleEntity> rules =
+        ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL);
+    if (rules.isEmpty()) return Map.of();
 
+    // Same lock as Re-apply, so the two never write one capture's matches at once (#925).
+    ruleSync.lockFile(fileId);
+    Map<UUID, List<UUID>> matched = evaluate(conversations, rules);
+
+    // Label the conversations in rule order, as before; AnalysisService persists the labels.
+    Map<UUID, PcapParserService.ConversationInfo> byId = new HashMap<>();
+    for (PcapParserService.ConversationInfo c : conversations) byId.put(c.getEntityId(), c);
     int matchCount = 0;
+    for (DetectionRuleEntity rule : rules) {
+      for (UUID convId : matched.getOrDefault(rule.getId(), List.of())) {
+        PcapParserService.ConversationInfo conv = byId.get(convId);
+        if (conv != null && !conv.getCustomSignatures().contains(rule.getName())) {
+          conv.getCustomSignatures().add(rule.getName());
+          matchCount++;
+        }
+      }
+    }
+    // Record what was checked, at which versions, so a later rule edit shows this capture as stale.
+    ruleSync.replaceResults(fileId, rules, matched, List.of());
+    if (matchCount > 0) {
+      log.info("Custom signatures: {} match(es) across {} conversations", matchCount, conversations.size());
+    }
+    return computeDeviceTypeOverrides(toMaps(rules), conversations);
+  }
+
+  /**
+   * Which conversations each rule matches (#925): rule id → conversation ids. The matching itself
+   * is the same as it has always been; see the class comment for the fields. Shared by analysis
+   * and Re-apply. A payload rule reads the conversation's packets, so callers must not pass one
+   * for a capture whose packets were pruned.
+   */
+  public Map<UUID, List<UUID>> evaluate(
+      List<PcapParserService.ConversationInfo> conversations, List<DetectionRuleEntity> rules) {
+    Map<UUID, List<UUID>> result = new HashMap<>();
+    if (rules.isEmpty() || conversations.isEmpty()) return result;
+    List<Map<String, Object>> shaped = toMaps(rules);
     for (PcapParserService.ConversationInfo conv : conversations) {
       // Fetched at most once per conversation, only if some rule actually needs it — most
       // deployments have no payload_contains/payload_regex rules at all, and this is a database
       // round trip now that payloads live there instead of on ConversationInfo (#779).
       List<String> payloads = null;
-      for (Map<String, Object> rule : rules) {
-        String name = (String) rule.get("name");
-        if (name == null || name.isBlank()) continue;
+      for (int i = 0; i < shaped.size(); i++) {
+        Map<String, Object> rule = shaped.get(i);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> match = (Map<String, Object>) rule.get("match");
@@ -143,20 +181,16 @@ public class CustomSignatureService implements SignatureApplier {
           if (!payloadRegexMatch(payloads, payloadRegex, matchAll)) continue;
         }
 
-        if (!conv.getCustomSignatures().contains(name)) {
-          conv.getCustomSignatures().add(name);
-          matchCount++;
-        }
+        result.computeIfAbsent(rules.get(i).getId(), k -> new java.util.ArrayList<>()).add(conv.getEntityId());
       }
     }
-    if (matchCount > 0) {
-      log.info(
-          "Custom signatures: {} match(es) across {} conversations",
-          matchCount,
-          conversations.size());
-    }
+    return result;
+  }
 
-    return computeDeviceTypeOverrides(rules, conversations);
+  /** Whether a rule looks inside packets, and so can't be checked once they're pruned. */
+  public static boolean isPayloadRule(DetectionRuleEntity r) {
+    return (r.getPayloadContains() != null && !r.getPayloadContains().isEmpty())
+        || (r.getPayloadRegex() != null && !r.getPayloadRegex().isEmpty());
   }
 
   /**
@@ -195,11 +229,10 @@ public class CustomSignatureService implements SignatureApplier {
   // Internal helpers
   // -------------------------------------------------------------------------
 
-  /** The enabled global rules, each in the YAML-shaped map form the matcher reads. */
-  private List<Map<String, Object>> loadRules() {
-    List<Map<String, Object>> rules = new ArrayList<>();
-    for (DetectionRuleEntity e :
-        ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL)) {
+  /** Rules in the YAML-shaped map form the matcher reads. */
+  private static List<Map<String, Object>> toMaps(List<DetectionRuleEntity> rules) {
+    List<Map<String, Object>> out = new ArrayList<>(rules.size());
+    for (DetectionRuleEntity e : rules) {
       Map<String, Object> rule = new HashMap<>();
       rule.put("name", e.getName());
       rule.put("match", e.getMatchCriteria());
@@ -207,9 +240,9 @@ public class CustomSignatureService implements SignatureApplier {
       rule.put("payload_regex", e.getPayloadRegex());
       rule.put("match_all", e.isMatchAll());
       if (e.getDeviceType() != null) rule.put("device_type", e.getDeviceType());
-      rules.add(rule);
+      out.add(rule);
     }
-    return rules;
+    return out;
   }
 
   /** Returns true if the conversation satisfies ALL non-null criteria in the match block. */

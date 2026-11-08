@@ -19,7 +19,7 @@ class PayloadRegexMatchingTest {
 
   // No PacketLookup needed: these tests exercise payloadRegexMatch directly, below the point
   // where a conversation's payloads would be fetched from the database (#779).
-  private final CustomSignatureService service = new CustomSignatureService(null, null);
+  private final CustomSignatureService service = new CustomSignatureService(null, null, null);
 
   private static String packet(String ascii) {
     return HexFormat.of().formatHex(ascii.getBytes());

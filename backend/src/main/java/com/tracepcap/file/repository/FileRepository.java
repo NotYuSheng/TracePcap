@@ -41,4 +41,13 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
 
   /** Find the most recently uploaded file with the given SHA-256 hash */
   Optional<FileEntity> findFirstByFileHashOrderByUploadedAtDesc(String fileHash);
+
+  @org.springframework.data.jpa.repository.Query("SELECT f.id FROM FileEntity f WHERE f.status = :status")
+  List<java.util.UUID> findIdsByStatus(
+      @org.springframework.data.repository.query.Param("status") FileEntity.FileStatus status);
+
+  /** Ids of every capture whose analysis completed (#925: the captures rules apply to). */
+  default List<java.util.UUID> findCompletedIds() {
+    return findIdsByStatus(FileEntity.FileStatus.COMPLETED);
+  }
 }

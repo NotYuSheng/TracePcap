@@ -46,6 +46,7 @@ public class DetectionRuleService {
   private final PermissionService permissionService;
   private final AuditLogService auditLog;
   private final CurrentActor currentActor;
+  private final RuleSyncService ruleSync;
 
   @Transactional(readOnly = true)
   public List<DetectionRuleDto> listGlobal() {
@@ -77,9 +78,10 @@ public class DetectionRuleService {
     requireUniqueName(request.getName(), id);
     DetectionRuleDto before = toDto(e);
     if (!apply(e, request)) return before;
-    repository.save(e);
+    repository.saveAndFlush(e);
     DetectionRuleDto after = toDto(e);
     auditLog.record("detection-rule.update", AUDIT_TARGET, id.toString(), auditView(before), auditView(after));
+    refreshLabelsIfShown(before, after);
     return after;
   }
 
@@ -88,8 +90,11 @@ public class DetectionRuleService {
     permissionService.require(PermissionAction.DETECTION_RULES_GLOBAL);
     DetectionRuleEntity e = find(id);
     DetectionRuleDto before = toDto(e);
+    List<UUID> labelled = ruleSync.filesMatchedBy(id);
     repository.delete(e);
+    repository.flush(); // its matches go with it (ON DELETE CASCADE) before the labels are rebuilt
     auditLog.record("detection-rule.delete", AUDIT_TARGET, id.toString(), auditView(before), null);
+    ruleSync.refreshLabels(labelled);
   }
 
   /** All global rules in the file format. Reading needs no permission, like the list. */
@@ -143,8 +148,10 @@ public class DetectionRuleService {
           changed = true;
         }
         if (changed) {
-          repository.save(e);
-          auditLog.record("detection-rule.update", AUDIT_TARGET, e.getId().toString(), auditView(before), auditView(toDto(e)));
+          repository.saveAndFlush(e);
+          DetectionRuleDto after = toDto(e);
+          auditLog.record("detection-rule.update", AUDIT_TARGET, e.getId().toString(), auditView(before), auditView(after));
+          refreshLabelsIfShown(before, after);
           updated++;
         } else {
           unchanged++;
@@ -161,7 +168,10 @@ public class DetectionRuleService {
       for (DetectionRuleEntity e : repository.findByScopeOrderByNameAsc(Scope.GLOBAL)) {
         if (seen.contains(e.getId())) continue;
         auditLog.record("detection-rule.delete", AUDIT_TARGET, e.getId().toString(), auditView(toDto(e)), null);
+        List<UUID> labelled = ruleSync.filesMatchedBy(e.getId());
         repository.delete(e);
+        repository.flush();
+        ruleSync.refreshLabels(labelled);
         deleted++;
       }
     }
@@ -175,6 +185,17 @@ public class DetectionRuleService {
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Switching a rule on or off, or renaming it, changes what its existing matches are labelled
+   * with, so those captures' labels are rewritten now (#925 phase 2). A change to what the rule
+   * matches doesn't touch them: they show as out of date until someone re-applies.
+   */
+  private void refreshLabelsIfShown(DetectionRuleDto before, DetectionRuleDto after) {
+    if (before.isEnabled() != after.isEnabled() || !before.getName().equals(after.getName())) {
+      ruleSync.refreshLabels(ruleSync.filesMatchedBy(after.getId()));
+    }
+  }
 
   private DetectionRuleEntity find(UUID id) {
     return repository
