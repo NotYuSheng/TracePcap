@@ -1,5 +1,8 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.governance.AuditLogService;
+import com.tracepcap.governance.PermissionAction;
+import com.tracepcap.governance.PermissionService;
 import com.tracepcap.monitor.dto.NetworkSettingsDto;
 import java.util.Set;
 import java.util.Map;
@@ -31,6 +34,8 @@ public class NetworkService {
   private final NetworkSnapshotRepository snapshotRepository;
   private final NetworkChangeEventRepository changeEventRepository;
   private final InsightPresence insightPresence;
+  private final PermissionService permissionService;
+  private final AuditLogService auditLog;
 
   @Transactional(readOnly = true)
   public List<NetworkDto> getAllNetworks() {
@@ -74,12 +79,21 @@ public class NetworkService {
     return settingsOf(findOrThrow(networkId));
   }
 
-  /** Replaces the network's settings (#488). Validated by the controller's @Valid. */
+  /**
+   * Replaces the network's settings (#488). Validated by the controller's @Valid. Needs the
+   * NETWORK_SETTINGS permission and is audited (#915).
+   */
   public NetworkSettingsDto updateSettings(UUID networkId, NetworkSettingsDto settings) {
+    permissionService.require(PermissionAction.NETWORK_SETTINGS);
     NetworkEntity entity = findOrThrow(networkId);
+    NetworkSettingsDto before = settingsOf(entity);
     entity.setInactivityMode(settings.getInactivityMode().name());
     entity.setInactivityThreshold(settings.getInactivityThreshold());
-    return settingsOf(networkRepository.save(entity));
+    NetworkSettingsDto after = settingsOf(networkRepository.save(entity));
+    if (!before.equals(after)) {
+      auditLog.record("network.settings.update", "network", networkId.toString(), before, after);
+    }
+    return after;
   }
 
   private static NetworkSettingsDto settingsOf(NetworkEntity e) {

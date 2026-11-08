@@ -19,7 +19,10 @@ import org.springframework.stereotype.Component;
  * {@link #SYSTEM}. The feature must work without a login — an unattributed action is recorded as
  * "system", not rejected.
  */
+// Registered here, not only on AuthEnabledSecurityConfig: isAdmin() needs the properties with login
+// off too (SYSTEM_SETTINGS_EDITABLE), when that config isn't loaded.
 @Component
+@org.springframework.boot.context.properties.EnableConfigurationProperties(AuthProperties.class)
 public class CurrentActor {
 
   /** The Keycloak client role that marks an admin (#915). A client role, so it's namespaced. */
