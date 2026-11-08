@@ -11,10 +11,14 @@ import { apiClient } from '@/services/api/client';
 import { env } from '@/config/env';
 
 const DEFAULT_MAX_BYTES = 512 * 1024 * 1024; // fallback if API is unreachable
+// Mirror the backend app.max-packets default so the hint stays honest when /system/limits is
+// unreachable — the server still enforces this cap even if the UI couldn't fetch it.
+const DEFAULT_MAX_PACKETS = 2_000_000;
 
 export const UploadPage = () => {
   const { uploadFiles, uploads, clearUploads, isUploading } = useFileUpload();
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(DEFAULT_MAX_BYTES);
+  const [maxUploadPackets, setMaxUploadPackets] = useState<number>(DEFAULT_MAX_PACKETS);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [analysisOptions, setAnalysisOptions] = useState<AnalysisOptions>({
     enableNdpi: true,
@@ -30,9 +34,10 @@ export const UploadPage = () => {
   useEffect(() => {
     // Use the shared apiClient so the auth token is attached when auth is enabled.
     apiClient
-      .get<{ maxUploadBytes?: number }>('/system/limits')
+      .get<{ maxUploadBytes?: number; maxUploadPackets?: number }>('/system/limits')
       .then(({ data }) => {
         if (data.maxUploadBytes) setMaxUploadBytes(data.maxUploadBytes);
+        if (typeof data.maxUploadPackets === 'number') setMaxUploadPackets(data.maxUploadPackets);
       })
       .catch(err => {
         console.error('Failed to fetch upload limits, using default.', err);
@@ -82,6 +87,7 @@ export const UploadPage = () => {
                 onFileSelect={handleFileSelect}
                 disabled={isUploading}
                 maxSize={maxUploadBytes}
+                maxPackets={maxUploadPackets}
                 acceptedFileTypes={acceptedTypes}
               />
             </Col>

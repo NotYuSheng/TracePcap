@@ -21,6 +21,24 @@ services:
     image: postgres:15-alpine
     container_name: tracepcap-postgres
     restart: unless-stopped
+    # Pin the memory knobs that drive parallel-query shared-memory use so a query's /dev/shm demand
+    # is BOUNDED rather than "whatever the planner picks" — the worst case is roughly
+    # work_mem × hash_mem_multiplier × (1 + max_parallel_workers_per_gather). With the defaults
+    # below (32MB × 2 × 3 ≈ 192MB) that stays under shm_size. Raise these together with
+    # POSTGRES_SHM_SIZE and MAX_UPLOAD_PACKETS to provision for larger captures — see .env.example.
+    command:
+      - "postgres"
+      - "-c"
+      - "work_mem=${POSTGRES_WORK_MEM:-32MB}"
+      - "-c"
+      - "hash_mem_multiplier=${POSTGRES_HASH_MEM_MULTIPLIER:-2.0}"
+      - "-c"
+      - "max_parallel_workers_per_gather=${POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER:-2}"
+    # Postgres puts parallel-query shared memory (parallel hash joins/sorts, etc.) in /dev/shm.
+    # Docker's default 64MB /dev/shm is far too small — a single parallel query can try to
+    # allocate 100MB+ and fail with `could not resize shared memory segment ... No space left
+    # on device` even when the host has ample RAM and disk. Raise the cap. Override via .env.
+    shm_size: ${POSTGRES_SHM_SIZE:-256m}
     deploy:
       resources:
         limits:
@@ -196,6 +214,10 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: tracepcap-files
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # Packet-count upload gate (see application.yml app.max-packets). Raise together with
+      # POSTGRES_SHM_SIZE / POSTGRES_WORK_MEM above; 0 disables.
+      MAX_UPLOAD_PACKETS: ${MAX_UPLOAD_PACKETS:-2000000}
+      MAX_UPLOAD_PACKETS_VERIFY_FRACTION: ${MAX_UPLOAD_PACKETS_VERIFY_FRACTION:-0.5}
       # Data retention. FILE_RETENTION_ENABLED=false is the master switch — it keeps
       # uploaded files forever, and the cleanup scheduler is then not registered at all, so
       # nothing below has any effect. NOTE 0 means "never" only for the MONITOR_ and PACKET_
