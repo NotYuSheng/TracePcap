@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { server } from '@/test/msw'
 import { NetworkSettingsModal } from '../NetworkSettingsModal'
 
 describe('NetworkSettingsModal', () => {
@@ -53,5 +55,35 @@ describe('NetworkSettingsModal', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Reset to default' }))
     expect(screen.getByLabelText('Number of captures')).toHaveValue(1)
+  })
+
+  it('stays visible but greyed out, with the reason, when the caller may not change it (#915)', async () => {
+    server.use(
+      http.get('*/me', () =>
+        HttpResponse.json({
+          username: 'bob',
+          authEnabled: true,
+          admin: false,
+          canManagePermissions: false,
+          permissions: [
+            {
+              action: 'NETWORK_SETTINGS',
+              label: 'Edit network settings',
+              description: '',
+              level: 'ADMIN',
+              defaultLevel: 'ANALYST',
+              allowed: false,
+              reason: 'only admins can change this.',
+            },
+          ],
+        })
+      )
+    )
+    render(<NetworkSettingsModal show onHide={() => {}} onSave={vi.fn()} />)
+
+    expect(await screen.findByTestId('settings-locked')).toHaveTextContent('only admins can change this')
+    expect(screen.getByLabelText('Count by')).toBeDisabled()
+    expect(screen.getByLabelText('Number of captures')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 })

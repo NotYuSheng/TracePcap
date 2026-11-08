@@ -107,6 +107,10 @@ export const API_ENDPOINTS = {
   SYSTEM_LIMITS: '/system/limits',
   SYSTEM_SETTINGS: '/system/settings',
   PREFERENCES: '/preferences',
+  ME: '/me',
+  PERMISSIONS: '/permissions',
+  PERMISSION: (action: string) => `/permissions/${action}`,
+  AUDIT_LOG: '/audit-log',
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
