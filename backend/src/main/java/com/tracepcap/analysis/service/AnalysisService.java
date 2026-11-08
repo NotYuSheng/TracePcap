@@ -523,14 +523,15 @@ public class AnalysisService {
 
     List<HostClassificationEntity> hostClassifications =
         hostClassifier.classify(
-            run.file,
-            run.parseResult.getConversations(),
-            run.parseResult.getHostTtls(),
-            run.parseResult.getHostMacs(),
-            deviceOverrides,
-            hostnames,
-            serviceLogs.rolesByIp(),
-            windowsIdentityClaimsByIp);
+            new HostClassifier.ClassificationRequest(
+                run.file,
+                run.parseResult.getConversations(),
+                run.parseResult.getHostTtls(),
+                run.parseResult.getHostMacs(),
+                deviceOverrides,
+                hostnames,
+                serviceLogs.rolesByIp(),
+                windowsIdentityClaimsByIp));
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
     applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
     hostClassificationRepository.saveAll(hostClassifications);
