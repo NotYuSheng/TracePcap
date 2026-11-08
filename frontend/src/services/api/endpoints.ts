@@ -117,6 +117,8 @@ export const API_ENDPOINTS = {
   DETECTION_RULES_EXPORT: '/detection-rules/export',
   DETECTION_RULES_IMPORT: '/detection-rules/import',
   DETECTION_RULES_STATUS: '/detection-rules/status',
+  CAPTURE_DETECTION_RULES: (fileId: string) => `/files/${fileId}/detection-rules`,
+  DETECTION_RULE_PROMOTIONS: (id: string) => `/detection-rules/${id}/promotions`,
   FILE_RULE_STATUS: (fileId: string) => `/files/${fileId}/rule-status`,
   RULE_REAPPLY_JOBS: '/rule-reapply-jobs',
   RULE_REAPPLY_JOB: (id: string) => `/rule-reapply-jobs/${id}`,

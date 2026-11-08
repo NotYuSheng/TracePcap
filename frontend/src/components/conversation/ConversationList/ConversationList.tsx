@@ -1,3 +1,4 @@
+import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { useState } from 'react';
 import { Badge } from '@govtechsg/sgds-react';
 import { ScrollableTable } from '@components/common/ScrollableTable';
@@ -47,6 +48,8 @@ interface ConversationListProps {
   onRiskFilterClick?: () => void;
   visibleColumns: Set<ColumnKey>;
   signatureSeverities?: Record<string, string>;
+  /** Rule name → scope (GLOBAL / CAPTURE), shown in each badge (#925 phase 3). */
+  signatureScopes?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
 }
 
@@ -86,11 +89,11 @@ export const ConversationList = ({
   onSort,
   visibleColumns,
   signatureSeverities = {},
+  signatureScopes = {},
 }: ConversationListProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const col = (key: ColumnKey) => visibleColumns.has(key);
-
 
   const handleRowClick = (conversation: Conversation) => {
     setSelectedId(conversation.id);
@@ -137,9 +140,7 @@ export const ConversationList = ({
               {col('risks') && <th>Risks</th>}
               {col('customRules') && <th>Custom Rules</th>}
               {col('idsAlerts') && <th>IDS Alerts</th>}
-              {col('fileTypes') && (
-                <th style={{ whiteSpace: 'nowrap' }}>File Type</th>
-              )}
+              {col('fileTypes') && <th style={{ whiteSpace: 'nowrap' }}>File Type</th>}
               {col('srcCountry') && <th style={{ whiteSpace: 'nowrap' }}>Src Country</th>}
               {col('dstCountry') && <th style={{ whiteSpace: 'nowrap' }}>Dst Country</th>}
               {col('packets') && <SortableHeader field="packets" label="Packets" />}
@@ -292,6 +293,7 @@ export const ConversationList = ({
                                 style={{ backgroundColor: bg, color: text, whiteSpace: 'nowrap' }}
                               >
                                 {rule.replace(/_/g, ' ')}
+                                <RuleScopeTag scope={signatureScopes[rule]} />
                               </span>
                             );
                           })}
@@ -335,12 +337,7 @@ export const ConversationList = ({
                       conversation.detectedFileTypes.length > 0 ? (
                         <div className="d-inline-flex flex-wrap gap-1">
                           {conversation.detectedFileTypes.map(ft => (
-                            <Badge
-                              key={ft}
-                              bg="info"
-                              text="dark"
-                              style={{ whiteSpace: 'nowrap' }}
-                            >
+                            <Badge key={ft} bg="info" text="dark" style={{ whiteSpace: 'nowrap' }}>
                               {ft}
                             </Badge>
                           ))}

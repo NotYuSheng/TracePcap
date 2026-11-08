@@ -1,3 +1,4 @@
+import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Badge, Button, Card } from '@govtechsg/sgds-react';
 import { createPortal } from 'react-dom';
@@ -27,6 +28,8 @@ import './ConversationDetail.css';
 interface ConversationDetailProps {
   conversation: Conversation;
   signatureSeverities?: Record<string, string>;
+  /** Rule name → scope, shown in each badge (#925 phase 3). */
+  signatureScopes?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
   fileId?: string;
   /** When set, the packet with this frame number is scrolled into view and briefly highlighted. */
@@ -264,6 +267,7 @@ function hasReadableAscii(hex: string): boolean {
 export const ConversationDetail = ({
   conversation,
   signatureSeverities = {},
+  signatureScopes = {},
   hostClassMap,
   fileId,
   highlightPacketNumber,
@@ -443,7 +447,7 @@ export const ConversationDetail = ({
               ))}
               {conversation.customSignatures?.map(rule => {
                 const { bg, text } = getSeverityColor(signatureSeverities[rule]);
-                return <span key={rule} className="cd-chip" style={{ backgroundColor: bg, color: text }}>{rule.replace(/_/g, ' ')}</span>;
+                return <span key={rule} className="cd-chip" style={{ backgroundColor: bg, color: text }}>{rule.replace(/_/g, ' ')}<RuleScopeTag scope={signatureScopes[rule]} /></span>;
               })}
               {conversation.suricataAlerts?.map(alert => (
                 <span key={alert} className="cd-chip" style={{ backgroundColor: IDS_BADGE.bg, color: IDS_BADGE.text }}>{alert}</span>

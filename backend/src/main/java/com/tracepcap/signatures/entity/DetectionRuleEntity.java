@@ -79,6 +79,10 @@ public class DetectionRuleEntity {
   @Column(name = "device_type", length = 100)
   private String deviceType;
 
+  /** The rule this one was promoted from (#925 phase 3), if any. */
+  @Column(name = "promoted_from")
+  private UUID promotedFrom;
+
   /** Bumped on every edit, so matches can later be checked against the version they came from. */
   @Column(nullable = false)
   private int version;

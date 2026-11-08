@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,10 +478,10 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         /** Add a custom private range */
-        post: operations["create_4"];
+        post: operations["create_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -512,11 +512,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the global detection rules, by name */
-        get: operations["list_5"];
+        /**
+         * List the global detection rules, by name
+         * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
+         */
+        get: operations["list_6"];
         put?: never;
         /** Create a global detection rule (audited) */
-        post: operations["create_3"];
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -594,6 +597,26 @@ export interface paths {
         post?: never;
         /** Delete a detection rule (audited) */
         delete: operations["delete_7"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/{id}/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote a capture rule to a global rule (audited)
+         * @description Creates a linked global copy, checked against the source capture at once. Needs DETECTION_RULES_GLOBAL, and DETECTION_RULES_CAPTURE too when the original is removed.
+         */
+        post: operations["promote"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -786,6 +809,24 @@ export interface paths {
         get: operations["getAnswers"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/detection-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This capture's own rules */
+        get: operations["list_5"];
+        put?: never;
+        /** Add a rule to this capture; it's checked at once (audited) */
+        post: operations["create_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2476,12 +2517,16 @@ export interface components {
             deviceType?: string;
             enabled?: boolean;
             /** Format: uuid */
+            fileId?: string;
+            /** Format: uuid */
             id?: string;
             match?: components["schemas"]["Match"];
             matchAll?: boolean;
             name?: string;
             payloadContains?: components["schemas"]["PayloadPattern"][];
             payloadRegex?: components["schemas"]["RegexPattern"][];
+            /** Format: uuid */
+            promotedFrom?: string;
             scope?: string;
             severity?: string;
             /** Format: date-time */
@@ -3185,6 +3230,9 @@ export interface components {
             shared?: boolean;
             themeMode?: string;
         };
+        PromoteRuleRequest: {
+            keepOriginal?: boolean;
+        };
         Protocol: {
             layer?: string;
             name?: string;
@@ -3688,7 +3736,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: {
                 page?: number;
@@ -4314,7 +4362,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -4334,7 +4382,7 @@ export interface operations {
             };
         };
     };
-    create_4: {
+    create_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -4378,9 +4426,11 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
-            query?: never;
+            query?: {
+                fileId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4398,7 +4448,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -4551,6 +4601,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    promote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PromoteRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
             };
         };
     };
@@ -5001,6 +5077,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnswerResponse"][];
+                };
+            };
+        };
+    };
+    list_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"][];
+                };
+            };
+        };
+    };
+    create_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
                 };
             };
         };

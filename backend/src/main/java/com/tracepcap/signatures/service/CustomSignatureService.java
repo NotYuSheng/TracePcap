@@ -98,8 +98,11 @@ public class CustomSignatureService implements SignatureApplier {
   @Override
   public Map<String, String> applySignatures(
       UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
+    // Global rules, plus the capture's own if it has any (a capture analysed again keeps them).
     List<DetectionRuleEntity> rules =
-        ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL);
+        new ArrayList<>(ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL));
+    rules.addAll(
+        ruleRepository.findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.CAPTURE, fileId));
     if (rules.isEmpty()) return Map.of();
 
     // Same lock as Re-apply, so the two never write one capture's matches at once (#925).

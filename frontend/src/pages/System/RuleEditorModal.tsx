@@ -19,6 +19,8 @@ interface RuleEditorModalProps {
   rule: DetectionRule | null;
   /** View only: the caller may not change rules. */
   readOnly?: boolean;
+  /** Create the rule for this capture only (#925 phase 3), instead of a global rule. */
+  fileId?: string;
   onHide: () => void;
   onSaved: () => void;
 }
@@ -91,6 +93,7 @@ export function RuleEditorModal({
   show,
   rule,
   readOnly = false,
+  fileId,
   onHide,
   onSaved,
 }: RuleEditorModalProps) {
@@ -110,6 +113,7 @@ export function RuleEditorModal({
   }, [show, rule]);
 
   const local = useMemo(() => localErrors(draft), [draft]);
+  const captureScope = rule ? rule.scope === 'CAPTURE' : !!fileId;
   // Local errors show once the user has typed; server errors until the field is changed again.
   const errors = { ...(touched ? local : {}), ...serverErrors };
   const err = (key: string) => errors[key];
@@ -135,6 +139,7 @@ export function RuleEditorModal({
     setError(null);
     try {
       if (rule) await detectionRulesService.update(rule.id, draft);
+      else if (fileId) await detectionRulesService.createForCapture(fileId, draft);
       else await detectionRulesService.create(draft);
       onSaved();
       onHide();
@@ -153,7 +158,11 @@ export function RuleEditorModal({
     <Modal show={show} onHide={() => !saving && onHide()} size="lg" scrollable>
       <Modal.Header closeButton>
         <Modal.Title>
-          {rule ? `${readOnly ? 'Rule' : 'Edit rule'}: ${rule.name}` : 'New detection rule'}
+          {rule
+            ? `${readOnly ? 'Rule' : 'Edit rule'}: ${rule.name}`
+            : captureScope
+              ? 'New rule for this capture'
+              : 'New detection rule'}
         </Modal.Title>
       </Modal.Header>
       <form onSubmit={save} noValidate>
@@ -164,8 +173,10 @@ export function RuleEditorModal({
             </Alert>
           )}
           <p className="small text-muted">
-            A global rule flags every conversation it matches, in every capture analysed from now
-            on. It fires when <strong>every</strong> field you fill in matches.
+            {captureScope
+              ? 'A capture rule flags matching conversations in this capture only, straight away, wherever the capture is viewed.'
+              : 'A global rule flags every conversation it matches, in every capture analysed from now on.'}{' '}
+            It fires when <strong>every</strong> field you fill in matches.
           </p>
 
           <Row className="g-2 mb-2">

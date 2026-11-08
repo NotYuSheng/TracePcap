@@ -1183,6 +1183,10 @@
           "enabled": {
             "type": "boolean"
           },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -1207,6 +1211,10 @@
               "$ref": "#/components/schemas/RegexPattern"
             },
             "type": "array"
+          },
+          "promotedFrom": {
+            "format": "uuid",
+            "type": "string"
           },
           "scope": {
             "type": "string"
@@ -3166,6 +3174,14 @@
         },
         "type": "object"
       },
+      "PromoteRuleRequest": {
+        "properties": {
+          "keepOriginal": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "Protocol": {
         "properties": {
           "layer": {
@@ -4465,7 +4481,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "query",
@@ -5936,7 +5952,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_6",
+        "operationId": "list_7",
         "responses": {
           "200": {
             "content": {
@@ -5958,7 +5974,7 @@
         ]
       },
       "post": {
-        "operationId": "create_4",
+        "operationId": "create_5",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6014,7 +6030,19 @@
     },
     "/api/v1/detection-rules": {
       "get": {
-        "operationId": "list_5",
+        "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
+        "operationId": "list_6",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fileId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -6036,7 +6064,7 @@
         ]
       },
       "post": {
-        "operationId": "create_3",
+        "operationId": "create_4",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6231,6 +6259,48 @@
           }
         },
         "summary": "Replace a detection rule (audited; bumps its version if anything changed)",
+        "tags": [
+          "Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/detection-rules/{id}/promotions": {
+      "post": {
+        "description": "Creates a linked global copy, checked against the source capture at once. Needs DETECTION_RULES_GLOBAL, and DETECTION_RULES_CAPTURE too when the original is removed.",
+        "operationId": "promote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteRuleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionRuleDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Promote a capture rule to a global rule (audited)",
         "tags": [
           "Detection Rules"
         ]
@@ -7075,6 +7145,81 @@
         "summary": "Deterministic answers to the standard investigation questions for a file",
         "tags": [
           "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/detection-rules": {
+      "get": {
+        "operationId": "list_5",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DetectionRuleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "This capture's own rules",
+        "tags": [
+          "Capture Detection Rules"
+        ]
+      },
+      "post": {
+        "operationId": "create_3",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionRuleDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a rule to this capture; it's checked at once (audited)",
+        "tags": [
+          "Capture Detection Rules"
         ]
       }
     },
@@ -10385,6 +10530,10 @@
     {
       "description": "Per-file nDPI security alerts",
       "name": "Security Alerts"
+    },
+    {
+      "description": "Detection rules that belong to one capture",
+      "name": "Capture Detection Rules"
     },
     {
       "description": "Detected drift events for a monitored network",

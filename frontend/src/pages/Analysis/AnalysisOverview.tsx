@@ -1,3 +1,5 @@
+import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
+import { CaptureRulesCard } from '@/features/detectionRules/CaptureRulesCard';
 import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
 import { usePermission } from '@/features/me/useMe';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
@@ -25,6 +27,7 @@ import type { Answer } from '@/types';
 interface AnalysisOutletContext {
   data: AnalysisData;
   fileId: string;
+  refreshSummary?: () => void;
 }
 
 const ndpiPopover = (
@@ -116,10 +119,12 @@ const customRulesPopover = (
 );
 
 export const AnalysisOverview = () => {
-  const { data, fileId } = useOutletContext<AnalysisOutletContext>();
+  const { data, fileId, refreshSummary } = useOutletContext<AnalysisOutletContext>();
+  const [rulesVersion, setRulesVersion] = useState(0);
   const rulesPermission = usePermission('DETECTION_RULES_GLOBAL');
   const navigate = useNavigate();
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
+  const [signatureScopes, setSignatureScopes] = useState<Record<string, string>>({});
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -131,13 +136,16 @@ export const AnalysisOverview = () => {
 
   useEffect(() => {
     conversationService
-      .getSignatureRules()
+      .getSignatureRules(fileId)
       .then(rules => {
         const map: Record<string, string> = {};
+        const scopes: Record<string, string> = {};
         rules.forEach(r => {
           map[r.name] = r.severity;
+          scopes[r.name] = r.scope;
         });
         setSignatureSeverities(map);
+        setSignatureScopes(scopes);
       })
       .catch(console.error);
 
@@ -157,7 +165,7 @@ export const AnalysisOverview = () => {
         setAnswers([]);
         setUnknowns([]);
       });
-  }, [fileId]);
+  }, [fileId, rulesVersion]);
 
   const detectedApps = data.detectedApplications ?? [];
 
@@ -170,6 +178,17 @@ export const AnalysisOverview = () => {
         reason={rulesPermission.reason}
       />
       <AnalysisSummary summary={data} extractedFilesCount={extractedFilesCount} />
+
+      {/* This capture's own detection rules (#925 phase 3). */}
+      <div className="mt-4">
+        <CaptureRulesCard
+          fileId={fileId}
+          onChanged={() => {
+            setRulesVersion(v => v + 1);
+            refreshSummary?.();
+          }}
+        />
+      </div>
 
       {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4).
           Only shown when there are answers; the dashboard stays clean for benign captures. */}
@@ -336,6 +355,7 @@ export const AnalysisOverview = () => {
                   }
                 >
                   {rule.replace(/_/g, ' ')}
+                  <RuleScopeTag scope={signatureScopes[rule]} />
                 </button>
               );
             })}

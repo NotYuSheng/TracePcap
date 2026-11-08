@@ -36,7 +36,7 @@ class DetectionRuleServiceTest {
   private final AuditLogService audit = mock(AuditLogService.class);
   private final CurrentActor actor = mock(CurrentActor.class);
   private final RuleSyncService ruleSync = mock(RuleSyncService.class);
-  private final DetectionRuleService service = new DetectionRuleService(repo, permissions, audit, actor, ruleSync);
+  private final DetectionRuleService service = new DetectionRuleService(repo, permissions, audit, actor, ruleSync, mock(com.tracepcap.file.repository.FileRepository.class));
 
   private static DetectionRuleRequest req(String name, int port) {
     return DetectionRuleRequest.builder()
@@ -68,7 +68,7 @@ class DetectionRuleServiceTest {
 
   @Test
   void aDuplicateNameIsAFieldError() {
-    when(repo.findGlobalByName("C2")).thenReturn(Optional.of(entity("c2", 1)));
+    when(repo.findAllByName("C2")).thenReturn(List.of(entity("c2", 1)));
     assertThatThrownBy(() -> service.create(req("C2", 4444)))
         .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getErrors()).containsKey("name"));
   }

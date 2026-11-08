@@ -42,6 +42,34 @@ reason in its description, so nothing is lost and nothing starts matching
 differently. The audit log records the import. If you had pointed
 ``SIGNATURES_PATH`` at a different file, import it with **Import** instead.
 
+Rules for one capture
+---------------------
+
+Sometimes a rule only makes sense for one capture: "in this capture,
+``10.0.0.53`` is the sanctioned DNS server", or a pattern you're testing
+before you trust it everywhere. A capture's **Overview** has **Rules for this
+capture**:
+
+- **Add rule** opens the same form as global rules. The rule flags
+  conversations in this capture only, **straight away**, with no re-apply,
+  and wherever the capture is viewed, including inside a network where it's a
+  snapshot.
+- Each rule can be switched off, edited, deleted, or **promoted**.
+- **Promote** makes a global copy, so the rule flags every capture. You
+  choose whether to keep the capture's rule as well. The copy is checked
+  against this capture at once; other captures show as out of date until the
+  rules are re-applied.
+- A capture rule's name can't be the same as a global rule's, since both label
+  the same capture. A promoted copy is the exception: it's meant to label the
+  same thing.
+- Who can edit capture rules is its own permission (*Edit capture detection
+  rules*, analysts by default). Promoting needs the global-rules permission
+  too. Every change is in the audit log.
+
+**Each match says where it comes from.** Rule badges in the conversations
+table, the conversation details, the filter and the Overview end in their
+scope: *global* or *capture*.
+
 Keeping matches up to date
 --------------------------
 

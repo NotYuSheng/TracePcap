@@ -52,6 +52,7 @@ export const ConversationPage = () => {
   const [suricataAlertOptions, setSuricataAlertOptions] = useState<string[]>([]);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
+  const [signatureScopes, setSignatureScopes] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
   // Personal preferences loaded from the server can replace the columns while this page is open.
@@ -98,13 +99,16 @@ export const ConversationPage = () => {
         setSuricataAlertOptions([]);
       });
     conversationService
-      .getSignatureRules()
+      .getSignatureRules(fileId)
       .then(rules => {
         const map: Record<string, string> = {};
+        const scopes: Record<string, string> = {};
         rules.forEach(r => {
           map[r.name] = r.severity;
+          scopes[r.name] = r.scope;
         });
         setSignatureSeverities(map);
+        setSignatureScopes(scopes);
       })
       .catch(console.error);
     conversationService
@@ -349,7 +353,13 @@ export const ConversationPage = () => {
   }));
   const appOptions = (data.detectedApplications ?? []).map(a => ({ name: a.name }));
   const categoryOptions = (data.categoryDistribution ?? []).map(c => ({ category: c.category }));
-  const presentDeviceTypes = [...new Set(Array.from(hostClassMap.values()).map(h => h.deviceType).filter(Boolean))];
+  const presentDeviceTypes = [
+    ...new Set(
+      Array.from(hostClassMap.values())
+        .map(h => h.deviceType)
+        .filter(Boolean)
+    ),
+  ];
 
   // CSV export URL
   const exportUrl = conversationService.getExportUrl(fileId, filters);
@@ -412,6 +422,7 @@ export const ConversationPage = () => {
             customSignatureOptions={customSignatureOptions}
             suricataAlertOptions={suricataAlertOptions}
             signatureSeverities={signatureSeverities}
+            signatureScopes={signatureScopes}
             countryOptions={countryOptions}
             presentDeviceTypes={presentDeviceTypes}
             activeFilterCount={activeFilterCount}
@@ -453,6 +464,7 @@ export const ConversationPage = () => {
                     onRiskFilterClick={() => setFilters({ hasRisks: true })}
                     visibleColumns={visibleColumns}
                     signatureSeverities={signatureSeverities}
+                    signatureScopes={signatureScopes}
                     hostClassMap={hostClassMap}
                   />
                 </div>
@@ -547,6 +559,7 @@ export const ConversationPage = () => {
               <ConversationDetail
                 conversation={selectedConversation}
                 signatureSeverities={signatureSeverities}
+                signatureScopes={signatureScopes}
                 hostClassMap={hostClassMap}
                 fileId={fileId}
                 highlightPacketNumber={highlightPacket}
