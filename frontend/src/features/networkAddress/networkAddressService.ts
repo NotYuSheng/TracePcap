@@ -30,20 +30,31 @@ export interface AddressEntryInput {
   hidden?: boolean;
 }
 
+const NETWORK_LIST: Record<AddressKind, (networkId: string) => string> = {
+  subnets: API_ENDPOINTS.NETWORK_SUBNETS,
+  'custom-private-ranges': API_ENDPOINTS.NETWORK_PRIVATE_RANGES,
+  'ip-org-rules': API_ENDPOINTS.NETWORK_ORG_RULES,
+};
+const NETWORK_ENTRY: Record<AddressKind, (networkId: string, id: number) => string> = {
+  subnets: API_ENDPOINTS.NETWORK_SUBNET,
+  'custom-private-ranges': API_ENDPOINTS.NETWORK_PRIVATE_RANGE,
+  'ip-org-rules': API_ENDPOINTS.NETWORK_ORG_RULE,
+};
+
 export const networkAddressService = {
   list: async (networkId: string, kind: AddressKind): Promise<AddressEntry[]> =>
-    (await apiClient.get<AddressEntry[]>(API_ENDPOINTS.NETWORK_ADDRESS_ENTRIES(networkId, kind))).data,
+    (await apiClient.get<AddressEntry[]>(NETWORK_LIST[kind](networkId))).data,
 
   /** Override or add the network's entry for a CIDR, or hide the default's (`hidden: true`). */
   put: async (networkId: string, kind: AddressKind, body: AddressEntryInput): Promise<AddressEntry> => {
     // A subnet label set here is the analyst's, so it counts as confirmed (and baselines staleness).
     const payload = kind === 'subnets' ? { ...body, confirmed: !body.hidden, networkId } : body;
-    return (await apiClient.post<AddressEntry>(API_ENDPOINTS.NETWORK_ADDRESS_ENTRIES(networkId, kind), payload)).data;
+    return (await apiClient.post<AddressEntry>(NETWORK_LIST[kind](networkId), payload)).data;
   },
 
   /** Removes the network's entry, so the default applies again. */
   revert: async (networkId: string, kind: AddressKind, id: number): Promise<void> => {
-    await apiClient.delete(API_ENDPOINTS.NETWORK_ADDRESS_ENTRY(networkId, kind, id));
+    await apiClient.delete(NETWORK_ENTRY[kind](networkId, id));
   },
 
   /** The entries in effect: the network's visible ones and the default's it leaves alone. */
