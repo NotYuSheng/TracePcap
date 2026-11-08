@@ -43,6 +43,35 @@ public final class IpLocality {
    * implementations already agreed on that; the fourth treated null as local, which silently
    * counted rows with no address as internal traffic.
    */
+  /**
+   * True when the address can be one machine (#918). False for the unspecified address
+   * ({@code 0.0.0.0}, {@code ::}, a DHCP client before it has an address), IPv4 limited broadcast
+   * and multicast/reserved space ({@code 224.0.0.0/3} and up), IPv6 multicast ({@code ff00::/8}),
+   * and the broadcast MAC (which the parser uses as an endpoint for non-IP frames). These are
+   * destinations, not hosts, and classifying them made "devices" out of {@code 0.0.0.0} and
+   * {@code 224.0.0.18}. Anything else, including an unparseable value, counts as a host, so callers
+   * keep their existing behaviour for inputs this doesn't recognise.
+   */
+  public static boolean isHostAddress(String ip) {
+    if (ip == null || ip.isBlank()) return false;
+    String a = ip.trim().toLowerCase();
+    if (a.equals("ff:ff:ff:ff:ff:ff")) return false;
+    if (a.indexOf(':') < 0) {
+      try {
+        long v = toLong(a);
+        return v != 0L && v < 0xE0000000L; // not 0.0.0.0, not 224.0.0.0 and above
+      } catch (RuntimeException e) {
+        return true;
+      }
+    }
+    if (a.equals("::")) return false;
+    String first = a.substring(0, a.indexOf(':'));
+    if (first.length() >= 1 && first.length() <= 4 && first.chars().allMatch(c -> Character.digit(c, 16) >= 0)) {
+      return Integer.parseInt(first, 16) < 0xff00;
+    }
+    return true;
+  }
+
   public static boolean isLocal(String ip) {
     if (ip == null) {
       return false;
