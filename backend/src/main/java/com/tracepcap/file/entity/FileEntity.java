@@ -36,7 +36,8 @@ public class FileEntity {
   @Column(name = "minio_path", nullable = false, length = 512)
   private String minioPath;
 
-  @Column(name = "file_hash", length = 64)
+  // Unique (V44 uq_files_file_hash): one stored capture per content hash. NULL is allowed, and repeatable.
+  @Column(name = "file_hash", length = 64, unique = true)
   private String fileHash;
 
   @Builder.Default
