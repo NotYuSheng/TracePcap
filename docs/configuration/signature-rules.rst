@@ -25,7 +25,8 @@ Each rule is a YAML mapping under the top-level ``signatures`` list:
          - pattern: <regex>
            case_insensitive: <bool>   # optional, default false
        match_all: <bool>          # optional: AND all payload_contains / payload_regex entries
-       device_type: <string>      # optional: pin device type for matched IPs
+       device_type: <string>      # optional: classification hint for matched hosts
+       device_type_weight: <int>  # optional: the hint's weight, 1-100 (default 40)
 
 Execution Semantics
 --------------------
@@ -205,17 +206,29 @@ and **all** ``payload_regex`` entries must each find a match somewhere in the
 conversation's packets (AND semantics). When ``false`` or absent, any single
 entry matching is sufficient (OR semantics).
 
-``device_type``
-~~~~~~~~~~~~~~~
+``device_type`` and ``device_type_weight``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Optional string. When the rule fires, all IP addresses involved in the
-matching conversation are assigned this device type in the Network
-Visualization and Conversations filter.
+Optional. A **classification hint**: hosts this rule matches are probably this
+kind of device. It's one weighted vote in device classification, shown in the
+host's *Evidence weighed* as "Custom rule *name* → type +weight". It is **not**
+an override: other signals add 5 to 35 points each, so strong contrary evidence
+can still win, and a label set on the host wins over the vote.
+
+``device_type_weight`` is 1 to 100 and defaults to 40.
+
+Which host gets the vote follows from the rule: the one that matched its
+``ip`` or ``cidr``; otherwise the one on its ``dstPort`` (or ``srcPort``);
+otherwise, with nothing endpoint-specific, both ends of the conversation.
 
 Standard values: ``ROUTER``, ``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``,
-``IOT``, ``UNKNOWN``.
+``IOT``, ``DNS_SERVER``, ``WEB_SERVER``, ``API_SERVER``. Custom strings are
+accepted (e.g. ``"PLC"``, ``"CCTV Camera"``).
 
-Custom strings are accepted (e.g. ``"PLC"``, ``"CCTV Camera"``).
+Before this, ``device_type`` forced the type of every host in a matching
+conversation. Rules that had one keep it as a hint with weight 80, and an old
+file imported without ``device_type_weight`` gets 80 too. To say "I know this
+one host is X", label the host instead.
 
 Editing Rules
 -------------

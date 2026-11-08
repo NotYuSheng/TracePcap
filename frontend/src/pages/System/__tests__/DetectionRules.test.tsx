@@ -171,4 +171,36 @@ describe('DetectionRulesPanel (#925 phase 1)', () => {
       'rules[1] (bad).payloadRegex[0].pattern'
     );
   });
+
+  it('sends a classification hint with its weight, and checks the weight (#926)', async () => {
+    let posted: Record<string, unknown> | null = null;
+    server.use(
+      http.get('*/me', () => HttpResponse.json(me(true))),
+      http.get('*/detection-rules', () => HttpResponse.json([])),
+      http.get('*/files', () => HttpResponse.json({ data: [] })),
+      http.post('*/detection-rules', async ({ request }) => {
+        posted = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...rule, id: 'r9' }, { status: 201 });
+      })
+    );
+    render(<DetectionRulesPanel />);
+    await userEvent.click(await screen.findByRole('button', { name: /Add rule/ }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'rtsp_camera');
+    await userEvent.type(within(dialog).getByLabelText('Destination port'), '554');
+    const weight = within(dialog).getByLabelText('Weight');
+    expect(weight).toBeDisabled(); // no device type yet
+    await userEvent.type(within(dialog).getByLabelText('Device type'), 'CCTV Camera');
+    await userEvent.type(weight, '150');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(within(dialog).getByText('A weight is 1 to 100.')).toBeInTheDocument();
+    expect(posted).toBeNull();
+
+    await userEvent.clear(weight);
+    await userEvent.type(weight, '60');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(posted).toMatchObject({ deviceType: 'CCTV Camera', deviceTypeWeight: 60 })
+    );
+  });
 });

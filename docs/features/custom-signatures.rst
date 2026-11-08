@@ -157,9 +157,10 @@ CIDR-to-label mappings used in the Network Visualization grouping mode (see
 
 .. note::
 
-   ``device_type`` (setting a matched host's device type) is still honoured
-   for existing rules, but can't be set in the editor any more. Device types
-   are moving to classification signals (#926).
+   A rule can carry a **classification hint** (*Device type* and *Weight* at
+   the bottom of the form): a weighted vote in device classification, named
+   in the host's evidence, not an override. See
+   :doc:`../configuration/signature-rules`.
 
 Rule Format
 -----------
@@ -277,19 +278,25 @@ in the conversation is sufficient.
 ``payload_contains`` and ``payload_regex`` can coexist in the same rule; both
 must match (AND).
 
-Device Type Override
---------------------
+Classification Hint
+-------------------
 
-A rule can pin the device type of all IPs involved in a matching conversation:
+A rule can vote for the device type of the hosts it matches. The vote is
+weighed with the other classification signals and shown in the host's
+evidence; it doesn't override them:
 
 .. code-block:: yaml
 
-   - name: cctv_camera
-     description: Known CCTV camera
+   - name: rtsp_camera
+     description: RTSP video stream server
      severity: low
      device_type: "CCTV Camera"
+     device_type_weight: 40
      match:
-       ip: "192.168.1.50"
+       dstPort: 554
+
+Here the host on port 554 gets the vote, not the client watching it. To pin a
+single known host, label the host instead.
 
 Standard values: ``ROUTER``, ``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``,
 ``IOT``, ``UNKNOWN``. Custom strings (e.g. ``"PLC"``, ``"CCTV Camera"``) are

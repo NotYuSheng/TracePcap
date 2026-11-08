@@ -35,6 +35,10 @@ export interface DetectionRuleInput {
   payloadContains: PayloadPattern[];
   payloadRegex: RegexPattern[];
   matchAll: boolean;
+  /** Classification hint (#926): matching hosts are probably this device type. Optional. */
+  deviceType?: string | null;
+  /** The hint's weight, 1 to 100; defaults to 40. */
+  deviceTypeWeight?: number | null;
 }
 
 /** Mirrors DetectionRuleDto. */
@@ -49,8 +53,6 @@ export interface DetectionRule extends DetectionRuleInput {
   networkId?: string | null;
   /** The rule this one was promoted from, if any. */
   promotedFrom?: string | null;
-  /** Legacy, read-only: overrides matched hosts' device type until #926 replaces it. */
-  deviceType?: string | null;
   version: number;
   createdAt: string;
   createdBy: string;
@@ -119,6 +121,8 @@ export function toInput(r: DetectionRule): DetectionRuleInput {
     payloadContains: r.payloadContains ?? [],
     payloadRegex: r.payloadRegex ?? [],
     matchAll: r.matchAll,
+    deviceType: r.deviceType ?? null,
+    deviceTypeWeight: r.deviceTypeWeight ?? null,
   };
 }
 
@@ -147,7 +151,8 @@ export const detectionRulesService = {
     (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId))).data,
   /** What a rule would match in one capture, without saving it (#925 phase 4). */
   preview: async (rule: DetectionRuleInput, fileId: string): Promise<RulePreview> =>
-    (await apiClient.post<RulePreview>(API_ENDPOINTS.DETECTION_RULE_PREVIEWS, { rule, fileId })).data,
+    (await apiClient.post<RulePreview>(API_ENDPOINTS.DETECTION_RULE_PREVIEWS, { rule, fileId }))
+      .data,
   /** Ids of the global rules switched off in a network's views. */
   suppressedIn: async (networkId: string): Promise<string[]> =>
     (
