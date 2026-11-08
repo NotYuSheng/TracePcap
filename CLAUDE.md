@@ -34,7 +34,7 @@ Only build a custom component if SGDS has no equivalent.
 - **DB**: PostgreSQL with Flyway migrations
 - **Storage**: MinIO
 - **Build**: Docker Compose — run `docker compose build` to build, `docker compose up -d` to start
-- **After every change**: run `docker compose up -d --build` to rebuild and restart all services
+- **After every change**: run `scripts/rebuild.sh` to rebuild and restart all services. It builds one image at a time; `docker compose up -d --build` builds them in parallel and, next to a running stack and a `mvn verify`, has frozen this 15 GB machine. Never run it alongside `mvn verify` or the frontend test suite.
 
 ## API Conventions
 

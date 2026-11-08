@@ -109,7 +109,7 @@ The script reads the spec from the **running** app, so the stack must be up to
 date with your change first:
 
 ```bash
-docker compose up -d --build      # rebuild & start the stack with your change
+scripts/rebuild.sh                # rebuild (one image at a time) & start the stack
 # the backend takes a few seconds to boot — wait until it serves the spec
 until curl -sf http://localhost:8888/v3/api-docs >/dev/null; do sleep 2; done
 node scripts/openapi-snapshot.mjs # regenerate openapi/baseline.json
