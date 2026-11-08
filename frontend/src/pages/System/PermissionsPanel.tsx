@@ -70,7 +70,11 @@ export function PermissionsPanel() {
           {manageReason}
         </Alert>
       )}
-      {error && <Alert variant="danger" className="py-2">{error}</Alert>}
+      {error && (
+        <Alert variant="danger" className="py-2">
+          {error}
+        </Alert>
+      )}
       <ul className="list-unstyled mb-0">
         {me.permissions.map(p => {
           const selectId = `perm-level-${p.action}`;
@@ -87,10 +91,14 @@ export function PermissionsPanel() {
                   aria-controls={detailId}
                   onClick={() => setOpen(expanded ? null : p.action)}
                 >
-                  {!me.canManagePermissions && <i className="bi bi-lock me-1 text-muted" aria-hidden="true" />}
+                  {!me.canManagePermissions && (
+                    <i className="bi bi-lock me-1 text-muted" aria-hidden="true" />
+                  )}
                   {p.label}
                   {p.level !== p.defaultLevel && (
-                    <span className="badge bg-secondary-subtle text-secondary-emphasis ms-2">changed</span>
+                    <span className="badge bg-secondary-subtle text-secondary-emphasis ms-2">
+                      changed
+                    </span>
                   )}
                 </button>
                 <Form.Select

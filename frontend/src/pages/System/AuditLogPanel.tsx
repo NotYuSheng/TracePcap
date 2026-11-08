@@ -71,7 +71,9 @@ export function AuditLogPanel() {
         </div>
       )}
       {result && result.total === 0 && (
-        <p className="small text-muted">{query ? `No entries match "${query}".` : 'No changes recorded yet.'}</p>
+        <p className="small text-muted">
+          {query ? `No entries match "${query}".` : 'No changes recorded yet.'}
+        </p>
       )}
       {result && result.total > 0 && (
         <>
@@ -94,7 +96,12 @@ export function AuditLogPanel() {
                       <div className="font-monospace">{e.action}</div>
                       <div className="text-muted">
                         {e.targetType}
-                        {e.targetId && <> · <span className="font-monospace">{e.targetId}</span></>}
+                        {e.targetId && (
+                          <>
+                            {' '}
+                            · <span className="font-monospace">{e.targetId}</span>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td>
