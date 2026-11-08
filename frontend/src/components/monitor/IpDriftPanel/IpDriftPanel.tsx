@@ -1,4 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { absentBadge, describeRule, presenceOf } from '@/features/monitor/utils/presence';
+import type { NetworkSettings } from '@/features/monitor/types/monitor.types';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
@@ -13,6 +15,8 @@ import { Pagination } from '@components/common/Pagination/Pagination';
 
 interface IpDriftPanelProps {
   snapshots: NetworkSnapshot[];
+  /** The network's inactivity rule (#488); defaults to today's behaviour. */
+  settings?: NetworkSettings;
   subnets?: SubnetDefinition[];
 }
 
@@ -107,10 +111,10 @@ function IpBadgeGroup({
             type="button"
             variant="secondary"
             size="sm"
-            className="text-decoration-line-through border-0 py-0 px-1"
-            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(item.entity.key) }}
+            className={absentBadge(item.entity).className}
+            style={{ ...hashBadgeStyle(item.entity.key), ...absentBadge(item.entity).style }}
             onClick={() => onAbsentClick(item.entity)}
-            title={`Last seen in ${item.entity.lastSeenFileName}`}
+            title={absentBadge(item.entity).title}
           >
             {item.entity.key}
           </Button>
@@ -266,7 +270,7 @@ function PrivateOverridesSection({
   );
 }
 
-export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => {
+export const IpDriftPanel = ({ snapshots, subnets = [], settings }: IpDriftPanelProps) => {
   const [selectedAbsent, setSelectedAbsent] = useState<AbsentEntity | null>(null);
   const [selectedIp, setSelectedIp] = useState<SelectedIp>(null);
   const [privateIps, setPrivateIps] = useState<EntityGroup>({ active: [], absent: [] });
@@ -320,6 +324,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
               lastSeenFileName: snap.fileName,
               lastSeenStartTime: snap.startTime,
               lastSeenFileId: snap.fileId,
+              presence: presenceOf(snap, sorted, settings),
             });
           }
         }
@@ -335,7 +340,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
       setLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshots.map(s => s.id).join(','), customRanges]);
+  }, [snapshots.map(s => s.id).join(','), settings?.inactivityMode, settings?.inactivityThreshold, customRanges]);
 
   if (loading) {
     return <div className="text-muted small text-center py-3"><Spinner animation="border" size="sm" className="me-2" />Loading…</div>;
@@ -469,7 +474,7 @@ export const IpDriftPanel = ({ snapshots, subnets = [] }: IpDriftPanelProps) => 
       {hasAbsent && (
         <small className="text-muted d-block mt-1">
           <i className="bi bi-info-circle me-1"></i>
-          Greyed-out addresses are no longer seen. Click for details.
+          Struck-through addresses are {describeRule(settings)}; dashed ones are quiet (not in the latest capture, but still within this network's rule). Click for details.
         </small>
       )}
       <PrivateOverridesSection

@@ -2,6 +2,7 @@ import { apiClient } from '@/services/api/client';
 import { MONITOR_ENDPOINTS } from '@/services/api/endpoints';
 import type {
   Network,
+  NetworkSettings,
   NetworkSnapshot,
   ChangeEvent,
   BaselineDefinition,
@@ -22,6 +23,10 @@ export const monitorService = {
     apiClient
       .post<Network>(MONITOR_ENDPOINTS.NETWORKS, { name, description })
       .then(r => r.data),
+
+  /** Replaces the network's settings (#488): the inactivity rule the drift panels apply. */
+  updateNetworkSettings: (id: string, settings: NetworkSettings): Promise<NetworkSettings> =>
+    apiClient.put<NetworkSettings>(MONITOR_ENDPOINTS.NETWORK_SETTINGS(id), settings).then(r => r.data),
 
   updateNetwork: (id: string, name: string, description: string): Promise<Network> =>
     apiClient

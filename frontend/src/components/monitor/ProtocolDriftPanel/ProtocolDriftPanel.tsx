@@ -1,4 +1,6 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { absentBadge, describeRule, presenceOf } from '@/features/monitor/utils/presence';
+import type { NetworkSettings } from '@/features/monitor/types/monitor.types';
 import { useState, useEffect, type CSSProperties } from 'react';
 import { Button } from '@govtechsg/sgds-react';
 import { apiClient } from '@/services/api/client';
@@ -29,6 +31,8 @@ function hashBadgeStyle(s: string): CSSProperties {
 
 interface ProtocolDriftPanelProps {
   snapshots: NetworkSnapshot[];
+  /** The network's inactivity rule (#488); defaults to today's behaviour. */
+  settings?: NetworkSettings;
 }
 
 type EntityGroup = {
@@ -86,10 +90,10 @@ function BadgeGroup({
             type="button"
             variant="secondary"
             size="sm"
-            className="text-decoration-line-through border-0 py-0 px-1"
-            style={{ fontSize: '0.75em', opacity: 0.5, ...hashBadgeStyle(item.entity.key) }}
+            className={absentBadge(item.entity).className}
+            style={{ ...hashBadgeStyle(item.entity.key), ...absentBadge(item.entity).style }}
             onClick={() => onAbsentClick(item.entity)}
-            title={`Last seen in ${item.entity.lastSeenFileName}`}
+            title={absentBadge(item.entity).title}
           >
             {item.entity.key}
           </Button>
@@ -112,7 +116,7 @@ function BadgeGroup({
 
 type SelectedEntity = { key: string; entityType: EntityType; fileId: string; isActive: boolean; lastSeenTime?: string | null; lastSeenFileName?: string | null } | null;
 
-export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
+export const ProtocolDriftPanel = ({ snapshots, settings }: ProtocolDriftPanelProps) => {
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity>(null);
   const [apps, setApps] = useState<EntityGroup>({ active: [], absent: [] });
   const [protocols, setProtocols] = useState<EntityGroup>({ active: [], absent: [] });
@@ -170,6 +174,7 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
               lastSeenFileName: snap.fileName,
               lastSeenStartTime: snap.startTime,
               lastSeenFileId: snap.fileId,
+              presence: presenceOf(snap, sorted, settings),
             });
           }
         }
@@ -181,7 +186,7 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
       setLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshots.map(s => s.id).join(',')]);
+  }, [snapshots.map(s => s.id).join(','), settings?.inactivityMode, settings?.inactivityThreshold]);
 
   if (loading) {
     return <div className="text-muted small text-center py-3"><Spinner animation="border" size="sm" className="me-2" />Loading…</div>;
@@ -242,7 +247,7 @@ export const ProtocolDriftPanel = ({ snapshots }: ProtocolDriftPanelProps) => {
       {hasAbsent && (
         <small className="text-muted d-block mt-1">
           <i className="bi bi-info-circle me-1"></i>
-          Greyed-out items are no longer seen. Click for details.
+          Struck-through items are {describeRule(settings)}; dashed ones are quiet (not in the latest capture, but still within this network's rule). Click for details.
         </small>
       )}
       {selectedEntity && (

@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.controller;
 
+import com.tracepcap.monitor.dto.NetworkSettingsDto;
 import com.tracepcap.monitor.dto.CreateNetworkRequest;
 import com.tracepcap.monitor.dto.NetworkDto;
 import com.tracepcap.monitor.dto.UpdateNetworkRequest;
@@ -45,6 +46,25 @@ public class NetworkController {
   public NetworkDto updateNetwork(
       @PathVariable UUID networkId, @Valid @RequestBody UpdateNetworkRequest request) {
     return networkService.updateNetwork(networkId, request);
+  }
+
+  @GetMapping("/{networkId}/settings")
+  @Operation(summary = "Get a network's settings (inactivity rule)")
+  public NetworkSettingsDto getSettings(@PathVariable UUID networkId) {
+    return networkService.getSettings(networkId);
+  }
+
+  @PutMapping("/{networkId}/settings")
+  @Operation(
+      summary = "Replace a network's settings (inactivity rule)",
+      description =
+          "inactivityMode SNAPSHOTS: a device, IP or protocol is 'no longer seen' once missing from"
+              + " the last inactivityThreshold captures. DAYS: once not seen for more than"
+              + " inactivityThreshold days, counted from the latest capture. Before that it's"
+              + " 'quiet'. Default SNAPSHOTS / 1, which is the behaviour before this setting.")
+  public NetworkSettingsDto updateSettings(
+      @PathVariable UUID networkId, @Valid @RequestBody NetworkSettingsDto settings) {
+    return networkService.updateSettings(networkId, settings);
   }
 
   @DeleteMapping("/{networkId}")

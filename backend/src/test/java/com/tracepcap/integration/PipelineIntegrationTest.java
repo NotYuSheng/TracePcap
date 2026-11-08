@@ -454,6 +454,39 @@ class PipelineIntegrationTest {
     assertThat(folders).containsExactlyInAnyOrder("Clark Collier:USERS", "Dana Lee:CUSTOM");
   }
 
+  /**
+   * Per-network inactivity settings (#488): a new network starts on the default (captures, 1:
+   * the behaviour before the setting existed), a valid rule is saved and returned on the network,
+   * and an invalid one is a 400 with validation errors.
+   */
+  @Test
+  void networkSettings_defaultSaveAndValidate() {
+    String id =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"settings-net\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    String url = "/api/v1/monitor/networks/" + id + "/settings";
+
+    JsonNode defaults = rest.getForEntity(url, JsonNode.class).getBody();
+    assertThat(defaults.get("inactivityMode").asText()).isEqualTo("SNAPSHOTS");
+    assertThat(defaults.get("inactivityThreshold").asInt()).isEqualTo(1);
+
+    ResponseEntity<JsonNode> saved =
+        rest.exchange(url, HttpMethod.PUT, json("{\"inactivityMode\":\"DAYS\",\"inactivityThreshold\":14}"), JsonNode.class);
+    assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+    JsonNode network = rest.getForEntity("/api/v1/monitor/networks/" + id, JsonNode.class).getBody();
+    assertThat(network.path("settings").path("inactivityMode").asText()).isEqualTo("DAYS");
+    assertThat(network.path("settings").path("inactivityThreshold").asInt()).isEqualTo(14);
+
+    ResponseEntity<JsonNode> zero =
+        rest.exchange(url, HttpMethod.PUT, json("{\"inactivityMode\":\"SNAPSHOTS\",\"inactivityThreshold\":0}"), JsonNode.class);
+    assertThat(zero.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(zero.getBody().path("validationErrors").has("inactivityThreshold")).isTrue();
+
+    ResponseEntity<JsonNode> noMode =
+        rest.exchange(url, HttpMethod.PUT, json("{\"inactivityThreshold\":3}"), JsonNode.class);
+    assertThat(noMode.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

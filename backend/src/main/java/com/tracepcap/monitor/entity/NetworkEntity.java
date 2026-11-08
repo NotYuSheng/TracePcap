@@ -35,6 +35,15 @@ public class NetworkEntity {
   @Column(columnDefinition = "TEXT")
   private String description;
 
+  /** SNAPSHOTS | DAYS: see NetworkSettingsDto (#488). Default SNAPSHOTS, 1 = today's behaviour. */
+  @Builder.Default
+  @Column(name = "inactivity_mode", nullable = false, length = 10)
+  private String inactivityMode = "SNAPSHOTS";
+
+  @Builder.Default
+  @Column(name = "inactivity_threshold", nullable = false)
+  private int inactivityThreshold = 1;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;

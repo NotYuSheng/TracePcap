@@ -2337,6 +2337,9 @@
           "name": {
             "type": "string"
           },
+          "settings": {
+            "$ref": "#/components/schemas/NetworkSettingsDto"
+          },
           "snapshotCount": {
             "format": "int32",
             "type": "integer"
@@ -2454,6 +2457,28 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "NetworkSettingsDto": {
+        "properties": {
+          "inactivityMode": {
+            "enum": [
+              "SNAPSHOTS",
+              "DAYS"
+            ],
+            "type": "string"
+          },
+          "inactivityThreshold": {
+            "format": "int32",
+            "maximum": 3650,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inactivityMode",
+          "inactivityThreshold"
+        ],
         "type": "object"
       },
       "NetworkSnapshotDto": {
@@ -7736,6 +7761,79 @@
         "summary": "Get the latest generated insight for a network",
         "tags": [
           "Network Insights"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/settings": {
+      "get": {
+        "operationId": "getSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkSettingsDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get a network's settings (inactivity rule)",
+        "tags": [
+          "Monitor Networks"
+        ]
+      },
+      "put": {
+        "description": "inactivityMode SNAPSHOTS: a device, IP or protocol is 'no longer seen' once missing from the last inactivityThreshold captures. DAYS: once not seen for more than inactivityThreshold days, counted from the latest capture. Before that it's 'quiet'. Default SNAPSHOTS / 1, which is the behaviour before this setting.",
+        "operationId": "updateSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkSettingsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkSettingsDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Replace a network's settings (inactivity rule)",
+        "tags": [
+          "Monitor Networks"
         ]
       }
     },

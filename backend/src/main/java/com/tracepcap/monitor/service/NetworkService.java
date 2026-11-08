@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import com.tracepcap.monitor.dto.NetworkSettingsDto;
 import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
@@ -68,6 +69,33 @@ public class NetworkService {
     networkRepository.deleteById(networkId);
   }
 
+  @Transactional(readOnly = true)
+  public NetworkSettingsDto getSettings(UUID networkId) {
+    return settingsOf(findOrThrow(networkId));
+  }
+
+  /** Replaces the network's settings (#488). Validated by the controller's @Valid. */
+  public NetworkSettingsDto updateSettings(UUID networkId, NetworkSettingsDto settings) {
+    NetworkEntity entity = findOrThrow(networkId);
+    entity.setInactivityMode(settings.getInactivityMode().name());
+    entity.setInactivityThreshold(settings.getInactivityThreshold());
+    return settingsOf(networkRepository.save(entity));
+  }
+
+  private static NetworkSettingsDto settingsOf(NetworkEntity e) {
+    NetworkSettingsDto.InactivityMode mode;
+    try {
+      mode = NetworkSettingsDto.InactivityMode.valueOf(e.getInactivityMode());
+    } catch (IllegalArgumentException | NullPointerException ex) {
+      mode = NetworkSettingsDto.DEFAULT_MODE; // the CHECK constraint makes this unreachable
+    }
+    return NetworkSettingsDto.builder()
+        .inactivityMode(mode)
+        .inactivityThreshold(
+            e.getInactivityThreshold() >= 1 ? e.getInactivityThreshold() : NetworkSettingsDto.DEFAULT_THRESHOLD)
+        .build();
+  }
+
   NetworkEntity findOrThrow(UUID networkId) {
     return networkRepository
         .findById(networkId)
@@ -111,6 +139,7 @@ public class NetworkService {
                     .criticalChanges(critical.getOrDefault(e.getId(), 0L))
                     .warningChanges(warning.getOrDefault(e.getId(), 0L))
                     .hasInsights(withInsights.contains(e.getId()))
+                    .settings(settingsOf(e))
                     .createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt())
                     .build())

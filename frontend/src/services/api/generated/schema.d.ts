@@ -1238,6 +1238,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/monitor/networks/{networkId}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a network's settings (inactivity rule) */
+        get: operations["getSettings"];
+        /**
+         * Replace a network's settings (inactivity rule)
+         * @description inactivityMode SNAPSHOTS: a device, IP or protocol is 'no longer seen' once missing from the last inactivityThreshold captures. DAYS: once not seen for more than inactivityThreshold days, counted from the latest capture. Before that it's 'quiet'. Default SNAPSHOTS / 1, which is the behaviour before this setting.
+         */
+        put: operations["updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/monitor/networks/{networkId}/snapshots": {
         parameters: {
             query?: never;
@@ -2629,6 +2650,7 @@ export interface components {
             /** Format: uuid */
             id?: string;
             name?: string;
+            settings?: components["schemas"]["NetworkSettingsDto"];
             /** Format: int32 */
             snapshotCount?: number;
             /** Format: date-time */
@@ -2672,6 +2694,12 @@ export interface components {
             recommendations?: string[];
             status?: string;
             summary?: string;
+        };
+        NetworkSettingsDto: {
+            /** @enum {string} */
+            inactivityMode: "SNAPSHOTS" | "DAYS";
+            /** Format: int32 */
+            inactivityThreshold: number;
         };
         NetworkSnapshotDto: {
             /** Format: date-time */
@@ -5288,6 +5316,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NetworkInsightDto"];
+                };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkSettingsDto"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkSettingsDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkSettingsDto"];
                 };
             };
         };
