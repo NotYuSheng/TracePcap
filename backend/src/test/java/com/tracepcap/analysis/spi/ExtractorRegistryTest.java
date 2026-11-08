@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.tracepcap.analysis.service.ExtractionRunService;
@@ -148,6 +149,105 @@ class ExtractorRegistryTest {
     assertThat(survivor.ran).as("a peer's failure must not stop this one").isTrue();
     assertThat(conversations.get(0).getAppName()).isEqualTo("PROBE");
     verify(manifest).record(eq(FILE_ID), eq("boom"), eq(ExtractionManifest.Status.FAILED), any());
+  }
+
+  /** A two-phase extractor (#409): the tool part runs in prepareAll, the mapping in runAll. */
+  static class TwoPhaseExtractor extends ProbeExtractor {
+    final List<String> calls;
+    final String label;
+    final int order;
+
+    TwoPhaseExtractor(List<String> calls, String label, int order) {
+      this.calls = calls;
+      this.label = label;
+      this.order = order;
+    }
+
+    @Override
+    public String name() {
+      return label;
+    }
+
+    @Override
+    public String manifestKey() {
+      return label;
+    }
+
+    @Override
+    public int order() {
+      return order;
+    }
+
+    @Override
+    public Prepared prepare(ExtractionTarget target) {
+      // The contract: no conversations exist yet when prepare runs.
+      assertThat(target.conversations()).isEmpty();
+      calls.add(label + ":tool");
+      return conversations -> {
+        calls.add(label + ":apply");
+        conversations.forEach(c -> c.setAppName(label));
+        return Outcome.completed(label + " applied");
+      };
+    }
+
+    @Override
+    public Outcome extract(ExtractionTarget target) {
+      calls.add(label + ":extract");
+      return Outcome.completed("extract fallback");
+    }
+  }
+
+  @Test
+  void preparedExtractorsRunTheirToolOnceAndApplyInsideRunAll() {
+    List<String> calls = new ArrayList<>();
+    TwoPhaseExtractor ndpi = new TwoPhaseExtractor(calls, "first", 10);
+    ProbeExtractor plain = new ProbeExtractor(); // order 100, no prepare: falls back to extract
+    TwoPhaseExtractor tshark = new TwoPhaseExtractor(calls, "last", 200);
+    ExtractorRunner runner = new ExtractorRunner(List.of(tshark, plain, ndpi), manifest);
+    File capture = new File("/tmp/x.pcap");
+
+    ExtractorRunner.PreparedExtractions prepared = runner.prepareAll(file(), capture);
+    assertThat(calls).containsExactly("first:tool", "last:tool");
+    // Prepare writes nothing: the manifest row belongs to runAll, inside the transaction.
+    verify(manifest, never()).record(any(), any(), any(), any());
+
+    List<PcapParserService.ConversationInfo> conversations = new ArrayList<>(List.of(conversation()));
+    runner.runAll(file(), capture, conversations, prepared);
+
+    // Tools never re-run, extract() is not called for a prepared extractor, and apply keeps the
+    // declared order, so the last writer is the highest order.
+    assertThat(calls).containsExactly("first:tool", "last:tool", "first:apply", "last:apply");
+    assertThat(plain.ran).as("an unsplit extractor still runs via extract()").isTrue();
+    assertThat(conversations.get(0).getAppName()).isEqualTo("last");
+    verify(manifest).record(eq(FILE_ID), eq("first"), eq(ExtractionManifest.Status.COMPLETED), eq("first applied"));
+  }
+
+  @Test
+  void aPrepareThatThrowsIsRecordedAsFailedAndPeersStillApply() {
+    List<String> calls = new ArrayList<>();
+    TwoPhaseExtractor boom =
+        new TwoPhaseExtractor(calls, "boom", 10) {
+          @Override
+          public Prepared prepare(ExtractionTarget target) {
+            throw new IllegalStateException("suricata socket gone");
+          }
+        };
+    TwoPhaseExtractor survivor = new TwoPhaseExtractor(calls, "survivor", 20);
+    ExtractorRunner runner = new ExtractorRunner(List.of(boom, survivor), manifest);
+    File capture = new File("/tmp/x.pcap");
+
+    ExtractorRunner.PreparedExtractions prepared = runner.prepareAll(file(), capture);
+    List<PcapParserService.ConversationInfo> conversations = new ArrayList<>(List.of(conversation()));
+    runner.runAll(file(), capture, conversations, prepared);
+
+    assertThat(calls).doesNotContain("boom:extract");
+    assertThat(conversations.get(0).getAppName()).isEqualTo("survivor");
+    verify(manifest)
+        .record(
+            eq(FILE_ID),
+            eq("boom"),
+            eq(ExtractionManifest.Status.FAILED),
+            eq("IllegalStateException: suricata socket gone"));
   }
 
   /** Order is declared by the module; the runner sorts rather than knowing who goes first. */

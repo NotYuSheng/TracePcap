@@ -104,7 +104,8 @@ public class AnalysisService {
     // against a real large capture, the same follow-up the streaming design itself called for.
     List<StageStep> plan = new ArrayList<>();
     plan.add(new StageStep("Downloading capture", 3));
-    plan.add(new StageStep("Parsing packets", coldEngine ? 3 : 24));
+    // The analysers' tool runs (Suricata, nDPI, tshark) come before parsing since #409. They need
+    // only the file, and running them first keeps them outside the DB transaction.
     // The one stage whose cost is not about this capture at all: on a cold engine it is the
     // ruleset build, which dwarfs everything else and is paid once per process.
     // Labelled for what it is on a cold engine. The bar cannot move inside a stage, so this one
@@ -114,6 +115,7 @@ public class AnalysisService {
         coldEngine
             ? new StageStep("Building threat-detection ruleset (first run)", 90)
             : new StageStep("Detecting applications & threats", 21));
+    plan.add(new StageStep("Parsing packets", coldEngine ? 3 : 24));
     plan.add(new StageStep("Classifying hosts & geo-locating", coldEngine ? 2 : 30));
     plan.add(new StageStep("Saving analysis summary", 1));
     plan.add(new StageStep("Finalizing conversations", 1));
@@ -172,6 +174,12 @@ public class AnalysisService {
   private final HostnameClaimWriter hostnameClaimWriter;
   private final SuricataEngine suricataEngine;
   private final WindowsIdentityResolverService windowsIdentityResolverService;
+  private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  /** The pipeline's one write transaction (see analyzeFile). Package-private for the boundary test. */
+  org.springframework.transaction.support.TransactionTemplate pipelineTx() {
+    return new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+  }
 
   /**
    * Runs the capture through the pipeline (#512 slice 7).
@@ -184,8 +192,14 @@ public class AnalysisService {
    * <p>What stays here is what genuinely belongs to the whole job: the guard against re-analysis,
    * the temp file's lifetime, and the failure path — which has to mark the record FAILED in its own
    * committed transaction, since the one being rolled back cannot record why it failed.
+   *
+   * <p><b>Not {@code @Transactional}, on purpose (#409).</b> Downloading the capture and the
+   * analysers' tool runs ({@link ExtractorRunner#prepareAll}) need only the file, and they are about
+   * 90% of the wall-clock time. They run first, with no transaction open. Everything that writes,
+   * from the streaming parse through completion, then runs in one {@link #pipelineTx} transaction.
+   * So a failure still rolls back every partial row, exactly as before, but a connection is held
+   * for seconds instead of the whole job. {@code AnalysisTransactionBoundaryTest} pins both halves.
    */
-  @Transactional
   public void analyzeFile(UUID fileId) {
     log.info("Starting analysis for file: {}", fileId);
 
@@ -214,14 +228,30 @@ public class AnalysisService {
       File tempFile = File.createTempFile("pcap-", ".pcap");
       run.pcap = tempFile;
       try {
+        // No transaction open: file-only work.
         downloadCapture(run);
-        parseCapture(run);
-        runExtractors(run);
-        enrichAndClassify(run);
-        persistAnalysisResult(run);
-        persistConversationsAndPackets(run);
-        extractEmbeddedFiles(run);
-        completeFile(run);
+        prepareExtractors(run);
+
+        // One transaction for every write. The batch flush in the streaming parse
+        // (EntityManager.flush) throws without one. AFTER_COMMIT listeners (analysis trigger,
+        // identity adjudication) fire when it commits.
+        pipelineTx()
+            .executeWithoutResult(
+                status -> {
+                  // Re-read inside the transaction so completeFile updates a managed entity. The
+                  // copy loaded above is detached by now.
+                  run.file =
+                      fileRepository
+                          .findById(fileId)
+                          .orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+                  parseCapture(run);
+                  runExtractors(run);
+                  enrichAndClassify(run);
+                  persistAnalysisResult(run);
+                  persistConversationsAndPackets(run);
+                  extractEmbeddedFiles(run);
+                  completeFile(run);
+                });
 
         log.info(
             "[{}] Analysis complete: total {}ms",
@@ -265,12 +295,16 @@ public class AnalysisService {
    */
   private static final class Run {
     final UUID fileId;
-    final FileEntity file;
+    /** Detached copy before the pipeline transaction; re-read inside it. */
+    FileEntity file;
     final List<StageStep> plan;
     final AnalysisResultEntity analysis;
 
     /** Stage 1 writes; stages 2, 3, 4 and 7 read. Deleted by the caller's finally. */
     File pcap;
+
+    /** The analysers' tool output, from before the transaction; applied in stage 3. */
+    ExtractorRunner.PreparedExtractions prepared = ExtractorRunner.PreparedExtractions.NONE;
 
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
@@ -298,7 +332,7 @@ public class AnalysisService {
   // ── Stage 2: parse ──────────────────────────────────────────────────────────
 
   private void parseCapture(Run run) {
-    reportStage(run.fileId, run.plan, 1);
+    reportStage(run.fileId, run.plan, 2);
     long t = System.currentTimeMillis();
 
     // `packets` is LIST-partitioned on file_id (#394) and has no default partition, so the
@@ -425,10 +459,22 @@ public class AnalysisService {
    * row is automatic (#512).
    */
   private void runExtractors(Run run) {
-    reportStage(run.fileId, run.plan, 2);
+    // No reportStage: the visible "Detecting applications & threats" step was prepareExtractors.
+    // This is the apply half, which takes milliseconds.
     long t = System.currentTimeMillis();
-    extractorRunner.runAll(run.file, run.pcap, run.parseResult.getConversations());
-    log.info("[{}] [3/7] Extract: {}ms", run.fileId, System.currentTimeMillis() - t);
+    extractorRunner.runAll(run.file, run.pcap, run.parseResult.getConversations(), run.prepared);
+    log.info("[{}] [3/7] Extract (apply): {}ms", run.fileId, System.currentTimeMillis() - t);
+  }
+
+  /** Runs the analysers' tools on the file, before the pipeline transaction opens (#409). */
+  private void prepareExtractors(Run run) {
+    reportStage(run.fileId, run.plan, 1);
+    long t = System.currentTimeMillis();
+    run.prepared = extractorRunner.prepareAll(run.file, run.pcap);
+    log.info(
+        "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
+        run.fileId,
+        System.currentTimeMillis() - t);
   }
 
   // ── Stage 4: signatures, classification, geo-IP ─────────────────────────────

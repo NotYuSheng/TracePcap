@@ -1,51 +1,82 @@
 package com.tracepcap.analysis.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * {@code analyzeFile} must run in a transaction.
+ * Pins where the analysis pipeline's transaction starts and ends (#409).
  *
- * <p>#750 removed the annotation while restructuring the method, and nothing noticed. It compiles,
- * every unit test passes, and small captures analyse fine — JPA autocommits each save on its own.
- * The failure needs more than {@code JPA_FLUSH_INTERVAL} (50) conversations in one capture, because
- * only then does the batch flush run, and {@code EntityManager.flush()} outside a transaction
- * throws {@code TransactionRequiredException}. Every fixture used to verify that change was smaller
- * than that, so the pipeline reported success on small files and failed on real ones.
+ * <p>Two properties, each of which has been lost once:
  *
- * <p>An annotation assertion is a blunt test, and the right one here: the defect was not bad logic,
- * it was a silently deleted line that no behavioural test in reach could see.
+ * <ul>
+ *   <li><b>Every write runs in a real transaction.</b> #750 removed {@code @Transactional} while
+ *       restructuring, and nothing noticed. Small captures analysed fine, because JPA autocommits
+ *       each save. The failure needs more than {@code JPA_FLUSH_INTERVAL} (50) conversations,
+ *       because only then does the batch {@code EntityManager.flush()} run, and outside a
+ *       transaction it throws. {@code PipelineIntegrationTest} now analyses such a capture. This
+ *       test catches the copy-paste version: a read-only or suspended template.
+ *   <li><b>The tool runs are outside it.</b> Until #409, the whole method was
+ *       {@code @Transactional}, so Suricata, ndpiReader and tshark (about 90% of an analysis) held
+ *       a pooled connection open and idle. Re-adding the annotation would compile and pass every
+ *       functional test.
+ * </ul>
  */
 class AnalysisTransactionBoundaryTest {
 
   @Test
-  void analyzeFileIsTransactional() throws Exception {
-    Method analyze = AnalysisService.class.getMethod("analyzeFile", java.util.UUID.class);
+  void analyzeFileDoesNotWrapTheToolRunsInATransaction() throws Exception {
+    Method analyze = AnalysisService.class.getMethod("analyzeFile", UUID.class);
 
-    Transactional tx = analyze.getAnnotation(Transactional.class);
-
-    assertThat(tx)
+    assertThat(analyze.getAnnotation(Transactional.class))
         .as(
-            "analyzeFile writes conversations and packets in a batch and calls "
-                + "EntityManager.flush() every %d conversations; without a transaction that throws "
-                + "on any capture large enough to reach the flush",
-            50)
-        .isNotNull();
+            "analyzeFile must not be @Transactional: the download and ExtractorRunner.prepareAll"
+                + " would then hold a DB connection for the length of every Suricata run (#409)."
+                + " The writes have their own transaction, in pipelineTx()")
+        .isNull();
+    assertThat(AnalysisService.class.getAnnotation(Transactional.class))
+        .as("a class-level @Transactional would re-wrap analyzeFile")
+        .isNull();
+  }
 
-    // Presence alone is not the property. readOnly = true is a plausible copy-paste from the four
-    // read-only methods below this one, and NOT_SUPPORTED suspends the transaction outright —
-    // both would satisfy isAnnotationPresent while reproducing the bug exactly.
-    assertThat(tx.readOnly()).as("a read-only transaction cannot flush writes").isFalse();
-    assertThat(tx.propagation())
-        .as("the pipeline must run inside a real transaction, not with one suspended")
-        .isIn(Propagation.REQUIRED, Propagation.REQUIRES_NEW);
+  @Test
+  void theWritePhaseRunsInARealReadWriteTransaction() throws Exception {
+    TransactionTemplate tx = serviceWithOnly(mock(PlatformTransactionManager.class)).pipelineTx();
 
-    // AdjudicatorRunner listens for AnalysisCompletedEvent on AFTER_COMMIT. With no transaction
-    // there is no commit, so identity adjudication was skipped for every file — including the
-    // small ones that appeared to analyse fine.
+    // readOnly is a plausible copy-paste from the read-only query methods in the same class, and
+    // NOT_SUPPORTED/NEVER suspend the transaction. Both would reproduce the #750 failure exactly.
+    assertThat(tx.isReadOnly()).as("a read-only transaction cannot flush writes").isFalse();
+    assertThat(tx.getPropagationBehavior())
+        .as("the write phase must run inside a real transaction, not with one suspended")
+        .isIn(TransactionDefinition.PROPAGATION_REQUIRED, TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    assertThat(tx.getTransactionManager()).isNotNull();
+  }
+
+  /**
+   * Builds the service with every collaborator null except the transaction manager. Reflection
+   * rather than a 25-argument call, so adding a dependency doesn't break this test.
+   */
+  private static AnalysisService serviceWithOnly(PlatformTransactionManager txManager)
+      throws Exception {
+    Constructor<?> ctor =
+        Arrays.stream(AnalysisService.class.getDeclaredConstructors())
+            .max((a, b) -> Integer.compare(a.getParameterCount(), b.getParameterCount()))
+            .orElseThrow();
+    Object[] args = new Object[ctor.getParameterCount()];
+    Class<?>[] types = ctor.getParameterTypes();
+    for (int i = 0; i < types.length; i++) {
+      if (types[i] == PlatformTransactionManager.class) args[i] = txManager;
+    }
+    ctor.setAccessible(true);
+    return (AnalysisService) ctor.newInstance(args);
   }
 }

@@ -77,6 +77,7 @@ class PipelineIntegrationTest {
   @Autowired private com.tracepcap.analysis.service.ExtractionRunService extractionRunService;
   @Autowired private com.tracepcap.extraction.repository.ExtractedFileRepository extractedFiles;
   @Autowired private com.tracepcap.file.repository.FileRepository files;
+  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   @Test
   void filesList_returnsPagedResponseEnvelope() {
@@ -343,6 +344,39 @@ class PipelineIntegrationTest {
             JsonNode.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  /**
+   * A full analysis of a capture past the batch-flush threshold completes (#409, #750).
+   *
+   * <p>The pipeline flushes every {@code JPA_FLUSH_INTERVAL} (50) conversations, and
+   * {@code EntityManager.flush()} throws outside a transaction. Every other fixture here has fewer
+   * than 50 conversations, which is how #750 shipped a pipeline with no transaction at all: small
+   * captures analysed fine. {@code many-conversations.pcap} is {@code sample-files/whatsapp.pcap}
+   * (86 conversations), so this one reaches the flush. It also exercises the #409 split for real:
+   * tool runs with no transaction open, then one transaction for every write.
+   */
+  @Test
+  void analysisOfACapturePastTheFlushThreshold_completes() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("many-conversations.pcap");
+    assertThat(upload.getStatusCode()).isIn(HttpStatus.CREATED, HttpStatus.CONFLICT);
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+
+    String status = "processing";
+    long deadline = System.currentTimeMillis() + 120_000;
+    while ("processing".equals(status) && System.currentTimeMillis() < deadline) {
+      Thread.sleep(500);
+      status = rest.getForEntity("/api/v1/files/" + fileId, JsonNode.class).getBody().get("status").asText();
+    }
+
+    assertThat(status).as("analysis of an 86-conversation capture").isEqualTo("completed");
+    Integer conversations =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM conversations WHERE file_id = ?::uuid", Integer.class, fileId);
+    assertThat(conversations).as("enough to have reached the batch flush").isGreaterThan(50);
   }
 
   /**
