@@ -3,7 +3,7 @@
 --
 -- Existing duplicates can't simply be deleted: each one is a user's file with its own analysis.
 -- Instead, keep the hash on the newest row per hash (the one duplicate detection already returns,
--- findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc) and clear it on the older copies. file_hash is used
+-- findFirstByFileHashOrderByUploadedAtDesc) and clear it on the older copies. file_hash is used
 -- only for duplicate detection and is shown nowhere, so nothing visible changes. Postgres allows
 -- any number of NULLs under a unique index.
 UPDATE files f
