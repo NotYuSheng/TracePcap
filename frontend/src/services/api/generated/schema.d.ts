@@ -1246,7 +1246,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get a network's settings (inactivity rule) */
-        get: operations["getSettings"];
+        get: operations["getSettings_1"];
         /**
          * Replace a network's settings (inactivity rule)
          * @description inactivityMode SNAPSHOTS: a device, IP or protocol is 'no longer seen' once missing from the last inactivityThreshold captures. DAYS: once not seen for more than inactivityThreshold days, counted from the latest capture. Before that it's 'quiet'. Default SNAPSHOTS / 1, which is the behaviour before this setting.
@@ -1676,6 +1676,26 @@ export interface paths {
         };
         /** Get runtime limits (upload size, analysis and LLM timeouts) */
         get: operations["getLimits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every deploy-time setting with its effective value (read-only)
+         * @description Lists each environment-driven setting, grouped as infrastructure, memory-tied or analysis policy, with its effective value and why it can't be changed in the app. Secrets are reported as set or not set; their values are never returned.
+         */
+        get: operations["getSettings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3042,6 +3062,18 @@ export interface components {
             description?: string;
             inherited?: boolean;
             label?: string;
+        };
+        SystemSettingDto: {
+            defaultValue?: string;
+            description?: string;
+            editable?: boolean;
+            group?: string;
+            key?: string;
+            label?: string;
+            lockedReason?: string;
+            secret?: boolean;
+            set?: boolean;
+            value?: string;
         };
         TimelineDataDto: {
             /** Format: int64 */
@@ -5329,7 +5361,7 @@ export interface operations {
             };
         };
     };
-    getSettings: {
+    getSettings_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6121,6 +6153,26 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"][];
                 };
             };
         };

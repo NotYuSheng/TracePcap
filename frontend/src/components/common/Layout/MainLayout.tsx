@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
+import { SettingsModal } from '@components/settings/SettingsModal/SettingsModal';
 import { AuthMenu } from '@/auth/AuthMenu';
 import { getAccessToken } from '@/auth/tokenStore';
 import { env } from '@/config/env';
@@ -84,6 +85,7 @@ function useResolvedDark(themeMode: ThemeMode): boolean {
 
 export const MainLayout = () => {
   const [showSignatures, setShowSignatures] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const backendReady = useBackendReady();
   const themeMode = useStore(s => s.themeMode);
   const cycleTheme = useStore(s => s.cycleTheme);
@@ -154,6 +156,15 @@ export const MainLayout = () => {
                   type="button"
                   size="sm"
                   variant="outline-secondary"
+                  onClick={() => setShowSettings(true)}
+                  aria-label="Settings"
+                >
+                  <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline-secondary"
                   onClick={() => setShowSignatures(true)}
                 >
                   <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
@@ -165,6 +176,7 @@ export const MainLayout = () => {
         </Navbar>
       </header>
       <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
+      <SettingsModal show={showSettings} onHide={() => setShowSettings(false)} />
       <main className="main-content">{mainContent}</main>
       <footer className="main-footer mt-auto py-4">
         <Container>
