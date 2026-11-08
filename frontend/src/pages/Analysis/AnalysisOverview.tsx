@@ -178,9 +178,9 @@ export const AnalysisOverview = () => {
     }
   }, [fileId, rulesVersion, networkContext]);
 
-  const triggeredRules = Array.from(
-    new Set([...(data.triggeredCustomRules ?? []), ...(networkContext ? networkTriggered : [])])
-  ).sort();
+  // In a network, the network-aware list: stored matches minus the global rules it switched off,
+  // plus its own rules' matches (#925 phases 3-4).
+  const triggeredRules = networkContext ? networkTriggered : (data.triggeredCustomRules ?? []);
 
   const detectedApps = data.detectedApplications ?? [];
 

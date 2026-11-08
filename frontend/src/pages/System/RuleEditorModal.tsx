@@ -1,3 +1,4 @@
+import { RulePreviewPanel } from '@/features/detectionRules/RulePreviewPanel';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Col, Form, Modal, Row } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
@@ -419,6 +420,14 @@ export function RuleEditorModal({
               checked={draft.matchAll}
               onChange={e => update({ matchAll: e.target.checked })}
               disabled={saving || readOnly}
+            />
+          )}
+
+          {!readOnly && (
+            <RulePreviewPanel
+              draft={draft}
+              defaultFileId={fileId ?? rule?.fileId ?? undefined}
+              canTest={Object.keys(local).length === 0}
             />
           )}
 

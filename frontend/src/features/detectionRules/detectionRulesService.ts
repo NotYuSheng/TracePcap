@@ -89,6 +89,26 @@ export interface ReapplyJob {
   finishedAt?: string | null;
 }
 
+/** Mirrors RulePreviewDto (#925 phase 4). */
+export interface RulePreview {
+  fileId: string;
+  fileName: string;
+  /** Null when it couldn't be checked: the rule looks inside packets that were deleted. */
+  matches: number | null;
+  conversations: number;
+  packetsDeleted: boolean;
+  sample: {
+    conversationId: string;
+    srcIp: string;
+    srcPort?: number | null;
+    dstIp: string;
+    dstPort?: number | null;
+    protocol?: string | null;
+    appName?: string | null;
+    hostname?: string | null;
+  }[];
+}
+
 export function toInput(r: DetectionRule): DetectionRuleInput {
   return {
     name: r.name,
@@ -125,6 +145,18 @@ export const detectionRulesService = {
       .data,
   listCapture: async (fileId: string): Promise<DetectionRule[]> =>
     (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId))).data,
+  /** What a rule would match in one capture, without saving it (#925 phase 4). */
+  preview: async (rule: DetectionRuleInput, fileId: string): Promise<RulePreview> =>
+    (await apiClient.post<RulePreview>(API_ENDPOINTS.DETECTION_RULE_PREVIEWS, { rule, fileId })).data,
+  /** Ids of the global rules switched off in a network's views. */
+  suppressedIn: async (networkId: string): Promise<string[]> =>
+    (
+      await apiClient.get<{ ruleId: string }[]>(API_ENDPOINTS.NETWORK_RULE_SUPPRESSIONS(networkId))
+    ).data.map(s => s.ruleId),
+  setSuppressed: async (networkId: string, ruleId: string, suppressed: boolean): Promise<void> => {
+    if (suppressed) await apiClient.put(API_ENDPOINTS.NETWORK_RULE_SUPPRESSION(networkId, ruleId));
+    else await apiClient.delete(API_ENDPOINTS.NETWORK_RULE_SUPPRESSION(networkId, ruleId));
+  },
   /** The networks a capture is a snapshot of (#925 phase 3). */
   captureNetworks: async (fileId: string): Promise<{ id: string; name: string }[]> =>
     (await apiClient.get<{ id: string; name: string }[]>(API_ENDPOINTS.FILE_NETWORKS(fileId))).data,

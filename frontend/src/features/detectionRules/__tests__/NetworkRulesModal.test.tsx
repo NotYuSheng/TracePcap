@@ -63,4 +63,27 @@ describe('NetworkRulesModal (#925 phase 3)', () => {
     expect(screen.getByRole('button', { name: 'Delete hq_dns' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'View hq_dns' })).toBeEnabled()
   })
+
+  it('switches a global rule off in this network (#925 phase 4)', async () => {
+    let put = 0
+    serve(true)
+    server.use(
+      http.get('*/detection-rules', () =>
+        HttpResponse.json([{ ...netRule, id: 'g1', scope: 'GLOBAL', networkId: null, name: 'noisy_rule' }])
+      ),
+      http.get('*/monitor/networks/net-1/detection-rules/suppressions', () =>
+        HttpResponse.json(put ? [{ ruleId: 'g1', ruleName: 'noisy_rule' }] : [])
+      ),
+      http.put('*/monitor/networks/net-1/detection-rules/suppressions/g1', () => {
+        put++
+        return HttpResponse.json([{ ruleId: 'g1', ruleName: 'noisy_rule' }])
+      })
+    )
+    render(<NetworkRulesModal show networkId="net-1" networkName="HQ" onHide={() => {}} />)
+    const toggle = await screen.findByLabelText('noisy_rule applies in this network')
+    expect(toggle).toBeChecked()
+    await userEvent.click(toggle)
+    await waitFor(() => expect(put).toBe(1))
+    expect(await screen.findByText('off here')).toBeInTheDocument()
+  })
 })
