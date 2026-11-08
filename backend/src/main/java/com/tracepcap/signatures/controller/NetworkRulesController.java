@@ -36,6 +36,29 @@ public class NetworkRulesController {
     return service.listNetwork(networkId);
   }
 
+  @GetMapping("/suppressions")
+  @Operation(summary = "The global rules switched off in this network's views")
+  public List<com.tracepcap.signatures.dto.RuleSuppressionDto> suppressions(@PathVariable UUID networkId) {
+    return service.listSuppressions(networkId);
+  }
+
+  @org.springframework.web.bind.annotation.PutMapping("/suppressions/{ruleId}")
+  @Operation(
+      summary = "Switch a global rule off in this network's views (audited, idempotent)",
+      description = "The rule keeps running elsewhere; its matches are hidden when viewed in this network.")
+  public List<com.tracepcap.signatures.dto.RuleSuppressionDto> suppress(
+      @PathVariable UUID networkId, @PathVariable UUID ruleId) {
+    service.setSuppressed(networkId, ruleId, true);
+    return service.listSuppressions(networkId);
+  }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/suppressions/{ruleId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Switch a global rule back on in this network's views (audited)")
+  public void unsuppress(@PathVariable UUID networkId, @PathVariable UUID ruleId) {
+    service.setSuppressed(networkId, ruleId, false);
+  }
+
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(

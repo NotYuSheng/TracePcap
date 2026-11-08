@@ -49,6 +49,11 @@ public class DetectionRuleService {
   private final RuleSyncService ruleSync;
   private final com.tracepcap.file.repository.FileRepository fileRepository;
   private final com.tracepcap.monitor.repository.NetworkRepository networkRepository;
+  private final CustomSignatureService matcher;
+  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  /** How many matching conversations a preview lists. */
+  public static final int PREVIEW_SAMPLE = 10;
 
   @Transactional(readOnly = true)
   public List<DetectionRuleDto> listGlobal() {
@@ -105,6 +110,99 @@ public class DetectionRuleService {
     DetectionRuleDto dto = toDto(e);
     auditLog.record("detection-rule.create", AUDIT_TARGET, e.getId().toString(), null, auditView(dto));
     return dto;
+  }
+
+  /**
+   * What a rule would match in one capture, without saving anything (#925 phase 4). Needs no edit
+   * permission: it only reads the capture, like viewing it.
+   */
+  @Transactional(readOnly = true)
+  public com.tracepcap.signatures.dto.RulePreviewDto preview(DetectionRuleRequest request, UUID fileId) {
+    validateOrThrow(request);
+    var file =
+        fileRepository
+            .findById(fileId)
+            .orElseThrow(() -> new ResourceNotFoundException("Capture not found: " + fileId));
+    if (file.getStatus() != com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED) {
+      throw new IllegalArgumentException("The capture's analysis hasn't completed yet.");
+    }
+    DetectionRuleEntity probe = new DetectionRuleEntity();
+    probe.setId(UUID.randomUUID());
+    copy(probe, request);
+    var convs = ruleSync.conversations(fileId);
+    var out =
+        com.tracepcap.signatures.dto.RulePreviewDto.builder()
+            .fileId(fileId)
+            .fileName(file.getFileName())
+            .conversations(convs.size());
+    if (file.getPacketsPrunedAt() != null && CustomSignatureService.isPayloadRule(probe)) {
+      return out.packetsDeleted(true).sample(List.of()).build();
+    }
+    List<UUID> hits = matcher.evaluate(convs, List.of(probe)).getOrDefault(probe.getId(), List.of());
+    Set<UUID> sampleIds = new HashSet<>(hits.subList(0, Math.min(PREVIEW_SAMPLE, hits.size())));
+    List<com.tracepcap.signatures.dto.RulePreviewDto.Sample> sample = new ArrayList<>();
+    for (var c : convs) {
+      if (!sampleIds.contains(c.getEntityId())) continue;
+      sample.add(
+          com.tracepcap.signatures.dto.RulePreviewDto.Sample.builder()
+              .conversationId(c.getEntityId())
+              .srcIp(c.getSrcIp())
+              .srcPort(c.getSrcPort())
+              .dstIp(c.getDstIp())
+              .dstPort(c.getDstPort())
+              .protocol(c.getProtocol())
+              .appName(c.getAppName())
+              .hostname(c.getHostname())
+              .build());
+    }
+    return out.matches(hits.size()).sample(sample).build();
+  }
+
+  /** The global rules switched off in one network's views (#925 phase 4). */
+  @Transactional(readOnly = true)
+  public List<com.tracepcap.signatures.dto.RuleSuppressionDto> listSuppressions(UUID networkId) {
+    return jdbc.query(
+        "SELECT s.rule_id, r.name, s.created_at, s.created_by FROM rule_suppressions s"
+            + " JOIN detection_rules r ON r.id = s.rule_id WHERE s.network_id = ? ORDER BY r.name",
+        (rs, i) ->
+            com.tracepcap.signatures.dto.RuleSuppressionDto.builder()
+                .ruleId(rs.getObject(1, UUID.class))
+                .ruleName(rs.getString(2))
+                .createdAt(rs.getTimestamp(3).toLocalDateTime())
+                .createdBy(rs.getString(4))
+                .build(),
+        networkId);
+  }
+
+  /**
+   * Switches a global rule off, or back on, within one network's views (#925 phase 4). Needs
+   * DETECTION_RULES_NETWORK; audited. Idempotent.
+   */
+  @Transactional
+  public void setSuppressed(UUID networkId, UUID ruleId, boolean suppressed) {
+    permissionService.require(PermissionAction.DETECTION_RULES_NETWORK);
+    if (!networkRepository.existsById(networkId)) {
+      throw new ResourceNotFoundException("Network not found: " + networkId);
+    }
+    DetectionRuleEntity rule = find(ruleId);
+    if (rule.getScope() != Scope.GLOBAL) {
+      throw new IllegalArgumentException("Only a global rule can be switched off for a network.");
+    }
+    int changed =
+        suppressed
+            ? jdbc.update(
+                "INSERT INTO rule_suppressions (network_id, rule_id, created_by) VALUES (?, ?, ?)"
+                    + " ON CONFLICT DO NOTHING",
+                networkId, ruleId, currentActor.username())
+            : jdbc.update("DELETE FROM rule_suppressions WHERE network_id = ? AND rule_id = ?", networkId, ruleId);
+    if (changed > 0) {
+      auditLog.record(
+          suppressed ? "detection-rule.suppress" : "detection-rule.unsuppress",
+          AUDIT_TARGET,
+          ruleId.toString(),
+          Map.of("rule", rule.getName(), "network", networkId.toString(), "suppressed", !suppressed),
+          Map.of("rule", rule.getName(), "network", networkId.toString(), "suppressed", suppressed));
+    }
   }
 
   /** One capture's own rules. */

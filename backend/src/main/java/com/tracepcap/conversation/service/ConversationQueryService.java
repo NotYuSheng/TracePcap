@@ -118,9 +118,16 @@ public class ConversationQueryService {
   @Transactional(readOnly = true)
   public PagedResponse<ConversationResponse> getConversations(
       UUID fileId, int page, int pageSize, ConversationFilterParams params, UUID networkId) {
+    java.util.Set<String> suppressed =
+        networkId == null ? java.util.Set.of() : networkRuleOverlay.suppressedNames(networkId);
     if (networkId != null && params.getCustomSignatures() != null && !params.getCustomSignatures().isEmpty()) {
+      // Global rules switched off in this network don't count (#925 phase 4); if only those were
+      // asked for, nothing matches by name (the network's own rules still can, by id).
+      List<String> wanted = params.getCustomSignatures().stream().filter(n -> !suppressed.contains(n)).toList();
       params =
           params.toBuilder()
+              // "" is no rule's name (names can't be blank), so it matches nothing by name.
+              .customSignatures(wanted.isEmpty() ? List.of("") : wanted)
               .customSignatureMatchIds(
                   networkRuleOverlay.conversationsMatching(networkId, fileId, params.getCustomSignatures()))
               .build();
@@ -131,14 +138,18 @@ public class ConversationQueryService {
     List<ConversationResponse> content = mapConversationsWithFileTypes(dbPage.content());
     if (networkId != null) {
       Map<UUID, List<String>> overlay = networkRuleOverlay.labels(networkId, fileId);
-      if (!overlay.isEmpty()) {
-        for (ConversationResponse c : content) {
-          List<String> extra = overlay.get(c.getConversationId());
-          if (extra != null) c.setCustomSignatures(mergeNames(c.getCustomSignatures(), extra));
-        }
+      for (ConversationResponse c : content) {
+        List<String> shown = withoutSuppressed(c.getCustomSignatures(), suppressed);
+        List<String> extra = overlay.get(c.getConversationId());
+        c.setCustomSignatures(extra == null ? shown : mergeNames(shown, extra));
       }
     }
     return PagedResponse.of(content, dbPage.totalElements(), page, pageSize);
+  }
+
+  private static List<String> withoutSuppressed(List<String> names, java.util.Set<String> suppressed) {
+    if (names == null || suppressed.isEmpty()) return names;
+    return names.stream().filter(n -> !suppressed.contains(n)).toList();
   }
 
   /** Stored names first, then the network's, without repeats. */
@@ -174,6 +185,7 @@ public class ConversationQueryService {
     List<String> stored = conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
     if (networkId == null) return stored;
     java.util.TreeSet<String> all = new java.util.TreeSet<>(stored);
+    all.removeAll(networkRuleOverlay.suppressedNames(networkId));
     networkRuleOverlay.labels(networkId, fileId).values().forEach(all::addAll);
     return new java.util.ArrayList<>(all);
   }
@@ -543,9 +555,11 @@ public class ConversationQueryService {
     if (networkId != null) {
       UUID fileId =
           conversationLookup.conversationFactsById(conversationId).map(ConversationFacts::fileId).orElse(null);
+      List<String> shown =
+          withoutSuppressed(detail.getCustomSignatures(), networkRuleOverlay.suppressedNames(networkId));
       List<String> extra =
           fileId == null ? null : networkRuleOverlay.labels(networkId, fileId).get(conversationId);
-      if (extra != null) detail.setCustomSignatures(mergeNames(detail.getCustomSignatures(), extra));
+      detail.setCustomSignatures(extra == null ? shown : mergeNames(shown, extra));
     }
     return detail;
   }

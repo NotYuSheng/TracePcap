@@ -47,6 +47,17 @@ public class DetectionRulesController {
     return fileId == null ? service.listGlobal() : service.listForFile(fileId, networkId);
   }
 
+  @PostMapping("/previews")
+  @Operation(
+      summary = "What a rule would match in one capture, without saving it",
+      description =
+          "Returns the number of matching conversations and a sample. Nothing is stored, so it's"
+              + " 200 rather than 201, and needs no edit permission.")
+  public com.tracepcap.signatures.dto.RulePreviewDto preview(
+      @Valid @RequestBody com.tracepcap.signatures.dto.RulePreviewRequest request) {
+    return service.preview(request.getRule(), request.getFileId());
+  }
+
   @PostMapping("/{id}/promotions")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
