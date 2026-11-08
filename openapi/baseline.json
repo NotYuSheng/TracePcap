@@ -3369,6 +3369,77 @@
         },
         "type": "object"
       },
+      "RuleReapplyJobDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "done": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          },
+          "failed": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RuleSyncStatusDto": {
+        "properties": {
+          "captures": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "staleCaptures": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "staleRules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "uncheckableCaptures": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "uncheckableRules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "ServiceServerSummaryDto": {
         "properties": {
           "anomalyRatio": {
@@ -3494,6 +3565,15 @@
             "type": "boolean"
           },
           "label": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StartReapplyRequest": {
+        "properties": {
+          "fileId": {
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -6040,6 +6120,27 @@
         ]
       }
     },
+    "/api/v1/detection-rules/status": {
+      "get": {
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSyncStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "How many captures are out of date with the enabled rules",
+        "tags": [
+          "Detection Rule Sync"
+        ]
+      }
+    },
     "/api/v1/detection-rules/{id}": {
       "delete": {
         "operationId": "delete_7",
@@ -6065,7 +6166,7 @@
         ]
       },
       "get": {
-        "operationId": "get_2",
+        "operationId": "get_3",
         "parameters": [
           {
             "in": "path",
@@ -6830,7 +6931,7 @@
         ]
       },
       "get": {
-        "operationId": "get_1",
+        "operationId": "get_2",
         "parameters": [
           {
             "in": "path",
@@ -7529,6 +7630,38 @@
         "summary": "Generate and download a PDF analysis report for a PCAP file",
         "tags": [
           "Reports"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/rule-status": {
+      "get": {
+        "operationId": "fileStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSyncStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Which enabled rules one capture is out of date for, or couldn't re-check",
+        "tags": [
+          "Detection Rule Sync"
         ]
       }
     },
@@ -9220,7 +9353,7 @@
     },
     "/api/v1/preferences": {
       "get": {
-        "operationId": "get",
+        "operationId": "get_1",
         "responses": {
           "200": {
             "content": {
@@ -9265,6 +9398,91 @@
         "summary": "Replace my preferences (shared by everyone when login is off)",
         "tags": [
           "Preferences"
+        ]
+      }
+    },
+    "/api/v1/rule-reapply-jobs": {
+      "get": {
+        "operationId": "recent",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleReapplyJobDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The most recent Re-apply jobs, newest first",
+        "tags": [
+          "Detection Rule Sync"
+        ]
+      },
+      "post": {
+        "description": "Runs in the background; poll the job. 201 for a new job; 200 with the running job if one is already running. Needs DETECTION_RULES_GLOBAL.",
+        "operationId": "start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartReapplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleReapplyJobDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Re-apply the rules to one capture, or to every out-of-date one (audited)",
+        "tags": [
+          "Detection Rule Sync"
+        ]
+      }
+    },
+    "/api/v1/rule-reapply-jobs/{id}": {
+      "get": {
+        "operationId": "get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleReapplyJobDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "One Re-apply job and its progress",
+        "tags": [
+          "Detection Rule Sync"
         ]
       }
     },
@@ -10243,6 +10461,10 @@
     {
       "description": "APIs for PCAP file upload, download, and management",
       "name": "File Management"
+    },
+    {
+      "description": "Staleness of rule matches, and re-applying rules",
+      "name": "Detection Rule Sync"
     },
     {
       "description": "The assembled knowledge board for a file — entities, relationships, and findings",

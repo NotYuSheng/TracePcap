@@ -563,6 +563,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/detection-rules/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many captures are out of date with the enabled rules */
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/detection-rules/{id}": {
         parameters: {
             query?: never;
@@ -571,7 +588,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get one detection rule */
-        get: operations["get_2"];
+        get: operations["get_3"];
         /** Replace a detection rule (audited; bumps its version if anything changed) */
         put: operations["update_1"];
         post?: never;
@@ -747,7 +764,7 @@ export interface paths {
             cookie?: never;
         };
         /** The human override for a question about an entity, if one is set */
-        get: operations["get_1"];
+        get: operations["get_2"];
         /** Set or replace the human override; re-runs adjudication (actor from token) */
         put: operations["put_1"];
         post?: never;
@@ -1025,6 +1042,23 @@ export interface paths {
         put?: never;
         /** Generate and download a PDF analysis report for a PCAP file */
         post: operations["downloadReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/rule-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which enabled rules one capture is out of date for, or couldn't re-check */
+        get: operations["fileStatus"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1561,9 +1595,47 @@ export interface paths {
             cookie?: never;
         };
         /** Get my preferences (shared by everyone when login is off) */
-        get: operations["get"];
+        get: operations["get_1"];
         /** Replace my preferences (shared by everyone when login is off) */
         put: operations["put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rule-reapply-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The most recent Re-apply jobs, newest first */
+        get: operations["recent"];
+        put?: never;
+        /**
+         * Re-apply the rules to one capture, or to every out-of-date one (audited)
+         * @description Runs in the background; poll the job. 201 for a new job; 200 with the running job if one is already running. Needs DETECTION_RULES_GLOBAL.
+         */
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rule-reapply-jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Re-apply job and its progress */
+        get: operations["get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3185,6 +3257,35 @@ export interface components {
             /** Format: int32 */
             updated?: number;
         };
+        RuleReapplyJobDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            done?: number;
+            error?: string;
+            /** Format: int32 */
+            failed?: number;
+            /** Format: uuid */
+            fileId?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: uuid */
+            id?: string;
+            requestedBy?: string;
+            status?: string;
+            /** Format: int32 */
+            total?: number;
+        };
+        RuleSyncStatusDto: {
+            /** Format: int32 */
+            captures?: number;
+            /** Format: int32 */
+            staleCaptures?: number;
+            staleRules?: string[];
+            /** Format: int32 */
+            uncheckableCaptures?: number;
+            uncheckableRules?: string[];
+        };
         ServiceServerSummaryDto: {
             /** Format: double */
             anomalyRatio?: number;
@@ -3231,6 +3332,10 @@ export interface components {
             id?: number;
             inherited?: boolean;
             label?: string;
+        };
+        StartReapplyRequest: {
+            /** Format: uuid */
+            fileId?: string;
         };
         StepExplanation: {
             explanation?: string;
@@ -4361,7 +4466,27 @@ export interface operations {
             };
         };
     };
-    get_2: {
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSyncStatusDto"];
+                };
+            };
+        };
+    };
+    get_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -4775,7 +4900,7 @@ export interface operations {
             };
         };
     };
-    get_1: {
+    get_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5202,6 +5327,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["StreamingResponseBody"];
+                };
+            };
+        };
+    };
+    fileStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSyncStatusDto"];
                 };
             };
         };
@@ -6260,7 +6407,7 @@ export interface operations {
             };
         };
     };
-    get: {
+    get_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6300,6 +6447,72 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PreferencesDto"];
+                };
+            };
+        };
+    };
+    recent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleReapplyJobDto"][];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartReapplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleReapplyJobDto"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleReapplyJobDto"];
                 };
             };
         };
