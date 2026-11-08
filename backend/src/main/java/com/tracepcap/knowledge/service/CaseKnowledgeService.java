@@ -24,13 +24,19 @@ import org.springframework.stereotype.Service;
 public class CaseKnowledgeService {
 
   private final List<KnowledgeContributor> contributors;
+  private final com.tracepcap.analysis.spi.ConversationLookup conversationLookup;
+  private final com.tracepcap.analysis.spi.HostClassificationLookup hostClassificationLookup;
 
   /** Runs every contributor and returns the assembled board. Never throws for a single bad source. */
   public CaseKnowledge assemble(UUID fileId) {
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(fileId);
+    // One context for the whole assembly, so each fact list is loaded once, not once per
+    // contributor (#816).
+    com.tracepcap.knowledge.spi.KnowledgeContext context =
+        com.tracepcap.knowledge.spi.KnowledgeContext.of(fileId, conversationLookup, hostClassificationLookup);
     for (KnowledgeContributor contributor : contributors) {
       try {
-        contributor.contribute(fileId, board);
+        contributor.contribute(context, board);
       } catch (Exception e) {
         log.warn(
             "Knowledge contributor '{}' failed for file {}: {}",

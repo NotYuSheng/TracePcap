@@ -1,18 +1,17 @@
 package com.tracepcap.knowledge.contributor;
 
-import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.GeoOrgLookup;
 import com.tracepcap.analysis.spi.GeoOrgLookup.IpAttribution;
 import com.tracepcap.common.net.IpLocality;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
+import com.tracepcap.knowledge.spi.KnowledgeContext;
 import com.tracepcap.knowledge.spi.KnowledgeContributor;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +26,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class GeoOrgContributor implements KnowledgeContributor {
 
-  private final ConversationLookup conversationLookup;
   private final GeoOrgLookup geoOrgLookup;
 
   @Override
@@ -36,9 +34,9 @@ public class GeoOrgContributor implements KnowledgeContributor {
   }
 
   @Override
-  public void contribute(UUID fileId, CaseKnowledgeBuilder board) {
+  public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
     Set<String> externals = new LinkedHashSet<>();
-    for (ConversationFacts conv : conversationLookup.conversationFacts(fileId)) {
+    for (ConversationFacts conv : context.conversationFacts()) {
       addExternal(externals, conv.flow().srcIp());
       addExternal(externals, conv.flow().dstIp());
     }

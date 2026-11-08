@@ -1,16 +1,15 @@
 package com.tracepcap.knowledge.contributor;
 
 import com.tracepcap.analysis.service.WindowsIdentityResolverService;
-import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.HostClassificationLookup.HostFacts;
 import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Grade;
+import com.tracepcap.knowledge.spi.KnowledgeContext;
 import com.tracepcap.knowledge.spi.KnowledgeContributor;
 import com.tracepcap.knowledge.spi.Relationship;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +25,6 @@ public class HostIdentityContributor implements KnowledgeContributor {
 
   static final String SIGNED_IN_AS = "signed-in-as";
 
-  private final HostClassificationLookup hostClassificationLookup;
 
   @Override
   public String name() {
@@ -34,8 +32,8 @@ public class HostIdentityContributor implements KnowledgeContributor {
   }
 
   @Override
-  public void contribute(UUID fileId, CaseKnowledgeBuilder board) {
-    for (HostFacts host : hostClassificationLookup.hostFacts(fileId)) {
+  public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    for (HostFacts host : context.hostFacts()) {
       EntityRef hostRef = EntityRef.host(host.ip());
       board.addEntity(hostRef, hostAttributes(host));
 
