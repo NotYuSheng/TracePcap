@@ -2,8 +2,6 @@ package com.tracepcap.subnets.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,9 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "subnet_definitions")
@@ -33,7 +29,7 @@ public class SubnetDefinitionEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(nullable = false, unique = true, length = 50)
+  @Column(nullable = false, length = 50)
   private String cidr;
 
   @Column(length = 100)
@@ -50,27 +46,16 @@ public class SubnetDefinitionEntity {
   @Column(nullable = false)
   private boolean confirmed = false;
 
-  // ── Staleness baseline (#363) ─────────────────────────────────────────────
-  // Captured when an analyst confirms the label: the subnet's composition (dominant member device
-  // types + protocols) at that moment. Each new snapshot is compared against this; drift sets
-  // staleSince/staleFields until the analyst re-labels or dismisses.
+  /** Null for the shared default; set for a network's own entry (#915 phase 4). */
+  @Column(name = "network_id")
+  private UUID networkId;
 
-  @Column(name = "labeled_at")
-  private LocalDateTime labeledAt;
+  /** A network entry that hides the default's subnet for this CIDR in that network. */
+  @Builder.Default
+  @Column(nullable = false)
+  private boolean hidden = false;
 
-  @Column(name = "baseline_file_id")
-  private UUID baselineFileId;
-
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "baseline_composition", columnDefinition = "jsonb")
-  private Map<String, Object> baselineComposition;
-
-  @Column(name = "stale_since")
-  private LocalDateTime staleSince;
-
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "stale_fields", columnDefinition = "jsonb")
-  private List<String> staleFields;
+  // The staleness baseline (#363) is per network now: SubnetNetworkBaselineEntity.
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

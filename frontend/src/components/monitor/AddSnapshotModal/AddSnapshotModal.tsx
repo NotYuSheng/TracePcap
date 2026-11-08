@@ -14,6 +14,8 @@ interface AddSnapshotModalProps {
   show: boolean;
   onHide: () => void;
   existingFileIds: string[];
+  /** The network the snapshot goes into: its subnets (own entries layered on the default) prefill the list. */
+  networkId?: string;
   onAdd: (fileId: string, subnetOverrides?: SubnetOverrideInput[]) => Promise<void>;
 }
 
@@ -34,6 +36,7 @@ function globalToInput(s: SubnetDefinition): SubnetOverrideInput {
 export const AddSnapshotModal = ({
   show,
   onHide,
+  networkId,
   onAdd,
 }: AddSnapshotModalProps) => {
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -84,7 +87,7 @@ export const AddSnapshotModal = ({
     if (next && !subnetOverridesActive && subnetOverrides.length === 0) {
       setLoadingSubnets(true);
       try {
-        const globals = await subnetService.list();
+        const globals = await subnetService.list(networkId);
         setSubnetOverrides(globals.map(globalToInput));
       } catch {
         // fetch failed — user can still add CIDRs manually

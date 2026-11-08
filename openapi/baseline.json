@@ -1142,9 +1142,18 @@
             ],
             "type": "string"
           },
+          "hidden": {
+            "type": "boolean"
+          },
           "id": {
             "format": "int64",
             "type": "integer"
+          },
+          "overridesDefault": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2501,11 +2510,20 @@
           "cidr": {
             "type": "string"
           },
+          "hidden": {
+            "type": "boolean"
+          },
           "id": {
             "format": "int64",
             "type": "integer"
           },
           "label": {
+            "type": "string"
+          },
+          "overridesDefault": {
+            "type": "boolean"
+          },
+          "scope": {
             "type": "string"
           }
         },
@@ -4104,6 +4122,9 @@
           "description": {
             "type": "string"
           },
+          "hidden": {
+            "type": "boolean"
+          },
           "hostCount": {
             "format": "int32",
             "type": "integer"
@@ -4117,6 +4138,12 @@
           },
           "labeledAt": {
             "format": "date-time",
+            "type": "string"
+          },
+          "overridesDefault": {
+            "type": "boolean"
+          },
+          "scope": {
             "type": "string"
           },
           "snapshotsSeen": {
@@ -4600,6 +4627,9 @@
           "description": {
             "type": "string"
           },
+          "hidden": {
+            "type": "boolean"
+          },
           "label": {
             "type": "string"
           },
@@ -4810,7 +4840,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_10",
+        "operationId": "list_11",
         "parameters": [
           {
             "in": "query",
@@ -6310,7 +6340,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_9",
+        "operationId": "list_10",
         "responses": {
           "200": {
             "content": {
@@ -6389,7 +6419,7 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_8",
+        "operationId": "list_9",
         "parameters": [
           {
             "in": "query",
@@ -7550,7 +7580,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "path",
@@ -8237,7 +8267,7 @@
     },
     "/api/v1/files/{fileId}/networks": {
       "get": {
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "in": "path",
@@ -8599,7 +8629,7 @@
     },
     "/api/v1/ip-org-rules": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_6",
         "responses": {
           "200": {
             "content": {
@@ -8846,7 +8876,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations": {
       "get": {
-        "operationId": "list_4",
+        "operationId": "list_5",
         "parameters": [
           {
             "in": "path",
@@ -9216,9 +9246,120 @@
         ]
       }
     },
+    "/api/v1/monitor/networks/{networkId}/custom-private-ranges": {
+      "get": {
+        "operationId": "listRanges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomPrivateRangeDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A network's private/public range overrides: its own entries and the default's",
+        "tags": [
+          "Network address configuration"
+        ]
+      },
+      "post": {
+        "description": "With hidden=true, hides the default's entry for the CIDR. Needs NETWORK_SETTINGS. Audited.",
+        "operationId": "putRange",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomPrivateRangeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomPrivateRangeDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Set the network's range override for a CIDR, or hide the default's",
+        "tags": [
+          "Network address configuration"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/custom-private-ranges/{id}": {
+      "delete": {
+        "description": "Needs NETWORK_SETTINGS. Audited.",
+        "operationId": "revertRange",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Remove the network's range entry, so the default applies again",
+        "tags": [
+          "Network address configuration"
+        ]
+      }
+    },
     "/api/v1/monitor/networks/{networkId}/detection-rules": {
       "get": {
-        "operationId": "list_3",
+        "operationId": "list_4",
         "parameters": [
           {
             "in": "path",
@@ -9406,7 +9547,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/external-events": {
       "get": {
-        "operationId": "list_2",
+        "operationId": "list_3",
         "parameters": [
           {
             "in": "path",
@@ -9632,6 +9773,117 @@
         "summary": "Get the latest generated insight for a network",
         "tags": [
           "Network Insights"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/ip-org-rules": {
+      "get": {
+        "operationId": "listOrgRules",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IpOrgRuleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A network's IP-org rules: its own entries and the default's",
+        "tags": [
+          "Network address configuration"
+        ]
+      },
+      "post": {
+        "description": "With hidden=true, hides the default's rule for the CIDR. Needs NETWORK_SETTINGS. Audited.",
+        "operationId": "putOrgRule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IpOrgRuleDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpOrgRuleDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Set the network's IP-org rule for a CIDR, or hide the default's",
+        "tags": [
+          "Network address configuration"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/ip-org-rules/{id}": {
+      "delete": {
+        "description": "Needs NETWORK_SETTINGS. Audited.",
+        "operationId": "revertOrgRule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Remove the network's IP-org rule, so the default applies again",
+        "tags": [
+          "Network address configuration"
         ]
       }
     },
@@ -9954,6 +10206,118 @@
         "summary": "Get the latest generated insight for a snapshot",
         "tags": [
           "Snapshot Insights"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/subnets": {
+      "get": {
+        "description": "Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.",
+        "operationId": "list_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubnetDefinitionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A network's subnets: its own entries and the default's",
+        "tags": [
+          "Network address configuration"
+        ]
+      },
+      "post": {
+        "description": "An override or an addition; with hidden=true, hides the default's subnet. Needs NETWORK_SETTINGS. Audited.",
+        "operationId": "put_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSubnetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubnetDefinitionDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Set the network's subnet for a CIDR, or hide the default's",
+        "tags": [
+          "Network address configuration"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/subnets/{subnetId}": {
+      "delete": {
+        "description": "Needs NETWORK_SETTINGS. Audited.",
+        "operationId": "revert",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "subnetId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Remove the network's entry, so the default applies again",
+        "tags": [
+          "Network address configuration"
         ]
       }
     },
@@ -10608,7 +10972,19 @@
     },
     "/api/v1/subnets": {
       "get": {
+        "description": "Without networkId, the shared default. With networkId, the subnets in effect in that network (its own entries layered on the default, #915 phase 4), with staleness against that network's snapshots.",
         "operationId": "list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -11419,6 +11795,10 @@
     {
       "description": "Binned traffic statistics over time for a file",
       "name": "Timeline"
+    },
+    {
+      "description": "A network's own entries on top of the shared default",
+      "name": "Network address configuration"
     },
     {
       "description": "Manage monitored networks",

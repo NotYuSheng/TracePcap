@@ -45,7 +45,13 @@ public class SubnetOverlapDetectionService {
   public List<SubnetOverlapWarningDto> detect(UUID networkId) {
     if (networkId == null) return List.of();
 
-    List<SubnetDefinitionEntity> subnets = subnetRepo.findAll();
+    // The subnets in effect for this network (#915 phase 4): its own entries layered on the default.
+    List<SubnetDefinitionEntity> subnets =
+        com.tracepcap.common.net.NetworkLayering.effective(
+            subnetRepo.findByNetworkIdIsNullOrderByCidr(),
+            subnetRepo.findByNetworkIdOrderByCidr(networkId),
+            SubnetDefinitionEntity::getCidr,
+            SubnetDefinitionEntity::isHidden);
     if (subnets.isEmpty()) return List.of();
 
     // Precompute CIDR integer ranges once.

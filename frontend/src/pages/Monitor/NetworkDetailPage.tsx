@@ -398,6 +398,7 @@ export const NetworkDetailPage = () => {
         show={showAddSnapshot}
         onHide={() => setShowAddSnapshot(false)}
         existingFileIds={snapshots.map(s => s.fileId)}
+        networkId={networkId}
         onAdd={data.handleAddSnapshot}
       />
       {network && (

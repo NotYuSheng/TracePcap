@@ -647,6 +647,124 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
+   * shared default per CIDR (override, add, hide), the default is unaffected, every change is
+   * audited, and reverting brings the default back.
+   */
+  @Test
+  void networkAddressConfig_layersOnTheDefault_perCidr() {
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"layer-net\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    String base = "/api/v1/monitor/networks/" + net;
+    long rangeId = rest.postForEntity("/api/v1/custom-private-ranges",
+            json("{\"cidr\":\"10.250.0.0/16\",\"classification\":\"PRIVATE\"}"), JsonNode.class)
+        .getBody().get("id").asLong();
+    long orgId = rest.postForEntity("/api/v1/ip-org-rules",
+            json("{\"cidr\":\"10.250.0.0/16\",\"label\":\"Corp\"}"), JsonNode.class)
+        .getBody().get("id").asLong();
+    long subnetId = rest.postForEntity("/api/v1/subnets",
+            json("{\"cidr\":\"10.250.1.0/24\",\"label\":\"Servers\"}"), JsonNode.class)
+        .getBody().get("id").asLong();
+    try {
+      // Override the range, hide the org rule, add an org rule, override the subnet's label.
+      ResponseEntity<JsonNode> r = rest.postForEntity(base + "/custom-private-ranges",
+          json("{\"cidr\":\"10.250.0.0/16\",\"classification\":\"PUBLIC\"}"), JsonNode.class);
+      assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(rest.postForEntity(base + "/ip-org-rules",
+          json("{\"cidr\":\"10.250.0.0/16\",\"hidden\":true}"), JsonNode.class).getStatusCode())
+          .isEqualTo(HttpStatus.CREATED);
+      rest.postForEntity(base + "/ip-org-rules", json("{\"cidr\":\"10.251.0.0/16\",\"label\":\"Branch\"}"), JsonNode.class);
+      rest.postForEntity(base + "/subnets", json("{\"cidr\":\"10.250.1.0/24\",\"label\":\"HQ servers\"}"), JsonNode.class);
+
+      JsonNode ranges = rest.getForEntity(base + "/custom-private-ranges", JsonNode.class).getBody();
+      JsonNode mine = find(ranges, "10.250.0.0/16");
+      assertThat(mine.get("scope").asText()).isEqualTo("network");
+      assertThat(mine.get("classification").asText()).isEqualTo("PUBLIC");
+      assertThat(mine.get("overridesDefault").asBoolean()).isTrue();
+
+      JsonNode org = rest.getForEntity(base + "/ip-org-rules", JsonNode.class).getBody();
+      assertThat(find(org, "10.250.0.0/16").get("hidden").asBoolean()).isTrue();
+      assertThat(find(org, "10.251.0.0/16").get("label").asText()).isEqualTo("Branch");
+
+      JsonNode effective = rest.getForEntity("/api/v1/subnets?networkId=" + net, JsonNode.class).getBody();
+      assertThat(find(effective, "10.250.1.0/24").get("label").asText()).isEqualTo("HQ servers");
+      // The default is untouched.
+      JsonNode defaults = rest.getForEntity("/api/v1/subnets", JsonNode.class).getBody();
+      assertThat(find(defaults, "10.250.1.0/24").get("label").asText()).isEqualTo("Servers");
+      assertThat(find(rest.getForEntity("/api/v1/ip-org-rules", JsonNode.class).getBody(), "10.251.0.0/16")).isNull();
+
+      // Audited.
+      JsonNode log = rest.getForEntity("/api/v1/audit-log?pageSize=10&search=" + net, JsonNode.class).getBody();
+      assertThat(log.get("total").asLong()).isEqualTo(4);
+
+      // A hide needs something to hide.
+      assertThat(rest.postForEntity(base + "/custom-private-ranges",
+          json("{\"cidr\":\"10.99.0.0/16\",\"hidden\":true}"), JsonNode.class).getStatusCode())
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+
+      // Revert: the default's value applies again.
+      rest.delete(base + "/custom-private-ranges/" + mine.get("id").asLong());
+      JsonNode reverted = find(rest.getForEntity(base + "/custom-private-ranges", JsonNode.class).getBody(), "10.250.0.0/16");
+      assertThat(reverted.get("scope").asText()).isEqualTo("default");
+      assertThat(reverted.get("classification").asText()).isEqualTo("PRIVATE");
+    } finally {
+      rest.delete("/api/v1/monitor/networks/" + net);
+      rest.delete("/api/v1/custom-private-ranges/" + rangeId);
+      rest.delete("/api/v1/ip-org-rules/" + orgId);
+      rest.delete("/api/v1/subnets/" + subnetId);
+    }
+  }
+
+  /**
+   * Subnet staleness baselines are per network (#915 phase 4a): confirming a label while viewing
+   * network A baselines it in A only; B has none until it's confirmed (or dismissed) there.
+   */
+  @Test
+  void subnetBaselines_arePerNetwork() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    String a = rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"baseline-a\"}"), JsonNode.class).getBody().get("id").asText();
+    String b = rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"baseline-b\"}"), JsonNode.class).getBody().get("id").asText();
+    Long subnetId = null;
+    try {
+      for (String n : java.util.List.of(a, b)) {
+        assertThat(rest.postForEntity("/api/v1/monitor/networks/" + n + "/snapshots",
+            json("{\"fileId\":\"" + fileId + "\"}"), JsonNode.class).getStatusCode().is2xxSuccessful()).isTrue();
+      }
+      JsonNode saved = rest.postForEntity("/api/v1/subnets",
+          json("{\"cidr\":\"10.0.0.0/24\",\"label\":\"Office\",\"confirmed\":true,\"networkId\":\"" + a + "\"}"),
+          JsonNode.class).getBody();
+      subnetId = saved.get("id").asLong();
+      assertThat(saved.get("labeledAt").isNull()).isFalse();
+
+      JsonNode inA = find(rest.getForEntity("/api/v1/subnets?networkId=" + a, JsonNode.class).getBody(), "10.0.0.0/24");
+      JsonNode inB = find(rest.getForEntity("/api/v1/subnets?networkId=" + b, JsonNode.class).getBody(), "10.0.0.0/24");
+      assertThat(inA.get("labeledAt").isNull()).isFalse();
+      assertThat(inB.get("labeledAt").isNull()).isTrue();
+
+      rest.postForEntity("/api/v1/subnets/" + subnetId + "/dismiss-staleness?networkId=" + b, null, JsonNode.class);
+      inB = find(rest.getForEntity("/api/v1/subnets?networkId=" + b, JsonNode.class).getBody(), "10.0.0.0/24");
+      assertThat(inB.get("labeledAt").isNull()).isFalse();
+      assertThat(jdbc.queryForObject("SELECT count(*) FROM subnet_network_baselines WHERE subnet_id = ?", Integer.class, subnetId))
+          .isEqualTo(2);
+    } finally {
+      rest.delete("/api/v1/monitor/networks/" + a);
+      rest.delete("/api/v1/monitor/networks/" + b);
+      if (subnetId != null) rest.delete("/api/v1/subnets/" + subnetId);
+    }
+  }
+
+  private static JsonNode find(JsonNode list, String cidr) {
+    for (JsonNode n : list) if (cidr.equals(n.path("cidr").asText())) return n;
+    return null;
+  }
+
+  /**
    * Permissions and the audit log with login off (#915): everyone is an analyst and no one is an
    * admin (SYSTEM_SETTINGS_EDITABLE defaults to false). Analyst actions work and are audited as
    * "system"; admin actions and changing permission levels are refused with the reason.

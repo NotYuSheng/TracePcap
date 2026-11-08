@@ -1,5 +1,8 @@
 package com.tracepcap.subnets.service;
 
+import com.tracepcap.subnets.entity.SubnetNetworkBaselineEntity;
+import java.util.Optional;
+
 import com.tracepcap.monitor.entity.NetworkSnapshotEntity;
 import com.tracepcap.monitor.repository.NetworkSnapshotRepository;
 import com.tracepcap.monitor.spi.SnapshotRevalidationHook;
@@ -38,6 +41,7 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
   private static final int TOP_PROTOCOLS = 8;
 
   private final SubnetDefinitionRepository subnetRepo;
+  private final com.tracepcap.subnets.repository.SubnetNetworkBaselineRepository baselineRepo;
   private final NetworkSnapshotRepository snapshotRepo;
   private final JdbcTemplate jdbc;
 
@@ -114,49 +118,66 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
   }
 
   /**
-   * Capture the current composition of a subnet as its staleness baseline, using the most recent
-   * snapshot of the network (or a specific file). Called when an analyst confirms the label.
+   * Capture the current composition of a subnet as its staleness baseline in a network, from that
+   * network's latest snapshot. Called when an analyst confirms the label. Baselines are per network
+   * (#915 phase 4): with no network there's nothing to compare against, so nothing is recorded.
    */
   @Transactional
   public void captureBaseline(SubnetDefinitionEntity subnet, UUID networkId) {
     UUID fileId = latestFileId(networkId);
-    if (fileId == null) {
+    if (fileId == null || subnet.getId() == null) {
       // No snapshot to baseline against (no networkId, or an empty network). The label is saved,
       // but the subnet can never be flagged stale. The UI always passes networkId, so this is an
       // API caller that omitted it. Logged so "why is this subnet never stale?" has an answer (#465).
       log.info(
           "Subnet {} ({}) labelled without a staleness baseline: no snapshot for network {}",
           subnet.getId(), subnet.getCidr(), networkId);
+      return;
     }
-    Map<String, Object> comp = fileId != null ? computeComposition(subnet.getCidr(), fileId) : null;
-    subnet.setLabeledAt(LocalDateTime.now());
-    subnet.setBaselineFileId(fileId);
-    subnet.setBaselineComposition(
-        comp != null && Boolean.TRUE.equals(comp.get("observed")) ? comp : null);
-    subnet.setStaleSince(null);
-    subnet.setStaleFields(null);
+    Map<String, Object> comp = computeComposition(subnet.getCidr(), fileId);
+    SubnetNetworkBaselineEntity b =
+        baselineRepo
+            .findBySubnetIdAndNetworkId(subnet.getId(), networkId)
+            .orElseGet(() -> SubnetNetworkBaselineEntity.builder().subnetId(subnet.getId()).networkId(networkId).build());
+    b.setLabeledAt(LocalDateTime.now());
+    b.setBaselineFileId(fileId);
+    b.setBaselineComposition(Boolean.TRUE.equals(comp.get("observed")) ? comp : null);
+    b.setStaleSince(null);
+    b.setStaleFields(null);
+    baselineRepo.save(b);
+  }
+
+  /** A subnet's baseline in a network, if it has one. */
+  public Optional<SubnetNetworkBaselineEntity> baseline(Long subnetId, UUID networkId) {
+    if (subnetId == null || networkId == null) return Optional.empty();
+    return baselineRepo.findBySubnetIdAndNetworkId(subnetId, networkId);
   }
 
   /**
    * Re-validate every labelled subnet against the latest snapshot of a network: recompute each
-   * subnet's composition and, if it has drifted from the baseline, flag it stale. Called by
-   * monitor change detection through the {@code SnapshotRevalidationHook} port after a snapshot is
-   * added/reordered (#512 slice 3). No-op for subnets without a baseline.
+   * subnet's composition and, if it has drifted from its baseline in this network, flag it stale.
+   * Called by monitor change detection through the {@code SnapshotRevalidationHook} port after a
+   * snapshot is added/reordered (#512 slice 3). No-op for subnets without a baseline here.
    */
   @Override
   @Transactional
   public void revalidate(UUID networkId) {
     UUID fileId = latestFileId(networkId);
     if (fileId == null) return;
-    for (SubnetDefinitionEntity subnet : subnetRepo.findAll()) {
-      if (subnet.getBaselineComposition() == null || subnet.getLabeledAt() == null) continue;
+    Map<Long, SubnetDefinitionEntity> byId = new HashMap<>();
+    subnetRepo.findAllById(
+            baselineRepo.findByNetworkId(networkId).stream().map(SubnetNetworkBaselineEntity::getSubnetId).toList())
+        .forEach(sd -> byId.put(sd.getId(), sd));
+    for (SubnetNetworkBaselineEntity b : baselineRepo.findByNetworkId(networkId)) {
+      SubnetDefinitionEntity subnet = byId.get(b.getSubnetId());
+      if (subnet == null || b.getBaselineComposition() == null || b.getLabeledAt() == null) continue;
       Map<String, Object> current = computeComposition(subnet.getCidr(), fileId);
       if (!Boolean.TRUE.equals(current.get("observed"))) continue; // subnet absent in this snapshot
-      List<String> changes = diff(subnet.getBaselineComposition(), current);
+      List<String> changes = diff(b.getBaselineComposition(), current);
       if (!changes.isEmpty()) {
-        if (subnet.getStaleSince() == null) subnet.setStaleSince(LocalDateTime.now());
-        subnet.setStaleFields(changes);
-        subnetRepo.save(subnet);
+        if (b.getStaleSince() == null) b.setStaleSince(LocalDateTime.now());
+        b.setStaleFields(changes);
+        baselineRepo.save(b);
       }
     }
   }
