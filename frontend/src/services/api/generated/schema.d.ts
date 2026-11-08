@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,10 +478,10 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         /** Add a custom private range */
-        post: operations["create_3"];
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -499,6 +499,83 @@ export interface paths {
         put?: never;
         post?: never;
         /** Delete a custom private range */
+        delete: operations["delete_8"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the global detection rules, by name */
+        get: operations["list_5"];
+        put?: never;
+        /** Create a global detection rule (audited) */
+        post: operations["create_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download every global rule as a YAML file
+         * @description For backups and for moving rules between installs. Import reads the same format.
+         */
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a YAML rules file (audited, all or nothing)
+         * @description Accepts an export or an old signatures.yml. Rules are matched by name. MERGE adds and updates; REPLACE also deletes global rules the file doesn't contain. One invalid rule rejects the whole file, with validationErrors keyed by rule.
+         */
+        post: operations["importRules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one detection rule */
+        get: operations["get_2"];
+        /** Replace a detection rule (audited; bumps its version if anything changed) */
+        put: operations["update_1"];
+        post?: never;
+        /** Delete a detection rule (audited) */
         delete: operations["delete_7"];
         options?: never;
         head?: never;
@@ -1133,7 +1210,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update an annotation's body */
-        patch: operations["update_1"];
+        patch: operations["update_2"];
         trace?: never;
     };
     "/api/v1/monitor/networks/{networkId}/baseline/definitions": {
@@ -1487,41 +1564,6 @@ export interface paths {
         get: operations["get"];
         /** Replace my preferences (shared by everyone when login is off) */
         put: operations["put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/signatures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get custom signatures file content */
-        get: operations["getSignatures"];
-        /** Save custom signatures file content */
-        put: operations["saveSignatures"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/signatures/rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List configured signature rules with severity */
-        get: operations["getSignatureRules"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2354,6 +2396,38 @@ export interface components {
             /** Format: int64 */
             packetCount?: number;
         };
+        DetectionRuleDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            description?: string;
+            deviceType?: string;
+            enabled?: boolean;
+            /** Format: uuid */
+            id?: string;
+            match?: components["schemas"]["Match"];
+            matchAll?: boolean;
+            name?: string;
+            payloadContains?: components["schemas"]["PayloadPattern"][];
+            payloadRegex?: components["schemas"]["RegexPattern"][];
+            scope?: string;
+            severity?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+            /** Format: int32 */
+            version?: number;
+        };
+        DetectionRuleRequest: {
+            description?: string;
+            enabled?: boolean;
+            match?: components["schemas"]["Match"];
+            matchAll?: boolean;
+            name: string;
+            payloadContains?: components["schemas"]["PayloadPattern"][];
+            payloadRegex?: components["schemas"]["RegexPattern"][];
+            severity: string;
+        };
         DnsQueryEntryDto: {
             /** Format: int64 */
             frame?: number;
@@ -2754,6 +2828,18 @@ export interface components {
             id?: number;
             label?: string;
         };
+        Match: {
+            app?: string;
+            cidr?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            hostname?: string;
+            ip?: string;
+            ja3?: string;
+            protocol?: string;
+            /** Format: int32 */
+            srcPort?: number;
+        };
         MeDto: {
             admin?: boolean;
             authEnabled?: boolean;
@@ -3003,6 +3089,10 @@ export interface components {
             notes?: string;
             subnetOverrides?: components["schemas"]["SubnetOverrideInput"][];
         };
+        PayloadPattern: {
+            ascii?: string;
+            hex?: string;
+        };
         PermissionDto: {
             /** @enum {string} */
             action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
@@ -3051,6 +3141,10 @@ export interface components {
                 [key: string]: components["schemas"]["ProtocolStat"];
             };
         };
+        RegexPattern: {
+            caseInsensitive?: boolean;
+            pattern: string;
+        };
         RelatedData: {
             conversations?: string[];
             packets?: string[];
@@ -3074,6 +3168,22 @@ export interface components {
         RoleSuggestionDto: {
             roleDescription?: string;
             roleLabel?: string;
+        };
+        RuleImportRequest: {
+            content: string;
+            /** @enum {string} */
+            mode: "MERGE" | "REPLACE";
+        };
+        RuleImportResult: {
+            /** Format: int32 */
+            created?: number;
+            /** Format: int32 */
+            deleted?: number;
+            duplicates?: string[];
+            /** Format: int32 */
+            unchanged?: number;
+            /** Format: int32 */
+            updated?: number;
         };
         ServiceServerSummaryDto: {
             /** Format: double */
@@ -3473,7 +3583,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: {
                 page?: number;
@@ -4099,7 +4209,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -4119,7 +4229,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -4143,7 +4253,7 @@ export interface operations {
             };
         };
     };
-    delete_7: {
+    delete_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -4156,6 +4266,162 @@ export interface operations {
         responses: {
             /** @description OK */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"][];
+                };
+            };
+        };
+    };
+    create_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/yaml": string;
+                };
+            };
+        };
+    };
+    importRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleImportRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleImportResult"];
+                };
+            };
+        };
+    };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    update_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    delete_7: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5282,7 +5548,7 @@ export interface operations {
             };
         };
     };
-    update_1: {
+    update_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -6034,78 +6300,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PreferencesDto"];
-                };
-            };
-        };
-    };
-    getSignatures: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
-    saveSignatures: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: string;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
-    getSignatureRules: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: string;
-                    }[];
                 };
             };
         };

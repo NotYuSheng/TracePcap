@@ -250,8 +250,7 @@ export function RuleEditorModal({
 
           <h6 className="mb-1">Payload</h6>
           <p className="small text-muted mb-2">
-            Look inside the packets. Needs the capture's raw packets, so it can't run on a capture
-            whose packets were pruned by retention.
+            Look inside the packets' payloads: bytes or text they contain, or a regular expression.
           </p>
           {draft.payloadContains.map((p, i) => {
             const isHex = p.hex !== undefined && p.hex !== null;
