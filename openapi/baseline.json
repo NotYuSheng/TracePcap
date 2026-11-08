@@ -3212,6 +3212,19 @@
         },
         "type": "object"
       },
+      "SetValueRequest": {
+        "properties": {
+          "value": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
       "SkippedFile": {
         "properties": {
           "conversationId": {
@@ -3567,6 +3580,9 @@
           "defaultValue": {
             "type": "string"
           },
+          "deployValue": {
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -3575,6 +3591,9 @@
           },
           "group": {
             "type": "string"
+          },
+          "inAppEditable": {
+            "type": "boolean"
           },
           "key": {
             "type": "string"
@@ -3585,11 +3604,17 @@
           "lockedReason": {
             "type": "string"
           },
+          "overridden": {
+            "type": "boolean"
+          },
           "secret": {
             "type": "boolean"
           },
           "set": {
             "type": "boolean"
+          },
+          "takesEffect": {
+            "type": "string"
           },
           "value": {
             "type": "string"
@@ -9442,6 +9467,70 @@
         ]
       }
     },
+    "/api/v1/system/settings/{key}": {
+      "delete": {
+        "operationId": "reset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Remove an override, so the deployment's value applies again (audited)",
+        "tags": [
+          "Policy Settings"
+        ]
+      },
+      "put": {
+        "description": "Needs the RETENTION or ANALYSIS_POLICY permission. Setting the deployment's value removes the override. Audited.",
+        "operationId": "set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetValueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemSettingDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Override an editable policy setting (retention, detection thresholds)",
+        "tags": [
+          "Policy Settings"
+        ]
+      }
+    },
     "/api/v1/system/time": {
       "get": {
         "operationId": "getServerTime",
@@ -9748,6 +9837,10 @@
     {
       "description": "Per-file conversation listing, facets, export, and session reconstruction",
       "name": "Conversations"
+    },
+    {
+      "description": "Change editable analysis policy in the app (audited)",
+      "name": "Policy Settings"
     },
     {
       "description": "User notes attached to network entities, with history",

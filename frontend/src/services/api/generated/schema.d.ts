@@ -1793,6 +1793,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Override an editable policy setting (retention, detection thresholds)
+         * @description Needs the RETENTION or ANALYSIS_POLICY permission. Setting the deployment's value removes the override. Audited.
+         */
+        put: operations["set"];
+        post?: never;
+        /** Remove an override, so the deployment's value applies again (audited) */
+        delete: operations["reset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/time": {
         parameters: {
             query?: never;
@@ -3081,6 +3102,9 @@ export interface components {
             totalServerBytes?: number;
             truncated?: boolean;
         };
+        SetValueRequest: {
+            value: string;
+        };
         SkippedFile: {
             /** Format: uuid */
             conversationId?: string;
@@ -3204,14 +3228,18 @@ export interface components {
         };
         SystemSettingDto: {
             defaultValue?: string;
+            deployValue?: string;
             description?: string;
             editable?: boolean;
             group?: string;
+            inAppEditable?: boolean;
             key?: string;
             label?: string;
             lockedReason?: string;
+            overridden?: boolean;
             secret?: boolean;
             set?: boolean;
+            takesEffect?: string;
             value?: string;
         };
         TimelineDataDto: {
@@ -6451,6 +6479,52 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["SystemSettingDto"][];
                 };
+            };
+        };
+    };
+    set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetValueRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SystemSettingDto"];
+                };
+            };
+        };
+    };
+    reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
