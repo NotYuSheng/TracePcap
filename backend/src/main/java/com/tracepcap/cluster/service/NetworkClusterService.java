@@ -1,6 +1,8 @@
 package com.tracepcap.cluster.service;
 
 import com.tracepcap.common.net.LocalityPolicy;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import com.tracepcap.common.net.LocalityRules;
 import com.tracepcap.analysis.dto.ConversationFilterParams;
 import com.tracepcap.hostlog.entity.DnsQueryLogEntity;
@@ -41,6 +43,8 @@ import com.tracepcap.cluster.dto.ClusterEdgeDto;
 public class NetworkClusterService {
 
   private final LocalityPolicy localityPolicy;
+  // DNS/HTTP suspicion thresholds are editable in the app (#915 phase 5): read per request.
+  private final RuntimePolicy runtimePolicy;
   private final ConversationLookup conversationLookup;
   private final HostClassificationLookup hostClassificationLookup;
   private final GeoOrgLookup geoOrgLookup;
@@ -59,17 +63,6 @@ public class NetworkClusterService {
   @Value("${tracepcap.intelligence.max-edges:200}")
   private int maxEdges;
 
-  @Value("${tracepcap.dns.nxdomain-suspicious-ratio:0.5}")
-  private double dnsNxdomainSuspiciousRatio;
-
-  @Value("${tracepcap.dns.nxdomain-min-queries:20}")
-  private int dnsNxdomainMinQueries;
-
-  @Value("${tracepcap.http.client-error-suspicious-ratio:0.5}")
-  private double httpClientErrorSuspiciousRatio;
-
-  @Value("${tracepcap.http.min-requests:20}")
-  private int httpMinRequests;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -433,7 +426,7 @@ public class NetworkClusterService {
                   .okCount(c.resolved)
                   .failedCount(c.failed)
                   .anomalyRatio(c.nxdomainRatio())
-                  .suspicious(c.suspicious(dnsNxdomainSuspiciousRatio, dnsNxdomainMinQueries))
+                  .suspicious(c.suspicious(runtimePolicy.getDouble(EditablePolicy.DNS_NXDOMAIN_SUSPICIOUS_RATIO), runtimePolicy.getInt(EditablePolicy.DNS_NXDOMAIN_MIN_QUERIES)))
                   .build();
             })
         .sorted(Comparator.comparingLong(ServiceServerSummaryDto::getTotalRequests).reversed())
@@ -474,7 +467,7 @@ public class NetworkClusterService {
         .resolvedCount(c.resolved)
         .failedCount(c.failed)
         .nxdomainRatio(c.nxdomainRatio())
-        .suspicious(c.suspicious(dnsNxdomainSuspiciousRatio, dnsNxdomainMinQueries))
+        .suspicious(c.suspicious(runtimePolicy.getDouble(EditablePolicy.DNS_NXDOMAIN_SUSPICIOUS_RATIO), runtimePolicy.getInt(EditablePolicy.DNS_NXDOMAIN_MIN_QUERIES)))
         .entries(entries)
         .build();
   }
@@ -546,7 +539,7 @@ public class NetworkClusterService {
                   .okCount(c.success)
                   .failedCount(c.clientError + c.serverError)
                   .anomalyRatio(c.clientErrorRatio())
-                  .suspicious(c.suspicious(httpClientErrorSuspiciousRatio, httpMinRequests))
+                  .suspicious(c.suspicious(runtimePolicy.getDouble(EditablePolicy.HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO), runtimePolicy.getInt(EditablePolicy.HTTP_MIN_REQUESTS)))
                   .build();
             })
         .sorted(Comparator.comparingLong(ServiceServerSummaryDto::getTotalRequests).reversed())
@@ -602,7 +595,7 @@ public class NetworkClusterService {
         .clientErrorCount(c.clientError)
         .serverErrorCount(c.serverError)
         .clientErrorRatio(c.clientErrorRatio())
-        .suspicious(c.suspicious(httpClientErrorSuspiciousRatio, httpMinRequests))
+        .suspicious(c.suspicious(runtimePolicy.getDouble(EditablePolicy.HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO), runtimePolicy.getInt(EditablePolicy.HTTP_MIN_REQUESTS)))
         .serverSoftware(serverSoftware)
         .contentTypes(contentTypes)
         .tls(buildTlsInfo(fileId, serverIp))

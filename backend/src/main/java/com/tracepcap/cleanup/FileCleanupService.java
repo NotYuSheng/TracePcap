@@ -1,6 +1,8 @@
 package com.tracepcap.cleanup;
 
 import com.tracepcap.analysis.spi.PacketPartitions;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import com.tracepcap.config.CleanupProperties;
 import com.tracepcap.file.entity.FileEntity;
 import com.tracepcap.file.entity.FileEntity.FileSource;
@@ -30,6 +32,8 @@ public class FileCleanupService {
   private final FileService fileService;
   private final CleanupProperties cleanupProperties;
   private final PacketPartitions packetPartitions;
+  // Retention hours are editable in the app (#915 phase 5), so read them per run, never at startup.
+  private final RuntimePolicy runtimePolicy;
 
   /**
    * Scheduled task to clean up expired files Runs according to the cron expression configured in
@@ -49,15 +53,15 @@ public class FileCleanupService {
 
       // Analysis files — always apply retention
       LocalDateTime analysisExpiry =
-          LocalDateTime.now().minusHours(cleanupProperties.getRetentionHours());
+          LocalDateTime.now().minusHours(runtimePolicy.getInt(EditablePolicy.FILE_RETENTION_HOURS));
       log.info("Checking analysis files uploaded before: {}", analysisExpiry);
       expiredFiles.addAll(
           fileRepository.findBySourceAndUploadedAtBefore(FileSource.ANALYSIS, analysisExpiry));
 
       // Monitor files — only apply if monitorRetentionHours > 0
-      if (cleanupProperties.getMonitorRetentionHours() > 0) {
-        LocalDateTime monitorExpiry =
-            LocalDateTime.now().minusHours(cleanupProperties.getMonitorRetentionHours());
+      int monitorRetentionHours = runtimePolicy.getInt(EditablePolicy.MONITOR_FILE_RETENTION_HOURS);
+      if (monitorRetentionHours > 0) {
+        LocalDateTime monitorExpiry = LocalDateTime.now().minusHours(monitorRetentionHours);
         log.info("Checking monitor files uploaded before: {}", monitorExpiry);
         expiredFiles.addAll(
             fileRepository.findBySourceAndUploadedAtBefore(FileSource.MONITOR, monitorExpiry));
@@ -112,12 +116,12 @@ public class FileCleanupService {
    */
   @Scheduled(cron = "${tracepcap.cleanup.cron}")
   public void prunePacketsOfAgedFiles() {
-    if (!cleanupProperties.isEnabled() || cleanupProperties.getPacketRetentionHours() <= 0) {
+    int packetRetentionHours = runtimePolicy.getInt(EditablePolicy.PACKET_RETENTION_HOURS);
+    if (!cleanupProperties.isEnabled() || packetRetentionHours <= 0) {
       return;
     }
 
-    LocalDateTime packetExpiry =
-        LocalDateTime.now().minusHours(cleanupProperties.getPacketRetentionHours());
+    LocalDateTime packetExpiry = LocalDateTime.now().minusHours(packetRetentionHours);
     log.info("Pruning packets for files uploaded before: {}", packetExpiry);
 
     try {

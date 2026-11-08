@@ -48,6 +48,13 @@ public class PermissionService {
     if (!allowed(level)) throw new ForbiddenException(action.label() + ": " + reasonFor(level));
   }
 
+  /** Why the caller may not perform {@code action}, or null when they may. */
+  @Transactional(readOnly = true)
+  public String reason(PermissionAction action) {
+    PermissionLevel level = level(action);
+    return allowed(level) ? null : reasonFor(level);
+  }
+
   /** Every configurable action, as it applies to the caller. */
   @Transactional(readOnly = true)
   public List<PermissionDto> list() {

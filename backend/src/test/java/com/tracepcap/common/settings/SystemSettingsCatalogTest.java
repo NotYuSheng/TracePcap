@@ -32,7 +32,7 @@ class SystemSettingsCatalogTest {
   void secretsAreReportedAsSetButNeverReturned() {
     MockEnvironment env = new MockEnvironment().withProperty("llm.api.api-key", "sk-real-key");
     SystemSettingDto key =
-        new SystemSettingsService(env).list().stream()
+        service(env, true).list().stream()
             .filter(s -> s.getKey().equals("LLM_API_KEY")).findFirst().orElseThrow();
 
     assertThat(key.isSecret()).isTrue();
@@ -44,7 +44,7 @@ class SystemSettingsCatalogTest {
   @Test
   void showsTheEffectiveValue_fallingBackToTheDefault() {
     MockEnvironment env = new MockEnvironment().withProperty("tracepcap.cleanup.retention-hours", "48");
-    var byKey = new SystemSettingsService(env).list().stream()
+    var byKey = service(env, true).list().stream()
         .collect(Collectors.toMap(SystemSettingDto::getKey, s -> s));
 
     assertThat(byKey.get("FILE_RETENTION_HOURS").getValue()).isEqualTo("48");
@@ -53,14 +53,52 @@ class SystemSettingsCatalogTest {
   }
 
   @Test
-  void nothingIsEditableInPhaseOne_andEverySettingSaysWhy() {
-    var all = new SystemSettingsService(new MockEnvironment()).list();
+  void onlyEditablePolicyCanBeChanged_andEveryLockedSettingSaysWhy() {
+    var all = service(new MockEnvironment(), false).list();
 
     assertThat(all).allSatisfy(s -> {
       assertThat(s.isEditable()).isFalse();
-      assertThat(s.getLockedReason()).contains(s.getKey());
+      assertThat(s.getLockedReason()).isNotBlank();
+      if (!s.isInAppEditable()) assertThat(s.getLockedReason()).contains(s.getKey());
     });
+    assertThat(all).filteredOn(SystemSettingDto::isInAppEditable).extracting(SystemSettingDto::getKey)
+        .containsExactlyInAnyOrder(
+            java.util.Arrays.stream(EditablePolicy.values()).map(Enum::name).toArray(String[]::new));
     assertThat(all).extracting(SystemSettingDto::getGroup)
         .contains("INFRASTRUCTURE", "MEMORY", "POLICY");
+
+    // With the permission, the editable ones become editable and lose their reason.
+    assertThat(service(new MockEnvironment(), true).list())
+        .filteredOn(SystemSettingDto::isInAppEditable)
+        .allSatisfy(s -> {
+          assertThat(s.isEditable()).isTrue();
+          assertThat(s.getLockedReason()).isNull();
+        });
+  }
+
+  @Test
+  void everyEditablePolicyIsInTheCatalog() {
+    for (EditablePolicy p : EditablePolicy.values()) {
+      assertThat(RuntimePolicy.entry(p).group()).isEqualTo(SystemSettingsCatalog.Group.POLICY);
+    }
+  }
+
+  /** The service with no overrides stored, and a gate that allows or refuses every edit. */
+  private static SystemSettingsService service(org.springframework.core.env.Environment env, boolean canEdit) {
+    SystemSettingOverrideRepository repo = org.mockito.Mockito.mock(SystemSettingOverrideRepository.class);
+    org.mockito.Mockito.when(repo.findAll()).thenReturn(java.util.List.of());
+    PolicyEditGate gate =
+        new PolicyEditGate() {
+          @Override
+          public boolean canEdit(EditablePolicy.Kind kind) {
+            return canEdit;
+          }
+
+          @Override
+          public String reason(EditablePolicy.Kind kind) {
+            return canEdit ? null : "only admins";
+          }
+        };
+    return new SystemSettingsService(env, new RuntimePolicy(repo, env), gate);
   }
 }

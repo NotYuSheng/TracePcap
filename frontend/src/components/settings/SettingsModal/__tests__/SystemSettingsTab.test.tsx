@@ -68,4 +68,64 @@ describe('SystemSettingsTab', () => {
     expect(screen.getByText('DB pool max size')).toBeInTheDocument()
     expect(screen.queryByText('File retention hours')).not.toBeInTheDocument()
   })
+
+  describe('editable policy (#915 phase 5)', () => {
+    const threshold = {
+      key: 'HTTP_MIN_REQUESTS', label: 'HTTP min requests', group: 'POLICY', value: '20', defaultValue: '20',
+      secret: false, set: true, editable: true, inAppEditable: true, deployValue: '20', overridden: false,
+      takesEffect: 'At once in the network cluster view.', lockedReason: null, description: 'Minimum requests.',
+    }
+    const retention = {
+      key: 'FILE_RETENTION_HOURS', label: 'File retention hours', group: 'POLICY', value: '12', defaultValue: '12',
+      secret: false, set: true, editable: false, inAppEditable: true, deployValue: '12', overridden: false,
+      lockedReason: 'only admins can change this.', description: 'Hours kept.',
+    }
+
+    it('changes a setting in a modal, then shows it as changed in the app', async () => {
+      let current = threshold
+      let sent: unknown = null
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json([current, retention])),
+        http.put('*/system/settings/HTTP_MIN_REQUESTS', async ({ request }) => {
+          sent = await request.json()
+          current = { ...threshold, value: '35', overridden: true }
+          return HttpResponse.json(current)
+        })
+      )
+      render(<SystemSettingsTab />)
+
+      await userEvent.click(await screen.findByRole('button', { name: /HTTP min requests/ }))
+      await userEvent.click(screen.getByRole('button', { name: 'Change…' }))
+      const input = screen.getByLabelText('Value')
+      await userEvent.clear(input)
+      await userEvent.type(input, '35')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(sent).toEqual({ value: '35' })
+      expect(await screen.findByText('changed in the app')).toBeInTheDocument()
+    })
+
+    it("shows the server's refusal in the modal", async () => {
+      server.use(
+        http.get('*/system/settings', () => HttpResponse.json([threshold])),
+        http.put('*/system/settings/HTTP_MIN_REQUESTS', () =>
+          HttpResponse.json({ message: 'Enter a whole number.' }, { status: 400 })
+        )
+      )
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /HTTP min requests/ }))
+      await userEvent.click(screen.getByRole('button', { name: 'Change…' }))
+      await userEvent.type(screen.getByLabelText('Value'), '.5')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      expect(await screen.findByText('Enter a whole number.')).toBeInTheDocument()
+    })
+
+    it('greys out one you may not change, with the reason and no Change button', async () => {
+      server.use(http.get('*/system/settings', () => HttpResponse.json([retention])))
+      render(<SystemSettingsTab />)
+      await userEvent.click(await screen.findByRole('button', { name: /File retention hours/ }))
+      expect(screen.getByText(/only admins can change this/)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Change…' })).not.toBeInTheDocument()
+    })
+  })
 })

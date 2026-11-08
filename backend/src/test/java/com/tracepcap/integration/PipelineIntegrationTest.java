@@ -649,6 +649,61 @@ class PipelineIntegrationTest {
     rest.exchange("/api/v1/monitor/networks/" + id, HttpMethod.DELETE, null, Void.class);
   }
 
+  /**
+   * Editable analysis policy with login off (#915 phase 5). Detection thresholds are analyst-level
+   * by default, so they can be changed, and are audited; retention is admin-level, so it can't.
+   * Setting the deployment's value again, or resetting, removes the override.
+   */
+  @Test
+  void editablePolicy_loginOff_thresholdsYes_retentionNo() {
+    jdbc.update("DELETE FROM permissions");
+    jdbc.update("DELETE FROM system_settings");
+    String url = "/api/v1/system/settings/HTTP_MIN_REQUESTS";
+
+    ResponseEntity<JsonNode> set = rest.exchange(url, HttpMethod.PUT, json("{\"value\":\"35\"}"), JsonNode.class);
+    assertThat(set.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(set.getBody().get("value").asText()).isEqualTo("35");
+    assertThat(set.getBody().get("overridden").asBoolean()).isTrue();
+    assertThat(set.getBody().get("deployValue").asText()).isEqualTo("20");
+    assertThat(set.getBody().get("editable").asBoolean()).isTrue();
+
+    JsonNode log =
+        rest.getForEntity("/api/v1/audit-log?search=HTTP_MIN_REQUESTS", JsonNode.class).getBody();
+    assertThat(log.get("total").asLong()).isGreaterThanOrEqualTo(1);
+    assertThat(log.get("data").get(0).path("after").path("value").asText()).isEqualTo("35");
+
+    ResponseEntity<JsonNode> bad = rest.exchange(url, HttpMethod.PUT, json("{\"value\":\"1.5\"}"), JsonNode.class);
+    assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    ResponseEntity<JsonNode> retention =
+        rest.exchange(
+            "/api/v1/system/settings/FILE_RETENTION_HOURS", HttpMethod.PUT, json("{\"value\":\"48\"}"), JsonNode.class);
+    assertThat(retention.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+    ResponseEntity<JsonNode> deployTime =
+        rest.exchange(
+            "/api/v1/system/settings/SURICATA_ENABLED", HttpMethod.PUT, json("{\"value\":\"false\"}"), JsonNode.class);
+    assertThat(deployTime.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+    java.util.Map<String, JsonNode> byKey = new java.util.HashMap<>();
+    rest.getForEntity("/api/v1/system/settings", JsonNode.class).getBody().forEach(n -> byKey.put(n.get("key").asText(), n));
+    assertThat(byKey.get("FILE_RETENTION_HOURS").get("inAppEditable").asBoolean()).isTrue();
+    assertThat(byKey.get("FILE_RETENTION_HOURS").get("editable").asBoolean()).isFalse();
+    assertThat(byKey.get("FILE_RETENTION_HOURS").get("lockedReason").asText()).contains("SYSTEM_SETTINGS_EDITABLE");
+    assertThat(byKey.get("SURICATA_ENABLED").get("inAppEditable").asBoolean()).isFalse();
+
+    assertThat(rest.exchange(url, HttpMethod.DELETE, null, Void.class).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    JsonNode after = rest.getForEntity("/api/v1/system/settings", JsonNode.class).getBody();
+    after.forEach(
+        n -> {
+          if (n.get("key").asText().equals("HTTP_MIN_REQUESTS")) {
+            assertThat(n.get("value").asText()).isEqualTo("20");
+            assertThat(n.get("overridden").asBoolean()).isFalse();
+          }
+        });
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";
