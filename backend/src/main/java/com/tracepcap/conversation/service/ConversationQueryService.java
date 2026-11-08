@@ -536,6 +536,20 @@ public class ConversationQueryService {
         .build();
   }
 
+  /** As {@link #getConversationDetail(UUID)}, with the network's own rule matches added (#925). */
+  @Transactional(readOnly = true)
+  public ConversationDetailResponse getConversationDetail(UUID conversationId, UUID networkId) {
+    ConversationDetailResponse detail = getConversationDetail(conversationId);
+    if (networkId != null) {
+      UUID fileId =
+          conversationLookup.conversationFactsById(conversationId).map(ConversationFacts::fileId).orElse(null);
+      List<String> extra =
+          fileId == null ? null : networkRuleOverlay.labels(networkId, fileId).get(conversationId);
+      if (extra != null) detail.setCustomSignatures(mergeNames(detail.getCustomSignatures(), extra));
+    }
+    return detail;
+  }
+
   @Transactional(readOnly = true)
   public ConversationDetailResponse getConversationDetail(UUID conversationId) {
     ConversationFacts conversation =

@@ -21,6 +21,8 @@ public class DetectionRuleDto {
   private UUID fileId;
   /** For a NETWORK rule: its network. */
   private UUID networkId;
+  /** For a NETWORK rule: its network's name, for labelling matches (filled when listing). */
+  private String networkName;
   /** The rule this one was promoted from, if any. */
   private UUID promotedFrom;
   private String name;
