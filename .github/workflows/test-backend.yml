@@ -19,12 +19,7 @@ permissions:
 jobs:
   test:
     name: mvn verify (JUnit + Testcontainers)
-    # Pinned, not ubuntu-latest. When ubuntu-latest moved to 26.04 (2026-11), two things broke at
-    # once: its Docker engine rejects the API version Testcontainers 1.19.3 negotiates ("client
-    # version 1.32 is too old"), so every integration test errored; and its tshark 4.6.4 made
-    # WebServerLogExtractorRealCaptureTest's passes exit 3. Production runs tshark 3.6 (jammy
-    # base image), so 24.04's 4.2 is the closer match anyway. Unpin once both are fixed: #871.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     defaults:
       run:
@@ -75,7 +70,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends tshark
           tshark --version | head -1
 
-      # Testcontainers needs a Docker daemon; ubuntu-latest runners provide one.
+      # Ubuntu 26.04 ships an AppArmor profile that confines tshark on the host, and under it tshark
+      # cannot read the fixtures in the checkout ("You don't have permission to read the file",
+      # exit 3), so WebServerLogExtractorRealCaptureTest got empty results (#871). The confinement
+      # is a property of the runner host, not of the app: production runs tshark inside the backend
+      # container, which this profile does not apply to. Unload whichever packet-tool profiles
+      # exist. It is a no-op on images that don't ship one.
+      - name: Unconfine tshark (runner AppArmor)
+        run: |
+          for f in /etc/apparmor.d/*; do
+            case "$(basename "$f")" in
+              *tshark*|*wireshark*|*dumpcap*) echo "unloading $f"; sudo apparmor_parser -R "$f" || true ;;
+            esac
+          done
+          sudo aa-status 2>/dev/null | grep -i -E 'tshark|wireshark|dumpcap' || echo "no packet-tool profiles loaded"
+
+      # Testcontainers needs a Docker daemon; ubuntu runners provide one.
       - name: Run unit + integration tests
         run: mvn -B clean verify
 
