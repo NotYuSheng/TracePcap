@@ -258,7 +258,8 @@ public class DeviceClassifierService implements HostClassifier {
       PcapParserService.ConversationInfo conv,
       boolean isSrc) {
 
-    if (ip == null) return;
+    // Broadcast, multicast and the unspecified address are destinations, not machines (#918).
+    if (ip == null || !com.tracepcap.common.net.IpLocality.isHostAddress(ip)) return;
     HostProfile p = profiles.computeIfAbsent(ip, k -> new HostProfile());
 
     p.totalBytes += conv.getTotalBytes() != null ? conv.getTotalBytes() : 0L;

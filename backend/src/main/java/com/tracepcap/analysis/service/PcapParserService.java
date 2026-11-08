@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Set;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,7 +50,9 @@ public class PcapParserService {
     result.setConversations(new ArrayList<>());
     // First-seen TTL and MAC per source IP (used for device classification)
     Map<String, Integer> hostTtls = new HashMap<>();
-    Map<String, String> hostMacs = new HashMap<>();
+    // Every Ethernet source MAC seen per source IP, in order. Turned into one MAC per IP after the
+    // parse (attributeMacs), once we know which MACs are routers fronting many IPs (#918).
+    Map<String, LinkedHashSet<String>> ethMacsByIp = new HashMap<>();
     // All distinct source MACs seen per IP. Usually one; more than one within a single capture is
     // the tell for two devices sharing an IP (overlapping networks / ARP conflict) — #461.
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
@@ -261,7 +264,7 @@ public class PcapParserService {
           // Record first-seen TTL and MAC for source IP
           if (srcIp != null) {
             if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
-            if (srcMac != null) hostMacs.putIfAbsent(srcIp, srcMac);
+            if (srcMac != null) ethMacsByIp.computeIfAbsent(srcIp, k -> new LinkedHashSet<>()).add(srcMac);
           }
 
           // Overlap detection (#461): record the IP↔MAC ownership claim from ARP
@@ -417,7 +420,7 @@ public class PcapParserService {
     result.setPacketCount(packetNumber);
     result.setConversations(new ArrayList<>(conversationMap.values()));
     result.setHostTtls(hostTtls);
-    result.setHostMacs(hostMacs);
+    result.setHostMacs(attributeMacs(ethMacsByIp, hostMacObservations));
     result.setHostMacObservations(hostMacObservations);
 
     log.info(
@@ -454,6 +457,60 @@ public class PcapParserService {
    * proportional to itself again rather than growing the pool without limit.
    */
   private static final int MAX_POOL_SIZE = 50_000;
+
+  /**
+   * An Ethernet source MAC that is the source for at least this many IPs, none of which it claims
+   * by ARP, is a router: the IPs behind it are off-subnet hosts whose frames it forwards (#918).
+   */
+  static final int ROUTER_MAC_MIN_IPS = 3;
+
+  /**
+   * One MAC per source IP, for classification and the host's MAC field (#918).
+   *
+   * <p>Until #918 this was simply the first {@code eth.src} seen for the IP. For an off-subnet host
+   * that's the gateway's MAC, because routed frames carry the router's address. On a real 635-host
+   * capture, 149 internet hosts were all recorded with one router's MAC (and its manufacturer,
+   * which also fed the device classifier). Now:
+   *
+   * <ol>
+   *   <li>A MAC that claimed the IP by ARP wins. ARP is the "this address is mine" statement, the
+   *       same source #461/#467 use.
+   *   <li>Otherwise the first {@code eth.src}, unless that MAC is a router: the source for
+   *       {@link #ROUTER_MAC_MIN_IPS} or more IPs it never claimed by ARP.
+   *   <li>Otherwise no MAC. An off-subnet host's real MAC isn't in the capture, and leaving it
+   *       empty is honest, where the router's MAC was wrong.
+   * </ol>
+   */
+  static Map<String, String> attributeMacs(
+      Map<String, LinkedHashSet<String>> ethMacsByIp, Map<String, LinkedHashSet<String>> arpMacsByIp) {
+    Map<String, Integer> unclaimedIpsByMac = new HashMap<>();
+    ethMacsByIp.forEach(
+        (ip, macs) -> {
+          Set<String> claimed = arpMacsByIp.getOrDefault(ip, new LinkedHashSet<>());
+          for (String mac : macs) {
+            if (!claimed.contains(mac)) unclaimedIpsByMac.merge(mac, 1, Integer::sum);
+          }
+        });
+    Map<String, String> result = new HashMap<>();
+    Set<String> ips = new java.util.HashSet<>(ethMacsByIp.keySet());
+    ips.addAll(arpMacsByIp.keySet());
+    for (String ip : ips) {
+      LinkedHashSet<String> arp = arpMacsByIp.get(ip);
+      if (arp != null && !arp.isEmpty()) {
+        result.put(ip, arp.iterator().next());
+        continue;
+      }
+      LinkedHashSet<String> eth = ethMacsByIp.get(ip);
+      if (eth == null) continue;
+      for (String mac : eth) {
+        if (unclaimedIpsByMac.getOrDefault(mac, 0) < ROUTER_MAC_MIN_IPS) {
+          result.put(ip, mac);
+          break;
+        }
+      }
+    }
+    return result;
+  }
 
   private static String pooled(Map<String, String> pool, String value) {
     if (value == null) return null;

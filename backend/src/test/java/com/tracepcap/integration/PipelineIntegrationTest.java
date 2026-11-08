@@ -553,6 +553,33 @@ class PipelineIntegrationTest {
     assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
   }
 
+  /**
+   * Host identity fixes from the #918 audit, on identity-cases.pcap (see identity-cases.gen.py):
+   * off-subnet hosts no longer get the gateway's MAC, and broadcast / multicast / unspecified
+   * addresses are not classified as hosts.
+   */
+  @Test
+  void hostIdentity_noGatewayMacOnRoutedHosts_noHostsForNonHostAddresses() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    JsonNode hosts = rest.getForEntity("/api/v1/files/" + fileId + "/host-classifications", JsonNode.class).getBody();
+    java.util.Map<String, JsonNode> byIp = new java.util.HashMap<>();
+    hosts.forEach(h -> byIp.put(h.get("ip").asText(), h));
+
+    for (String routed : java.util.List.of("93.184.216.34", "151.101.1.69", "140.82.112.3")) {
+      JsonNode mac = byIp.get(routed).path("mac");
+      assertThat(mac.isNull() || mac.isMissingNode()).as("%s must not carry the gateway's MAC", routed).isTrue();
+    }
+    assertThat(byIp).doesNotContainKeys("0.0.0.0", "255.255.255.255", "224.0.0.18");
+    // A local host keeps its own (ARP-claimed) MAC.
+    assertThat(byIp.get("10.0.0.50").get("mac").asText()).isEqualTo("bb:bb:bb:00:00:01");
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";
