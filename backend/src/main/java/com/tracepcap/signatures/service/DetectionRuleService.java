@@ -48,6 +48,7 @@ public class DetectionRuleService {
   private final CurrentActor currentActor;
   private final RuleSyncService ruleSync;
   private final com.tracepcap.file.repository.FileRepository fileRepository;
+  private final com.tracepcap.monitor.repository.NetworkRepository networkRepository;
 
   @Transactional(readOnly = true)
   public List<DetectionRuleDto> listGlobal() {
@@ -60,6 +61,37 @@ public class DetectionRuleService {
     List<DetectionRuleDto> out = new ArrayList<>(listGlobal());
     out.addAll(listCapture(fileId));
     return out;
+  }
+
+  /** One network's own rules (#925 phase 3). */
+  @Transactional(readOnly = true)
+  public List<DetectionRuleDto> listNetwork(UUID networkId) {
+    return repository.findByScopeAndNetworkIdOrderByNameAsc(Scope.NETWORK, networkId).stream()
+        .map(DetectionRuleService::toDto)
+        .toList();
+  }
+
+  /**
+   * Creates a rule for one network (#925 phase 3). Like a global rule, it's checked against the
+   * network's captures on Re-apply, and against each capture that joins the network from now on.
+   * Its matches show only when the capture is viewed in this network. Needs
+   * DETECTION_RULES_NETWORK; audited.
+   */
+  @Transactional
+  public DetectionRuleDto createForNetwork(UUID networkId, DetectionRuleRequest request) {
+    permissionService.require(PermissionAction.DETECTION_RULES_NETWORK);
+    if (!networkRepository.existsById(networkId)) {
+      throw new ResourceNotFoundException("Network not found: " + networkId);
+    }
+    validateOrThrow(request);
+    requireUniqueName(request.getName(), null, Scope.NETWORK, networkId, null);
+    DetectionRuleEntity e = newEntity(request, null);
+    e.setScope(Scope.NETWORK);
+    e.setNetworkId(networkId);
+    repository.save(e);
+    DetectionRuleDto dto = toDto(e);
+    auditLog.record("detection-rule.create", AUDIT_TARGET, e.getId().toString(), null, auditView(dto));
+    return dto;
   }
 
   /** One capture's own rules. */
@@ -153,13 +185,21 @@ public class DetectionRuleService {
     DetectionRuleEntity e = find(id);
     permissionService.require(permissionFor(e.getScope()));
     validateOrThrow(request);
-    requireUniqueName(request.getName(), id, e.getScope(), e.getFileId(), e.getPromotedFrom());
+    requireUniqueName(
+        request.getName(),
+        id,
+        e.getScope(),
+        e.getScope() == Scope.NETWORK ? e.getNetworkId() : e.getFileId(),
+        e.getPromotedFrom());
     DetectionRuleDto before = toDto(e);
     if (!apply(e, request)) return before;
     repository.saveAndFlush(e);
     DetectionRuleDto after = toDto(e);
     auditLog.record("detection-rule.update", AUDIT_TARGET, id.toString(), auditView(before), auditView(after));
-    if (e.getScope() == Scope.CAPTURE) {
+    if (e.getScope() == Scope.NETWORK) {
+      // Network matches are read with the rule's current name and enabled flag (#925 phase 3):
+      // nothing stored to rewrite. A change to what it matches shows as out of date.
+    } else if (e.getScope() == Scope.CAPTURE) {
       // A capture rule is re-checked at once (#925): it's one capture, and it's what the analyst
       // is looking at. A disabled one just has its labels hidden.
       if (e.isEnabled()) ruleSync.checkNow(e.getFileId(), List.of(e));
@@ -289,7 +329,6 @@ public class DetectionRuleService {
   private DetectionRuleEntity find(UUID id) {
     return repository
         .findById(id)
-        .filter(e -> e.getScope() != Scope.NETWORK) // network rules arrive with #925 phase 3b
         .orElseThrow(() -> new ResourceNotFoundException("Detection rule not found: " + id));
   }
 
@@ -307,26 +346,35 @@ public class DetectionRuleService {
   }
 
   /**
-   * A rule's name is what its matches are labelled with, and global and capture rules both label
-   * a capture, so a name must be unique among the global rules and the capture's own rules
-   * together. The one exception is a rule and its promoted copy ({@code linked}), which are meant
-   * to label the same thing.
+   * A rule's name is what its matches are labelled with, so it must be unique among the rules that
+   * can label the same capture: a global rule's name across every rule; a capture rule's across
+   * the global rules and that capture's ({@code ownerId}); a network rule's across the global
+   * rules and that network's. The one exception is a rule and its promoted copy ({@code linked}),
+   * which are meant to label the same thing.
    */
-  private void requireUniqueName(String name, UUID self, Scope scope, UUID fileId, UUID linked) {
+  private void requireUniqueName(String name, UUID self, Scope scope, UUID ownerId, UUID linked) {
     for (DetectionRuleEntity other : repository.findAllByName(name.trim())) {
       if (other.getId().equals(self)) continue;
       if (linked != null && (other.getId().equals(linked) || linked.equals(other.getPromotedFrom()))) continue;
       if (self != null && self.equals(other.getPromotedFrom())) continue;
+      // A network rule labels its network's captures alongside the global rules (#925 phase 3).
       boolean clash =
           switch (scope) {
-            case GLOBAL -> other.getScope() == Scope.GLOBAL || other.getScope() == Scope.CAPTURE;
+            case GLOBAL -> true;
             case CAPTURE ->
                 other.getScope() == Scope.GLOBAL
-                    || (other.getScope() == Scope.CAPTURE && Objects.equals(other.getFileId(), fileId));
-            case NETWORK -> false;
+                    || (other.getScope() == Scope.CAPTURE && Objects.equals(other.getFileId(), ownerId));
+            case NETWORK ->
+                other.getScope() == Scope.GLOBAL
+                    || (other.getScope() == Scope.NETWORK && Objects.equals(other.getNetworkId(), ownerId));
           };
       if (clash) {
-        String where = other.getScope() == Scope.GLOBAL ? "A global rule" : "A rule on a capture";
+        String where =
+            switch (other.getScope()) {
+              case GLOBAL -> "A global rule";
+              case CAPTURE -> "A rule on a capture";
+              case NETWORK -> "A network's rule";
+            };
         throw new FieldValidationException(
             "Duplicate name", Map.of("name", where + " is already called \"" + other.getName() + "\"."));
       }
@@ -404,6 +452,7 @@ public class DetectionRuleService {
         .id(e.getId())
         .scope(e.getScope().name())
         .fileId(e.getFileId())
+        .networkId(e.getNetworkId())
         .promotedFrom(e.getPromotedFrom())
         .name(r.getName())
         .description(r.getDescription())

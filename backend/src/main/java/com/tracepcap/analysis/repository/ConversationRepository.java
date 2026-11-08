@@ -569,6 +569,10 @@ public interface ConversationRepository
                                 cb.literal(sig)),
                             0))
                 .collect(java.util.stream.Collectors.toList());
+        // Network rules' matches aren't stored on the row (#925 phase 3); they come in as ids.
+        if (params.getCustomSignatureMatchIds() != null && !params.getCustomSignatureMatchIds().isEmpty()) {
+          sigPreds.add(root.get("id").in(params.getCustomSignatureMatchIds()));
+        }
         predicates.add(cb.or(sigPreds.toArray(new Predicate[0])));
       }
 

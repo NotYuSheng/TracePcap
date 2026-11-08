@@ -946,6 +946,63 @@ class PipelineIntegrationTest {
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
   }
 
+  /**
+   * Network rules (#925 phase 3): checked when a capture joins the network; their matches show only
+   * when the capture is viewed in that network (list, filter, distinct names); switching one off
+   * hides them; leaving the network drops them; names can't clash with global rules.
+   */
+  @Test
+  void networkRules_applyWhenACaptureJoins_andShowOnlyInThatNetwork() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "net-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(file)).isEqualTo("completed");
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"" + tag + "\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+
+    String rule = "{\"name\":\"" + tag + "-r\",\"severity\":\"medium\",\"match\":{\"dstPort\":5999}}";
+    ResponseEntity<JsonNode> created =
+        rest.postForEntity("/api/v1/monitor/networks/" + net + "/detection-rules", json(rule), JsonNode.class);
+    assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(created.getBody().get("scope").asText()).isEqualTo("NETWORK");
+    String ruleId = created.getBody().get("id").asText();
+    assertThat(rest.postForEntity("/api/v1/detection-rules", json(rule), JsonNode.class).getStatusCode())
+        .as("a global rule can't take a network rule's name").isEqualTo(HttpStatus.BAD_REQUEST);
+
+    // Joining the network checks its rules on the capture.
+    String snap =
+        rest.postForEntity("/api/v1/monitor/networks/" + net + "/snapshots", json("{\"fileId\":\"" + file + "\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    String inNet = "/api/v1/conversations/" + file + "?networkId=" + net;
+    assertThat(rest.getForEntity(inNet, JsonNode.class).getBody().get("data").get(0).get("customSignatures").toString())
+        .contains(tag + "-r");
+    assertThat(labels(file)).as("not stored on the capture itself").doesNotContain(tag + "-r");
+    assertThat(rest.getForEntity("/api/v1/conversations/" + file + "/custom-signatures?networkId=" + net, JsonNode.class)
+            .getBody().toString()).contains(tag + "-r");
+    assertThat(rest.getForEntity(inNet + "&customSignatures=" + tag + "-r", JsonNode.class).getBody().get("total").asLong())
+        .isEqualTo(1);
+    assertThat(rest.getForEntity("/api/v1/conversations/" + file + "?customSignatures=" + tag + "-r", JsonNode.class)
+            .getBody().get("total").asLong())
+        .as("outside the network the filter doesn't see it").isZero();
+    assertThat(ruleStatus(file).get("staleRules")).isEmpty();
+
+    // Switching the rule off hides its matches at once.
+    rest.exchange("/api/v1/detection-rules/" + ruleId, HttpMethod.PUT,
+        json(rule.replace("\"severity\"", "\"enabled\":false,\"severity\"")), JsonNode.class);
+    assertThat(rest.getForEntity(inNet, JsonNode.class).getBody().get("data").get(0).get("customSignatures").toString())
+        .doesNotContain(tag + "-r");
+
+    // Leaving the network drops its results.
+    rest.exchange("/api/v1/monitor/networks/" + net + "/snapshots/" + snap, HttpMethod.DELETE, null, Void.class);
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM rule_matches WHERE rule_id = ?::uuid", Long.class, ruleId)).isZero();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM rule_evaluations WHERE rule_id = ?::uuid", Long.class, ruleId)).isZero();
+
+    rest.exchange("/api/v1/monitor/networks/" + net, HttpMethod.DELETE, null, Void.class);
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM detection_rules WHERE id = ?::uuid", Long.class, ruleId))
+        .as("a network's rules go with it").isZero();
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);

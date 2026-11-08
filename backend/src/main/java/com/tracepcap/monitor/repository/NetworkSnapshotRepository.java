@@ -21,6 +21,10 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
   /** Snapshots referencing a given file — a file may be added to more than one network. */
   List<NetworkSnapshotEntity> findByFileId(UUID fileId);
 
+  /** Every (network id, capture id) membership, for an install-wide pass (#925 phase 3). */
+  @Query("SELECT s.network.id, s.file.id FROM NetworkSnapshotEntity s")
+  List<Object[]> findAllMemberships();
+
   long countByNetworkId(UUID networkId);
 
   /** Snapshot count per network, for the networks list in one query (#469). */

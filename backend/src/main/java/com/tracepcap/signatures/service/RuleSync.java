@@ -90,6 +90,23 @@ public class RuleSync {
         evals);
   }
 
+  /** Drops the given rules' matches and evaluations for one capture. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void removeResults(UUID fileId, List<UUID> ruleIds) {
+    if (ruleIds.isEmpty()) return;
+    UUID[] ids = ruleIds.toArray(UUID[]::new);
+    for (String table : List.of("rule_matches", "rule_evaluations")) {
+      jdbc.update(
+          con -> {
+            PreparedStatement ps =
+                con.prepareStatement("DELETE FROM " + table + " WHERE file_id = ? AND rule_id = ANY (?)");
+            ps.setObject(1, fileId);
+            ps.setArray(2, con.createArrayOf("uuid", ids));
+            return ps;
+          });
+    }
+  }
+
   /**
    * What each conversation in a capture should be labelled with: the names of the enabled global
    * and capture rules that matched it, by name. This is the read model's source (custom_signatures).

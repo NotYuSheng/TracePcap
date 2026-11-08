@@ -6,7 +6,7 @@ import lombok.Getter;
 
 /** Encapsulates all filter and sort parameters for the conversations listing endpoint. */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class ConversationFilterParams {
 
   /** Free-text match against srcIp, dstIp, or hostname (case-insensitive contains). */
@@ -47,6 +47,12 @@ public class ConversationFilterParams {
    * name strings (OR match). Empty = no filter.
    */
   private final List<String> customSignatures;
+
+  /**
+   * Conversations that also count as matching {@link #customSignatures}: matches of the viewed
+   * network's own rules (#925 phase 3), which aren't stored on the conversation. Null = none.
+   */
+  private final java.util.Set<java.util.UUID> customSignatureMatchIds;
 
   /**
    * Restrict to conversations whose suricata_alerts array contains at least one of the given alert
