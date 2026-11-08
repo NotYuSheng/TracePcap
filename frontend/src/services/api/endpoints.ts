@@ -20,6 +20,10 @@ export const API_ENDPOINTS = {
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   WINDOWS_LOGONS: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/windows-logons`,
+  /** A network's own address entries layered on the default (#915 phase 4). */
+  NETWORK_ADDRESS_ENTRIES: (networkId: string, kind: string) => `/monitor/networks/${networkId}/${kind}`,
+  NETWORK_ADDRESS_ENTRY: (networkId: string, kind: string, id: number) =>
+    `/monitor/networks/${networkId}/${kind}/${id}`,
   /** Which devices held an address when, and the analyst's split/merge decisions (#918). */
   HOST_OCCUPANCIES: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancies`,
