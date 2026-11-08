@@ -23,6 +23,16 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
 
   long countByNetworkId(UUID networkId);
 
+  /**
+   * Networks whose snapshot_order is no longer 0..n-1 (#635). That happens when a snapshot's file is
+   * deleted outside {@code SnapshotService.removeSnapshot}, for example by retention or a delete from
+   * the files list. The FK cascade drops the snapshot but nothing renumbers the rest.
+   */
+  @Query(
+      "SELECT s.network.id FROM NetworkSnapshotEntity s GROUP BY s.network.id"
+          + " HAVING MIN(s.snapshotOrder) <> 0 OR MAX(s.snapshotOrder) <> COUNT(s) - 1")
+  List<UUID> findNetworkIdsWithSnapshotOrderGaps();
+
   void deleteByNetworkId(UUID networkId);
 
   @Query(
