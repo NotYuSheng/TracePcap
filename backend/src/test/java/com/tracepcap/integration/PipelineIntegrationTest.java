@@ -1198,6 +1198,58 @@ class PipelineIntegrationTest {
     assertThat(byIp.get("10.0.0.1").path("identityWarning").isNull()).isTrue();
   }
 
+  /**
+   * Re-analysis as a new version (#915 phase 3): its own copy and analysis with the new options,
+   * linked to the original, with the capture's own rules; uploads still dedupe to the original; a
+   * version of a version derives from the original; deleting the original leaves its versions.
+   */
+  @Test
+  void reanalysis_createsAVersion_keepsTheOriginal_andCarriesCaptureRules() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "ver-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    byte[] pcap = udpPcap(tag);
+    String orig = uploadBytes(tag + ".pcap", pcap).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(orig)).isEqualTo("completed");
+    rest.postForEntity("/api/v1/files/" + orig + "/detection-rules",
+        json("{\"name\":\"" + tag + "-c\",\"severity\":\"low\",\"match\":{\"dstPort\":5999}}"), JsonNode.class);
+
+    ResponseEntity<JsonNode> re = rest.postForEntity("/api/v1/files/" + orig + "/reanalyses",
+        json("{\"enableNdpi\":true,\"enableSuricata\":false,\"enableFileExtraction\":false}"), JsonNode.class);
+    assertThat(re.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    String v1 = re.getBody().get("fileId").asText();
+    assertThat(v1).isNotEqualTo(orig);
+    assertThat(awaitAnalysis(v1)).isEqualTo("completed");
+    JsonNode meta = rest.getForEntity("/api/v1/files/" + v1, JsonNode.class).getBody();
+    assertThat(meta.get("derivedFrom").asText()).isEqualTo(orig);
+    assertThat(meta.get("version").asBoolean()).isTrue();
+    assertThat(meta.get("enableNdpi").asBoolean()).isTrue();
+    assertThat(labels(v1)).as("the capture's own rule came along and was applied").contains(tag + "-c");
+    assertThat(labels(orig)).contains(tag + "-c");
+
+    // Uploading the same capture again still points at the original.
+    ResponseEntity<JsonNode> dup = uploadBytes(tag + ".pcap", pcap);
+    assertThat(dup.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(dup.getBody().get("existingFileId").asText()).isEqualTo(orig);
+
+    // A version of a version derives from the original.
+    String v2 = rest.postForEntity("/api/v1/files/" + v1 + "/reanalyses", json("{}"), JsonNode.class)
+        .getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(v2)).isEqualTo("completed");
+    assertThat(rest.getForEntity("/api/v1/files/" + v2, JsonNode.class).getBody().get("derivedFrom").asText()).isEqualTo(orig);
+    JsonNode versions = rest.getForEntity("/api/v1/files/" + v2 + "/versions", JsonNode.class).getBody();
+    java.util.List<String> ids = new java.util.ArrayList<>();
+    versions.forEach(v -> ids.add(v.get("fileId").asText()));
+    assertThat(ids).containsExactly(orig, v1, v2);
+
+    // Deleting the original leaves its versions, with their own copy of the capture.
+    assertThat(rest.exchange("/api/v1/files/" + orig, HttpMethod.DELETE, null, Void.class).getStatusCode().is2xxSuccessful()).isTrue();
+    assertThat(rest.getForEntity("/api/v1/files/" + v1 + "/download", byte[].class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(rest.getForEntity("/api/v1/files/" + v1 + "/versions", JsonNode.class).getBody()).isNotEmpty();
+
+    rest.exchange("/api/v1/files/" + v1, HttpMethod.DELETE, null, Void.class);
+    rest.exchange("/api/v1/files/" + v2, HttpMethod.DELETE, null, Void.class);
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);

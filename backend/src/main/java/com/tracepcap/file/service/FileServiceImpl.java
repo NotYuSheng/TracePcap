@@ -149,7 +149,7 @@ public class FileServiceImpl implements FileService {
       Optional<FileEntity> winner =
           fileEntity.getFileHash() == null
               ? Optional.empty()
-              : fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileEntity.getFileHash());
+              : fileRepository.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(fileEntity.getFileHash());
       if (winner.isEmpty()) throw e; // some other constraint; not a duplicate
       try {
         storageService.deleteFile(storedPath);
@@ -159,6 +159,77 @@ public class FileServiceImpl implements FileService {
       log.info("Duplicate upload lost the race to {}; rejected", winner.get().getId());
       throw new DuplicateFileException(winner.get().getId());
     }
+  }
+
+  /**
+   * Re-analyses a capture with other options, as a new version (#915 phase 3). The version gets its
+   * own copy of the capture in storage, so deleting either never breaks the other, and its own
+   * analysis; the original is left as it was. A version of a version derives from the original.
+   * The duplicate-upload check doesn't apply (versions share the original's hash).
+   */
+  @Override
+  public FileUploadResponse reanalyse(
+      UUID fileId, boolean enableNdpi, boolean enableSuricata, boolean enableFileExtraction) {
+    FileEntity source =
+        fileRepository.findById(fileId).orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    if (source.getStatus() == FileEntity.FileStatus.PROCESSING || source.getStatus() == FileEntity.FileStatus.UPLOADING) {
+      throw new IllegalArgumentException("Wait for the current analysis to finish before re-analysing.");
+    }
+    if (source.getPacketsPrunedAt() != null) {
+      throw new IllegalArgumentException(
+          "Retention already deleted this capture's packets, so it can't be re-analysed.");
+    }
+    UUID rootId = source.getDerivedFrom() != null && source.isVersion() ? source.getDerivedFrom() : source.getId();
+    UUID versionId = UUID.randomUUID();
+    String objectName = versionId + getFileExtension(source.getFileName());
+    storageService.copyFile(source.getMinioPath(), objectName);
+    FileEntity version =
+        FileEntity.builder()
+            .id(versionId)
+            .fileName(source.getFileName())
+            .fileSize(source.getFileSize())
+            .packetCount(source.getPacketCount())
+            .minioPath(objectName)
+            .uploadedAt(LocalDateTime.now())
+            .status(FileEntity.FileStatus.PROCESSING)
+            .fileHash(source.getFileHash())
+            .source(source.getSource())
+            .enableNdpi(enableNdpi)
+            .enableSuricata(enableSuricata)
+            .enableFileExtraction(enableFileExtraction)
+            .derivedFrom(rootId)
+            .isVersion(true)
+            .build();
+    try {
+      FileEntity saved =
+          persistTx.execute(
+              status -> {
+                FileEntity s = fileRepository.save(version);
+                // Before the analysis trigger: listeners copy what belongs to the capture.
+                eventPublisher.publishEvent(new com.tracepcap.file.event.FileVersionCreatedEvent(this, versionId, source.getId()));
+                eventPublisher.publishEvent(new FileUploadedEvent(this, versionId));
+                return s;
+              });
+      log.info("Re-analysing {} as version {}", fileId, versionId);
+      return fileMapper.toUploadResponse(saved);
+    } catch (RuntimeException e) {
+      storageService.deleteFile(objectName); // don't leave the copy behind
+      throw e;
+    }
+  }
+
+  @Override
+  public java.util.List<FileMetadataDto> versions(UUID fileId) {
+    FileEntity f =
+        fileRepository.findById(fileId).orElseThrow(() -> new ResourceNotFoundException("File not found: " + fileId));
+    UUID rootId = f.isVersion() && f.getDerivedFrom() != null ? f.getDerivedFrom() : f.getId();
+    java.util.List<FileMetadataDto> out = new java.util.ArrayList<>();
+    fileRepository.findById(rootId).ifPresent(r -> out.add(fileMapper.toMetadataDto(r)));
+    fileRepository.findByDerivedFromOrderByUploadedAtAsc(rootId).forEach(v -> out.add(fileMapper.toMetadataDto(v)));
+    if (out.stream().noneMatch(d -> d.getFileId().equals(fileId.toString()))) {
+      out.add(fileMapper.toMetadataDto(f)); // a version whose original was deleted
+    }
+    return out;
   }
 
   private FileEntity persistAndPublish(FileEntity fileEntity) {
@@ -243,7 +314,7 @@ public class FileServiceImpl implements FileService {
 
     // Reject if a file with the same hash already exists
     Optional<FileEntity> existing =
-        fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+        fileRepository.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(fileHash);
     if (existing.isPresent()) {
       throw new DuplicateFileException(existing.get().getId());
     }
@@ -500,7 +571,7 @@ public class FileServiceImpl implements FileService {
       String fileHash = computeSha256FromFile(tempOutput);
 
       Optional<FileEntity> existing =
-          fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileHash);
+          fileRepository.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(fileHash);
       if (existing.isPresent()) {
         throw new DuplicateFileException(existing.get().getId());
       }

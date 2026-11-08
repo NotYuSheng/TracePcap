@@ -77,7 +77,7 @@ class FileUploadTransactionBoundaryTest {
     FileMapper mapper = mock(FileMapper.class);
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
 
-    when(repo.findFirstByFileHashOrderByUploadedAtDesc(anyString()))
+    when(repo.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(anyString()))
         .thenAnswer(
             inv -> {
               trace.add("hash-lookup tx=" + tx.active);
@@ -136,7 +136,7 @@ class FileUploadTransactionBoundaryTest {
     StorageService storage = mock(StorageService.class);
     FileEntity winner = FileEntity.builder().id(java.util.UUID.randomUUID()).build();
 
-    when(repo.findFirstByFileHashOrderByUploadedAtDesc(anyString()))
+    when(repo.findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(anyString()))
         .thenReturn(Optional.empty()) // fast path: the winner hasn't committed yet
         .thenReturn(Optional.of(winner)); // after the violation: it has
     when(storage.uploadFile(any(MultipartFile.class), anyString()))

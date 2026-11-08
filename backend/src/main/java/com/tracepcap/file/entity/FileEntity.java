@@ -86,6 +86,15 @@ public class FileEntity {
   @Column(name = "packets_pruned_at")
   private LocalDateTime packetsPrunedAt;
 
+  /** The capture this is a re-analysis of (#915 phase 3); null for an upload. */
+  @Column(name = "derived_from")
+  private UUID derivedFrom;
+
+  /** A re-analysis version rather than an upload (#915 phase 3). */
+  @Column(name = "is_version", nullable = false)
+  @Builder.Default
+  private boolean isVersion = false;
+
   @Column(name = "status", nullable = false, length = 50)
   @Enumerated(EnumType.STRING)
   private FileStatus status;

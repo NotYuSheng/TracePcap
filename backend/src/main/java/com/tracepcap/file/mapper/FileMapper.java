@@ -122,6 +122,8 @@ public class FileMapper {
         .fileSize(entity.getFileSize())
         .uploadedAt(entity.getUploadedAt())
         .status(entity.getStatus().name().toLowerCase())
+        .derivedFrom(entity.getDerivedFrom() != null ? entity.getDerivedFrom().toString() : null)
+        .version(entity.isVersion())
         .packetCount(entity.getPacketCount())
         .duration(entity.getDuration())
         .startTime(entity.getStartTime())

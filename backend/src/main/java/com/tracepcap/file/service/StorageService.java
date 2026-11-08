@@ -46,6 +46,9 @@ public interface StorageService {
    */
   void deleteFile(String fileName);
 
+  /** Copies an object within the bucket, server-side (#915 phase 3: a re-analysis's own copy). */
+  void copyFile(String sourceName, String targetName);
+
   /**
    * Delete every object under a prefix
    *

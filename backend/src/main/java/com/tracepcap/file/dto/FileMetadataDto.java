@@ -25,6 +25,12 @@ public class FileMetadataDto {
 
   private String status;
 
+  /** The capture this re-analyses (#915 phase 3); null for an upload. */
+  private String derivedFrom;
+
+  /** A re-analysis version rather than an upload. */
+  private boolean version;
+
   private String source;
 
   // Per-file analysis stage toggles chosen at upload time. Surfaced so the UI can flag files

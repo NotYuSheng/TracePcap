@@ -82,6 +82,22 @@ public class StorageServiceImpl implements StorageService {
   }
 
   @Override
+  public void copyFile(String sourceName, String targetName) {
+    try {
+      minioClient.copyObject(
+          CopyObjectArgs.builder()
+              .bucket(minioConfig.getBucket())
+              .object(targetName)
+              .source(CopySource.builder().bucket(minioConfig.getBucket()).object(sourceName).build())
+              .build());
+      log.info("Copied {} to {} in MinIO", sourceName, targetName);
+    } catch (Exception e) {
+      log.error("Failed to copy {} to {}", sourceName, targetName, e);
+      throw new StorageException("Failed to copy file in storage", e);
+    }
+  }
+
+  @Override
   public int deleteByPrefix(String prefix) {
     requireFolderPrefix(prefix);
     try {
