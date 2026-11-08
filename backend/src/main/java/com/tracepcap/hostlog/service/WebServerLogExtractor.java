@@ -297,14 +297,16 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       cmd.add(field);
     }
     ProcessBuilder pb = new ProcessBuilder(cmd);
-    pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
     Process process = null;
     ExecutorService ioExecutor = null;
     try {
       process = pb.start();
       final Process proc = process;
-      ioExecutor = Executors.newSingleThreadExecutor();
+      // Two drains: stdout for rows, stderr kept (bounded) so a non-zero exit says *why* — it was
+      // discarded before, which left a CI-only "exited with code 3" undiagnosable (#871).
+      ioExecutor = Executors.newFixedThreadPool(2);
+      Future<String> stderrTask = ioExecutor.submit(() -> drainBounded(proc.getErrorStream()));
       Future<?> stdoutTask =
           ioExecutor.submit(
               () -> {
@@ -326,7 +328,11 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
       } else {
         int exit = process.exitValue();
         if (exit != 0) {
-          log.warn("Web server extraction: tshark exited with code {} for filter {}", exit, displayFilter);
+          log.warn(
+              "Web server extraction: tshark exited with code {} for filter {}: {}",
+              exit,
+              displayFilter,
+              stderrOf(stderrTask));
         }
         try {
           stdoutTask.get(2, TimeUnit.MINUTES);
@@ -342,6 +348,31 @@ public class WebServerLogExtractor implements HostServiceLogExtractor {
     } finally {
       if (process != null) process.destroyForcibly();
       if (ioExecutor != null) ioExecutor.shutdownNow();
+    }
+  }
+
+  private static final int STDERR_LIMIT = 2048;
+
+  /** Reads a stream to EOF, keeping at most {@link #STDERR_LIMIT} chars (the rest is drained). */
+  private static String drainBounded(java.io.InputStream in) throws java.io.IOException {
+    StringBuilder kept = new StringBuilder();
+    try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+      char[] buf = new char[1024];
+      int n;
+      while ((n = r.read(buf)) != -1) {
+        int room = STDERR_LIMIT - kept.length();
+        if (room > 0) kept.append(buf, 0, Math.min(n, room));
+      }
+    }
+    return kept.toString().strip();
+  }
+
+  private static String stderrOf(Future<String> stderrTask) {
+    try {
+      String err = stderrTask.get(5, TimeUnit.SECONDS);
+      return err.isEmpty() ? "(no stderr)" : err;
+    } catch (Exception e) {
+      return "(stderr unavailable)";
     }
   }
 

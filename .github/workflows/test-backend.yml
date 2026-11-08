@@ -19,12 +19,7 @@ permissions:
 jobs:
   test:
     name: mvn verify (JUnit + Testcontainers)
-    # Pinned, not ubuntu-latest. When ubuntu-latest moved to 26.04 (2026-11), two things broke at
-    # once: its Docker engine rejects the API version Testcontainers 1.19.3 negotiates ("client
-    # version 1.32 is too old"), so every integration test errored; and its tshark 4.6.4 made
-    # WebServerLogExtractorRealCaptureTest's passes exit 3. Production runs tshark 3.6 (jammy
-    # base image), so 24.04's 4.2 is the closer match anyway. Unpin once both are fixed: #871.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     defaults:
       run:
