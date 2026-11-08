@@ -205,6 +205,8 @@ services:
       # Authentication off by default — the app runs fully open. To enable OIDC,
       # use docker-compose.prod.yml (bundles Keycloak) or set TRACEPCAP_AUTH_ENABLED + KEYCLOAK_* envs.
       TRACEPCAP_AUTH_ENABLED: ${TRACEPCAP_AUTH_ENABLED:-false}
+      # Login off only: allow admin-only actions (#915) for everyone. Default false.
+      SYSTEM_SETTINGS_EDITABLE: ${SYSTEM_SETTINGS_EDITABLE:-false}
       # Must resolve to the same values as the postgres service above.
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tracepcap}
       DATABASE_USERNAME: ${POSTGRES_USER:-tracepcap_user}

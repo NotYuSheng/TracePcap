@@ -61,3 +61,51 @@ and what it does. **Secrets** (database password, MinIO keys, LLM API key) only 
 whether they're set. Their values are never sent to the browser.
 
 The System tab behaves the same with login on or off, since it only reads.
+
+
+.. _settings-permissions:
+
+Who can change what
+-------------------
+
+Some settings and rule sets are open to every analyst, and some need an **admin**. Which
+is which is configurable per item, and **every change is recorded in the audit log**, so
+the defaults favour analysts:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20
+
+   * - Item
+     - Default
+   * - Global, network and capture detection rules
+     - analysts
+   * - Network settings
+     - analysts
+   * - Analysis policy
+     - analysts
+   * - Retention
+     - admins
+   * - Which items need an admin (this table)
+     - admins, always
+
+**Who is an admin:**
+
+- **Login on**: users with the Keycloak client role ``admin`` (see
+  :doc:`../configuration/user-management`). Everyone else is an analyst.
+- **Login off**: everyone is an analyst. Admin-only items can be changed by everyone if
+  the server sets ``SYSTEM_SETTINGS_EDITABLE=true``, and by no one otherwise (the
+  default).
+
+An item you can't change is still shown, greyed out, with the reason. Network settings
+work this way today.
+
+Audit log
+---------
+
+Every change to these items is recorded with **who** made it, **when**, and the value
+**before and after**. With login on, "who" is the username; with login off it's
+``system``, because there are no accounts. Entries are recorded in the same transaction
+as the change, so a change is never saved without its entry. The log is available from
+the API at ``GET /api/v1/audit-log`` (paged, newest first, with ``search``).
+

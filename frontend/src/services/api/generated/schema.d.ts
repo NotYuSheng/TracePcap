@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audited changes, newest first
+         * @description search matches the actor, action, target type or target id.
+         */
+        get: operations["list_6"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{fileId}/dns-servers": {
         parameters: {
             query?: never;
@@ -458,7 +478,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         /** Add a custom private range */
         post: operations["create_3"];
@@ -999,7 +1019,7 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_3"];
+        get: operations["list_4"];
         put?: never;
         /** Add an IP organization rule */
         post: operations["create_2"];
@@ -1021,6 +1041,23 @@ export interface paths {
         post?: never;
         /** Delete an IP organization rule */
         delete: operations["delete_4"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who I am and what I may change */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1071,7 +1108,7 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         /** Create an annotation */
         post: operations["create_1"];
@@ -1096,7 +1133,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update an annotation's body */
-        patch: operations["update"];
+        patch: operations["update_1"];
         trace?: never;
     };
     "/api/v1/monitor/networks/{networkId}/baseline/definitions": {
@@ -1176,7 +1213,7 @@ export interface paths {
             cookie?: never;
         };
         /** List external events for a network */
-        get: operations["list_1"];
+        get: operations["list_2"];
         put?: never;
         /** Create an external event */
         post: operations["create"];
@@ -1399,6 +1436,40 @@ export interface paths {
          * @description Generates a fresh label/description from the file's traffic to pre-fill the update-label editor — used to re-classify a drifted label without overwriting the confirmed one.
          */
         post: operations["suggestPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List configurable actions, the level each requires, and whether I may do it */
+        get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/permissions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the level an action requires (admin only; audited) */
+        put: operations["update"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1918,6 +1989,18 @@ export interface components {
             org?: string;
             /** Format: double */
             pct?: number;
+        };
+        AuditLogDto: {
+            action?: string;
+            actor?: string;
+            after?: Record<string, never>;
+            /** Format: date-time */
+            at?: string;
+            before?: Record<string, never>;
+            /** Format: int64 */
+            id?: number;
+            targetId?: string;
+            targetType?: string;
         };
         BaselineDefinitionDto: {
             /** Format: date-time */
@@ -2650,6 +2733,13 @@ export interface components {
             id?: number;
             label?: string;
         };
+        MeDto: {
+            admin?: boolean;
+            authEnabled?: boolean;
+            canManagePermissions?: boolean;
+            permissions?: components["schemas"]["PermissionDto"][];
+            username?: string;
+        };
         MediaInfo: {
             codec?: string;
             containerFormat?: string;
@@ -2854,6 +2944,17 @@ export interface components {
             /** Format: date-time */
             timestamp?: string;
         };
+        PagedResponseAuditLogDto: {
+            data?: components["schemas"]["AuditLogDto"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PagedResponseConversationResponse: {
             data?: components["schemas"]["ConversationResponse"][];
             /** Format: int32 */
@@ -2880,6 +2981,18 @@ export interface components {
             context?: string;
             notes?: string;
             subnetOverrides?: components["schemas"]["SubnetOverrideInput"][];
+        };
+        PermissionDto: {
+            /** @enum {string} */
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+            allowed?: boolean;
+            /** @enum {string} */
+            defaultLevel?: "ANALYST" | "ADMIN";
+            description?: string;
+            label?: string;
+            /** @enum {string} */
+            level?: "ANALYST" | "ADMIN";
+            reason?: string;
         };
         PreferencesDto: {
             conversationColumns?: string[];
@@ -3196,6 +3309,10 @@ export interface components {
             description?: string;
             name: string;
         };
+        UpdatePermissionRequest: {
+            /** @enum {string} */
+            level: "ANALYST" | "ADMIN";
+        };
         UpsertNodeRoleRequest: {
             confirmedByHuman?: boolean;
             entityKey?: string;
@@ -3324,6 +3441,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AnalysisSummaryResponse"];
+                };
+            };
+        };
+    };
+    list_6: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseAuditLogDto"];
                 };
             };
         };
@@ -3930,7 +4071,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -4848,7 +4989,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -4909,6 +5050,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MeDto"];
+                };
             };
         };
     };
@@ -5024,7 +5185,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -5093,7 +5254,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    update_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -5243,7 +5404,7 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5755,6 +5916,52 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RoleSuggestionDto"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PermissionDto"][];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePermissionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PermissionDto"];
                 };
             };
         };

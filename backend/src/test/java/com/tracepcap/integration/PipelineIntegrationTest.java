@@ -580,6 +580,75 @@ class PipelineIntegrationTest {
     assertThat(byIp.get("10.0.0.50").get("mac").asText()).isEqualTo("bb:bb:bb:00:00:01");
   }
 
+  /**
+   * Permissions and the audit log with login off (#915): everyone is an analyst and no one is an
+   * admin (SYSTEM_SETTINGS_EDITABLE defaults to false). Analyst actions work and are audited as
+   * "system"; admin actions and changing permission levels are refused with the reason.
+   */
+  @Test
+  void permissionsAndAudit_loginOff() {
+    jdbc.update("DELETE FROM permissions"); // tests share the DB
+
+    JsonNode me = rest.getForEntity("/api/v1/me", JsonNode.class).getBody();
+    assertThat(me.get("authEnabled").asBoolean()).isFalse();
+    assertThat(me.get("admin").asBoolean()).isFalse();
+    assertThat(me.get("username").asText()).isEqualTo("system");
+    assertThat(me.get("canManagePermissions").asBoolean()).isFalse();
+    java.util.Map<String, JsonNode> perms = new java.util.HashMap<>();
+    me.get("permissions").forEach(p -> perms.put(p.get("action").asText(), p));
+    assertThat(perms.get("NETWORK_SETTINGS").get("allowed").asBoolean()).isTrue();
+    assertThat(perms.get("RETENTION").get("allowed").asBoolean()).isFalse();
+    assertThat(perms.get("RETENTION").get("reason").asText()).contains("SYSTEM_SETTINGS_EDITABLE");
+
+    String id =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"audit-net\"}"), JsonNode.class)
+            .getBody()
+            .get("id")
+            .asText();
+    ResponseEntity<JsonNode> saved =
+        rest.exchange(
+            "/api/v1/monitor/networks/" + id + "/settings",
+            HttpMethod.PUT,
+            json("{\"inactivityMode\":\"DAYS\",\"inactivityThreshold\":7}"),
+            JsonNode.class);
+    assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode log =
+        rest.getForEntity("/api/v1/audit-log?pageSize=5&search=" + id, JsonNode.class).getBody();
+    assertThat(log.get("total").asLong()).isEqualTo(1);
+    JsonNode entry = log.get("data").get(0);
+    assertThat(entry.get("actor").asText()).isEqualTo("system");
+    assertThat(entry.get("action").asText()).isEqualTo("network.settings.update");
+    assertThat(entry.path("before").path("inactivityMode").asText()).isEqualTo("SNAPSHOTS");
+    assertThat(entry.path("after").path("inactivityThreshold").asInt()).isEqualTo(7);
+
+    ResponseEntity<JsonNode> change =
+        rest.exchange(
+            "/api/v1/permissions/NETWORK_SETTINGS", HttpMethod.PUT, json("{\"level\":\"ADMIN\"}"), JsonNode.class);
+    assertThat(change.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+    // An admin could raise it (simulated here); then the same analyst save is refused, unaudited.
+    jdbc.update(
+        "INSERT INTO permissions (action, level, updated_by) VALUES ('NETWORK_SETTINGS', 'ADMIN', 'itest')");
+    ResponseEntity<JsonNode> refused =
+        rest.exchange(
+            "/api/v1/monitor/networks/" + id + "/settings",
+            HttpMethod.PUT,
+            json("{\"inactivityMode\":\"SNAPSHOTS\",\"inactivityThreshold\":2}"),
+            JsonNode.class);
+    assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    assertThat(refused.getBody().get("message").asText()).contains("only admins");
+    assertThat(
+            rest.getForEntity("/api/v1/audit-log?search=" + id, JsonNode.class)
+                .getBody()
+                .get("total")
+                .asLong())
+        .isEqualTo(1);
+
+    jdbc.update("DELETE FROM permissions");
+    rest.exchange("/api/v1/monitor/networks/" + id, HttpMethod.DELETE, null, Void.class);
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

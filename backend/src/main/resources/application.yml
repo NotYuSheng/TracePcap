@@ -195,6 +195,12 @@ tracepcap:
     issuer-uri: ${KEYCLOAK_ISSUER_URI:}
     # Backend-reachable JWKS URL; blank = discover from issuer-uri
     jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
+    # Keycloak client whose roles TracePcap reads (resource_access.<client>.roles). Its client role
+    # `admin` marks an admin (#915). Matches the frontend's VITE_OIDC_CLIENT_ID default.
+    client-id: tracepcap-frontend
+    # With login off there are no roles: this decides whether admin-only actions (#915) are allowed
+    # for everyone (true) or for no one (false, the default).
+    system-settings-editable: ${SYSTEM_SETTINGS_EDITABLE:false}
   analysis:
     batch-size: 1000
     timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:300}

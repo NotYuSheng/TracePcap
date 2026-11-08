@@ -130,12 +130,30 @@ container, so re-import requires recreating it:
    be lost and the realm re-seeded from the export. Back up first if needed —
    see :doc:`../operations/backup-restore`.
 
+Making someone an admin
+-----------------------
+
+``admin`` is a client role, so it's listed under the client, not the realm:
+
+1. In the admin console, open **Users** and select the user.
+2. Open **Role mapping** → **Assign role**.
+3. Change the filter to **Filter by clients**, select
+   ``tracepcap-frontend`` ``admin``, and click **Assign**.
+
+The change takes effect at the user's next sign-in (or token refresh, within
+minutes). To remove it, unassign the role the same way.
+
+With login off there are no accounts and no roles. Whether admin-only settings
+can be changed is then set for everyone by ``SYSTEM_SETTINGS_EDITABLE`` (see
+:doc:`environment-variables`).
+
 Notes
 -----
 
-- TracePcap does not use Keycloak **roles** for access control today; any
-  authenticated realm user has full app access. The ``realm-export.json`` roles
-  list is intentionally empty.
+- Every signed-in realm user is an **analyst**. The realm defines one role,
+  the **client role** ``admin`` on the ``tracepcap-frontend`` client. An admin
+  can change settings marked admin-only and decide which settings need an admin
+  (see :ref:`settings-permissions`).
 - Self-service registration and email-based password recovery are off by design
   for offline/air-gapped use. User creation and password resets go through the
   admin console.

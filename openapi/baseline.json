@@ -236,6 +236,37 @@
         },
         "type": "object"
       },
+      "AuditLogDto": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "after": {
+            "type": "object"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "before": {
+            "type": "object"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "BaselineDefinitionDto": {
         "properties": {
           "createdAt": {
@@ -2235,6 +2266,29 @@
         },
         "type": "object"
       },
+      "MeDto": {
+        "properties": {
+          "admin": {
+            "type": "boolean"
+          },
+          "authEnabled": {
+            "type": "boolean"
+          },
+          "canManagePermissions": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionDto"
+            },
+            "type": "array"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MediaInfo": {
         "properties": {
           "codec": {
@@ -2775,6 +2829,33 @@
         },
         "type": "object"
       },
+      "PagedResponseAuditLogDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PagedResponseConversationResponse": {
         "properties": {
           "data": {
@@ -2842,6 +2923,48 @@
               "$ref": "#/components/schemas/SubnetOverrideInput"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "PermissionDto": {
+        "properties": {
+          "action": {
+            "enum": [
+              "DETECTION_RULES_GLOBAL",
+              "DETECTION_RULES_NETWORK",
+              "DETECTION_RULES_CAPTURE",
+              "NETWORK_SETTINGS",
+              "ANALYSIS_POLICY",
+              "RETENTION"
+            ],
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "defaultLevel": {
+            "enum": [
+              "ANALYST",
+              "ADMIN"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "ANALYST",
+              "ADMIN"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -3730,6 +3853,21 @@
         ],
         "type": "object"
       },
+      "UpdatePermissionRequest": {
+        "properties": {
+          "level": {
+            "enum": [
+              "ANALYST",
+              "ADMIN"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "level"
+        ],
+        "type": "object"
+      },
       "UpsertNodeRoleRequest": {
         "properties": {
           "confirmedByHuman": {
@@ -3983,6 +4121,58 @@
         "summary": "Get analysis summary for a file (202 while still processing)",
         "tags": [
           "Analysis"
+        ]
+      }
+    },
+    "/api/v1/audit-log": {
+      "get": {
+        "description": "search matches the actor, action, target type or target id.",
+        "operationId": "list_6",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseAuditLogDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List audited changes, newest first",
+        "tags": [
+          "Audit Log"
         ]
       }
     },
@@ -5408,7 +5598,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_4",
+        "operationId": "list_5",
         "responses": {
           "200": {
             "content": {
@@ -7022,7 +7212,7 @@
     },
     "/api/v1/ip-org-rules": {
       "get": {
-        "operationId": "list_3",
+        "operationId": "list_4",
         "responses": {
           "200": {
             "content": {
@@ -7095,6 +7285,27 @@
         "summary": "Delete an IP organization rule",
         "tags": [
           "IP Org Rules"
+        ]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Who I am and what I may change",
+        "tags": [
+          "Me"
         ]
       }
     },
@@ -7248,7 +7459,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations": {
       "get": {
-        "operationId": "list_2",
+        "operationId": "list_3",
         "parameters": [
           {
             "in": "path",
@@ -7355,7 +7566,7 @@
         ]
       },
       "patch": {
-        "operationId": "update",
+        "operationId": "update_1",
         "parameters": [
           {
             "in": "path",
@@ -7620,7 +7831,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/external-events": {
       "get": {
-        "operationId": "list_1",
+        "operationId": "list_2",
         "parameters": [
           {
             "in": "path",
@@ -8470,6 +8681,79 @@
         "summary": "Preview an AI role suggestion without persisting",
         "tags": [
           "Node Roles"
+        ]
+      }
+    },
+    "/api/v1/permissions": {
+      "get": {
+        "operationId": "list_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PermissionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List configurable actions, the level each requires, and whether I may do it",
+        "tags": [
+          "Permissions"
+        ]
+      }
+    },
+    "/api/v1/permissions/{action}": {
+      "put": {
+        "operationId": "update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "DETECTION_RULES_GLOBAL",
+                "DETECTION_RULES_NETWORK",
+                "DETECTION_RULES_CAPTURE",
+                "NETWORK_SETTINGS",
+                "ANALYSIS_POLICY",
+                "RETENTION"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Set the level an action requires (admin only; audited)",
+        "tags": [
+          "Permissions"
         ]
       }
     },
@@ -9414,6 +9698,10 @@
   },
   "tags": [
     {
+      "description": "Who may change each setting or rule set (analysts or admins)",
+      "name": "Permissions"
+    },
+    {
       "description": "AI-generated insights for a monitored network",
       "name": "Network Insights"
     },
@@ -9530,12 +9818,20 @@
       "name": "Adjudication Overrides"
     },
     {
+      "description": "The current caller: identity, admin status and permissions",
+      "name": "Me"
+    },
+    {
       "description": "Packet-level conversation trace with AI explanations",
       "name": "Conversation Tracer"
     },
     {
       "description": "Personal preferences (theme, node labels, table columns)",
       "name": "Preferences"
+    },
+    {
+      "description": "Who changed which setting or rule, when, before and after",
+      "name": "Audit Log"
     },
     {
       "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",

@@ -19,8 +19,47 @@ import org.springframework.stereotype.Component;
  * {@link #SYSTEM}. The feature must work without a login — an unattributed action is recorded as
  * "system", not rejected.
  */
+// Registered here, not only on AuthEnabledSecurityConfig: isAdmin() needs the properties with login
+// off too (SYSTEM_SETTINGS_EDITABLE), when that config isn't loaded.
 @Component
+@org.springframework.boot.context.properties.EnableConfigurationProperties(AuthProperties.class)
 public class CurrentActor {
+
+  /** The Keycloak client role that marks an admin (#915). A client role, so it's namespaced. */
+  public static final String ADMIN_ROLE = "admin";
+
+  private final AuthProperties authProperties;
+
+  public CurrentActor(AuthProperties authProperties) {
+    this.authProperties = authProperties;
+  }
+
+  /** Whether login is on for this install. */
+  public boolean authEnabled() {
+    return authProperties.isEnabled();
+  }
+
+  /**
+   * Whether the caller is an admin (#915).
+   *
+   * <p>Login on: the token carries the client role {@link #ADMIN_ROLE} on the configured client
+   * ({@code resource_access.<client-id>.roles}). Keycloak is the only place admin is granted.
+   *
+   * <p>Login off: there are no roles, so admin is the deployer's call. Everyone is an admin when
+   * {@code SYSTEM_SETTINGS_EDITABLE=true}, and no one otherwise.
+   */
+  public boolean isAdmin() {
+    if (!authProperties.isEnabled()) return authProperties.isSystemSettingsEditable();
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !auth.isAuthenticated() || isAnonymous(auth)) return false;
+    if (!(auth.getPrincipal() instanceof Jwt jwt)) return false;
+    Object resourceAccess = jwt.getClaims().get("resource_access");
+    if (!(resourceAccess instanceof java.util.Map<?, ?> clients)) return false;
+    Object client = clients.get(authProperties.getClientId());
+    if (!(client instanceof java.util.Map<?, ?> clientClaims)) return false;
+    Object roles = clientClaims.get("roles");
+    return roles instanceof java.util.Collection<?> list && list.contains(ADMIN_ROLE);
+  }
 
   /** Recorded when there is no authenticated principal (auth disabled, or an internal caller). */
   public static final String SYSTEM = "system";
