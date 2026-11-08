@@ -36,7 +36,7 @@ class DetectionRuleServiceTest {
   private final AuditLogService audit = mock(AuditLogService.class);
   private final CurrentActor actor = mock(CurrentActor.class);
   private final RuleSyncService ruleSync = mock(RuleSyncService.class);
-  private final DetectionRuleService service = new DetectionRuleService(repo, permissions, audit, actor, ruleSync, mock(com.tracepcap.file.repository.FileRepository.class), mock(com.tracepcap.monitor.repository.NetworkRepository.class));
+  private final DetectionRuleService service = new DetectionRuleService(repo, permissions, audit, actor, ruleSync, mock(com.tracepcap.file.repository.FileRepository.class), mock(com.tracepcap.monitor.repository.NetworkRepository.class), mock(CustomSignatureService.class), mock(org.springframework.jdbc.core.JdbcTemplate.class));
 
   private static DetectionRuleRequest req(String name, int port) {
     return DetectionRuleRequest.builder()

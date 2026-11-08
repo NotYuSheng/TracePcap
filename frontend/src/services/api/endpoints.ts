@@ -120,6 +120,10 @@ export const API_ENDPOINTS = {
   CAPTURE_DETECTION_RULES: (fileId: string) => `/files/${fileId}/detection-rules`,
   NETWORK_DETECTION_RULES: (networkId: string) => `/monitor/networks/${networkId}/detection-rules`,
   FILE_NETWORKS: (fileId: string) => `/files/${fileId}/networks`,
+  NETWORK_RULE_SUPPRESSIONS: (networkId: string) => `/monitor/networks/${networkId}/detection-rules/suppressions`,
+  NETWORK_RULE_SUPPRESSION: (networkId: string, ruleId: string) =>
+    `/monitor/networks/${networkId}/detection-rules/suppressions/${ruleId}`,
+  DETECTION_RULE_PREVIEWS: '/detection-rules/previews',
   DETECTION_RULE_PROMOTIONS: (id: string) => `/detection-rules/${id}/promotions`,
   FILE_RULE_STATUS: (fileId: string) => `/files/${fileId}/rule-status`,
   RULE_REAPPLY_JOBS: '/rule-reapply-jobs',

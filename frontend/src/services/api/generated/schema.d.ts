@@ -566,6 +566,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/detection-rules/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What a rule would match in one capture, without saving it
+         * @description Returns the number of matching conversations and a sample. Nothing is stored, so it's 200 rather than 201, and needs no edit permission.
+         */
+        post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/detection-rules/status": {
         parameters: {
             query?: never;
@@ -912,7 +932,7 @@ export interface paths {
             cookie?: never;
         };
         /** Preview an extracted file inline (browser-renderable types only) */
-        get: operations["preview"];
+        get: operations["preview_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1390,6 +1410,44 @@ export interface paths {
          */
         post: operations["create_1"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/detection-rules/suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The global rules switched off in this network's views */
+        get: operations["suppressions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/detection-rules/suppressions/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch a global rule off in this network's views (audited, idempotent)
+         * @description The rule keeps running elsewhere; its matches are hidden when viewed in this network.
+         */
+        put: operations["suppress"];
+        post?: never;
+        /** Switch a global rule back on in this network's views (audited) */
+        delete: operations["unsuppress"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3351,6 +3409,22 @@ export interface components {
             /** Format: int32 */
             updated?: number;
         };
+        RulePreviewDto: {
+            /** Format: int32 */
+            conversations?: number;
+            /** Format: uuid */
+            fileId?: string;
+            fileName?: string;
+            /** Format: int32 */
+            matches?: number;
+            packetsDeleted?: boolean;
+            sample?: components["schemas"]["Sample"][];
+        };
+        RulePreviewRequest: {
+            /** Format: uuid */
+            fileId: string;
+            rule: components["schemas"]["DetectionRuleRequest"];
+        };
         RuleReapplyJobDto: {
             /** Format: date-time */
             createdAt?: string;
@@ -3370,6 +3444,14 @@ export interface components {
             /** Format: int32 */
             total?: number;
         };
+        RuleSuppressionDto: {
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            /** Format: uuid */
+            ruleId?: string;
+            ruleName?: string;
+        };
         RuleSyncStatusDto: {
             /** Format: int32 */
             captures?: number;
@@ -3379,6 +3461,19 @@ export interface components {
             /** Format: int32 */
             uncheckableCaptures?: number;
             uncheckableRules?: string[];
+        };
+        Sample: {
+            appName?: string;
+            /** Format: uuid */
+            conversationId?: string;
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            hostname?: string;
+            protocol?: string;
+            srcIp?: string;
+            /** Format: int32 */
+            srcPort?: number;
         };
         ServiceServerSummaryDto: {
             /** Format: double */
@@ -4571,6 +4666,30 @@ export interface operations {
             };
         };
     };
+    preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RulePreviewDto"];
+                };
+            };
+        };
+    };
     status: {
         parameters: {
             query?: never;
@@ -5275,7 +5394,7 @@ export interface operations {
             };
         };
     };
-    preview: {
+    preview_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6091,6 +6210,72 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["DetectionRuleDto"];
                 };
+            };
+        };
+    };
+    suppressions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSuppressionDto"][];
+                };
+            };
+        };
+    };
+    suppress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RuleSuppressionDto"][];
+                };
+            };
+        };
+    };
+    unsuppress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

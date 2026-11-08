@@ -3404,6 +3404,51 @@
         },
         "type": "object"
       },
+      "RulePreviewDto": {
+        "properties": {
+          "conversations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "matches": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "packetsDeleted": {
+            "type": "boolean"
+          },
+          "sample": {
+            "items": {
+              "$ref": "#/components/schemas/Sample"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RulePreviewRequest": {
+        "properties": {
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/DetectionRuleRequest"
+          }
+        },
+        "required": [
+          "fileId",
+          "rule"
+        ],
+        "type": "object"
+      },
       "RuleReapplyJobDto": {
         "properties": {
           "createdAt": {
@@ -3446,6 +3491,25 @@
         },
         "type": "object"
       },
+      "RuleSuppressionDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "ruleId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ruleName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RuleSyncStatusDto": {
         "properties": {
           "captures": {
@@ -3471,6 +3535,38 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Sample": {
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6206,6 +6302,38 @@
         ]
       }
     },
+    "/api/v1/detection-rules/previews": {
+      "post": {
+        "description": "Returns the number of matching conversations and a sample. Nothing is stored, so it's 200 rather than 201, and needs no edit permission.",
+        "operationId": "preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulePreviewDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "What a rule would match in one capture, without saving it",
+        "tags": [
+          "Detection Rules"
+        ]
+      }
+    },
     "/api/v1/detection-rules/status": {
       "get": {
         "operationId": "status",
@@ -7433,7 +7561,7 @@
     },
     "/api/v1/files/{fileId}/extractions/{extractionId}/preview": {
       "get": {
-        "operationId": "preview",
+        "operationId": "preview_1",
         "parameters": [
           {
             "in": "path",
@@ -8732,6 +8860,118 @@
           }
         },
         "summary": "Add a rule to this network (audited)",
+        "tags": [
+          "Network Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/detection-rules/suppressions": {
+      "get": {
+        "operationId": "suppressions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleSuppressionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The global rules switched off in this network's views",
+        "tags": [
+          "Network Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/detection-rules/suppressions/{ruleId}": {
+      "delete": {
+        "operationId": "unsuppress",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ruleId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Switch a global rule back on in this network's views (audited)",
+        "tags": [
+          "Network Detection Rules"
+        ]
+      },
+      "put": {
+        "description": "The rule keeps running elsewhere; its matches are hidden when viewed in this network.",
+        "operationId": "suppress",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ruleId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleSuppressionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Switch a global rule off in this network's views (audited, idempotent)",
         "tags": [
           "Network Detection Rules"
         ]

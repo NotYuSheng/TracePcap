@@ -1055,6 +1055,76 @@ class PipelineIntegrationTest {
     rest.exchange("/api/v1/monitor/networks/" + other, HttpMethod.DELETE, null, Void.class);
   }
 
+  /**
+   * Suppression and preview (#925 phase 4): a network switching a global rule off hides it in that
+   * network's views only, and switching it back on restores it; a preview says what a rule would
+   * match in a capture without saving anything.
+   */
+  @Test
+  void suppressionHidesAGlobalRuleInOneNetwork_andPreviewMatchesWithoutSaving() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "sup-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String g = createRule("{\"name\":\"" + tag + "-g\",\"severity\":\"high\",\"match\":{\"dstPort\":5999}}");
+    String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(file)).isEqualTo("completed");
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"" + tag + "\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    rest.postForEntity("/api/v1/monitor/networks/" + net + "/snapshots", json("{\"fileId\":\"" + file + "\"}"), JsonNode.class);
+    String inNet = "/api/v1/conversations/" + file + "?networkId=" + net;
+    java.util.function.Supplier<String> shownInNet =
+        () -> rest.getForEntity(inNet, JsonNode.class).getBody().get("data").get(0).get("customSignatures").toString();
+    assertThat(shownInNet.get()).contains(tag + "-g");
+
+    String sup = "/api/v1/monitor/networks/" + net + "/detection-rules/suppressions/" + g;
+    ResponseEntity<JsonNode> put = rest.exchange(sup, HttpMethod.PUT, null, JsonNode.class);
+    assertThat(put.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(put.getBody().toString()).contains(tag + "-g");
+    assertThat(shownInNet.get()).doesNotContain(tag + "-g");
+    assertThat(rest.getForEntity(inNet + "&customSignatures=" + tag + "-g", JsonNode.class).getBody().get("total").asLong()).isZero();
+    assertThat(rest.getForEntity("/api/v1/conversations/" + file + "/custom-signatures?networkId=" + net, JsonNode.class)
+            .getBody().toString()).doesNotContain(tag + "-g");
+    assertThat(labels(file)).as("elsewhere it still applies").contains(tag + "-g");
+    assertThat(rest.getForEntity("/api/v1/audit-log?search=" + g, JsonNode.class).getBody().toString())
+        .contains("detection-rule.suppress");
+
+    assertThat(rest.exchange(sup, HttpMethod.DELETE, null, Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(shownInNet.get()).contains(tag + "-g");
+
+    // Only a global rule can be suppressed.
+    String local = rest.postForEntity("/api/v1/files/" + file + "/detection-rules",
+        json("{\"name\":\"" + tag + "-c\",\"severity\":\"low\",\"match\":{\"protocol\":\"UDP\"}}"), JsonNode.class)
+        .getBody().get("id").asText();
+    assertThat(rest.exchange("/api/v1/monitor/networks/" + net + "/detection-rules/suppressions/" + local, HttpMethod.PUT, null, JsonNode.class)
+            .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    // Preview: counts and samples, stores nothing.
+    long rulesBefore = jdbc.queryForObject("SELECT count(*) FROM detection_rules", Long.class);
+    JsonNode hit = rest.postForEntity("/api/v1/detection-rules/previews",
+        json("{\"fileId\":\"" + file + "\",\"rule\":{\"name\":\"try\",\"severity\":\"low\",\"match\":{\"dstPort\":5999}}}"),
+        JsonNode.class).getBody();
+    assertThat(hit.get("matches").asInt()).isEqualTo(1);
+    assertThat(hit.get("conversations").asInt()).isEqualTo(1);
+    assertThat(hit.get("sample").get(0).get("dstPort").asInt()).isEqualTo(5999);
+    JsonNode miss = rest.postForEntity("/api/v1/detection-rules/previews",
+        json("{\"fileId\":\"" + file + "\",\"rule\":{\"name\":\"try\",\"severity\":\"low\",\"match\":{\"dstPort\":1}}}"),
+        JsonNode.class).getBody();
+    assertThat(miss.get("matches").asInt()).isZero();
+    assertThat(rest.postForEntity("/api/v1/detection-rules/previews",
+            json("{\"fileId\":\"" + file + "\",\"rule\":{\"name\":\"try\",\"severity\":\"low\"}}"), JsonNode.class)
+        .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    jdbc.update("UPDATE files SET packets_pruned_at = now() WHERE id = ?::uuid", file);
+    JsonNode pruned = rest.postForEntity("/api/v1/detection-rules/previews",
+        json("{\"fileId\":\"" + file + "\",\"rule\":{\"name\":\"try\",\"severity\":\"low\",\"payloadContains\":[{\"ascii\":\"" + tag + "\"}]}}"),
+        JsonNode.class).getBody();
+    assertThat(pruned.get("packetsDeleted").asBoolean()).isTrue();
+    assertThat(pruned.get("matches").isNull()).isTrue();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM detection_rules", Long.class)).isEqualTo(rulesBefore);
+
+    rest.exchange("/api/v1/monitor/networks/" + net, HttpMethod.DELETE, null, Void.class);
+    jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);

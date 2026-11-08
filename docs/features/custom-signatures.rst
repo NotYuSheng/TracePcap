@@ -19,6 +19,10 @@ capture. They're edited on the **System** page, under **Detection rules**
   shown next to its field.
 - Each rule has an **on/off switch**, so a rule can be paused without losing
   it, and shows who last changed it, when, and its version.
+- **Test against a capture**, at the bottom of the form, says what the rule as
+  it stands would match in a capture you pick, with a few examples, before you
+  save it. Nothing is saved. A rule that looks inside packets can't be tested
+  on a capture whose packets retention deleted.
 - New captures are checked against the enabled rules when they're
   analysed. Captures analysed earlier are **not** re-checked automatically
   when a rule is added or changed; see `Keeping matches up to date`_.
@@ -97,6 +101,12 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
   rules would flag: they're checked against the capture when you do. Matches
   are labelled with the network's name.
 - A network rule's name can't be the same as a global rule's.
+- **Switching a global rule off for one network.** Under *Global rules in
+  this network*, switch a global rule off to hide its matches when the
+  network's captures are viewed in this network, for example a rule that's
+  noisy at one site. It keeps applying everywhere else, and switching it back
+  on shows its matches again. This needs the network-rules permission and is
+  in the audit log.
 - Who can edit network rules is its own permission (*Edit network detection
   rules*, analysts by default). Every change is in the audit log. Deleting the
   network deletes its rules.

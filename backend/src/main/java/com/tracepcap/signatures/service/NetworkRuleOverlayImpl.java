@@ -42,6 +42,16 @@ class NetworkRuleOverlayImpl implements NetworkRuleOverlay {
   }
 
   @Override
+  public Set<String> suppressedNames(UUID networkId) {
+    return new HashSet<>(
+        jdbc.queryForList(
+            "SELECT r.name FROM rule_suppressions s JOIN detection_rules r ON r.id = s.rule_id"
+                + " WHERE s.network_id = ? AND r.scope = 'GLOBAL'",
+            String.class,
+            networkId));
+  }
+
+  @Override
   public Set<UUID> conversationsMatching(UUID networkId, UUID fileId, Collection<String> names) {
     Set<UUID> out = new HashSet<>();
     if (names == null || names.isEmpty()) return out;

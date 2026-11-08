@@ -39,6 +39,8 @@ export function NetworkRulesModal({
   const [deleting, setDeleting] = useState<DetectionRule | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [globalRules, setGlobalRules] = useState<DetectionRule[]>([]);
+  const [suppressed, setSuppressed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!show) return;
@@ -46,6 +48,13 @@ export function NetworkRulesModal({
       .listNetwork(networkId)
       .then(setRules)
       .catch(() => setRules([]));
+    // Global rules, and which this network has switched off in its views (#925 phase 4).
+    Promise.all([detectionRulesService.list(), detectionRulesService.suppressedIn(networkId)])
+      .then(([globals, off]) => {
+        setGlobalRules(globals);
+        setSuppressed(new Set(off));
+      })
+      .catch(() => setGlobalRules([]));
   }, [show, networkId, reload]);
 
   const run = async (action: () => Promise<unknown>) => {
@@ -157,6 +166,43 @@ export function NetworkRulesModal({
                 </li>
               ))}
             </ul>
+          )}
+          {globalRules.length > 0 && (
+            <section className="mt-4" data-testid="global-rules-here">
+              <h6 className="mb-1">Global rules in this network</h6>
+              <p className="small text-muted mb-1">
+                Switch a global rule off here to hide its matches when this network's captures are
+                viewed in this network. It keeps applying everywhere else.
+              </p>
+              <ul className="list-unstyled small mb-0">
+                {globalRules.map(g => {
+                  const applies = !suppressed.has(g.id);
+                  return (
+                    <li key={g.id} className="d-flex align-items-center gap-2 border-top py-1">
+                      <Form.Check
+                        type="switch"
+                        id={`global-here-${g.id}`}
+                        aria-label={`${g.name} applies in this network`}
+                        checked={applies}
+                        disabled={!perm.allowed || busy}
+                        onChange={() =>
+                          run(() => detectionRulesService.setSuppressed(networkId, g.id, applies))
+                        }
+                      />
+                      <span className={applies ? '' : 'text-muted text-decoration-line-through'}>
+                        <span className="font-monospace">{g.name}</span>{' '}
+                        <span className="text-muted font-monospace">{describeCriteria(g)}</span>
+                      </span>
+                      {!applies && (
+                        <span className="badge bg-secondary-subtle text-secondary-emphasis ms-auto">
+                          off here
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           )}
         </Modal.Body>
         <Modal.Footer>

@@ -269,7 +269,7 @@ public class RuleSyncService {
   }
 
   /** The capture's conversations, in the shape the matcher reads. */
-  private List<ConversationInfo> conversations(UUID fileId) {
+  List<ConversationInfo> conversations(UUID fileId) {
     List<ConversationInfo> out = new ArrayList<>();
     for (ConversationLookup.ConversationFacts f : conversationLookup.conversationFacts(fileId)) {
       ConversationInfo c = new ConversationInfo();

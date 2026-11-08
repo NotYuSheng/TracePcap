@@ -19,4 +19,10 @@ public interface NetworkRuleOverlay {
 
   /** Conversations in the capture matched by any of the network's enabled rules called {@code names}. */
   Set<UUID> conversationsMatching(UUID networkId, UUID fileId, Collection<String> names);
+
+  /**
+   * Names of the global rules this network has switched off in its views (#925 phase 4): their
+   * stored matches are hidden when a capture is viewed in the network.
+   */
+  Set<String> suppressedNames(UUID networkId);
 }
