@@ -19,9 +19,9 @@ capture. They're edited on the **System** page, under **Detection rules**
   shown next to its field.
 - Each rule has an **on/off switch**, so a rule can be paused without losing
   it, and shows who last changed it, when, and its version.
-- Edits take effect on the **next analysis**. Captures that were already
-  analysed keep the matches they had; re-applying rules to them is coming
-  in #925.
+- New captures are checked against the enabled rules when they're
+  analysed. Captures analysed earlier are **not** re-checked automatically
+  when a rule is added or changed; see `Keeping matches up to date`_.
 - **Who can edit** is a permission (*Edit global detection rules*, analysts by
   default; see :ref:`settings-permissions`). Everyone can view the rules.
 - Every create, edit and delete is recorded in the **audit log**, with the
@@ -41,6 +41,38 @@ example a regex that doesn't compile) is imported **disabled**, with the
 reason in its description, so nothing is lost and nothing starts matching
 differently. The audit log records the import. If you had pointed
 ``SIGNATURES_PATH`` at a different file, import it with **Import** instead.
+
+Keeping matches up to date
+--------------------------
+
+TracePcap records, for each capture, which version of each rule it was
+checked against. When you add a rule or change what one matches, captures
+checked before stay as they were, and are shown as **out of date**:
+
+- The **Detection rules** tab says how many captures haven't been checked
+  against the current rules, with **Re-apply** to check them all.
+- A capture's **Overview** names the rules it's out of date for, with
+  **Re-apply to this capture**.
+
+Re-apply runs in the background, with its progress shown, one capture at a
+time. It's safe to run again, and a capture is never left half-updated. It
+needs the same permission as editing rules, and is recorded in the audit
+log. If the backend restarts mid-run, the job is marked *interrupted*; start
+it again to finish.
+
+Some changes apply **at once**, everywhere, with no re-apply: switching a
+rule off hides its matches, switching it back on shows them again, renaming
+it relabels them, and deleting it removes them.
+
+**Captures whose packets were deleted.** Rules that look inside packets
+(``payload_contains``, ``payload_regex``) need the capture's raw packets. If
+retention has deleted them (``PACKET_RETENTION_HOURS``), Re-apply can't
+re-check those rules, so their old matches are dropped and the capture says
+**couldn't re-check** rather than showing results from an older rule.
+
+**After upgrading,** captures analysed by an earlier version show as out of
+date: which rule versions produced their matches isn't known. Their existing
+matches stay visible; Re-apply brings them up to date.
 
 The **Network Labels** tab of the **Custom Detection Rules** dialog defines
 CIDR-to-label mappings used in the Network Visualization grouping mode (see

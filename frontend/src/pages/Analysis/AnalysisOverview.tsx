@@ -1,3 +1,5 @@
+import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
+import { usePermission } from '@/features/me/useMe';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -115,6 +117,7 @@ const customRulesPopover = (
 
 export const AnalysisOverview = () => {
   const { data, fileId } = useOutletContext<AnalysisOutletContext>();
+  const rulesPermission = usePermission('DETECTION_RULES_GLOBAL');
   const navigate = useNavigate();
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [riskTypes, setRiskTypes] = useState<string[]>([]);
@@ -146,14 +149,26 @@ export const AnalysisOverview = () => {
 
     storyService
       .getInvestigation(fileId)
-      .then(s => { setAnswers(s.answers); setUnknowns(s.unknowns); })
-      .catch(() => { setAnswers([]); setUnknowns([]); });
+      .then(s => {
+        setAnswers(s.answers);
+        setUnknowns(s.unknowns);
+      })
+      .catch(() => {
+        setAnswers([]);
+        setUnknowns([]);
+      });
   }, [fileId]);
 
   const detectedApps = data.detectedApplications ?? [];
 
   return (
     <div className="analysis-overview">
+      {/* Out of date with the detection rules? Says which, and offers Re-apply (#925 phase 2). */}
+      <RuleSyncBanner
+        fileId={fileId}
+        canReapply={rulesPermission.allowed}
+        reason={rulesPermission.reason}
+      />
       <AnalysisSummary summary={data} extractedFilesCount={extractedFilesCount} />
 
       {/* Investigation Summary — deterministic answers surfaced at a glance (#813 slice 4).
@@ -199,7 +214,9 @@ export const AnalysisOverview = () => {
                     cursor: 'pointer',
                   }}
                   title={`${(app.packetCount ?? 0).toLocaleString()} packets · ${((app.bytes ?? 0) / 1024).toFixed(1)} KB — click for details`}
-                  onClick={() => setEntityModal({ type: 'APPLICATION', key: app.name, name: app.name })}
+                  onClick={() =>
+                    setEntityModal({ type: 'APPLICATION', key: app.name, name: app.name })
+                  }
                 >
                   {app.name}
                 </button>
@@ -291,11 +308,7 @@ export const AnalysisOverview = () => {
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-shield-lock me-2" style={{ color: '#6f42c1' }}></i>
             Custom Security Alerts
-            <EscapableOverlayTrigger
-              trigger="click"
-              placement="right"
-              overlay={customRulesPopover}
-            >
+            <EscapableOverlayTrigger trigger="click" placement="right" overlay={customRulesPopover}>
               <Button
                 type="button"
                 variant="link"

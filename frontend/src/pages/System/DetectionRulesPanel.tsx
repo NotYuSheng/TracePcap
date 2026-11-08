@@ -13,6 +13,7 @@ import {
   type RuleImportResult,
 } from '@/features/detectionRules/detectionRulesService';
 import { describeCriteria } from '@/features/detectionRules/describeCriteria';
+import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
 import { RuleEditorModal } from './RuleEditorModal';
 
 const PAGE_SIZE = 25;
@@ -127,6 +128,12 @@ export function DetectionRulesPanel() {
           {error}
         </Alert>
       )}
+      <RuleSyncBanner
+        canReapply={allowed}
+        reason={reason}
+        refreshKey={reload}
+        onReapplied={refresh}
+      />
       {notice && (
         <Alert variant="success" className="py-2" onClose={() => setNotice(null)} dismissible>
           {notice}

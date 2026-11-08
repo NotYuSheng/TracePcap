@@ -116,6 +116,10 @@ export const API_ENDPOINTS = {
   DETECTION_RULE: (id: string) => `/detection-rules/${id}`,
   DETECTION_RULES_EXPORT: '/detection-rules/export',
   DETECTION_RULES_IMPORT: '/detection-rules/import',
+  DETECTION_RULES_STATUS: '/detection-rules/status',
+  FILE_RULE_STATUS: (fileId: string) => `/files/${fileId}/rule-status`,
+  RULE_REAPPLY_JOBS: '/rule-reapply-jobs',
+  RULE_REAPPLY_JOB: (id: string) => `/rule-reapply-jobs/${id}`,
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
