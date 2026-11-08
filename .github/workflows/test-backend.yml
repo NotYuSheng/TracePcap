@@ -19,7 +19,7 @@ permissions:
 jobs:
   test:
     name: mvn verify (JUnit + Testcontainers)
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
 
     defaults:
       run:
@@ -70,7 +70,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends tshark
           tshark --version | head -1
 
-      # Testcontainers needs a Docker daemon; ubuntu-latest runners provide one.
+      # Ubuntu 26.04 ships an AppArmor profile that confines tshark on the host, and under it tshark
+      # cannot read the fixtures in the checkout ("You don't have permission to read the file",
+      # exit 3), so WebServerLogExtractorRealCaptureTest got empty results (#871). The confinement
+      # is a property of the runner host, not of the app: production runs tshark inside the backend
+      # container, which this profile does not apply to. Unload whichever packet-tool profiles
+      # exist. It is a no-op on images that don't ship one.
+      - name: Unconfine tshark (runner AppArmor)
+        run: |
+          for f in /etc/apparmor.d/*; do
+            case "$(basename "$f")" in
+              *tshark*|*wireshark*|*dumpcap*) echo "unloading $f"; sudo apparmor_parser -R "$f" || true ;;
+            esac
+          done
+          sudo aa-status 2>/dev/null | grep -i -E 'tshark|wireshark|dumpcap' || echo "no packet-tool profiles loaded"
+
+      # Testcontainers needs a Docker daemon; ubuntu runners provide one.
       - name: Run unit + integration tests
         run: mvn -B clean verify
 
