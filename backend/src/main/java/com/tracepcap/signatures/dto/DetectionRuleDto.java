@@ -17,6 +17,10 @@ public class DetectionRuleDto {
   private UUID id;
   /** GLOBAL today; NETWORK and CAPTURE arrive in #925 phase 3. */
   private String scope;
+  /** For a CAPTURE rule: its capture. */
+  private UUID fileId;
+  /** The rule this one was promoted from, if any. */
+  private UUID promotedFrom;
   private String name;
   private String description;
   private String severity;

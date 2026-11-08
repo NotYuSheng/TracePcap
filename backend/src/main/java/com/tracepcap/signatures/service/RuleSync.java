@@ -92,13 +92,18 @@ public class RuleSync {
 
   /**
    * What each conversation in a capture should be labelled with: the names of the enabled global
-   * rules that matched it, by name. This is the read model's source (custom_signatures).
+   * and capture rules that matched it, by name. This is the read model's source (custom_signatures).
    */
   public Map<UUID, List<String>> labelsForFile(UUID fileId) {
     Map<UUID, List<String>> out = new LinkedHashMap<>();
     jdbc.query(
-        "SELECT m.conversation_id, r.name FROM rule_matches m JOIN detection_rules r ON r.id = m.rule_id"
-            + " WHERE m.file_id = ? AND r.enabled AND r.scope = 'GLOBAL' ORDER BY m.conversation_id, r.name",
+        // Global rules and the capture's own (#925 phase 3); a rule and its promoted copy share a
+        // name, so names are de-duplicated. Network rules aren't stored here: they depend on the
+        // network being viewed.
+        "SELECT DISTINCT m.conversation_id, r.name FROM rule_matches m JOIN detection_rules r ON r.id = m.rule_id"
+            + " WHERE m.file_id = ? AND r.enabled"
+            + " AND (r.scope = 'GLOBAL' OR (r.scope = 'CAPTURE' AND r.file_id = m.file_id))"
+            + " ORDER BY m.conversation_id, r.name",
         rs -> {
           out.computeIfAbsent(rs.getObject(1, UUID.class), k -> new ArrayList<>()).add(rs.getString(2));
         },

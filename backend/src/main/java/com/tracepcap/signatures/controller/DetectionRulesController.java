@@ -36,9 +36,22 @@ public class DetectionRulesController {
   private final DetectionRuleService service;
 
   @GetMapping
-  @Operation(summary = "List the global detection rules, by name")
-  public List<DetectionRuleDto> list() {
-    return service.listGlobal();
+  @Operation(
+      summary = "List the global detection rules, by name",
+      description = "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.")
+  public List<DetectionRuleDto> list(@org.springframework.web.bind.annotation.RequestParam(required = false) UUID fileId) {
+    return fileId == null ? service.listGlobal() : service.listForFile(fileId);
+  }
+
+  @PostMapping("/{id}/promotions")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Promote a capture rule to a global rule (audited)",
+      description =
+          "Creates a linked global copy, checked against the source capture at once. Needs"
+              + " DETECTION_RULES_GLOBAL, and DETECTION_RULES_CAPTURE too when the original is removed.")
+  public DetectionRuleDto promote(@PathVariable UUID id, @RequestBody(required = false) com.tracepcap.signatures.dto.PromoteRuleRequest request) {
+    return service.promote(id, request == null || request.isKeepOriginal());
   }
 
   @GetMapping("/{id}")

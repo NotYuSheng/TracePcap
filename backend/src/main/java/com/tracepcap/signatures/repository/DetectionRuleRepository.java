@@ -16,4 +16,14 @@ public interface DetectionRuleRepository extends JpaRepository<DetectionRuleEnti
 
   @Query("SELECT r FROM DetectionRuleEntity r WHERE r.scope = 'GLOBAL' AND LOWER(r.name) = LOWER(?1)")
   Optional<DetectionRuleEntity> findGlobalByName(String name);
+
+  /** Every rule called {@code name}, in any scope. */
+  @Query("SELECT r FROM DetectionRuleEntity r WHERE LOWER(r.name) = LOWER(?1)")
+  List<DetectionRuleEntity> findAllByName(String name);
+
+  List<DetectionRuleEntity> findByScopeAndFileIdOrderByNameAsc(Scope scope, UUID fileId);
+
+  List<DetectionRuleEntity> findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(Scope scope, UUID fileId);
+
+  List<DetectionRuleEntity> findByScopeAndEnabledTrue(Scope scope);
 }

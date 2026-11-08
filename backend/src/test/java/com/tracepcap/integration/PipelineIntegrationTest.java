@@ -887,6 +887,65 @@ class PipelineIntegrationTest {
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
   }
 
+  /**
+   * Capture rules (#925 phase 3): they label only their own capture, at once; their names can't
+   * clash with global rules; promoting one makes a linked global copy that keeps the source
+   * capture's label even when the original goes; and their permission is enforced.
+   */
+  @Test
+  void captureRules_applyAtOnceToTheirCaptureOnly_andPromote() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "cap-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String a = uploadBytes(tag + "-a.pcap", udpPcap(tag + "-a")).getBody().get("fileId").asText();
+    String b = uploadBytes(tag + "-b.pcap", udpPcap(tag + "-b")).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(a)).isEqualTo("completed");
+    assertThat(awaitAnalysis(b)).isEqualTo("completed");
+
+    String rule = "{\"name\":\"" + tag + "\",\"severity\":\"high\",\"match\":{\"dstPort\":5999}}";
+    ResponseEntity<JsonNode> created =
+        rest.postForEntity("/api/v1/files/" + a + "/detection-rules", json(rule), JsonNode.class);
+    assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(created.getBody().get("scope").asText()).isEqualTo("CAPTURE");
+    String id = created.getBody().get("id").asText();
+    assertThat(labels(a)).containsExactly(tag); // checked at once, no Re-apply
+    assertThat(labels(b)).doesNotContain(tag);
+    assertThat(ruleStatus(a).get("staleRules")).isEmpty();
+
+    // A global rule can't take the same name: both would label capture a.
+    ResponseEntity<JsonNode> clash = rest.postForEntity("/api/v1/detection-rules", json(rule), JsonNode.class);
+    assertThat(clash.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(clash.getBody().path("validationErrors").path("name").asText()).contains("capture");
+
+    JsonNode forA = rest.getForEntity("/api/v1/detection-rules?fileId=" + a, JsonNode.class).getBody();
+    assertThat(forA.toString()).contains("\"scope\":\"CAPTURE\"").contains(tag);
+    JsonNode globalOnly = rest.getForEntity("/api/v1/detection-rules", JsonNode.class).getBody();
+    assertThat(globalOnly.toString()).doesNotContain(tag);
+
+    // Promote, removing the original: the global copy keeps a's label at once; b is now stale.
+    ResponseEntity<JsonNode> promoted =
+        rest.postForEntity("/api/v1/detection-rules/" + id + "/promotions", json("{\"keepOriginal\":false}"), JsonNode.class);
+    assertThat(promoted.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(promoted.getBody().get("scope").asText()).isEqualTo("GLOBAL");
+    assertThat(promoted.getBody().get("promotedFrom").asText()).isEqualTo(id);
+    assertThat(rest.getForEntity("/api/v1/detection-rules/" + id, JsonNode.class).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(labels(a)).containsExactly(tag);
+    assertThat(ruleStatus(a).get("staleRules")).isEmpty();
+    assertThat(ruleStatus(b).get("staleRules").toString()).contains(tag);
+
+    // The capture-rule permission is enforced.
+    jdbc.update("INSERT INTO permissions (action, level, updated_by) VALUES ('DETECTION_RULES_CAPTURE', 'ADMIN', 'itest')");
+    assertThat(
+            rest.postForEntity(
+                    "/api/v1/files/" + b + "/detection-rules",
+                    json(rule.replace(tag, tag + "-x")),
+                    JsonNode.class)
+                .getStatusCode())
+        .isEqualTo(HttpStatus.FORBIDDEN);
+    jdbc.update("DELETE FROM permissions");
+    jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);

@@ -47,10 +47,27 @@ public class DetectionRuleService {
   private final AuditLogService auditLog;
   private final CurrentActor currentActor;
   private final RuleSyncService ruleSync;
+  private final com.tracepcap.file.repository.FileRepository fileRepository;
 
   @Transactional(readOnly = true)
   public List<DetectionRuleDto> listGlobal() {
     return repository.findByScopeOrderByNameAsc(Scope.GLOBAL).stream().map(DetectionRuleService::toDto).toList();
+  }
+
+  /** The rules that apply to one capture: the global ones and its own (#925 phase 3). */
+  @Transactional(readOnly = true)
+  public List<DetectionRuleDto> listForFile(UUID fileId) {
+    List<DetectionRuleDto> out = new ArrayList<>(listGlobal());
+    out.addAll(listCapture(fileId));
+    return out;
+  }
+
+  /** One capture's own rules. */
+  @Transactional(readOnly = true)
+  public List<DetectionRuleDto> listCapture(UUID fileId) {
+    return repository.findByScopeAndFileIdOrderByNameAsc(Scope.CAPTURE, fileId).stream()
+        .map(DetectionRuleService::toDto)
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -62,7 +79,7 @@ public class DetectionRuleService {
   public DetectionRuleDto create(DetectionRuleRequest request) {
     permissionService.require(PermissionAction.DETECTION_RULES_GLOBAL);
     validateOrThrow(request);
-    requireUniqueName(request.getName(), null);
+    requireUniqueName(request.getName(), null, Scope.GLOBAL, null, null);
     DetectionRuleEntity e = newEntity(request, null);
     repository.save(e);
     DetectionRuleDto dto = toDto(e);
@@ -70,25 +87,93 @@ public class DetectionRuleService {
     return dto;
   }
 
+  /**
+   * Creates a rule for one capture (#925 phase 3). It's checked against that capture at once, so
+   * its matches show straight away. Needs DETECTION_RULES_CAPTURE; audited.
+   */
+  @Transactional
+  public DetectionRuleDto createForCapture(UUID fileId, DetectionRuleRequest request) {
+    permissionService.require(PermissionAction.DETECTION_RULES_CAPTURE);
+    var file =
+        fileRepository
+            .findById(fileId)
+            .orElseThrow(() -> new ResourceNotFoundException("Capture not found: " + fileId));
+    if (file.getStatus() != com.tracepcap.file.entity.FileEntity.FileStatus.COMPLETED) {
+      throw new IllegalArgumentException("Rules can be added once the capture's analysis has completed.");
+    }
+    validateOrThrow(request);
+    requireUniqueName(request.getName(), null, Scope.CAPTURE, fileId, null);
+    DetectionRuleEntity e = newEntity(request, null);
+    e.setScope(Scope.CAPTURE);
+    e.setFileId(fileId);
+    repository.saveAndFlush(e);
+    DetectionRuleDto dto = toDto(e);
+    auditLog.record("detection-rule.create", AUDIT_TARGET, e.getId().toString(), null, auditView(dto));
+    if (e.isEnabled()) ruleSync.checkNow(fileId, List.of(e));
+    return dto;
+  }
+
+  /**
+   * Copies a capture rule up to a global one (#925 phase 3): a linked copy, so the two may share a
+   * name. The copy is checked against the source capture at once, so its labels don't drop if the
+   * original is removed; other captures show as out of date until re-applied, as for any new rule.
+   */
+  @Transactional
+  public DetectionRuleDto promote(UUID id, boolean keepOriginal) {
+    DetectionRuleEntity source = find(id);
+    if (source.getScope() != Scope.CAPTURE) {
+      throw new IllegalArgumentException("Only a capture rule can be promoted to a global rule.");
+    }
+    permissionService.require(PermissionAction.DETECTION_RULES_GLOBAL);
+    if (!keepOriginal) permissionService.require(PermissionAction.DETECTION_RULES_CAPTURE);
+    requireUniqueName(source.getName(), null, Scope.GLOBAL, null, source.getId());
+
+    DetectionRuleEntity copy = newEntity(toRequest(source), source.getDeviceType());
+    copy.setPromotedFrom(source.getId());
+    repository.saveAndFlush(copy);
+    DetectionRuleDto dto = toDto(copy);
+    Map<String, Object> after = auditView(dto);
+    after.put("promotedFrom", source.getId().toString());
+    after.put("keptOriginal", keepOriginal);
+    auditLog.record("detection-rule.promote", AUDIT_TARGET, copy.getId().toString(), auditView(toDto(source)), after);
+
+    UUID fileId = source.getFileId();
+    if (copy.isEnabled()) ruleSync.checkNow(fileId, List.of(copy));
+    if (!keepOriginal) {
+      auditLog.record("detection-rule.delete", AUDIT_TARGET, source.getId().toString(), auditView(toDto(source)), null);
+      repository.delete(source);
+      repository.flush();
+      ruleSync.refreshLabels(List.of(fileId));
+    }
+    return dto;
+  }
+
   @Transactional
   public DetectionRuleDto update(UUID id, DetectionRuleRequest request) {
-    permissionService.require(PermissionAction.DETECTION_RULES_GLOBAL);
-    validateOrThrow(request);
     DetectionRuleEntity e = find(id);
-    requireUniqueName(request.getName(), id);
+    permissionService.require(permissionFor(e.getScope()));
+    validateOrThrow(request);
+    requireUniqueName(request.getName(), id, e.getScope(), e.getFileId(), e.getPromotedFrom());
     DetectionRuleDto before = toDto(e);
     if (!apply(e, request)) return before;
     repository.saveAndFlush(e);
     DetectionRuleDto after = toDto(e);
     auditLog.record("detection-rule.update", AUDIT_TARGET, id.toString(), auditView(before), auditView(after));
-    refreshLabelsIfShown(before, after);
+    if (e.getScope() == Scope.CAPTURE) {
+      // A capture rule is re-checked at once (#925): it's one capture, and it's what the analyst
+      // is looking at. A disabled one just has its labels hidden.
+      if (e.isEnabled()) ruleSync.checkNow(e.getFileId(), List.of(e));
+      else ruleSync.refreshLabels(List.of(e.getFileId()));
+    } else {
+      refreshLabelsIfShown(before, after);
+    }
     return after;
   }
 
   @Transactional
   public void delete(UUID id) {
-    permissionService.require(PermissionAction.DETECTION_RULES_GLOBAL);
     DetectionRuleEntity e = find(id);
+    permissionService.require(permissionFor(e.getScope()));
     DetectionRuleDto before = toDto(e);
     List<UUID> labelled = ruleSync.filesMatchedBy(id);
     repository.delete(e);
@@ -137,6 +222,10 @@ public class DetectionRuleService {
     Set<UUID> seen = new HashSet<>();
     for (RuleCodec.ParsedRule p : byName.values()) {
       var existing = repository.findGlobalByName(p.rule().getName().trim());
+      if (existing.isEmpty()) {
+        // A new global rule mustn't take a name a capture rule already uses.
+        requireUniqueName(p.rule().getName(), null, Scope.GLOBAL, null, null);
+      }
       if (existing.isPresent()) {
         DetectionRuleEntity e = existing.get();
         seen.add(e.getId());
@@ -200,8 +289,16 @@ public class DetectionRuleService {
   private DetectionRuleEntity find(UUID id) {
     return repository
         .findById(id)
-        .filter(e -> e.getScope() == Scope.GLOBAL)
+        .filter(e -> e.getScope() != Scope.NETWORK) // network rules arrive with #925 phase 3b
         .orElseThrow(() -> new ResourceNotFoundException("Detection rule not found: " + id));
+  }
+
+  static PermissionAction permissionFor(Scope scope) {
+    return switch (scope) {
+      case GLOBAL -> PermissionAction.DETECTION_RULES_GLOBAL;
+      case NETWORK -> PermissionAction.DETECTION_RULES_NETWORK;
+      case CAPTURE -> PermissionAction.DETECTION_RULES_CAPTURE;
+    };
   }
 
   private static void validateOrThrow(DetectionRuleRequest r) {
@@ -209,16 +306,31 @@ public class DetectionRuleService {
     if (!errors.isEmpty()) throw new FieldValidationException("The rule isn't valid", errors);
   }
 
-  private void requireUniqueName(String name, UUID self) {
-    repository
-        .findGlobalByName(name.trim())
-        .filter(other -> !other.getId().equals(self))
-        .ifPresent(
-            other -> {
-              throw new FieldValidationException(
-                  "Duplicate name",
-                  Map.of("name", "A global rule called \"" + other.getName() + "\" already exists."));
-            });
+  /**
+   * A rule's name is what its matches are labelled with, and global and capture rules both label
+   * a capture, so a name must be unique among the global rules and the capture's own rules
+   * together. The one exception is a rule and its promoted copy ({@code linked}), which are meant
+   * to label the same thing.
+   */
+  private void requireUniqueName(String name, UUID self, Scope scope, UUID fileId, UUID linked) {
+    for (DetectionRuleEntity other : repository.findAllByName(name.trim())) {
+      if (other.getId().equals(self)) continue;
+      if (linked != null && (other.getId().equals(linked) || linked.equals(other.getPromotedFrom()))) continue;
+      if (self != null && self.equals(other.getPromotedFrom())) continue;
+      boolean clash =
+          switch (scope) {
+            case GLOBAL -> other.getScope() == Scope.GLOBAL || other.getScope() == Scope.CAPTURE;
+            case CAPTURE ->
+                other.getScope() == Scope.GLOBAL
+                    || (other.getScope() == Scope.CAPTURE && Objects.equals(other.getFileId(), fileId));
+            case NETWORK -> false;
+          };
+      if (clash) {
+        String where = other.getScope() == Scope.GLOBAL ? "A global rule" : "A rule on a capture";
+        throw new FieldValidationException(
+            "Duplicate name", Map.of("name", where + " is already called \"" + other.getName() + "\"."));
+      }
+    }
   }
 
   private DetectionRuleEntity newEntity(DetectionRuleRequest r, String deviceType) {
@@ -291,6 +403,8 @@ public class DetectionRuleService {
     return DetectionRuleDto.builder()
         .id(e.getId())
         .scope(e.getScope().name())
+        .fileId(e.getFileId())
+        .promotedFrom(e.getPromotedFrom())
         .name(r.getName())
         .description(r.getDescription())
         .severity(r.getSeverity())

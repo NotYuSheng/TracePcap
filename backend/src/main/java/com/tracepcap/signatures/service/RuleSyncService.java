@@ -48,14 +48,15 @@ public class RuleSyncService {
   /** The install-wide picture, for the Detection rules tab. */
   @Transactional(readOnly = true)
   public RuleSyncStatusDto overall() {
-    List<DetectionRuleEntity> rules = enabledRules();
     Map<UUID, Map<UUID, Evaluation>> evals = ruleSync.evaluationsByFile();
+    RulesByFile rules = rulesByFile();
     int stale = 0, uncheckable = 0;
     List<UUID> files = fileRepository.findCompletedIds();
     for (UUID f : files) {
       Map<UUID, Evaluation> e = evals.getOrDefault(f, Map.of());
-      if (!staleRules(rules, e).isEmpty()) stale++;
-      if (!uncheckableRules(rules, e).isEmpty()) uncheckable++;
+      List<DetectionRuleEntity> forFile = rules.forFile(f);
+      if (!staleRules(forFile, e).isEmpty()) stale++;
+      if (!uncheckableRules(forFile, e).isEmpty()) uncheckable++;
     }
     return RuleSyncStatusDto.builder()
         .captures(files.size())
@@ -67,7 +68,7 @@ public class RuleSyncService {
   /** One capture: which enabled rules it's out of date for, and which couldn't be re-checked. */
   @Transactional(readOnly = true)
   public RuleSyncStatusDto forFile(UUID fileId) {
-    List<DetectionRuleEntity> rules = enabledRules();
+    List<DetectionRuleEntity> rules = enabledRules(fileId);
     Map<UUID, Evaluation> e = ruleSync.evaluationsForFile(fileId);
     boolean completed =
         fileRepository.findById(fileId).map(f -> f.getStatus() == FileEntity.FileStatus.COMPLETED).orElse(false);
@@ -85,11 +86,11 @@ public class RuleSyncService {
   /** Captures out of date for at least one enabled rule. */
   @Transactional(readOnly = true)
   public List<UUID> staleFiles() {
-    List<DetectionRuleEntity> rules = enabledRules();
+    RulesByFile rules = rulesByFile();
     Map<UUID, Map<UUID, Evaluation>> evals = ruleSync.evaluationsByFile();
     List<UUID> out = new ArrayList<>();
     for (UUID f : fileRepository.findCompletedIds()) {
-      if (!staleRules(rules, evals.getOrDefault(f, Map.of())).isEmpty()) out.add(f);
+      if (!staleRules(rules.forFile(f), evals.getOrDefault(f, Map.of())).isEmpty()) out.add(f);
     }
     return out;
   }
@@ -104,9 +105,26 @@ public class RuleSyncService {
     FileEntity file = fileRepository.findById(fileId).orElse(null);
     if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED) return 0;
     ruleSync.lockFile(fileId);
-    List<DetectionRuleEntity> stale = staleRules(enabledRules(), ruleSync.evaluationsForFile(fileId));
+    List<DetectionRuleEntity> stale = staleRules(enabledRules(fileId), ruleSync.evaluationsForFile(fileId));
     if (stale.isEmpty()) return 0;
+    check(file, stale);
+    return stale.size();
+  }
 
+  /**
+   * Checks the given rules against one capture now, in the caller's transaction: used when a
+   * capture rule is saved, and for a promoted copy on its source capture (#925 phase 3).
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void checkNow(UUID fileId, List<DetectionRuleEntity> rules) {
+    FileEntity file = fileRepository.findById(fileId).orElse(null);
+    if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED || rules.isEmpty()) return;
+    ruleSync.lockFile(fileId);
+    check(file, rules);
+  }
+
+  private void check(FileEntity file, List<DetectionRuleEntity> stale) {
+    UUID fileId = file.getId();
     boolean packetsGone = file.getPacketsPrunedAt() != null;
     List<DetectionRuleEntity> checkable = new ArrayList<>();
     List<DetectionRuleEntity> uncheckable = new ArrayList<>();
@@ -118,9 +136,8 @@ public class RuleSyncService {
     ruleSync.replaceResults(fileId, checkable, matched, uncheckable);
     labelStore.replaceForFile(fileId, ruleSync.labelsForFile(fileId));
     log.info(
-        "Re-applied {} rule(s) to {}: {} checked, {} couldn't be re-checked (packets deleted)",
+        "Checked {} rule(s) on {}: {} checked, {} couldn't be re-checked (packets deleted)",
         stale.size(), fileId, checkable.size(), uncheckable.size());
-    return stale.size();
   }
 
   /**
@@ -141,8 +158,32 @@ public class RuleSyncService {
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
-  private List<DetectionRuleEntity> enabledRules() {
-    return ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL);
+  /** The enabled rules that apply to one capture: global, plus its own. */
+  private List<DetectionRuleEntity> enabledRules(UUID fileId) {
+    List<DetectionRuleEntity> out =
+        new ArrayList<>(ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL));
+    out.addAll(ruleRepository.findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.CAPTURE, fileId));
+    return out;
+  }
+
+  /** The enabled global rules, and each capture's own, loaded once for an install-wide pass. */
+  private record RulesByFile(List<DetectionRuleEntity> global, Map<UUID, List<DetectionRuleEntity>> capture) {
+    List<DetectionRuleEntity> forFile(UUID fileId) {
+      List<DetectionRuleEntity> own = capture.get(fileId);
+      if (own == null) return global;
+      List<DetectionRuleEntity> out = new ArrayList<>(global);
+      out.addAll(own);
+      return out;
+    }
+  }
+
+  private RulesByFile rulesByFile() {
+    Map<UUID, List<DetectionRuleEntity>> capture = new java.util.HashMap<>();
+    for (DetectionRuleEntity r : ruleRepository.findByScopeAndEnabledTrue(DetectionRuleEntity.Scope.CAPTURE)) {
+      capture.computeIfAbsent(r.getFileId(), k -> new ArrayList<>()).add(r);
+    }
+    return new RulesByFile(
+        ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL), capture);
   }
 
   static List<DetectionRuleEntity> staleRules(List<DetectionRuleEntity> rules, Map<UUID, Evaluation> evals) {
