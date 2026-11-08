@@ -133,6 +133,34 @@ public class FileServiceImpl implements FileService {
    * the {@code AFTER_COMMIT} listener starts analysis only once the row is visible. This is the
    * only place an upload or merge holds a DB connection (see {@link #persistTx}).
    */
+  /**
+   * {@link #persistAndPublish}, turning a lost duplicate race into the usual 409.
+   *
+   * <p>The hash check before the upload is only a fast path. Two identical uploads can both pass it
+   * before either inserts (8 simultaneous ones all did), so the unique index
+   * {@code uq_files_file_hash} (V44) is what actually enforces one capture per hash. The loser's
+   * insert fails here. Its MinIO object is now orphaned, so remove it, then answer exactly as the
+   * fast path would have, with the winner's id.
+   */
+  private FileEntity persistOrReportDuplicate(FileEntity fileEntity, String storedPath) {
+    try {
+      return persistAndPublish(fileEntity);
+    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+      Optional<FileEntity> winner =
+          fileEntity.getFileHash() == null
+              ? Optional.empty()
+              : fileRepository.findFirstByFileHashOrderByUploadedAtDesc(fileEntity.getFileHash());
+      if (winner.isEmpty()) throw e; // some other constraint; not a duplicate
+      try {
+        storageService.deleteFile(storedPath);
+      } catch (Exception cleanup) {
+        log.warn("Could not remove orphaned upload {} after duplicate race: {}", storedPath, cleanup.getMessage());
+      }
+      log.info("Duplicate upload lost the race to {}; rejected", winner.get().getId());
+      throw new DuplicateFileException(winner.get().getId());
+    }
+  }
+
   private FileEntity persistAndPublish(FileEntity fileEntity) {
     return persistTx.execute(
         status -> {
@@ -259,11 +287,13 @@ public class FileServiceImpl implements FileService {
               .enableFileExtraction(enableFileExtraction)
               .build();
 
-      FileEntity saved = persistAndPublish(fileEntity);
+      FileEntity saved = persistOrReportDuplicate(fileEntity, minioPath);
       log.info("File uploaded successfully: {} (ID: {})", originalFilename, fileId);
 
       return fileMapper.toUploadResponse(saved);
 
+    } catch (DuplicateFileException e) {
+      throw e;
     } catch (Exception e) {
       log.error("Failed to upload file: {}", originalFilename, e);
       throw new InvalidFileException("Failed to upload file: " + e.getMessage(), e);
@@ -511,7 +541,7 @@ public class FileServiceImpl implements FileService {
               .enableFileExtraction(enableFileExtraction)
               .build();
 
-      FileEntity saved = persistAndPublish(fileEntity);
+      FileEntity saved = persistOrReportDuplicate(fileEntity, storedName);
       log.info("Merged PCAP saved: {} (ID: {})", mergedName, newFileId);
 
       return fileMapper.toUploadResponse(saved);

@@ -127,6 +127,50 @@ class FileUploadTransactionBoundaryTest {
     order.verify(publisher).publishEvent(any(FileUploadedEvent.class));
   }
 
+  @Test
+  void losingTheDuplicateRace_is409WithTheWinnersId_andTheOrphanedObjectIsRemoved() {
+    // Two identical uploads both pass the hash fast path, and the unique index (V44) rejects the
+    // second insert. That must surface as the normal duplicate answer, not a 400 "Failed to upload
+    // file", and the object this upload already put in MinIO must not be left behind.
+    FileRepository repo = mock(FileRepository.class);
+    StorageService storage = mock(StorageService.class);
+    FileEntity winner = FileEntity.builder().id(java.util.UUID.randomUUID()).build();
+
+    when(repo.findFirstByFileHashOrderByUploadedAtDesc(anyString()))
+        .thenReturn(Optional.empty()) // fast path: the winner hasn't committed yet
+        .thenReturn(Optional.of(winner)); // after the violation: it has
+    when(storage.uploadFile(any(MultipartFile.class), anyString()))
+        .thenAnswer(inv -> inv.getArgument(1));
+    when(repo.save(any(FileEntity.class)))
+        .thenThrow(
+            new org.springframework.dao.DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"uq_files_file_hash\""));
+
+    FileServiceImpl service =
+        new FileServiceImpl(
+            repo,
+            storage,
+            mock(FileMapper.class),
+            mock(ApplicationEventPublisher.class),
+            new RecordingTxManager(),
+            1024 * 1024,
+            0,
+            0.5);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                service.uploadFile(
+                    new MockMultipartFile("file", "capture.pcap", "application/octet-stream", new byte[64]),
+                    false,
+                    false,
+                    false,
+                    FileSource.ANALYSIS))
+        .isInstanceOfSatisfying(
+            com.tracepcap.common.exception.DuplicateFileException.class,
+            e -> assertThat(e.getExistingFileId()).isEqualTo(winner.getId()));
+    org.mockito.Mockito.verify(storage).deleteFile(org.mockito.ArgumentMatchers.endsWith(".pcap"));
+  }
+
   /** Tracks whether a transaction is open, without a datasource. */
   private static final class RecordingTxManager implements PlatformTransactionManager {
     boolean active;

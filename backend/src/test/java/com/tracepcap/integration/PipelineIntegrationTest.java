@@ -380,6 +380,55 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Simultaneous identical uploads store one file (V44). Before the unique index, 8 parallel uploads
+   * of the same capture all got 201 and became 8 rows, each analysed separately, because the hash
+   * check and the insert are separate steps.
+   */
+  @Test
+  void simultaneousIdenticalUploads_storeExactlyOneFile() throws Exception {
+    byte[] bytes;
+    try (InputStream in = getClass().getResourceAsStream("/fixtures/ftp.pcap")) {
+      bytes = in.readAllBytes();
+    }
+    // Unique to this run, so it can't collide with the other tests' ftp.pcap uploads.
+    byte[] unique = java.util.Arrays.copyOf(bytes, bytes.length + 16);
+    System.arraycopy(
+        UUID.randomUUID().toString().substring(0, 16).getBytes(), 0, unique, bytes.length, 16);
+
+    int n = 6;
+    java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(n);
+    java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+    java.util.List<java.util.concurrent.Future<ResponseEntity<JsonNode>>> results = new java.util.ArrayList<>();
+    for (int i = 0; i < n; i++) {
+      results.add(
+          pool.submit(
+              () -> {
+                start.await();
+                return uploadBytes("race.pcap", unique);
+              }));
+    }
+    start.countDown();
+
+    java.util.List<String> createdIds = new java.util.ArrayList<>();
+    java.util.Set<String> pointedAt = new java.util.HashSet<>();
+    for (java.util.concurrent.Future<ResponseEntity<JsonNode>> f : results) {
+      ResponseEntity<JsonNode> r = f.get(60, java.util.concurrent.TimeUnit.SECONDS);
+      assertThat(r.getStatusCode()).isIn(HttpStatus.CREATED, HttpStatus.CONFLICT);
+      if (r.getStatusCode() == HttpStatus.CREATED) createdIds.add(r.getBody().get("fileId").asText());
+      else pointedAt.add(r.getBody().get("existingFileId").asText());
+    }
+    pool.shutdown();
+
+    assertThat(createdIds).as("exactly one upload wins").hasSize(1);
+    assertThat(pointedAt).as("every loser is pointed at the winner").containsOnly(createdIds.get(0));
+    String hash =
+        java.util.HexFormat.of()
+            .formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(unique));
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM files WHERE file_hash = ?", Integer.class, hash))
+        .isEqualTo(1);
+  }
+
+  /**
    * Uploads the shared fixture and returns its id.
    *
    * <p>201 on a fresh container; 409 once another test in this class has already stored the same
