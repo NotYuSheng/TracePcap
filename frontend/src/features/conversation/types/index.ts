@@ -4,6 +4,13 @@ export type SortDir = 'asc' | 'desc';
 
 export interface ConversationFilters {
   ip: string;
+  /**
+   * Exact directional pair (#471): conversations where srcIp = this AND dstIp = `dstIp`. Unlike
+   * `ip` (contains-match on either end), this pins one flow. Optional; set by deep links such as
+   * the monitor Security tab's flow rows.
+   */
+  srcIp?: string;
+  dstIp?: string;
   port: string;
   payloadContains: string;
   protocols: string[];

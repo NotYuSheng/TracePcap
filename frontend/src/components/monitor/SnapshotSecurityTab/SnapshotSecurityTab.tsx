@@ -19,8 +19,9 @@ type FilterParam = 'suricataAlerts' | 'riskTypes' | 'customSignatures' | 'fileTy
 interface Flow {
   /** Display label "src → dst". */
   label: string;
-  /** Source IP — used as the `ip` filter when deep-linking a single flow. */
+  /** Source and destination IPs. A flow deep link filters on exactly this pair (#471). */
   src: string;
+  dst: string;
 }
 
 interface SignalRow {
@@ -53,7 +54,7 @@ function aggregate(edges: GraphEdge[], pick: (e: GraphEdge) => string[] | undefi
     for (const v of values) {
       if (!v) continue;
       if (!byValue.has(v)) byValue.set(v, new Map());
-      byValue.get(v)!.set(label, { label, src: e.source });
+      byValue.get(v)!.set(label, { label, src: e.source, dst: e.target });
     }
   }
   return [...byValue.entries()]
@@ -75,7 +76,7 @@ function SignalSectionView({
   buildUrl,
 }: {
   section: SignalSection;
-  buildUrl: (param: FilterParam, value: string, ip?: string) => string;
+  buildUrl: (param: FilterParam, value: string, flow?: Flow) => string;
 }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(section.rows.length / SECTION_PAGE_SIZE);
@@ -128,11 +129,11 @@ function SignalSectionView({
                       {row.flows.map(f => (
                         <div key={f.label} className="font-monospace" style={{ fontSize: '0.76rem' }}>
                           <a
-                            href={buildUrl(section.filterParam, row.value, f.src)}
+                            href={buildUrl(section.filterParam, row.value, f)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-muted"
-                            title={`Open conversations for this signal involving ${f.src}`}
+                            title={`Open conversations for this signal from ${f.src} to ${f.dst}`}
                           >
                             {f.label}
                           </a>
@@ -170,13 +171,17 @@ interface SnapshotSecurityTabProps {
 export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurityTabProps) => {
   /**
    * Build a deep-link into analysis mode's conversation table, pre-filtered to this signal
-   * (and optionally a single source host). The conversation page reads every filter from URL
-   * query params, so this lands the analyst on exactly the offending flows.
+   * (and optionally one exact src → dst flow). The conversation page reads every filter from URL
+   * query params, so this lands the analyst on exactly the offending flows. Each edge is one
+   * conversation (source = srcIp, target = dstIp), so the directional pair is exact (#471).
    */
-  const buildUrl = (param: FilterParam, value: string, ip?: string): string => {
+  const buildUrl = (param: FilterParam, value: string, flow?: Flow): string => {
     const qs = new URLSearchParams();
     qs.set(param, value);
-    if (ip) qs.set('ip', ip);
+    if (flow) {
+      qs.set('srcIp', flow.src);
+      qs.set('dstIp', flow.dst);
+    }
     return `/analysis/${fileId}/conversations?${qs.toString()}`;
   };
 
@@ -246,8 +251,8 @@ export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurity
       <p className="text-muted small mb-3">
         Security-relevant signals detected in this capture. This is the absolute posture of the
         snapshot; the <strong>Changes</strong> tab shows what is new versus the previous snapshot.
-        Click a signal to open the matching conversations in analysis mode, or a flow to also
-        filter by that host.
+        Click a signal to open the matching conversations in analysis mode, or a flow to open just
+        that source → destination pair.
       </p>
       {sections.map(section => (
         <SignalSectionView key={section.key} section={section} buildUrl={buildUrl} />

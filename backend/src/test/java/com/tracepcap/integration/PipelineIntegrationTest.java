@@ -365,18 +365,65 @@ class PipelineIntegrationTest {
             ? upload.getBody().get("fileId").asText()
             : upload.getBody().get("existingFileId").asText();
 
+    assertThat(awaitAnalysis(fileId)).as("analysis of an 86-conversation capture").isEqualTo("completed");
+    Integer conversations =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM conversations WHERE file_id = ?::uuid", Integer.class, fileId);
+    assertThat(conversations).as("enough to have reached the batch flush").isGreaterThan(50);
+  }
+
+  /**
+   * srcIp + dstIp pin one directional pair (#471), where ip is a contains-match on either end.
+   * Checked against SQL on a real analysed capture: the API total equals the exact-pair count, and
+   * the filter is strictly narrower than ip for a host that also talks to other peers.
+   */
+  @Test
+  void srcAndDstIp_filterToExactlyOneDirectionalPair() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("many-conversations.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    // The busiest source that also talks to more than one peer, and its most frequent destination.
+    java.util.Map<String, Object> pair =
+        jdbc.queryForMap(
+            "SELECT src_ip, dst_ip, count(*) AS n FROM conversations WHERE file_id = ?::uuid"
+                + " AND src_ip IN (SELECT src_ip FROM conversations WHERE file_id = ?::uuid"
+                + "   GROUP BY src_ip HAVING count(DISTINCT dst_ip) > 1)"
+                + " GROUP BY src_ip, dst_ip ORDER BY n DESC LIMIT 1",
+            fileId,
+            fileId);
+    String src = (String) pair.get("src_ip");
+    String dst = (String) pair.get("dst_ip");
+    long exact = ((Number) pair.get("n")).longValue();
+
+    JsonNode byPair =
+        rest.getForEntity(
+                "/api/v1/conversations/" + fileId + "?pageSize=500&srcIp={s}&dstIp={d}",
+                JsonNode.class,
+                src,
+                dst)
+            .getBody();
+    JsonNode byIp =
+        rest.getForEntity(
+                "/api/v1/conversations/" + fileId + "?pageSize=500&ip={s}", JsonNode.class, src)
+            .getBody();
+
+    assertThat(byPair.get("total").asLong()).isEqualTo(exact);
+    assertThat(byIp.get("total").asLong()).isGreaterThan(exact);
+  }
+
+  /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
+  private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";
     long deadline = System.currentTimeMillis() + 120_000;
     while ("processing".equals(status) && System.currentTimeMillis() < deadline) {
       Thread.sleep(500);
       status = rest.getForEntity("/api/v1/files/" + fileId, JsonNode.class).getBody().get("status").asText();
     }
-
-    assertThat(status).as("analysis of an 86-conversation capture").isEqualTo("completed");
-    Integer conversations =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM conversations WHERE file_id = ?::uuid", Integer.class, fileId);
-    assertThat(conversations).as("enough to have reached the batch flush").isGreaterThan(50);
+    return status;
   }
 
   /**

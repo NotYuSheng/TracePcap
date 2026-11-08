@@ -171,6 +171,23 @@ export function ConversationFilterPanel({
           )}
           <i className={`bi ms-2 ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
         </Button>
+        {/* Exact src → dst pair (#471). Only deep links set it, and no input in the panel edits it,
+            so it's shown here (always visible) with its own remove button. Otherwise it would
+            silently narrow the table. */}
+        {(filters.srcIp || filters.dstIp) && (
+          <Badge bg="light" text="dark" className="border d-inline-flex align-items-center gap-1 font-monospace">
+            <i className="bi bi-arrow-right-circle" aria-hidden="true"></i>
+            {filters.srcIp || 'any'} → {filters.dstIp || 'any'}
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 ms-1 text-secondary"
+              aria-label="Remove source → destination filter"
+              onClick={() => onFiltersChange({ srcIp: '', dstIp: '' })}
+            >
+              <i className="bi bi-x" aria-hidden="true"></i>
+            </button>
+          </Badge>
+        )}
       </div>
 
       {/* Collapsible panel */}

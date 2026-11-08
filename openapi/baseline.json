@@ -4530,6 +4530,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Exact source address. With dstIp, matches one directional src → dst pair (#471); unlike ip, which is a contains-match on either end",
+            "in": "query",
+            "name": "srcIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact destination address (see srcIp)",
+            "in": "query",
+            "name": "dstIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4924,6 +4942,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "srcIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dstIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5082,6 +5116,22 @@
           {
             "in": "query",
             "name": "countries",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "srcIp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dstIp",
             "required": false,
             "schema": {
               "type": "string"
