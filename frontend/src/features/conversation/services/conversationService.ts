@@ -230,6 +230,7 @@ export const conversationService = {
     if (filters.ip) params.ip = filters.ip;
     if (filters.srcIp) params.srcIp = filters.srcIp;
     if (filters.dstIp) params.dstIp = filters.dstIp;
+    if (filters.networkId) params.networkId = filters.networkId;
     if (filters.port) params.port = filters.port;
     if (filters.payloadContains) params.payloadContains = filters.payloadContains;
     if (filters.protocols.length > 0) params.protocols = filters.protocols.join(',');

@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,10 +478,10 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /** Add a custom private range */
-        post: operations["create_5"];
+        post: operations["create_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -516,10 +516,10 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         /** Create a global detection rule (audited) */
-        post: operations["create_4"];
+        post: operations["create_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -823,10 +823,10 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
-        post: operations["create_3"];
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1171,10 +1171,10 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         /** Add an IP organization rule */
-        post: operations["create_2"];
+        post: operations["create_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1260,10 +1260,10 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_3"];
+        get: operations["list_4"];
         put?: never;
         /** Create an annotation */
-        post: operations["create_1"];
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1355,6 +1355,27 @@ export interface paths {
         head?: never;
         /** Update a change event's reviewed flag or notes */
         patch: operations["patchEvent"];
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/detection-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This network's own rules */
+        get: operations["list_3"];
+        put?: never;
+        /**
+         * Add a rule to this network (audited)
+         * @description Checked against each capture that joins the network from now on, and against the network's existing captures on Re-apply.
+         */
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/monitor/networks/{networkId}/external-events": {
@@ -2523,6 +2544,8 @@ export interface components {
             match?: components["schemas"]["Match"];
             matchAll?: boolean;
             name?: string;
+            /** Format: uuid */
+            networkId?: string;
             payloadContains?: components["schemas"]["PayloadPattern"][];
             payloadRegex?: components["schemas"]["RegexPattern"][];
             /** Format: uuid */
@@ -3736,7 +3759,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: {
                 page?: number;
@@ -4059,6 +4082,8 @@ export interface operations {
                 srcIp?: string;
                 /** @description Exact destination address (see srcIp) */
                 dstIp?: string;
+                /** @description View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter */
+                networkId?: string;
             };
             header?: never;
             path: {
@@ -4103,7 +4128,9 @@ export interface operations {
     };
     getCustomSignatures: {
         parameters: {
-            query?: never;
+            query?: {
+                networkId?: string;
+            };
             header?: never;
             path: {
                 fileId: string;
@@ -4362,7 +4389,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -4382,7 +4409,7 @@ export interface operations {
             };
         };
     };
-    create_5: {
+    create_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -4426,7 +4453,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: {
                 fileId?: string;
@@ -4448,7 +4475,7 @@ export interface operations {
             };
         };
     };
-    create_4: {
+    create_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -5081,7 +5108,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -5103,7 +5130,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -5554,7 +5581,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -5574,7 +5601,7 @@ export interface operations {
             };
         };
     };
-    create_2: {
+    create_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -5750,7 +5777,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -5772,7 +5799,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5965,6 +5992,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ChangeEventDto"];
+                };
+            };
+        };
+    };
+    list_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"][];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectionRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetectionRuleDto"];
                 };
             };
         };

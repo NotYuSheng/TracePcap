@@ -26,4 +26,10 @@ public interface DetectionRuleRepository extends JpaRepository<DetectionRuleEnti
   List<DetectionRuleEntity> findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(Scope scope, UUID fileId);
 
   List<DetectionRuleEntity> findByScopeAndEnabledTrue(Scope scope);
+
+  List<DetectionRuleEntity> findByScopeAndNetworkIdOrderByNameAsc(Scope scope, UUID networkId);
+
+  List<DetectionRuleEntity> findByScopeAndNetworkIdAndEnabledTrueOrderByNameAsc(Scope scope, UUID networkId);
+
+  List<DetectionRuleEntity> findByScopeAndNetworkId(Scope scope, UUID networkId);
 }

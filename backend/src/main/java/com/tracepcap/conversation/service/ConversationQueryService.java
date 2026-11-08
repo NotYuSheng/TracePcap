@@ -58,6 +58,7 @@ public class ConversationQueryService {
   private final FileRepository fileRepository;
   private final GeoIpService geoIpService;
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
+  private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
   private final StorageService storageService;
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
@@ -106,13 +107,46 @@ public class ConversationQueryService {
   @Transactional(readOnly = true)
   public PagedResponse<ConversationResponse> getConversations(
       UUID fileId, int page, int pageSize, ConversationFilterParams params) {
+    return getConversations(fileId, page, pageSize, params, null);
+  }
 
+  /**
+   * As {@link #getConversations(UUID, int, int, ConversationFilterParams)}, viewed in a network
+   * (#925 phase 3): that network's rule matches are added to each conversation's custom
+   * signatures, and count for the custom-signature filter.
+   */
+  @Transactional(readOnly = true)
+  public PagedResponse<ConversationResponse> getConversations(
+      UUID fileId, int page, int pageSize, ConversationFilterParams params, UUID networkId) {
+    if (networkId != null && params.getCustomSignatures() != null && !params.getCustomSignatures().isEmpty()) {
+      params =
+          params.toBuilder()
+              .customSignatureMatchIds(
+                  networkRuleOverlay.conversationsMatching(networkId, fileId, params.getCustomSignatures()))
+              .build();
+    }
     ConversationLookup.ConversationPage dbPage =
         conversationLookup.conversationPage(fileId, page, pageSize, params);
 
     List<ConversationResponse> content = mapConversationsWithFileTypes(dbPage.content());
-
+    if (networkId != null) {
+      Map<UUID, List<String>> overlay = networkRuleOverlay.labels(networkId, fileId);
+      if (!overlay.isEmpty()) {
+        for (ConversationResponse c : content) {
+          List<String> extra = overlay.get(c.getConversationId());
+          if (extra != null) c.setCustomSignatures(mergeNames(c.getCustomSignatures(), extra));
+        }
+      }
+    }
     return PagedResponse.of(content, dbPage.totalElements(), page, pageSize);
+  }
+
+  /** Stored names first, then the network's, without repeats. */
+  static List<String> mergeNames(List<String> stored, List<String> extra) {
+    java.util.LinkedHashSet<String> all = new java.util.LinkedHashSet<>();
+    if (stored != null) all.addAll(stored);
+    all.addAll(extra);
+    return new java.util.ArrayList<>(all);
   }
 
   /** Returns distinct detected file types found in packets for the given file. */
@@ -131,7 +165,17 @@ public class ConversationQueryService {
 
   @Transactional(readOnly = true)
   public List<String> getDistinctCustomSignatures(UUID fileId) {
-    return conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
+    return getDistinctCustomSignatures(fileId, null);
+  }
+
+  /** As above, plus the names of the network's rules that matched, when viewed in a network. */
+  @Transactional(readOnly = true)
+  public List<String> getDistinctCustomSignatures(UUID fileId, UUID networkId) {
+    List<String> stored = conversationLookup.distinctValues(fileId, Facet.CUSTOM_SIGNATURE);
+    if (networkId == null) return stored;
+    java.util.TreeSet<String> all = new java.util.TreeSet<>(stored);
+    networkRuleOverlay.labels(networkId, fileId).values().forEach(all::addAll);
+    return new java.util.ArrayList<>(all);
   }
 
   /** Returns distinct Suricata IDS alert strings present in this file's conversations. */

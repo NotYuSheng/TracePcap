@@ -70,6 +70,29 @@ capture**:
 table, the conversation details, the filter and the Overview end in their
 scope: *global* or *capture*.
 
+Rules for a network
+-------------------
+
+A monitored network can have its own rules, for things that are only true of
+that site: "at HQ, ``10.0.0.53`` is the sanctioned DNS server", or "this
+site's cameras live on ``10.20.0.0/16``". Open the network's page and click
+**Detection rules**.
+
+- A network rule's matches show when the network's captures are viewed **in
+  that network**: its snapshots, their **Security** tab, and the
+  conversations those link to. The same capture viewed on its own, or in
+  another network, doesn't show them.
+- Each capture that **joins** the network is checked against its rules
+  straight away. A capture that **leaves** loses the network's matches.
+- Adding or changing a network rule doesn't re-check the captures already in
+  the network: they show as out of date, as for a global rule, until the rules
+  are re-applied.
+- Switching a network rule off hides its matches at once.
+- A network rule's name can't be the same as a global rule's.
+- Who can edit network rules is its own permission (*Edit network detection
+  rules*, analysts by default). Every change is in the audit log. Deleting the
+  network deletes its rules.
+
 Keeping matches up to date
 --------------------------
 

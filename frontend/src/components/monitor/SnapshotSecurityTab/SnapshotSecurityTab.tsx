@@ -166,9 +166,11 @@ interface SnapshotSecurityTabProps {
   loading: boolean;
   /** File backing this snapshot; deep-links jump to its analysis-mode conversation view. */
   fileId: string;
+  /** The network being viewed; deep links keep it as the context (#925 phase 3). */
+  networkId?: string;
 }
 
-export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurityTabProps) => {
+export const SnapshotSecurityTab = ({ edges, loading, fileId, networkId }: SnapshotSecurityTabProps) => {
   /**
    * Build a deep-link into analysis mode's conversation table, pre-filtered to this signal
    * (and optionally one exact src → dst flow). The conversation page reads every filter from URL
@@ -178,6 +180,7 @@ export const SnapshotSecurityTab = ({ edges, loading, fileId }: SnapshotSecurity
   const buildUrl = (param: FilterParam, value: string, flow?: Flow): string => {
     const qs = new URLSearchParams();
     qs.set(param, value);
+    if (networkId) qs.set('networkId', networkId);
     if (flow) {
       qs.set('srcIp', flow.src);
       qs.set('dstIp', flow.dst);

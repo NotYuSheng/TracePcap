@@ -43,6 +43,7 @@ public class SnapshotService {
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
   private final ConversationLookup conversationLookup;
+  private final org.springframework.context.ApplicationEventPublisher events;
 
   @Transactional(readOnly = true)
   public List<NetworkSnapshotDto> listSnapshots(UUID networkId) {
@@ -162,6 +163,9 @@ public class SnapshotService {
     long changeCount = changeEventRepository.countByToSnapshotId(snapshot.getId());
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshot.getId());
     List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshot.getId());
+    // Detection rules (#925): the network's rules get checked on the new capture.
+    events.publishEvent(
+        new com.tracepcap.monitor.event.SnapshotMembershipChangedEvent(networkId, fileId, true));
     return toDto(snapshot, changeCount, criticalCount,
         securitySignalCount(snapshot.getFile().getId()), overrides);
   }
@@ -237,12 +241,19 @@ public class SnapshotService {
 
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
     networkService.findOrThrow(networkId);
-    snapshotRepository
-        .findById(snapshotId)
-        .filter(s -> s.getNetwork().getId().equals(networkId))
-        .orElseThrow(() -> new ResourceNotFoundException("Snapshot not found: " + snapshotId));
+    NetworkSnapshotEntity removed =
+        snapshotRepository
+            .findById(snapshotId)
+            .filter(s -> s.getNetwork().getId().equals(networkId))
+            .orElseThrow(() -> new ResourceNotFoundException("Snapshot not found: " + snapshotId));
+    UUID removedFileId = removed.getFile() != null ? removed.getFile().getId() : null;
 
     snapshotRepository.deleteById(snapshotId);
+    // Detection rules (#925): this network's rule matches no longer apply to the capture.
+    if (removedFileId != null) {
+      events.publishEvent(
+          new com.tracepcap.monitor.event.SnapshotMembershipChangedEvent(networkId, removedFileId, false));
+    }
     reorderSnapshots(networkId);
     rerunChangeDetectionChain(networkId);
   }

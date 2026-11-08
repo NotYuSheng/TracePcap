@@ -55,6 +55,13 @@ function serveAll() {
 afterEach(() => vi.resetAllMocks())
 
 describe('useNetworkData', () => {
+  it('asks for the conversations in a network, when given one (#925 phase 3)', async () => {
+    serveAll()
+    const { result } = renderHook(() => useNetworkData(FILE, undefined, 50, 'net-1'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(convService.getConversations).toHaveBeenCalledWith(FILE, expect.objectContaining({ networkId: 'net-1' }))
+  })
+
   it('builds a graph from the conversations', async () => {
     serveAll()
 

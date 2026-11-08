@@ -44,6 +44,7 @@ public class RuleSyncService {
   private final ConversationLookup conversationLookup;
   private final CustomSignatureStore labelStore;
   private final FileRepository fileRepository;
+  private final com.tracepcap.monitor.repository.NetworkSnapshotRepository snapshotRepository;
 
   /** The install-wide picture, for the Detection rules tab. */
   @Transactional(readOnly = true)
@@ -158,12 +159,45 @@ public class RuleSyncService {
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
-  /** The enabled rules that apply to one capture: global, plus its own. */
+  /** The enabled rules that apply to one capture: global, its own, and its networks' (#925). */
   private List<DetectionRuleEntity> enabledRules(UUID fileId) {
     List<DetectionRuleEntity> out =
         new ArrayList<>(ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL));
     out.addAll(ruleRepository.findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.CAPTURE, fileId));
+    for (var snap : snapshotRepository.findByFileId(fileId)) {
+      out.addAll(
+          ruleRepository.findByScopeAndNetworkIdAndEnabledTrueOrderByNameAsc(
+              DetectionRuleEntity.Scope.NETWORK, snap.getNetwork().getId()));
+    }
     return out;
+  }
+
+  /**
+   * A capture joined a network: check the network's enabled rules on it now (#925 phase 3), in
+   * its own transaction. Called after the membership change committed.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void onJoinedNetwork(UUID networkId, UUID fileId) {
+    FileEntity file = fileRepository.findById(fileId).orElse(null);
+    if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED) return;
+    List<DetectionRuleEntity> rules =
+        ruleRepository.findByScopeAndNetworkIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.NETWORK, networkId);
+    if (rules.isEmpty()) return;
+    ruleSync.lockFile(fileId);
+    check(file, rules);
+  }
+
+  /** A capture left a network: drop that network's rule results for it (#925 phase 3). */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void onLeftNetwork(UUID networkId, UUID fileId) {
+    if (snapshotRepository.findByNetworkIdAndFileId(networkId, fileId).isPresent()) return; // still in it
+    List<UUID> ruleIds =
+        ruleRepository.findByScopeAndNetworkId(DetectionRuleEntity.Scope.NETWORK, networkId).stream()
+            .map(DetectionRuleEntity::getId)
+            .toList();
+    if (ruleIds.isEmpty()) return;
+    ruleSync.lockFile(fileId);
+    ruleSync.removeResults(fileId, ruleIds);
   }
 
   /** The enabled global rules, and each capture's own, loaded once for an install-wide pass. */
@@ -178,9 +212,20 @@ public class RuleSyncService {
   }
 
   private RulesByFile rulesByFile() {
+    // Each capture's own rules, plus the rules of every network it's in (#925 phase 3).
     Map<UUID, List<DetectionRuleEntity>> capture = new java.util.HashMap<>();
     for (DetectionRuleEntity r : ruleRepository.findByScopeAndEnabledTrue(DetectionRuleEntity.Scope.CAPTURE)) {
       capture.computeIfAbsent(r.getFileId(), k -> new ArrayList<>()).add(r);
+    }
+    Map<UUID, List<DetectionRuleEntity>> byNetwork = new java.util.HashMap<>();
+    for (DetectionRuleEntity r : ruleRepository.findByScopeAndEnabledTrue(DetectionRuleEntity.Scope.NETWORK)) {
+      byNetwork.computeIfAbsent(r.getNetworkId(), k -> new ArrayList<>()).add(r);
+    }
+    if (!byNetwork.isEmpty()) {
+      for (Object[] m : snapshotRepository.findAllMemberships()) {
+        List<DetectionRuleEntity> rules = byNetwork.get((UUID) m[0]);
+        if (rules != null) capture.computeIfAbsent((UUID) m[1], k -> new ArrayList<>()).addAll(rules);
+      }
     }
     return new RulesByFile(
         ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL), capture);

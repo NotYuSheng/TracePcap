@@ -21,6 +21,8 @@ interface RuleEditorModalProps {
   readOnly?: boolean;
   /** Create the rule for this capture only (#925 phase 3), instead of a global rule. */
   fileId?: string;
+  /** Create the rule for this network (#925 phase 3), instead of a global rule. */
+  networkId?: string;
   onHide: () => void;
   onSaved: () => void;
 }
@@ -94,6 +96,7 @@ export function RuleEditorModal({
   rule,
   readOnly = false,
   fileId,
+  networkId,
   onHide,
   onSaved,
 }: RuleEditorModalProps) {
@@ -113,7 +116,8 @@ export function RuleEditorModal({
   }, [show, rule]);
 
   const local = useMemo(() => localErrors(draft), [draft]);
-  const captureScope = rule ? rule.scope === 'CAPTURE' : !!fileId;
+  const scope = rule ? rule.scope : networkId ? 'NETWORK' : fileId ? 'CAPTURE' : 'GLOBAL';
+  const captureScope = scope === 'CAPTURE';
   // Local errors show once the user has typed; server errors until the field is changed again.
   const errors = { ...(touched ? local : {}), ...serverErrors };
   const err = (key: string) => errors[key];
@@ -139,6 +143,7 @@ export function RuleEditorModal({
     setError(null);
     try {
       if (rule) await detectionRulesService.update(rule.id, draft);
+      else if (networkId) await detectionRulesService.createForNetwork(networkId, draft);
       else if (fileId) await detectionRulesService.createForCapture(fileId, draft);
       else await detectionRulesService.create(draft);
       onSaved();
@@ -160,9 +165,11 @@ export function RuleEditorModal({
         <Modal.Title>
           {rule
             ? `${readOnly ? 'Rule' : 'Edit rule'}: ${rule.name}`
-            : captureScope
-              ? 'New rule for this capture'
-              : 'New detection rule'}
+            : scope === 'NETWORK'
+              ? 'New rule for this network'
+              : captureScope
+                ? 'New rule for this capture'
+                : 'New detection rule'}
         </Modal.Title>
       </Modal.Header>
       <form onSubmit={save} noValidate>
@@ -173,9 +180,11 @@ export function RuleEditorModal({
             </Alert>
           )}
           <p className="small text-muted">
-            {captureScope
-              ? 'A capture rule flags matching conversations in this capture only, straight away, wherever the capture is viewed.'
-              : 'A global rule flags every conversation it matches, in every capture analysed from now on.'}{' '}
+            {scope === 'NETWORK'
+              ? "A network rule flags matching conversations in this network's captures, shown when you view them in this network. It's checked on each capture that joins; for captures already here, re-apply."
+              : captureScope
+                ? 'A capture rule flags matching conversations in this capture only, straight away, wherever the capture is viewed.'
+                : 'A global rule flags every conversation it matches, in every capture analysed from now on.'}{' '}
             It fires when <strong>every</strong> field you fill in matches.
           </p>
 

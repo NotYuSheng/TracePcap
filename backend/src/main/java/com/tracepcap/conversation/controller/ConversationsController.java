@@ -114,7 +114,13 @@ public class ConversationsController {
           String srcIp,
       @Parameter(description = "Exact destination address (see srcIp)")
           @RequestParam(required = false)
-          String dstIp) {
+          String dstIp,
+      @Parameter(
+              description =
+                  "View in this network (#925): its own detection rules' matches are added to"
+                      + " customSignatures and count for that filter")
+          @RequestParam(required = false)
+          UUID networkId) {
 
     if (page < 1) page = 1;
     if (pageSize < 1) pageSize = 25;
@@ -159,7 +165,7 @@ public class ConversationsController {
         sortBy,
         sortDir);
 
-    return ResponseEntity.ok(conversationQueryService.getConversations(fileId, page, pageSize, params));
+    return ResponseEntity.ok(conversationQueryService.getConversations(fileId, page, pageSize, params, networkId));
   }
 
   /**
@@ -196,8 +202,9 @@ public class ConversationsController {
   /** Returns the distinct custom signature rule names triggered for this file. */
   @GetMapping("/{fileId}/custom-signatures")
   @Operation(summary = "List distinct custom signature rule names for a file")
-  public ResponseEntity<List<String>> getCustomSignatures(@PathVariable UUID fileId) {
-    return ResponseEntity.ok(conversationQueryService.getDistinctCustomSignatures(fileId));
+  public ResponseEntity<List<String>> getCustomSignatures(
+      @PathVariable UUID fileId, @RequestParam(required = false) UUID networkId) {
+    return ResponseEntity.ok(conversationQueryService.getDistinctCustomSignatures(fileId, networkId));
   }
 
   /** Returns the distinct Suricata IDS alert strings present for this file. */

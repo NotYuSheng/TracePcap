@@ -19,6 +19,8 @@ public class DetectionRuleDto {
   private String scope;
   /** For a CAPTURE rule: its capture. */
   private UUID fileId;
+  /** For a NETWORK rule: its network. */
+  private UUID networkId;
   /** The rule this one was promoted from, if any. */
   private UUID promotedFrom;
   private String name;
