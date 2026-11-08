@@ -307,7 +307,7 @@ services:
         # The default below is rewritten on every merge to main by
         # .github/workflows/app-version.yml — it is the version local builds bake in.
         # Export APP_VERSION to override (CI passes the live `git describe` for GHCR images).
-        VITE_APP_VERSION: ${APP_VERSION:-v0.2.0-196-g454e21a}
+        VITE_APP_VERSION: ${APP_VERSION:-v0.2.0-199-g6a84b09}
     container_name: tracepcap-nginx
     restart: unless-stopped
     deploy:
