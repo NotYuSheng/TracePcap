@@ -152,15 +152,16 @@ public class DeviceClassifierService implements HostClassifier {
    * @return one HostClassificationEntity per unique IP
    */
   @Override
-  public List<HostClassificationEntity> classify(
-      FileEntity file,
-      List<PcapParserService.ConversationInfo> conversations,
-      Map<String, Integer> hostTtls,
-      Map<String, String> hostMacs,
-      Map<String, String> deviceOverrides,
-      Map<String, HostnameResolverService.ResolvedHostname> hostnames,
-      Map<String, Set<String>> serviceRolesByIp,
-      Map<String, List<Claim>> windowsIdentityClaimsByIp) {
+  public List<HostClassificationEntity> classify(HostClassifier.ClassificationRequest request) {
+    // Unpacked into the names the body has always used, so this refactor (#421) leaves it untouched.
+    FileEntity file = request.file();
+    List<PcapParserService.ConversationInfo> conversations = request.conversations();
+    Map<String, Integer> hostTtls = request.hostTtls();
+    Map<String, String> hostMacs = request.hostMacs();
+    Map<String, String> deviceOverrides = request.deviceOverrides();
+    Map<String, HostnameResolverService.ResolvedHostname> hostnames = request.hostnames();
+    Map<String, Set<String>> serviceRolesByIp = request.serviceRolesByIp();
+    Map<String, List<Claim>> windowsIdentityClaimsByIp = request.windowsIdentityClaimsByIp();
 
     // Build per-host profiles from all conversations
     Map<String, HostProfile> profiles = new LinkedHashMap<>();

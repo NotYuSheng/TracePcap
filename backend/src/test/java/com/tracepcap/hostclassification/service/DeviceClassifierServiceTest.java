@@ -49,14 +49,8 @@ class DeviceClassifierServiceTest {
     List<HostClassificationEntity> results =
         service()
             .classify(
-                FileEntity.builder().build(),
-                List.of(dnsFlow()),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of(),
-                Map.of());
+                com.tracepcap.analysis.spi.HostClassifier.ClassificationRequest.of(
+                    FileEntity.builder().build(), List.of(dnsFlow())));
     return results.stream().filter(h -> ip.equals(h.getIp())).findFirst().orElseThrow();
   }
 
