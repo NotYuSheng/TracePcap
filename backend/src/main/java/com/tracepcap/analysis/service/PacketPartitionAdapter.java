@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Serves {@link PacketPartitions} with DDL against the partitioned {@code packets} table (#394).
@@ -33,7 +35,25 @@ public class PacketPartitionAdapter implements PacketPartitions {
     return "packets_" + fileId.toString().replace("-", "");
   }
 
+  /**
+   * Creates the file's partition and its FK, in a transaction of its own that commits on return.
+   *
+   * <p>{@code REQUIRES_NEW} is what makes the javadoc above true. The only caller is
+   * {@code AnalysisService.analyzeFile}, which is one transaction for the whole pipeline, and
+   * {@code JdbcTemplate} joins it. {@code CREATE TABLE … PARTITION OF packets} takes an
+   * {@code ACCESS EXCLUSIVE} lock on the parent, and the {@code ADD FOREIGN KEY} takes
+   * {@code SHARE ROW EXCLUSIVE} on {@code conversations}. Inside that transaction both were held
+   * until the analysis committed, often minutes later. Two things followed. Every other analysis
+   * queued behind it, so analyses ran one at a time. And every read of {@code packets}, for any
+   * file, blocked, so the UI hung for as long as an analysis was running. Committing here holds
+   * those locks for milliseconds.
+   *
+   * <p>The cost: if the analysis then fails and rolls back, it leaves behind an empty partition.
+   * That is harmless. It is still owned by the file and is dropped with it, and
+   * {@code IF NOT EXISTS} reuses it on a retry.
+   */
   @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void ensurePartition(UUID fileId) {
     String name = partitionName(fileId);
 
