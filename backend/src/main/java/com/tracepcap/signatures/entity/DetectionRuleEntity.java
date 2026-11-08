@@ -75,9 +75,16 @@ public class DetectionRuleEntity {
   @Column(name = "match_all", nullable = false)
   private boolean matchAll;
 
-  /** Legacy override of the matched hosts' device type; #926 replaces it. Not editable. */
+  /**
+   * Classification hint (#926): matching hosts are probably this device type. A weighted vote in
+   * device classification, not an override. Null for none.
+   */
   @Column(name = "device_type", length = 100)
   private String deviceType;
+
+  /** The hint's weight, 1 to 100; null means the default. */
+  @Column(name = "device_type_weight")
+  private Integer deviceTypeWeight;
 
   /** The rule this one was promoted from (#925 phase 3), if any. */
   @Column(name = "promoted_from")

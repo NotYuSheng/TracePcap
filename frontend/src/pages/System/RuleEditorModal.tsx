@@ -88,6 +88,10 @@ function localErrors(r: DetectionRuleInput): Record<string, string> {
   r.payloadRegex.forEach((p, i) => {
     if (!p.pattern.trim()) e[`payloadRegex[${i}].pattern`] = 'Enter a pattern.';
   });
+  const w = r.deviceTypeWeight;
+  if (r.deviceType && w !== null && w !== undefined && (!Number.isInteger(w) || w < 1 || w > 100)) {
+    e.deviceTypeWeight = 'A weight is 1 to 100.';
+  }
   return e;
 }
 
@@ -431,13 +435,69 @@ export function RuleEditorModal({
             />
           )}
 
-          {rule?.deviceType && (
-            <Alert variant="info" className="py-2 small mt-3 mb-0">
-              This rule also sets the device type of matched hosts to{' '}
-              <strong>{rule.deviceType}</strong>. That's kept as it was, but can't be edited here:
-              device types are moving to classification signals (#926).
-            </Alert>
-          )}
+          <h6 className="mb-1 mt-3">Classification hint</h6>
+          <p className="small text-muted mb-2">
+            Optional: hosts this rule matches are probably a certain kind of device. It's a weighted
+            vote in device classification, shown in the host's evidence, not an override: other
+            signals add 5 to 35 each, and a label you set on a host still wins. The vote goes to the
+            host that matched the rule's IP or CIDR, else the one on its port, else both ends.
+          </p>
+          <Row className="g-2 mb-2">
+            <Col md={8}>
+              <Form.Label htmlFor="rule-device-type" className="small mb-0">
+                Device type
+              </Form.Label>
+              <Form.Control
+                id="rule-device-type"
+                size="sm"
+                list="rule-device-type-options"
+                placeholder="e.g. IOT, or CCTV Camera"
+                value={draft.deviceType ?? ''}
+                onChange={e => update({ deviceType: e.target.value || null }, ['deviceType'])}
+                isInvalid={!!err('deviceType')}
+                disabled={saving || readOnly}
+              />
+              <datalist id="rule-device-type-options">
+                {[
+                  'ROUTER',
+                  'MOBILE',
+                  'LAPTOP_DESKTOP',
+                  'SERVER',
+                  'IOT',
+                  'DNS_SERVER',
+                  'WEB_SERVER',
+                  'API_SERVER',
+                ].map(t => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
+            </Col>
+            <Col md={4}>
+              <Form.Label htmlFor="rule-device-weight" className="small mb-0">
+                Weight
+              </Form.Label>
+              <Form.Control
+                id="rule-device-weight"
+                size="sm"
+                type="number"
+                min={1}
+                max={100}
+                placeholder="40"
+                value={draft.deviceTypeWeight ?? ''}
+                onChange={e =>
+                  update(
+                    { deviceTypeWeight: e.target.value === '' ? null : Number(e.target.value) },
+                    ['deviceTypeWeight']
+                  )
+                }
+                isInvalid={!!err('deviceTypeWeight')}
+                disabled={saving || readOnly || !draft.deviceType}
+              />
+              <Form.Control.Feedback type="invalid">
+                {err('deviceTypeWeight')}
+              </Form.Control.Feedback>
+            </Col>
+          </Row>
         </Modal.Body>
         <Modal.Footer>
           {rule && (

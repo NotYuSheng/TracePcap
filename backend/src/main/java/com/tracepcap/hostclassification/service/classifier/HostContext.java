@@ -30,13 +30,29 @@ public record HostContext(
     String ouiHint,
     String hostname,
     Set<String> serviceRoles,
-    List<WindowsIdentityResolverService.Claim> windowsIdentityClaims) {
+    List<WindowsIdentityResolverService.Claim> windowsIdentityClaims,
+    List<com.tracepcap.analysis.spi.ClassificationHint> ruleHints) {
 
   /** Enforces the documented non-null contract and makes the collections immutable. */
   public HostContext {
     serviceRoles = (serviceRoles == null) ? Set.of() : Set.copyOf(serviceRoles);
     windowsIdentityClaims =
         (windowsIdentityClaims == null) ? List.of() : List.copyOf(windowsIdentityClaims);
+    ruleHints = (ruleHints == null) ? List.of() : List.copyOf(ruleHints);
+  }
+
+  /** Without detection-rule hints (#926). */
+  public HostContext(
+      String ip,
+      HostProfile profile,
+      Integer ttl,
+      String mac,
+      String manufacturer,
+      String ouiHint,
+      String hostname,
+      Set<String> serviceRoles,
+      List<WindowsIdentityResolverService.Claim> windowsIdentityClaims) {
+    this(ip, profile, ttl, mac, manufacturer, ouiHint, hostname, serviceRoles, windowsIdentityClaims, List.of());
   }
 
   /** Convenience for signals (and their tests) that don't involve Windows sign-in claims. */

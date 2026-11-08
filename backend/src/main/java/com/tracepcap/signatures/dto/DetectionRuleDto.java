@@ -33,8 +33,10 @@ public class DetectionRuleDto {
   private List<DetectionRuleRequest.PayloadPattern> payloadContains;
   private List<DetectionRuleRequest.RegexPattern> payloadRegex;
   private boolean matchAll;
-  /** Legacy: overrides the matched hosts' device type. Read-only; #926 replaces it. */
+  /** Classification hint (#926): matching hosts are probably this device type. */
   private String deviceType;
+  /** The hint's weight, 1 to 100. */
+  private Integer deviceTypeWeight;
   private int version;
   private LocalDateTime createdAt;
   private String createdBy;

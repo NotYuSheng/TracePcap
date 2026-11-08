@@ -498,7 +498,7 @@ public class AnalysisService {
     long t = System.currentTimeMillis();
     UUID fileId = run.fileId;
 
-    Map<String, String> deviceOverrides =
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> ruleHints =
         signatureApplier.applySignatures(fileId, run.parseResult.getConversations());
 
     // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
@@ -550,7 +550,7 @@ public class AnalysisService {
                 run.parseResult.getConversations(),
                 run.parseResult.getHostTtls(),
                 run.parseResult.getHostMacs(),
-                deviceOverrides,
+                ruleHints,
                 hostnames,
                 serviceLogs.rolesByIp(),
                 windowsIdentityClaimsByIp));

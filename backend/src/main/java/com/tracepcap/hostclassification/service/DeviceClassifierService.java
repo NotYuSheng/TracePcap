@@ -38,8 +38,8 @@ import org.springframework.stereotype.Service;
  *       very high peer count → router; limited app variety + low volume → IoT
  * </ol>
  *
- * <p>A YAML {@code device_type} override (set by CustomSignatureService) takes precedence over all
- * heuristics and sets confidence to 100.
+ * <p>Detection rules don't override the result: a rule's classification hint is one more weighted
+ * vote ({@code CustomRuleClassificationSignal}, #926), and a human label wins over the vote.
  */
 @Slf4j
 @Service
@@ -142,7 +142,7 @@ public class DeviceClassifierService implements HostClassifier {
    * @param conversations parsed conversation list
    * @param hostTtls first-seen TTL per source IP
    * @param hostMacs first-seen MAC per source IP
-   * @param deviceOverrides IP → custom device type string set by YAML rules (may be empty)
+   * @param ruleHints IP → detection rules' weighted device-type votes (#926; may be empty)
    * @param hostnames IP → passively-discovered hostname/source (may be empty)
    * @param serviceRolesByIp IP → service roles the host was detected serving, e.g. {@code "dns"}
    *     (may be empty); feeds role-aware signals and is recorded on each host
@@ -158,7 +158,7 @@ public class DeviceClassifierService implements HostClassifier {
     List<PcapParserService.ConversationInfo> conversations = request.conversations();
     Map<String, Integer> hostTtls = request.hostTtls();
     Map<String, String> hostMacs = request.hostMacs();
-    Map<String, String> deviceOverrides = request.deviceOverrides();
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> ruleHints = request.ruleHints();
     Map<String, HostnameResolverService.ResolvedHostname> hostnames = request.hostnames();
     Map<String, Set<String>> serviceRolesByIp = request.serviceRolesByIp();
     Map<String, List<Claim>> windowsIdentityClaimsByIp = request.windowsIdentityClaimsByIp();
@@ -182,25 +182,11 @@ public class DeviceClassifierService implements HostClassifier {
       Set<String> roles = serviceRolesByIp.getOrDefault(ip, Set.of());
       List<Claim> windowsIdentityClaims = windowsIdentityClaimsByIp.getOrDefault(ip, List.of());
 
-      // Check YAML device_type override first
-      if (deviceOverrides.containsKey(ip)) {
-        results.add(
-            HostClassificationEntity.builder()
-                .file(file)
-                .ip(ip)
-                .mac(mac)
-                .manufacturer(manufacturer)
-                .ttl(ttl)
-                .deviceType(deviceOverrides.get(ip))
-                .confidence(100)
-                .serviceRoles(joinRoles(roles))
-                .build());
-        continue;
-      }
-
       // Run every registered signal into a shared score board; the highest-scoring type wins.
       HostContext ctx =
-          new HostContext(ip, profile, ttl, mac, manufacturer, ouiHint, null, roles, windowsIdentityClaims);
+          new HostContext(
+              ip, profile, ttl, mac, manufacturer, ouiHint, null, roles, windowsIdentityClaims,
+              ruleHints.getOrDefault(ip, List.of()));
       ScoreBoard board = new ScoreBoard();
       for (DeviceClassificationSignal signal : signals) {
         try {

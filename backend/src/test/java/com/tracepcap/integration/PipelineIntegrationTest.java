@@ -1125,6 +1125,34 @@ class PipelineIntegrationTest {
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
   }
 
+  /**
+   * A rule's classification hint is a weighted vote, not an override (#926): the endpoint on the
+   * matched port gets it, explained in the evidence; the other endpoint doesn't.
+   */
+  @Test
+  void ruleClassificationHint_votesForTheMatchedEndpoint_withTheRuleInTheEvidence() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "hint-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    createRule("{\"name\":\"" + tag + "\",\"severity\":\"low\",\"match\":{\"dstPort\":5999},"
+        + "\"deviceType\":\"CCTV Camera\",\"deviceTypeWeight\":100}");
+    String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(file)).isEqualTo("completed");
+
+    JsonNode hosts = rest.getForEntity("/api/v1/files/" + file + "/host-classifications", JsonNode.class).getBody();
+    java.util.Map<String, JsonNode> byIp = new java.util.HashMap<>();
+    hosts.forEach(h -> byIp.put(h.get("ip").asText(), h));
+    JsonNode camera = byIp.get("10.99.0.2");
+    assertThat(camera.get("deviceType").asText()).isEqualTo("CCTV Camera");
+    // The evidence behind the verdict names the rule ("Evidence weighed").
+    assertThat(rest.getForEntity("/api/v1/files/" + file + "/host-identities?ips=10.99.0.2", JsonNode.class)
+            .getBody().toString()).contains("Custom rule").contains(tag);
+    assertThat(camera.get("confidence").asInt()).as("a vote, not a forced 100").isLessThanOrEqualTo(100);
+    assertThat(byIp.get("10.99.0.1").get("deviceType").asText())
+        .as("the client on the other end isn't voted a camera").isNotEqualTo("CCTV Camera");
+
+    jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);
