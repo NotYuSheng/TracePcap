@@ -47,6 +47,26 @@ public class CurrentActor {
     return (name == null || name.isBlank()) ? SYSTEM : name;
   }
 
+  /** The profile everyone shares when there is no logged-in account (login off). */
+  public static final String SHARED_PROFILE = "shared";
+
+  /**
+   * Whose personal preferences this request reads and writes (#915). The token's stable subject
+   * id when logged in (not the username, which an admin can rename), or {@link #SHARED_PROFILE}
+   * when there is no account. With login off everyone shares one profile, by design.
+   */
+  public String profileKey() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !auth.isAuthenticated() || isAnonymous(auth)) return SHARED_PROFILE;
+    if (auth.getPrincipal() instanceof Jwt jwt
+        && jwt.getSubject() != null
+        && !jwt.getSubject().isBlank()) {
+      return "sub:" + jwt.getSubject();
+    }
+    String name = auth.getName();
+    return (name == null || name.isBlank()) ? SHARED_PROFILE : "name:" + name;
+  }
+
   /** Spring inserts an {@code anonymousUser} authentication on permit-all chains; that is not a who. */
   private boolean isAnonymous(Authentication auth) {
     return "anonymousUser".equals(auth.getPrincipal());

@@ -5,6 +5,7 @@ import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react'
 import { Activity } from 'lucide-react';
 import { SignaturesModal } from '@components/signatures/SignaturesModal';
 import { SettingsModal } from '@components/settings/SettingsModal/SettingsModal';
+import { usePreferencesSync } from '@/features/preferences/usePreferencesSync';
 import { AuthMenu } from '@/auth/AuthMenu';
 import { getAccessToken } from '@/auth/tokenStore';
 import { env } from '@/config/env';
@@ -86,6 +87,8 @@ function useResolvedDark(themeMode: ThemeMode): boolean {
 export const MainLayout = () => {
   const [showSignatures, setShowSignatures] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // Personal preferences live on the server (#915): per account with login on, shared when off.
+  usePreferencesSync();
   const backendReady = useBackendReady();
   const themeMode = useStore(s => s.themeMode);
   const cycleTheme = useStore(s => s.cycleTheme);

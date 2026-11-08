@@ -2846,6 +2846,34 @@
         },
         "type": "object"
       },
+      "PreferencesDto": {
+        "properties": {
+          "conversationColumns": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 0,
+            "type": "array"
+          },
+          "nodeLabelConfig": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "themeMode": {
+            "pattern": "system|light|dark",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Protocol": {
         "properties": {
           "layer": {
@@ -6151,7 +6179,7 @@
         ]
       },
       "get": {
-        "operationId": "get",
+        "operationId": "get_1",
         "parameters": [
           {
             "in": "path",
@@ -6207,7 +6235,7 @@
         ]
       },
       "put": {
-        "operationId": "put",
+        "operationId": "put_1",
         "parameters": [
           {
             "in": "path",
@@ -8445,6 +8473,56 @@
         ]
       }
     },
+    "/api/v1/preferences": {
+      "get": {
+        "operationId": "get",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get my preferences (shared by everyone when login is off)",
+        "tags": [
+          "Preferences"
+        ]
+      },
+      "put": {
+        "operationId": "put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Replace my preferences (shared by everyone when login is off)",
+        "tags": [
+          "Preferences"
+        ]
+      }
+    },
     "/api/v1/signatures": {
       "get": {
         "operationId": "getSignatures",
@@ -9454,6 +9532,10 @@
     {
       "description": "Packet-level conversation trace with AI explanations",
       "name": "Conversation Tracer"
+    },
+    {
+      "description": "Personal preferences (theme, node labels, table columns)",
+      "name": "Preferences"
     },
     {
       "description": "Adjudicated per-file host identities — one answer per host, or an explicit contest",

@@ -46,6 +46,32 @@ export function defaultVisibleColumns(): Set<ColumnKey> {
   return new Set(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key));
 }
 
+/** Fired after the visible columns are saved, so personal preferences can sync them (#915). */
+export const COLUMNS_SAVED_EVENT = 'tracepcap:columns-saved';
+/** Fired after preferences from the server replace the stored columns, so an open table can reload. */
+export const COLUMNS_APPLIED_EVENT = 'tracepcap:columns-applied';
+
+/** Saves the visible columns, or clears the override (back to the default) when given null. */
+export function saveVisibleColumns(columns: Set<ColumnKey> | null): void {
+  try {
+    if (columns) localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify([...columns]));
+    else localStorage.removeItem(COLUMN_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(COLUMNS_SAVED_EVENT));
+}
+
+/** The stored override, or null when the user has never customised the columns. */
+export function storedVisibleColumns(): ColumnKey[] | null {
+  try {
+    const stored = localStorage.getItem(COLUMN_STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as ColumnKey[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadVisibleColumns(): Set<ColumnKey> {
   try {
     const stored = localStorage.getItem(COLUMN_STORAGE_KEY);

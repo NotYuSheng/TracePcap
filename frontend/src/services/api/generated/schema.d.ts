@@ -650,9 +650,9 @@ export interface paths {
             cookie?: never;
         };
         /** The human override for a question about an entity, if one is set */
-        get: operations["get"];
+        get: operations["get_1"];
         /** Set or replace the human override; re-runs adjudication (actor from token) */
-        put: operations["put"];
+        put: operations["put_1"];
         post?: never;
         /** Clear the human override, letting the machine vote decide again */
         delete: operations["delete_5"];
@@ -1399,6 +1399,24 @@ export interface paths {
          * @description Generates a fresh label/description from the file's traffic to pre-fill the update-label editor — used to re-classify a drifted label without overwriting the confirmed one.
          */
         post: operations["suggestPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get my preferences (shared by everyone when login is off) */
+        get: operations["get"];
+        /** Replace my preferences (shared by everyone when login is off) */
+        put: operations["put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2863,6 +2881,14 @@ export interface components {
             notes?: string;
             subnetOverrides?: components["schemas"]["SubnetOverrideInput"][];
         };
+        PreferencesDto: {
+            conversationColumns?: string[];
+            nodeLabelConfig?: {
+                [key: string]: Record<string, never>;
+            };
+            shared?: boolean;
+            themeMode?: string;
+        };
         Protocol: {
             layer?: string;
             name?: string;
@@ -4314,7 +4340,7 @@ export interface operations {
             };
         };
     };
-    get: {
+    get_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4347,7 +4373,7 @@ export interface operations {
             };
         };
     };
-    put: {
+    put_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -5729,6 +5755,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RoleSuggestionDto"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PreferencesDto"];
+                };
+            };
+        };
+    };
+    put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferencesDto"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PreferencesDto"];
                 };
             };
         };
