@@ -1181,9 +1181,12 @@ class PipelineIntegrationTest {
 
     // The VRRP virtual address isn't a device.
     JsonNode vip = byIp.get("10.0.0.254");
-    if (vip != null) { // present only if traffic was addressed to it in the capture
-      assertThat(vip.get("addressKind").asText()).isEqualTo("VIRTUAL_FAILOVER");
-      assertThat(vip.get("deviceType").asText()).isEqualTo("VIRTUAL_ADDRESS");
+    assertThat(vip.get("addressKind").asText()).isEqualTo("VIRTUAL_FAILOVER");
+    assertThat(vip.get("deviceType").asText()).isEqualTo("VIRTUAL_ADDRESS");
+    // The routers advertise from the virtual MAC, but they're the members, not the virtual address.
+    for (String router : java.util.List.of("10.0.0.2", "10.0.0.3")) {
+      assertThat(byIp.get(router).path("addressKind").isNull()).as(router).isTrue();
+      assertThat(byIp.get(router).get("deviceType").asText()).as(router).isNotEqualTo("VIRTUAL_ADDRESS");
     }
     // The host's evidence panel carries the warning and every TTL too.
     JsonNode evidence =

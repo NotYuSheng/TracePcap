@@ -21,7 +21,11 @@ class HostIdentityChecksTest {
     HostClassificationEntity vip = host("10.0.0.254", "00:00:5e:00:01:0a");
     var adverts =
         Map.of("10.0.0.254", new FailoverAddressResolverService.VirtualAddress("10.0.0.254", "VRRP", new TreeSet<>(Set.of("10.0.0.2", "10.0.0.3"))));
-    HostIdentityChecks.apply(List.of(vip), Map.of(), List.of(), adverts);
+    // The routers advertise from the virtual MAC too (as VRRP does); they're members, not virtual.
+    HostClassificationEntity router = host("10.0.0.2", "00:00:5e:00:01:0a");
+    HostIdentityChecks.apply(
+        List.of(vip, router), Map.of(), List.of(), adverts, Map.of("10.0.0.2", List.of("00:00:5e:00:01:0a")));
+    assertThat(router.getAddressKind()).isNull();
     assertThat(vip.getAddressKind()).isEqualTo("VIRTUAL_FAILOVER");
     assertThat(vip.getDeviceType()).isEqualTo("VIRTUAL_ADDRESS");
     assertThat(vip.getWinnerReasons()).contains("VRRP").contains("10.0.0.2, 10.0.0.3");
@@ -29,11 +33,22 @@ class HostIdentityChecksTest {
   }
 
   @Test
-  void aVirtualRouterMacMarksTheAddressEvenWithoutAdverts() {
-    HostClassificationEntity hsrp = host("10.1.0.1", "00:00:0c:07:ac:01");
-    HostClassificationEntity carp = host("10.2.0.1", "00:00:5E:00:01:05");
-    HostClassificationEntity plain = host("10.3.0.1", "00:11:22:33:44:55");
-    HostIdentityChecks.apply(List.of(hsrp, carp, plain), Map.of(), List.of(), Map.of());
+  void anArpClaimByAVirtualRouterMacMarksTheAddressEvenWithoutAdverts() {
+    HostClassificationEntity hsrp = host("10.1.0.1", null);
+    HostClassificationEntity carp = host("10.2.0.1", null);
+    HostClassificationEntity plain = host("10.3.0.1", null);
+    // A virtual MAC only as the first eth.src (no ARP claim) doesn't count.
+    HostClassificationEntity sender = host("10.4.0.1", "00:00:5e:00:01:07");
+    HostIdentityChecks.apply(
+        List.of(hsrp, carp, plain, sender),
+        Map.of(),
+        List.of(),
+        Map.of(),
+        Map.of(
+            "10.1.0.1", List.of("00:00:0c:07:ac:01"),
+            "10.2.0.1", List.of("00:00:5E:00:01:05"),
+            "10.3.0.1", List.of("00:11:22:33:44:55")));
+    assertThat(sender.getAddressKind()).isNull();
     assertThat(hsrp.getAddressKind()).isEqualTo("VIRTUAL_FAILOVER");
     assertThat(hsrp.getWinnerReasons()).contains("HSRP");
     assertThat(carp.getAddressKind()).isEqualTo("VIRTUAL_FAILOVER");
@@ -55,6 +70,7 @@ class HostIdentityChecksTest {
         List.of(clone, routed, named),
         Map.of("10.0.0.70", List.of(128, 64, 64), "8.8.8.8", List.of(118, 120)),
         claims,
+        Map.of(),
         Map.of());
 
     assertThat(clone.getTtls()).containsExactly(64, 128);

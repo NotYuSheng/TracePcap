@@ -13,8 +13,8 @@ import java.util.TreeSet;
  *
  * <ul>
  *   <li><b>Every TTL</b> seen from the IP is kept, not just the first.
- *   <li><b>Virtual addresses.</b> A VRRP/HSRP/CARP virtual IP, from the adverts or a virtual-router
- *       MAC, is marked VIRTUAL_FAILOVER and its device type set to VIRTUAL_ADDRESS, with the member
+ *   <li><b>Virtual addresses.</b> A VRRP/HSRP/CARP virtual IP, from the adverts or an ARP claim by a
+ *       virtual-router MAC, is marked VIRTUAL_FAILOVER and its device type set to VIRTUAL_ADDRESS, with the member
  *       routers in the explanation. The protocol says so, so it replaces the traffic vote (which
  *       used to call these "IoT", from the IANA MAC's manufacturer).
  *   <li><b>Possibly more than one machine.</b> Different TTL families on one IP (64 Linux/macOS, 128
@@ -34,7 +34,12 @@ final class HostIdentityChecks {
       List<HostClassificationEntity> hosts,
       Map<String, ? extends Collection<Integer>> ttlObservations,
       List<HostnameResolverService.Claim> hostnameClaims,
-      Map<String, FailoverAddressResolverService.VirtualAddress> failover) {
+      Map<String, FailoverAddressResolverService.VirtualAddress> failover,
+      Map<String, ? extends Collection<String>> arpMacs) {
+    // The routers sending adverts are members, not virtual addresses, even though VRRP sends its
+    // adverts from the virtual MAC.
+    Set<String> members = new java.util.HashSet<>();
+    if (failover != null) failover.values().forEach(v -> { if (v.members() != null) members.addAll(v.members()); });
     Map<String, Set<String>> dhcpNames = new java.util.HashMap<>();
     if (hostnameClaims != null) {
       for (var c : hostnameClaims) {
@@ -48,7 +53,14 @@ final class HostIdentityChecks {
       if (ttls != null && !ttls.isEmpty()) h.setTtls(new TreeSet<>(ttls).toArray(Integer[]::new));
 
       var advertised = failover == null ? null : failover.get(h.getIp());
-      String macProtocol = FailoverAddressResolverService.virtualRouterProtocol(h.getMac());
+      // Only ARP ownership counts for the MAC check: who answers for the address.
+      String macProtocol = null;
+      if (!members.contains(h.getIp()) && arpMacs != null && arpMacs.get(h.getIp()) != null) {
+        for (String mac : arpMacs.get(h.getIp())) {
+          macProtocol = FailoverAddressResolverService.virtualRouterProtocol(mac);
+          if (macProtocol != null) break;
+        }
+      }
       if (advertised != null || macProtocol != null) {
         markVirtual(h, advertised != null ? advertised.protocol() : macProtocol, advertised);
         continue; // a shared address: the per-machine checks below don't apply
@@ -82,8 +94,8 @@ final class HostIdentityChecks {
     StringBuilder why = new StringBuilder("Virtual address of a " + protocol + " router failover pair");
     if (advertised != null && advertised.members() != null && !advertised.members().isEmpty()) {
       why.append(", shared by ").append(String.join(", ", advertised.members()));
-    } else if (h.getMac() != null) {
-      why.append(" (virtual-router MAC ").append(h.getMac()).append(")");
+    } else {
+      why.append(" (answered by a virtual-router MAC)");
     }
     why.append(". It's an address, not a machine.");
     h.setWinnerReasons(why.toString());

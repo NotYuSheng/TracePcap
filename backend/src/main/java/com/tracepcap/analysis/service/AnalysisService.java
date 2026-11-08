@@ -564,7 +564,8 @@ public class AnalysisService {
         hostClassifications,
         run.parseResult.getHostTtlObservations(),
         hostnameClaims,
-        run.failoverAddresses);
+        run.failoverAddresses,
+        run.parseResult.getHostMacObservations());
     hostClassificationRepository.saveAll(hostClassifications);
 
     try {
