@@ -1,5 +1,6 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Card, Form, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { useOutletContext } from 'react-router-dom';
 import type { Answer, TimelineDataPoint } from '@/types';
@@ -45,7 +46,7 @@ function NarrativeInfoPopover() {
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -55,7 +56,7 @@ function NarrativeInfoPopover() {
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 

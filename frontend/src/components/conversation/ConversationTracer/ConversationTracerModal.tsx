@@ -1,6 +1,7 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Badge, Button, Modal, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Modal, Popover } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { tracerService, type TracerStep, type TracerStepsResponse, type TracerPeer } from '@/features/tracer/tracerService';
 
@@ -25,7 +26,7 @@ function AiExplanationInfoPopover() {
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -35,7 +36,7 @@ function AiExplanationInfoPopover() {
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.85rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 

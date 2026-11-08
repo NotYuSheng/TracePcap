@@ -1,8 +1,9 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { CategoryStat } from '@/types';
 import { getCategoryColor } from '@/utils/appColors';
 import { formatBytes } from '@/utils/formatters';
-import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Popover } from '@govtechsg/sgds-react';
 
 const categoryInfoPopover = (
   <Popover id="category-info" style={{ maxWidth: '310px' }}>
@@ -48,7 +49,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
     <div className="protocol-breakdown">
       <h3 className="breakdown-title d-flex align-items-center gap-2">
         Category Distribution
-        <OverlayTrigger trigger="click" placement="right" overlay={categoryInfoPopover} rootClose>
+        <EscapableOverlayTrigger trigger="click" placement="right" overlay={categoryInfoPopover}>
           <Button
             type="button"
             variant="link"
@@ -58,7 +59,7 @@ export const CategoryBreakdownChart = ({ categoryStats }: CategoryBreakdownChart
           >
             <i className="bi bi-info-circle fs-6"></i>
           </Button>
-        </OverlayTrigger>
+        </EscapableOverlayTrigger>
       </h3>
 
       <div className="breakdown-content">

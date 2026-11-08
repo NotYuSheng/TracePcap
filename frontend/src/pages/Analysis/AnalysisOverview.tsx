@@ -1,3 +1,4 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData } from '@/types';
@@ -11,7 +12,7 @@ import {
   getSeverityColor,
   RISK_BADGE,
 } from '@/utils/appColors';
-import { Button, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Popover } from '@govtechsg/sgds-react';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import { storyService } from '@/features/story/services/storyService';
 import { getExtractedFiles } from '@features/extractedFiles/services/extractedFilesService';
@@ -173,7 +174,7 @@ export const AnalysisOverview = () => {
                 (showing top {detectedApps.length})
               </span>
             )}
-            <OverlayTrigger trigger="click" placement="right" overlay={ndpiPopover} rootClose>
+            <EscapableOverlayTrigger trigger="click" placement="right" overlay={ndpiPopover}>
               <Button
                 type="button"
                 variant="link"
@@ -183,7 +184,7 @@ export const AnalysisOverview = () => {
               >
                 <i className="bi bi-info-circle fs-6"></i>
               </Button>
-            </OverlayTrigger>
+            </EscapableOverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {detectedApps.map(app => {
@@ -213,7 +214,7 @@ export const AnalysisOverview = () => {
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-layers me-2"></i>
             Dissected Protocols
-            <OverlayTrigger trigger="click" placement="right" overlay={l7Popover} rootClose>
+            <EscapableOverlayTrigger trigger="click" placement="right" overlay={l7Popover}>
               <Button
                 type="button"
                 variant="link"
@@ -223,7 +224,7 @@ export const AnalysisOverview = () => {
               >
                 <i className="bi bi-info-circle fs-6"></i>
               </Button>
-            </OverlayTrigger>
+            </EscapableOverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {data.detectedL7Protocols.map(proto => {
@@ -249,7 +250,7 @@ export const AnalysisOverview = () => {
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-shield-exclamation me-2 text-warning"></i>
             Risk Alerts
-            <OverlayTrigger trigger="click" placement="right" overlay={riskPopover} rootClose>
+            <EscapableOverlayTrigger trigger="click" placement="right" overlay={riskPopover}>
               <Button
                 type="button"
                 variant="link"
@@ -259,7 +260,7 @@ export const AnalysisOverview = () => {
               >
                 <i className="bi bi-info-circle fs-6"></i>
               </Button>
-            </OverlayTrigger>
+            </EscapableOverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {riskTypes.map(risk => (
@@ -290,11 +291,10 @@ export const AnalysisOverview = () => {
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-shield-lock me-2" style={{ color: '#6f42c1' }}></i>
             Custom Security Alerts
-            <OverlayTrigger
+            <EscapableOverlayTrigger
               trigger="click"
               placement="right"
               overlay={customRulesPopover}
-              rootClose
             >
               <Button
                 type="button"
@@ -305,7 +305,7 @@ export const AnalysisOverview = () => {
               >
                 <i className="bi bi-info-circle fs-6"></i>
               </Button>
-            </OverlayTrigger>
+            </EscapableOverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
             {data.triggeredCustomRules.map(rule => {

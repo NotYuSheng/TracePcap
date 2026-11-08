@@ -1,3 +1,4 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
   PROTOCOL_COLORS,
@@ -14,7 +15,7 @@ import {
   RISK_BADGE,
 } from '@/utils/appColors';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, Popover } from '@govtechsg/sgds-react';
 import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import './NetworkControls.css';
 
@@ -26,7 +27,7 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -36,7 +37,7 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 
