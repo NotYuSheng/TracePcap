@@ -1,6 +1,22 @@
 {
   "components": {
     "schemas": {
+      "AccountAtTime": {
+        "properties": {
+          "accountCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "firstLoginAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "AddSnapshotRequest": {
         "properties": {
           "fileId": {
@@ -809,6 +825,9 @@
             },
             "type": "array"
           },
+          "dstAccount": {
+            "$ref": "#/components/schemas/AccountAtTime"
+          },
           "dstGeo": {
             "$ref": "#/components/schemas/GeoInfo"
           },
@@ -861,6 +880,9 @@
           },
           "protocol": {
             "type": "string"
+          },
+          "srcAccount": {
+            "$ref": "#/components/schemas/AccountAtTime"
           },
           "srcGeo": {
             "$ref": "#/components/schemas/GeoInfo"
