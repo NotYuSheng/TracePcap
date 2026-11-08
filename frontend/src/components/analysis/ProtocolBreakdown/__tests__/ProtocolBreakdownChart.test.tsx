@@ -59,12 +59,15 @@ describe('ProtocolBreakdownChart table', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Show all 391' }));
 
-    expect(screen.getByRole('cell', { name: 'PROTO-391' })).toBeInTheDocument();
+    // Text queries, not getByRole('cell'). With all 391 rows rendered, a role query computes the
+    // role and accessible name of every cell in the table. That took ~1s locally and went past the
+    // 5s timeout on busy CI runners, twice in one day. The cell's text is the same assertion.
+    expect(screen.getByText('PROTO-391').closest('td')).toBeInTheDocument();
     expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
+    await userEvent.click(screen.getByText('Show fewer').closest('button')!);
 
-    expect(screen.queryByRole('cell', { name: 'PROTO-391' })).not.toBeInTheDocument();
+    expect(screen.queryByText('PROTO-391')).not.toBeInTheDocument();
     expect(screen.getByText('Showing 1 to 10 of 391 items')).toBeInTheDocument();
   });
 
