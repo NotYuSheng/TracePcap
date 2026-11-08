@@ -1,5 +1,11 @@
 package com.tracepcap.integration;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import javax.sql.DataSource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tracepcap.analysis.spi.PacketPartitions;
@@ -104,6 +110,47 @@ class PacketPartitionIntegrationTest {
     assertThat(partitionCount(fileId)).isEqualTo(1);
     // The FK to conversations lives on the partition; the second call must not duplicate it.
     assertThat(foreignKeyCount(fileId)).isEqualTo(1);
+  }
+
+  @Autowired private PlatformTransactionManager txManager;
+  @Autowired private DataSource dataSource;
+
+  @Test
+  void ensurePartition_commitsOnItsOwn_soItsLocksDoNotOutliveTheCall() throws Exception {
+    // The real caller, AnalysisService.analyzeFile, runs the whole pipeline in one transaction. If
+    // the DDL joins it, ACCESS EXCLUSIVE on `packets` is held until that analysis commits. Other
+    // analyses queue behind it, and every read of `packets` blocks. Reproduce that outer
+    // transaction and check, from another connection, while it is still open.
+    UUID fileId = insertFile();
+    TransactionTemplate outer = new TransactionTemplate(txManager);
+
+    outer.executeWithoutResult(
+        status -> {
+          packetPartitions.ensurePartition(fileId);
+
+          try (Connection other = dataSource.getConnection();
+              Statement st = other.createStatement()) {
+            st.execute("SET lock_timeout = '1s'");
+            // Throws "canceling statement due to lock timeout" if the partition DDL's lock is
+            // still held by the outer transaction.
+            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM packets")) {
+              assertThat(rs.next()).isTrue();
+            }
+            // Committed, not just created: visible to a different session.
+            try (ResultSet rs =
+                st.executeQuery(
+                    "SELECT count(*) FROM pg_inherits WHERE inhparent = 'packets'::regclass"
+                        + " AND inhrelid::regclass::text = 'packets_"
+                        + fileId.toString().replace("-", "")
+                        + "'")) {
+              rs.next();
+              assertThat(rs.getInt(1)).isEqualTo(1);
+            }
+          } catch (java.sql.SQLException e) {
+            throw new AssertionError(
+                "packets was still locked by the outer transaction: " + e.getMessage(), e);
+          }
+        });
   }
 
   @Test
