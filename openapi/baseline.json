@@ -1204,6 +1204,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "networkName": {
+            "type": "string"
+          },
           "payloadContains": {
             "items": {
               "$ref": "#/components/schemas/PayloadPattern"
@@ -2696,6 +2699,18 @@
             "type": "string"
           },
           "summary": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
             "type": "string"
           }
         },
@@ -4485,7 +4500,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_9",
+        "operationId": "list_10",
         "parameters": [
           {
             "in": "query",
@@ -4961,6 +4976,16 @@
             "in": "path",
             "name": "conversationId",
             "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "View in this network (#925): adds its own detection rules' matches",
+            "in": "query",
+            "name": "networkId",
+            "required": false,
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -5975,7 +6000,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_8",
+        "operationId": "list_9",
         "responses": {
           "200": {
             "content": {
@@ -6054,11 +6079,21 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "query",
             "name": "fileId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "With fileId: also this network's rules (#925 phase 3)",
+            "in": "query",
+            "name": "networkId",
             "required": false,
             "schema": {
               "format": "uuid",
@@ -7173,7 +7208,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "in": "path",
@@ -7720,6 +7755,41 @@
         "summary": "Assembled knowledge board (entities, relationships, findings) for a file",
         "tags": [
           "Knowledge"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/networks": {
+      "get": {
+        "operationId": "list_6",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NetworkRef"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The networks this capture is a snapshot of",
+        "tags": [
+          "Monitor Networks"
         ]
       }
     },

@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,7 +478,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         /** Add a custom private range */
         post: operations["create_6"];
@@ -516,7 +516,7 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /** Create a global detection rule (audited) */
         post: operations["create_5"];
@@ -823,7 +823,7 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
         post: operations["create_4"];
@@ -1044,6 +1044,23 @@ export interface paths {
         };
         /** Assembled knowledge board (entities, relationships, findings) for a file */
         get: operations["getKnowledge"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The networks this capture is a snapshot of */
+        get: operations["list_6"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2546,6 +2563,7 @@ export interface components {
             name?: string;
             /** Format: uuid */
             networkId?: string;
+            networkName?: string;
             payloadContains?: components["schemas"]["PayloadPattern"][];
             payloadRegex?: components["schemas"]["RegexPattern"][];
             /** Format: uuid */
@@ -3078,6 +3096,11 @@ export interface components {
             recommendations?: string[];
             status?: string;
             summary?: string;
+        };
+        NetworkRef: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
         };
         NetworkSettingsDto: {
             /** @enum {string} */
@@ -3759,7 +3782,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: {
                 page?: number;
@@ -3975,7 +3998,10 @@ export interface operations {
     };
     getConversationDetail: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description View in this network (#925): adds its own detection rules' matches */
+                networkId?: string;
+            };
             header?: never;
             path: {
                 conversationId: string;
@@ -4389,7 +4415,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -4453,10 +4479,12 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: {
                 fileId?: string;
+                /** @description With fileId: also this network's rules (#925 phase 3) */
+                networkId?: string;
             };
             header?: never;
             path?: never;
@@ -5108,7 +5136,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -5430,6 +5458,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CaseKnowledgeResponse"];
+                };
+            };
+        };
+    };
+    list_6: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkRef"][];
                 };
             };
         };
