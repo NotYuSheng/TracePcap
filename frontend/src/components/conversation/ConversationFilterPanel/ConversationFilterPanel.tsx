@@ -1,6 +1,7 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
-import { Badge, Button, Card, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Badge, Button, Card, Form, Popover } from '@govtechsg/sgds-react';
 import type { ConversationFilters } from '@/features/conversation/types';
 import { COLUMN_DEFS } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
@@ -59,7 +60,7 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -69,7 +70,7 @@ function InfoPopover({ id, title, body }: { id: string; title: string; body: Rea
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.8rem' }}></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 

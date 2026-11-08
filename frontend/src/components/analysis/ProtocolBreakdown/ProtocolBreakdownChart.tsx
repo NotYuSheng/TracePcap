@@ -1,7 +1,8 @@
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import type { ProtocolStats } from '@/types';
-import { Button, Form, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { Button, Form, Popover } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import './ProtocolBreakdownChart.css';
 import { formatBytes } from '@/utils/formatters';
@@ -72,7 +73,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
     <div className="protocol-breakdown">
       <h3 className="breakdown-title d-flex align-items-center gap-2">
         Protocol Distribution
-        <OverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover} rootClose>
+        <EscapableOverlayTrigger trigger="click" placement="right" overlay={protocolInfoPopover}>
           <Button
             type="button"
             variant="link"
@@ -82,7 +83,7 @@ export const ProtocolBreakdownChart = ({ protocolStats }: ProtocolBreakdownChart
           >
             <i className="bi bi-info-circle fs-6"></i>
           </Button>
-        </OverlayTrigger>
+        </EscapableOverlayTrigger>
       </h3>
 
       <div className="breakdown-content">

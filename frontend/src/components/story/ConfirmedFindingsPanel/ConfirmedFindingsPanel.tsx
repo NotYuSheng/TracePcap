@@ -1,4 +1,5 @@
-import { Button, Card, OverlayTrigger, Popover } from '@govtechsg/sgds-react';
+import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
+import { Button, Card, Popover } from '@govtechsg/sgds-react';
 import type { Answer } from '@/types';
 
 interface ConfirmedFindingsPanelProps {
@@ -38,7 +39,7 @@ function InvestigationSummaryInfoPopover() {
     </Popover>
   );
   return (
-    <OverlayTrigger trigger="click" placement="right" overlay={popover} rootClose>
+    <EscapableOverlayTrigger trigger="click" placement="right" overlay={popover}>
       <Button
         type="button"
         variant="link"
@@ -48,7 +49,7 @@ function InvestigationSummaryInfoPopover() {
       >
         <i className="bi bi-info-circle" style={{ fontSize: '0.9rem' }} aria-hidden="true"></i>
       </Button>
-    </OverlayTrigger>
+    </EscapableOverlayTrigger>
   );
 }
 
