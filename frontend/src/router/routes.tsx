@@ -11,6 +11,7 @@ import { NetworkDiagramPage } from '@pages/NetworkDiagram';
 import { ExtractedFilesPage } from '@pages/ExtractedFiles';
 import { ComparePage } from '@pages/Compare/ComparePage';
 import { NetworkClusterPage } from '@pages/NetworkCluster';
+import { FileTabPage } from '@pages/Analysis/FileTabPage';
 import { NotFoundPage } from '@pages/NotFound';
 import { MonitorPage } from '@pages/Monitor/MonitorPage';
 import { NetworkDetailPage } from '@pages/Monitor/NetworkDetailPage';
@@ -56,6 +57,11 @@ export const router = createBrowserRouter([
           {
             path: 'network-diagram',
             element: <NetworkDiagramPage />,
+            errorElement: <RouteErrorBoundary />,
+          },
+          {
+            path: 'file',
+            element: <FileTabPage />,
             errorElement: <RouteErrorBoundary />,
           },
           {

@@ -1109,6 +1109,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/reanalyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-analyse a capture with other options, as a new version
+         * @description Creates a new capture (its own copy in storage, derivedFrom the original) and analyses it with the given options. The original and its analysis are kept. The capture's own detection rules are copied to the version.
+         */
+        post: operations["reanalyse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/report": {
         parameters: {
             query?: never;
@@ -1152,6 +1172,23 @@ export interface paths {
         };
         /** Get conversations with nDPI security risk flags */
         get: operations["getSecurityAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A capture and its re-analysis versions, the original first */
+        get: operations["versions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2761,6 +2798,7 @@ export interface components {
             sizeLimitFiles?: components["schemas"]["SkippedFile"][];
         };
         FileMetadataDto: {
+            derivedFrom?: string;
             /** Format: int64 */
             duration?: number;
             enableFileExtraction?: boolean;
@@ -2782,6 +2820,7 @@ export interface components {
             status?: string;
             /** Format: date-time */
             uploadedAt?: string;
+            version?: boolean;
         };
         FileUploadResponse: {
             fileId?: string;
@@ -3375,6 +3414,11 @@ export interface components {
             protocols?: {
                 [key: string]: components["schemas"]["ProtocolStat"];
             };
+        };
+        ReanalyseRequest: {
+            enableFileExtraction?: boolean;
+            enableNdpi?: boolean;
+            enableSuricata?: boolean;
         };
         RegexPattern: {
             caseInsensitive?: boolean;
@@ -5636,6 +5680,32 @@ export interface operations {
             };
         };
     };
+    reanalyse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReanalyseRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FileUploadResponse"];
+                };
+            };
+        };
+    };
     downloadReport: {
         parameters: {
             query?: never;
@@ -5702,6 +5772,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ConversationResponse"][];
+                };
+            };
+        };
+    };
+    versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FileMetadataDto"][];
                 };
             };
         };

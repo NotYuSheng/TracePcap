@@ -35,6 +35,12 @@ public interface FileService {
    */
   FileMetadataDto getFileMetadata(UUID fileId);
 
+  /** Re-analyses a capture with other options, as a new version (#915 phase 3). */
+  FileUploadResponse reanalyse(UUID fileId, boolean enableNdpi, boolean enableSuricata, boolean enableFileExtraction);
+
+  /** A capture and its versions, the original first (#915 phase 3). */
+  java.util.List<FileMetadataDto> versions(UUID fileId);
+
   /**
    * Get all files with pagination
    *

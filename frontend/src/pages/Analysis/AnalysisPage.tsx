@@ -278,6 +278,7 @@ export const AnalysisPage = () => {
     else if (path.includes('/network-diagram')) setActiveTab('network-diagram');
     else if (path.includes('/extracted-files')) setActiveTab('extracted-files');
     else if (path.includes('/network-cluster')) setActiveTab('network-cluster');
+    else if (path.endsWith('/file')) setActiveTab('file');
     else setActiveTab('overview');
   }, [location.pathname]);
 
@@ -577,6 +578,15 @@ export const AnalysisPage = () => {
             onClick={() => handleTabChange('network-cluster')}
           >
             <i className="bi bi-globe-europe-africa me-2"></i>Network Cluster
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            style={{ whiteSpace: 'nowrap' }}
+            className={`nav-link ${activeTab === 'file' ? 'active' : ''}`}
+            onClick={() => handleTabChange('file')}
+          >
+            <i className="bi bi-file-earmark-binary me-2"></i>File
           </button>
         </li>
         </ul>

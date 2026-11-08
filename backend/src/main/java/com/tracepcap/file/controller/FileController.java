@@ -97,6 +97,26 @@ public class FileController {
     return ResponseEntity.ok(metadata);
   }
 
+  @PostMapping("/{fileId}/reanalyses")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Re-analyse a capture with other options, as a new version",
+      description =
+          "Creates a new capture (its own copy in storage, derivedFrom the original) and analyses it"
+              + " with the given options. The original and its analysis are kept. The capture's own"
+              + " detection rules are copied to the version.")
+  public com.tracepcap.file.dto.FileUploadResponse reanalyse(
+      @PathVariable UUID fileId, @RequestBody com.tracepcap.file.dto.ReanalyseRequest request) {
+    return fileService.reanalyse(
+        fileId, request.isEnableNdpi(), request.isEnableSuricata(), request.isEnableFileExtraction());
+  }
+
+  @GetMapping("/{fileId}/versions")
+  @Operation(summary = "A capture and its re-analysis versions, the original first")
+  public java.util.List<FileMetadataDto> versions(@PathVariable UUID fileId) {
+    return fileService.versions(fileId);
+  }
+
   @GetMapping("/{fileId}/download")
   @Operation(summary = "Download file", description = "Download a PCAP file")
   public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String fileId) {

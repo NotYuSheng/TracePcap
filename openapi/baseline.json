@@ -1605,6 +1605,9 @@
       },
       "FileMetadataDto": {
         "properties": {
+          "derivedFrom": {
+            "type": "string"
+          },
           "duration": {
             "format": "int64",
             "type": "integer"
@@ -1653,6 +1656,9 @@
           "uploadedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "version": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -3303,6 +3309,20 @@
               "$ref": "#/components/schemas/ProtocolStat"
             },
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ReanalyseRequest": {
+        "properties": {
+          "enableFileExtraction": {
+            "type": "boolean"
+          },
+          "enableNdpi": {
+            "type": "boolean"
+          },
+          "enableSuricata": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -7999,6 +8019,49 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/reanalyses": {
+      "post": {
+        "description": "Creates a new capture (its own copy in storage, derivedFrom the original) and analyses it with the given options. The original and its analysis are kept. The capture's own detection rules are copied to the version.",
+        "operationId": "reanalyse",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Re-analyse a capture with other options, as a new version",
+        "tags": [
+          "File Management"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/report": {
       "post": {
         "operationId": "downloadReport",
@@ -8104,6 +8167,41 @@
         "summary": "Get conversations with nDPI security risk flags",
         "tags": [
           "Security Alerts"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/versions": {
+      "get": {
+        "operationId": "versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileMetadataDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A capture and its re-analysis versions, the original first",
+        "tags": [
+          "File Management"
         ]
       }
     },

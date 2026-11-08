@@ -40,7 +40,11 @@ public interface FileRepository extends JpaRepository<FileEntity, UUID> {
       FileEntity.FileStatus status, LocalDateTime timestamp);
 
   /** Find the most recently uploaded file with the given SHA-256 hash */
-  Optional<FileEntity> findFirstByFileHashOrderByUploadedAtDesc(String fileHash);
+  /** The upload with this hash (#885); re-analysis versions share it and don't count. */
+  Optional<FileEntity> findFirstByFileHashAndIsVersionFalseOrderByUploadedAtDesc(String fileHash);
+
+  /** A capture's versions (#915 phase 3), oldest first. */
+  List<FileEntity> findByDerivedFromOrderByUploadedAtAsc(java.util.UUID derivedFrom);
 
   @org.springframework.data.jpa.repository.Query("SELECT f.id FROM FileEntity f WHERE f.status = :status")
   List<java.util.UUID> findIdsByStatus(

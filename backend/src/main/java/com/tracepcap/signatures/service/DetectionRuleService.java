@@ -205,6 +205,24 @@ public class DetectionRuleService {
     }
   }
 
+  /**
+   * Copies a capture's own rules to its new version (#915 phase 3), so the re-analysis applies
+   * them. Part of creating the version, not an edit, so no permission is needed; each copy is
+   * audited. Joins the caller's transaction.
+   */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public void copyCaptureRules(UUID fromFileId, UUID toFileId) {
+    for (DetectionRuleEntity src : repository.findByScopeAndFileIdOrderByNameAsc(Scope.CAPTURE, fromFileId)) {
+      DetectionRuleEntity copy = newEntity(toRequest(src), null);
+      copy.setScope(Scope.CAPTURE);
+      copy.setFileId(toFileId);
+      repository.save(copy);
+      Map<String, Object> after = auditView(toDto(copy));
+      after.put("copiedFrom", src.getId().toString());
+      auditLog.record("detection-rule.create", AUDIT_TARGET, copy.getId().toString(), null, after);
+    }
+  }
+
   /** One capture's own rules. */
   @Transactional(readOnly = true)
   public List<DetectionRuleDto> listCapture(UUID fileId) {
