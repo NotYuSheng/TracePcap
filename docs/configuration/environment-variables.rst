@@ -116,6 +116,12 @@ documented in its own section below with the surrounding detail.
      - Gates the API behind a Keycloak JWT and adds a login flow. Set to
        ``true`` by the production overlays; you rarely set it directly. See
        :doc:`authentication`.
+   * - ``SYSTEM_SETTINGS_EDITABLE``
+     - ``false``
+     - With login off, decides whether actions marked admin-only (such as
+       changing retention) are allowed for everyone (``true``) or for no one
+       (``false``). Ignored with login on, where the Keycloak client role
+       ``admin`` decides. See :doc:`user-management`.
    * - ``SURICATA_ENABLED``
      - ``true``
      - Deployment-wide switch for intrusion-detection enrichment. ``false``

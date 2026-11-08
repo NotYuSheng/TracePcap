@@ -29,6 +29,28 @@ public class AuthProperties {
    */
   private String jwkSetUri;
 
+  /** Keycloak client whose roles are read; its client role {@code admin} marks an admin (#915). */
+  private String clientId = "tracepcap-frontend";
+
+  /** Login off only: whether admin-only actions are allowed for everyone (#915). Default false. */
+  private boolean systemSettingsEditable = false;
+
+  public String getClientId() {
+    return clientId;
+  }
+
+  public void setClientId(String clientId) {
+    this.clientId = clientId;
+  }
+
+  public boolean isSystemSettingsEditable() {
+    return systemSettingsEditable;
+  }
+
+  public void setSystemSettingsEditable(boolean systemSettingsEditable) {
+    this.systemSettingsEditable = systemSettingsEditable;
+  }
+
   public boolean isEnabled() {
     return enabled;
   }

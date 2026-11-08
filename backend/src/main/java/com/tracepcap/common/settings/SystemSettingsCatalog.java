@@ -99,6 +99,8 @@ final class SystemSettingsCatalog {
           "OIDC issuer (Keycloak realm) used when login is on."),
       new Entry("KEYCLOAK_JWK_SET_URI", "tracepcap.auth.jwk-set-uri", null, Group.INFRASTRUCTURE, false, "Keycloak JWK set URI",
           "Where the backend fetches the login token signing keys; discovered from the issuer when blank."),
+      new Entry("SYSTEM_SETTINGS_EDITABLE", "tracepcap.auth.system-settings-editable", "false", Group.INFRASTRUCTURE, false, "System settings editable",
+          "With login off, whether actions marked admin-only are allowed for everyone (true) or no one (false). Ignored with login on, where the Keycloak client role admin decides."),
       new Entry("ANALYSIS_TIMEOUT_SECONDS", "tracepcap.analysis.timeout-seconds", "300", Group.MEMORY, false, "Analysis timeout seconds",
           "How long one analysis may run before it is stopped and marked failed."),
       new Entry("SURICATA_ENABLED", "tracepcap.suricata.enabled", "true", Group.POLICY, false, "Suricata enabled",

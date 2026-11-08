@@ -16,7 +16,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 /** Whose preferences a request reads and writes (#915). */
 class CurrentActorProfileKeyTest {
 
-  private final CurrentActor actor = new CurrentActor();
+  private final CurrentActor actor = new CurrentActor(new AuthProperties());
 
   @AfterEach
   void clear() {
