@@ -53,7 +53,7 @@ export function useNetworkDetailData(networkId: string | undefined) {
         insightsService.listExternalEvents(networkId),
         insightsService.listAnnotations(networkId),
         insightsService.getLatestInsight(networkId),
-        subnetService.list(),
+        subnetService.list(networkId),
       ]);
       setError(null);
       setNetwork(net);

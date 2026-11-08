@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -19,20 +20,25 @@ import org.springframework.stereotype.Service;
 public class IpOrgRuleService {
 
   private final IpOrgRuleRepository repository;
+  private final com.tracepcap.governance.PermissionService permissionService;
+  private final com.tracepcap.governance.AuditLogService auditLog;
 
   /** Pre-parsed CIDR cache: avoids repeated string splitting and InetAddress construction. */
   private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
   private static final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
       new ConcurrentHashMap<>();
 
+  /** The shared default. */
   public List<IpOrgRuleDto> list() {
-    return repository.findAllByOrderByPrefixLengthDescLabelAsc().stream()
+    return repository.findByNetworkIdIsNullOrderByPrefixLengthDescLabelAsc().stream()
         .map(e -> IpOrgRuleDto.builder().id(e.getId()).label(e.getLabel()).cidr(e.getCidr()).build())
         .collect(Collectors.toList());
   }
 
-  public IpOrgRuleDto create(IpOrgRuleDto dto) {
-    String cidr = dto.getCidr().trim();
+  /** Validates a CIDR (an address and a prefix length). */
+  private static String validCidr(String raw) {
+    if (raw == null || raw.isBlank()) throw new IllegalArgumentException("A CIDR is required");
+    String cidr = raw.trim();
     // Validate IP and prefix before persisting
     String[] parts = cidr.split("/");
     if (parts.length != 2) throw new IllegalArgumentException("Invalid CIDR format: " + cidr);
@@ -47,6 +53,13 @@ public class IpOrgRuleService {
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
     }
+    return cidr;
+  }
+
+  /** Adds a rule to the shared default. */
+  public IpOrgRuleDto create(IpOrgRuleDto dto) {
+    String cidr = validCidr(dto.getCidr());
+    if (dto.getLabel() == null || dto.getLabel().isBlank()) throw new IllegalArgumentException("A label is required");
     int prefixLength = parsePrefixLength(cidr);
     IpOrgRuleEntity entity = IpOrgRuleEntity.builder()
         .label(dto.getLabel().trim())
@@ -58,13 +71,114 @@ public class IpOrgRuleService {
     return IpOrgRuleDto.builder().id(entity.getId()).label(entity.getLabel()).cidr(entity.getCidr()).build();
   }
 
+  /** Deletes a rule of the shared default. A network's entries are removed through the network. */
   public void delete(Long id) {
-    repository.deleteById(id);
+    repository.findById(id).filter(e -> e.getNetworkId() == null).ifPresent(repository::delete);
   }
 
-  /** Returns all rules sorted most-specific first. Call once and pass the result to matchIp. */
+  /** The shared default, most specific first. Call once and pass the result to matchIp. */
   public List<IpOrgRuleEntity> loadRules() {
-    return repository.findAllByOrderByPrefixLengthDescLabelAsc();
+    return repository.findByNetworkIdIsNullOrderByPrefixLengthDescLabelAsc();
+  }
+
+  /**
+   * The rules in effect for a network (#915 phase 4), most specific first: its own entries layered
+   * on the default, per CIDR. Null means the default.
+   */
+  public List<IpOrgRuleEntity> loadRules(UUID networkId) {
+    if (networkId == null) return loadRules();
+    List<IpOrgRuleEntity> out =
+        new java.util.ArrayList<>(
+            com.tracepcap.common.net.NetworkLayering.effective(
+                loadRules(),
+                repository.findByNetworkIdOrderByPrefixLengthDescLabelAsc(networkId),
+                IpOrgRuleEntity::getCidr,
+                IpOrgRuleEntity::isHidden));
+    // matchIp takes the first match, so keep most-specific-first across both layers. The sort is
+    // stable, so for equal prefixes the network's entry stays ahead of the default's.
+    out.sort(java.util.Comparator.comparingInt(IpOrgRuleEntity::getPrefixLength).reversed());
+    return out;
+  }
+
+  // ── A network's entries (#915 phase 4) ──────────────────────────────────────
+
+  /** A network's view: its own entries (hidden ones included), then the default's it leaves alone. */
+  public List<IpOrgRuleDto> listForNetwork(UUID networkId) {
+    List<IpOrgRuleEntity> defaults = loadRules();
+    java.util.Set<String> defaultCidrs = defaults.stream().map(IpOrgRuleEntity::getCidr).collect(Collectors.toSet());
+    List<IpOrgRuleEntity> own = repository.findByNetworkIdOrderByPrefixLengthDescLabelAsc(networkId);
+    java.util.Set<String> ownCidrs = own.stream().map(IpOrgRuleEntity::getCidr).collect(Collectors.toSet());
+    List<IpOrgRuleDto> out = new java.util.ArrayList<>();
+    for (var e : own) {
+      IpOrgRuleDto d = toDto(e);
+      d.setScope("network");
+      d.setHidden(e.isHidden());
+      d.setOverridesDefault(defaultCidrs.contains(e.getCidr()));
+      out.add(d);
+    }
+    for (var e : defaults) {
+      if (ownCidrs.contains(e.getCidr())) continue;
+      IpOrgRuleDto d = toDto(e);
+      d.setScope("default");
+      out.add(d);
+    }
+    return out;
+  }
+
+  /**
+   * Sets the network's rule for a CIDR (override or addition), or hides the default's with {@code
+   * hidden}. Needs NETWORK_SETTINGS; audited.
+   */
+  @org.springframework.transaction.annotation.Transactional
+  public IpOrgRuleDto putForNetwork(UUID networkId, IpOrgRuleDto dto, boolean hidden) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
+    String cidr = validCidr(dto.getCidr());
+    String label;
+    if (hidden) {
+      label =
+          loadRules().stream()
+              .filter(e -> e.getCidr().equals(cidr))
+              .map(IpOrgRuleEntity::getLabel)
+              .findFirst()
+              .orElseThrow(() -> new IllegalArgumentException("The default has no rule for " + cidr + " to hide."));
+    } else {
+      if (dto.getLabel() == null || dto.getLabel().isBlank()) throw new IllegalArgumentException("A label is required");
+      label = dto.getLabel().trim();
+    }
+    IpOrgRuleEntity e =
+        repository
+            .findByNetworkIdAndCidr(networkId, cidr)
+            .orElseGet(() -> IpOrgRuleEntity.builder().networkId(networkId).cidr(cidr).build());
+    IpOrgRuleDto before = e.getId() == null ? null : toDto(e);
+    e.setLabel(label);
+    e.setPrefixLength(parsePrefixLength(cidr));
+    e.setHidden(hidden);
+    e.setCreatedAt(LocalDateTime.now());
+    e = repository.save(e);
+    IpOrgRuleDto after = toDto(e);
+    after.setScope("network");
+    after.setHidden(hidden);
+    auditLog.record(
+        hidden ? "ip-org-rule.network.hide" : "ip-org-rule.network.set",
+        "network-ip-org-rule", networkId + "/" + cidr, before, after);
+    return after;
+  }
+
+  /** Removes the network's rule, so the default applies again. Needs NETWORK_SETTINGS; audited. */
+  @org.springframework.transaction.annotation.Transactional
+  public void deleteForNetwork(UUID networkId, Long id) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
+    IpOrgRuleEntity e =
+        repository
+            .findById(id)
+            .filter(r -> networkId.equals(r.getNetworkId()))
+            .orElseThrow(() -> new com.tracepcap.common.exception.ResourceNotFoundException("Entry not found: " + id));
+    repository.delete(e);
+    auditLog.record("ip-org-rule.network.revert", "network-ip-org-rule", networkId + "/" + e.getCidr(), toDto(e), null);
+  }
+
+  private static IpOrgRuleDto toDto(IpOrgRuleEntity e) {
+    return IpOrgRuleDto.builder().id(e.getId()).label(e.getLabel()).cidr(e.getCidr()).build();
   }
 
   /**
@@ -81,7 +195,7 @@ public class IpOrgRuleService {
   }
 
   public boolean hasRules() {
-    return repository.count() > 0;
+    return repository.countByNetworkIdIsNull() > 0;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

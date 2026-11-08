@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,7 +478,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         /** Add a custom private range */
         post: operations["create_6"];
@@ -516,7 +516,7 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         /** Create a global detection rule (audited) */
         post: operations["create_5"];
@@ -843,7 +843,7 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
         post: operations["create_4"];
@@ -1140,7 +1140,7 @@ export interface paths {
             cookie?: never;
         };
         /** The networks this capture is a snapshot of */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1305,7 +1305,7 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         /** Add an IP organization rule */
         post: operations["create_3"];
@@ -1394,7 +1394,7 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         /** Create an annotation */
         post: operations["create_2"];
@@ -1491,6 +1491,47 @@ export interface paths {
         patch: operations["patchEvent"];
         trace?: never;
     };
+    "/api/v1/monitor/networks/{networkId}/custom-private-ranges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A network's private/public range overrides: its own entries and the default's */
+        get: operations["listRanges"];
+        put?: never;
+        /**
+         * Set the network's range override for a CIDR, or hide the default's
+         * @description With hidden=true, hides the default's entry for the CIDR. Needs NETWORK_SETTINGS. Audited.
+         */
+        post: operations["putRange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/custom-private-ranges/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the network's range entry, so the default applies again
+         * @description Needs NETWORK_SETTINGS. Audited.
+         */
+        delete: operations["revertRange"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/monitor/networks/{networkId}/detection-rules": {
         parameters: {
             query?: never;
@@ -1499,7 +1540,7 @@ export interface paths {
             cookie?: never;
         };
         /** This network's own rules */
-        get: operations["list_3"];
+        get: operations["list_4"];
         put?: never;
         /**
          * Add a rule to this network (audited)
@@ -1558,7 +1599,7 @@ export interface paths {
             cookie?: never;
         };
         /** List external events for a network */
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         /** Create an external event */
         post: operations["create"];
@@ -1615,6 +1656,47 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/ip-org-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A network's IP-org rules: its own entries and the default's */
+        get: operations["listOrgRules"];
+        put?: never;
+        /**
+         * Set the network's IP-org rule for a CIDR, or hide the default's
+         * @description With hidden=true, hides the default's rule for the CIDR. Needs NETWORK_SETTINGS. Audited.
+         */
+        post: operations["putOrgRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/ip-org-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the network's IP-org rule, so the default applies again
+         * @description Needs NETWORK_SETTINGS. Audited.
+         */
+        delete: operations["revertOrgRule"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1706,6 +1788,50 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/subnets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A network's subnets: its own entries and the default's
+         * @description Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.
+         */
+        get: operations["list_2"];
+        put?: never;
+        /**
+         * Set the network's subnet for a CIDR, or hide the default's
+         * @description An override or an addition; with hidden=true, hides the default's subnet. Needs NETWORK_SETTINGS. Audited.
+         */
+        post: operations["put_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/subnets/{subnetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the network's entry, so the default applies again
+         * @description Needs NETWORK_SETTINGS. Audited.
+         */
+        delete: operations["revert"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1948,7 +2074,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List defined subnets */
+        /**
+         * List defined subnets
+         * @description Without networkId, the shared default. With networkId, the subnets in effect in that network (its own entries layered on the default, #915 phase 4), with staleness against that network's snapshots.
+         */
         get: operations["list"];
         put?: never;
         /** Create or update a subnet definition */
@@ -2692,8 +2821,11 @@ export interface components {
              * @enum {string}
              */
             classification: "PRIVATE" | "PUBLIC";
+            hidden?: boolean;
             /** Format: int64 */
             id?: number;
+            overridesDefault?: boolean;
+            scope?: string;
         };
         Decision: {
             action?: string;
@@ -3175,9 +3307,12 @@ export interface components {
         };
         IpOrgRuleDto: {
             cidr?: string;
+            hidden?: boolean;
             /** Format: int64 */
             id?: number;
             label?: string;
+            overridesDefault?: boolean;
+            scope?: string;
         };
         Match: {
             app?: string;
@@ -3750,6 +3885,7 @@ export interface components {
             /** Format: double */
             densityScore?: number;
             description?: string;
+            hidden?: boolean;
             /** Format: int32 */
             hostCount?: number;
             /** Format: int64 */
@@ -3757,6 +3893,8 @@ export interface components {
             label?: string;
             /** Format: date-time */
             labeledAt?: string;
+            overridesDefault?: boolean;
+            scope?: string;
             /** Format: int32 */
             snapshotsSeen?: number;
             source?: string;
@@ -3932,6 +4070,7 @@ export interface components {
             cidr?: string;
             confirmed?: boolean;
             description?: string;
+            hidden?: boolean;
             label?: string;
             /** Format: uuid */
             networkId?: string;
@@ -4046,7 +4185,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: {
                 page?: number;
@@ -4679,7 +4818,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -4743,7 +4882,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: {
                 fileId?: string;
@@ -5424,7 +5563,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -5822,7 +5961,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -6039,7 +6178,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -6235,7 +6374,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -6454,7 +6593,76 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    listRanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomPrivateRangeDto"][];
+                };
+            };
+        };
+    };
+    putRange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomPrivateRangeDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomPrivateRangeDto"];
+                };
+            };
+        };
+    };
+    revertRange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -6568,7 +6776,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -6709,6 +6917,75 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["NetworkInsightDto"];
                 };
+            };
+        };
+    };
+    listOrgRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IpOrgRuleDto"][];
+                };
+            };
+        };
+    };
+    putOrgRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IpOrgRuleDto"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IpOrgRuleDto"];
+                };
+            };
+        };
+    };
+    revertOrgRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -6903,6 +7180,75 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["NetworkInsightDto"];
                 };
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SubnetDefinitionDto"][];
+                };
+            };
+        };
+    };
+    put_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertSubnetRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SubnetDefinitionDto"];
+                };
+            };
+        };
+    };
+    revert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                subnetId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -7336,7 +7682,9 @@ export interface operations {
     };
     list: {
         parameters: {
-            query?: never;
+            query?: {
+                networkId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

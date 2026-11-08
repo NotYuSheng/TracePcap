@@ -29,12 +29,36 @@ public class SubnetService {
   private final HostClassificationLookup hostClassificationLookup;
   private final NetworkSnapshotRepository snapshotRepo;
   private final SubnetStalenessService stalenessService;
+  private final com.tracepcap.monitor.repository.NetworkRepository networkRepo;
+  private final com.tracepcap.governance.PermissionService permissionService;
+  private final com.tracepcap.governance.AuditLogService auditLog;
 
+  /** The shared default. */
   public List<SubnetDefinitionDto> list() {
-    return subnetRepo.findAll().stream()
+    return subnetRepo.findByNetworkIdIsNullOrderByCidr().stream().map(e -> toDto(e, null)).toList();
+  }
+
+  /**
+   * The subnets in effect for a network (#915 phase 4): its own entries layered on the default, per
+   * CIDR, each with its staleness in that network. Null means the default.
+   */
+  public List<SubnetDefinitionDto> list(UUID networkId) {
+    if (networkId == null) return list();
+    return effective(networkId).stream()
         .sorted(Comparator.comparing(SubnetDefinitionEntity::getCidr))
-        .map(this::toDto)
-        .collect(Collectors.toList());
+        .map(e -> toDto(e, networkId))
+        .toList();
+  }
+
+  /** The subnet entities in effect for a network (null = the default). */
+  public List<SubnetDefinitionEntity> effective(UUID networkId) {
+    List<SubnetDefinitionEntity> defaults = subnetRepo.findByNetworkIdIsNullOrderByCidr();
+    if (networkId == null) return defaults;
+    return com.tracepcap.common.net.NetworkLayering.effective(
+        defaults,
+        subnetRepo.findByNetworkIdOrderByCidr(networkId),
+        SubnetDefinitionEntity::getCidr,
+        SubnetDefinitionEntity::isHidden);
   }
 
   /** The raw subnet entity by id, for callers that need its CIDR (e.g. history lookups). */
@@ -42,27 +66,36 @@ public class SubnetService {
     return subnetRepo.findById(id);
   }
 
+  /** Creates or updates a subnet of the shared default. */
   @Transactional
   public SubnetDefinitionDto upsert(UpsertSubnetRequest req) {
     String cidr = normaliseCidr(req.getCidr());
     SubnetDefinitionEntity entity =
         subnetRepo
-            .findByCidr(cidr)
+            .findByCidrAndNetworkIdIsNull(cidr)
             .orElseGet(
                 () -> SubnetDefinitionEntity.builder().cidr(cidr).source("MANUAL").build());
+    return save(entity, req);
+  }
+
+  private SubnetDefinitionDto save(SubnetDefinitionEntity entity, UpsertSubnetRequest req) {
     boolean labelChanged = !java.util.Objects.equals(entity.getLabel(), req.getLabel());
+    boolean baselined =
+        entity.getId() != null && stalenessService.baseline(entity.getId(), req.getNetworkId()).isPresent();
     entity.setLabel(req.getLabel());
     entity.setDescription(req.getDescription());
     entity.setConfirmed(req.isConfirmed());
     if (entity.getId() == null) entity.setSource("MANUAL");
-    // Confirming a (new or changed) label re-baselines the composition and clears any stale flag.
-    if (req.isConfirmed() && (labelChanged || entity.getLabeledAt() == null)) {
+    entity = subnetRepo.save(entity);
+    // Confirming a (new or changed) label re-baselines the composition in the network the analyst
+    // is looking at, and clears its stale flag there.
+    if (req.isConfirmed() && (labelChanged || !baselined)) {
       stalenessService.captureBaseline(entity, req.getNetworkId());
     }
-    return toDto(subnetRepo.save(entity));
+    return toDto(entity, req.getNetworkId());
   }
 
-  /** Dismiss a subnet's stale flag and re-baseline its composition against the latest snapshot. */
+  /** Dismiss a subnet's stale flag in a network and re-baseline it against the latest snapshot. */
   @Transactional
   public SubnetDefinitionDto dismissStaleness(Long id, UUID networkId) {
     SubnetDefinitionEntity entity =
@@ -73,25 +106,111 @@ public class SubnetService {
                     new com.tracepcap.common.exception.ResourceNotFoundException(
                         "Subnet not found: " + id));
     stalenessService.captureBaseline(entity, networkId);
-    return toDto(subnetRepo.save(entity));
+    return toDto(entity, networkId);
   }
 
+  /** Persists an auto-detected subnet into the shared default. */
   @Transactional
   public SubnetDefinitionDto saveDetected(UpsertSubnetRequest req) {
     String cidr = normaliseCidr(req.getCidr());
     SubnetDefinitionEntity entity =
         subnetRepo
-            .findByCidr(cidr)
+            .findByCidrAndNetworkIdIsNull(cidr)
             .orElseGet(() -> SubnetDefinitionEntity.builder().cidr(cidr).source("AUTO").build());
     if (req.getLabel() != null) entity.setLabel(req.getLabel());
     if (req.getDescription() != null) entity.setDescription(req.getDescription());
     entity.setConfirmed(req.isConfirmed());
-    return toDto(subnetRepo.save(entity));
+    return toDto(subnetRepo.save(entity), req.getNetworkId());
   }
 
+  /** Deletes a subnet of the shared default. A network's entries are removed through the network. */
   @Transactional
   public void delete(Long id) {
-    subnetRepo.deleteById(id);
+    subnetRepo.findById(id).filter(e -> e.getNetworkId() == null).ifPresent(subnetRepo::delete);
+  }
+
+  // ── A network's entries (#915 phase 4) ──────────────────────────────────────
+
+  /** A network's view: its own entries (hidden ones included), then the default's it leaves alone. */
+  public List<SubnetDefinitionDto> listForNetwork(UUID networkId) {
+    requireNetwork(networkId);
+    List<SubnetDefinitionEntity> defaults = subnetRepo.findByNetworkIdIsNullOrderByCidr();
+    java.util.Set<String> defaultCidrs =
+        defaults.stream().map(SubnetDefinitionEntity::getCidr).collect(Collectors.toSet());
+    List<SubnetDefinitionEntity> own = subnetRepo.findByNetworkIdOrderByCidr(networkId);
+    java.util.Set<String> ownCidrs = own.stream().map(SubnetDefinitionEntity::getCidr).collect(Collectors.toSet());
+    List<SubnetDefinitionDto> out = new java.util.ArrayList<>();
+    for (var e : own) {
+      SubnetDefinitionDto d = toDto(e, networkId);
+      d.setScope("network");
+      d.setHidden(e.isHidden());
+      d.setOverridesDefault(defaultCidrs.contains(e.getCidr()));
+      out.add(d);
+    }
+    for (var e : defaults) {
+      if (ownCidrs.contains(e.getCidr())) continue;
+      SubnetDefinitionDto d = toDto(e, networkId);
+      d.setScope("default");
+      out.add(d);
+    }
+    out.sort(Comparator.comparing(SubnetDefinitionDto::getCidr));
+    return out;
+  }
+
+  /**
+   * Sets the network's subnet for a CIDR (override or addition), or hides the default's with
+   * {@code req.hidden}. Needs NETWORK_SETTINGS; audited.
+   */
+  @Transactional
+  public SubnetDefinitionDto putForNetwork(UUID networkId, UpsertSubnetRequest req) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
+    requireNetwork(networkId);
+    String cidr = normaliseCidr(req.getCidr());
+    req.setNetworkId(networkId);
+    if (req.isHidden() && subnetRepo.findByCidrAndNetworkIdIsNull(cidr).isEmpty()) {
+      throw new IllegalArgumentException("The default has no subnet " + cidr + " to hide.");
+    }
+    SubnetDefinitionEntity entity =
+        subnetRepo
+            .findByNetworkIdAndCidr(networkId, cidr)
+            .orElseGet(() -> SubnetDefinitionEntity.builder().networkId(networkId).cidr(cidr).source("MANUAL").build());
+    SubnetDefinitionDto before = entity.getId() == null ? null : toDto(entity, null);
+    entity.setHidden(req.isHidden());
+    SubnetDefinitionDto after;
+    if (req.isHidden()) {
+      entity.setLabel(null);
+      entity.setDescription(null);
+      entity.setConfirmed(false);
+      after = toDto(subnetRepo.save(entity), networkId);
+    } else {
+      after = save(entity, req);
+    }
+    after.setScope("network");
+    after.setHidden(req.isHidden());
+    auditLog.record(
+        req.isHidden() ? "subnet.network.hide" : "subnet.network.set",
+        "network-subnet", networkId + "/" + cidr, before, after);
+    return after;
+  }
+
+  /** Removes the network's entry, so the default applies again. Needs NETWORK_SETTINGS; audited. */
+  @Transactional
+  public void deleteForNetwork(UUID networkId, Long id) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
+    SubnetDefinitionEntity e =
+        subnetRepo
+            .findById(id)
+            .filter(r -> networkId.equals(r.getNetworkId()))
+            .orElseThrow(() -> new com.tracepcap.common.exception.ResourceNotFoundException("Entry not found: " + id));
+    SubnetDefinitionDto before = toDto(e, null);
+    subnetRepo.delete(e);
+    auditLog.record("subnet.network.revert", "network-subnet", networkId + "/" + e.getCidr(), before, null);
+  }
+
+  private void requireNetwork(UUID networkId) {
+    if (networkId == null || !networkRepo.existsById(networkId)) {
+      throw new com.tracepcap.common.exception.ResourceNotFoundException("Network not found: " + networkId);
+    }
   }
 
   /**
@@ -272,7 +391,9 @@ public class SubnetService {
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
-  private SubnetDefinitionDto toDto(SubnetDefinitionEntity e) {
+  /** {@code networkId} picks whose staleness baseline to show; null shows none. */
+  private SubnetDefinitionDto toDto(SubnetDefinitionEntity e, UUID networkId) {
+    var b = stalenessService.baseline(e.getId(), networkId).orElse(null);
     return SubnetDefinitionDto.builder()
         .id(e.getId())
         .cidr(e.getCidr())
@@ -280,9 +401,9 @@ public class SubnetService {
         .description(e.getDescription())
         .source(e.getSource())
         .confirmed(e.isConfirmed())
-        .labeledAt(e.getLabeledAt())
-        .staleSince(e.getStaleSince())
-        .staleFields(e.getStaleFields())
+        .labeledAt(b == null ? null : b.getLabeledAt())
+        .staleSince(b == null ? null : b.getStaleSince())
+        .staleFields(b == null ? null : b.getStaleFields())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())
         .build();

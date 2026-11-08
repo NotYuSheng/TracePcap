@@ -42,9 +42,14 @@ public class SubnetController {
   }
 
   @GetMapping
-  @Operation(summary = "List defined subnets")
-  public ResponseEntity<List<SubnetDefinitionDto>> list() {
-    return ResponseEntity.ok(subnetService.list());
+  @Operation(
+      summary = "List defined subnets",
+      description =
+          "Without networkId, the shared default. With networkId, the subnets in effect in that"
+              + " network (its own entries layered on the default, #915 phase 4), with staleness"
+              + " against that network's snapshots.")
+  public ResponseEntity<List<SubnetDefinitionDto>> list(@RequestParam(required = false) UUID networkId) {
+    return ResponseEntity.ok(subnetService.list(networkId));
   }
 
   @PostMapping

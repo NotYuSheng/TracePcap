@@ -27,8 +27,13 @@ public class CustomRangeLocalityPolicy implements LocalityPolicy {
 
   @Override
   public LocalityRules currentRules(LocalityRules.CidrSet additionalPrivate) {
+    return currentRules(null, additionalPrivate);
+  }
+
+  @Override
+  public LocalityRules currentRules(java.util.UUID networkId, LocalityRules.CidrSet additionalPrivate) {
     // Loaded once here rather than per address: the callers classify every host in a capture.
-    List<CustomPrivateRangeEntity> overrides = customPrivateRangeService.loadRanges();
+    List<CustomPrivateRangeEntity> overrides = customPrivateRangeService.loadRanges(networkId);
     return ip -> classify(ip, overrides, additionalPrivate);
   }
 

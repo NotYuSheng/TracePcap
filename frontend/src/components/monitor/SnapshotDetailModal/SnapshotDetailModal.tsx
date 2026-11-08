@@ -353,7 +353,7 @@ export const SnapshotDetailModal = ({
   const handleLoadGlobalSubnets = useCallback(async () => {
     setLoadingGlobals(true);
     try {
-      const globals = await subnetService.list();
+      const globals = await subnetService.list(networkId);
       setSubnetDraft(globals.map((s: SubnetDefinition) => ({
         cidr: s.cidr, label: s.label ?? null, description: s.description ?? null, inherited: true,
       })));
@@ -363,7 +363,7 @@ export const SnapshotDetailModal = ({
       setSubnetCustomizeMode(true);
       setLoadingGlobals(false);
     }
-  }, []);
+  }, [networkId]);
 
   const updateSubnetRow = (i: number, field: 'cidr' | 'label', value: string | null) => {
     setSubnetDraft(prev => prev.map((o, idx) =>

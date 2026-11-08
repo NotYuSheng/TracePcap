@@ -8,6 +8,7 @@ import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 public class CustomPrivateRangeService {
 
   private final CustomPrivateRangeRepository repository;
+  private final com.tracepcap.governance.PermissionService permissionService;
+  private final com.tracepcap.governance.AuditLogService auditLog;
 
   private record ParsedCidr(byte[] networkBytes, int prefixLen) {}
   private final ConcurrentHashMap<String, Optional<ParsedCidr>> cidrCache =
@@ -30,8 +33,9 @@ public class CustomPrivateRangeService {
   private static final Pattern NUMERIC_IP =
       Pattern.compile("^(\\d{1,3}\\.){3}\\d{1,3}$|^[0-9a-fA-F]*:[0-9a-fA-F:.]*$");
 
+  /** The shared default. */
   public List<CustomPrivateRangeDto> list() {
-    return repository.findAllByOrderByCreatedAtDesc().stream()
+    return repository.findByNetworkIdIsNullOrderByCreatedAtDesc().stream()
         .map(CustomPrivateRangeService::toDto)
         .collect(Collectors.toList());
   }
@@ -44,8 +48,10 @@ public class CustomPrivateRangeService {
         .build();
   }
 
-  public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
-    String cidr = dto.getCidr().trim();
+  /** A bare IP or CIDR, validated and normalised (bare IPs become /32 or /128). */
+  static String normaliseCidr(String raw) {
+    if (raw == null || raw.isBlank()) throw new IllegalArgumentException("A CIDR is required");
+    String cidr = raw.trim();
     // Determine IP and optional prefix parts — indexOf avoids split edge-case with bare "/"
     int slashIdx = cidr.indexOf('/');
     String ipPart = slashIdx >= 0 ? cidr.substring(0, slashIdx).trim() : cidr;
@@ -77,6 +83,12 @@ public class CustomPrivateRangeService {
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid IP address in CIDR: " + cidr);
     }
+    return cidr;
+  }
+
+  /** Adds an entry to the shared default. */
+  public CustomPrivateRangeDto create(CustomPrivateRangeDto dto) {
+    String cidr = normaliseCidr(dto.getCidr());
     IpClassification classification = parseClassification(dto.getClassification());
     CustomPrivateRangeEntity entity = CustomPrivateRangeEntity.builder()
         .cidr(cidr)
@@ -98,14 +110,112 @@ public class CustomPrivateRangeService {
     }
   }
 
+  /** Deletes an entry of the shared default. A network's entries are removed through the network. */
   public void delete(Long id) {
-    repository.deleteById(id);
+    repository
+        .findById(id)
+        .filter(e -> e.getNetworkId() == null)
+        .ifPresent(repository::delete);
     cidrCache.clear();
   }
 
-  /** Loads all custom private ranges for use in batch classification. */
+  /** The shared default, for batch classification. */
   public List<CustomPrivateRangeEntity> loadRanges() {
-    return repository.findAllByOrderByCreatedAtDesc();
+    return repository.findByNetworkIdIsNullOrderByCreatedAtDesc();
+  }
+
+  /**
+   * The ranges in effect for a network (#915 phase 4): its own entries layered on the default,
+   * per CIDR. Null means the default.
+   */
+  public List<CustomPrivateRangeEntity> loadRanges(UUID networkId) {
+    if (networkId == null) return loadRanges();
+    return com.tracepcap.common.net.NetworkLayering.effective(
+        loadRanges(),
+        repository.findByNetworkIdOrderByCreatedAtDesc(networkId),
+        CustomPrivateRangeEntity::getCidr,
+        CustomPrivateRangeEntity::isHidden);
+  }
+
+  // ── A network's entries (#915 phase 4) ──────────────────────────────────────
+
+  /**
+   * A network's view: its own entries (hidden ones included, so they can be reverted), then the
+   * default's entries it doesn't override or hide.
+   */
+  public List<CustomPrivateRangeDto> listForNetwork(UUID networkId) {
+    List<CustomPrivateRangeEntity> defaults = loadRanges();
+    java.util.Set<String> defaultCidrs =
+        defaults.stream().map(CustomPrivateRangeEntity::getCidr).collect(Collectors.toSet());
+    List<CustomPrivateRangeEntity> own = repository.findByNetworkIdOrderByCreatedAtDesc(networkId);
+    java.util.Set<String> ownCidrs = own.stream().map(CustomPrivateRangeEntity::getCidr).collect(Collectors.toSet());
+    List<CustomPrivateRangeDto> out = new java.util.ArrayList<>();
+    for (var e : own) {
+      CustomPrivateRangeDto d = toDto(e);
+      d.setScope("network");
+      d.setHidden(e.isHidden());
+      d.setOverridesDefault(defaultCidrs.contains(e.getCidr()));
+      out.add(d);
+    }
+    for (var e : defaults) {
+      if (ownCidrs.contains(e.getCidr())) continue;
+      CustomPrivateRangeDto d = toDto(e);
+      d.setScope("default");
+      out.add(d);
+    }
+    return out;
+  }
+
+  /**
+   * Sets the network's entry for a CIDR: an override or an addition, or, with {@code hidden}, hides
+   * the default's entry in this network. Needs NETWORK_SETTINGS; audited.
+   */
+  @org.springframework.transaction.annotation.Transactional
+  public CustomPrivateRangeDto putForNetwork(UUID networkId, CustomPrivateRangeDto dto, boolean hidden) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
+    String cidr = normaliseCidr(dto.getCidr());
+    IpClassification classification;
+    if (hidden) {
+      CustomPrivateRangeEntity def =
+          loadRanges().stream()
+              .filter(e -> e.getCidr().equals(cidr))
+              .findFirst()
+              .orElseThrow(() -> new IllegalArgumentException("The default has no entry for " + cidr + " to hide."));
+      classification = def.getClassification();
+    } else {
+      classification = parseClassification(dto.getClassification());
+    }
+    CustomPrivateRangeEntity e =
+        repository
+            .findByNetworkIdAndCidr(networkId, cidr)
+            .orElseGet(() -> CustomPrivateRangeEntity.builder().networkId(networkId).cidr(cidr).build());
+    CustomPrivateRangeDto before = e.getId() == null ? null : toDto(e);
+    e.setClassification(classification);
+    e.setHidden(hidden);
+    e.setCreatedAt(LocalDateTime.now());
+    e = repository.save(e);
+    cidrCache.clear();
+    CustomPrivateRangeDto after = toDto(e);
+    after.setScope("network");
+    after.setHidden(hidden);
+    auditLog.record(
+        hidden ? "private-range.network.hide" : "private-range.network.set",
+        "network-private-range", networkId + "/" + cidr, before, after);
+    return after;
+  }
+
+  /** Removes the network's entry, so the default applies again. Needs NETWORK_SETTINGS; audited. */
+  @org.springframework.transaction.annotation.Transactional
+  public void deleteForNetwork(UUID networkId, Long id) {
+    permissionService.require(com.tracepcap.governance.PermissionAction.NETWORK_SETTINGS);
+    CustomPrivateRangeEntity e =
+        repository
+            .findById(id)
+            .filter(r -> networkId.equals(r.getNetworkId()))
+            .orElseThrow(() -> new com.tracepcap.common.exception.ResourceNotFoundException("Entry not found: " + id));
+    repository.delete(e);
+    cidrCache.clear();
+    auditLog.record("private-range.network.revert", "network-private-range", networkId + "/" + e.getCidr(), toDto(e), null);
   }
 
   /**

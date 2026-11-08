@@ -8,8 +8,14 @@ import type {
 } from '../types/subnet.types';
 
 export const subnetService = {
-  list: () =>
-    apiClient.get<SubnetDefinition[]>(SUBNET_ENDPOINTS.SUBNETS).then(r => r.data),
+  /**
+   * The shared default, or with a network, the subnets in effect there (its own entries layered on
+   * the default) with staleness against that network's snapshots (#915 phase 4).
+   */
+  list: (networkId?: string) =>
+    apiClient
+      .get<SubnetDefinition[]>(SUBNET_ENDPOINTS.SUBNETS, networkId ? { params: { networkId } } : undefined)
+      .then(r => r.data),
 
   // networkId (optional) lets the backend capture the staleness baseline from that network's
   // latest snapshot when a label is confirmed.
