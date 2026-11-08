@@ -648,3 +648,38 @@ MinIO Configuration (internal)
      - MinIO admin username (default ``minioadmin``) — **change in production**
    * - ``MINIO_ROOT_PASSWORD``
      - MinIO admin password (default ``minioadmin``) — **change in production**
+
+Build Resources
+---------------
+
+The containers' memory and CPU limits (``*_MEM_LIMIT``, ``*_CPU_LIMIT``) apply
+while the stack **runs**. They don't apply to ``docker compose build``, and
+BuildKit has no build-time memory limit, so the build stages cap themselves.
+Building both images at once next to a running stack, uncapped, has frozen a
+15 GB machine.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 15 55
+
+   * - Variable
+     - Default
+     - Description
+   * - ``BUILD_JVM_MAX_HEAP``
+     - ``768m``
+     - Maven's JVM heap for the backend build (otherwise a quarter of the
+       host's RAM).
+   * - ``BUILD_JOBS``
+     - ``2``
+     - Parallel compile jobs for nDPI in the backend image (compiled for arm64
+       images; amd64 uses a prebuilt one).
+   * - ``BUILD_NODE_MAX_HEAP_MB``
+     - ``1536``
+     - Node's heap for ``tsc`` and ``vite`` in the frontend build.
+
+``scripts/rebuild.sh`` builds the images **one at a time** and then starts the
+stack; prefer it to ``docker compose up -d --build``, which builds them in
+parallel. It takes the same ``-f`` arguments as ``docker compose``. Measured on
+an 8-core, 16 GB machine with the stack running: the backend build adds about
+0.5 GB and the frontend build about 2 GB.
+

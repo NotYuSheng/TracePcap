@@ -4,6 +4,12 @@
 # compiling it under emulation during a cross-architecture build.
 FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21-alpine AS build
 
+# Build-time memory cap. Compose's deploy.resources limits apply to running containers, not to
+# builds, and Maven's JVM otherwise takes a quarter of the host's RAM; building this alongside the
+# frontend and a running stack has frozen a 15 GB machine. Override with BUILD_JVM_MAX_HEAP.
+ARG BUILD_JVM_MAX_HEAP=768m
+ENV MAVEN_OPTS="-Xmx${BUILD_JVM_MAX_HEAP} -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+
 WORKDIR /app
 
 # Copy pom.xml and download dependencies (cached layer)
@@ -22,6 +28,9 @@ RUN mvn clean package -DskipTests -B
 # NDPI_BRANCH is a branch rather than a commit so a no-cache rebuild picks up upstream's security
 # fixes, matching the rolling ntop package on amd64. Move it when ntop's package moves to a new major.
 FROM eclipse-temurin:21-jre-jammy AS ndpi
+# Parallel compile jobs for nDPI. Every core (nproc) competes with everything else on the machine;
+# a couple is enough. Override with BUILD_JOBS.
+ARG BUILD_JOBS=2
 ARG TARGETARCH
 ARG NDPI_BRANCH=6.0-stable
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -46,7 +55,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     cd /tmp/nDPI && \
     ./autogen.sh && \
     ./configure --prefix=/usr && \
-    make -j"$(nproc)" && \
+    make -j"${BUILD_JOBS}" && \
     make install DESTDIR=/out && \
     rm -rf /out/usr/include /out/usr/lib/pkgconfig /out/usr/lib/libndpi.a && \
     find /out/usr -type f \( -name ndpiReader -o -name 'libndpi.so*' \) -exec strip {} + && \

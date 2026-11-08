@@ -3,6 +3,11 @@
 # gain from compiling it under emulation during a cross-architecture build.
 FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
+# Build-time memory cap for tsc and vite (compose's deploy.resources don't apply to builds).
+# Override with BUILD_NODE_MAX_HEAP_MB.
+ARG BUILD_NODE_MAX_HEAP_MB=1536
+ENV NODE_OPTIONS="--max-old-space-size=${BUILD_NODE_MAX_HEAP_MB}"
+
 WORKDIR /app
 
 # Copy package files and .npmrc (needed for legacy-peer-deps flag)
