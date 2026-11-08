@@ -16,6 +16,8 @@ export const API_ENDPOINTS = {
 
   // Host Classifications
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
+  WINDOWS_LOGONS: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/windows-logons`,
   /** Deterministic answers to the standard investigation questions (#813). */
   ANSWERS: (fileId: string) => `/files/${fileId}/answers`,
   /** Goal-driven autonomous investigation report — producers plus pivots (#819). */

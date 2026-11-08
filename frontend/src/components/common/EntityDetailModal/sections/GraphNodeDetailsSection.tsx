@@ -5,6 +5,7 @@ import { getProtocolColor } from '@/features/network/constants';
 import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
 import { LoggedInUserSourceBadge } from '@components/common/LoggedInUserSourceBadge/LoggedInUserSourceBadge';
 import { Pagination } from '@components/common/Pagination/Pagination';
+import { WindowsLogonTimeline } from '@components/common/WindowsLogonTimeline';
 import { Alert } from '@components/common/Alert';
 import { formatBytes, formatNumber } from '../format';
 
@@ -117,14 +118,26 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
                 </dd>
               </>
             )}
-            {node.data.loggedInUser && (
+            {(node.data.loggedInUserCount ?? 0) > 1 ? (
               <>
-                <dt className="col-5 text-muted">Signed-in user</dt>
-                <dd className="col-7 mb-1 d-flex align-items-center gap-1">
-                  <span>{node.data.loggedInUser}</span>
-                  <LoggedInUserSourceBadge source={node.data.loggedInUserSource} />
+                <dt className="col-5 text-muted">Windows accounts</dt>
+                <dd className="col-7 mb-1">
+                  {node.data.loggedInUserCount} accounts. See the timeline below.
                 </dd>
               </>
+            ) : (
+              node.data.loggedInUser && (
+                <>
+                  {/* "Looked up" for LDAP-only evidence: a lookup isn't proof of a sign-in (#812). */}
+                  <dt className="col-5 text-muted">
+                    {node.data.loggedInUserSource === 'ldap_dn' ? 'Looked-up user' : 'Signed-in user'}
+                  </dt>
+                  <dd className="col-7 mb-1 d-flex align-items-center gap-1">
+                    <span>{node.data.loggedInUser}</span>
+                    <LoggedInUserSourceBadge source={node.data.loggedInUserSource} />
+                  </dd>
+                </>
+              )
             )}
           </dl>
         </div>
@@ -143,6 +156,8 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
           </dl>
         </div>
       </div>
+
+      <WindowsLogonTimeline fileId={fileId} ip={node.data.ip} deviceType={node.data.deviceType} />
 
       {/* Protocols */}
       <div className="mb-3">

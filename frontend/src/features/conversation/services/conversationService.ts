@@ -13,7 +13,7 @@ import type {
   HostIdentity,
   HostIdentityEvidence,
 } from '@/types';
-import type { ConversationFilters } from '../types';
+import type { ConversationFilters, WindowsLogon } from '../types';
 
 // Backend response types
 interface ConversationApiResponse {
@@ -382,6 +382,12 @@ export const conversationService = {
   /**
    * Returns device-type classifications for all unique hosts in the given file.
    */
+  /** Every Windows account seen on one host, oldest first: its login timeline (#812). */
+  getWindowsLogons: async (fileId: string, ip: string): Promise<WindowsLogon[]> => {
+    const response = await apiClient.get<WindowsLogon[]>(API_ENDPOINTS.WINDOWS_LOGONS(fileId, ip));
+    return response.data;
+  },
+
   getHostClassifications: async (fileId: string): Promise<HostClassification[]> => {
     const response = await apiClient.get<HostClassification[]>(
       API_ENDPOINTS.HOST_CLASSIFICATIONS(fileId)
