@@ -3491,6 +3491,10 @@ export interface operations {
                 deviceTypes?: string;
                 /** @description Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG) */
                 countries?: string;
+                /** @description Exact source address. With dstIp, matches one directional src → dst pair (#471); unlike ip, which is a contains-match on either end */
+                srcIp?: string;
+                /** @description Exact destination address (see srcIp) */
+                dstIp?: string;
             };
             header?: never;
             path: {
@@ -3668,6 +3672,8 @@ export interface operations {
                 search?: string;
                 deviceTypes?: string;
                 countries?: string;
+                srcIp?: string;
+                dstIp?: string;
             };
             header?: never;
             path: {
@@ -3706,6 +3712,8 @@ export interface operations {
                 search?: string;
                 deviceTypes?: string;
                 countries?: string;
+                srcIp?: string;
+                dstIp?: string;
             };
             header?: never;
             path: {

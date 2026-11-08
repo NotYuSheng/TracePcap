@@ -105,7 +105,16 @@ public class ConversationsController {
               description =
                   "Comma-separated list of ISO 3166-1 alpha-2 country codes to include (e.g. US,CN,SG)")
           @RequestParam(required = false)
-          String countries) {
+          String countries,
+      @Parameter(
+              description =
+                  "Exact source address. With dstIp, matches one directional src → dst pair (#471);"
+                      + " unlike ip, which is a contains-match on either end")
+          @RequestParam(required = false)
+          String srcIp,
+      @Parameter(description = "Exact destination address (see srcIp)")
+          @RequestParam(required = false)
+          String dstIp) {
 
     if (page < 1) page = 1;
     if (pageSize < 1) pageSize = 25;
@@ -129,7 +138,9 @@ public class ConversationsController {
             sortDir,
             search,
             deviceTypes,
-            countries);
+            countries,
+            srcIp,
+            dstIp);
 
     log.info(
         "GET /api/conversations/{} - page:{}, pageSize:{}, ip:{}, port:{}, protocols:{}, l7Protocols:{}, apps:{}, categories:{}, hasRisks:{}, fileTypes:{}, riskTypes:{}, sortBy:{} {}",
@@ -252,6 +263,8 @@ public class ConversationsController {
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String deviceTypes,
       @RequestParam(required = false) String countries,
+      @RequestParam(required = false) String srcIp,
+      @RequestParam(required = false) String dstIp,
       HttpServletResponse response)
       throws IOException {
 
@@ -273,7 +286,9 @@ public class ConversationsController {
             sortDir,
             search,
             deviceTypes,
-            countries);
+            countries,
+            srcIp,
+            dstIp);
     List<ConversationResponse> rows = conversationQueryService.getConversationsForExport(fileId, params);
 
     response.setContentType("text/csv");
@@ -332,6 +347,8 @@ public class ConversationsController {
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String deviceTypes,
       @RequestParam(required = false) String countries,
+      @RequestParam(required = false) String srcIp,
+      @RequestParam(required = false) String dstIp,
       HttpServletResponse response)
       throws IOException {
 
@@ -353,7 +370,9 @@ public class ConversationsController {
             sortDir,
             search,
             deviceTypes,
-            countries);
+            countries,
+            srcIp,
+            dstIp);
 
     String filename = conversationQueryService.getBulkPcapFilename(fileId);
     response.setContentType("application/vnd.tcpdump.pcap");
@@ -413,7 +432,9 @@ public class ConversationsController {
       String sortDir,
       String search,
       String deviceTypes,
-      String countries) {
+      String countries,
+      String srcIp,
+      String dstIp) {
     String resolvedIp = (ip != null) ? ip : search;
     return ConversationFilterParams.builder()
         .ip(resolvedIp)
@@ -430,6 +451,9 @@ public class ConversationsController {
         .payloadContains(payloadContains)
         .deviceTypes(splitComma(deviceTypes))
         .countries(splitComma(countries))
+        // Blank is "no filter", not "match the empty address".
+        .srcIp(srcIp == null || srcIp.isBlank() ? null : srcIp.trim())
+        .dstIp(dstIp == null || dstIp.isBlank() ? null : dstIp.trim())
         .sortBy(sortBy)
         .sortDir(sortDir)
         .build();

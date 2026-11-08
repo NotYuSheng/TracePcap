@@ -223,6 +223,8 @@ export const conversationService = {
       pageSize: String(filters.pageSize),
     };
     if (filters.ip) params.ip = filters.ip;
+    if (filters.srcIp) params.srcIp = filters.srcIp;
+    if (filters.dstIp) params.dstIp = filters.dstIp;
     if (filters.port) params.port = filters.port;
     if (filters.payloadContains) params.payloadContains = filters.payloadContains;
     if (filters.protocols.length > 0) params.protocols = filters.protocols.join(',');
@@ -266,6 +268,8 @@ export const conversationService = {
   getExportUrl: (fileId: string, filters: ConversationFilters): string => {
     const params = new URLSearchParams();
     if (filters.ip) params.set('ip', filters.ip);
+    if (filters.srcIp) params.set('srcIp', filters.srcIp);
+    if (filters.dstIp) params.set('dstIp', filters.dstIp);
     if (filters.port) params.set('port', filters.port);
     if (filters.payloadContains) params.set('payloadContains', filters.payloadContains);
     if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
@@ -302,6 +306,8 @@ export const conversationService = {
   getPcapExportUrl: (fileId: string, filters: ConversationFilters): string => {
     const params = new URLSearchParams();
     if (filters.ip) params.set('ip', filters.ip);
+    if (filters.srcIp) params.set('srcIp', filters.srcIp);
+    if (filters.dstIp) params.set('dstIp', filters.dstIp);
     if (filters.port) params.set('port', filters.port);
     if (filters.payloadContains) params.set('payloadContains', filters.payloadContains);
     if (filters.protocols.length > 0) params.set('protocols', filters.protocols.join(','));
