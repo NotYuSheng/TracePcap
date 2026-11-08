@@ -24,7 +24,7 @@ class HostIdentityChecksTest {
     // The routers advertise from the virtual MAC too (as VRRP does); they're members, not virtual.
     HostClassificationEntity router = host("10.0.0.2", "00:00:5e:00:01:0a");
     HostIdentityChecks.apply(
-        List.of(vip, router), Map.of(), List.of(), adverts, Map.of("10.0.0.2", List.of("00:00:5e:00:01:0a")));
+        List.of(vip, router), Map.of(), List.of(), adverts, Map.of("10.0.0.2", List.of("00:00:5e:00:01:0a")), Set.of());
     assertThat(router.getAddressKind()).isNull();
     assertThat(vip.getAddressKind()).isEqualTo("VIRTUAL_FAILOVER");
     assertThat(vip.getDeviceType()).isEqualTo("VIRTUAL_ADDRESS");
@@ -47,7 +47,8 @@ class HostIdentityChecksTest {
         Map.of(
             "10.1.0.1", List.of("00:00:0c:07:ac:01"),
             "10.2.0.1", List.of("00:00:5E:00:01:05"),
-            "10.3.0.1", List.of("00:11:22:33:44:55")));
+            "10.3.0.1", List.of("00:11:22:33:44:55")),
+        Set.of());
     assertThat(sender.getAddressKind()).isNull();
     assertThat(hsrp.getAddressKind()).isEqualTo("VIRTUAL_FAILOVER");
     assertThat(hsrp.getWinnerReasons()).contains("HSRP");
@@ -71,7 +72,8 @@ class HostIdentityChecksTest {
         Map.of("10.0.0.70", List.of(128, 64, 64), "8.8.8.8", List.of(118, 120)),
         claims,
         Map.of(),
-        Map.of());
+        Map.of(),
+        Set.of());
 
     assertThat(clone.getTtls()).containsExactly(64, 128);
     assertThat(clone.getIdentityWarning()).contains("Possibly more than one machine").contains("Windows");
@@ -79,6 +81,19 @@ class HostIdentityChecksTest {
     assertThat(routed.getIdentityWarning()).isNull();
     // The same DHCP name in two cases, plus an mDNS name: one DHCP hostname. No warning.
     assertThat(named.getIdentityWarning()).isNull();
+  }
+
+  @Test
+  void aReusedAddressGetsItsTimeline_notThePossiblyTwoMachinesWarning() {
+    HostClassificationEntity reused = host("10.0.0.50", "bb:bb:bb:00:00:01");
+    var claims =
+        List.of(
+            new HostnameResolverService.Claim("10.0.0.50", "LAPTOP-ALICE", HostnameResolverService.SOURCE_DHCP),
+            new HostnameResolverService.Claim("10.0.0.50", "iPhone-Bob", HostnameResolverService.SOURCE_DHCP));
+    HostIdentityChecks.apply(
+        List.of(reused), Map.of("10.0.0.50", List.of(128, 64)), claims, Map.of(), Map.of(), Set.of("10.0.0.50"));
+    assertThat(reused.getTtls()).containsExactly(64, 128);
+    assertThat(reused.getIdentityWarning()).isNull();
   }
 
   @Test

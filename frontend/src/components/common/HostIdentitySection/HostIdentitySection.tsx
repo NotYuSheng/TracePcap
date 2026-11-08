@@ -14,6 +14,7 @@ import { DEVICE_TYPES, deviceTypeLabel } from '@/utils/deviceType';
 import { conversationService } from '@/features/conversation/services/conversationService';
 import type { DeviceType, HostIdentityEvidence } from '@/types';
 import { Spinner } from '@components/common/Spinner/Spinner';
+import { HostOccupancySection } from '@components/common/HostOccupancySection';
 import { isPrivateIp } from '@/utils/ipClassification';
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
@@ -268,6 +269,9 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
           {evidence.ttls && evidence.ttls.length > 1 && <> TTLs seen: {evidence.ttls.join(', ')}.</>}
         </Alert>
       )}
+
+      {/* Which devices held this address, and when (#918 item 3). */}
+      <HostOccupancySection fileId={fileId} ip={ip} />
 
       {/* Evidence weighed — the independent measured signals behind the verdict. */}
       <div className="mb-4">

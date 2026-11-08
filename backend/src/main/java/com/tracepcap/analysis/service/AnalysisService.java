@@ -33,6 +33,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.File;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -176,6 +177,8 @@ public class AnalysisService {
   private final SuricataEngine suricataEngine;
   private final WindowsIdentityResolverService windowsIdentityResolverService;
   private final FailoverAddressResolverService failoverAddressResolverService;
+  private final DhcpLeaseResolverService dhcpLeaseResolverService;
+  private final HostOccupancyService hostOccupancyService;
   private final WindowsLogonWriter windowsLogonWriter;
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -314,6 +317,7 @@ public class AnalysisService {
     List<HostnameResolverService.Claim> hostnameClaims = List.of();
     List<WindowsIdentityResolverService.Logon> logons = List.of();
     Map<String, FailoverAddressResolverService.VirtualAddress> failoverAddresses = Map.of();
+    List<DhcpLeaseResolverService.Lease> dhcpLeases = List.of();
 
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
@@ -489,6 +493,8 @@ public class AnalysisService {
     run.logons = windowsIdentityResolverService.resolveLogons(run.pcap);
     // Router failover virtual addresses (VRRP/HSRP, #918): a small filtered pass. Never throws.
     run.failoverAddresses = failoverAddressResolverService.resolve(run.pcap);
+    // DHCP leases (#918 item 3): which client MAC held which address when. Never throws.
+    run.dhcpLeases = dhcpLeaseResolverService.resolve(run.pcap);
     log.info(
         "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
         run.fileId,
@@ -560,20 +566,30 @@ public class AnalysisService {
                 windowsIdentityClaimsByIp));
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
     applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
+    try {
+      persistIpMacObservations(
+          run.file, run.parseResult.getHostMacObservations(), run.parseResult.getArpClaimWindows());
+    } catch (Exception e) {
+      // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
+      log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
+    }
+    // Which device held each address when (#918 item 3), from the ARP claims above and the DHCP
+    // leases, plus any split/merge decisions (a re-analysis version inherits them).
+    Map<String, Integer> occupancyCounts = Map.of();
+    try {
+      hostOccupancyService.saveLeases(fileId, run.dhcpLeases);
+      occupancyCounts = hostOccupancyService.recompute(fileId, run.failoverAddresses.keySet());
+    } catch (Exception e) {
+      log.warn("Failed to compute host occupancies for file {}: {}", fileId, e.getMessage());
+    }
     HostIdentityChecks.apply(
         hostClassifications,
         run.parseResult.getHostTtlObservations(),
         hostnameClaims,
         run.failoverAddresses,
-        run.parseResult.getHostMacObservations());
+        run.parseResult.getHostMacObservations(),
+        occupancyCounts.keySet());
     hostClassificationRepository.saveAll(hostClassifications);
-
-    try {
-      persistIpMacObservations(run.file, run.parseResult.getHostMacObservations());
-    } catch (Exception e) {
-      // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
-      log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
-    }
 
     try {
       Set<String> allIps =
@@ -1107,19 +1123,25 @@ public class AnalysisService {
    * overlap signal, but we store all pairings so the detector can present the full evidence.
    */
   private void persistIpMacObservations(
-      FileEntity file, Map<String, LinkedHashSet<String>> macsByIp) {
+      FileEntity file,
+      Map<String, LinkedHashSet<String>> macsByIp,
+      Map<String, Map<String, LocalDateTime[]>> windows) {
     if (macsByIp == null || macsByIp.isEmpty()) return;
     List<IpMacObservationEntity> rows = new ArrayList<>();
     macsByIp.forEach(
         (ip, macs) ->
             macs.forEach(
-                mac ->
-                    rows.add(
-                        IpMacObservationEntity.builder()
-                            .fileId(file.getId())
-                            .ip(ip)
-                            .mac(mac)
-                            .build())));
+                mac -> {
+                  LocalDateTime[] w = windows == null ? null : windows.getOrDefault(ip, Map.of()).get(mac);
+                  rows.add(
+                      IpMacObservationEntity.builder()
+                          .fileId(file.getId())
+                          .ip(ip)
+                          .mac(mac)
+                          .firstSeen(w == null ? null : w[0])
+                          .lastSeen(w == null ? null : w[1])
+                          .build());
+                }));
     if (!rows.isEmpty()) ipMacObservationRepository.saveAll(rows);
   }
 

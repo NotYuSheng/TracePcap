@@ -1149,6 +1149,32 @@
         },
         "type": "object"
       },
+      "Decision": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "DetectedApplication": {
         "properties": {
           "bytes": {
@@ -2157,6 +2183,52 @@
         },
         "type": "object"
       },
+      "HostOccupancyResponse": {
+        "properties": {
+          "canEdit": {
+            "type": "boolean"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array"
+          },
+          "editReason": {
+            "type": "string"
+          },
+          "firstActivity": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "lastActivity": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "occupancies": {
+            "items": {
+              "$ref": "#/components/schemas/Occupancy"
+            },
+            "type": "array"
+          },
+          "overlapping": {
+            "type": "boolean"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "type": "array"
+          },
+          "virtualAddress": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "HostSummaryDto": {
         "properties": {
           "conversationCount": {
@@ -2907,6 +2979,68 @@
         },
         "type": "object"
       },
+      "Occupancy": {
+        "properties": {
+          "automatic": {
+            "type": "boolean"
+          },
+          "boundaryKey": {
+            "type": "string"
+          },
+          "conversations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "idx": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "mac": {
+            "type": "string"
+          },
+          "startEvidence": {
+            "type": "string"
+          },
+          "startSource": {
+            "type": "string"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OccupancyDecisionRequest": {
+        "properties": {
+          "action": {
+            "pattern": "split|merge",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "at",
+          "reason"
+        ],
+        "type": "object"
+      },
       "OverrideDto": {
         "properties": {
           "actor": {
@@ -3177,6 +3311,7 @@
               "DETECTION_RULES_GLOBAL",
               "DETECTION_RULES_NETWORK",
               "DETECTION_RULES_CAPTURE",
+              "HOST_OCCUPANCY",
               "NETWORK_SETTINGS",
               "ANALYSIS_POLICY",
               "RETENTION"
@@ -4078,6 +4213,24 @@
         "required": [
           "cidr"
         ],
+        "type": "object"
+      },
+      "Suggestion": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "SystemSettingDto": {
@@ -7785,6 +7938,141 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancies": {
+      "get": {
+        "description": "Occupancies come from ARP ownership claims and DHCP leases, corrected by analysts' split and merge decisions. One occupancy means one device for the whole capture. Includes suggested split points.",
+        "operationId": "occupancies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostOccupancyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Which devices held this address, and when",
+        "tags": [
+          "Host Occupancy"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions": {
+      "post": {
+        "description": "Needs the HOST_OCCUPANCY permission. Audited. Returns the updated occupancies.",
+        "operationId": "decide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OccupancyDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostOccupancyResponse"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Split the address at a time, or merge away an automatic boundary",
+        "tags": [
+          "Host Occupancy"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions/{decisionId}": {
+      "delete": {
+        "description": "Needs the HOST_OCCUPANCY permission. Audited.",
+        "operationId": "undo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "decisionId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Undo a split or merge",
+        "tags": [
+          "Host Occupancy"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/hosts/{ip}/windows-logons": {
       "get": {
         "operationId": "getWindowsLogons",
@@ -10008,6 +10296,7 @@
                 "DETECTION_RULES_GLOBAL",
                 "DETECTION_RULES_NETWORK",
                 "DETECTION_RULES_CAPTURE",
+                "HOST_OCCUPANCY",
                 "NETWORK_SETTINGS",
                 "ANALYSIS_POLICY",
                 "RETENTION"
@@ -11082,6 +11371,10 @@
     {
       "description": "Per-file nDPI security alerts",
       "name": "Security Alerts"
+    },
+    {
+      "description": "Devices that held one address at different times in a capture",
+      "name": "Host Occupancy"
     },
     {
       "description": "Detection rules that belong to one capture",

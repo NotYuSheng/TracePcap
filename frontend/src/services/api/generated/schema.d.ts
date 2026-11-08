@@ -998,6 +998,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which devices held this address, and when
+         * @description Occupancies come from ARP ownership claims and DHCP leases, corrected by analysts' split and merge decisions. One occupancy means one device for the whole capture. Includes suggested split points.
+         */
+        get: operations["occupancies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split the address at a time, or merge away an automatic boundary
+         * @description Needs the HOST_OCCUPANCY permission. Audited. Returns the updated occupancies.
+         */
+        post: operations["decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions/{decisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo a split or merge
+         * @description Needs the HOST_OCCUPANCY permission. Audited.
+         */
+        delete: operations["undo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/hosts/{ip}/windows-logons": {
         parameters: {
             query?: never;
@@ -2635,6 +2695,17 @@ export interface components {
             /** Format: int64 */
             id?: number;
         };
+        Decision: {
+            action?: string;
+            actor?: string;
+            /** Format: date-time */
+            at?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            id?: number;
+            reason?: string;
+        };
         DetectedApplication: {
             /** Format: int64 */
             bytes?: number;
@@ -2989,6 +3060,20 @@ export interface components {
             ttl?: number;
             ttls?: number[];
         };
+        HostOccupancyResponse: {
+            canEdit?: boolean;
+            decisions?: components["schemas"]["Decision"][];
+            editReason?: string;
+            /** Format: date-time */
+            firstActivity?: string;
+            ip?: string;
+            /** Format: date-time */
+            lastActivity?: string;
+            occupancies?: components["schemas"]["Occupancy"][];
+            overlapping?: boolean;
+            suggestions?: components["schemas"]["Suggestion"][];
+            virtualAddress?: boolean;
+        };
         HostSummaryDto: {
             /** Format: int64 */
             conversationCount?: number;
@@ -3266,6 +3351,28 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        Occupancy: {
+            automatic?: boolean;
+            boundaryKey?: string;
+            /** Format: int64 */
+            conversations?: number;
+            /** Format: date-time */
+            endsAt?: string;
+            hostname?: string;
+            /** Format: int32 */
+            idx?: number;
+            mac?: string;
+            startEvidence?: string;
+            startSource?: string;
+            /** Format: date-time */
+            startsAt?: string;
+        };
+        OccupancyDecisionRequest: {
+            action: string;
+            /** Format: date-time */
+            at: string;
+            reason: string;
+        };
         OverrideDto: {
             actor?: string;
             /** Format: date-time */
@@ -3366,7 +3473,7 @@ export interface components {
         };
         PermissionDto: {
             /** @enum {string} */
-            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
             allowed?: boolean;
             /** @enum {string} */
             defaultLevel?: "ANALYST" | "ADMIN";
@@ -3684,6 +3791,13 @@ export interface components {
             description?: string;
             inherited?: boolean;
             label?: string;
+        };
+        Suggestion: {
+            /** Format: date-time */
+            at?: string;
+            description?: string;
+            key?: string;
+            kind?: string;
         };
         SystemSettingDto: {
             defaultValue?: string;
@@ -5542,6 +5656,78 @@ export interface operations {
             };
         };
     };
+    occupancies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HostOccupancyResponse"];
+                };
+            };
+        };
+    };
+    decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OccupancyDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HostOccupancyResponse"];
+                };
+            };
+        };
+    };
+    undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+                decisionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getWindowsLogons: {
         parameters: {
             query?: never;
@@ -6923,7 +7109,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
             };
             cookie?: never;
         };

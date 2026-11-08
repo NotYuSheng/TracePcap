@@ -13,7 +13,13 @@ const base = {
 function serve(evidence: Record<string, unknown>) {
   server.use(
     http.get('*/files/f1/hosts/:ip/identity', () => HttpResponse.json({ ...base, ...evidence })),
-    http.get('*/custom-private-ranges', () => HttpResponse.json([]))
+    http.get('*/custom-private-ranges', () => HttpResponse.json([])),
+    http.get('*/files/f1/hosts/:ip/occupancies', () =>
+      HttpResponse.json({
+        ip: '10.0.0.70', overlapping: false, virtualAddress: false, decisions: [], suggestions: [],
+        canEdit: true, occupancies: [{ idx: 0, automatic: false, conversations: 1 }],
+      })
+    )
   )
 }
 
