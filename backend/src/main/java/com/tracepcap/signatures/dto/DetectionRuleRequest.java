@@ -45,6 +45,18 @@ public class DetectionRuleRequest {
   /** Require every payload pattern to match, instead of any one. */
   private boolean matchAll;
 
+  /**
+   * Classification hint (#926): hosts matching this rule are probably this device type, e.g.
+   * {@code IOT} or {@code CCTV Camera}. A weighted vote in device classification; optional.
+   */
+  @Size(max = 100)
+  private String deviceType;
+
+  /** The hint's weight, 1 to 100 (other signals add 5 to 35). Defaults to 40. */
+  @jakarta.validation.constraints.Min(1)
+  @jakarta.validation.constraints.Max(100)
+  private Integer deviceTypeWeight;
+
   /** All optional; a rule fires when every field given matches. */
   @Data
   @Builder

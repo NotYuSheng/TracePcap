@@ -24,8 +24,9 @@ public interface SignatureApplier {
    * <p>Also records, for {@code fileId}, which conversations each rule matched and which rule
    * versions were checked (#925), so a later rule edit can show the capture as out of date.
    *
-   * @return device-type overrides keyed by IP; empty if no rules carry a {@code device_type}
+   * @return classification hints from the matched rules that carry one, by IP (#926): weighted
+   *     votes for the classifier, not overrides; empty if none
    */
-  Map<String, String> applySignatures(
+  Map<String, List<ClassificationHint>> applySignatures(
       java.util.UUID fileId, List<PcapParserService.ConversationInfo> conversations);
 }

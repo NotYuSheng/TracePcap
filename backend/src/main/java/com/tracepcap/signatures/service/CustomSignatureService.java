@@ -96,7 +96,7 @@ public class CustomSignatureService implements SignatureApplier {
    *     device_type}; empty if there are none
    */
   @Override
-  public Map<String, String> applySignatures(
+  public Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> applySignatures(
       UUID fileId, List<PcapParserService.ConversationInfo> conversations) {
     // Global rules, plus the capture's own if it has any (a capture analysed again keeps them).
     List<DetectionRuleEntity> rules =
@@ -127,7 +127,7 @@ public class CustomSignatureService implements SignatureApplier {
     if (matchCount > 0) {
       log.info("Custom signatures: {} match(es) across {} conversations", matchCount, conversations.size());
     }
-    return computeDeviceTypeOverrides(toMaps(rules), conversations);
+    return classificationHints(rules, matched, byId);
   }
 
   /**
@@ -197,35 +197,51 @@ public class CustomSignatureService implements SignatureApplier {
   }
 
   /**
-   * Derives IP → custom device-type overrides from the already-loaded {@code rules} and the matches
-   * applied by {@link #applySignatures}. Only IPs from conversations matched by a rule carrying a
-   * {@code device_type} are included.
+   * The classification hints of the matched rules that carry one (#926), by IP. Which endpoint
+   * gets the vote follows from the rule: the one that matched its {@code ip} or {@code cidr}; else
+   * the one on its {@code dstPort} (or {@code srcPort}); else, with nothing endpoint-specific to go
+   * on, both. (The old override labelled both ends, so a client talking to a camera became a
+   * camera too.) One vote per rule per host.
    */
-  private Map<String, String> computeDeviceTypeOverrides(
-      List<Map<String, Object>> rules, List<PcapParserService.ConversationInfo> conversations) {
-    // Build rule-name → device_type map in one pass over rules
-    Map<String, String> ruleDeviceType = new HashMap<>();
-    for (Map<String, Object> rule : rules) {
-      String deviceType = (String) rule.get("device_type");
-      String name = (String) rule.get("name");
-      if (deviceType != null && !deviceType.isBlank() && name != null && !name.isBlank()) {
-        ruleDeviceType.put(name, deviceType);
-      }
-    }
-    if (ruleDeviceType.isEmpty()) return Map.of();
-
-    // One pass over conversations — look up each matched signature in the map
-    Map<String, String> overrides = new HashMap<>();
-    for (PcapParserService.ConversationInfo conv : conversations) {
-      for (String sig : conv.getCustomSignatures()) {
-        String deviceType = ruleDeviceType.get(sig);
-        if (deviceType != null) {
-          if (conv.getSrcIp() != null) overrides.putIfAbsent(conv.getSrcIp(), deviceType);
-          if (conv.getDstIp() != null) overrides.putIfAbsent(conv.getDstIp(), deviceType);
+  Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> classificationHints(
+      List<DetectionRuleEntity> rules,
+      Map<UUID, List<UUID>> matched,
+      Map<UUID, PcapParserService.ConversationInfo> byId) {
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> out = new HashMap<>();
+    for (DetectionRuleEntity rule : rules) {
+      if (rule.getDeviceType() == null || rule.getDeviceType().isBlank()) continue;
+      int weight = rule.getDeviceTypeWeight() != null ? rule.getDeviceTypeWeight() : DEFAULT_HINT_WEIGHT;
+      var hint = new com.tracepcap.analysis.spi.ClassificationHint(rule.getName(), rule.getDeviceType(), weight);
+      java.util.Set<String> voted = new java.util.HashSet<>();
+      for (UUID convId : matched.getOrDefault(rule.getId(), List.of())) {
+        PcapParserService.ConversationInfo conv = byId.get(convId);
+        if (conv == null) continue;
+        for (String ip : hintTargets(rule.getMatchCriteria(), conv)) {
+          if (ip != null && voted.add(ip)) out.computeIfAbsent(ip, k -> new ArrayList<>()).add(hint);
         }
       }
     }
-    return overrides;
+    return out;
+  }
+
+  /** The weight of a classification hint that doesn't say. */
+  public static final int DEFAULT_HINT_WEIGHT = 40;
+
+  private List<String> hintTargets(Map<String, Object> match, PcapParserService.ConversationInfo conv) {
+    if (match == null) match = Map.of();
+    List<String> both = new ArrayList<>(List.of(conv.getSrcIp(), conv.getDstIp()));
+    both.removeIf(java.util.Objects::isNull);
+    if (match.containsKey("ip")) {
+      String ip = String.valueOf(match.get("ip"));
+      return both.stream().filter(ip::equals).toList();
+    }
+    if (match.containsKey("cidr")) {
+      String cidr = String.valueOf(match.get("cidr"));
+      return both.stream().filter(x -> inCidr(x, cidr)).toList();
+    }
+    if (match.containsKey("dstPort") && conv.getDstIp() != null) return List.of(conv.getDstIp());
+    if (match.containsKey("srcPort") && conv.getSrcIp() != null) return List.of(conv.getSrcIp());
+    return both;
   }
 
   // -------------------------------------------------------------------------

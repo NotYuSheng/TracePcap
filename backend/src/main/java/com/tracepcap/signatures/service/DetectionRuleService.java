@@ -382,8 +382,11 @@ public class DetectionRuleService {
         seen.add(e.getId());
         DetectionRuleDto before = toDto(e);
         boolean changed = apply(e, p.rule());
-        if (!Objects.equals(e.getDeviceType(), p.deviceType())) {
+        if (p.rule().getDeviceType() == null && p.deviceType() != null
+            && !Objects.equals(e.getDeviceType(), p.deviceType())) {
+          // An old file's device_type (no weight): a strong hint, as on upgrade (#926).
           e.setDeviceType(p.deviceType());
+          e.setDeviceTypeWeight(LEGACY_HINT_WEIGHT);
           if (!changed) bump(e);
           changed = true;
         }
@@ -507,8 +510,16 @@ public class DetectionRuleService {
             .updatedBy(who)
             .build();
     copy(e, r);
+    if (e.getDeviceType() == null && deviceType != null && !deviceType.isBlank()) {
+      // A legacy file's device_type with no weight (an old signatures.yml): a strong hint (#926).
+      e.setDeviceType(deviceType);
+      e.setDeviceTypeWeight(LEGACY_HINT_WEIGHT);
+    }
     return e;
   }
+
+  /** The weight given to a device_type from before #926, when it was an override. */
+  static final int LEGACY_HINT_WEIGHT = 80;
 
   /** Copies the request onto the rule and bumps the version, if anything changed. */
   private boolean apply(DetectionRuleEntity e, DetectionRuleRequest r) {
@@ -535,6 +546,10 @@ public class DetectionRuleService {
     e.setPayloadContains(RuleCodec.toPayloadContains(r.getPayloadContains()));
     e.setPayloadRegex(RuleCodec.toPayloadRegex(r.getPayloadRegex()));
     e.setMatchAll(r.isMatchAll());
+    boolean hint = r.getDeviceType() != null && !r.getDeviceType().isBlank();
+    e.setDeviceType(hint ? r.getDeviceType().trim() : null);
+    e.setDeviceTypeWeight(
+        hint ? (r.getDeviceTypeWeight() != null ? r.getDeviceTypeWeight() : CustomSignatureService.DEFAULT_HINT_WEIGHT) : null);
   }
 
   /** The request as it would be stored, so "did anything change" compares like with like. */
@@ -554,6 +569,8 @@ public class DetectionRuleService {
         .payloadContains(RuleCodec.fromPayloadContains(e.getPayloadContains()))
         .payloadRegex(RuleCodec.fromPayloadRegex(e.getPayloadRegex()))
         .matchAll(e.isMatchAll())
+        .deviceType(e.getDeviceType())
+        .deviceTypeWeight(e.getDeviceTypeWeight())
         .build();
   }
 
@@ -574,6 +591,7 @@ public class DetectionRuleService {
         .payloadRegex(r.getPayloadRegex())
         .matchAll(r.isMatchAll())
         .deviceType(e.getDeviceType())
+        .deviceTypeWeight(e.getDeviceTypeWeight())
         .version(e.getVersion())
         .createdAt(e.getCreatedAt())
         .createdBy(e.getCreatedBy())
@@ -594,8 +612,10 @@ public class DetectionRuleService {
             .payloadContains(d.getPayloadContains())
             .payloadRegex(d.getPayloadRegex())
             .matchAll(d.isMatchAll())
+            .deviceType(d.getDeviceType())
+            .deviceTypeWeight(d.getDeviceTypeWeight())
             .build(),
-        d.getDeviceType()));
+        null));
     v.put("version", d.getVersion());
     return v;
   }

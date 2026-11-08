@@ -33,7 +33,7 @@ public interface HostClassifier {
    * @param conversations parsed conversations; the host profiles are built from these
    * @param hostTtls observed IP TTL per host
    * @param hostMacs source MAC per host IP
-   * @param deviceOverrides device type forced by custom signatures, by IP
+   * @param ruleHints detection rules' weighted device-type votes, by IP (#926)
    * @param hostnames adjudicated hostname per IP
    * @param serviceRolesByIp service-log roles per IP (dns, web, api, tls...)
    * @param windowsIdentityClaimsByIp Kerberos / LDAP sign-in claims per IP (#809)
@@ -43,7 +43,7 @@ public interface HostClassifier {
       List<PcapParserService.ConversationInfo> conversations,
       Map<String, Integer> hostTtls,
       Map<String, String> hostMacs,
-      Map<String, String> deviceOverrides,
+      Map<String, List<ClassificationHint>> ruleHints,
       Map<String, HostnameResolverService.ResolvedHostname> hostnames,
       Map<String, Set<String>> serviceRolesByIp,
       Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
@@ -52,7 +52,7 @@ public interface HostClassifier {
       conversations = conversations == null ? List.of() : conversations;
       hostTtls = hostTtls == null ? Map.of() : hostTtls;
       hostMacs = hostMacs == null ? Map.of() : hostMacs;
-      deviceOverrides = deviceOverrides == null ? Map.of() : deviceOverrides;
+      ruleHints = ruleHints == null ? Map.of() : ruleHints;
       hostnames = hostnames == null ? Map.of() : hostnames;
       serviceRolesByIp = serviceRolesByIp == null ? Map.of() : serviceRolesByIp;
       windowsIdentityClaimsByIp =

@@ -81,10 +81,17 @@ class RuleCodecTest {
     assertThat(r.deviceType()).isEqualTo("C2 Server");
     assertThat(parsed.get(1).rule().getName()).isNull();
 
+    // An old file's device_type has no weight; exported, it's a classification hint with the
+    // strong legacy weight (#926), which reads back into the rule itself.
+    assertThat(r.rule().getDeviceType()).isNull();
     String exported = RuleCodec.formatYaml(List.of(RuleCodec.toYamlMap(r.rule(), r.deviceType())), "# h\n");
+    assertThat(exported).contains("device_type_weight: 80");
     var again = RuleCodec.parseYaml(exported).get(0);
+    assertThat(again.rule().getDeviceType()).isEqualTo("C2 Server");
+    assertThat(again.rule().getDeviceTypeWeight()).isEqualTo(80);
+    again.rule().setDeviceType(null);
+    again.rule().setDeviceTypeWeight(null);
     assertThat(again.rule()).isEqualTo(r.rule());
-    assertThat(again.deviceType()).isEqualTo("C2 Server");
   }
 
   @Test

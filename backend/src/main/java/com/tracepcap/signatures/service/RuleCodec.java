@@ -86,6 +86,9 @@ public final class RuleCodec {
         }
       }
     }
+    if (r.getDeviceTypeWeight() != null && (r.getDeviceTypeWeight() < 1 || r.getDeviceTypeWeight() > 100)) {
+      errors.put("deviceTypeWeight", "A weight is 1 to 100.");
+    }
     if (hasRegex) {
       for (int i = 0; i < r.getPayloadRegex().size(); i++) {
         RegexPattern p = r.getPayloadRegex().get(i);
@@ -223,7 +226,14 @@ public final class RuleCodec {
               .payloadRegex(pr instanceof List<?> l ? fromPayloadRegex((List<Map<String, Object>>) l) : null)
               .matchAll(Boolean.TRUE.equals(rule.get("match_all")))
               .build();
-      out.add(new ParsedRule(req, text(rule.get("device_type"))));
+      String deviceType = text(rule.get("device_type"));
+      if (deviceType != null && rule.containsKey("device_type_weight")) {
+        // A file from #926 on: the hint and its weight. An old file has no weight; the caller
+        // decides what that means (a strong hint, since it used to be an override).
+        req.setDeviceType(deviceType);
+        req.setDeviceTypeWeight(integer(rule.get("device_type_weight")));
+      }
+      out.add(new ParsedRule(req, deviceType));
     }
     return out;
   }
@@ -243,7 +253,11 @@ public final class RuleCodec {
     List<Map<String, Object>> pr = toPayloadRegex(r.getPayloadRegex());
     if (!pr.isEmpty()) out.put("payload_regex", pr);
     if (r.isMatchAll()) out.put("match_all", true);
-    if (notBlank(deviceType)) out.put("device_type", deviceType);
+    String type = notBlank(r.getDeviceType()) ? r.getDeviceType() : deviceType;
+    if (notBlank(type)) {
+      out.put("device_type", type);
+      out.put("device_type_weight", r.getDeviceTypeWeight() != null ? r.getDeviceTypeWeight() : 80);
+    }
     return out;
   }
 
