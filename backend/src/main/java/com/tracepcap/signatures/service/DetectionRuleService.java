@@ -63,12 +63,25 @@ public class DetectionRuleService {
     return out;
   }
 
-  /** One network's own rules (#925 phase 3). */
+  /** One network's own rules (#925 phase 3), each carrying the network's name. */
   @Transactional(readOnly = true)
   public List<DetectionRuleDto> listNetwork(UUID networkId) {
+    String name = networkRepository.findById(networkId).map(n -> n.getName()).orElse(null);
     return repository.findByScopeAndNetworkIdOrderByNameAsc(Scope.NETWORK, networkId).stream()
         .map(DetectionRuleService::toDto)
+        .peek(d -> d.setNetworkName(name))
         .toList();
+  }
+
+  /**
+   * Every rule that labels a capture viewed in a network (#925 phase 3): the global ones, the
+   * capture's own, and the network's.
+   */
+  @Transactional(readOnly = true)
+  public List<DetectionRuleDto> listForFile(UUID fileId, UUID networkId) {
+    List<DetectionRuleDto> out = new ArrayList<>(listForFile(fileId));
+    if (networkId != null) out.addAll(listNetwork(networkId));
+    return out;
   }
 
   /**

@@ -88,6 +88,14 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
   the network: they show as out of date, as for a global rule, until the rules
   are re-applied.
 - Switching a network rule off hides its matches at once.
+- On a capture's **Analysis** page, **Viewing with** (under the file ID)
+  adds a network's rules to every tab that shows matches: the Overview, the
+  conversations (list, filters and details) and the network visualization.
+  The networks the capture is in are listed first, with a hint when it's in
+  one; links from a network's Security tab open the capture already in that
+  network. You can also pick a network the capture isn't in, to see what its
+  rules would flag: they're checked against the capture when you do. Matches
+  are labelled with the network's name.
 - A network rule's name can't be the same as a global rule's.
 - Who can edit network rules is its own permission (*Edit network detection
   rules*, analysts by default). Every change is in the audit log. Deleting the

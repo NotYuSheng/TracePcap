@@ -39,8 +39,12 @@ public class DetectionRulesController {
   @Operation(
       summary = "List the global detection rules, by name",
       description = "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.")
-  public List<DetectionRuleDto> list(@org.springframework.web.bind.annotation.RequestParam(required = false) UUID fileId) {
-    return fileId == null ? service.listGlobal() : service.listForFile(fileId);
+  public List<DetectionRuleDto> list(
+      @org.springframework.web.bind.annotation.RequestParam(required = false) UUID fileId,
+      @io.swagger.v3.oas.annotations.Parameter(description = "With fileId: also this network's rules (#925 phase 3)")
+          @org.springframework.web.bind.annotation.RequestParam(required = false)
+          UUID networkId) {
+    return fileId == null ? service.listGlobal() : service.listForFile(fileId, networkId);
   }
 
   @PostMapping("/{id}/promotions")

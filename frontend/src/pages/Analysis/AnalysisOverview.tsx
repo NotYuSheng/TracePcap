@@ -1,3 +1,4 @@
+import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { CaptureRulesCard } from '@/features/detectionRules/CaptureRulesCard';
 import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
@@ -121,6 +122,10 @@ const customRulesPopover = (
 export const AnalysisOverview = () => {
   const { data, fileId, refreshSummary } = useOutletContext<AnalysisOutletContext>();
   const [rulesVersion, setRulesVersion] = useState(0);
+  // Viewed in a network (#925 phase 3): its own rules' matches count as triggered too.
+  const [networkContext] = useNetworkContext();
+  const [networkTriggered, setNetworkTriggered] = useState<string[]>([]);
+  const ctxQuery = networkContext ? `&networkId=${encodeURIComponent(networkContext)}` : '';
   const rulesPermission = usePermission('DETECTION_RULES_GLOBAL');
   const navigate = useNavigate();
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
@@ -136,7 +141,7 @@ export const AnalysisOverview = () => {
 
   useEffect(() => {
     conversationService
-      .getSignatureRules(fileId)
+      .getSignatureRules(fileId, networkContext)
       .then(rules => {
         const map: Record<string, string> = {};
         const scopes: Record<string, string> = {};
@@ -165,7 +170,17 @@ export const AnalysisOverview = () => {
         setAnswers([]);
         setUnknowns([]);
       });
-  }, [fileId, rulesVersion]);
+    if (networkContext) {
+      conversationService
+        .getCustomSignatures(fileId, networkContext)
+        .then(setNetworkTriggered)
+        .catch(() => setNetworkTriggered([]));
+    }
+  }, [fileId, rulesVersion, networkContext]);
+
+  const triggeredRules = Array.from(
+    new Set([...(data.triggeredCustomRules ?? []), ...(networkContext ? networkTriggered : [])])
+  ).sort();
 
   const detectedApps = data.detectedApplications ?? [];
 
@@ -322,7 +337,7 @@ export const AnalysisOverview = () => {
         </div>
       )}
 
-      {data.triggeredCustomRules && data.triggeredCustomRules.length > 0 && (
+      {triggeredRules.length > 0 && (
         <div className="mt-4">
           <h5 className="mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-shield-lock me-2" style={{ color: '#6f42c1' }}></i>
@@ -340,7 +355,7 @@ export const AnalysisOverview = () => {
             </EscapableOverlayTrigger>
           </h5>
           <div className="d-flex flex-wrap gap-2">
-            {data.triggeredCustomRules.map(rule => {
+            {triggeredRules.map(rule => {
               const { bg, text } = getSeverityColor(signatureSeverities[rule]);
               return (
                 <button
@@ -350,7 +365,7 @@ export const AnalysisOverview = () => {
                   title="Click to filter conversations by this rule"
                   onClick={() =>
                     navigate(
-                      `/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}`
+                      `/analysis/${fileId}/conversations?customSignatures=${encodeURIComponent(rule)}${ctxQuery}`
                     )
                   }
                 >

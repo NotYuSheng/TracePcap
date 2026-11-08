@@ -14,15 +14,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Reads a network's rule matches for one capture from rule_matches (#925 phase 3). */
+/**
+ * Reads a network's rule matches for one capture from rule_matches (#925 phase 3). For a capture
+ * outside the network, the rules are checked first, on demand.
+ */
 @Component
 @RequiredArgsConstructor
 class NetworkRuleOverlayImpl implements NetworkRuleOverlay {
 
   private final JdbcTemplate jdbc;
+  private final RuleSyncService ruleSync;
 
   @Override
   public Map<UUID, List<String>> labels(UUID networkId, UUID fileId) {
+    ruleSync.ensureCheckedForViewing(networkId, fileId);
     Map<UUID, List<String>> out = new LinkedHashMap<>();
     jdbc.query(
         "SELECT m.conversation_id, r.name FROM rule_matches m JOIN detection_rules r ON r.id = m.rule_id"
@@ -40,6 +45,7 @@ class NetworkRuleOverlayImpl implements NetworkRuleOverlay {
   public Set<UUID> conversationsMatching(UUID networkId, UUID fileId, Collection<String> names) {
     Set<UUID> out = new HashSet<>();
     if (names == null || names.isEmpty()) return out;
+    ruleSync.ensureCheckedForViewing(networkId, fileId);
     String[] arr = names.toArray(String[]::new);
     jdbc.query(
         con -> {

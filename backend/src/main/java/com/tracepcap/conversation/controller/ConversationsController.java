@@ -402,9 +402,12 @@ public class ConversationsController {
   @GetMapping("/detail/{conversationId}")
   @Operation(summary = "Get conversation details with packet stream")
   public ResponseEntity<ConversationDetailResponse> getConversationDetail(
-      @PathVariable UUID conversationId) {
+      @PathVariable UUID conversationId,
+      @Parameter(description = "View in this network (#925): adds its own detection rules' matches")
+          @RequestParam(required = false)
+          UUID networkId) {
     log.info("GET /api/conversations/detail/{}", conversationId);
-    return ResponseEntity.ok(conversationQueryService.getConversationDetail(conversationId));
+    return ResponseEntity.ok(conversationQueryService.getConversationDetail(conversationId, networkId));
   }
 
   /** Export a single conversation as a PCAP file filtered from the original capture. */

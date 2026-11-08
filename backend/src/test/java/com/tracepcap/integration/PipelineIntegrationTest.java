@@ -1003,6 +1003,58 @@ class PipelineIntegrationTest {
         .as("a network's rules go with it").isZero();
   }
 
+  /**
+   * The network context for the Analysis page (#925 phase 3c): which networks a capture is in, the
+   * rules that label it in one (with the network's name for the scope label), and the network's
+   * matches on a single conversation's detail.
+   */
+  @Test
+  void networkContext_listsTheCapturesNetworks_rulesWithNames_andDetailOverlay() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "ctx-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String file = uploadBytes(tag + ".pcap", udpPcap(tag)).getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(file)).isEqualTo("completed");
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"" + tag + "-HQ\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    rest.postForEntity("/api/v1/monitor/networks/" + net + "/detection-rules",
+        json("{\"name\":\"" + tag + "-r\",\"severity\":\"low\",\"match\":{\"dstPort\":5999}}"), JsonNode.class);
+    assertThat(rest.getForEntity("/api/v1/files/" + file + "/networks", JsonNode.class).getBody()).isEmpty();
+    rest.postForEntity("/api/v1/monitor/networks/" + net + "/snapshots", json("{\"fileId\":\"" + file + "\"}"), JsonNode.class);
+
+    JsonNode nets = rest.getForEntity("/api/v1/files/" + file + "/networks", JsonNode.class).getBody();
+    assertThat(nets).hasSize(1);
+    assertThat(nets.get(0).get("name").asText()).isEqualTo(tag + "-HQ");
+
+    JsonNode rules =
+        rest.getForEntity("/api/v1/detection-rules?fileId=" + file + "&networkId=" + net, JsonNode.class).getBody();
+    JsonNode netRule = null;
+    for (JsonNode r : rules) if (r.get("name").asText().equals(tag + "-r")) netRule = r;
+    assertThat(netRule).isNotNull();
+    assertThat(netRule.get("scope").asText()).isEqualTo("NETWORK");
+    assertThat(netRule.get("networkName").asText()).isEqualTo(tag + "-HQ");
+
+    String convId =
+        rest.getForEntity("/api/v1/conversations/" + file, JsonNode.class).getBody().get("data").get(0).get("conversationId").asText();
+    assertThat(rest.getForEntity("/api/v1/conversations/detail/" + convId + "?networkId=" + net, JsonNode.class)
+            .getBody().get("customSignatures").toString()).contains(tag + "-r");
+    assertThat(rest.getForEntity("/api/v1/conversations/detail/" + convId, JsonNode.class)
+            .getBody().get("customSignatures").toString()).doesNotContain(tag + "-r");
+
+    // Another network the capture isn't in: its rules are checked on demand when viewed in it.
+    String other =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"" + tag + "-branch\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    rest.postForEntity("/api/v1/monitor/networks/" + other + "/detection-rules",
+        json("{\"name\":\"" + tag + "-o\",\"severity\":\"low\",\"match\":{\"protocol\":\"UDP\"}}"), JsonNode.class);
+    assertThat(rest.getForEntity("/api/v1/conversations/" + file + "?networkId=" + other, JsonNode.class)
+            .getBody().get("data").get(0).get("customSignatures").toString()).contains(tag + "-o");
+    assertThat(rest.getForEntity("/api/v1/files/" + file + "/networks", JsonNode.class).getBody()).hasSize(1);
+
+    rest.exchange("/api/v1/monitor/networks/" + net, HttpMethod.DELETE, null, Void.class);
+    rest.exchange("/api/v1/monitor/networks/" + other, HttpMethod.DELETE, null, Void.class);
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);

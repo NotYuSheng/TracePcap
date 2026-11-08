@@ -86,7 +86,7 @@ export const ConversationPage = () => {
     conversationService.getFileTypes(fileId).then(setFileTypeOptions).catch(console.error);
     conversationService.getRiskTypes(fileId).then(setRiskTypeOptions).catch(console.error);
     conversationService
-      .getCustomSignatures(fileId)
+      .getCustomSignatures(fileId, filters.networkId)
       .then(setCustomSignatureOptions)
       .catch(console.error);
     // Clear first so stale options from the previous file aren't shown while/if the fetch fails.
@@ -99,7 +99,7 @@ export const ConversationPage = () => {
         setSuricataAlertOptions([]);
       });
     conversationService
-      .getSignatureRules(fileId)
+      .getSignatureRules(fileId, filters.networkId)
       .then(rules => {
         const map: Record<string, string> = {};
         const scopes: Record<string, string> = {};
@@ -116,7 +116,7 @@ export const ConversationPage = () => {
       .then(list => setHostClassMap(new Map(list.map(c => [c.ip, c]))))
       .catch(console.error);
     conversationService.getCountries(fileId).then(setCountryOptions).catch(console.error);
-  }, [fileId]);
+  }, [fileId, filters.networkId]);
 
   // One-shot migration of legacy URL params from NodeDetails and Overview navigation
   useEffect(() => {
@@ -148,7 +148,7 @@ export const ConversationPage = () => {
     setSearchParams(next, { replace: true });
     setDetailLoading(true);
     conversationService
-      .getConversationDetail(highlightId)
+      .getConversationDetail(highlightId, filters.networkId)
       .then(conv => {
         setSelectedConversation(conv);
         setSelectedIndex(-1);
@@ -172,7 +172,7 @@ export const ConversationPage = () => {
       .getPacketLocation(fileId, frame)
       .then(loc => {
         if (!loc) return undefined;
-        return conversationService.getConversationDetail(loc.conversationId).then(conv => {
+        return conversationService.getConversationDetail(loc.conversationId, filters.networkId).then(conv => {
           setSelectedConversation(conv);
           setSelectedIndex(-1);
           setHighlightPacket(frame);
@@ -215,7 +215,7 @@ export const ConversationPage = () => {
       if (conversation.packets && conversation.packets.length > 0) {
         setSelectedConversation(conversation);
       } else {
-        const full = await conversationService.getConversationDetail(conversation.id);
+        const full = await conversationService.getConversationDetail(conversation.id, filters.networkId);
         setSelectedConversation(full);
       }
     } catch (err) {
@@ -224,7 +224,7 @@ export const ConversationPage = () => {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [filters.networkId]);
 
   const closeModal = useCallback(() => {
     setSelectedConversation(null);
