@@ -52,6 +52,12 @@ public class HostIdentityEvidenceDto {
   // ── Hardware facts ──────────────────────────────────────────────────────────
   String manufacturer;
   Integer ttl;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  java.util.List<Integer> ttls;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918); else null. */
+  String addressKind;
+  /** Why this may be more than one machine (#918); null when nothing conflicts. */
+  String identityWarning;
 
   // ── Service facts ───────────────────────────────────────────────────────────
   /** Confirmed service roles (e.g. ["dns"]); never null, may be empty. */

@@ -22,6 +22,12 @@ public class HostClassificationResponse {
    */
   int loggedInUserCount;
   Integer ttl;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  java.util.List<Integer> ttls;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918); else null. */
+  String addressKind;
+  /** Why this may be more than one machine (#918); null when nothing conflicts. */
+  String identityWarning;
   String deviceType;
   int confidence;
   /** Service roles this host was detected serving (e.g. ["dns"]); drives the node modal tabs. */

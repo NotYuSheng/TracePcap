@@ -438,8 +438,9 @@ export type DeviceType =
   | 'DNS_SERVER'
   | 'WEB_SERVER'
   | 'API_SERVER'
+  | 'VIRTUAL_ADDRESS'
   | 'UNKNOWN'
-  | string; // custom override values from YAML
+  | string; // custom values from detection-rule classification hints (#926)
 
 export interface HostClassification {
   ip: string;
@@ -459,6 +460,12 @@ export interface HostClassification {
    */
   loggedInUserCount?: number;
   ttl?: number;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  ttls?: number[] | null;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918). */
+  addressKind?: string | null;
+  /** Why this may be more than one machine (#918); absent when nothing conflicts. */
+  identityWarning?: string | null;
   deviceType: DeviceType;
   confidence: number;
   /** Service roles this host was detected serving (e.g. ["dns"]); drives node-modal tabs. */
@@ -495,6 +502,12 @@ export interface HostIdentityEvidence {
   // Hardware facts
   manufacturer?: string | null;
   ttl?: number | null;
+  /** Every TTL seen from this IP, lowest first (#918). */
+  ttls?: number[] | null;
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918). */
+  addressKind?: string | null;
+  /** Why this may be more than one machine (#918); absent when nothing conflicts. */
+  identityWarning?: string | null;
   // Service facts
   serviceRoles: string[];
   ndpiApps: string[];

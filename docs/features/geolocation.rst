@@ -407,14 +407,35 @@ MOBILE wins, but confidence is not 100% because Apple OUIs cover both iPhones
 and MacBooks. Observing mobile-specific apps (e.g. WhatsApp, Instagram) would
 push the margin to ≥ 60 and confidence to 100%.
 
-Custom Signature Override
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Detection Rule Hints
+~~~~~~~~~~~~~~~~~~~~
 
-A ``device_type`` field in a custom signature rule **overrides** all
-heuristics with confidence **100** for every IP address involved in a matching
-conversation — see :doc:`custom-signatures`. Standard values (``ROUTER``,
-``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``, ``IOT``, ``UNKNOWN``) and custom
-strings (e.g. ``"PLC"``, ``"CCTV Camera"``) are both accepted.
+A detection rule can carry a **classification hint**: hosts it matches are
+probably a given device type. The hint is one more weighted vote, shown in the
+host's *Evidence weighed* as "Custom rule *name* → type +weight"; it doesn't
+override the other signals, and a label set on the host still wins. See
+:doc:`../configuration/signature-rules`.
+
+What a "Host" Is
+~~~~~~~~~~~~~~~~
+
+A host is an IP address in a capture, which isn't always one machine. TracePcap
+checks for the common cases and says so in the host's details:
+
+- **Every TTL is kept.** Not just the first TTL seen from an IP, but each one
+  (up to 16), so a conflict is visible.
+- **Possibly more than one machine.** An IP whose TTLs come from different
+  operating-system families (≤64 Linux/macOS, ≤128 Windows, ≤255 network
+  equipment), or that asked DHCP for more than one hostname, gets a warning
+  saying what was seen. Cloned VMs, a duplicated MAC, NAT, or the address
+  passing to another device can all cause it. TTLs that differ only by hops
+  (118 and 120) don't count.
+- **Router failover addresses.** The virtual IP of a VRRP, HSRP or CARP pair is
+  shared by two or more routers. It's recognised from the routers' adverts
+  (which name it) or from a virtual-router MAC (``00:00:5e:00:01:xx``,
+  ``00:00:0c:07:ac:xx``, ``00:00:0c:9f:fx:xx``), shown as **Virtual address**
+  with the member routers, and not classified as a device. Before, these were
+  usually called IoT devices, from the IANA MAC's manufacturer.
 
 .. list-table::
    :header-rows: 1

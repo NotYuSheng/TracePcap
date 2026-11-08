@@ -175,6 +175,7 @@ public class AnalysisService {
   private final HostnameClaimWriter hostnameClaimWriter;
   private final SuricataEngine suricataEngine;
   private final WindowsIdentityResolverService windowsIdentityResolverService;
+  private final FailoverAddressResolverService failoverAddressResolverService;
   private final WindowsLogonWriter windowsLogonWriter;
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -312,6 +313,7 @@ public class AnalysisService {
     /** Hostname claims and Windows logins: file-only tshark passes, run before the transaction. */
     List<HostnameResolverService.Claim> hostnameClaims = List.of();
     List<WindowsIdentityResolverService.Logon> logons = List.of();
+    Map<String, FailoverAddressResolverService.VirtualAddress> failoverAddresses = Map.of();
 
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
@@ -485,6 +487,8 @@ public class AnalysisService {
     // Both resolvers never throw.
     run.hostnameClaims = hostnameResolverService.resolve(run.pcap);
     run.logons = windowsIdentityResolverService.resolveLogons(run.pcap);
+    // Router failover virtual addresses (VRRP/HSRP, #918): a small filtered pass. Never throws.
+    run.failoverAddresses = failoverAddressResolverService.resolve(run.pcap);
     log.info(
         "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
         run.fileId,
@@ -556,6 +560,11 @@ public class AnalysisService {
                 windowsIdentityClaimsByIp));
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
     applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
+    HostIdentityChecks.apply(
+        hostClassifications,
+        run.parseResult.getHostTtlObservations(),
+        hostnameClaims,
+        run.failoverAddresses);
     hostClassificationRepository.saveAll(hostClassifications);
 
     try {

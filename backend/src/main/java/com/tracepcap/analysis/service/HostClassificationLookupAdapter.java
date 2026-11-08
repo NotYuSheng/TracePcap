@@ -72,7 +72,10 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
         e.getTtl(),
         e.getDeviceType(),
         e.getConfidence(),
-        splitRoles(e.getServiceRoles()));
+        splitRoles(e.getServiceRoles()),
+        e.getTtls() == null ? List.of() : List.of(e.getTtls()),
+        e.getAddressKind(),
+        e.getIdentityWarning());
   }
 
   /** Splits the comma-joined service_roles column into a list (empty when null/blank). */
