@@ -16,7 +16,7 @@ class CaseKnowledgeServiceTest {
   private KnowledgeContributor contributor(String name) {
     return new KnowledgeContributor() {
       @Override public String name() { return name; }
-      @Override public void contribute(UUID fileId, com.tracepcap.knowledge.spi.CaseKnowledgeBuilder board) {
+      @Override public void contribute(com.tracepcap.knowledge.spi.KnowledgeContext context, com.tracepcap.knowledge.spi.CaseKnowledgeBuilder board) {
         board.addEntity(EntityRef.host("10.0.0." + name.length()));
       }
     };
@@ -25,7 +25,7 @@ class CaseKnowledgeServiceTest {
   @Test
   void assemblesFromAllContributors() {
     CaseKnowledgeService service =
-        new CaseKnowledgeService(List.of(contributor("a"), contributor("bb")));
+        service(List.of(contributor("a"), contributor("bb")));
 
     CaseKnowledge k = service.assemble(FILE);
 
@@ -37,11 +37,11 @@ class CaseKnowledgeServiceTest {
   void aThrowingContributorIsIsolatedAndTheRestStillAssemble() {
     KnowledgeContributor bad = new KnowledgeContributor() {
       @Override public String name() { return "bad"; }
-      @Override public void contribute(UUID fileId, com.tracepcap.knowledge.spi.CaseKnowledgeBuilder board) {
+      @Override public void contribute(com.tracepcap.knowledge.spi.KnowledgeContext context, com.tracepcap.knowledge.spi.CaseKnowledgeBuilder board) {
         throw new IllegalStateException("boom");
       }
     };
-    CaseKnowledgeService service = new CaseKnowledgeService(List.of(bad, contributor("good")));
+    CaseKnowledgeService service = service(List.of(bad, contributor("good")));
 
     CaseKnowledge k = service.assemble(FILE);
 
@@ -51,9 +51,38 @@ class CaseKnowledgeServiceTest {
 
   @Test
   void noContributors_yieldsAnEmptyBoard() {
-    CaseKnowledge k = new CaseKnowledgeService(List.of()).assemble(FILE);
+    CaseKnowledge k = service(List.of()).assemble(FILE);
     assertThat(k.entities()).isEmpty();
     assertThat(k.relationships()).isEmpty();
     assertThat(k.findings()).isEmpty();
+  }
+
+  private final com.tracepcap.analysis.spi.ConversationLookup conversations =
+      org.mockito.Mockito.mock(com.tracepcap.analysis.spi.ConversationLookup.class);
+  private final com.tracepcap.analysis.spi.HostClassificationLookup hosts =
+      org.mockito.Mockito.mock(com.tracepcap.analysis.spi.HostClassificationLookup.class);
+
+  private CaseKnowledgeService service(List<KnowledgeContributor> contributors) {
+    return new CaseKnowledgeService(contributors, conversations, hosts);
+  }
+
+  /** One assembly loads each fact list once, however many contributors read it (#816). */
+  @Test
+  void factsAreLoadedOncePerAssembly_notOncePerContributor() {
+    org.mockito.Mockito.when(conversations.conversationFacts(FILE)).thenReturn(List.of());
+    KnowledgeContributor reader =
+        new KnowledgeContributor() {
+          @Override public String name() { return "reader"; }
+          @Override public void contribute(com.tracepcap.knowledge.spi.KnowledgeContext context, com.tracepcap.knowledge.spi.CaseKnowledgeBuilder board) {
+            context.conversationFacts();
+            context.conversationFacts();
+          }
+        };
+
+    service(List.of(reader, reader, reader)).assemble(FILE);
+
+    org.mockito.Mockito.verify(conversations, org.mockito.Mockito.times(1)).conversationFacts(FILE);
+    // Nobody asked for hosts, so they are never loaded.
+    org.mockito.Mockito.verify(hosts, org.mockito.Mockito.never()).hostFacts(org.mockito.ArgumentMatchers.any());
   }
 }

@@ -1,6 +1,5 @@
 package com.tracepcap.knowledge.contributor;
 
-import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.analysis.spi.ConversationLookup.ConversationFacts;
 import com.tracepcap.analysis.spi.ConversationLookup.FlowIdentity;
 import com.tracepcap.analysis.spi.ConversationLookup.TlsFacts;
@@ -10,13 +9,13 @@ import com.tracepcap.knowledge.spi.CaseKnowledgeBuilder;
 import com.tracepcap.knowledge.spi.EntityRef;
 import com.tracepcap.knowledge.spi.Finding;
 import com.tracepcap.knowledge.spi.Grade;
+import com.tracepcap.knowledge.spi.KnowledgeContext;
 import com.tracepcap.knowledge.spi.KnowledgeContributor;
 import com.tracepcap.knowledge.spi.Relationship;
 import com.tracepcap.knowledge.spi.Severity;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -49,7 +48,6 @@ public class BeaconContributor implements KnowledgeContributor {
   /** Low-throughput: control traffic, not a bulk transfer (that is the traffic/data-transfer path). */
   private static final long MAX_AVG_BYTES_PER_PACKET = 800;
 
-  private final ConversationLookup conversationLookup;
 
   @Override
   public String name() {
@@ -57,8 +55,8 @@ public class BeaconContributor implements KnowledgeContributor {
   }
 
   @Override
-  public void contribute(UUID fileId, CaseKnowledgeBuilder board) {
-    for (ConversationFacts conv : conversationLookup.conversationFacts(fileId)) {
+  public void contribute(KnowledgeContext context, CaseKnowledgeBuilder board) {
+    for (ConversationFacts conv : context.conversationFacts()) {
       FlowIdentity f = conv.flow();
       if (f.protocol() == null || !"TCP".equalsIgnoreCase(f.protocol())) continue;
       if (f.srcIp() == null || f.dstIp() == null) continue;

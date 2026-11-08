@@ -1,5 +1,7 @@
 package com.tracepcap.knowledge.contributor;
 
+import com.tracepcap.knowledge.spi.KnowledgeContext;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +30,7 @@ class HostIdentityContributorTest {
   private CaseKnowledge run(HostFacts... hosts) {
     when(hostClassificationLookup.hostFacts(FILE)).thenReturn(List.of(hosts));
     CaseKnowledgeBuilder board = new CaseKnowledgeBuilder(FILE);
-    new HostIdentityContributor(hostClassificationLookup).contribute(FILE, board);
+    new HostIdentityContributor().contribute(KnowledgeContext.of(FILE, null, hostClassificationLookup), board);
     return board.build();
   }
 
