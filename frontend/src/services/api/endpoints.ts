@@ -106,6 +106,7 @@ export const API_ENDPOINTS = {
   SYSTEM_TIME: '/system/time',
   SYSTEM_LIMITS: '/system/limits',
   SYSTEM_SETTINGS: '/system/settings',
+  SYSTEM_SETTING: (key: string) => `/system/settings/${key}`,
   PREFERENCES: '/preferences',
   ME: '/me',
   PERMISSIONS: '/permissions',

@@ -201,6 +201,10 @@ content whose file has already been deleted.
 Deletion is only ever triggered by these settings; nothing else in the
 application removes captures or packets on its own.
 
+The three retention hours can also be changed in the app, on the System page,
+by an admin (see :ref:`settings-permissions`). The value here stays the
+default, and the app refuses ``FILE_RETENTION_HOURS`` below ``1``.
+
 .. list-table::
    :header-rows: 1
    :widths: 35 15 50

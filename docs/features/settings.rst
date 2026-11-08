@@ -60,12 +60,41 @@ such as the upload cap. They are grouped as:
 - **Memory and capacity**: limits tied to how much memory the backend has.
 - **Infrastructure**: servers, storage, login, and the LLM.
 
-**Nothing here can be changed in the app yet.** Each setting is shown greyed out with a
-lock. Click it to see why it can't be changed here, which variable sets it, its default,
-and what it does. **Secrets** (database password, MinIO keys, LLM API key) only show
-whether they're set. Their values are never sent to the browser.
+Most settings can't be changed in the app: each is greyed out with a lock, and clicking
+it shows why, which variable sets it, its default, and what it does. **Secrets**
+(database password, MinIO keys, LLM API key) only show whether they're set. Their values
+are never sent to the browser.
 
-This tab behaves the same with login on or off, since it only reads.
+**Changing policy in the app.** A few analysis-policy settings can be changed here
+without a redeploy, by whoever has the permission for them (see
+:ref:`settings-permissions`):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - Setting
+     - Permission
+     - Takes effect
+   * - ``FILE_RETENTION_HOURS``, ``MONITOR_FILE_RETENTION_HOURS``,
+       ``PACKET_RETENTION_HOURS``
+     - Retention (admins)
+     - From the next hourly cleanup run.
+   * - ``DNS_NXDOMAIN_SUSPICIOUS_RATIO``, ``DNS_NXDOMAIN_MIN_QUERIES``
+     - Analysis policy (analysts)
+     - At once in the network cluster view; host DNS logs use it from the next
+       analysis.
+   * - ``HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO``, ``HTTP_MIN_REQUESTS``
+     - Analysis policy (analysts)
+     - At once in the network cluster view.
+
+Click the setting, then **Change…**. The value from the deployment's ``.env`` stays the
+default: a setting changed in the app is marked *changed in the app*, and **Reset to the
+deployment's value** removes the change. Every change is in the audit log.
+
+Other policy settings, such as whether file retention runs at all
+(``FILE_RETENTION_ENABLED``) or whether Suricata runs, stay deploy-time on purpose:
+changing them means starting or stopping a component, which needs a restart.
 
 
 .. _settings-permissions:
