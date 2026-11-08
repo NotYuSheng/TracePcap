@@ -16,9 +16,6 @@ public class AnalysisProperties {
   /** Timeout in seconds for analysis operations */
   private int timeoutSeconds = 300;
 
-  /** Maximum number of concurrent analysis operations */
-  private int maxConcurrentAnalyses = 3;
-
   /** Maximum number of data points to return in timeline queries */
   private int maxTimelineDataPoints = 1000;
 
