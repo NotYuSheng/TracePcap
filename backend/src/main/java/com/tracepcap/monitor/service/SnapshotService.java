@@ -242,6 +242,26 @@ public class SnapshotService {
     rerunChangeDetectionChain(networkId);
   }
 
+  /**
+   * Brings every network whose snapshot order has gaps back in line, exactly as
+   * {@link #removeSnapshot} does after its own delete: renumber, then re-run change detection
+   * (#635). Returns the networks it repaired.
+   *
+   * <p>Called after a file delete has committed (see {@code SnapshotFileDeletionListener}).
+   * {@code REQUIRES_NEW} because in an AFTER_COMMIT callback a plain REQUIRED transaction would join
+   * the already-completed one, and its writes would never commit.
+   */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+  public List<UUID> repairNetworksWithSnapshotGaps() {
+    List<UUID> networks = snapshotRepository.findNetworkIdsWithSnapshotOrderGaps();
+    for (UUID networkId : networks) {
+      reorderSnapshots(networkId);
+      rerunChangeDetectionChain(networkId);
+      log.info("Repaired snapshot order and change history for network {} after a file delete", networkId);
+    }
+    return networks;
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   private void reorderSnapshots(UUID networkId) {
