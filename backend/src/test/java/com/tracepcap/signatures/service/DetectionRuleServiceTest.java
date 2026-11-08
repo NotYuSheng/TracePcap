@@ -35,7 +35,8 @@ class DetectionRuleServiceTest {
   private final PermissionService permissions = mock(PermissionService.class);
   private final AuditLogService audit = mock(AuditLogService.class);
   private final CurrentActor actor = mock(CurrentActor.class);
-  private final DetectionRuleService service = new DetectionRuleService(repo, permissions, audit, actor);
+  private final RuleSyncService ruleSync = mock(RuleSyncService.class);
+  private final DetectionRuleService service = new DetectionRuleService(repo, permissions, audit, actor, ruleSync);
 
   private static DetectionRuleRequest req(String name, int port) {
     return DetectionRuleRequest.builder()
@@ -51,6 +52,7 @@ class DetectionRuleServiceTest {
     assertThatThrownBy(() -> service.create(req("a", 1))).isInstanceOf(ForbiddenException.class);
     assertThatThrownBy(() -> service.importYaml(new RuleImportRequest("signatures: []", RuleImportRequest.Mode.MERGE)))
         .isInstanceOf(ForbiddenException.class);
+    verify(repo, never()).saveAndFlush(any());
     verify(repo, never()).save(any());
   }
 
@@ -78,6 +80,7 @@ class DetectionRuleServiceTest {
     when(actor.username()).thenReturn("bob");
 
     assertThat(service.update(e.getId(), req("c2", 4444)).getVersion()).isEqualTo(1);
+    verify(repo, never()).saveAndFlush(any());
     verify(repo, never()).save(any());
 
     var changed = service.update(e.getId(), req("c2", 5555));
@@ -94,6 +97,7 @@ class DetectionRuleServiceTest {
         .isInstanceOfSatisfying(
             FieldValidationException.class,
             e -> assertThat(e.getErrors()).containsKey("rules[1] (bad).payloadRegex[0].pattern"));
+    verify(repo, never()).saveAndFlush(any());
     verify(repo, never()).save(any());
   }
 
