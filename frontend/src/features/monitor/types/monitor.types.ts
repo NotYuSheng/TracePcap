@@ -8,6 +8,19 @@ export interface Network {
   hasInsights: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Per-network settings (#488). Absent on old responses: treat as DEFAULT_NETWORK_SETTINGS. */
+  settings?: NetworkSettings;
+}
+
+/**
+ * Per-network settings (#468, #488). The inactivity rule decides when something missing from the
+ * latest capture stops being "quiet" and becomes "no longer seen".
+ */
+export interface NetworkSettings {
+  /** SNAPSHOTS: count missed captures. DAYS: count days before the latest capture. */
+  inactivityMode: 'SNAPSHOTS' | 'DAYS';
+  /** A capture count for SNAPSHOTS, a day count for DAYS. At least 1. */
+  inactivityThreshold: number;
 }
 
 export interface SubnetOverride {
@@ -109,4 +122,6 @@ export interface AbsentEntity {
   lastSeenFileName: string;
   lastSeenStartTime: string | null;
   lastSeenFileId: string | null;
+  /** Quiet (still within the network's inactivity rule) or gone (#488). Gone when unset. */
+  presence?: 'quiet' | 'gone';
 }

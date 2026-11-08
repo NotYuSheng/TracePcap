@@ -7,6 +7,8 @@ import { SnapshotTimeline } from '@/components/monitor/SnapshotTimeline/Snapshot
 import { DeviceDriftPanel } from '@/components/monitor/DeviceDriftPanel/DeviceDriftPanel';
 import { ProtocolDriftPanel } from '@/components/monitor/ProtocolDriftPanel/ProtocolDriftPanel';
 import { IpDriftPanel } from '@/components/monitor/IpDriftPanel/IpDriftPanel';
+import { monitorService } from '@/features/monitor/services/monitorService';
+import { NetworkSettingsModal } from '@/components/monitor/NetworkSettingsModal/NetworkSettingsModal';
 import { SubnetsPanel } from '@/components/monitor/SubnetsPanel/SubnetsPanel';
 import { BaselineDefinitionPanel } from '@/components/monitor/BaselineDefinitionPanel/BaselineDefinitionPanel';
 import { ExternalEventsPanel } from '@/components/monitor/ExternalEventsPanel/ExternalEventsPanel';
@@ -33,6 +35,7 @@ export const NetworkDetailPage = () => {
 
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [showManage, setShowManage] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const navSections: SectionDef[] = [
     { id: 'sec-timeline', label: 'Capture Timeline', icon: 'bi-clock-history' },
@@ -92,6 +95,15 @@ export const NetworkDetailPage = () => {
                 Updated {lastUpdated.toLocaleTimeString()}
               </small>
             )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => setShowSettings(true)}
+              aria-label="Network settings"
+            >
+              <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
+            </Button>
             <Button
               type="button"
               size="sm"
@@ -173,7 +185,7 @@ export const NetworkDetailPage = () => {
                   </h6>
                 </Card.Header>
                 <Card.Body style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                  <DeviceDriftPanel snapshots={snapshots} />
+                  <DeviceDriftPanel snapshots={snapshots} settings={network.settings} />
                 </Card.Body>
               </Card>
             </Col>
@@ -185,7 +197,7 @@ export const NetworkDetailPage = () => {
                   </h6>
                 </Card.Header>
                 <Card.Body style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                  <ProtocolDriftPanel snapshots={snapshots} />
+                  <ProtocolDriftPanel snapshots={snapshots} settings={network.settings} />
                 </Card.Body>
               </Card>
             </Col>
@@ -197,7 +209,7 @@ export const NetworkDetailPage = () => {
                   </h6>
                 </Card.Header>
                 <Card.Body style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                  <IpDriftPanel snapshots={snapshots} subnets={subnets} />
+                  <IpDriftPanel snapshots={snapshots} subnets={subnets} settings={network.settings} />
                 </Card.Body>
               </Card>
             </Col>
@@ -377,6 +389,15 @@ export const NetworkDetailPage = () => {
         onHide={() => setShowAddSnapshot(false)}
         existingFileIds={snapshots.map(s => s.fileId)}
         onAdd={data.handleAddSnapshot}
+      />
+      <NetworkSettingsModal
+        show={showSettings}
+        onHide={() => setShowSettings(false)}
+        initial={network.settings}
+        onSave={async settings => {
+          await monitorService.updateNetworkSettings(network.id, settings);
+          reload(false);
+        }}
       />
     </Container>
   );

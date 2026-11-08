@@ -76,8 +76,8 @@ Tracks which hardware devices (identified by MAC address) appear or disappear.
 - **MAC_ADDED** (WARNING) — a MAC address present in the new snapshot was not
   seen in the previous one. Payload includes IP, manufacturer, and device type.
 - Devices that disappear are shown as **absent entities** in the Devices drift
-  panel (greyed-out, strikethrough) rather than as change events, since a host
-  going offline is expected behaviour.
+  panel (quiet or no longer seen, per the network's inactivity rule) rather than as
+  change events, since a host going offline is expected behaviour.
 
 Signal 2 — IP ↔ MAC Binding Drift
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -323,6 +323,31 @@ Drift Panels
 Three drift panels on the network detail page give a cross-snapshot summary.
 All three panels have a **search box** at the top to filter by name.
 
+Active, quiet, and no longer seen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every device, IP, protocol, and application in the panels is in one of three states:
+
+- **Active** — present in the latest capture.
+- **Quiet** (dashed badge) — missing from the latest capture, but still within the
+  network's inactivity rule. It may simply not have communicated during that capture.
+- **No longer seen** (greyed out, struck through) — past the inactivity rule.
+
+The rule is set per network: open the network and click **Settings**. Choose how to
+count:
+
+- **Captures** — no longer seen once missing from the last *N* captures. Suits
+  irregular capture schedules.
+- **Days** — no longer seen once not seen for more than *N* days before the latest
+  capture. Suits regular schedules. It counts from the latest capture's start, not
+  from today, so reviewing an older set of captures still works.
+
+The default is **captures, 1**: no longer seen as soon as something is missing from the
+latest capture. That is how the panels behaved before the setting existed, so a
+network looks the same until you change it. For example, with weekly captures and a
+rule of *3 captures*, a printer nobody used this week shows as quiet, while a laptop
+missing for three weeks shows as no longer seen.
+
 Devices Panel
 ~~~~~~~~~~~~~
 
@@ -337,14 +362,15 @@ History Modal**, which shows:
   applications per snapshot (paginated; use ← → arrow keys to page)
 - **Notes** tab — free-text notes persisted globally for this device
 
-Absent devices (not seen in the latest snapshot) appear greyed-out with
-strikethrough.
+Devices missing from the latest snapshot appear **quiet** (dashed) or **no longer
+seen** (greyed out, struck through), depending on the network's inactivity rule (see
+`Active, quiet, and no longer seen`_).
 
 Protocols & Applications Panel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Shows all protocols and nDPI application names seen across all snapshots.
-Absent entries are greyed-out with strikethrough. Click any badge to open the
+Entries missing from the latest snapshot are quiet or no longer seen, as above. Click any badge to open the
 **Entity Detail** modal showing stats for that protocol or application in the
 latest snapshot, and its capture history across all uploaded files.
 
@@ -367,7 +393,7 @@ Click any IP badge to open the **Entity Detail** modal, which shows:
   snapshot
 - **Notes** tab
 
-Absent addresses follow the same greyed-out / strikethrough pattern.
+Addresses missing from the latest snapshot follow the same quiet / no longer seen rule.
 
 Private IP Overrides
 ~~~~~~~~~~~~~~~~~~~~

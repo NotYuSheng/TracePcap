@@ -121,6 +121,7 @@ export const API_ENDPOINTS = {
 export const MONITOR_ENDPOINTS = {
   NETWORKS: '/monitor/networks',
   NETWORK: (id: string) => `/monitor/networks/${id}`,
+  NETWORK_SETTINGS: (id: string) => `/monitor/networks/${id}/settings`,
   SNAPSHOTS: (networkId: string) => `/monitor/networks/${networkId}/snapshots`,
   SNAPSHOT: (networkId: string, snapshotId: string) =>
     `/monitor/networks/${networkId}/snapshots/${snapshotId}`,

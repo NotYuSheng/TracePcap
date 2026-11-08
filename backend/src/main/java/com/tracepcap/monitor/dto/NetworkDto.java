@@ -15,6 +15,8 @@ public class NetworkDto {
   private long criticalChanges;
   private long warningChanges;
   private boolean hasInsights;
+  /** Per-network settings (#488): the inactivity rule the drift panels apply. */
+  private NetworkSettingsDto settings;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }
