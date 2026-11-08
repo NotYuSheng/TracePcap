@@ -1795,6 +1795,10 @@
           "loggedInUser": {
             "type": "string"
           },
+          "loggedInUserCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "loggedInUserSource": {
             "type": "string"
           },
@@ -3726,6 +3730,44 @@
           "totalRequests": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "WindowsLogonResponse": {
+        "properties": {
+          "candidateOnly": {
+            "type": "boolean"
+          },
+          "directoryEntry": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "firstSeen": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "folder": {
+            "type": "string"
+          },
+          "folderKind": {
+            "type": "string"
+          },
+          "lastSeen": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "seenCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -6486,6 +6528,49 @@
         "summary": "Adjudicated identity plus evidence axes for one host",
         "tags": [
           "Host Identities"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/hosts/{ip}/windows-logons": {
+      "get": {
+        "operationId": "getWindowsLogons",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ip",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WindowsLogonResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Windows accounts seen on a host, with when (login timeline)",
+        "tags": [
+          "Host Classifications"
         ]
       }
     },

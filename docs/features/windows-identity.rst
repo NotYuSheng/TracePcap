@@ -46,11 +46,41 @@ weight, during the same analysis pass that classifies device types:
    guarantee — a helpdesk or admin tool could just as easily be looking up *someone
    else's* account. It contributes a smaller vote.
 
-The **signed-in user** attribute records the strongest available claim: a
-Kerberos-authenticated principal outranks an LDAP lookup name. Both, when present,
-appear as separate lines in the host's classification evidence, so an analyst sees
-each protocol's contribution and why their weights differ, rather than a single
-opaque number.
+Every login is kept, with when it was first and last seen and how many times, so a
+host used by more than one person over a capture (a shift change, a shared PC, an
+admin signing in remotely) shows all of them. The host's **signed-in user** label
+follows from that:
+
+- **One account seen**: the label is that account. Kerberos logins decide when there
+  are any; otherwise LDAP lookups do.
+- **More than one account seen**: no name is picked. The host shows **"N accounts"**,
+  and its detail view lists them on a timeline. A capture shows logins but rarely
+  logouts, so picking one would be a guess.
+- **LDAP-only on a server or router**: ignored for the label. Domain controllers, mail
+  and file servers look accounts up all day, which says nothing about who is signed in
+  there.
+- **LDAP-only evidence** is worded as **"Looked-up user"**, not "Signed-in user": a
+  lookup isn't proof of a sign-in.
+
+Both signals, when present, also appear as separate lines in the host's
+classification evidence, so an analyst sees each protocol's contribution and why their
+weights differ, rather than a single opaque number.
+
+Where an account lives in the directory
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An LDAP lookup names its target by its full path in Active Directory, for example
+``CN=Clark Collier,CN=Users,DC=example,DC=com``: the account *Clark Collier*, in
+Windows' default **Users** folder, in the domain *example.com*. Organisations often
+move people into their own folders instead (``OU=Staff``), but computers, groups and
+service accounts live in those folders too, and the path alone can't tell them apart.
+So:
+
+- An account in the default **Users** folder counts as a person.
+- An account in a **custom folder** is kept as a candidate only. It appears on the
+  host's timeline, marked "Not used by default" with the caveat that it could be a
+  person, a computer or a group, but it never sets the label or votes in device
+  classification. The analyst judges it in context.
 
 Two exclusions apply unconditionally:
 
@@ -109,9 +139,15 @@ Where it surfaces in the UI
 Open any host's detail panel (from the Network Diagram, Analysis Overview, Compare,
 Monitor drift panels, or Conversation Detail — they all share the same entity view):
 
-- The **Signed-in user** row appears in the host's details alongside its **Hostname**,
-  with a small badge showing whether the name came from Kerberos (stronger) or LDAP
-  (weaker).
+- The **Signed-in user** row (or **Looked-up user** for LDAP-only evidence) appears in
+  the host's details alongside its **Hostname**, with a small badge showing whether the
+  name came from Kerberos (stronger) or LDAP (weaker). Click the badge for what that
+  means. When more than one account was seen, the row reads **"N accounts"** instead.
+- **Windows accounts seen on this host** lists every account, oldest first: when it
+  was seen, whether it signed in (Kerberos) or was looked up (LDAP), where it lives in
+  the directory in plain words, and the raw directory entry for anyone who wants it.
+- In the Network Diagram, the **Signed-in user** node label (off by default; turn it on
+  in the label settings) shows the account, or "N accounts".
 - The sign-in shows up in the host's **Evidence weighed → Identity** breakdown as one
   or two lines naming the principal and the protocol that observed it — the same
   explainability trail behind every device-type verdict.
@@ -124,9 +160,9 @@ What it is *not*
   user is an observed attribute of the host and a contributor to its device-type
   classification — not a standalone "who is this?" question competing with "what is
   this?".
-- It is **not** a general user-activity or authentication log. It resolves one thing —
-  *whose account is associated with this host* — from the two specific signals above,
-  not a full record of every login or lookup observed.
+- It is **not** a general user-activity or authentication log. It records the two
+  specific signals above per host, with their times, and nothing else: no logouts, no
+  failed logins, no other protocols.
 - It does **not** decrypt or need to decrypt anything. Kerberos and LDAP both carry
   these identity fields in the clear (or via mechanisms TracePcap already parses); no
   keys or credentials are required or used.

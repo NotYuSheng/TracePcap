@@ -823,6 +823,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/hosts/{ip}/windows-logons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Windows accounts seen on a host, with when (login timeline) */
+        get: operations["getWindowsLogons"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/investigation": {
         parameters: {
             query?: never;
@@ -2411,6 +2428,8 @@ export interface components {
             hostnameSource?: string;
             ip?: string;
             loggedInUser?: string;
+            /** Format: int32 */
+            loggedInUserCount?: number;
             loggedInUserSource?: string;
             mac?: string;
             manufacturer?: string;
@@ -3123,6 +3142,21 @@ export interface components {
             tls?: components["schemas"]["TlsInfo"];
             /** Format: int64 */
             totalRequests?: number;
+        };
+        WindowsLogonResponse: {
+            candidateOnly?: boolean;
+            directoryEntry?: string;
+            domain?: string;
+            evidence?: string;
+            /** Format: date-time */
+            firstSeen?: string;
+            folder?: string;
+            folderKind?: string;
+            /** Format: date-time */
+            lastSeen?: string;
+            /** Format: int32 */
+            seenCount?: number;
+            username?: string;
         };
     };
     responses: never;
@@ -4496,6 +4530,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["HostIdentityEvidenceDto"];
+                };
+            };
+        };
+    };
+    getWindowsLogons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+                ip: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WindowsLogonResponse"][];
                 };
             };
         };
