@@ -1,3 +1,4 @@
+import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
@@ -54,8 +55,10 @@ export const NetworkDiagramPage = () => {
   const [showSignificanceModal, setShowSignificanceModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
+  // In a network, its own detection rules' matches show on the edges too (#925 phase 3).
+  const [networkContext] = useNetworkContext();
   const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } =
-    useNetworkData(fileId, data, nodeLimit);
+    useNetworkData(fileId, data, nodeLimit, networkContext);
 
   const navigate = useNavigate();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);

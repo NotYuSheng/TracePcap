@@ -187,6 +187,25 @@ public class RuleSyncService {
     check(file, rules);
   }
 
+  /**
+   * Viewing a capture in a network it isn't part of (#925 phase 3): nothing checks that network's
+   * rules on it otherwise, so they're checked on demand, in their own transaction, and only those
+   * not yet checked at their current version. Members keep the usual model (out of date until
+   * re-applied).
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void ensureCheckedForViewing(UUID networkId, UUID fileId) {
+    if (snapshotRepository.findByNetworkIdAndFileId(networkId, fileId).isPresent()) return;
+    List<DetectionRuleEntity> rules =
+        ruleRepository.findByScopeAndNetworkIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.NETWORK, networkId);
+    if (rules.isEmpty() || staleRules(rules, ruleSync.evaluationsForFile(fileId)).isEmpty()) return;
+    FileEntity file = fileRepository.findById(fileId).orElse(null);
+    if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED) return;
+    ruleSync.lockFile(fileId);
+    List<DetectionRuleEntity> stale = staleRules(rules, ruleSync.evaluationsForFile(fileId)); // under the lock
+    if (!stale.isEmpty()) check(file, stale);
+  }
+
   /** A capture left a network: drop that network's rule results for it (#925 phase 3). */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void onLeftNetwork(UUID networkId, UUID fileId) {

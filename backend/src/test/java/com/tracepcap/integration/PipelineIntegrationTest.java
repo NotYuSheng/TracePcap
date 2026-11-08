@@ -1041,7 +1041,18 @@ class PipelineIntegrationTest {
     assertThat(rest.getForEntity("/api/v1/conversations/detail/" + convId, JsonNode.class)
             .getBody().get("customSignatures").toString()).doesNotContain(tag + "-r");
 
+    // Another network the capture isn't in: its rules are checked on demand when viewed in it.
+    String other =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"" + tag + "-branch\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    rest.postForEntity("/api/v1/monitor/networks/" + other + "/detection-rules",
+        json("{\"name\":\"" + tag + "-o\",\"severity\":\"low\",\"match\":{\"protocol\":\"UDP\"}}"), JsonNode.class);
+    assertThat(rest.getForEntity("/api/v1/conversations/" + file + "?networkId=" + other, JsonNode.class)
+            .getBody().get("data").get(0).get("customSignatures").toString()).contains(tag + "-o");
+    assertThat(rest.getForEntity("/api/v1/files/" + file + "/networks", JsonNode.class).getBody()).hasSize(1);
+
     rest.exchange("/api/v1/monitor/networks/" + net, HttpMethod.DELETE, null, Void.class);
+    rest.exchange("/api/v1/monitor/networks/" + other, HttpMethod.DELETE, null, Void.class);
   }
 
   private String createRule(String body) {

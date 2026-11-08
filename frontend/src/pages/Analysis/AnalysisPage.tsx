@@ -1,3 +1,4 @@
+import { NetworkContextPicker } from '@/features/detectionRules/NetworkContextPicker';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { describeLlmError } from '@utils/llmError';
 import { Alert } from '@components/common/Alert';
@@ -282,7 +283,12 @@ export const AnalysisPage = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    navigate(tab === 'overview' ? `/analysis/${fileId}` : `/analysis/${fileId}/${tab}`);
+    // Keep the network context (#925 phase 3) when moving between tabs.
+    const ctx = new URLSearchParams(location.search).get('networkId');
+    navigate({
+      pathname: tab === 'overview' ? `/analysis/${fileId}` : `/analysis/${fileId}/${tab}`,
+      search: ctx ? `?networkId=${encodeURIComponent(ctx)}` : '',
+    });
   };
 
   const handleDownloadReport = async () => {
@@ -438,7 +444,8 @@ export const AnalysisPage = () => {
       <div className="analysis-header mb-4 d-flex justify-content-between align-items-start">
         <div>
           <h2>Network Traffic Analysis</h2>
-          <p className="text-muted">File ID: {fileId}</p>
+          <p className="text-muted mb-2">File ID: {fileId}</p>
+          <NetworkContextPicker fileId={fileId!} />
         </div>
         <div className="d-flex flex-column align-items-end gap-1">
           <Button

@@ -21,6 +21,8 @@ export function useConversationFilters() {
   // This prevents ConversationPage's useEffect from firing on every render.
   const filters = useMemo(
     (): ConversationFilters => ({
+      // The network context (#925 phase 3): set by the Analysis page's picker or a monitor link.
+      networkId: searchParams.get('networkId') ?? undefined,
       ip: searchParams.get('ip') ?? '',
       srcIp: searchParams.get('srcIp') ?? '',
       dstIp: searchParams.get('dstIp') ?? '',

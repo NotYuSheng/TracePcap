@@ -125,6 +125,9 @@ export const detectionRulesService = {
       .data,
   listCapture: async (fileId: string): Promise<DetectionRule[]> =>
     (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId))).data,
+  /** The networks a capture is a snapshot of (#925 phase 3). */
+  captureNetworks: async (fileId: string): Promise<{ id: string; name: string }[]> =>
+    (await apiClient.get<{ id: string; name: string }[]>(API_ENDPOINTS.FILE_NETWORKS(fileId))).data,
   listNetwork: async (networkId: string): Promise<DetectionRule[]> =>
     (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.NETWORK_DETECTION_RULES(networkId))).data,
   createForNetwork: async (networkId: string, rule: DetectionRuleInput): Promise<DetectionRule> =>

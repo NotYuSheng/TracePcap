@@ -339,8 +339,12 @@ export const conversationService = {
   /**
    * Returns distinct custom signature rule names triggered for the given file.
    */
-  getCustomSignatures: async (fileId: string): Promise<string[]> => {
-    const response = await apiClient.get<string[]>(`/conversations/${fileId}/custom-signatures`);
+  getCustomSignatures: async (fileId: string, networkId?: string): Promise<string[]> => {
+    // In a network, its own rules' matches too (#925 phase 3).
+    const response = await apiClient.get<string[]>(
+      `/conversations/${fileId}/custom-signatures`,
+      networkId ? { params: { networkId } } : undefined
+    );
     return response.data;
   },
 
@@ -357,15 +361,24 @@ export const conversationService = {
    * severity. Disabled rules are included: their old matches still carry the name.
    */
   getSignatureRules: async (
-    fileId?: string
+    fileId?: string,
+    networkId?: string
   ): Promise<{ name: string; severity: string; scope: string }[]> => {
-    // With a capture, its own rules too (#925 phase 3), so their matches get a colour and a scope.
-    const response = await apiClient.get<{ name: string; severity: string; scope: string }[]>(
-      API_ENDPOINTS.DETECTION_RULES,
-      fileId ? { params: { fileId } } : undefined
-    );
-    return response.data.map(r => ({ name: r.name, severity: r.severity, scope: r.scope }));
+    // With a capture, its own rules too; with a network, that network's (#925 phase 3), so their
+    // matches get a colour and a scope label. A network rule's scope is "NETWORK:<name>".
+    const params: Record<string, string> = {};
+    if (fileId) params.fileId = fileId;
+    if (fileId && networkId) params.networkId = networkId;
+    const response = await apiClient.get<
+      { name: string; severity: string; scope: string; networkName?: string | null }[]
+    >(API_ENDPOINTS.DETECTION_RULES, { params });
+    return response.data.map(r => ({
+      name: r.name,
+      severity: r.severity,
+      scope: r.scope === 'NETWORK' ? `NETWORK:${r.networkName ?? 'network'}` : r.scope,
+    }));
   },
+
 
   /**
    * Returns distinct country codes seen in external IPs for this file, as "CC|Country" strings.
@@ -445,9 +458,10 @@ export const conversationService = {
   /**
    * Get detailed conversation info including the full packet stream.
    */
-  getConversationDetail: async (conversationId: string): Promise<Conversation> => {
+  getConversationDetail: async (conversationId: string, networkId?: string): Promise<Conversation> => {
     const response = await apiClient.get<ConversationDetailApiResponse>(
-      API_ENDPOINTS.CONVERSATION_DETAIL(conversationId)
+      API_ENDPOINTS.CONVERSATION_DETAIL(conversationId),
+      networkId ? { params: { networkId } } : undefined
     );
 
     const apiData = response.data;
