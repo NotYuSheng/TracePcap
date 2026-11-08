@@ -166,11 +166,8 @@ RUN chmod +x /docker-entrypoint.sh
 # Copy the built JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Copy the default signatures file into both locations:
-# - /app/config/signatures.yml  — picked up by Docker on first-time named volume init
-# - /app/config-defaults/       — fallback used by entrypoint if volume file is missing
-COPY --chown=spring:spring config/signatures.yml /app/config/signatures.yml
-COPY --chown=spring:spring config/signatures.yml /app/config-defaults/signatures.yml
+# Detection rules live in the database (#925). /app/config is still mounted (config_data) so an
+# upgrade can import the old signatures.yml once (Flyway V51); nothing is seeded into it any more.
 
 # Expose the application port
 EXPOSE 8080

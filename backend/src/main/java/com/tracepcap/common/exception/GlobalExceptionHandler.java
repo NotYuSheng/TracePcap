@@ -318,6 +318,22 @@ public class GlobalExceptionHandler {
     return (numerator + denominator - 1) / denominator;
   }
 
+  @ExceptionHandler(FieldValidationException.class)
+  public ResponseEntity<ErrorResponse> handleFieldValidation(
+      FieldValidationException ex, HttpServletRequest request) {
+    log.warn("Validation failed: {}", ex.getErrors());
+    ErrorResponse error =
+        ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+            .message(ex.getMessage())
+            .path(request.getRequestURI())
+            .validationErrors(new LinkedHashMap<>(ex.getErrors()))
+            .build();
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+  }
+
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
       MethodArgumentNotValidException ex, HttpServletRequest request) {

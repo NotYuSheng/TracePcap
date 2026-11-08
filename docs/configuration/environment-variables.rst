@@ -162,10 +162,12 @@ documented in its own section below with the surrounding detail.
 
 .. note::
 
-   Two capabilities are switched by configuration rather than a boolean. AI
-   features are governed by ``LLM_API_BASE_URL`` — point it at a reachable local
-   inference server to enable them; the production overlays require it to be set
-   explicitly. Custom detection rules activate when a signatures file is present.
+   AI features are switched by configuration rather than a boolean: they are
+   governed by ``LLM_API_BASE_URL`` — point it at a reachable local inference
+   server to enable them; the production overlays require it to be set
+   explicitly. Custom detection rules are not configured here at all: they live
+   in the database and are edited on the System page (see
+   :doc:`signature-rules`).
 
 File Retention
 --------------
