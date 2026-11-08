@@ -120,6 +120,14 @@ public class SubnetStalenessService implements SnapshotRevalidationHook {
   @Transactional
   public void captureBaseline(SubnetDefinitionEntity subnet, UUID networkId) {
     UUID fileId = latestFileId(networkId);
+    if (fileId == null) {
+      // No snapshot to baseline against (no networkId, or an empty network). The label is saved,
+      // but the subnet can never be flagged stale. The UI always passes networkId, so this is an
+      // API caller that omitted it. Logged so "why is this subnet never stale?" has an answer (#465).
+      log.info(
+          "Subnet {} ({}) labelled without a staleness baseline: no snapshot for network {}",
+          subnet.getId(), subnet.getCidr(), networkId);
+    }
     Map<String, Object> comp = fileId != null ? computeComposition(subnet.getCidr(), fileId) : null;
     subnet.setLabeledAt(LocalDateTime.now());
     subnet.setBaselineFileId(fileId);
