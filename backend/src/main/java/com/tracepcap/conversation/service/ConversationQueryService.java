@@ -57,6 +57,7 @@ public class ConversationQueryService {
 
   private final FileRepository fileRepository;
   private final GeoIpService geoIpService;
+  private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final StorageService storageService;
 
   private static final java.time.format.DateTimeFormatter PCAP_FILENAME_TS =
@@ -388,8 +389,17 @@ public class ConversationQueryService {
     List<UUID> convIds = conversations.stream().map(ConversationFacts::id).toList();
     Map<UUID, List<String>> fileTypeMap = buildFileTypeMap(convIds);
     Map<String, GeoIpService.GeoResult> geoMap = buildGeoMap(conversations);
+    // Who was logged in on each endpoint at the row's start (#812 follow-up). One query for the
+    // page's hosts; a page is always one file.
+    com.tracepcap.analysis.spi.WindowsLogonLookup.AccountsAtTime accounts =
+        windowsLogonLookup.accountsAtTime(
+            conversations.get(0).fileId(),
+            conversations.stream()
+                .flatMap(c -> java.util.stream.Stream.of(c.flow().srcIp(), c.flow().dstIp()))
+                .filter(ip -> ip != null && !ip.isBlank())
+                .collect(Collectors.toSet()));
     return conversations.stream()
-        .map(c -> toConversationResponse(c, fileTypeMap, geoMap))
+        .map(c -> toConversationResponse(c, fileTypeMap, geoMap).withAccountsFrom(accounts))
         .collect(Collectors.toList());
   }
 

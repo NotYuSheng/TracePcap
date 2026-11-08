@@ -12,6 +12,8 @@ public interface HostClassificationRepository
 
   List<HostClassificationEntity> findByFileId(UUID fileId);
 
+  List<HostClassificationEntity> findByFileIdAndIpIn(UUID fileId, java.util.Collection<String> ips);
+
   // findFirst + OrderByIdAsc (LIMIT 1, deterministic): a file can hold >1 classification for the
   // same IP or MAC (e.g. an IP claimed by two MACs during an ARP spoof), which would make a plain
   // Optional query throw NonUniqueResultException. The explicit order keeps the chosen row stable

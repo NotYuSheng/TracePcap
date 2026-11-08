@@ -3,6 +3,7 @@ import { directApiUrl } from '@/services/api/directUrl';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { parseDateTime } from '@/utils/dateUtils';
 import type {
+  AccountAtTime,
   Conversation,
   ConversationGeoInfo,
   NetworkEndpoint,
@@ -43,6 +44,8 @@ interface ConversationApiResponse {
   detectedFileTypes?: string[] | null;
   srcGeo?: ConversationGeoInfo | null;
   dstGeo?: ConversationGeoInfo | null;
+  srcAccount?: AccountAtTime | null;
+  dstAccount?: AccountAtTime | null;
   packetCount: number;
   totalBytes: number;
   startTime: string | number[];
@@ -128,6 +131,8 @@ function transformConversation(
     detectedFileTypes: apiData.detectedFileTypes ?? [],
     srcGeo: apiData.srcGeo ?? undefined,
     dstGeo: apiData.dstGeo ?? undefined,
+    srcAccount: apiData.srcAccount ?? undefined,
+    dstAccount: apiData.dstAccount ?? undefined,
     startTime: parseDateTime(apiData.startTime),
     endTime: parseDateTime(apiData.endTime),
     packetCount: apiData.packetCount,
