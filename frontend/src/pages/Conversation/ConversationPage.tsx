@@ -6,7 +6,8 @@ import type { SortField } from '@/features/conversation/types';
 import {
   loadVisibleColumns,
   defaultVisibleColumns,
-  COLUMN_STORAGE_KEY,
+  COLUMNS_APPLIED_EVENT,
+  saveVisibleColumns,
 } from '@/features/conversation/constants';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { useConversationFilters } from '@/features/conversation/hooks/useConversationFilters';
@@ -53,6 +54,12 @@ export const ConversationPage = () => {
   const [signatureSeverities, setSignatureSeverities] = useState<Record<string, string>>({});
   const [hostClassMap, setHostClassMap] = useState<Map<string, HostClassification>>(new Map());
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(loadVisibleColumns);
+  // Personal preferences loaded from the server can replace the columns while this page is open.
+  useEffect(() => {
+    const reload = () => setVisibleColumns(loadVisibleColumns());
+    window.addEventListener(COLUMNS_APPLIED_EVENT, reload);
+    return () => window.removeEventListener(COLUMNS_APPLIED_EVENT, reload);
+  }, []);
   const [tracerConversationId, setTracerConversationId] = useState<string | null>(null);
   const [highlightPacket, setHighlightPacket] = useState<number | null>(null);
 
@@ -61,14 +68,14 @@ export const ConversationPage = () => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify([...next]));
+      saveVisibleColumns(next);
       return next;
     });
   }, []);
 
   // Restore the default visible-column set, clearing any stored override.
   const resetColumns = useCallback(() => {
-    localStorage.removeItem(COLUMN_STORAGE_KEY);
+    saveVisibleColumns(null);
     setVisibleColumns(defaultVisibleColumns());
   }, []);
 

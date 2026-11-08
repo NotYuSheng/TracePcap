@@ -1,4 +1,5 @@
 import { Modal, Tab, Tabs } from '@govtechsg/sgds-react';
+import { PersonalSettingsTab } from './PersonalSettingsTab';
 import { SystemSettingsTab } from './SystemSettingsTab';
 
 interface SettingsModalProps {
@@ -7,8 +8,9 @@ interface SettingsModalProps {
 }
 
 /**
- * Settings, grouped by who they affect (#915). Phase 1 has the System tab. Network settings live on
- * each network's page (Settings button), and Personal and File tabs come in later phases.
+ * Settings, grouped by who they affect (#915): Personal (only me, or everyone when login is off)
+ * and System (everyone). Network settings live on each network's page (Settings button); a File
+ * tab comes in a later phase.
  */
 export function SettingsModal({ show, onHide }: SettingsModalProps) {
   return (
@@ -17,7 +19,10 @@ export function SettingsModal({ show, onHide }: SettingsModalProps) {
         <Modal.Title>Settings</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <Tabs defaultActiveKey="system" id="settings-tabs" className="mb-3">
+        <Tabs defaultActiveKey="personal" id="settings-tabs" className="mb-3">
+          <Tab eventKey="personal" title="Personal">
+            <PersonalSettingsTab />
+          </Tab>
           <Tab eventKey="system" title="System">
             <SystemSettingsTab />
           </Tab>

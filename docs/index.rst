@@ -47,6 +47,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/network-monitor
    features/label-staleness
    features/streaming-upload
+   features/settings
 
 .. toctree::
    :maxdepth: 2

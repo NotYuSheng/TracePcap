@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Button, Form, Modal } from '@govtechsg/sgds-react';
+import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import type { NetworkSettings } from '@/features/monitor/types/monitor.types';
 import { DEFAULT_NETWORK_SETTINGS, describeRule } from '@/features/monitor/utils/presence';

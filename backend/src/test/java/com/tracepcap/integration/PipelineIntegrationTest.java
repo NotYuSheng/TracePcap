@@ -520,6 +520,39 @@ class PipelineIntegrationTest {
     assertThat(dc.isNull() || dc.isMissingNode()).isTrue();
   }
 
+  /**
+   * Personal preferences with login off (#915 phase 2): one shared profile everyone reads and
+   * updates, flagged as shared so the UI can say so.
+   */
+  @Test
+  void preferences_loginOff_areOneSharedProfile() {
+    String url = "/api/v1/preferences";
+    rest.exchange(url, HttpMethod.PUT, json("{}"), JsonNode.class); // start clean: tests share the DB
+
+    JsonNode empty = rest.getForEntity(url, JsonNode.class).getBody();
+    assertThat(empty.get("shared").asBoolean()).isTrue();
+    assertThat(empty.path("themeMode").isNull() || empty.path("themeMode").isMissingNode()).isTrue();
+
+    ResponseEntity<JsonNode> saved =
+        rest.exchange(
+            url,
+            HttpMethod.PUT,
+            json("{\"themeMode\":\"dark\",\"conversationColumns\":[\"source\",\"users\"],"
+                + "\"nodeLabelConfig\":{\"fields\":[{\"field\":\"ip\",\"enabled\":true}]}}"),
+            JsonNode.class);
+    assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+    JsonNode back = rest.getForEntity(url, JsonNode.class).getBody();
+    assertThat(back.get("themeMode").asText()).isEqualTo("dark");
+    assertThat(back.get("conversationColumns")).hasSize(2);
+    assertThat(back.path("nodeLabelConfig").path("fields").get(0).get("field").asText()).isEqualTo("ip");
+    assertThat(back.get("shared").asBoolean()).isTrue();
+
+    ResponseEntity<JsonNode> bad =
+        rest.exchange(url, HttpMethod.PUT, json("{\"themeMode\":\"neon\"}"), JsonNode.class);
+    assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

@@ -106,6 +106,7 @@ export const API_ENDPOINTS = {
   SYSTEM_TIME: '/system/time',
   SYSTEM_LIMITS: '/system/limits',
   SYSTEM_SETTINGS: '/system/settings',
+  PREFERENCES: '/preferences',
 
   // Report
   REPORT_DOWNLOAD: (fileId: string) => `/files/${fileId}/report`,
