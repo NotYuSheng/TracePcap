@@ -480,7 +480,10 @@ export interface paths {
         /** List custom private ranges */
         get: operations["list_10"];
         put?: never;
-        /** Add a custom private range */
+        /**
+         * Set a custom private range in the shared default
+         * @description Adds it, or changes the classification of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.
+         */
         post: operations["create_6"];
         delete?: never;
         options?: never;
@@ -498,7 +501,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a custom private range */
+        /**
+         * Delete a custom private range from the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         delete: operations["delete_8"];
         options?: never;
         head?: never;
@@ -1307,7 +1313,10 @@ export interface paths {
         /** List IP organization rules */
         get: operations["list_6"];
         put?: never;
-        /** Add an IP organization rule */
+        /**
+         * Set an IP organization rule in the shared default
+         * @description Adds it, or changes the label of the CIDR already there. Needs ADDRESS_DEFAULTS. Audited.
+         */
         post: operations["create_3"];
         delete?: never;
         options?: never;
@@ -1325,7 +1334,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete an IP organization rule */
+        /**
+         * Delete an IP organization rule from the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         delete: operations["delete_4"];
         options?: never;
         head?: never;
@@ -2080,7 +2092,10 @@ export interface paths {
          */
         get: operations["list"];
         put?: never;
-        /** Create or update a subnet definition */
+        /**
+         * Create or update a subnet in the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         post: operations["upsert_2"];
         delete?: never;
         options?: never;
@@ -2131,7 +2146,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Persist an auto-detected subnet */
+        /**
+         * Persist an auto-detected subnet in the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         post: operations["saveDetected"];
         delete?: never;
         options?: never;
@@ -2169,7 +2187,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a subnet definition */
+        /**
+         * Delete a subnet from the shared default
+         * @description Needs ADDRESS_DEFAULTS. Audited.
+         */
         delete: operations["delete"];
         options?: never;
         head?: never;
@@ -3608,7 +3629,7 @@ export interface components {
         };
         PermissionDto: {
             /** @enum {string} */
-            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
             allowed?: boolean;
             /** @enum {string} */
             defaultLevel?: "ANALYST" | "ADMIN";
@@ -4286,6 +4307,8 @@ export interface operations {
                 countries?: string;
                 /** @description Comma-separated network label names (e.g. 'Office,DMZ') */
                 networkLabels?: string;
+                /** @description View in this network: its IP-org rules and private/public ranges layered on the default (#915 phase 4) */
+                networkId?: string;
             };
             header?: never;
             path: {
@@ -7455,7 +7478,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
             };
             cookie?: never;
         };
