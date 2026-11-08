@@ -241,8 +241,7 @@ export const conversationService = {
     if (filters.riskTypes.length > 0) params.riskTypes = filters.riskTypes.join(',');
     if (filters.customSignatures.length > 0)
       params.customSignatures = filters.customSignatures.join(',');
-    if (filters.suricataAlerts.length > 0)
-      params.suricataAlerts = filters.suricataAlerts.join(',');
+    if (filters.suricataAlerts.length > 0) params.suricataAlerts = filters.suricataAlerts.join(',');
     if (filters.deviceTypes && filters.deviceTypes.length > 0)
       params.deviceTypes = filters.deviceTypes.join(',');
     if (filters.countries && filters.countries.length > 0)
@@ -356,9 +355,15 @@ export const conversationService = {
    * Returns the global detection rules' names and severities (#925), to colour matches by
    * severity. Disabled rules are included: their old matches still carry the name.
    */
-  getSignatureRules: async (): Promise<{ name: string; severity: string }[]> => {
-    const response = await apiClient.get<{ name: string; severity: string }[]>(API_ENDPOINTS.DETECTION_RULES);
-    return response.data.map(r => ({ name: r.name, severity: r.severity }));
+  getSignatureRules: async (
+    fileId?: string
+  ): Promise<{ name: string; severity: string; scope: string }[]> => {
+    // With a capture, its own rules too (#925 phase 3), so their matches get a colour and a scope.
+    const response = await apiClient.get<{ name: string; severity: string; scope: string }[]>(
+      API_ENDPOINTS.DETECTION_RULES,
+      fileId ? { params: { fileId } } : undefined
+    );
+    return response.data.map(r => ({ name: r.name, severity: r.severity, scope: r.scope }));
   },
 
   /**
@@ -419,12 +424,9 @@ export const conversationService = {
    * Full explainable classification (verdict + evidence axes) for one host, keyed by fileId+ip —
    * lets any surface render the graph's "verdict, and why" panel without the graph's node data.
    */
-  getHostIdentityEvidence: async (
-    fileId: string,
-    ip: string,
-  ): Promise<HostIdentityEvidence> => {
+  getHostIdentityEvidence: async (fileId: string, ip: string): Promise<HostIdentityEvidence> => {
     const response = await apiClient.get<HostIdentityEvidence>(
-      API_ENDPOINTS.HOST_IDENTITY_EVIDENCE(fileId, ip),
+      API_ENDPOINTS.HOST_IDENTITY_EVIDENCE(fileId, ip)
     );
     return response.data;
   },
@@ -434,7 +436,7 @@ export const conversationService = {
    */
   reconstructSession: async (conversationId: string): Promise<SessionData> => {
     const response = await apiClient.get<SessionData>(
-      `/conversations/detail/${conversationId}/session`,
+      `/conversations/detail/${conversationId}/session`
     );
     return response.data;
   },

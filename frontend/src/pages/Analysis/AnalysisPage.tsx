@@ -86,6 +86,8 @@ export interface AnalysisOutletContext {
   networkGraphStateRef: React.MutableRefObject<NetworkGraphState>;
   networkDiagramFilters: NetworkDiagramFilterState;
   storyState: StoryGenerationState;
+  /** Reloads the summary without blanking the page, e.g. after a rule change (#925). */
+  refreshSummary: () => void;
 }
 
 // Re-export so NetworkDiagramPage can import from one place
@@ -404,7 +406,7 @@ export const AnalysisPage = () => {
   if (loading) return <AnalysisLoadingView fileId={fileId!} />;
   if (error)
     return (
-      <ErrorMessage title="Failed to Load Analysis" message={error.message} onRetry={refetch} />
+      <ErrorMessage title="Failed to Load Analysis" message={error.message} onRetry={() => refetch()} />
     );
   if (!data)
     return (
@@ -585,7 +587,7 @@ export const AnalysisPage = () => {
       {/* Tab Content */}
       <Card>
         <Card.Body>
-          <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState } satisfies AnalysisOutletContext} />
+          <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState, refreshSummary: () => void refetch({ silent: true }) } satisfies AnalysisOutletContext} />
         </Card.Body>
       </Card>
     </div>

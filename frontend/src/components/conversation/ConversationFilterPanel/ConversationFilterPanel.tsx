@@ -1,3 +1,4 @@
+import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import React, { useState, useEffect, useRef } from 'react';
 import { PillSectionHeader } from '@components/common/PillSectionHeader/PillSectionHeader';
@@ -42,6 +43,8 @@ interface ConversationFilterPanelProps {
   customSignatureOptions: string[];
   suricataAlertOptions: string[];
   signatureSeverities?: Record<string, string>;
+  /** Rule name → scope, shown in each pill (#925 phase 3). */
+  signatureScopes?: Record<string, string>;
   countryOptions: string[];
   presentDeviceTypes?: string[];
   activeFilterCount: number;
@@ -95,6 +98,7 @@ export function ConversationFilterPanel({
   customSignatureOptions,
   suricataAlertOptions,
   signatureSeverities = {},
+  signatureScopes = {},
   countryOptions,
   presentDeviceTypes,
   activeFilterCount,
@@ -591,6 +595,7 @@ export function ConversationFilterPanel({
                           onClick={() => toggle('customSignatures', rule, filters.customSignatures)}
                         >
                           {rule.replace(/_/g, ' ')}
+                          <RuleScopeTag scope={signatureScopes[rule]} />
                         </button>
                       );
                     })}

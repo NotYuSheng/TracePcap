@@ -38,9 +38,15 @@ export interface DetectionRuleInput {
 }
 
 /** Mirrors DetectionRuleDto. */
+export type RuleScope = 'GLOBAL' | 'NETWORK' | 'CAPTURE';
+
 export interface DetectionRule extends DetectionRuleInput {
   id: string;
-  scope: 'GLOBAL' | 'NETWORK' | 'CAPTURE';
+  scope: RuleScope;
+  /** For a capture rule: its capture. */
+  fileId?: string | null;
+  /** The rule this one was promoted from, if any. */
+  promotedFrom?: string | null;
   /** Legacy, read-only: overrides matched hosts' device type until #926 replaces it. */
   deviceType?: string | null;
   version: number;
@@ -111,6 +117,21 @@ export function errorMessage(err: unknown, fallback: string): string {
 export const detectionRulesService = {
   list: async (): Promise<DetectionRule[]> =>
     (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.DETECTION_RULES)).data,
+  /** Every rule that labels one capture: the global ones and its own (#925 phase 3). */
+  listForFile: async (fileId: string): Promise<DetectionRule[]> =>
+    (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.DETECTION_RULES, { params: { fileId } }))
+      .data,
+  listCapture: async (fileId: string): Promise<DetectionRule[]> =>
+    (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId))).data,
+  createForCapture: async (fileId: string, rule: DetectionRuleInput): Promise<DetectionRule> =>
+    (await apiClient.post<DetectionRule>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId), rule)).data,
+  /** Copies a capture rule up to a global one; keepOriginal false removes the capture rule. */
+  promote: async (id: string, keepOriginal: boolean): Promise<DetectionRule> =>
+    (
+      await apiClient.post<DetectionRule>(API_ENDPOINTS.DETECTION_RULE_PROMOTIONS(id), {
+        keepOriginal,
+      })
+    ).data,
   create: async (rule: DetectionRuleInput): Promise<DetectionRule> =>
     (await apiClient.post<DetectionRule>(API_ENDPOINTS.DETECTION_RULES, rule)).data,
   update: async (id: string, rule: DetectionRuleInput): Promise<DetectionRule> =>
