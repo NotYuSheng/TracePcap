@@ -35,7 +35,8 @@ final class HostIdentityChecks {
       Map<String, ? extends Collection<Integer>> ttlObservations,
       List<HostnameResolverService.Claim> hostnameClaims,
       Map<String, FailoverAddressResolverService.VirtualAddress> failover,
-      Map<String, ? extends Collection<String>> arpMacs) {
+      Map<String, ? extends Collection<String>> arpMacs,
+      Set<String> reusedAddresses) {
     // The routers sending adverts are members, not virtual addresses, even though VRRP sends its
     // adverts from the virtual MAC.
     Set<String> members = new java.util.HashSet<>();
@@ -76,7 +77,10 @@ final class HostIdentityChecks {
       if (names != null && names.size() > 1) {
         warnings.add("several DHCP hostnames (" + String.join(", ", names) + ")");
       }
-      if (!warnings.isEmpty()) {
+      // An address that passed between devices (#918 item 3) shows its occupancy timeline instead:
+      // the differing TTLs and names belong to different devices, which the timeline already says.
+      boolean reused = reusedAddresses != null && reusedAddresses.contains(h.getIp());
+      if (!warnings.isEmpty() && !reused) {
         h.setIdentityWarning(
             "Possibly more than one machine: "
                 + String.join("; ", warnings)

@@ -34,6 +34,12 @@ public interface ConversationRepository
   List<ConversationEntity> findByFileIdAndIp(
       @Param("fileId") UUID fileId, @Param("ip") String ip);
 
+  /** Start and end of every conversation the IP took part in, earliest first (#918 item 3). */
+  @Query(
+      "SELECT c.startTime, c.endTime FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND (c.srcIp = :ip OR c.dstIp = :ip) ORDER BY c.startTime")
+  List<Object[]> findTimesByFileIdAndIp(@Param("fileId") UUID fileId, @Param("ip") String ip);
+
   /** Returns the distinct detected file types present in packets for the given file. */
   @Query(
       "SELECT DISTINCT p.detectedFileType FROM PacketEntity p"

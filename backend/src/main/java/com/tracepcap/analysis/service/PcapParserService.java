@@ -58,6 +58,8 @@ public class PcapParserService {
     // All distinct source MACs seen per IP. Usually one; more than one within a single capture is
     // the tell for two devices sharing an IP (overlapping networks / ARP conflict) — #461.
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
+    // When each ARP claim (ip, mac) was first and last seen (#918 item 3): [first, last].
+    Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
     // Discarded with the parse; see pooled().
@@ -282,6 +284,12 @@ public class PcapParserService {
             hostMacObservations
                 .computeIfAbsent(arpSrcIp, k -> new LinkedHashSet<>())
                 .add(arpSrcMac);
+            LocalDateTime[] w =
+                arpClaimWindows
+                    .computeIfAbsent(arpSrcIp, k -> new java.util.LinkedHashMap<>())
+                    .computeIfAbsent(arpSrcMac, k -> new LocalDateTime[] {timestamp, timestamp});
+            if (timestamp.isBefore(w[0])) w[0] = timestamp;
+            if (timestamp.isAfter(w[1])) w[1] = timestamp;
           }
 
           // Track conversations for IP traffic
@@ -429,6 +437,7 @@ public class PcapParserService {
     result.setHostTtlObservations(hostTtlObservations);
     result.setHostMacs(attributeMacs(ethMacsByIp, hostMacObservations));
     result.setHostMacObservations(hostMacObservations);
+    result.setArpClaimWindows(arpClaimWindows);
 
     log.info(
         "PCAP analysis completed: {} packets, {} bytes, {} conversations",
@@ -614,6 +623,9 @@ public class PcapParserService {
 
     /** All distinct source MACs seen per source IP (>1 ⇒ possible overlapping networks, #461). */
     private Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
+
+    /** Per IP, per ARP-claimed MAC: when the claim was first and last seen (#918 item 3). */
+    private Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
   }
 
   @lombok.Data

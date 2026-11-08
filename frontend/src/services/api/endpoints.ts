@@ -20,6 +20,13 @@ export const API_ENDPOINTS = {
   HOST_CLASSIFICATIONS: (fileId: string) => `/files/${fileId}/host-classifications`,
   WINDOWS_LOGONS: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/windows-logons`,
+  /** Which devices held an address when, and the analyst's split/merge decisions (#918). */
+  HOST_OCCUPANCIES: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancies`,
+  HOST_OCCUPANCY_DECISIONS: (fileId: string, ip: string) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancy-decisions`,
+  HOST_OCCUPANCY_DECISION: (fileId: string, ip: string, decisionId: number) =>
+    `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancy-decisions/${decisionId}`,
   /** Deterministic answers to the standard investigation questions (#813). */
   ANSWERS: (fileId: string) => `/files/${fileId}/answers`,
   /** Goal-driven autonomous investigation report — producers plus pivots (#819). */

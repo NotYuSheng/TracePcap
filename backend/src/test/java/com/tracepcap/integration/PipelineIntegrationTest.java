@@ -581,6 +581,72 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Time-bounded occupancy (#918 item 3, slice 1) on identity-cases.pcap: 10.0.0.50 was the laptop
+   * (ARP + DHCP as LAPTOP-ALICE), then an hour later the phone. Two occupancies, split by ARP. The
+   * cloned VMs (one MAC) are one occupancy until an analyst splits them; the split is audited and
+   * can be undone.
+   */
+  @Test
+  void occupancy_splitsAReusedAddress_andAnalystsCanSplitAndUndo() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    String base = "/api/v1/files/" + fileId + "/hosts/";
+
+    JsonNode reused = rest.getForEntity(base + "10.0.0.50/occupancies", JsonNode.class).getBody();
+    JsonNode occ = reused.get("occupancies");
+    assertThat(occ).hasSize(2);
+    assertThat(occ.get(0).get("mac").asText()).isEqualTo("bb:bb:bb:00:00:01");
+    assertThat(occ.get(0).get("hostname").asText()).isEqualTo("LAPTOP-ALICE");
+    assertThat(occ.get(1).get("mac").asText()).isEqualTo("cc:cc:cc:00:00:02");
+    assertThat(occ.get(1).get("hostname").asText()).isEqualTo("iPhone-Bob");
+    assertThat(occ.get(1).get("startSource").asText()).isEqualTo("arp");
+    assertThat(occ.get(1).get("automatic").asBoolean()).isTrue();
+    assertThat(occ.get(0).get("conversations").asLong()).isPositive();
+    assertThat(occ.get(1).get("conversations").asLong()).isPositive();
+
+    // Cloned VMs: one MAC, so one device until an analyst says otherwise.
+    JsonNode clone = rest.getForEntity(base + "10.0.0.70/occupancies", JsonNode.class).getBody();
+    assertThat(clone.get("occupancies")).hasSize(1);
+    java.util.Map<String, Object> split = new java.util.HashMap<>();
+    split.put("action", "split");
+    split.put("reason", "two VMs cloned from one image");
+    // The VM traffic runs from +300 s to +305 s; split at +302 s.
+    java.time.LocalDateTime t0 =
+        java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochSecond(1730000000L + 302), java.time.ZoneId.systemDefault());
+    split.put("at", t0.toString());
+    ResponseEntity<JsonNode> created = rest.postForEntity(base + "10.0.0.70/occupancy-decisions", split, JsonNode.class);
+    assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(created.getBody().get("occupancies")).hasSize(2);
+    assertThat(created.getBody().get("occupancies").get(1).get("startSource").asText()).isEqualTo("manual");
+    long decisionId = created.getBody().get("decisions").get(0).get("id").asLong();
+    assertThat(jdbc.queryForObject(
+            "SELECT count(*) FROM audit_log WHERE action = 'host-occupancy.split'", Integer.class))
+        .isPositive();
+
+    // A split with no activity on one side is refused.
+    split.put("at", t0.plusDays(1).toString());
+    assertThat(rest.postForEntity(base + "10.0.0.70/occupancy-decisions", split, JsonNode.class).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+
+    rest.delete(base + "10.0.0.70/occupancy-decisions/" + decisionId);
+    assertThat(rest.getForEntity(base + "10.0.0.70/occupancies", JsonNode.class).getBody().get("occupancies")).hasSize(1);
+
+    // Merging the automatic boundary ("not a different device") makes 10.0.0.50 one occupancy.
+    java.util.Map<String, Object> merge = new java.util.HashMap<>();
+    merge.put("action", "merge");
+    merge.put("reason", "same phone, private MAC rotated");
+    merge.put("at", occ.get(1).get("boundaryKey").asText());
+    ResponseEntity<JsonNode> merged = rest.postForEntity(base + "10.0.0.50/occupancy-decisions", merge, JsonNode.class);
+    assertThat(merged.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(merged.getBody().get("occupancies")).hasSize(1);
+    rest.delete(base + "10.0.0.50/occupancy-decisions/" + merged.getBody().get("decisions").get(0).get("id").asLong());
+  }
+
+  /**
    * Permissions and the audit log with login off (#915): everyone is an analyst and no one is an
    * admin (SYSTEM_SETTINGS_EDITABLE defaults to false). Analyst actions work and are audited as
    * "system"; admin actions and changing permission levels are refused with the reason.
@@ -1176,8 +1242,10 @@ class PipelineIntegrationTest {
     assertThat(clone.get("identityWarning").asText())
         .contains("Possibly more than one machine").contains("web-vm-a").contains("web-vm-b");
 
-    // DHCP reuse: the laptop then the phone on one address.
-    assertThat(byIp.get("10.0.0.50").get("identityWarning").asText()).contains("LAPTOP-ALICE").contains("iPhone-Bob");
+    // DHCP reuse: the laptop then the phone on one address. That's a timeline now (#918 item 3),
+    // not a warning.
+    JsonNode reused = byIp.get("10.0.0.50").path("identityWarning");
+    assertThat(reused.isNull() || reused.isMissingNode()).isTrue();
 
     // The VRRP virtual address isn't a device.
     JsonNode vip = byIp.get("10.0.0.254");

@@ -105,7 +105,16 @@ public class SuricataEngine implements DetectionEngineStatus {
     warm = false;
     Process p = daemon;
     daemon = null;
-    if (p != null && p.isAlive()) p.destroyForcibly();
+    if (p != null && p.isAlive()) {
+      p.destroyForcibly();
+      // destroyForcibly only sends the signal. Wait for the exit, so the old engine (and the
+      // memory its rule set holds) is gone before a new one starts.
+      try {
+        p.waitFor(5, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   /**
