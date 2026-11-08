@@ -23,6 +23,12 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
 
   long countByNetworkId(UUID networkId);
 
+  /** Snapshot count per network, for the networks list in one query (#469). */
+  @Query(
+      "SELECT s.network.id, COUNT(s) FROM NetworkSnapshotEntity s WHERE s.network.id IN :ids"
+          + " GROUP BY s.network.id")
+  List<Object[]> countRawByNetworkIds(@Param("ids") java.util.Collection<UUID> ids);
+
   /**
    * Networks whose snapshot_order is no longer 0..n-1 (#635). That happens when a snapshot's file is
    * deleted outside {@code SnapshotService.removeSnapshot}, for example by retention or a delete from

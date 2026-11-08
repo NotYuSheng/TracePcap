@@ -12,4 +12,9 @@ public interface NetworkInsightRepository extends JpaRepository<NetworkInsightEn
   Optional<NetworkInsightEntity> findTopByNetworkIdOrderByGeneratedAtDesc(UUID networkId);
 
   boolean existsByNetworkId(UUID networkId);
+
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT DISTINCT i.network.id FROM NetworkInsightEntity i WHERE i.network.id IN :ids")
+  java.util.List<UUID> findNetworkIdsWithInsights(
+      @org.springframework.data.repository.query.Param("ids") java.util.Collection<UUID> ids);
 }

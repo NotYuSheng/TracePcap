@@ -1,5 +1,8 @@
 package com.tracepcap.monitor.service;
 
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.monitor.dto.NetworkDto;
 import com.tracepcap.monitor.dto.CreateNetworkRequest;
@@ -30,9 +33,7 @@ public class NetworkService {
 
   @Transactional(readOnly = true)
   public List<NetworkDto> getAllNetworks() {
-    return networkRepository.findAllByOrderByCreatedAtDesc().stream()
-        .map(this::toDto)
-        .collect(Collectors.toList());
+    return toDtos(networkRepository.findAllByOrderByCreatedAtDesc());
   }
 
   @Transactional(readOnly = true)
@@ -74,16 +75,45 @@ public class NetworkService {
   }
 
   private NetworkDto toDto(NetworkEntity e) {
-    return NetworkDto.builder()
-        .id(e.getId())
-        .name(e.getName())
-        .description(e.getDescription())
-        .snapshotCount((int) snapshotRepository.countByNetworkId(e.getId()))
-        .criticalChanges(changeEventRepository.countCriticalByNetworkId(e.getId()))
-        .warningChanges(changeEventRepository.countWarningByNetworkId(e.getId()))
-        .hasInsights(insightPresence.networkHasInsights(e.getId()))
-        .createdAt(e.getCreatedAt())
-        .updatedAt(e.getUpdatedAt())
-        .build();
+    return toDtos(List.of(e)).get(0);
+  }
+
+  /**
+   * Maps networks to DTOs with a fixed four queries for the whole list (#469): snapshot counts,
+   * unreviewed critical/warning counts, and insight presence, each grouped by network. It used to
+   * be four queries per network on every load of the networks page. Single-network callers go
+   * through here too, so there is one mapping, not two that can drift apart.
+   */
+  private List<NetworkDto> toDtos(List<NetworkEntity> networks) {
+    if (networks.isEmpty()) return List.of();
+    List<UUID> ids = networks.stream().map(NetworkEntity::getId).toList();
+
+    Map<UUID, Long> snapshotCounts = new HashMap<>();
+    for (Object[] row : snapshotRepository.countRawByNetworkIds(ids)) {
+      snapshotCounts.put((UUID) row[0], ((Number) row[1]).longValue());
+    }
+    Map<UUID, Long> critical = new HashMap<>();
+    Map<UUID, Long> warning = new HashMap<>();
+    for (Object[] row : changeEventRepository.countUnreviewedBySeverityRaw(ids)) {
+      Map<UUID, Long> target = "CRITICAL".equals(String.valueOf(row[1])) ? critical : warning;
+      target.put((UUID) row[0], ((Number) row[2]).longValue());
+    }
+    Set<UUID> withInsights = insightPresence.networksWithInsights(ids);
+
+    return networks.stream()
+        .map(
+            e ->
+                NetworkDto.builder()
+                    .id(e.getId())
+                    .name(e.getName())
+                    .description(e.getDescription())
+                    .snapshotCount(snapshotCounts.getOrDefault(e.getId(), 0L).intValue())
+                    .criticalChanges(critical.getOrDefault(e.getId(), 0L))
+                    .warningChanges(warning.getOrDefault(e.getId(), 0L))
+                    .hasInsights(withInsights.contains(e.getId()))
+                    .createdAt(e.getCreatedAt())
+                    .updatedAt(e.getUpdatedAt())
+                    .build())
+        .collect(Collectors.toList());
   }
 }

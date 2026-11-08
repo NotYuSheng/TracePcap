@@ -12,4 +12,9 @@ public interface SnapshotInsightRepository extends JpaRepository<SnapshotInsight
   Optional<SnapshotInsightEntity> findTopBySnapshotIdOrderByGeneratedAtDesc(UUID snapshotId);
 
   boolean existsBySnapshotId(UUID snapshotId);
+
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT DISTINCT i.snapshot.id FROM SnapshotInsightEntity i WHERE i.snapshot.id IN :ids")
+  java.util.List<UUID> findSnapshotIdsWithInsights(
+      @org.springframework.data.repository.query.Param("ids") java.util.Collection<UUID> ids);
 }
