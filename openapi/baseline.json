@@ -6524,6 +6524,7 @@
     },
     "/api/v1/files/{fileId}/ip-mac-observations": {
       "get": {
+        "description": "Every IP in the file by default. ip= narrows to that IP (the MACs that claimed it); mac= narrows to the IPs that MAC claimed, each with all its MACs. If both are given, ip wins.",
         "operationId": "getIpMacObservations",
         "parameters": [
           {
@@ -6532,6 +6533,24 @@
             "required": true,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this IP",
+            "in": "query",
+            "name": "ip",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the IPs this MAC claimed (case-insensitive)",
+            "in": "query",
+            "name": "mac",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           }

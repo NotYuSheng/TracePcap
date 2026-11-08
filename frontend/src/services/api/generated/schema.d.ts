@@ -850,7 +850,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List distinct source MACs observed per IP in a file */
+        /**
+         * List distinct source MACs observed per IP in a file
+         * @description Every IP in the file by default. ip= narrows to that IP (the MACs that claimed it); mac= narrows to the IPs that MAC claimed, each with all its MACs. If both are given, ip wins.
+         */
         get: operations["getIpMacObservations"];
         put?: never;
         post?: never;
@@ -4521,7 +4524,12 @@ export interface operations {
     };
     getIpMacObservations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only this IP */
+                ip?: string;
+                /** @description Only the IPs this MAC claimed (case-insensitive) */
+                mac?: string;
+            };
             header?: never;
             path: {
                 fileId: string;
