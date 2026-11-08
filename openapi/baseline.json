@@ -3411,6 +3411,41 @@
         ],
         "type": "object"
       },
+      "SystemSettingDto": {
+        "properties": {
+          "defaultValue": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "group": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "lockedReason": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "boolean"
+          },
+          "set": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TimelineDataDto": {
         "properties": {
           "bytes": {
@@ -7788,7 +7823,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/settings": {
       "get": {
-        "operationId": "getSettings",
+        "operationId": "getSettings_1",
         "parameters": [
           {
             "in": "path",
@@ -9020,6 +9055,31 @@
         ]
       }
     },
+    "/api/v1/system/settings": {
+      "get": {
+        "description": "Lists each environment-driven setting, grouped as infrastructure, memory-tied or analysis policy, with its effective value and why it can't be changed in the app. Secrets are reported as set or not set; their values are never returned.",
+        "operationId": "getSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemSettingDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Every deploy-time setting with its effective value (read-only)",
+        "tags": [
+          "System Settings"
+        ]
+      }
+    },
     "/api/v1/system/time": {
       "get": {
         "operationId": "getServerTime",
@@ -9362,6 +9422,10 @@
     {
       "description": "Baseline rules used to detect drift in a monitored network",
       "name": "Monitor Baseline Definitions"
+    },
+    {
+      "description": "Deploy-time settings and why each can or can't be changed",
+      "name": "System Settings"
     },
     {
       "description": "APIs for AI-powered network traffic story generation",

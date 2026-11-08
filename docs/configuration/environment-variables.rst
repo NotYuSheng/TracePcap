@@ -1,6 +1,13 @@
 Environment Variables
 =====================
 
+.. tip::
+
+   Every variable below can be seen in the app under **Settings → System**, with its
+   effective value (including values derived from ``APP_MEMORY_MB``) and why it can't be
+   changed there. Secrets show only whether they are set; their values are never shown.
+
+
 All configuration is driven by environment variables defined in the ``.env``
 file at the repository root. Copy ``.env.example`` to ``.env`` before starting.
 
