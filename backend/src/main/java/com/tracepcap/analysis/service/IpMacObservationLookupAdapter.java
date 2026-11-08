@@ -20,8 +20,22 @@ public class IpMacObservationLookupAdapter implements IpMacObservationLookup {
 
   @Override
   public List<IpMacs> ipMacObservations(UUID fileId) {
+    return group(repository.findByFileId(fileId));
+  }
+
+  @Override
+  public List<IpMacs> ipMacObservationsForIp(UUID fileId, String ip) {
+    return group(repository.findByFileIdAndIpOrderById(fileId, ip));
+  }
+
+  @Override
+  public List<IpMacs> ipMacObservationsForMac(UUID fileId, String mac) {
+    return group(repository.findByFileIdForIpsClaimedByMac(fileId, mac));
+  }
+
+  private static List<IpMacs> group(List<IpMacObservationEntity> rows) {
     Map<String, List<String>> byIp = new LinkedHashMap<>();
-    for (IpMacObservationEntity o : repository.findByFileId(fileId)) {
+    for (IpMacObservationEntity o : rows) {
       byIp.computeIfAbsent(o.getIp(), k -> new ArrayList<>()).add(o.getMac());
     }
     return byIp.entrySet().stream()

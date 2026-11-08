@@ -1,5 +1,7 @@
 package com.tracepcap.hostclassification.controller;
 
+import org.springframework.web.bind.annotation.RequestParam;
+import io.swagger.v3.oas.annotations.Parameter;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.IpMacObservationLookup;
 import com.tracepcap.hostclassification.dto.HostClassificationResponse;
@@ -52,11 +54,26 @@ public class HostClassificationsController {
    * devices claimed the same IP in this capture (overlapping networks / ARP conflict).
    */
   @GetMapping("/{fileId}/ip-mac-observations")
-  @Operation(summary = "List distinct source MACs observed per IP in a file")
+  @Operation(
+      summary = "List distinct source MACs observed per IP in a file",
+      description =
+          "Every IP in the file by default. ip= narrows to that IP (the MACs that claimed it);"
+              + " mac= narrows to the IPs that MAC claimed, each with all its MACs. If both are"
+              + " given, ip wins.")
   public ResponseEntity<List<IpMacObservationsResponse>> getIpMacObservations(
-      @PathVariable UUID fileId) {
+      @PathVariable UUID fileId,
+      @Parameter(description = "Only this IP") @RequestParam(required = false) String ip,
+      @Parameter(description = "Only the IPs this MAC claimed (case-insensitive)")
+          @RequestParam(required = false)
+          String mac) {
+    var observations =
+        ip != null && !ip.isBlank()
+            ? ipMacObservationLookup.ipMacObservationsForIp(fileId, ip.trim())
+            : mac != null && !mac.isBlank()
+                ? ipMacObservationLookup.ipMacObservationsForMac(fileId, mac.trim())
+                : ipMacObservationLookup.ipMacObservations(fileId);
     List<IpMacObservationsResponse> response =
-        ipMacObservationLookup.ipMacObservations(fileId).stream()
+        observations.stream()
             .map(o -> IpMacObservationsResponse.builder().ip(o.ip()).macs(o.macs()).build())
             .toList();
     return ResponseEntity.ok(response);
