@@ -487,6 +487,39 @@ class PipelineIntegrationTest {
     assertThat(noMode.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
   }
 
+  /**
+   * Conversation rows say who was logged in on each endpoint when they started (#812 follow-up),
+   * only when unambiguous. On windows-logons.pcap: 10.0.0.10's Kerberos conversation starts with
+   * alice's login (bob only arrives 5h later), 10.0.0.13's frame names two accounts at once, and
+   * the domain controller 10.0.0.1 has no login of its own.
+   */
+  @Test
+  void conversationRows_sayWhoWasLoggedInAtTheTime() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("windows-logons.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    JsonNode rows = rest.getForEntity("/api/v1/conversations/" + fileId + "?pageSize=100", JsonNode.class)
+        .getBody().get("data");
+    java.util.Map<String, JsonNode> bySrc = new java.util.HashMap<>();
+    rows.forEach(r -> bySrc.putIfAbsent(r.get("srcIp").asText(), r));
+
+    JsonNode alice = bySrc.get("10.0.0.10").get("srcAccount");
+    assertThat(alice.get("username").asText()).isEqualTo("alice");
+    assertThat(alice.get("accountCount").asInt()).isEqualTo(1);
+
+    JsonNode two = bySrc.get("10.0.0.13").get("srcAccount");
+    assertThat(two.get("accountCount").asInt()).isEqualTo(2);
+    assertThat(two.path("username").isNull() || two.path("username").isMissingNode()).isTrue();
+
+    // The DC is the destination of these flows and logs in as nobody.
+    JsonNode dc = bySrc.get("10.0.0.10").path("dstAccount");
+    assertThat(dc.isNull() || dc.isMissingNode()).isTrue();
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

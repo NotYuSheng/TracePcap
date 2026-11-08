@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Badge } from '@govtechsg/sgds-react';
 import { ScrollableTable } from '@components/common/ScrollableTable';
-import type { Conversation, ConversationGeoInfo, HostClassification } from '@/types';
+import type { AccountAtTime, Conversation, ConversationGeoInfo, HostClassification } from '@/types';
+import { parseDateTime } from '@/utils/dateUtils';
 import type { SortField, SortDir } from '@/features/conversation/types';
 import type { ColumnKey } from '@/features/conversation/constants';
 import { formatBytes, formatDuration, formatTimestamp } from '@/utils/formatters';
@@ -47,6 +48,34 @@ interface ConversationListProps {
   visibleColumns: Set<ColumnKey>;
   signatureSeverities?: Record<string, string>;
   hostClassMap?: Map<string, HostClassification>;
+}
+
+function loginTime(at: AccountAtTime['firstLoginAt']): string | null {
+  if (!at) return null;
+  const ms = parseDateTime(at);
+  return ms ? new Date(ms).toLocaleString() : null;
+}
+
+/**
+ * Who was logged in on one endpoint when the conversation started (#812). "Logged in by then", not
+ * "signed in": a capture shows logins, rarely logouts. Several accounts are flagged, not picked.
+ */
+function AccountAtTimeLine({ label, account }: { label: string; account?: AccountAtTime }) {
+  if (!account) return null;
+  const when = loginTime(account.firstLoginAt);
+  return (
+    <div className="small text-nowrap">
+      <span className="text-muted">{label}: </span>
+      {account.username ? (
+        <>
+          <span className="fw-semibold">{account.username}</span>
+          {when && <span className="text-muted"> (first login {when})</span>}
+        </>
+      ) : (
+        <span>{account.accountCount} accounts. See the host's timeline.</span>
+      )}
+    </div>
+  );
 }
 
 export const ConversationList = ({
@@ -98,6 +127,7 @@ export const ConversationList = ({
             <tr>
               {col('source') && <SortableHeader field="srcIp" label="Source" />}
               {col('destination') && <SortableHeader field="dstIp" label="Destination" />}
+              {col('users') && <th style={{ whiteSpace: 'nowrap' }}>User</th>}
               {col('protocol') && <th style={{ whiteSpace: 'nowrap' }}>Protocol</th>}
               {col('tsharkProtocol') && (
                 <th style={{ whiteSpace: 'nowrap' }}>Dissected Protocol</th>
@@ -146,6 +176,12 @@ export const ConversationList = ({
                       {conversation.hostname && (
                         <small className="text-info">{conversation.hostname}</small>
                       )}
+                    </td>
+                  )}
+                  {col('users') && (
+                    <td>
+                      <AccountAtTimeLine label="src" account={conversation.srcAccount} />
+                      <AccountAtTimeLine label="dst" account={conversation.dstAccount} />
                     </td>
                   )}
                   {col('protocol') && (

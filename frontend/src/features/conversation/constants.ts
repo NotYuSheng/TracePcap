@@ -1,6 +1,7 @@
 export type ColumnKey =
   | 'source'
   | 'destination'
+  | 'users'
   | 'protocol'
   | 'tsharkProtocol'
   | 'appName'
@@ -19,6 +20,7 @@ export type ColumnKey =
 export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boolean }[] = [
   { key: 'source', label: 'Source', defaultVisible: true },
   { key: 'destination', label: 'Destination', defaultVisible: true },
+  { key: 'users', label: 'User', defaultVisible: true },
   { key: 'protocol', label: 'Protocol', defaultVisible: false },
   { key: 'tsharkProtocol', label: 'Dissected Protocol', defaultVisible: true },
   { key: 'appName', label: 'Application', defaultVisible: true },
@@ -35,7 +37,9 @@ export const COLUMN_DEFS: { key: ColumnKey; label: string; defaultVisible: boole
   { key: 'startTime', label: 'Start Time', defaultVisible: true },
 ];
 
-export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v6';
+export const COLUMN_STORAGE_KEY = 'conv-visible-columns-v7';
+/** The previous key. v7 added the User column (#812); a v6 selection carries over with it added. */
+const PREVIOUS_COLUMN_STORAGE_KEY = 'conv-visible-columns-v6';
 
 /** The default set of visible columns, ignoring any stored user override. */
 export function defaultVisibleColumns(): Set<ColumnKey> {
@@ -46,6 +50,9 @@ export function loadVisibleColumns(): Set<ColumnKey> {
   try {
     const stored = localStorage.getItem(COLUMN_STORAGE_KEY);
     if (stored) return new Set(JSON.parse(stored) as ColumnKey[]);
+    // Keep a customised column set from before the User column existed, and show the new column.
+    const previous = localStorage.getItem(PREVIOUS_COLUMN_STORAGE_KEY);
+    if (previous) return new Set([...(JSON.parse(previous) as ColumnKey[]), 'users']);
   } catch {
     /* ignore */
   }

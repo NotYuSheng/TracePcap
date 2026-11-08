@@ -87,7 +87,22 @@ export interface Conversation {
   direction: 'bidirectional' | 'unidirectional';
   srcGeo?: ConversationGeoInfo;
   dstGeo?: ConversationGeoInfo;
+  /** Who was logged in on each endpoint when this started (#812). */
+  srcAccount?: AccountAtTime;
+  dstAccount?: AccountAtTime;
 }
+
+/**
+ * Who was logged in on a conversation endpoint when it started (#812 follow-up). Only answered
+ * when unambiguous: with several accounts, `username` is null and `accountCount` says how many.
+ */
+export interface AccountAtTime {
+  username?: string | null;
+  accountCount: number;
+  /** When that account was first seen logging in. */
+  firstLoginAt?: string | number[] | null;
+}
+
 
 // Analysis Types
 export interface AnalysisSummary {

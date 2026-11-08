@@ -148,6 +148,13 @@ Monitor drift panels, or Conversation Detail — they all share the same entity 
   the directory in plain words, and the raw directory entry for anyone who wants it.
 - In the Network Diagram, the **Signed-in user** node label (off by default; turn it on
   in the label settings) shows the account, or "N accounts".
+- In the **Conversations** table, the **User** column says who was logged in on each
+  endpoint when the conversation started, for example ``src: bob (first login 09:58)``.
+  It follows the same rule as the host label: one account is named, several are shown as
+  "N accounts" with a pointer to the host's timeline, and an endpoint with no login seen
+  by then shows nothing. Because a capture records logins but rarely logouts, this reads
+  as "logged in by then", not "still signed in". The same applies to IDS alerts, which
+  are conversation rows filtered by alert.
 - The sign-in shows up in the host's **Evidence weighed → Identity** breakdown as one
   or two lines naming the principal and the protocol that observed it — the same
   explainability trail behind every device-type verdict.

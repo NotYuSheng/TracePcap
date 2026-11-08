@@ -1799,6 +1799,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountAtTime: {
+            /** Format: int32 */
+            accountCount?: number;
+            /** Format: date-time */
+            firstLoginAt?: string;
+            username?: string;
+        };
         AddSnapshotRequest: {
             /** Format: uuid */
             fileId: string;
@@ -2089,6 +2096,7 @@ export interface components {
             conversationId?: string;
             customSignatures?: string[];
             detectedFileTypes?: string[];
+            dstAccount?: components["schemas"]["AccountAtTime"];
             dstGeo?: components["schemas"]["GeoInfo"];
             dstIp?: string;
             /** Format: int32 */
@@ -2108,6 +2116,7 @@ export interface components {
             /** Format: int64 */
             packetCount?: number;
             protocol?: string;
+            srcAccount?: components["schemas"]["AccountAtTime"];
             srcGeo?: components["schemas"]["GeoInfo"];
             srcIp?: string;
             /** Format: int32 */

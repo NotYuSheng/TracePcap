@@ -176,6 +176,7 @@ public class AnalysisService {
   private final SuricataEngine suricataEngine;
   private final WindowsIdentityResolverService windowsIdentityResolverService;
   private final WindowsLogonWriter windowsLogonWriter;
+  private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   /** The pipeline's one write transaction (see analyzeFile). Package-private for the boundary test. */
@@ -976,6 +977,14 @@ public class AnalysisService {
   @Transactional(readOnly = true)
   public List<ConversationResponse> getSecurityAlerts(UUID fileId) {
     List<ConversationEntity> conversations = conversationRepository.findByFileIdWithRisks(fileId);
+    // Who was logged in on each endpoint at the alert's start (#812 follow-up).
+    var accounts =
+        windowsLogonLookup.accountsAtTime(
+            fileId,
+            conversations.stream()
+                .flatMap(c -> java.util.stream.Stream.of(c.getSrcIp(), c.getDstIp()))
+                .filter(ip -> ip != null && !ip.isBlank())
+                .collect(Collectors.toSet()));
 
     return conversations.stream()
         .map(
@@ -1011,6 +1020,7 @@ public class AnalysisService {
                   .durationMs(duration.toMillis())
                   .build();
             })
+        .map(r -> r.withAccountsFrom(accounts))
         .collect(Collectors.toList());
   }
 
