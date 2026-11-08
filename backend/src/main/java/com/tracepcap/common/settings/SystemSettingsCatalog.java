@@ -139,8 +139,6 @@ final class SystemSettingsCatalog {
           "Max number of non-HTTP streams scanned for embedded files per PCAP."),
       new Entry("EXTRACTION_MAX_FILE_SIZE_MB", "tracepcap.extraction.max-file-size-mb", "50", Group.MEMORY, false, "Extraction max file size MB",
           "Max size (MB) of a single extracted file that will be stored. Larger files are detected but skipped (shown with a \"Too large\" badge)."),
-      new Entry("SIGNATURES_PATH", "tracepcap.signatures.path", "/app/config/signatures.yml", Group.INFRASTRUCTURE, false, "Signatures path",
-          "Path of the custom signature rules file mounted into the backend."),
       new Entry("GEO_ENRICHMENT_ENABLED", "tracepcap.geo.enabled", "true", Group.POLICY, false, "Geo enrichment enabled",
           "Turns geolocation enrichment off entirely — no lookups, no bundled-database resolution, so captures analyzed while it is off get no geo fields. Distinct from GEO_FORCE_OFFLINE, which keeps enrichment but stops it reaching the network. Not retroactive. See Geolocation."),
       new Entry("GEO_MMDB_PATH", "tracepcap.geo.mmdb-path", null, Group.INFRASTRUCTURE, false, "Geo MMDB path",

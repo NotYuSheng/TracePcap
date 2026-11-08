@@ -262,7 +262,7 @@ with AND logic — a conversation must satisfy all active filters to be shown.
      - Individual nDPI risk flag names (e.g. ``clear_text_credentials``,
        ``tls_self_signed_certificate``). Multiple selections are OR-matched.
    * - **Custom Rules** (pills)
-     - Custom detection rule names from ``signatures.yml`` that fired in this
+     - Custom detection rule names (System > Detection rules) that fired in this
        PCAP. Only rules that matched at least one conversation are shown.
        Severity quick-select buttons (critical/high/medium/low) select all
        rules of that severity level at once.

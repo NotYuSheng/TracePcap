@@ -98,13 +98,9 @@ if [ "$JACKSON_MAX_STRING_MB" -lt 8 ]; then JACKSON_MAX_STRING_MB=8; fi
 if [ "$JACKSON_MAX_STRING_MB" -gt 256 ]; then JACKSON_MAX_STRING_MB=256; fi
 JACKSON_MAX_STRING_BYTES=$(( JACKSON_MAX_STRING_MB * 1024 * 1024 ))
 
-# Ensure signatures.yml exists and is writable by the spring user.
-# Runs as root so it can fix ownership regardless of how the named volume was seeded.
-if [ ! -f /app/config/signatures.yml ] && [ -f /app/config-defaults/signatures.yml ]; then
-  cp /app/config-defaults/signatures.yml /app/config/signatures.yml
-fi
-chown spring:spring /app/config/signatures.yml 2>/dev/null || true
-chmod 664 /app/config/signatures.yml 2>/dev/null || true
+# Detection rules live in the database (#925). An old signatures.yml left in the config_data
+# volume is imported once on upgrade (Flyway V51) and needs only to be readable for that.
+chmod a+r /app/config/signatures.yml 2>/dev/null || true
 
 # Ensure the log directory exists and is writable by the spring user. The prod Spring profile
 # logs to a file (${LOG_DIR}/application.log, default /app/logs); the default dev profile is

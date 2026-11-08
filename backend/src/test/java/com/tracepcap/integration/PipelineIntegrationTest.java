@@ -704,6 +704,144 @@ class PipelineIntegrationTest {
         });
   }
 
+  /**
+   * Detection rules in the database (#925 phase 1): CRUD, export and import through the API, and
+   * the analysis applies an enabled global rule (and ignores a disabled one) to a fresh capture.
+   */
+  @Test
+  void detectionRules_crudExportImport_andAnalysisUsesThem() throws Exception {
+    jdbc.update("DELETE FROM permissions");
+    String tag = "itest-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    String ruleJson =
+        "{\"name\":\"" + tag + "-port\",\"severity\":\"high\",\"match\":{\"dstPort\":5999,\"protocol\":\"UDP\"},"
+            + "\"payloadContains\":[{\"ascii\":\"" + tag + "\"}]}";
+
+    ResponseEntity<JsonNode> created = rest.postForEntity("/api/v1/detection-rules", json(ruleJson), JsonNode.class);
+    assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    String id = created.getBody().get("id").asText();
+    assertThat(created.getBody().get("version").asInt()).isEqualTo(1);
+    assertThat(created.getBody().get("createdBy").asText()).isEqualTo("system");
+
+    ResponseEntity<JsonNode> dup = rest.postForEntity("/api/v1/detection-rules", json(ruleJson), JsonNode.class);
+    assertThat(dup.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(dup.getBody().path("validationErrors").has("name")).isTrue();
+
+    ResponseEntity<JsonNode> invalid =
+        rest.postForEntity(
+            "/api/v1/detection-rules",
+            json("{\"name\":\"" + tag + "-bad\",\"severity\":\"low\",\"payloadRegex\":[{\"pattern\":\"(\"}]}"),
+            JsonNode.class);
+    assertThat(invalid.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(invalid.getBody().path("validationErrors").has("payloadRegex[0].pattern")).isTrue();
+
+    // A disabled rule that would also match: it must not fire.
+    rest.postForEntity(
+        "/api/v1/detection-rules",
+        json("{\"name\":\"" + tag + "-off\",\"severity\":\"low\",\"enabled\":false,\"match\":{\"dstPort\":5999}}"),
+        JsonNode.class);
+
+    // Analysis applies the enabled rule to a capture nobody has uploaded before.
+    ResponseEntity<JsonNode> upload = uploadBytes(tag + ".pcap", udpPcap(tag));
+    assertThat(upload.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    String fileId = upload.getBody().get("fileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    JsonNode sigs = rest.getForEntity("/api/v1/conversations/" + fileId + "/custom-signatures", JsonNode.class).getBody();
+    java.util.List<String> names = new java.util.ArrayList<>();
+    sigs.forEach(n -> names.add(n.asText()));
+    assertThat(names).contains(tag + "-port").doesNotContain(tag + "-off");
+
+    // Edit bumps the version and is audited.
+    ResponseEntity<JsonNode> edited =
+        rest.exchange(
+            "/api/v1/detection-rules/" + id,
+            HttpMethod.PUT,
+            json(ruleJson.replace("\"high\"", "\"critical\"")),
+            JsonNode.class);
+    assertThat(edited.getBody().get("version").asInt()).isEqualTo(2);
+    JsonNode audit = rest.getForEntity("/api/v1/audit-log?search=" + id, JsonNode.class).getBody();
+    assertThat(audit.get("total").asLong()).isEqualTo(2); // create + update
+
+    // Export, delete, import back.
+    ResponseEntity<String> export = rest.getForEntity("/api/v1/detection-rules/export", String.class);
+    assertThat(export.getHeaders().getContentDisposition().getFilename()).isEqualTo("tracepcap-detection-rules.yml");
+    assertThat(export.getBody()).contains(tag + "-port").contains("severity: critical").contains("enabled: false");
+    assertThat(rest.exchange("/api/v1/detection-rules/" + id, HttpMethod.DELETE, null, Void.class).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    com.fasterxml.jackson.databind.node.ObjectNode body = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+    body.put("content", export.getBody());
+    body.put("mode", "MERGE");
+    JsonNode imported =
+        rest.postForEntity("/api/v1/detection-rules/import", json(body.toString()), JsonNode.class).getBody();
+    assertThat(imported.get("created").asInt()).isGreaterThanOrEqualTo(1);
+    JsonNode list = rest.getForEntity("/api/v1/detection-rules", JsonNode.class).getBody();
+    java.util.Map<String, JsonNode> byName = new java.util.HashMap<>();
+    list.forEach(n -> byName.put(n.get("name").asText(), n));
+    assertThat(byName.get(tag + "-port").get("severity").asText()).isEqualTo("critical");
+    assertThat(byName.get(tag + "-off").get("enabled").asBoolean()).isFalse();
+
+    jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
+  /**
+   * The one-time upgrade import of the old signatures.yml (#925, Flyway V51): valid rules arrive
+   * enabled, invalid ones disabled with the reason, nameless and repeated ones are skipped, and one
+   * audit entry records it.
+   */
+  @Test
+  void legacySignaturesFile_isImportedOnce_invalidRulesDisabledNotLost() throws Exception {
+    String tag = "legacy-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+    java.nio.file.Path file = java.nio.file.Files.createTempFile("signatures", ".yml");
+    java.nio.file.Files.writeString(
+        file,
+        "signatures:\n"
+            + "  - name: " + tag + "-ok\n    severity: high\n    match: {cidr: 198.51.100.0/24}\n"
+            + "    device_type: CCTV Camera\n"
+            + "  - name: " + tag + "-badregex\n    payload_regex: [{pattern: '('}]\n"
+            + "  - name: " + tag + "-ok\n    match: {app: TOR}\n"
+            + "  - match: {ip: 1.2.3.4}\n");
+    try (java.sql.Connection c = jdbc.getDataSource().getConnection()) {
+      var result = db.migration.V51__import_signatures_yml.importFile(c, file);
+      assertThat(result.imported()).isEqualTo(2);
+      assertThat(result.disabled()).containsExactly(tag + "-badregex");
+      assertThat(result.skipped()).hasSize(2);
+    } finally {
+      java.nio.file.Files.deleteIfExists(file);
+    }
+    var rows =
+        jdbc.queryForList("SELECT name, enabled, device_type, description FROM detection_rules WHERE name LIKE ?", tag + "%");
+    java.util.Map<String, java.util.Map<String, Object>> byName = new java.util.HashMap<>();
+    rows.forEach(r -> byName.put((String) r.get("name"), r));
+    assertThat(byName.get(tag + "-ok").get("enabled")).isEqualTo(true);
+    assertThat(byName.get(tag + "-ok").get("device_type")).isEqualTo("CCTV Camera");
+    assertThat(byName.get(tag + "-badregex").get("enabled")).isEqualTo(false);
+    assertThat((String) byName.get(tag + "-badregex").get("description")).contains("Imported disabled");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE action = 'detection-rules.import' AND after_value::text LIKE ?",
+                Long.class,
+                "%" + file.getFileName() + "%"))
+        .isEqualTo(1);
+    jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
+  /** A one-packet pcap (UDP 10.99.0.1:40000 → 10.99.0.2:5999) whose payload is {@code payload}. */
+  private static byte[] udpPcap(String payload) {
+    byte[] data = payload.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(24 + 16 + 14 + 20 + 8 + data.length);
+    b.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    b.putInt(0xa1b2c3d4).putShort((short) 2).putShort((short) 4).putInt(0).putInt(0).putInt(65535).putInt(1);
+    int frame = 14 + 20 + 8 + data.length;
+    b.putInt((int) (System.currentTimeMillis() / 1000)).putInt(0).putInt(frame).putInt(frame);
+    b.order(java.nio.ByteOrder.BIG_ENDIAN);
+    b.put(new byte[] {2, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 1}).putShort((short) 0x0800);
+    b.put((byte) 0x45).put((byte) 0).putShort((short) (20 + 8 + data.length)).putShort((short) 1).putShort((short) 0);
+    b.put((byte) 64).put((byte) 17).putShort((short) 0);
+    b.put(new byte[] {10, 99, 0, 1}).put(new byte[] {10, 99, 0, 2});
+    b.putShort((short) 40000).putShort((short) 5999).putShort((short) (8 + data.length)).putShort((short) 0);
+    b.put(data);
+    return b.array();
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

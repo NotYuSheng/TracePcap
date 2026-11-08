@@ -3,9 +3,8 @@ package com.tracepcap.signatures.service;
 import com.tracepcap.analysis.service.PcapParserService;
 import com.tracepcap.analysis.spi.PacketLookup;
 import com.tracepcap.analysis.spi.SignatureApplier;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import com.tracepcap.signatures.entity.DetectionRuleEntity;
+import com.tracepcap.signatures.repository.DetectionRuleRepository;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -18,19 +17,16 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
- * Loads custom detection rules from {@code signatures.yml} and applies them to each conversation
- * after nDPI enrichment. Matched rule names are appended to the conversation's {@code
+ * Applies the enabled global detection rules (#925, stored in {@code detection_rules}) to each
+ * conversation after nDPI enrichment. Matched rule names are appended to the conversation's {@code
  * customSignatures} list, making them visible in the UI alongside nDPI's built-in risk flags.
  *
- * <p>The file is reloaded on every analysis run so admins can update rules without restarting the
- * application.
+ * <p>The rules are read from the database on every analysis run, so an edit applies to the next
+ * analysis without a restart. Each rule is handed to the matcher in the same map shape the old
+ * {@code signatures.yml} used (see {@link RuleCodec}), so matching is unchanged.
  *
  * <p>Supported match fields (all optional; a rule fires when ALL specified fields match):
  *
@@ -74,8 +70,8 @@ public class CustomSignatureService implements SignatureApplier {
   // never reach the lines that use it.
   private final PacketLookup packetLookup;
 
-  @Value("${tracepcap.signatures.path:/app/config/signatures.yml}")
-  private String signaturesPath;
+  // Nullable only for the reflective unit tests of the payload matchers, which never load rules.
+  private final DetectionRuleRepository ruleRepository;
 
   /**
    * Evaluates all loaded rules against each conversation in a single pass: appends matched rule
@@ -199,39 +195,21 @@ public class CustomSignatureService implements SignatureApplier {
   // Internal helpers
   // -------------------------------------------------------------------------
 
-  /**
-   * Load and parse the signatures file. Returns an empty list if the file is missing or invalid.
-   */
-  @SuppressWarnings("unchecked")
+  /** The enabled global rules, each in the YAML-shaped map form the matcher reads. */
   private List<Map<String, Object>> loadRules() {
-    File file = new File(signaturesPath);
-    if (!file.exists()) {
-      return List.of();
+    List<Map<String, Object>> rules = new ArrayList<>();
+    for (DetectionRuleEntity e :
+        ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL)) {
+      Map<String, Object> rule = new HashMap<>();
+      rule.put("name", e.getName());
+      rule.put("match", e.getMatchCriteria());
+      rule.put("payload_contains", e.getPayloadContains());
+      rule.put("payload_regex", e.getPayloadRegex());
+      rule.put("match_all", e.isMatchAll());
+      if (e.getDeviceType() != null) rule.put("device_type", e.getDeviceType());
+      rules.add(rule);
     }
-
-    try (FileInputStream fis = new FileInputStream(file)) {
-      Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
-      Map<String, Object> root = yaml.load(fis);
-      if (root == null || !root.containsKey("signatures")) return List.of();
-
-      Object signaturesObj = root.get("signatures");
-      if (!(signaturesObj instanceof List)) return List.of();
-
-      List<?> raw = (List<?>) signaturesObj;
-      List<Map<String, Object>> rules = new ArrayList<>();
-      for (Object item : raw) {
-        if (item instanceof Map) {
-          rules.add((Map<String, Object>) item);
-        }
-      }
-      return rules;
-    } catch (IOException e) {
-      log.warn("Could not read signatures file at {}: {}", signaturesPath, e.getMessage());
-      return List.of();
-    } catch (Exception e) {
-      log.warn("Failed to parse signatures file at {}: {}", signaturesPath, e.getMessage());
-      return List.of();
-    }
+    return rules;
   }
 
   /** Returns true if the conversation satisfies ALL non-null criteria in the match block. */

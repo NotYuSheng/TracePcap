@@ -1165,6 +1165,117 @@
         },
         "type": "object"
       },
+      "DetectionRuleDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "match": {
+            "$ref": "#/components/schemas/Match"
+          },
+          "matchAll": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "payloadContains": {
+            "items": {
+              "$ref": "#/components/schemas/PayloadPattern"
+            },
+            "type": "array"
+          },
+          "payloadRegex": {
+            "items": {
+              "$ref": "#/components/schemas/RegexPattern"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "DetectionRuleRequest": {
+        "properties": {
+          "description": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "match": {
+            "$ref": "#/components/schemas/Match"
+          },
+          "matchAll": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "payloadContains": {
+            "items": {
+              "$ref": "#/components/schemas/PayloadPattern"
+            },
+            "maxItems": 50,
+            "minItems": 0,
+            "type": "array"
+          },
+          "payloadRegex": {
+            "items": {
+              "$ref": "#/components/schemas/RegexPattern"
+            },
+            "maxItems": 50,
+            "minItems": 0,
+            "type": "array"
+          },
+          "severity": {
+            "pattern": "low|medium|high|critical",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "severity"
+        ],
+        "type": "object"
+      },
       "DnsQueryEntryDto": {
         "properties": {
           "frame": {
@@ -2266,6 +2377,49 @@
         },
         "type": "object"
       },
+      "Match": {
+        "properties": {
+          "app": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          },
+          "cidr": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "hostname": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "ip": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "ja3": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          },
+          "protocol": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "MeDto": {
         "properties": {
           "admin": {
@@ -2927,6 +3081,21 @@
         },
         "type": "object"
       },
+      "PayloadPattern": {
+        "properties": {
+          "ascii": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "hex": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PermissionDto": {
         "properties": {
           "action": {
@@ -3062,6 +3231,22 @@
         },
         "type": "object"
       },
+      "RegexPattern": {
+        "properties": {
+          "caseInsensitive": {
+            "type": "boolean"
+          },
+          "pattern": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern"
+        ],
+        "type": "object"
+      },
       "RelatedData": {
         "properties": {
           "conversations": {
@@ -3132,6 +3317,54 @@
           },
           "roleLabel": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RuleImportRequest": {
+        "properties": {
+          "content": {
+            "maxLength": 2000000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "MERGE",
+              "REPLACE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "mode"
+        ],
+        "type": "object"
+      },
+      "RuleImportResult": {
+        "properties": {
+          "created": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "deleted": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "duplicates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unchanged": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updated": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -4152,7 +4385,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "in": "query",
@@ -5623,7 +5856,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_6",
         "responses": {
           "200": {
             "content": {
@@ -5645,7 +5878,7 @@
         ]
       },
       "post": {
-        "operationId": "create_3",
+        "operationId": "create_4",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5676,7 +5909,7 @@
     },
     "/api/v1/custom-private-ranges/{id}": {
       "delete": {
-        "operationId": "delete_7",
+        "operationId": "delete_8",
         "parameters": [
           {
             "in": "path",
@@ -5696,6 +5929,209 @@
         "summary": "Delete a custom private range",
         "tags": [
           "Custom Private Ranges"
+        ]
+      }
+    },
+    "/api/v1/detection-rules": {
+      "get": {
+        "operationId": "list_5",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DetectionRuleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List the global detection rules, by name",
+        "tags": [
+          "Detection Rules"
+        ]
+      },
+      "post": {
+        "operationId": "create_3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionRuleDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create a global detection rule (audited)",
+        "tags": [
+          "Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/detection-rules/export": {
+      "get": {
+        "description": "For backups and for moving rules between installs. Import reads the same format.",
+        "operationId": "export",
+        "responses": {
+          "200": {
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Download every global rule as a YAML file",
+        "tags": [
+          "Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/detection-rules/import": {
+      "post": {
+        "description": "Accepts an export or an old signatures.yml. Rules are matched by name. MERGE adds and updates; REPLACE also deletes global rules the file doesn't contain. One invalid rule rejects the whole file, with validationErrors keyed by rule.",
+        "operationId": "importRules",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Import a YAML rules file (audited, all or nothing)",
+        "tags": [
+          "Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/detection-rules/{id}": {
+      "delete": {
+        "operationId": "delete_7",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Delete a detection rule (audited)",
+        "tags": [
+          "Detection Rules"
+        ]
+      },
+      "get": {
+        "operationId": "get_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionRuleDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get one detection rule",
+        "tags": [
+          "Detection Rules"
+        ]
+      },
+      "put": {
+        "operationId": "update_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionRuleDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Replace a detection rule (audited; bumps its version if anything changed)",
+        "tags": [
+          "Detection Rules"
         ]
       }
     },
@@ -7591,7 +8027,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_1",
+        "operationId": "update_2",
         "parameters": [
           {
             "in": "path",
@@ -8832,92 +9268,6 @@
         ]
       }
     },
-    "/api/v1/signatures": {
-      "get": {
-        "operationId": "getSignatures",
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Get custom signatures file content",
-        "tags": [
-          "Signatures"
-        ]
-      },
-      "put": {
-        "operationId": "saveSignatures",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Save custom signatures file content",
-        "tags": [
-          "Signatures"
-        ]
-      }
-    },
-    "/api/v1/signatures/rules": {
-      "get": {
-        "operationId": "getSignatureRules",
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "type": "object"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "List configured signature rules with severity",
-        "tags": [
-          "Signatures"
-        ]
-      }
-    },
     "/api/v1/stories": {
       "get": {
         "description": "Get the latest story for a file, if one exists",
@@ -9795,10 +10145,6 @@
       "name": "Network Insights"
     },
     {
-      "description": "Read and update the custom signature ruleset",
-      "name": "Signatures"
-    },
-    {
       "description": "Server time and runtime limits",
       "name": "System"
     },
@@ -9825,6 +10171,10 @@
     {
       "description": "Detected drift events for a monitored network",
       "name": "Monitor Change Events"
+    },
+    {
+      "description": "Custom detection rules that flag conversations",
+      "name": "Detection Rules"
     },
     {
       "description": "User-defined CIDR-to-organization label mappings",

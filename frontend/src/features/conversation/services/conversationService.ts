@@ -353,11 +353,12 @@ export const conversationService = {
   },
 
   /**
-   * Returns configured signature rules with their severity from signatures.yml.
+   * Returns the global detection rules' names and severities (#925), to colour matches by
+   * severity. Disabled rules are included: their old matches still carry the name.
    */
   getSignatureRules: async (): Promise<{ name: string; severity: string }[]> => {
-    const response = await apiClient.get<{ name: string; severity: string }[]>('/signatures/rules');
-    return response.data;
+    const response = await apiClient.get<{ name: string; severity: string }[]>(API_ENDPOINTS.DETECTION_RULES);
+    return response.data.map(r => ({ name: r.name, severity: r.severity }));
   },
 
   /**

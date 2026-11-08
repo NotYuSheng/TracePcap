@@ -45,8 +45,8 @@ The script produces ``sample-files/demo_all_rules.pcap``.
 Walkthrough: Custom Signature Demo
 ------------------------------------
 
-1. Copy ``signatures.sample.yml`` into the TracePcap browser editor:
-   Navigate to **Custom Detection Rules** → paste the file contents → **Save**.
+1. Import ``signatures.sample.yml``: on the **System** page open
+   **Detection rules** → **Import**, choose the file, and click **Import**.
 
 2. Upload ``demo_all_rules.pcap`` with **nDPI Analysis** enabled.
 
