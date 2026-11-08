@@ -59,11 +59,21 @@ public class SubnetOverlapDetectionService {
     }
 
     Map<Long, SubnetOverlapWarningDto> bySubnet = new LinkedHashMap<>();
+    List<NetworkSnapshotEntity> snapshots =
+        snapshotRepo.findByNetworkIdWithFileOrderBySnapshotOrderAsc(networkId);
+    // Every snapshot's conflicts in one query, instead of one query per snapshot (#469).
+    Map<UUID, Map<String, List<String>>> conflictsByFile =
+        conflictingIpMacs(
+            snapshots.stream()
+                .filter(sn -> sn.getFile() != null)
+                .map(sn -> sn.getFile().getId())
+                .distinct()
+                .toList());
     // Walk snapshots in order so the first conflict found per subnet is the earliest one.
-    for (NetworkSnapshotEntity snap :
-        snapshotRepo.findByNetworkIdWithFileOrderBySnapshotOrderAsc(networkId)) {
+    for (NetworkSnapshotEntity snap : snapshots) {
       if (snap.getFile() == null) continue;
-      Map<String, List<String>> conflicts = conflictingIpMacs(snap.getFile().getId());
+      Map<String, List<String>> conflicts =
+          conflictsByFile.getOrDefault(snap.getFile().getId(), Map.of());
       if (conflicts.isEmpty()) continue;
 
       for (Map.Entry<SubnetDefinitionEntity, long[]> re : ranges.entrySet()) {
@@ -90,35 +100,42 @@ public class SubnetOverlapDetectionService {
     return new ArrayList<>(bySubnet.values());
   }
 
-  /** IPs in a file observed with more than one distinct MAC → {ip: [macs]}. */
-  private Map<String, List<String>> conflictingIpMacs(UUID fileId) {
-    Map<String, List<String>> byIp = new LinkedHashMap<>();
+  /**
+   * For each file, the IPs observed with more than one distinct MAC: {fileId: {ip: [macs]}}. One
+   * query across all the files. A failure returns no conflicts (logged), the same degrade as the
+   * old per-file lookup.
+   */
+  private Map<UUID, Map<String, List<String>>> conflictingIpMacs(List<UUID> fileIds) {
+    Map<UUID, Map<String, List<String>>> byFile = new LinkedHashMap<>();
+    if (fileIds.isEmpty()) return byFile;
     try {
       jdbc.query(
           con -> {
             var ps =
                 con.prepareStatement(
                     """
-                    SELECT ip, mac FROM ip_mac_observations
-                    WHERE file_id = ?
-                      AND ip IN (
-                        SELECT ip FROM ip_mac_observations
-                        WHERE file_id = ? GROUP BY ip HAVING COUNT(DISTINCT mac) > 1
-                      )
-                    ORDER BY ip, mac
+                    SELECT o.file_id, o.ip, o.mac FROM ip_mac_observations o
+                    JOIN (
+                      SELECT file_id, ip FROM ip_mac_observations
+                      WHERE file_id = ANY(?)
+                      GROUP BY file_id, ip HAVING COUNT(DISTINCT mac) > 1
+                    ) c ON c.file_id = o.file_id AND c.ip = o.ip
+                    ORDER BY o.file_id, o.ip, o.mac
                     """);
-            ps.setObject(1, fileId);
-            ps.setObject(2, fileId);
+            ps.setArray(1, con.createArrayOf("uuid", fileIds.toArray()));
             return ps;
           },
           rs -> {
-            byIp.computeIfAbsent(rs.getString("ip"), k -> new ArrayList<>()).add(rs.getString("mac"));
+            byFile
+                .computeIfAbsent(rs.getObject("file_id", UUID.class), k -> new LinkedHashMap<>())
+                .computeIfAbsent(rs.getString("ip"), k -> new ArrayList<>())
+                .add(rs.getString("mac"));
           });
     } catch (Exception e) {
-      log.warn("Conflicting IP/MAC lookup failed for file {}: {}", fileId, e.getMessage());
+      log.warn("Conflicting IP/MAC lookup failed for {} file(s): {}", fileIds.size(), e.getMessage());
       return Map.of();
     }
-    return byIp;
+    return byFile;
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────

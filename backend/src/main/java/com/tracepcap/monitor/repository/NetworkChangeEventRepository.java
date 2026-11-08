@@ -79,6 +79,17 @@ public interface NetworkChangeEventRepository
           + " GROUP BY e.toSnapshot.id")
   List<Object[]> countCriticalRawByToSnapshotIds(@Param("ids") List<UUID> ids);
 
+  /**
+   * Unreviewed events per (network, severity), for the networks list in one query (#469). Same
+   * filter as {@link #countCriticalByNetworkId} / {@link #countWarningByNetworkId}.
+   */
+  @Query(
+      "SELECT e.network.id, e.severity, COUNT(e) FROM NetworkChangeEventEntity e"
+          + " WHERE e.network.id IN :ids AND e.reviewed = false"
+          + " AND e.severity IN ('CRITICAL', 'WARNING')"
+          + " GROUP BY e.network.id, e.severity")
+  List<Object[]> countUnreviewedBySeverityRaw(@Param("ids") java.util.Collection<UUID> ids);
+
   default Map<UUID, Long> countByToSnapshotIds(List<UUID> ids) {
     Map<UUID, Long> result = new HashMap<>();
     for (Object[] row : countRawByToSnapshotIds(ids)) result.put((UUID) row[0], (Long) row[1]);

@@ -1,5 +1,6 @@
 package com.tracepcap.monitor.service;
 
+import java.util.Set;
 import com.tracepcap.analysis.spi.ConversationLookup;
 import com.tracepcap.common.exception.InvalidFileException;
 import com.tracepcap.common.exception.ResourceNotFoundException;
@@ -66,13 +67,17 @@ public class SnapshotService {
         securitySignalCounts(
             snapshots.stream().map(s -> s.getFile().getId()).distinct().collect(Collectors.toList()));
 
+    // One query for every snapshot's insight flag, instead of one per row (#469).
+    Set<UUID> withInsights = insightPresence.snapshotsWithInsights(ids);
+
     return snapshots.stream()
         .map(s -> toDto(
             s,
             changeCounts.getOrDefault(s.getId(), 0L),
             criticalCounts.getOrDefault(s.getId(), 0L),
             securityCounts.getOrDefault(s.getFile().getId(), 0L),
-            overridesMap.getOrDefault(s.getId(), Collections.emptyList())))
+            overridesMap.getOrDefault(s.getId(), Collections.emptyList()),
+            withInsights.contains(s.getId())))
         .collect(Collectors.toList());
   }
 
@@ -312,6 +317,12 @@ public class SnapshotService {
 
   NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount,
       long securitySignalCount, List<SnapshotSubnetOverrideDto> overrides) {
+    return toDto(s, changeCount, criticalCount, securitySignalCount, overrides,
+        insightPresence.snapshotHasInsights(s.getId()));
+  }
+
+  NetworkSnapshotDto toDto(NetworkSnapshotEntity s, long changeCount, long criticalCount,
+      long securitySignalCount, List<SnapshotSubnetOverrideDto> overrides, boolean hasInsights) {
     return NetworkSnapshotDto.builder()
         .id(s.getId())
         .networkId(s.getNetwork().getId())
@@ -327,7 +338,7 @@ public class SnapshotService {
         .securitySignalCount(securitySignalCount)
         .context(s.getContext())
         .notes(s.getNotes())
-        .hasInsights(insightPresence.snapshotHasInsights(s.getId()))
+        .hasInsights(hasInsights)
         .addedAt(s.getAddedAt())
         .subnetOverrides(overrides)
         .build();
