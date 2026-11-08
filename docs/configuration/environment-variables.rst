@@ -265,7 +265,11 @@ and MinIO) with a queue of a few hundred is a reasonable starting point.
    * - ``ASYNC_CORE_POOL_SIZE``
      - ``5``
      - Number of threads kept alive to run analyses. These stay up even when
-       idle.
+       idle. This is also how many analyses run at once, because extra threads
+       up to ``ASYNC_MAX_POOL_SIZE`` start only once ``ASYNC_QUEUE_CAPACITY``
+       is full. Each running analysis holds two database connections, so keep
+       ``DB_POOL_MAX_SIZE`` at least ``2 x ASYNC_CORE_POOL_SIZE + 5``. The
+       backend logs a warning at startup when it is smaller.
    * - ``ASYNC_MAX_POOL_SIZE``
      - ``10``
      - Maximum analysis threads. Keep at or below the host CPU core count —

@@ -18,6 +18,15 @@ public class AsyncConfig {
   @Value("${async.core-pool-size:5}")
   private int corePoolSize;
 
+  @Value("${spring.datasource.hikari.maximum-pool-size:10}")
+  private int dbPoolMaxSize;
+
+  /** Connections each running analysis holds at once: its pipeline transaction + one REQUIRES_NEW write. */
+  static final int CONNECTIONS_PER_ANALYSIS = 2;
+
+  /** Connections left over for HTTP requests while analyses run. */
+  static final int REQUEST_RESERVE = 5;
+
   @Value("${async.max-pool-size:10}")
   private int maxPoolSize;
 
@@ -48,6 +57,30 @@ public class AsyncConfig {
         maxPoolSize,
         queueCapacity);
 
+    int needed = connectionsNeeded(corePoolSize);
+    if (dbPoolMaxSize < needed) {
+      log.warn(
+          "DB pool too small for analysis concurrency: DB_POOL_MAX_SIZE={} but {} concurrent analyses"
+              + " (ASYNC_CORE_POOL_SIZE) hold up to {} connections, plus {} reserved for requests ="
+              + " {}. Under an upload burst, API requests will wait for connections. Raise"
+              + " DB_POOL_MAX_SIZE to at least {}, or lower ASYNC_CORE_POOL_SIZE (#767).",
+          dbPoolMaxSize,
+          corePoolSize,
+          corePoolSize * CONNECTIONS_PER_ANALYSIS,
+          REQUEST_RESERVE,
+          needed,
+          needed);
+    }
+
     return executor;
+  }
+
+  /**
+   * Pool size that steady-state analysis concurrency needs (#767). Steady state is the core size,
+   * not the max: with a bounded queue, {@link ThreadPoolTaskExecutor} adds threads past the core
+   * size only once the queue (default 100) is full.
+   */
+  static int connectionsNeeded(int analysisConcurrency) {
+    return analysisConcurrency * CONNECTIONS_PER_ANALYSIS + REQUEST_RESERVE;
   }
 }
