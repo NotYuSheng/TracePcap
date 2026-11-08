@@ -2611,6 +2611,8 @@ export interface components {
             createdBy?: string;
             description?: string;
             deviceType?: string;
+            /** Format: int32 */
+            deviceTypeWeight?: number;
             enabled?: boolean;
             /** Format: uuid */
             fileId?: string;
@@ -2636,6 +2638,9 @@ export interface components {
         };
         DetectionRuleRequest: {
             description?: string;
+            deviceType?: string;
+            /** Format: int32 */
+            deviceTypeWeight?: number;
             enabled?: boolean;
             match?: components["schemas"]["Match"];
             matchAll?: boolean;

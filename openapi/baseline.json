@@ -1180,6 +1180,10 @@
           "deviceType": {
             "type": "string"
           },
+          "deviceTypeWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
           "enabled": {
             "type": "boolean"
           },
@@ -1249,6 +1253,17 @@
             "maxLength": 2000,
             "minLength": 0,
             "type": "string"
+          },
+          "deviceType": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          },
+          "deviceTypeWeight": {
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
           },
           "enabled": {
             "type": "boolean"
