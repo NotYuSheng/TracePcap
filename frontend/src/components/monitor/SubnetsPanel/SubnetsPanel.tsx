@@ -5,6 +5,7 @@ import { Pagination } from '@components/common/Pagination/Pagination';
 import { SubnetDiagramModal } from '@components/monitor/SubnetDiagramModal/SubnetDiagramModal';
 import { SubnetDetailModal } from '@components/monitor/SubnetsPanel/SubnetDetailModal';
 import { subnetService } from '@/features/subnets/services/subnetService';
+import { networkAddressService } from '@/features/networkAddress/networkAddressService';
 import type { SubnetDefinition, SubnetOverlapWarning } from '@/features/subnets/types/subnet.types';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 
@@ -14,9 +15,11 @@ interface SubnetsPanelProps {
   snapshots: NetworkSnapshot[];
   onSaved: (subnet: SubnetDefinition) => void;
   onDeleted: (id: number) => void;
+  /** Reloads the list, e.g. after reverting brings the default's entry back. */
+  onChanged?: () => void;
 }
 
-export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted }: SubnetsPanelProps) => {
+export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted, onChanged }: SubnetsPanelProps) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addCidr, setAddCidr] = useState('');
   const [addLabel, setAddLabel] = useState('');
@@ -74,8 +77,14 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
     if (!addCidr.trim()) return;
     setAddSaving(true);
     try {
-      const saved = await subnetService.upsert(addCidr.trim(), addLabel.trim(), addDesc.trim(), true, networkId);
-      onSaved(saved);
+      // Edits here are this network's own entries (#915 phase 4); the shared default is edited in
+      // the System console.
+      const saved = await networkAddressService.put(networkId, 'subnets', {
+        cidr: addCidr.trim(),
+        label: addLabel.trim() || null,
+        description: addDesc.trim() || null,
+      });
+      onSaved(saved as unknown as SubnetDefinition);
       setAddCidr(''); setAddLabel(''); setAddDesc('');
       setShowAddForm(false);
     } finally {
@@ -83,11 +92,22 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
     }
   };
 
-  const handleDelete = async (id: number) => {
+  /**
+   * In a network, removing a subnet acts on this network only: the default's subnet is hidden
+   * here, and the network's own entry is removed (bringing back the default's, if it has one).
+   */
+  const handleDelete = async (subnet: SubnetDefinition) => {
+    if (subnet.id === null) return;
+    const id = subnet.id;
     setDeletingId(id);
     try {
-      await subnetService.delete(id);
+      if (subnet.scope === 'network') {
+        await networkAddressService.revert(networkId, 'subnets', id);
+      } else {
+        await networkAddressService.put(networkId, 'subnets', { cidr: subnet.cidr, hidden: true });
+      }
       onDeleted(id);
+      onChanged?.();
     } finally {
       setDeletingId(null);
     }
@@ -123,8 +143,12 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
   const handleSaveCandidate = async (candidate: SubnetDefinition) => {
     setSavingCidr(candidate.cidr);
     try {
-      const saved = await subnetService.saveDetected(candidate.cidr, candidate.label ?? '', candidate.description ?? '');
-      onSaved(saved);
+      const saved = await networkAddressService.put(networkId, 'subnets', {
+        cidr: candidate.cidr,
+        label: candidate.label ?? null,
+        description: candidate.description ?? null,
+      });
+      onSaved(saved as unknown as SubnetDefinition);
       setCandidates(prev => prev.filter(c => c.cidr !== candidate.cidr));
     } finally {
       setSavingCidr(null);
@@ -161,6 +185,11 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                       <td className="small">
                         <div className="d-flex align-items-center gap-1">
                           {subnet.label || <span className="text-muted fst-italic">—</span>}
+                          {subnet.scope === 'network' && (
+                            <Badge bg="primary" style={{ fontSize: '0.6rem' }}>
+                              {subnet.overridesDefault ? 'overridden here' : 'this network'}
+                            </Badge>
+                          )}
                           {subnet.staleSince && (
                             <Badge
                               bg="warning"
@@ -203,7 +232,14 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                           <Button
                             size="sm"
                             variant="outline-danger"
-                            onClick={() => subnet.id !== null && handleDelete(subnet.id)}
+                            aria-label={
+                              subnet.scope !== 'network'
+                                ? `Hide ${subnet.cidr} in this network`
+                                : subnet.overridesDefault
+                                  ? `Revert ${subnet.cidr} to the default`
+                                  : `Remove ${subnet.cidr}`
+                            }
+                            onClick={() => handleDelete(subnet)}
                             disabled={deletingId === subnet.id}
                           >
                             {deletingId === subnet.id
@@ -361,6 +397,10 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
       {/* Add form */}
       {showAddForm && (
         <form onSubmit={handleAdd} className="border rounded p-3 bg-light mt-3">
+          <p className="small text-muted mb-2">
+            Adds to this network only. Subnets for every network are set in the System console's
+            address defaults.
+          </p>
           <div className="row g-2">
             <div className="col-sm-4">
               <Form.Label className="small fw-semibold">CIDR <span className="text-danger">*</span></Form.Label>

@@ -43,6 +43,18 @@ and the network's own, badged by where they come from:
 **Add for this network** adds an entry only this network has. Changes apply to
 the network's existing snapshots straight away; nothing is re-analysed.
 
+The editors elsewhere on a network's page work the same way: adding a subnet in
+the **Subnets** panel, or an internal/external override under **IP drift**, adds
+it to this network only, and removing a default entry there hides it in this
+network.
+
+Editing the Default
+-------------------
+
+The shared default is edited on the **System** page, **Address defaults** tab:
+add, edit or delete entries for every network at once. Saving an entry for a
+CIDR that's already there changes it rather than adding a second one.
+
 Entries match **per range** (CIDR): a network entry for ``10.0.0.0/8``
 replaces the default's ``10.0.0.0/8`` entry, and leaves the default's other
 entries, including narrower ones such as ``10.1.0.0/16``, as they are.
@@ -71,6 +83,6 @@ network**, so confirming or dismissing in one network doesn't reset another.
 Who Can Change What
 -------------------
 
-A network's entries need the **Edit network settings** permission (default:
-analysts). Every change is recorded in the audit log. See
-:ref:`settings-permissions`.
+A network's entries need the **Edit network settings** permission, and the
+shared default needs **Edit address defaults** (both default to analysts).
+Every change is recorded in the audit log. See :ref:`settings-permissions`.

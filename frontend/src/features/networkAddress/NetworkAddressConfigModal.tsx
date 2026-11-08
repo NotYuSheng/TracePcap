@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Form, Modal, Tab, Tabs } from '@govtechsg/sgds-react';
+import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { usePermission } from '@/features/me/useMe';
 import {
-  networkAddressService,
+  networkSource,
   type AddressEntry,
   type AddressEntryInput,
   type AddressKind,
+  type AddressSource,
 } from './networkAddressService';
 
 interface KindConfig {
@@ -64,7 +65,7 @@ interface Props {
  * to the default.
  */
 export function NetworkAddressConfigModal({ show, networkId, networkName, onHide, onChanged }: Props) {
-  const [active, setActive] = useState<AddressKind>('subnets');
+  const source = useMemo(() => networkSource(networkId), [networkId]);
   return (
     <Modal show={show} onHide={onHide} size="lg" centered>
       <Modal.Header closeButton>
@@ -76,31 +77,64 @@ export function NetworkAddressConfigModal({ show, networkId, networkName, onHide
           apply in this network only, to its existing snapshots too: override a default entry, hide it,
           or add one only this network has.
         </p>
-        <Tabs activeKey={active} onSelect={k => k && setActive(k as AddressKind)} className="mb-3">
-          {KINDS.map(k => (
-            <Tab key={k.kind} eventKey={k.kind} title={k.title}>
-              {active === k.kind && (
-                <AddressList config={k} networkId={networkId} onChanged={onChanged} />
-              )}
-            </Tab>
-          ))}
-        </Tabs>
+        <AddressTabs source={source} idPrefix="network-address" onChanged={onChanged} />
       </Modal.Body>
     </Modal>
   );
 }
 
+/**
+ * The three address lists as tabs, over a network's layer or the shared default. Plain Bootstrap
+ * nav-tabs, as on the System page: the SGDS Tabs nav doesn't render visibly in this theme.
+ */
+export function AddressTabs({
+  source,
+  idPrefix,
+  onChanged,
+}: {
+  source: AddressSource;
+  idPrefix: string;
+  onChanged?: () => void;
+}) {
+  const [active, setActive] = useState<AddressKind>('subnets');
+  return (
+    <>
+      <ul className="nav nav-tabs mb-3" role="tablist">
+        {KINDS.map(k => (
+          <li className="nav-item" key={k.kind} role="presentation">
+            <button
+              type="button"
+              role="tab"
+              id={`${idPrefix}-tab-${k.kind}`}
+              aria-selected={active === k.kind}
+              aria-controls={`${idPrefix}-panel-${k.kind}`}
+              className={`nav-link${active === k.kind ? ' active' : ''}`}
+              onClick={() => setActive(k.kind)}
+            >
+              {k.title}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div role="tabpanel" id={`${idPrefix}-panel-${active}`} aria-labelledby={`${idPrefix}-tab-${active}`}>
+        <AddressList key={active} config={KINDS.find(k => k.kind === active)!} source={source} onChanged={onChanged} />
+      </div>
+    </>
+  );
+}
+
 function AddressList({
   config,
-  networkId,
+  source,
   onChanged,
 }: {
   config: KindConfig;
-  networkId: string;
+  source: AddressSource;
   onChanged?: () => void;
 }) {
   const { kind } = config;
-  const { allowed, reason } = usePermission('NETWORK_SETTINGS');
+  const inNetwork = source.mode === 'network';
+  const { allowed, reason } = usePermission(source.permission);
   const [entries, setEntries] = useState<AddressEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -111,8 +145,8 @@ function AddressList({
   const load = () => setReloadKey(k => k + 1);
   useEffect(() => {
     let alive = true;
-    networkAddressService
-      .list(networkId, kind)
+    source
+      .list(kind)
       .then(r => {
         if (!alive) return;
         setEntries(r);
@@ -124,7 +158,7 @@ function AddressList({
     return () => {
       alive = false;
     };
-  }, [networkId, kind, reloadKey]);
+  }, [source, kind, reloadKey]);
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -169,7 +203,7 @@ function AddressList({
         />
         <Button size="sm" variant="primary" disabled={!allowed} onClick={() => setEditing({})} className="text-nowrap">
           <i className="bi bi-plus-lg me-1" aria-hidden="true" />
-          Add for this network
+          {inNetwork ? 'Add for this network' : 'Add'}
         </Button>
       </div>
       {!allowed && reason && <div className="text-muted small mb-2">{reason}</div>}
@@ -181,7 +215,7 @@ function AddressList({
 
       {entries.length === 0 ? (
         <p className="text-muted fst-italic small mb-0">
-          Nothing here yet, in the default or this network.
+          {inNetwork ? 'Nothing here yet, in the default or this network.' : 'Nothing here yet.'}
         </p>
       ) : shown.length === 0 ? (
         <p className="text-muted fst-italic small mb-0">No entries match “{search}”.</p>
@@ -191,7 +225,7 @@ function AddressList({
             <tr>
               <th scope="col">CIDR</th>
               <th scope="col">{config.valueLabel}</th>
-              <th scope="col">From</th>
+              {inNetwork && <th scope="col">From</th>}
               <th scope="col" className="text-end">
                 <span className="visually-hidden">Actions</span>
               </th>
@@ -202,7 +236,7 @@ function AddressList({
               <tr key={`${e.scope}-${e.id}`} data-testid="address-row" className={e.hidden ? 'text-muted' : undefined}>
                 <td className="font-monospace">{e.hidden ? <s>{e.cidr}</s> : e.cidr}</td>
                 <td>{e.hidden ? <s>{valueOf(e, kind)}</s> : valueOf(e, kind) || <span className="text-muted">—</span>}</td>
-                <td>
+                {inNetwork && <td>
                   {e.scope === 'default' ? (
                     <Badge bg="secondary">default</Badge>
                   ) : e.hidden ? (
@@ -212,9 +246,24 @@ function AddressList({
                   ) : (
                     <Badge bg="primary">this network</Badge>
                   )}
-                </td>
+                </td>}
                 <td className="text-end text-nowrap">
-                  {e.scope === 'default' ? (
+                  {!inNetwork ? (
+                    <>
+                      <Button size="sm" variant="link" disabled={!allowed} onClick={() => setEditing({ entry: e })}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="link"
+                        className="text-danger"
+                        disabled={!allowed}
+                        onClick={() => run(() => source.remove(kind, e), "Couldn't delete it.")}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  ) : e.scope === 'default' ? (
                     <>
                       <Button size="sm" variant="link" disabled={!allowed} onClick={() => setEditing({ entry: e })}>
                         Override
@@ -224,7 +273,7 @@ function AddressList({
                         variant="link"
                         disabled={!allowed}
                         onClick={() =>
-                          run(() => networkAddressService.put(networkId, kind, { cidr: e.cidr, hidden: true }), "Couldn't hide it.")
+                          run(() => source.put(kind, { cidr: e.cidr, hidden: true }), "Couldn't hide it.")
                         }
                       >
                         Hide here
@@ -241,7 +290,7 @@ function AddressList({
                         size="sm"
                         variant="link"
                         disabled={!allowed}
-                        onClick={() => run(() => networkAddressService.revert(networkId, kind, e.id), "Couldn't revert it.")}
+                        onClick={() => run(() => source.remove(kind, e), "Couldn't revert it.")}
                       >
                         {e.hidden ? 'Show again' : e.overridesDefault ? 'Revert to default' : 'Remove'}
                       </Button>
@@ -256,10 +305,11 @@ function AddressList({
 
       <EntryModal
         config={config}
+        inNetwork={inNetwork}
         editing={editing}
         onHide={() => setEditing(null)}
         onSave={async input => {
-          await networkAddressService.put(networkId, kind, input);
+          await source.put(kind, input);
           setEditing(null);
           load();
           onChanged?.();
@@ -271,11 +321,13 @@ function AddressList({
 
 function EntryModal({
   config,
+  inNetwork,
   editing,
   onHide,
   onSave,
 }: {
   config: KindConfig;
+  inNetwork: boolean;
   editing: { entry?: AddressEntry } | null;
   onHide: () => void;
   onSave: (input: AddressEntryInput) => Promise<void>;
@@ -296,8 +348,10 @@ function EntryModal({
     setError(null);
   }, [editing, entry]);
 
-  const overriding = entry?.scope === 'default';
-  const title = !entry ? 'Add for this network' : overriding ? `Override ${entry.cidr} here` : `Edit ${entry.cidr}`;
+  const overriding = inNetwork && entry?.scope === 'default';
+  const title = !entry
+    ? inNetwork ? 'Add for this network' : 'Add to the default'
+    : overriding ? `Override ${entry.cidr} here` : `Edit ${entry.cidr}`;
   const needsLabel = kind !== 'custom-private-ranges';
   const valid = cidr.trim() !== '' && (!needsLabel || label.trim() !== '' || kind === 'subnets');
 

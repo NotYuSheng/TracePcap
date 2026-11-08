@@ -49,3 +49,51 @@ export const networkAddressService = {
   /** The entries in effect: the network's visible ones and the default's it leaves alone. */
   visible: (entries: AddressEntry[]): AddressEntry[] => entries.filter(e => !e.hidden),
 };
+
+/**
+ * Where an address list reads and writes: a network's own layer (#915 phase 4), or the shared
+ * default every network starts from (edited in the System console).
+ */
+export interface AddressSource {
+  mode: 'network' | 'default';
+  /** The permission that gates changes. */
+  permission: 'NETWORK_SETTINGS' | 'ADDRESS_DEFAULTS';
+  list(kind: AddressKind): Promise<AddressEntry[]>;
+  /** Network: override, add or hide. Default: set the CIDR's entry. */
+  put(kind: AddressKind, input: AddressEntryInput): Promise<unknown>;
+  /** Network: revert to the default. Default: delete. */
+  remove(kind: AddressKind, entry: AddressEntry): Promise<void>;
+}
+
+export function networkSource(networkId: string): AddressSource {
+  return {
+    mode: 'network',
+    permission: 'NETWORK_SETTINGS',
+    list: kind => networkAddressService.list(networkId, kind),
+    put: (kind, input) => networkAddressService.put(networkId, kind, input),
+    remove: (kind, entry) => networkAddressService.revert(networkId, kind, entry.id),
+  };
+}
+
+const DEFAULT_PATHS: Record<AddressKind, string> = {
+  subnets: '/subnets',
+  'custom-private-ranges': '/custom-private-ranges',
+  'ip-org-rules': '/ip-org-rules',
+};
+
+/** The shared default (#915 phase 4c). Every row is the default's own. */
+export const defaultSource: AddressSource = {
+  mode: 'default',
+  permission: 'ADDRESS_DEFAULTS',
+  list: async kind => {
+    const rows = (await apiClient.get<AddressEntry[]>(DEFAULT_PATHS[kind])).data;
+    return rows.map(r => ({ ...r, scope: 'default' as const, hidden: false, overridesDefault: false }));
+  },
+  put: async (kind, input) => {
+    const body = kind === 'subnets' ? { ...input, confirmed: true } : input;
+    return (await apiClient.post(DEFAULT_PATHS[kind], body)).data;
+  },
+  remove: async (kind, entry) => {
+    await apiClient.delete(`${DEFAULT_PATHS[kind]}/${entry.id}`);
+  },
+};

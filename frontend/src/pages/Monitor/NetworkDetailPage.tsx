@@ -229,7 +229,7 @@ export const NetworkDetailPage = () => {
                   </h6>
                 </Card.Header>
                 <Card.Body style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                  <IpDriftPanel snapshots={snapshots} subnets={subnets} settings={network.settings} />
+                  <IpDriftPanel networkId={networkId} snapshots={snapshots} subnets={subnets} settings={network.settings} />
                 </Card.Body>
               </Card>
             </Col>
@@ -316,6 +316,7 @@ export const NetworkDetailPage = () => {
                 snapshots={snapshots}
                 onSaved={data.handleSubnetSaved}
                 onDeleted={data.handleSubnetDeleted}
+                onChanged={() => reload(false)}
               />
             </Card.Body>
           </Card>

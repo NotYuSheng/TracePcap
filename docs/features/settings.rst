@@ -116,7 +116,11 @@ the defaults favour analysts:
      - analysts
    * - Splitting or merging a host's devices (:doc:`address-reuse`)
      - analysts
-   * - Network settings
+   * - Network settings, including a network's own address entries
+       (:doc:`network-address-config`)
+     - analysts
+   * - Address defaults: subnet labels, internal/external ranges and
+       organisations shared by every network
      - analysts
    * - Analysis policy
      - analysts
