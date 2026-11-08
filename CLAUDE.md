@@ -22,7 +22,7 @@ Only build a custom component if SGDS has no equivalent.
   `--base dev` explicitly.**
 - Branch from `dev`, and open PRs **against `dev`**. Never open a PR against `main` except the
   periodic `dev` -> `main` release PR, and never commit to `main` directly.
-- `dev` runs the same gates as `main` and is expected to be green.
+- PRs into `dev` run the full test gates and must be green to merge. The long jobs (system, backend, frontend, arm64) don't re-run on pushes to `dev`, only on the release PR and on `main`.
 - See CONTRIBUTING.md for what runs where and how to cut a release.
 
 
