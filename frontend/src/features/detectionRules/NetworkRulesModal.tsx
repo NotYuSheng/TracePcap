@@ -93,6 +93,7 @@ export function NetworkRulesModal({
           <div className="d-flex mb-2">
             <Button
               size="sm"
+              variant="primary"
               className="ms-auto"
               disabled={!perm.allowed}
               onClick={() => {

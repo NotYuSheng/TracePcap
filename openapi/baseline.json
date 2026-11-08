@@ -1200,6 +1200,10 @@
           "name": {
             "type": "string"
           },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "payloadContains": {
             "items": {
               "$ref": "#/components/schemas/PayloadPattern"
@@ -4481,7 +4485,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_8",
+        "operationId": "list_9",
         "parameters": [
           {
             "in": "query",
@@ -5244,6 +5248,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "View in this network (#925): its own detection rules' matches are added to customSignatures and count for that filter",
+            "in": "query",
+            "name": "networkId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5307,6 +5321,15 @@
             "in": "path",
             "name": "fileId",
             "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "networkId",
+            "required": false,
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -5952,7 +5975,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_7",
+        "operationId": "list_8",
         "responses": {
           "200": {
             "content": {
@@ -5974,7 +5997,7 @@
         ]
       },
       "post": {
-        "operationId": "create_5",
+        "operationId": "create_6",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6031,7 +6054,7 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_6",
+        "operationId": "list_7",
         "parameters": [
           {
             "in": "query",
@@ -6064,7 +6087,7 @@
         ]
       },
       "post": {
-        "operationId": "create_4",
+        "operationId": "create_5",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7150,7 +7173,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_6",
         "parameters": [
           {
             "in": "path",
@@ -7183,7 +7206,7 @@
         ]
       },
       "post": {
-        "operationId": "create_3",
+        "operationId": "create_4",
         "parameters": [
           {
             "in": "path",
@@ -7951,7 +7974,7 @@
     },
     "/api/v1/ip-org-rules": {
       "get": {
-        "operationId": "list_4",
+        "operationId": "list_5",
         "responses": {
           "200": {
             "content": {
@@ -7973,7 +7996,7 @@
         ]
       },
       "post": {
-        "operationId": "create_2",
+        "operationId": "create_3",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8198,7 +8221,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations": {
       "get": {
-        "operationId": "list_3",
+        "operationId": "list_4",
         "parameters": [
           {
             "in": "path",
@@ -8231,7 +8254,7 @@
         ]
       },
       "post": {
-        "operationId": "create_1",
+        "operationId": "create_2",
         "parameters": [
           {
             "in": "path",
@@ -8565,6 +8588,82 @@
         "summary": "Update a change event's reviewed flag or notes",
         "tags": [
           "Monitor Change Events"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/detection-rules": {
+      "get": {
+        "operationId": "list_3",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DetectionRuleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "This network's own rules",
+        "tags": [
+          "Network Detection Rules"
+        ]
+      },
+      "post": {
+        "description": "Checked against each capture that joins the network from now on, and against the network's existing captures on Re-apply.",
+        "operationId": "create_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectionRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionRuleDto"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Add a rule to this network (audited)",
+        "tags": [
+          "Network Detection Rules"
         ]
       }
     },
@@ -10499,6 +10598,10 @@
     }
   },
   "tags": [
+    {
+      "description": "Detection rules that belong to one network",
+      "name": "Network Detection Rules"
+    },
     {
       "description": "Who may change each setting or rule set (analysts or admins)",
       "name": "Permissions"
