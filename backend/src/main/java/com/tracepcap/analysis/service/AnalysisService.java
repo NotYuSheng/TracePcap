@@ -309,6 +309,10 @@ public class AnalysisService {
     /** The analysers' tool output, from before the transaction; applied in stage 3. */
     ExtractorRunner.PreparedExtractions prepared = ExtractorRunner.PreparedExtractions.NONE;
 
+    /** Hostname claims and Windows logins: file-only tshark passes, run before the transaction. */
+    List<HostnameResolverService.Claim> hostnameClaims = List.of();
+    List<WindowsIdentityResolverService.Logon> logons = List.of();
+
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
 
@@ -474,6 +478,13 @@ public class AnalysisService {
     reportStage(run.fileId, run.plan, 1);
     long t = System.currentTimeMillis();
     run.prepared = extractorRunner.prepareAll(run.file, run.pcap);
+    // The hostname and Windows-login passes read only the file too (#812 item 3), so they run here,
+    // with no DB connection held, rather than inside stage 4's transaction. Sequential on purpose:
+    // each tshark pass peaks around 170 MB, and running them alongside Suricata would raise the
+    // container's peak native memory, which the memory budget assumes is one tool at a time.
+    // Both resolvers never throw.
+    run.hostnameClaims = hostnameResolverService.resolve(run.pcap);
+    run.logons = windowsIdentityResolverService.resolveLogons(run.pcap);
     log.info(
         "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
         run.fileId,
@@ -493,7 +504,7 @@ public class AnalysisService {
     // resolve() degrades gracefully and never throws. Claims are persisted conflict-preserving
     // (#512 slice 4); the adjudicator picks display winners with the same semantics the
     // resolver used to apply at write time, so downstream behaviour is unchanged.
-    List<HostnameResolverService.Claim> hostnameClaims = hostnameResolverService.resolve(run.pcap);
+    List<HostnameResolverService.Claim> hostnameClaims = run.hostnameClaims;
     try {
       hostnameClaimWriter.replaceForFile(fileId, hostnameClaims);
     } catch (Exception e) {
@@ -513,7 +524,7 @@ public class AnalysisService {
         new LinkedHashMap<>();
     // Every login with its time (#812), kept for the host timeline; the claims below are the same
     // deduplicated classification view as before.
-    List<WindowsIdentityResolverService.Logon> logons = windowsIdentityResolverService.resolveLogons(run.pcap);
+    List<WindowsIdentityResolverService.Logon> logons = run.logons;
     try {
       windowsLogonWriter.replaceForFile(fileId, logons);
     } catch (Exception e) {
