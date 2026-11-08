@@ -119,7 +119,12 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
         value = node.data.hostname;
         break;
       case 'loggedInUser':
-        value = node.data.loggedInUser;
+        // Several accounts on one host (#812): flag it rather than pick one. The host's detail view
+        // shows the login timeline.
+        value =
+          (node.data.loggedInUserCount ?? 0) > 1
+            ? `${node.data.loggedInUserCount} accounts`
+            : node.data.loggedInUser;
         break;
       case 'mac':
         value = node.data.mac;

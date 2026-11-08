@@ -84,6 +84,15 @@ public class HostClassificationEntity {
   @Column(name = "logged_in_user_real_name", length = 255)
   private String loggedInUserRealName;
 
+  /**
+   * How many distinct accounts the sign-in label is choosing between (#812). {@link #loggedInUser}
+   * is only set when this is exactly 1; with more, the UI shows "N accounts" and the host's login
+   * timeline instead of picking one.
+   */
+  @Builder.Default
+  @Column(name = "logged_in_user_count", nullable = false)
+  private int loggedInUserCount = 0;
+
   /** First-seen IP TTL value (may be null for non-IP traffic). */
   @Column(name = "ttl")
   private Integer ttl;

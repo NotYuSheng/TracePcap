@@ -4,6 +4,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import io.swagger.v3.oas.annotations.Parameter;
 import com.tracepcap.analysis.spi.HostClassificationLookup;
 import com.tracepcap.analysis.spi.IpMacObservationLookup;
+import com.tracepcap.analysis.spi.WindowsLogonLookup;
+import com.tracepcap.hostclassification.dto.WindowsLogonResponse;
 import com.tracepcap.hostclassification.dto.HostClassificationResponse;
 import com.tracepcap.hostclassification.dto.IpMacObservationsResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +24,35 @@ public class HostClassificationsController {
 
   private final HostClassificationLookup hostClassificationLookup;
   private final IpMacObservationLookup ipMacObservationLookup;
+  private final WindowsLogonLookup windowsLogonLookup;
+
+  /**
+   * Every Windows account seen on one host, oldest first (#812). A host can have several over one
+   * capture (a shift change, a shared PC, a remote admin), so this is a timeline rather than one
+   * answer. Empty when none were seen.
+   */
+  @GetMapping("/{fileId}/hosts/{ip}/windows-logons")
+  @Operation(summary = "Windows accounts seen on a host, with when (login timeline)")
+  public ResponseEntity<List<WindowsLogonResponse>> getWindowsLogons(
+      @PathVariable UUID fileId, @PathVariable String ip) {
+    return ResponseEntity.ok(
+        windowsLogonLookup.logonsFor(fileId, ip).stream()
+            .map(
+                l ->
+                    WindowsLogonResponse.builder()
+                        .username(l.username())
+                        .evidence(l.evidence())
+                        .directoryEntry(l.directoryEntry())
+                        .folder(l.folder())
+                        .folderKind(l.folderKind())
+                        .domain(l.domain())
+                        .firstSeen(l.firstSeen())
+                        .lastSeen(l.lastSeen())
+                        .seenCount(l.seenCount())
+                        .candidateOnly(l.candidateOnly())
+                        .build())
+            .toList());
+  }
 
   /** Returns the device-type classification for every unique host in the given PCAP file. */
   @GetMapping("/{fileId}/host-classifications")
@@ -40,6 +71,7 @@ public class HostClassificationsController {
                         .hostnameSource(h.hostnameSource())
                         .loggedInUser(h.loggedInUser())
                         .loggedInUserSource(h.loggedInUserSource())
+                        .loggedInUserCount(h.loggedInUserCount())
                         .ttl(h.ttl())
                         .deviceType(h.deviceType())
                         .confidence(h.confidence())

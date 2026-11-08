@@ -68,6 +68,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
         e.getLoggedInUser(),
         e.getLoggedInUserSource(),
         e.getLoggedInUserRealName(),
+        e.getLoggedInUserCount(),
         e.getTtl(),
         e.getDeviceType(),
         e.getConfidence(),

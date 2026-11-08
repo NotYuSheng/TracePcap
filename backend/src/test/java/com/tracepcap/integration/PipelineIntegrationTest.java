@@ -415,6 +415,45 @@ class PipelineIntegrationTest {
     assertThat(byIp.get("total").asLong()).isGreaterThan(exact);
   }
 
+  /**
+   * Windows logins end to end (#812): a host with two accounts gets a count and no single name,
+   * a host with one gets that name, and the timeline endpoint lists every login oldest first.
+   * {@code windows-logons.pcap} is described in WindowsLogonRealCaptureTest.
+   */
+  @Test
+  void windowsLogons_labelOnlyWhenOneAccount_andTimelineListsAll() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("windows-logons.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    JsonNode hosts = rest.getForEntity("/api/v1/files/" + fileId + "/host-classifications", JsonNode.class).getBody();
+    java.util.Map<String, JsonNode> byIp = new java.util.HashMap<>();
+    hosts.forEach(h -> byIp.put(h.get("ip").asText(), h));
+
+    JsonNode shared = byIp.get("10.0.0.10"); // alice, then bob
+    assertThat(shared.get("loggedInUserCount").asInt()).isEqualTo(2);
+    assertThat(shared.path("loggedInUser").isNull() || shared.path("loggedInUser").isMissingNode()).isTrue();
+    JsonNode single = byIp.get("10.0.0.11"); // carol (the machine account doesn't count)
+    assertThat(single.get("loggedInUserCount").asInt()).isEqualTo(1);
+    assertThat(single.get("loggedInUser").asText()).isEqualTo("carol");
+
+    JsonNode timeline =
+        rest.getForEntity("/api/v1/files/" + fileId + "/hosts/10.0.0.10/windows-logons", JsonNode.class).getBody();
+    assertThat(timeline).hasSize(2);
+    assertThat(timeline.get(0).get("username").asText()).isEqualTo("alice");
+    assertThat(timeline.get(1).get("username").asText()).isEqualTo("bob");
+    assertThat(timeline.get(1).get("seenCount").asInt()).isEqualTo(2);
+
+    JsonNode ldapHost =
+        rest.getForEntity("/api/v1/files/" + fileId + "/hosts/10.0.0.12/windows-logons", JsonNode.class).getBody();
+    java.util.List<String> folders = new java.util.ArrayList<>();
+    ldapHost.forEach(l -> folders.add(l.get("username").asText() + ":" + l.get("folderKind").asText()));
+    assertThat(folders).containsExactlyInAnyOrder("Clark Collier:USERS", "Dana Lee:CUSTOM");
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";

@@ -74,6 +74,7 @@ public interface HostClassificationLookup {
       String loggedInUser,
       String loggedInUserSource,
       String loggedInUserRealName,
+      int loggedInUserCount,
       Integer ttl,
       String deviceType,
       int confidence,

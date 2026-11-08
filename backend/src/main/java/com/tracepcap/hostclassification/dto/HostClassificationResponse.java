@@ -16,6 +16,11 @@ public class HostClassificationResponse {
   String loggedInUser;
   /** How {@code loggedInUser} was discovered: {@code kerberos_as_req} or {@code ldap_dn}; null if unset. */
   String loggedInUserSource;
+  /**
+   * How many distinct accounts were seen signing in (#812). {@code loggedInUser} is only set when
+   * this is 1. With more, show "N accounts" and the host's login timeline instead.
+   */
+  int loggedInUserCount;
   Integer ttl;
   String deviceType;
   int confidence;

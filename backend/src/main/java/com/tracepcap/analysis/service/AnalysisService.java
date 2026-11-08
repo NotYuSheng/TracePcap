@@ -1,5 +1,6 @@
 package com.tracepcap.analysis.service;
 
+import java.util.Set;
 import com.tracepcap.analysis.dto.AnalysisProgressResponse;
 import com.tracepcap.analysis.dto.AnalysisSummaryResponse;
 import com.tracepcap.analysis.dto.ConversationResponse;
@@ -174,6 +175,7 @@ public class AnalysisService {
   private final HostnameClaimWriter hostnameClaimWriter;
   private final SuricataEngine suricataEngine;
   private final WindowsIdentityResolverService windowsIdentityResolverService;
+  private final WindowsLogonWriter windowsLogonWriter;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   /** The pipeline's one write transaction (see analyzeFile). Package-private for the boundary test. */
@@ -508,7 +510,15 @@ public class AnalysisService {
     // primary principal is recorded as the host's signed-in-user attribute (no separate table).
     Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp =
         new LinkedHashMap<>();
-    for (WindowsIdentityResolverService.Claim claim : windowsIdentityResolverService.resolve(run.pcap)) {
+    // Every login with its time (#812), kept for the host timeline; the claims below are the same
+    // deduplicated classification view as before.
+    List<WindowsIdentityResolverService.Logon> logons = windowsIdentityResolverService.resolveLogons(run.pcap);
+    try {
+      windowsLogonWriter.replaceForFile(fileId, logons);
+    } catch (Exception e) {
+      log.warn("Failed to persist {} Windows login(s) for file {}: {}", logons.size(), fileId, e.getMessage());
+    }
+    for (WindowsIdentityResolverService.Claim claim : WindowsIdentityResolverService.toClaims(logons)) {
       windowsIdentityClaimsByIp.computeIfAbsent(claim.ip(), k -> new ArrayList<>()).add(claim);
     }
 
@@ -1111,6 +1121,20 @@ public class AnalysisService {
    * winning source appear (a shared machine), the first observed is recorded; the full set stays
    * visible in the classification evidence.
    */
+  /**
+   * Device types where an LDAP lookup is not taken as a sign-in (#812 decision 1): servers and
+   * routers look users up all day (directory sync, mail, file ACLs). String literals because
+   * DeviceTypes lives in hostclassification, which analysis must not depend on.
+   */
+  private static final Set<String> NO_LDAP_SIGN_IN =
+      Set.of("SERVER", "ROUTER", "DNS_SERVER", "WEB_SERVER", "API_SERVER");
+
+  /**
+   * Sets the host's sign-in label (#812). A name is only set when exactly one account is in
+   * question; with more, loggedInUserCount says how many and the UI shows the timeline instead of
+   * picking one. Kerberos logins decide when present. Otherwise LDAP lookups in the default Users
+   * folder do, except on server/router hosts.
+   */
   private void applyWindowsSignIn(
       List<HostClassificationEntity> hostClassifications,
       Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
@@ -1118,29 +1142,25 @@ public class AnalysisService {
     for (HostClassificationEntity host : hostClassifications) {
       List<WindowsIdentityResolverService.Claim> claims =
           windowsIdentityClaimsByIp.getOrDefault(host.getIp(), List.of());
-      WindowsIdentityResolverService.Claim primary = primaryWindowsClaim(claims);
-      if (primary != null) {
-        host.setLoggedInUser(primary.username());
-        host.setLoggedInUserSource(primary.source());
+      List<String> kerberos = claims.stream()
+          .filter(c -> WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source()))
+          .map(WindowsIdentityResolverService.Claim::username).distinct().toList();
+      List<String> ldap = NO_LDAP_SIGN_IN.contains(host.getDeviceType())
+          ? List.<String>of()
+          : claims.stream()
+              .filter(c -> WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source()))
+              .map(WindowsIdentityResolverService.Claim::username).distinct().toList();
+      List<String> accounts = !kerberos.isEmpty() ? kerberos : ldap;
+      host.setLoggedInUserCount(accounts.size());
+      if (accounts.size() == 1) {
+        host.setLoggedInUser(accounts.get(0));
+        host.setLoggedInUserSource(!kerberos.isEmpty()
+            ? WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ
+            : WindowsIdentityResolverService.SOURCE_LDAP_DN);
+        if (ldap.size() == 1) host.setLoggedInUserRealName(ldap.get(0));
       }
-      // The LDAP-DN claim carries the person's display name (the CN), which the Kerberos principal
-      // does not — record it alongside, whichever claim won the primary slot.
-      claims.stream()
-          .filter(c -> WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source()))
-          .map(WindowsIdentityResolverService.Claim::username)
-          .filter(name -> name != null && !name.isBlank())
-          .findFirst()
-          .ifPresent(host::setLoggedInUserRealName);
     }
   }
 
-  private WindowsIdentityResolverService.Claim primaryWindowsClaim(
-      List<WindowsIdentityResolverService.Claim> claims) {
-    WindowsIdentityResolverService.Claim ldap = null;
-    for (WindowsIdentityResolverService.Claim c : claims) {
-      if (WindowsIdentityResolverService.SOURCE_KERBEROS_AS_REQ.equals(c.source())) return c;
-      if (ldap == null && WindowsIdentityResolverService.SOURCE_LDAP_DN.equals(c.source())) ldap = c;
-    }
-    return ldap;
-  }
+
 }

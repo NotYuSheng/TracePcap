@@ -438,6 +438,11 @@ export interface HostClassification {
   loggedInUser?: string;
   /** How `loggedInUser` was discovered: kerberos_as_req (stronger) | ldap_dn (weaker). */
   loggedInUserSource?: string;
+  /**
+   * How many distinct accounts were seen signing in (#812). `loggedInUser` is only set when this is
+   * 1. With more, show "N accounts" and the host's login timeline rather than picking one.
+   */
+  loggedInUserCount?: number;
   ttl?: number;
   deviceType: DeviceType;
   confidence: number;
