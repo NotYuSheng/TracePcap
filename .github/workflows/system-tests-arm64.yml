@@ -6,21 +6,17 @@ name: System Tests (arm64)
 
 on:
   workflow_dispatch:
+  # Release-only: the release PR into main, and main itself. Not on dev pushes or on PRs into dev.
+  # It's the slowest job and only catches arm64-specific build breakage, which is rare enough that
+  # finding it at release time is the right trade. No path filter on the PR trigger, so it runs on
+  # every release PR, not just ones that happen to touch build files. Run it by hand
+  # (workflow_dispatch) to check a risky build change before release.
   push:
     branches:
       - main
-      - dev
   pull_request:
-    paths:
-      - 'backend/Dockerfile'
-      - 'backend/docker-entrypoint.sh'
-      - 'backend/pom.xml'
-      - 'nginx/**'
-      - 'frontend/package-lock.json'
-      - 'docker-compose.yml'
-      - '.github/actions/build-stack/**'
-      - '.github/workflows/system-tests-arm64.yml'
-      - '.github/workflows/system-tests-run.yml'
+    branches:
+      - main
 
 permissions:
   contents: read

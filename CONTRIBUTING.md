@@ -43,10 +43,18 @@ distinction is not academic: whatever is on `main` is what someone can pull.
 
 | | on a PR | on push to `dev` | on push to `main` |
 |---|---|---|---|
-| tests, lint, contract and vocabulary gates | yes | yes | yes |
-| arm64 system test (`system-tests-arm64.yml`) | when the build changes, and on every release PR | yes | yes |
+| lint, contract and vocabulary gates | yes | yes | yes |
+| unit, integration and system tests (`test-backend.yml`, `test-frontend.yml`, `system-tests.yml`) | yes, when relevant paths change | — | yes |
+| E2E smoke and OpenAPI drift (`e2e.yml`, `api-schema-drift.yml`) | yes, when relevant paths change | — | — |
+| arm64 system test (`system-tests-arm64.yml`) | release PRs into `main` only | — | yes |
 | version stamp (`app-version.yml`) | — | yes, PR into `dev` | — |
 | container publish (`publish-ghcr.yml`) | — | — | yes |
+
+The long test jobs don't re-run on every merge into `dev`. The PR already ran them, and re-running
+them on each merge mostly queued them behind the next PR's checks. They run again on the release PR
+and on `main`, which still catches two independently green PRs that conflict once combined (#659),
+just at release time rather than per merge. To check a risky change on its own, any of them can be
+started by hand (`workflow_dispatch`).
 
 Stack builds use a Docker layer cache through `.github/actions/build-stack`, except on release PRs
 into `main`, which build from scratch so a cached layer can't hide an upstream package breaking.
