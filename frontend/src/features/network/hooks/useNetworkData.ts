@@ -36,7 +36,9 @@ const MAX_CONVERSATIONS = 500;
 export function useNetworkData(
   fileId: string,
   analysisSummary?: AnalysisSummary,
-  maxNodes: number = MAX_DIAGRAM_NODES
+  maxNodes: number = MAX_DIAGRAM_NODES,
+  /** View in this network: its own detection rules' matches show on the edges (#925 phase 3). */
+  networkId?: string
 ): UseNetworkDataReturn {
   const maxConversations = CONVERSATION_LIMIT_ENABLED ? MAX_CONVERSATIONS : Infinity;
 
@@ -107,6 +109,7 @@ export function useNetworkData(
       // may predate their endpoints). All depend only on fileId, so they run concurrently.
       const [response, classificationsRes, identitiesRes, rolesRes] = await Promise.allSettled([
         conversationService.getConversations(fileId, {
+          networkId,
           ip: '',
           port: '',
           payloadContains: '',
@@ -162,7 +165,7 @@ export function useNetworkData(
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId]);
+  }, [fileId, networkId]);
 
   // Re-transform (no network request) when maxNodes or analysisSummary changes
   useEffect(() => {

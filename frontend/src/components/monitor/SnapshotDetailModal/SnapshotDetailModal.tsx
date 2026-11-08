@@ -202,7 +202,13 @@ export const SnapshotDetailModal = ({
     return [...seen.entries()].map(([label, color]) => ({ label, color }));
   }, [highlightedNodes]);
 
-  const { nodes, edges, loading: graphLoading } = useNetworkData(diagramSnap.fileId);
+  // In this network, so its own detection rules' matches show too (#925 phase 3).
+  const { nodes, edges, loading: graphLoading } = useNetworkData(
+    diagramSnap.fileId,
+    undefined,
+    undefined,
+    networkId
+  );
 
   // "Present" sets for filter options
   const presentIdentities = useMemo(() => { const s = new Set<string>(); nodes.forEach(n => s.add(nodeIdentityKey(n.data))); return s; }, [nodes]);
@@ -759,7 +765,7 @@ export const SnapshotDetailModal = ({
 
         {/* ── Security tab ── */}
         {activeTab === 'security' && (
-          <SnapshotSecurityTab edges={edges} loading={graphLoading} fileId={diagramSnap.fileId} />
+          <SnapshotSecurityTab edges={edges} loading={graphLoading} fileId={diagramSnap.fileId} networkId={networkId} />
         )}
 
         {/* ── Context & Notes tab ── */}

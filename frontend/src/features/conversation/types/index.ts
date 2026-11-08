@@ -3,6 +3,11 @@ export type SortField = 'srcIp' | 'dstIp' | 'packets' | 'bytes' | 'duration' | '
 export type SortDir = 'asc' | 'desc';
 
 export interface ConversationFilters {
+  /**
+   * View in this network (#925 phase 3): its own detection rules' matches are added to
+   * customSignatures, and count for that filter. Optional.
+   */
+  networkId?: string;
   ip: string;
   /**
    * Exact directional pair (#471): conversations where srcIp = this AND dstIp = `dstIp`. Unlike

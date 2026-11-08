@@ -45,6 +45,8 @@ export interface DetectionRule extends DetectionRuleInput {
   scope: RuleScope;
   /** For a capture rule: its capture. */
   fileId?: string | null;
+  /** For a network rule: its network. */
+  networkId?: string | null;
   /** The rule this one was promoted from, if any. */
   promotedFrom?: string | null;
   /** Legacy, read-only: overrides matched hosts' device type until #926 replaces it. */
@@ -123,6 +125,11 @@ export const detectionRulesService = {
       .data,
   listCapture: async (fileId: string): Promise<DetectionRule[]> =>
     (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId))).data,
+  listNetwork: async (networkId: string): Promise<DetectionRule[]> =>
+    (await apiClient.get<DetectionRule[]>(API_ENDPOINTS.NETWORK_DETECTION_RULES(networkId))).data,
+  createForNetwork: async (networkId: string, rule: DetectionRuleInput): Promise<DetectionRule> =>
+    (await apiClient.post<DetectionRule>(API_ENDPOINTS.NETWORK_DETECTION_RULES(networkId), rule))
+      .data,
   createForCapture: async (fileId: string, rule: DetectionRuleInput): Promise<DetectionRule> =>
     (await apiClient.post<DetectionRule>(API_ENDPOINTS.CAPTURE_DETECTION_RULES(fileId), rule)).data,
   /** Copies a capture rule up to a global one; keepOriginal false removes the capture rule. */

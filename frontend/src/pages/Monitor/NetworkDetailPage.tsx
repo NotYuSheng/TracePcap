@@ -9,6 +9,7 @@ import { ProtocolDriftPanel } from '@/components/monitor/ProtocolDriftPanel/Prot
 import { IpDriftPanel } from '@/components/monitor/IpDriftPanel/IpDriftPanel';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import { NetworkSettingsModal } from '@/components/monitor/NetworkSettingsModal/NetworkSettingsModal';
+import { NetworkRulesModal } from '@/features/detectionRules/NetworkRulesModal';
 import { SubnetsPanel } from '@/components/monitor/SubnetsPanel/SubnetsPanel';
 import { BaselineDefinitionPanel } from '@/components/monitor/BaselineDefinitionPanel/BaselineDefinitionPanel';
 import { ExternalEventsPanel } from '@/components/monitor/ExternalEventsPanel/ExternalEventsPanel';
@@ -36,6 +37,7 @@ export const NetworkDetailPage = () => {
   const [showAddSnapshot, setShowAddSnapshot] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const navSections: SectionDef[] = [
     { id: 'sec-timeline', label: 'Capture Timeline', icon: 'bi-clock-history' },
@@ -103,6 +105,14 @@ export const NetworkDetailPage = () => {
               aria-label="Network settings"
             >
               <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => setShowRules(true)}
+            >
+              <i className="bi bi-shield-check me-1" aria-hidden="true"></i>Detection rules
             </Button>
             <Button
               type="button"
@@ -390,6 +400,14 @@ export const NetworkDetailPage = () => {
         existingFileIds={snapshots.map(s => s.fileId)}
         onAdd={data.handleAddSnapshot}
       />
+      {network && (
+        <NetworkRulesModal
+          show={showRules}
+          networkId={network.id}
+          networkName={network.name}
+          onHide={() => setShowRules(false)}
+        />
+      )}
       <NetworkSettingsModal
         show={showSettings}
         onHide={() => setShowSettings(false)}
