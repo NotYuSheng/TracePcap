@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for the packet-count provisioning gate in {@link FileServiceImpl} (#827).
  *
- * <p>{@code enforcePacketLimit} only reads the three numeric config values, so the collaborators are
- * passed as {@code null} and no mocking is needed. The gate is the security-relevant surface: a
+ * <p>{@code enforcePacketLimit} only reads the three numeric config values, so the collaborators
+ * are passed as {@code null} and no mocking is needed. The gate is the security-relevant surface: a
  * refactor that inverts the comparison, drops the disable guard, or breaks the size-gated
  * fail-closed branch must fail here rather than ship green.
  */
@@ -24,7 +24,8 @@ class FileServiceImplTest {
   private static final long VERIFY_THRESHOLD = (long) (MAX_FILE_SIZE * VERIFY_FRACTION);
 
   private static FileServiceImpl gateWith(long maxPackets, double verifyFraction) {
-    return new FileServiceImpl(null, null, null, null, MAX_FILE_SIZE, maxPackets, verifyFraction);
+    return new FileServiceImpl(
+        null, null, null, null, null, MAX_FILE_SIZE, maxPackets, verifyFraction);
   }
 
   private static FileServiceImpl defaultGate() {
@@ -36,7 +37,8 @@ class FileServiceImplTest {
 
     @Test
     void overLimit_throwsWithCountAndLimit() {
-      assertThatThrownBy(() -> defaultGate().enforcePacketLimit(MAX_PACKETS + 1, 1L, "over.pcap", true))
+      assertThatThrownBy(
+              () -> defaultGate().enforcePacketLimit(MAX_PACKETS + 1, 1L, "over.pcap", true))
           .isInstanceOfSatisfying(
               PacketCountExceededException.class,
               ex -> {
@@ -54,7 +56,8 @@ class FileServiceImplTest {
 
     @Test
     void underLimit_passes() {
-      assertThatCode(() -> defaultGate().enforcePacketLimit(MAX_PACKETS - 1, 1L, "under.pcap", true))
+      assertThatCode(
+              () -> defaultGate().enforcePacketLimit(MAX_PACKETS - 1, 1L, "under.pcap", true))
           .doesNotThrowAnyException();
     }
 
@@ -62,7 +65,8 @@ class FileServiceImplTest {
     void underLimit_isNotAffectedByFileSize() {
       // A known under-limit count is accepted even for a huge file — size only matters when the
       // count is unknown. Guards against wiring the size branch into the known-count path.
-      assertThatCode(() -> defaultGate().enforcePacketLimit(1L, MAX_FILE_SIZE, "big-but-few.pcap", true))
+      assertThatCode(
+              () -> defaultGate().enforcePacketLimit(1L, MAX_FILE_SIZE, "big-but-few.pcap", true))
           .doesNotThrowAnyException();
     }
   }
@@ -72,7 +76,8 @@ class FileServiceImplTest {
 
     @Test
     void largeFile_failsClosedAsUnverifiable() {
-      assertThatThrownBy(() -> defaultGate().enforcePacketLimit(null, VERIFY_THRESHOLD, "big.pcap", true))
+      assertThatThrownBy(
+              () -> defaultGate().enforcePacketLimit(null, VERIFY_THRESHOLD, "big.pcap", true))
           .isInstanceOfSatisfying(
               PacketCountExceededException.class,
               ex -> {
@@ -102,7 +107,8 @@ class FileServiceImplTest {
     @Test
     void fileJustBelowThreshold_failsOpen() {
       assertThatCode(
-              () -> defaultGate().enforcePacketLimit(null, VERIFY_THRESHOLD - 1, "small.pcap", true))
+              () ->
+                  defaultGate().enforcePacketLimit(null, VERIFY_THRESHOLD - 1, "small.pcap", true))
           .doesNotThrowAnyException();
     }
 
@@ -114,7 +120,8 @@ class FileServiceImplTest {
 
     @Test
     void verifyFractionAtOrAboveOne_restoresPureFailOpen() {
-      // fraction >= 1.0 is handled as an explicit "never fail closed" branch. This must hold even at
+      // fraction >= 1.0 is handled as an explicit "never fail closed" branch. This must hold even
+      // at
       // exactly maxFileSize — validateFile's check is strictly greater-than, so a file of exactly
       // that size reaches the gate, and a threshold-only implementation would wrongly reject it.
       FileServiceImpl pureFailOpen = gateWith(MAX_PACKETS, 1.0);
@@ -130,7 +137,8 @@ class FileServiceImplTest {
     void nonPositiveLimit_neverThrows_evenOverAnyPlausibleCount() {
       FileServiceImpl disabled = gateWith(0, VERIFY_FRACTION);
       assertThatCode(
-              () -> disabled.enforcePacketLimit(Long.MAX_VALUE, MAX_FILE_SIZE, "whatever.pcap", true))
+              () ->
+                  disabled.enforcePacketLimit(Long.MAX_VALUE, MAX_FILE_SIZE, "whatever.pcap", true))
           .doesNotThrowAnyException();
     }
 
@@ -153,10 +161,12 @@ class FileServiceImplTest {
       long raisedLimit = 3_000_000_000L; // > Integer.MAX_VALUE
       FileServiceImpl bigGate = gateWith(raisedLimit, VERIFY_FRACTION);
 
-      assertThatCode(() -> bigGate.enforcePacketLimit(2_500_000_000L, 1L, "under-raised.pcap", true))
+      assertThatCode(
+              () -> bigGate.enforcePacketLimit(2_500_000_000L, 1L, "under-raised.pcap", true))
           .doesNotThrowAnyException();
 
-      assertThatThrownBy(() -> bigGate.enforcePacketLimit(3_500_000_000L, 1L, "over-raised.pcap", true))
+      assertThatThrownBy(
+              () -> bigGate.enforcePacketLimit(3_500_000_000L, 1L, "over-raised.pcap", true))
           .isInstanceOf(PacketCountExceededException.class);
     }
   }

@@ -32,13 +32,15 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 /** Implementation of FileService */
@@ -52,6 +54,7 @@ public class FileServiceImpl implements FileService {
   private final ApplicationEventPublisher eventPublisher;
 
   private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList(".pcap", ".pcapng", ".cap");
+
   /**
    * The largest capture we will accept, from {@code app.max-file-size} (#779).
    *
@@ -63,19 +66,19 @@ public class FileServiceImpl implements FileService {
   private final long maxFileSize;
 
   /**
-   * The most packets we will accept in a single capture, from {@code app.max-packets}
-   * (env {@code MAX_UPLOAD_PACKETS}). A provisioning contract rather than a hard technical ceiling:
-   * packet count is the dominant driver of database row counts, and therefore of the parallel-query
-   * shared memory Postgres needs in {@code /dev/shm}. Raising it means also raising the Postgres
-   * {@code shm_size}/{@code work_mem} budget in the compose files — see {@code .env.example}. A
+   * The most packets we will accept in a single capture, from {@code app.max-packets} (env {@code
+   * MAX_UPLOAD_PACKETS}). A provisioning contract rather than a hard technical ceiling: packet
+   * count is the dominant driver of database row counts, and therefore of the parallel-query shared
+   * memory Postgres needs in {@code /dev/shm}. Raising it means also raising the Postgres {@code
+   * shm_size}/{@code work_mem} budget in the compose files — see {@code .env.example}. A
    * non-positive value disables the check. Enforced against the {@code capinfos} count, which is an
    * upper bound on rows actually inserted, so the gate never lets through more than it advertises.
    */
   private final long maxPackets;
 
   /**
-   * Size-gated fail-closed threshold for the packet gate, from {@code app.max-packets-verify-fraction}
-   * (default 0.5), as a fraction of {@link #maxFileSize}.
+   * Size-gated fail-closed threshold for the packet gate, from {@code
+   * app.max-packets-verify-fraction} (default 0.5), as a fraction of {@link #maxFileSize}.
    *
    * <p>When {@code capinfos} can't produce a count (timeout, non-zero exit, parse failure) the gate
    * has nothing to compare against. Failing open unconditionally would be weakest exactly where it
@@ -88,11 +91,30 @@ public class FileServiceImpl implements FileService {
    */
   private final double maxPacketsVerifyFraction;
 
+  /**
+   * The only transaction an upload or merge opens: around the metadata insert and the {@link
+   * FileUploadedEvent} publish (#826).
+   *
+   * <p>{@code uploadFile} and {@code mergeFiles} used to be {@code @Transactional}, and {@code
+   * JpaTransactionManager} takes a pooled connection the moment the transaction begins. That held a
+   * connection through the hashing, the {@code capinfos} count (up to 15s), the MinIO upload and,
+   * for a merge, the source downloads and a {@code mergecap} run of up to five minutes. A handful
+   * of concurrent large uploads could drain the pool and stall every other request. None of that
+   * work needs the database. The duplicate-hash lookup runs on its own, and the insert and publish
+   * need a transaction only because {@code FileUploadEventListener} is an {@code AFTER_COMMIT}
+   * listener. Without a commit, analysis would never start.
+   *
+   * <p>A TransactionTemplate rather than a self-injected proxy, as in {@code AdjudicatorRunner}:
+   * the boundary is visible at the call site.
+   */
+  private final TransactionTemplate persistTx;
+
   public FileServiceImpl(
       FileRepository fileRepository,
       StorageService storageService,
       FileMapper fileMapper,
       ApplicationEventPublisher eventPublisher,
+      PlatformTransactionManager txManager,
       @Value("${app.max-file-size:536870912}") long maxFileSize,
       @Value("${app.max-packets:2000000}") long maxPackets,
       @Value("${app.max-packets-verify-fraction:0.5}") double maxPacketsVerifyFraction) {
@@ -100,9 +122,24 @@ public class FileServiceImpl implements FileService {
     this.storageService = storageService;
     this.fileMapper = fileMapper;
     this.eventPublisher = eventPublisher;
+    this.persistTx = new TransactionTemplate(txManager);
     this.maxFileSize = maxFileSize;
     this.maxPackets = maxPackets;
     this.maxPacketsVerifyFraction = maxPacketsVerifyFraction;
+  }
+
+  /**
+   * Inserts the file row and publishes {@link FileUploadedEvent} inside one short transaction, so
+   * the {@code AFTER_COMMIT} listener starts analysis only once the row is visible. This is the
+   * only place an upload or merge holds a DB connection (see {@link #persistTx}).
+   */
+  private FileEntity persistAndPublish(FileEntity fileEntity) {
+    return persistTx.execute(
+        status -> {
+          FileEntity saved = fileRepository.save(fileEntity);
+          eventPublisher.publishEvent(new FileUploadedEvent(this, saved.getId()));
+          return saved;
+        });
   }
 
   /**
@@ -117,8 +154,8 @@ public class FileServiceImpl implements FileService {
    * @param fileSizeBytes the capture's size, used only for the size-gated fail-closed decision
    * @param label capture name for the rejection log line
    * @param retryable whether an unverifiable-count rejection should tell the operator to retry —
-   *     {@code true} for a direct upload (a transient capinfos failure may clear), {@code false} for
-   *     a merge (the merged file is deterministic, so capinfos fails identically on retry)
+   *     {@code true} for a direct upload (a transient capinfos failure may clear), {@code false}
+   *     for a merge (the merged file is deterministic, so capinfos fails identically on retry)
    */
   // Package-private for direct unit testing of the gate branches (see FileServiceImplTest, #827).
   void enforcePacketLimit(Long packetCount, long fileSizeBytes, String label, boolean retryable) {
@@ -127,14 +164,18 @@ public class FileServiceImpl implements FileService {
     }
     if (packetCount != null) {
       if (packetCount > maxPackets) {
-        log.warn("Upload rejected: {} has {} packets, over the provisioned limit of {}",
-            label, packetCount, maxPackets);
+        log.warn(
+            "Upload rejected: {} has {} packets, over the provisioned limit of {}",
+            label,
+            packetCount,
+            maxPackets);
         throw new PacketCountExceededException(packetCount, maxPackets);
       }
       return;
     }
     // Unknown count: fail closed only for large files, where an unverifiable size is suspicious.
-    // A fraction >= 1.0 means "never fail closed" (pure fail-open); handle it explicitly rather than
+    // A fraction >= 1.0 means "never fail closed" (pure fail-open); handle it explicitly rather
+    // than
     // via the threshold, since validateFile admits a file exactly at maxFileSize (its check is
     // strictly greater-than) and that would otherwise still trip a threshold of maxFileSize.
     if (maxPacketsVerifyFraction >= 1.0) {
@@ -145,14 +186,16 @@ public class FileServiceImpl implements FileService {
       log.warn(
           "Upload rejected: could not verify packet count for {} ({} bytes >= {} threshold); "
               + "too large to accept unverified against the {}-packet limit",
-          label, fileSizeBytes, verifyThreshold, maxPackets);
+          label,
+          fileSizeBytes,
+          verifyThreshold,
+          maxPackets);
       throw new PacketCountExceededException(maxPackets, retryable);
     }
   }
 
-
+  // Deliberately NOT @Transactional — see persistTx (#826).
   @Override
-  @Transactional
   public FileUploadResponse uploadFile(
       MultipartFile file,
       boolean enableNdpi,
@@ -178,11 +221,13 @@ public class FileServiceImpl implements FileService {
     }
 
     // Count packets up front (best-effort) so the loading view can show a packet-based time
-    // estimate immediately, before analysis has run. Overwritten with the exact count on completion.
+    // estimate immediately, before analysis has run. Overwritten with the exact count on
+    // completion.
     // Done before the MinIO upload so an over-limit capture is rejected without first storing it.
     Long packetCount = countPackets(file);
 
-    // Provisioning gate: reject captures larger than this instance is sized for, before spending any
+    // Provisioning gate: reject captures larger than this instance is sized for, before spending
+    // any
     // upload/analysis work on them (see enforcePacketLimit — including the size-gated fail-closed
     // behaviour when capinfos couldn't produce a count).
     enforcePacketLimit(packetCount, file.getSize(), originalFilename, /* retryable= */ true);
@@ -214,19 +259,10 @@ public class FileServiceImpl implements FileService {
               .enableFileExtraction(enableFileExtraction)
               .build();
 
-      fileEntity = fileRepository.save(fileEntity);
+      FileEntity saved = persistAndPublish(fileEntity);
       log.info("File uploaded successfully: {} (ID: {})", originalFilename, fileId);
-      log.info(
-          "DEBUG: About to publish event - fileId value: {}, fileEntity.getId(): {}",
-          fileId,
-          fileEntity.getId());
 
-      // Publish event - listener will trigger async analysis AFTER transaction commits
-      log.info("Publishing file uploaded event for file: {}", fileId);
-      eventPublisher.publishEvent(new FileUploadedEvent(this, fileId));
-      log.info("DEBUG: Event published with fileId: {}", fileId);
-
-      return fileMapper.toUploadResponse(fileEntity);
+      return fileMapper.toUploadResponse(saved);
 
     } catch (Exception e) {
       log.error("Failed to upload file: {}", originalFilename, e);
@@ -321,7 +357,9 @@ public class FileServiceImpl implements FileService {
 
     // Check file extension (strip any Windows/Unix path prefix before checking)
     String originalFilename = stripPath(file.getOriginalFilename());
-    if (originalFilename == null || originalFilename.isBlank() || !hasValidExtension(originalFilename)) {
+    if (originalFilename == null
+        || originalFilename.isBlank()
+        || !hasValidExtension(originalFilename)) {
       throw new InvalidFileException(
           "Invalid file type. Only .pcap, .pcapng, and .cap files are supported");
     }
@@ -341,8 +379,8 @@ public class FileServiceImpl implements FileService {
 
   /**
    * Strip any Windows or Unix directory prefix from a filename so that only the bare name is
-   * stored. Legacy browsers (IE11) send the full client-side path (e.g. C:\Users\…\file.pcap)
-   * in the Content-Disposition header; modern browsers send just the filename.
+   * stored. Legacy browsers (IE11) send the full client-side path (e.g. C:\Users\…\file.pcap) in
+   * the Content-Disposition header; modern browsers send just the filename.
    */
   private String stripPath(String originalFilename) {
     if (originalFilename == null) return null;
@@ -351,7 +389,7 @@ public class FileServiceImpl implements FileService {
   }
 
   @Override
-  @Transactional
+  // Deliberately NOT @Transactional — see persistTx (#826).
   public FileUploadResponse mergeFiles(
       List<UUID> fileIds,
       String mergedFileName,
@@ -447,8 +485,10 @@ public class FileServiceImpl implements FileService {
       // pipeline, so two under-limit captures must not merge into one over-limit capture and slip
       // past it. Checked here, before the upload/persist work below.
       Long mergedPacketCount = countPackets(tempOutput);
-      // retryable=false: the merged file is deterministic, so a capinfos failure will recur on retry.
-      enforcePacketLimit(mergedPacketCount, tempOutput.length(), mergedName, /* retryable= */ false);
+      // retryable=false: the merged file is deterministic, so a capinfos failure will recur on
+      // retry.
+      enforcePacketLimit(
+          mergedPacketCount, tempOutput.length(), mergedName, /* retryable= */ false);
 
       // Stream-upload the merged file to MinIO (avoids loading it fully into memory)
       UUID newFileId = UUID.randomUUID();
@@ -471,13 +511,10 @@ public class FileServiceImpl implements FileService {
               .enableFileExtraction(enableFileExtraction)
               .build();
 
-      fileEntity = fileRepository.save(fileEntity);
+      FileEntity saved = persistAndPublish(fileEntity);
       log.info("Merged PCAP saved: {} (ID: {})", mergedName, newFileId);
 
-      // Trigger async analysis
-      eventPublisher.publishEvent(new FileUploadedEvent(this, newFileId));
-
-      return fileMapper.toUploadResponse(fileEntity);
+      return fileMapper.toUploadResponse(saved);
 
     } catch (InvalidFileException | DuplicateFileException | PacketCountExceededException e) {
       throw e;
@@ -554,8 +591,9 @@ public class FileServiceImpl implements FileService {
 
   /**
    * Narrows the {@code Long} capinfos count to the entity's {@code Integer} column for the loading
-   * view's estimate. Null-safe; clamps a count above {@link Integer#MAX_VALUE} rather than letting it
-   * wrap to a negative number (the stored value is a best-effort estimate, not the enforced gate).
+   * view's estimate. Null-safe; clamps a count above {@link Integer#MAX_VALUE} rather than letting
+   * it wrap to a negative number (the stored value is a best-effort estimate, not the enforced
+   * gate).
    */
   private static Integer toStoredPacketCount(Long packetCount) {
     if (packetCount == null) {
@@ -565,25 +603,27 @@ public class FileServiceImpl implements FileService {
   }
 
   // Short bound for the best-effort packet count: capinfos -c only scans record headers and is fast
-  // even on large files, and this runs on the request thread inside the upload/merge transaction, so
-  // it must never hold resources long. On timeout we give up and fall back to the size-based estimate.
+  // even on large files, and this runs on the request thread inside the upload/merge transaction,
+  // so
+  // it must never hold resources long. On timeout we give up and fall back to the size-based
+  // estimate.
   private static final int CAPINFOS_TIMEOUT_SECONDS = 15;
 
   /**
    * Counts packets in an uploaded capture by streaming it through {@code capinfos -M -c -} (reads
-   * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate up
-   * front — cost tracks packets, not bytes. Best-effort: any failure returns {@code null} and the
-   * estimate falls back to a size-based one. Never throws.
+   * stdin, ~ms even for large files). Used to compute a packet-count-based analysis time estimate
+   * up front — cost tracks packets, not bytes. Best-effort: any failure returns {@code null} and
+   * the estimate falls back to a size-based one. Never throws.
    *
    * <p>Returns a {@code Long}: the provisioning gate compares against {@code app.max-packets} (a
-   * long) which an operator may raise above {@link Integer#MAX_VALUE}, so the count must not silently
-   * overflow at parse time — a capture past 2^31-1 packets would otherwise throw and fail-open.
+   * long) which an operator may raise above {@link Integer#MAX_VALUE}, so the count must not
+   * silently overflow at parse time — a capture past 2^31-1 packets would otherwise throw and
+   * fail-open.
    */
   private Long countPackets(MultipartFile file) {
     Process process = null;
     try {
-      process =
-          new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
+      process = new ProcessBuilder("capinfos", "-M", "-c", "-").redirectErrorStream(false).start();
       final Process p = process;
       // Drain stdout on a daemon thread so waitFor's timeout is honoured even if capinfos hangs
       // without closing stdout (a blocking readAllBytes here would bypass the timeout entirely).
@@ -614,7 +654,8 @@ public class FileServiceImpl implements FileService {
       Matcher m = PACKET_COUNT_PATTERN.matcher(output.toString());
       return m.find() ? Long.parseLong(m.group(1)) : null;
     } catch (Exception e) {
-      log.warn("capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
+      log.warn(
+          "capinfos packet count failed for {}: {}", file.getOriginalFilename(), e.getMessage());
       if (process != null) process.destroyForcibly();
       return null;
     }
