@@ -5,13 +5,15 @@ import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { apiClient } from '@/services/api/client';
 import { API_ENDPOINTS } from '@/services/api/endpoints';
+import { parseDateTime } from '@/utils/dateUtils';
 
 /** Mirrors FileMetadataDto (the fields this tab shows). */
 interface FileVersion {
   fileId: string;
   fileName: string;
   fileSize?: number;
-  uploadedAt?: string;
+  /** The file API sends LocalDateTime as an array; parseDateTime reads either form. */
+  uploadedAt?: string | number[];
   status: string;
   packetCount?: number | null;
   enableNdpi: boolean;
@@ -169,7 +171,7 @@ export function FileTabPage() {
           <p className="small text-muted mt-2 mb-0">
             {current.fileName}
             {current.packetCount != null && <> · {current.packetCount.toLocaleString()} packets</>}
-            {current.uploadedAt && <> · analysed {new Date(current.uploadedAt).toLocaleString()}</>}
+            {current.uploadedAt && <> · analysed {new Date(parseDateTime(current.uploadedAt)).toLocaleString()}</>}
           </p>
         </Card.Body>
       </Card>
@@ -191,7 +193,7 @@ export function FileTabPage() {
                 {versions.map(v => (
                   <tr key={v.fileId} className={v.fileId === fileId ? 'table-active' : undefined}>
                     <td>
-                      {v.uploadedAt ? new Date(v.uploadedAt).toLocaleString() : '—'}
+                      {v.uploadedAt ? new Date(parseDateTime(v.uploadedAt)).toLocaleString() : '—'}
                       <div className="text-muted">
                         {v.version ? 'Re-analysis' : 'Original upload'}
                       </div>

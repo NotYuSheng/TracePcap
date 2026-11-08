@@ -7,7 +7,7 @@ import { server } from '@/test/msw'
 import { FileTabPage } from '../FileTabPage'
 
 const orig = {
-  fileId: 'f1', fileName: 'a.pcap', status: 'completed', packetCount: 1200, uploadedAt: '2026-11-08T10:00:00',
+  fileId: 'f1', fileName: 'a.pcap', status: 'completed', packetCount: 1200, uploadedAt: [2026, 11, 8, 10, 0, 0, 0],
   enableNdpi: false, enableSuricata: false, enableFileExtraction: true, derivedFrom: null, version: false,
 }
 const v1 = { ...orig, fileId: 'f2', enableNdpi: true, derivedFrom: 'f1', version: true, uploadedAt: '2026-11-08T11:00:00' }
@@ -40,6 +40,7 @@ describe('FileTabPage (#915 phase 3)', () => {
     renderAt('f1')
     expect(await screen.findByText(/Application detection \(nDPI\):/)).toHaveTextContent('off')
     expect(screen.getByText(/File extraction:/)).toHaveTextContent('on')
+    expect(screen.getByTestId('file-tab')).not.toHaveTextContent('Invalid Date') // the API's array dates
 
     await userEvent.click(screen.getByRole('button', { name: /Re-analyse with other options/ }))
     const dialog = await screen.findByRole('dialog')
