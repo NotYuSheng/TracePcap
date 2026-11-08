@@ -14,6 +14,7 @@ import { NetworkClusterPage } from '@pages/NetworkCluster';
 import { NotFoundPage } from '@pages/NotFound';
 import { MonitorPage } from '@pages/Monitor/MonitorPage';
 import { NetworkDetailPage } from '@pages/Monitor/NetworkDetailPage';
+import { SystemPage } from '@pages/System';
 
 export const router = createBrowserRouter([
   {
@@ -86,6 +87,10 @@ export const router = createBrowserRouter([
       {
         path: 'monitor/:networkId',
         element: <NetworkDetailPage />,
+      },
+      {
+        path: 'system',
+        element: <SystemPage />,
       },
       {
         path: '*',
