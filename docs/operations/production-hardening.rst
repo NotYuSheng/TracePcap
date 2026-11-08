@@ -518,9 +518,18 @@ Restart Policies
 ----------------
 
 All long-running services set ``restart: unless-stopped`` so a crashed container
-comes back automatically and the stack survives a host reboot. The ``minio-init``
-bucket-bootstrap job is deliberately excluded — it is meant to run once and exit
-``0``, and a restart policy would loop it forever.
+comes back automatically and the stack survives a host reboot. The one-shot
+``minio-init`` (bucket bootstrap) and ``minio-volume-perms`` (volume-ownership
+repair) jobs are deliberately excluded — they are meant to run once and exit
+``0``, and a restart policy would loop them forever.
+
+``minio-volume-perms`` runs as root before MinIO on every start and hands the
+``minio_data`` volume to UID/GID ``65532``, the user the Chainguard MinIO image
+runs as. Volumes created by the earlier ``quay.io/minio/minio`` image are
+root-owned, so without it MinIO crash-loops after an upgrade with
+``file access denied`` (#854). It only rewrites ownership when something in the
+volume is not already ``65532:65532``, and it reuses the MinIO image, so
+air-gapped hosts need nothing beyond the offline bundle.
 
 To stop a service and have it *stay* stopped, use ``docker compose stop <svc>``;
 ``unless-stopped`` honours a manual stop across daemon restarts.
