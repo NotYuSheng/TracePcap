@@ -1970,6 +1970,9 @@
       },
       "HostClassificationResponse": {
         "properties": {
+          "addressKind": {
+            "type": "string"
+          },
           "confidence": {
             "format": "int32",
             "type": "integer"
@@ -1981,6 +1984,9 @@
             "type": "string"
           },
           "hostnameSource": {
+            "type": "string"
+          },
+          "identityWarning": {
             "type": "string"
           },
           "ip": {
@@ -2011,6 +2017,13 @@
           "ttl": {
             "format": "int32",
             "type": "integer"
+          },
+          "ttls": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -2047,6 +2060,9 @@
       },
       "HostIdentityEvidenceDto": {
         "properties": {
+          "addressKind": {
+            "type": "string"
+          },
           "answeredConversations": {
             "format": "int32",
             "type": "integer"
@@ -2086,6 +2102,9 @@
           "geoSource": {
             "type": "string"
           },
+          "identityWarning": {
+            "type": "string"
+          },
           "initiatedConversations": {
             "format": "int32",
             "type": "integer"
@@ -2121,6 +2140,13 @@
           "ttl": {
             "format": "int32",
             "type": "integer"
+          },
+          "ttls": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
           }
         },
         "type": "object"

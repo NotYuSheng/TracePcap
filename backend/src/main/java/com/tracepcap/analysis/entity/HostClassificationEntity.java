@@ -145,4 +145,16 @@ public class HostClassificationEntity {
   /** Newline-joined reasons the runner-up scored; null on walkover/override. */
   @Column(name = "runner_up_reasons", columnDefinition = "text")
   private String runnerUpReasons;
+
+  /** Every TTL seen from this IP, lowest first (#918 item 1c). */
+  @Column(name = "ttls", columnDefinition = "integer[]")
+  private Integer[] ttls;
+
+  /** VIRTUAL_FAILOVER for a router failover pair's virtual address (#918 item 2); else null. */
+  @Column(name = "address_kind", length = 40)
+  private String addressKind;
+
+  /** Why this may be more than one machine (#918 item 2); null when nothing conflicts. */
+  @Column(name = "identity_warning", columnDefinition = "text")
+  private String identityWarning;
 }

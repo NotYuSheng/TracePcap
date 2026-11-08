@@ -50,6 +50,8 @@ public class PcapParserService {
     result.setConversations(new ArrayList<>());
     // First-seen TTL and MAC per source IP (used for device classification)
     Map<String, Integer> hostTtls = new HashMap<>();
+    // Every TTL seen per source IP (#918 item 1c): differing TTL families on one IP suggest two machines.
+    Map<String, java.util.TreeSet<Integer>> hostTtlObservations = new HashMap<>();
     // Every Ethernet source MAC seen per source IP, in order. Turned into one MAC per IP after the
     // parse (attributeMacs), once we know which MACs are routers fronting many IPs (#918).
     Map<String, LinkedHashSet<String>> ethMacsByIp = new HashMap<>();
@@ -263,7 +265,11 @@ public class PcapParserService {
 
           // Record first-seen TTL and MAC for source IP
           if (srcIp != null) {
-            if (ttl != null) hostTtls.putIfAbsent(srcIp, ttl);
+            if (ttl != null) {
+              hostTtls.putIfAbsent(srcIp, ttl);
+              java.util.TreeSet<Integer> seen = hostTtlObservations.computeIfAbsent(srcIp, k -> new java.util.TreeSet<>());
+              if (seen.size() < 16) seen.add(ttl); // a handful is enough to see a conflict
+            }
             if (srcMac != null) ethMacsByIp.computeIfAbsent(srcIp, k -> new LinkedHashSet<>()).add(srcMac);
           }
 
@@ -420,6 +426,7 @@ public class PcapParserService {
     result.setPacketCount(packetNumber);
     result.setConversations(new ArrayList<>(conversationMap.values()));
     result.setHostTtls(hostTtls);
+    result.setHostTtlObservations(hostTtlObservations);
     result.setHostMacs(attributeMacs(ethMacsByIp, hostMacObservations));
     result.setHostMacObservations(hostMacObservations);
 
@@ -598,6 +605,9 @@ public class PcapParserService {
 
     /** First-seen TTL value per source IP address. */
     private Map<String, Integer> hostTtls = new HashMap<>();
+
+    /** Every TTL seen per source IP (up to 16), lowest first (#918 item 1c). */
+    private Map<String, java.util.TreeSet<Integer>> hostTtlObservations = new HashMap<>();
 
     /** First-seen Ethernet source MAC address per source IP address. */
     private Map<String, String> hostMacs = new HashMap<>();

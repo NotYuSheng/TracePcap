@@ -78,7 +78,31 @@ public interface HostClassificationLookup {
       Integer ttl,
       String deviceType,
       int confidence,
-      List<String> serviceRoles) {}
+      List<String> serviceRoles,
+      List<Integer> ttls,
+      String addressKind,
+      String identityWarning) {
+
+    /** Without the #918 identity checks; they default to none. */
+    public HostFacts(
+        String ip,
+        String mac,
+        String manufacturer,
+        String hostname,
+        String hostnameSource,
+        String loggedInUser,
+        String loggedInUserSource,
+        String loggedInUserRealName,
+        int loggedInUserCount,
+        Integer ttl,
+        String deviceType,
+        int confidence,
+        List<String> serviceRoles) {
+      this(ip, mac, manufacturer, hostname, hostnameSource, loggedInUser, loggedInUserSource,
+          loggedInUserRealName, loggedInUserCount, ttl, deviceType, confidence, serviceRoles,
+          List.of(), null, null);
+    }
+  }
 
   /** Never contains null elements — the adapter maps each persisted row to a fresh record. */
   List<ClassifiedHost> classifiedHosts(UUID fileId);

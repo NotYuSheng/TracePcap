@@ -2888,11 +2888,13 @@ export interface components {
             text?: string;
         };
         HostClassificationResponse: {
+            addressKind?: string;
             /** Format: int32 */
             confidence?: number;
             deviceType?: string;
             hostname?: string;
             hostnameSource?: string;
+            identityWarning?: string;
             ip?: string;
             loggedInUser?: string;
             /** Format: int32 */
@@ -2903,6 +2905,7 @@ export interface components {
             serviceRoles?: string[];
             /** Format: int32 */
             ttl?: number;
+            ttls?: number[];
         };
         HostIdentityDto: {
             basis?: string;
@@ -2916,6 +2919,7 @@ export interface components {
             primaryLabel?: string;
         };
         HostIdentityEvidenceDto: {
+            addressKind?: string;
             /** Format: int32 */
             answeredConversations?: number;
             asn?: string;
@@ -2931,6 +2935,7 @@ export interface components {
             country?: string;
             countryCode?: string;
             geoSource?: string;
+            identityWarning?: string;
             /** Format: int32 */
             initiatedConversations?: number;
             ip?: string;
@@ -2943,6 +2948,7 @@ export interface components {
             serviceRoles?: string[];
             /** Format: int32 */
             ttl?: number;
+            ttls?: number[];
         };
         HostSummaryDto: {
             /** Format: int64 */

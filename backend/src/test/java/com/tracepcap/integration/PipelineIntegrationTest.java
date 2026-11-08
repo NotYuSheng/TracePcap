@@ -1153,6 +1153,51 @@ class PipelineIntegrationTest {
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
   }
 
+  /**
+   * Host identity checks from the #918 audit, items 1c and 2, on identity-cases.pcap: every TTL is
+   * kept; a VRRP virtual address is marked as one (not classified as a device); cloned VMs and a
+   * reused DHCP address are flagged as possibly more than one machine.
+   */
+  @Test
+  void hostIdentity_keepsEveryTtl_marksVrrpVip_flagsPossiblyTwoMachines() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    JsonNode hosts = rest.getForEntity("/api/v1/files/" + fileId + "/host-classifications", JsonNode.class).getBody();
+    java.util.Map<String, JsonNode> byIp = new java.util.HashMap<>();
+    hosts.forEach(h -> byIp.put(h.get("ip").asText(), h));
+
+    // Cloned VMs: one IP+MAC, TTL 64 and 128, two DHCP hostnames.
+    JsonNode clone = byIp.get("10.0.0.70");
+    assertThat(clone.get("ttls").toString()).contains("64").contains("128");
+    assertThat(clone.get("identityWarning").asText())
+        .contains("Possibly more than one machine").contains("web-vm-a").contains("web-vm-b");
+
+    // DHCP reuse: the laptop then the phone on one address.
+    assertThat(byIp.get("10.0.0.50").get("identityWarning").asText()).contains("LAPTOP-ALICE").contains("iPhone-Bob");
+
+    // The VRRP virtual address isn't a device.
+    JsonNode vip = byIp.get("10.0.0.254");
+    assertThat(vip.get("addressKind").asText()).isEqualTo("VIRTUAL_FAILOVER");
+    assertThat(vip.get("deviceType").asText()).isEqualTo("VIRTUAL_ADDRESS");
+    // The routers advertise from the virtual MAC, but they're the members, not the virtual address.
+    for (String router : java.util.List.of("10.0.0.2", "10.0.0.3")) {
+      assertThat(byIp.get(router).path("addressKind").isNull()).as(router).isTrue();
+      assertThat(byIp.get(router).get("deviceType").asText()).as(router).isNotEqualTo("VIRTUAL_ADDRESS");
+    }
+    // The host's evidence panel carries the warning and every TTL too.
+    JsonNode evidence =
+        rest.getForEntity("/api/v1/files/" + fileId + "/hosts/10.0.0.70/identity", JsonNode.class).getBody();
+    assertThat(evidence.get("identityWarning").asText()).contains("Possibly more than one machine");
+    assertThat(evidence.get("ttls").toString()).contains("64").contains("128");
+
+    // An ordinary host has no warning.
+    assertThat(byIp.get("10.0.0.1").path("identityWarning").isNull()).isTrue();
+  }
+
   private String createRule(String body) {
     ResponseEntity<JsonNode> r = rest.postForEntity("/api/v1/detection-rules", json(body), JsonNode.class);
     assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);

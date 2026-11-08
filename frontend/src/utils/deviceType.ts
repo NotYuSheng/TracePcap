@@ -19,6 +19,8 @@ const DEVICE_TYPE_CONFIG: Partial<Record<DeviceType, DeviceTypeConfig>> = {
   // Pure L2 nodes (switches/bridges) have no adjudicated identity or device type of their own,
   // but are still a distinct filterable identity. Teal matches the l2-device node colour.
   L2_DEVICE:      { label: 'L2 Device',        color: '#1abc9c' }, // teal
+  // A router failover pair's shared virtual IP (#918): an address, not a machine.
+  VIRTUAL_ADDRESS: { label: 'Virtual address',  color: '#94a3b8' }, // slate
   UNKNOWN:        { label: 'Unknown',          color: '#6b7280' }, // gray
 };
 
@@ -28,7 +30,7 @@ const DEFAULT_COLOR = '#6b7280';
  * Returns a human-readable label for the device type.
  */
 export function deviceTypeLabel(deviceType: DeviceType): string {
-  return DEVICE_TYPE_CONFIG[deviceType]?.label ?? deviceType; // custom YAML override values pass through as-is
+  return DEVICE_TYPE_CONFIG[deviceType]?.label ?? deviceType; // custom classification-hint values (#926) pass through as-is
 }
 
 /**

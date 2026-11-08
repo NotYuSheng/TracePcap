@@ -1,3 +1,4 @@
+import { Alert } from '@components/common/Alert';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@govtechsg/sgds-react';
 import { AdjudicationPanel } from '@components/common/AdjudicationPanel/AdjudicationPanel';
@@ -252,6 +253,21 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
         }}
         onChanged={handleChanged}
       />
+
+      {/* What this "host" is (#918): a shared virtual address, or possibly more than one machine. */}
+      {evidence.addressKind === 'VIRTUAL_FAILOVER' && (
+        <Alert variant="info" className="py-2 small mb-3" data-testid="host-virtual-address">
+          <i className="bi bi-diagram-2 me-1" aria-hidden="true" />
+          This is a router failover pair's shared virtual address, not a machine of its own.
+        </Alert>
+      )}
+      {evidence.identityWarning && (
+        <Alert variant="warning" className="py-2 small mb-3" data-testid="host-identity-warning">
+          <i className="bi bi-exclamation-triangle me-1" aria-hidden="true" />
+          {evidence.identityWarning}
+          {evidence.ttls && evidence.ttls.length > 1 && <> TTLs seen: {evidence.ttls.join(', ')}.</>}
+        </Alert>
+      )}
 
       {/* Evidence weighed — the independent measured signals behind the verdict. */}
       <div className="mb-4">
