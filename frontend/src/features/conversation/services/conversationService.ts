@@ -383,9 +383,17 @@ export const conversationService = {
     return response.data;
   },
 
-  /** Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). */
-  getHostIdentities: async (fileId: string): Promise<HostIdentity[]> => {
-    const response = await apiClient.get<HostIdentity[]>(API_ENDPOINTS.HOST_IDENTITIES(fileId));
+  /**
+   * Adjudicated per-host identities for a file (winner-or-contested; #512 slice 5). Pass `ips` to
+   * fetch only those hosts (#576), e.g. a conversation's two endpoints, instead of every host in the
+   * file. Sent as one comma-separated param, because axios's default `ips[]=` form doesn't bind to
+   * Spring's List<String>.
+   */
+  getHostIdentities: async (fileId: string, ips?: string[]): Promise<HostIdentity[]> => {
+    const response = await apiClient.get<HostIdentity[]>(
+      API_ENDPOINTS.HOST_IDENTITIES(fileId),
+      ips && ips.length > 0 ? { params: { ips: ips.join(',') } } : undefined
+    );
     return response.data;
   },
 

@@ -790,7 +790,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Adjudicated identity per host for a file (winner-or-contested) */
+        /**
+         * Adjudicated identity per host for a file (winner-or-contested)
+         * @description Every host in the file by default. Pass ips (comma-separated) to get just those hosts, e.g. a conversation's two endpoints, without the file-wide payload. IPs with no identity are omitted rather than reported as errors.
+         */
         get: operations["getHostIdentities"];
         put?: never;
         post?: never;
@@ -4440,7 +4443,10 @@ export interface operations {
     };
     getHostIdentities: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only these host IPs (comma-separated). Omit for every host. */
+                ips?: string[];
+            };
             header?: never;
             path: {
                 fileId: string;

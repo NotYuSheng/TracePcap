@@ -314,16 +314,18 @@ export const ConversationDetail = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightPacketNumber, conversation.id, packetPageSize]);
 
-  // Load adjudicated identities for the file's hosts (for the flow-header chip). One call per file.
-  // Also re-run when the host-detail modal closes, so an in-modal "I disagree" override is reflected
-  // in the chip without waiting for a remount.
+  // Load adjudicated identities for the flow-header chips. Only the two endpoints are fetched, not
+  // every host in the file (#576). Also re-run when the host-detail modal closes, so an in-modal
+  // "I disagree" override is reflected in the chip without waiting for a remount.
+  const sourceIp = source.ip;
+  const destinationIp = destination.ip;
   const refreshIdentities = useCallback(() => {
     if (!fileId) return;
     conversationService
-      .getHostIdentities(fileId)
+      .getHostIdentities(fileId, [sourceIp, destinationIp])
       .then(list => setIdentityMap(new Map(list.map(i => [i.ip, i]))))
       .catch(() => setIdentityMap(new Map()));
-  }, [fileId]);
+  }, [fileId, sourceIp, destinationIp]);
 
   useEffect(() => {
     refreshIdentities();

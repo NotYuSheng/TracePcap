@@ -6352,6 +6352,7 @@
     },
     "/api/v1/files/{fileId}/host-identities": {
       "get": {
+        "description": "Every host in the file by default. Pass ips (comma-separated) to get just those hosts, e.g. a conversation's two endpoints, without the file-wide payload. IPs with no identity are omitted rather than reported as errors.",
         "operationId": "getHostIdentities",
         "parameters": [
           {
@@ -6361,6 +6362,18 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "description": "Only these host IPs (comma-separated). Omit for every host.",
+            "in": "query",
+            "name": "ips",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             }
           }
         ],
