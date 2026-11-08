@@ -300,9 +300,10 @@ public class SubnetLabelSuggestionService {
         cidr, context);
   }
 
-  private record Suggestion(String label, String description) {}
+  // Package-private for SubnetLabelSuggestionParseTest (#465): the LLM-response path regresses silently.
+  record Suggestion(String label, String description) {}
 
-  private Suggestion parse(String raw) {
+  Suggestion parse(String raw) {
     String json = extractJson(raw);
     try {
       Map<String, Object> data = LENIENT_MAPPER.readValue(json, new TypeReference<>() {});
