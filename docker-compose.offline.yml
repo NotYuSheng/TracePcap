@@ -214,6 +214,10 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: tracepcap-files
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # Packet-count upload gate (see application.yml app.max-packets). Raise together with
+      # POSTGRES_SHM_SIZE / POSTGRES_WORK_MEM above; 0 disables.
+      MAX_UPLOAD_PACKETS: ${MAX_UPLOAD_PACKETS:-2000000}
+      MAX_UPLOAD_PACKETS_VERIFY_FRACTION: ${MAX_UPLOAD_PACKETS_VERIFY_FRACTION:-0.5}
       # Data retention. FILE_RETENTION_ENABLED=false is the master switch — it keeps
       # uploaded files forever, and the cleanup scheduler is then not registered at all, so
       # nothing below has any effect. NOTE 0 means "never" only for the MONITOR_ and PACKET_

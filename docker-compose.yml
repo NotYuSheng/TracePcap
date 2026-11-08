@@ -220,6 +220,10 @@ services:
       # Memory allocation — all limits (JVM heap, max upload, timeouts) are derived
       # from this single value in the container entrypoint script
       APP_MEMORY_MB: ${APP_MEMORY_MB:-2048}
+      # Packet-count upload gate (see application.yml app.max-packets). Raise together with
+      # POSTGRES_SHM_SIZE / POSTGRES_WORK_MEM above; 0 disables.
+      MAX_UPLOAD_PACKETS: ${MAX_UPLOAD_PACKETS:-2000000}
+      MAX_UPLOAD_PACKETS_VERIFY_FRACTION: ${MAX_UPLOAD_PACKETS_VERIFY_FRACTION:-0.5}
       # LLM Configuration (OpenAI API Format)
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-https://api.openai.com/v1}
       LLM_API_KEY: ${LLM_API_KEY:-your-api-key-here}
