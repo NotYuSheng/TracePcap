@@ -215,6 +215,18 @@ public class ConversationLookupAdapter implements ConversationLookup {
   }
 
   @Override
+  public Map<UUID, java.util.Set<String>> customSignatureNames(Collection<UUID> fileIds) {
+    if (fileIds == null || fileIds.isEmpty()) return Map.of();
+    Map<UUID, java.util.Set<String>> out = new HashMap<>();
+    for (Object[] row : repository.findDistinctCustomSignaturesByFileIds(List.copyOf(fileIds))) {
+      String name = (String) row[1];
+      if (name == null || name.isBlank()) continue;
+      out.computeIfAbsent((UUID) row[0], k -> new java.util.HashSet<>()).add(name);
+    }
+    return out;
+  }
+
+  @Override
   public List<HostFanOut> fanOutCandidates(UUID fileId) {
     return repository.findFanOutCandidatesByFileId(fileId).stream()
         .map(r -> new HostFanOut((String) r[0], asLong(r[1]), asLong(r[2])))

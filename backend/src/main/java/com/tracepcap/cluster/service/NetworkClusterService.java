@@ -52,6 +52,7 @@ public class NetworkClusterService {
   private final DnsQueryLogRepository dnsQueryLogRepository;
   private final HttpEndpointLogRepository httpEndpointLogRepository;
   private final IpOrgRuleService ipOrgRuleService;
+  private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
   private final GeoIpService geoIpService;
 
   private static final int SAMPLE_IPS_LIMIT = 20;
@@ -77,6 +78,9 @@ public class NetworkClusterService {
   public ClusterGraphResponse computeClusters(
       UUID fileId, String groupBy, ConversationFilterParams filterParams, List<String> networkLabels, UUID networkId) {
     log.info("Computing {} clusters for file {}", groupBy, fileId);
+    // In a network, a rule filter also matches the network's own rules and not the global rules it
+    // suppresses (#925).
+    filterParams = networkRuleOverlay.scopeFilter(networkId, fileId, filterParams);
     List<ConversationFacts> conversations =
         conversationLookup.conversationFacts(
             fileId, (filterParams != null && hasActiveFilters(filterParams)) ? filterParams : null);

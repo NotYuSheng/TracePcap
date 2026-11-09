@@ -319,6 +319,14 @@ public interface ConversationRepository
   List<ConversationEntity> findTopConversationByRiskType(
       @Param("fileId") UUID fileId, @Param("riskType") String riskType);
 
+  /** (file_id, rule name) for every distinct stored custom signature in the files (#925). */
+  @Query(
+      value =
+          "SELECT DISTINCT file_id, unnest(custom_signatures) AS rule_name FROM conversations"
+              + " WHERE file_id IN (:fileIds) AND custom_signatures IS NOT NULL",
+      nativeQuery = true)
+  List<Object[]> findDistinctCustomSignaturesByFileIds(@Param("fileIds") List<UUID> fileIds);
+
   /** Returns the distinct custom signature rule names triggered for a file. */
   @Query(
       value =

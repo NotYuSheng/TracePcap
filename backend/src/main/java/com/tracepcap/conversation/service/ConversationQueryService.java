@@ -120,18 +120,7 @@ public class ConversationQueryService {
       UUID fileId, int page, int pageSize, ConversationFilterParams params, UUID networkId) {
     java.util.Set<String> suppressed =
         networkId == null ? java.util.Set.of() : networkRuleOverlay.suppressedNames(networkId);
-    if (networkId != null && params.getCustomSignatures() != null && !params.getCustomSignatures().isEmpty()) {
-      // Global rules switched off in this network don't count (#925 phase 4); if only those were
-      // asked for, nothing matches by name (the network's own rules still can, by id).
-      List<String> wanted = params.getCustomSignatures().stream().filter(n -> !suppressed.contains(n)).toList();
-      params =
-          params.toBuilder()
-              // "" is no rule's name (names can't be blank), so it matches nothing by name.
-              .customSignatures(wanted.isEmpty() ? List.of("") : wanted)
-              .customSignatureMatchIds(
-                  networkRuleOverlay.conversationsMatching(networkId, fileId, params.getCustomSignatures()))
-              .build();
-    }
+    params = networkRuleOverlay.scopeFilter(networkId, fileId, params);
     ConversationLookup.ConversationPage dbPage =
         conversationLookup.conversationPage(fileId, page, pageSize, params);
 

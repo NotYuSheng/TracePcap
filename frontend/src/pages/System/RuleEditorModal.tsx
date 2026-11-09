@@ -442,6 +442,11 @@ export function RuleEditorModal({
             signals add 5 to 35 each, and a label you set on a host still wins. The vote goes to the
             host that matched the rule's IP or CIDR, else the one on its port, else both ends.
           </p>
+          <p className="small text-muted mb-2" data-testid="rule-hint-timing">
+            The vote is counted when a capture is analysed, by global and capture rules. Re-apply
+            updates which conversations match, not device types: to re-classify a capture analysed
+            before this change, re-analyse it from its File tab (that makes a new version).
+          </p>
           <Row className="g-2 mb-2">
             <Col md={8}>
               <Form.Label htmlFor="rule-device-type" className="small mb-0">

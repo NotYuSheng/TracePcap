@@ -3705,6 +3705,8 @@ export interface components {
             activeFilters?: string[];
             forceDirectedImage?: string;
             hierarchicalImage?: string;
+            /** Format: uuid */
+            networkId?: string;
             nodeLimitNote?: string;
         };
         RoleSuggestionDto: {

@@ -74,4 +74,25 @@ class NetworkRuleOverlayImpl implements NetworkRuleOverlay {
         });
     return out;
   }
+
+  @Override
+  public Map<UUID, Set<String>> matchedNamesByFile(UUID networkId, Collection<UUID> fileIds) {
+    Map<UUID, Set<String>> out = new LinkedHashMap<>();
+    if (networkId == null || fileIds == null || fileIds.isEmpty()) return out;
+    UUID[] ids = fileIds.toArray(UUID[]::new);
+    jdbc.query(
+        con -> {
+          PreparedStatement ps =
+              con.prepareStatement(
+                  "SELECT DISTINCT m.file_id, r.name FROM rule_matches m JOIN detection_rules r ON r.id = m.rule_id"
+                      + " WHERE r.scope = 'NETWORK' AND r.network_id = ? AND r.enabled AND m.file_id = ANY (?)");
+          ps.setObject(1, networkId);
+          ps.setArray(2, con.createArrayOf("uuid", ids));
+          return ps;
+        },
+        rs -> {
+          out.computeIfAbsent(rs.getObject(1, UUID.class), k -> new HashSet<>()).add(rs.getString(2));
+        });
+    return out;
+  }
 }

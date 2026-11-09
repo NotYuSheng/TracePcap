@@ -1188,6 +1188,15 @@ class PipelineIntegrationTest {
         .as("outside the network the filter doesn't see it").isZero();
     assertThat(ruleStatus(file).get("staleRules")).isEmpty();
 
+    // The snapshot's security count and the cluster view's rule filter see it too (#925 follow-ups).
+    JsonNode snaps = rest.getForEntity("/api/v1/monitor/networks/" + net + "/snapshots", JsonNode.class).getBody();
+    assertThat(snaps.get(0).get("securitySignalCount").asLong()).isPositive();
+    String graph = "/api/v1/clusters/" + file + "/graph?groupBy=subnet24&customSignatures=" + tag + "-r";
+    assertThat(rest.getForEntity(graph + "&networkId=" + net, JsonNode.class).getBody().get("clusters"))
+        .as("in the network, the rule filter keeps its conversation").isNotEmpty();
+    assertThat(rest.getForEntity(graph, JsonNode.class).getBody().get("clusters"))
+        .as("outside it, nothing matches").isEmpty();
+
     // Switching the rule off hides its matches at once.
     rest.exchange("/api/v1/detection-rules/" + ruleId, HttpMethod.PUT,
         json(rule.replace("\"severity\"", "\"enabled\":false,\"severity\"")), JsonNode.class);

@@ -94,7 +94,11 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
 - Switching a network rule off hides its matches at once.
 - On a capture's **Analysis** page, **Viewing with** (under the file ID)
   adds a network's rules to every tab that shows matches: the Overview, the
-  conversations (list, filters and details) and the network visualization.
+  conversations (list, filters and details), the network visualization, the
+  Network Cluster's rule filter, and the PDF report's rule tags and rule
+  summary. Story doesn't use rule matches, in or out of a network.
+- A snapshot's **security count** on the network page counts the network's own
+  rules, and leaves out the global rules the network has switched off.
   The networks the capture is in are listed first, with a hint when it's in
   one; links from a network's Security tab open the capture already in that
   network. You can also pick a network the capture isn't in, to see what its
@@ -297,6 +301,12 @@ evidence; it doesn't override them:
 
 Here the host on port 554 gets the vote, not the client watching it. To pin a
 single known host, label the host instead.
+
+**When it counts.** The vote is counted when a capture is analysed, and only
+global and capture rules vote (a network rule's hint doesn't). **Re-apply**
+updates which conversations a rule matches, not device types: to re-classify a
+capture that was analysed before a hint changed, re-analyse it from its
+:doc:`File tab <reanalysis>`, which makes a new version.
 
 Standard values: ``ROUTER``, ``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``,
 ``IOT``, ``UNKNOWN``. Custom strings (e.g. ``"PLC"``, ``"CCTV Camera"``) are
