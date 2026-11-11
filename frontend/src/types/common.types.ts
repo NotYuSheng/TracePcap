@@ -301,7 +301,10 @@ export type FindingType =
   | 'FAN_OUT'
   | 'LONG_SESSION'
   | 'UNKNOWN_APP'
-  | 'PORT_PROTOCOL_MISMATCH';
+  | 'PORT_PROTOCOL_MISMATCH'
+  | 'COVERAGE_GAP'
+  /** Conversations matched by a detection rule (#925). */
+  | 'DETECTION_RULE';
 
 export type FindingSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -377,6 +380,9 @@ export interface Story {
   aggregates?: StoryAggregates;
   findings?: Finding[];
   investigationSteps?: InvestigationStep[];
+  /** The network whose detection rules the story used (#925); absent for the shared rules only. */
+  networkId?: string | null;
+  networkName?: string | null;
 }
 
 export interface NarrativeSection {

@@ -3092,7 +3092,7 @@ export interface components {
             summary?: string;
             title?: string;
             /** @enum {string} */
-            type?: "NDPI_RISK" | "BEACON" | "TLS_ANOMALY" | "VOLUME" | "FAN_OUT" | "LONG_SESSION" | "UNKNOWN_APP" | "PORT_PROTOCOL_MISMATCH" | "COVERAGE_GAP";
+            type?: "NDPI_RISK" | "BEACON" | "TLS_ANOMALY" | "VOLUME" | "FAN_OUT" | "LONG_SESSION" | "UNKNOWN_APP" | "PORT_PROTOCOL_MISMATCH" | "COVERAGE_GAP" | "DETECTION_RULE";
         };
         FindingDto: {
             attributes?: {
@@ -3119,6 +3119,8 @@ export interface components {
             maxFindings?: number;
             /** Format: int32 */
             maxRiskMatrix?: number;
+            /** Format: uuid */
+            networkId?: string;
         };
         GeoInfo: {
             asn?: string;
@@ -3878,6 +3880,8 @@ export interface components {
             id?: string;
             investigationSteps?: components["schemas"]["InvestigationStep"][];
             narrative?: components["schemas"]["NarrativeSection"][];
+            networkId?: string;
+            networkName?: string;
             suggestedQuestions?: string[];
             timeline?: components["schemas"]["StoryTimelineEvent"][];
         };

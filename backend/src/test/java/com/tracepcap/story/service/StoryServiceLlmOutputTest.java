@@ -13,7 +13,7 @@ class StoryServiceLlmOutputTest {
 
   private final StoryService service =
       new StoryService(
-          null, null, null, null, null, null, new ObjectMapper(), null, null, null, null, null,
+          null, null, null, null, null, null, null, new ObjectMapper(), null, null, null, null, null,
           null, null, null, null);
 
   private void parse(String content) {

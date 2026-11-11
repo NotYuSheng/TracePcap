@@ -20,4 +20,10 @@ public class GenerateStoryRequest {
   private Integer maxFindings;
   /** Max number of protocol risk matrix entries to include in the prompt (default 15). */
   private Integer maxRiskMatrix;
+
+  /**
+   * The network the capture is viewed in (#925): the story uses its detection rules too (and not
+   * the global rules it suppresses). Null for the shared rules only.
+   */
+  private UUID networkId;
 }

@@ -29,6 +29,11 @@ public class StoryResponse {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private List<Finding> findings;
 
+  /** The network whose detection rules the story used (#925), or null for the shared rules only. */
+  private String networkId;
+
+  private String networkName;
+
   /**
    * LLM-directed investigation steps: hypotheses, queries, and retrieved conversation evidence.
    * Null for legacy cached stories.

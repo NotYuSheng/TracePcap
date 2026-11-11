@@ -1836,7 +1836,8 @@
               "LONG_SESSION",
               "UNKNOWN_APP",
               "PORT_PROTOCOL_MISMATCH",
-              "COVERAGE_GAP"
+              "COVERAGE_GAP",
+              "DETECTION_RULE"
             ],
             "type": "string"
           }
@@ -1911,6 +1912,10 @@
           "maxRiskMatrix": {
             "format": "int32",
             "type": "integer"
+          },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
           }
         },
         "required": [
@@ -4040,6 +4045,12 @@
               "$ref": "#/components/schemas/NarrativeSection"
             },
             "type": "array"
+          },
+          "networkId": {
+            "type": "string"
+          },
+          "networkName": {
+            "type": "string"
           },
           "suggestedQuestions": {
             "items": {
