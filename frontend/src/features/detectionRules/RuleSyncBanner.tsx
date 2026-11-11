@@ -21,6 +21,45 @@ interface RuleSyncBannerProps {
   onReapplied?: () => void;
 }
 
+/**
+ * What re-scoring the rules' device-type votes changed (#925): never silent, but nothing to clear
+ * either. Analyst labels are never changed; the ones the new evidence contradicts are flagged.
+ */
+function ReclassifiedList({ job }: { job: ReapplyJob }) {
+  const changed = job.reclassifiedCount ?? 0;
+  const stale = job.staleLabelsCount ?? 0;
+  if (changed === 0 && stale === 0) return null;
+  const rows = job.reclassified ?? [];
+  return (
+    <div className="w-100 mt-1" data-testid="reapply-reclassified">
+      {changed > 0 && (
+        <div>
+          <i className="bi bi-arrow-left-right me-1" aria-hidden="true" />
+          {changed} host{changed === 1 ? '' : 's'} changed device type, from the rules' new votes:
+        </div>
+      )}
+      {rows.length > 0 && (
+        <ul className="mb-1 ps-4">
+          {rows.map(r => (
+            <li key={`${r.fileId}-${r.ip}`}>
+              <span className="font-monospace">{r.ip}</span>: {r.from} → <strong>{r.to}</strong>
+              {r.rules.length > 0 && <span className="text-muted"> (rule {r.rules.join(', ')})</span>}
+            </li>
+          ))}
+          {changed > rows.length && <li className="text-muted">and {changed - rows.length} more</li>}
+        </ul>
+      )}
+      {stale > 0 && (
+        <div>
+          <i className="bi bi-exclamation-triangle me-1" aria-hidden="true" />
+          {stale} analyst label{stale === 1 ? '' : 's'} now disagree{stale === 1 ? 's' : ''} with the
+          evidence and {stale === 1 ? 'is' : 'are'} marked stale. Labels aren't changed; review them on the host.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function jobLine(job: ReapplyJob): string {
   if (job.status === 'RUNNING')
     return `Re-applying rules: ${job.done + job.failed} of ${job.total} captures…`;
@@ -96,6 +135,7 @@ export function RuleSyncBanner({
               Show updated matches
             </Button>
           )}
+          <ReclassifiedList job={job} />
         </Alert>
       )}
       {error && (

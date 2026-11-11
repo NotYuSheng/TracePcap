@@ -6,12 +6,14 @@ import com.tracepcap.analysis.entity.HostClassificationEntity;
 import com.tracepcap.analysis.service.HostnameResolverService;
 import com.tracepcap.analysis.service.PcapParserService;
 import com.tracepcap.analysis.service.WindowsIdentityResolverService.Claim;
+import com.tracepcap.analysis.spi.ClassificationHint;
 import com.tracepcap.analysis.spi.HostClassifier;
 import com.tracepcap.hostclassification.service.classifier.DeviceClassificationSignal;
 import com.tracepcap.hostclassification.service.classifier.DeviceTypes;
 import com.tracepcap.hostclassification.service.classifier.HostContext;
 import com.tracepcap.hostclassification.service.classifier.HostProfile;
 import com.tracepcap.hostclassification.service.classifier.ScoreBoard;
+import com.tracepcap.hostclassification.service.classifier.signals.CustomRuleClassificationSignal;
 import com.tracepcap.file.entity.FileEntity;
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -153,6 +155,7 @@ public class DeviceClassifierService implements HostClassifier {
    */
   @Override
   public List<HostClassificationEntity> classify(HostClassifier.ClassificationRequest request) {
+    java.util.Map<String, Board> boards = request.boardsOut();
     // Unpacked into the names the body has always used, so this refactor (#421) leaves it untouched.
     FileEntity file = request.file();
     List<PcapParserService.ConversationInfo> conversations = request.conversations();
@@ -217,6 +220,8 @@ public class DeviceClassifierService implements HostClassifier {
               .winnerReasons(joinReasons(board.reasonsFor(deviceType)))
               .runnerUpReasons(runnerUp != null ? joinReasons(board.reasonsFor(runnerUp.getKey())) : null)
               .build());
+      // The whole board and the rule votes in it, so a rule change can be re-scored (#925).
+      boards.put(ip, new Board(board.scores(), board.allReasons(), votingHints(ctx.ruleHints())));
     }
 
     // Attach passively-discovered hostnames (DHCP/mDNS/NBNS/reverse DNS) to matching hosts.
@@ -232,6 +237,33 @@ public class DeviceClassifierService implements HostClassifier {
 
     log.info("Classified {} hosts", results.size());
     return results;
+  }
+
+  @Override
+  public java.util.Optional<Verdict> rescoreRuleVotes(Board stored, List<ClassificationHint> votes) {
+    if (stored == null || stored.scores() == null) return java.util.Optional.empty();
+    List<ClassificationHint> oldVotes = stored.ruleVotes() == null ? List.of() : stored.ruleVotes();
+    List<ClassificationHint> newVotes = votingHints(votes);
+    if (new java.util.HashSet<>(oldVotes).equals(new java.util.HashSet<>(newVotes))) return java.util.Optional.empty();
+    ScoreBoard board = ScoreBoard.of(stored.scores(), stored.reasons());
+    for (ClassificationHint h : oldVotes) board.remove(h.deviceType(), h.weight(), CustomRuleClassificationSignal.reason(h));
+    for (ClassificationHint h : newVotes) board.add(h.deviceType(), h.weight(), CustomRuleClassificationSignal.reason(h));
+    String deviceType = board.winner(DeviceTypes.UNKNOWN);
+    java.util.Map.Entry<String, Integer> runnerUp = board.runnerUp();
+    return java.util.Optional.of(
+        new Verdict(
+            deviceType,
+            board.confidence(CONFIDENCE_MARGIN_FOR_FULL),
+            board.scores().get(deviceType),
+            runnerUp != null ? runnerUp.getKey() : null,
+            runnerUp != null ? runnerUp.getValue() : null,
+            joinReasons(board.reasonsFor(deviceType)),
+            runnerUp != null ? joinReasons(board.reasonsFor(runnerUp.getKey())) : null,
+            new Board(board.scores(), board.allReasons(), newVotes)));
+  }
+
+  private static List<ClassificationHint> votingHints(List<ClassificationHint> hints) {
+    return hints == null ? List.of() : hints.stream().filter(CustomRuleClassificationSignal::votes).toList();
   }
 
   // -------------------------------------------------------------------------

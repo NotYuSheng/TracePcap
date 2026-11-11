@@ -443,9 +443,10 @@ export function RuleEditorModal({
             host that matched the rule's IP or CIDR, else the one on its port, else both ends.
           </p>
           <p className="small text-muted mb-2" data-testid="rule-hint-timing">
-            The vote is counted when a capture is analysed, by global and capture rules. Re-apply
-            updates which conversations match, not device types: to re-classify a capture analysed
-            before this change, re-analyse it from its File tab (that makes a new version).
+            Global and capture rules vote (a network rule's hint doesn't). After a change,
+            <strong> Re-apply</strong> re-scores captures already analysed: an automatic device type can
+            change, and is listed in Re-apply's result; an analyst's label is never changed, but is
+            marked stale if the evidence now points elsewhere.
           </p>
           <Row className="g-2 mb-2">
             <Col md={8}>

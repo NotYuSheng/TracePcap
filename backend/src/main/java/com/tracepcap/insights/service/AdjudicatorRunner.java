@@ -115,6 +115,12 @@ public class AdjudicatorRunner {
     runAll(event.fileId(), "human override");
   }
 
+  /** Re-apply re-scored rule votes and machine classifications changed (#925): re-answer. */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onClassificationsRescored(com.tracepcap.common.event.HostClassificationsRescoredEvent event) {
+    runAll(event.fileId(), "rule vote re-scoring");
+  }
+
   private void runAll(UUID fileId, String trigger) {
     for (Adjudicator adjudicator : adjudicators) {
       try {

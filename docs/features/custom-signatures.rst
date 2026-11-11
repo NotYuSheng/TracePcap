@@ -304,10 +304,22 @@ Here the host on port 554 gets the vote, not the client watching it. To pin a
 single known host, label the host instead.
 
 **When it counts.** The vote is counted when a capture is analysed, and only
-global and capture rules vote (a network rule's hint doesn't). **Re-apply**
-updates which conversations a rule matches, not device types: to re-classify a
-capture that was analysed before a hint changed, re-analyse it from its
-:doc:`File tab <reanalysis>`, which makes a new version.
+global and capture rules vote (a network rule's hint doesn't). When you add,
+edit, switch off or delete a rule with a hint, captures already analysed are
+re-scored when their rules are next checked: by **Re-apply**, or straight away
+for a switched-off or deleted rule. Re-scoring takes back the rule's old vote and
+counts its new one, then works out the winner again:
+
+- An **automatic** device type changes only if the winner changes. Each change
+  is listed in Re-apply's result ("10.0.0.9: IoT → CCTV Camera, rule
+  rtsp_camera"), shown on the host ("changed by Re-apply on …: it was IoT"), and
+  recorded in the audit log.
+- An **analyst's label** is never changed. If the new winner isn't what the
+  label says, the label is marked **stale**, with the reason; re-affirm it to
+  clear the flag. Re-applying again with nothing changed doesn't flag it again.
+
+Hosts analysed before this existed have no stored votes to re-score: re-analyse
+them from the :doc:`File tab <reanalysis>` once.
 
 Standard values: ``ROUTER``, ``MOBILE``, ``LAPTOP_DESKTOP``, ``SERVER``,
 ``IOT``, ``UNKNOWN``. Custom strings (e.g. ``"PLC"``, ``"CCTV Camera"``) are

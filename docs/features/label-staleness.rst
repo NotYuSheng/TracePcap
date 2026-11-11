@@ -59,6 +59,16 @@ Resolving a stale flag is an explicit analyst action:
   current composition, accepting the new behaviour as expected.
 
 
+A host's device type, when a detection rule's vote changes
+----------------------------------------------------------
+
+A host's device-type label (*I disagree, it's X*) can also go stale within one
+capture, when a detection rule's device-type vote changes and the capture is
+re-checked. If re-scoring moves the evidence's top answer to something other
+than the label, the label is marked stale with the rule and the new answer. The
+label itself is never changed. Re-affirm it to clear the flag. See
+:doc:`custom-signatures` (*Classification Hint*).
+
 What "properties" means per entity type
 ---------------------------------------
 

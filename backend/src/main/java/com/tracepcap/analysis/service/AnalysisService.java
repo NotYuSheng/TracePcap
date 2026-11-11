@@ -553,6 +553,7 @@ public class AnalysisService {
     // (e.g. a DNS responder → DNS_SERVER). Adding a role needs no change here.
     ServiceLogOutcome serviceLogs = runServiceLogExtractors(run.file, run.pcap);
 
+    Map<String, HostClassifier.Board> boards = new HashMap<>();
     List<HostClassificationEntity> hostClassifications =
         hostClassifier.classify(
             new HostClassifier.ClassificationRequest(
@@ -563,7 +564,13 @@ public class AnalysisService {
                 ruleHints,
                 hostnames,
                 serviceLogs.rolesByIp(),
-                windowsIdentityClaimsByIp));
+                windowsIdentityClaimsByIp,
+                boards));
+    // Each host's whole score board and rule votes, so a rule change can be re-scored (#925).
+    for (HostClassificationEntity h : hostClassifications) {
+      HostClassifier.Board board = boards.get(h.getIp());
+      if (board != null) RuleVoteRescoreService.applyBoard(h, board);
+    }
     applyServiceLogSuspicions(hostClassifications, serviceLogs.suspicions());
     applyWindowsSignIn(hostClassifications, windowsIdentityClaimsByIp);
     try {

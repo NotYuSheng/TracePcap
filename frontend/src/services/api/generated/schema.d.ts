@@ -3210,6 +3210,9 @@ export interface components {
             /** Format: int32 */
             peerCount?: number;
             primaryLabel?: string;
+            reclassified?: {
+                [key: string]: Record<string, never>;
+            };
             serviceRoles?: string[];
             /** Format: int32 */
             ttl?: number;
@@ -3761,7 +3764,14 @@ export interface components {
             finishedAt?: string;
             /** Format: uuid */
             id?: string;
+            reclassified?: {
+                [key: string]: Record<string, never>;
+            }[];
+            /** Format: int32 */
+            reclassifiedCount?: number;
             requestedBy?: string;
+            /** Format: int32 */
+            staleLabelsCount?: number;
             status?: string;
             /** Format: int32 */
             total?: number;

@@ -2177,6 +2177,12 @@
           "primaryLabel": {
             "type": "string"
           },
+          "reclassified": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
           "serviceRoles": {
             "items": {
               "type": "string"
@@ -3702,8 +3708,25 @@
             "format": "uuid",
             "type": "string"
           },
+          "reclassified": {
+            "items": {
+              "additionalProperties": {
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "reclassifiedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "requestedBy": {
             "type": "string"
+          },
+          "staleLabelsCount": {
+            "format": "int32",
+            "type": "integer"
           },
           "status": {
             "type": "string"

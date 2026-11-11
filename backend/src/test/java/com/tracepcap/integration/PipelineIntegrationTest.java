@@ -1368,7 +1368,60 @@ class PipelineIntegrationTest {
     assertThat(byIp.get("10.99.0.1").get("deviceType").asText())
         .as("the client on the other end isn't voted a camera").isNotEqualTo("CCTV Camera");
 
+    // Re-apply re-scores the vote (#925): the rule now says PLC, and the machine verdict follows,
+    // with the change recorded on the host, in the job's result, and in the audit log.
+    String ruleId = jdbc.queryForObject("SELECT id::text FROM detection_rules WHERE name = ?", String.class, tag);
+    String plc = "{\"name\":\"" + tag + "\",\"severity\":\"low\",\"match\":{\"dstPort\":5999},"
+        + "\"deviceType\":\"PLC\",\"deviceTypeWeight\":100}";
+    putRule(ruleId, plc);
+    assertThat(deviceType(file, "10.99.0.2")).as("nothing changes until Re-apply").isEqualTo("CCTV Camera");
+    JsonNode job = awaitJob(rest.postForEntity("/api/v1/rule-reapply-jobs", json("{\"fileId\":\"" + file + "\"}"), JsonNode.class)
+        .getBody().get("id").asText());
+    assertThat(job.get("reclassifiedCount").asInt()).isEqualTo(1);
+    assertThat(job.get("reclassified").get(0).get("ip").asText()).isEqualTo("10.99.0.2");
+    assertThat(job.get("reclassified").get(0).get("from").asText()).isEqualTo("CCTV Camera");
+    assertThat(job.get("reclassified").get(0).get("to").asText()).isEqualTo("PLC");
+    assertThat(deviceType(file, "10.99.0.2")).isEqualTo("PLC");
+    JsonNode evidence = rest.getForEntity("/api/v1/files/" + file + "/hosts/10.99.0.2/identity", JsonNode.class).getBody();
+    assertThat(evidence.get("reclassified").get("from").asText()).isEqualTo("CCTV Camera");
+    assertThat(evidence.get("reclassified").get("rules").asText()).isEqualTo(tag);
+    assertThat(jdbc.queryForObject(
+            "SELECT count(*) FROM audit_log WHERE action = 'host-classification.rescore' AND target_id = ?",
+            Integer.class, file + "/10.99.0.2"))
+        .isEqualTo(1);
+
+    // An analyst's label is never changed; it's flagged stale when the evidence's answer moves away.
+    String override = "/api/v1/files/" + file + "/adjudications/host-identity/10.99.0.2/override";
+    rest.exchange(override, HttpMethod.PUT, json("{\"label\":\"PLC\",\"rationale\":\"site survey\"}"), JsonNode.class);
+    putRule(ruleId, plc.replace("PLC", "Badge Reader"));
+    JsonNode job2 = awaitJob(rest.postForEntity("/api/v1/rule-reapply-jobs", json("{\"fileId\":\"" + file + "\"}"), JsonNode.class)
+        .getBody().get("id").asText());
+    assertThat(job2.get("staleLabelsCount").asInt()).isEqualTo(1);
+    JsonNode label = rest.getForEntity(override, JsonNode.class).getBody();
+    assertThat(label.get("label").asText()).isEqualTo("PLC");
+    assertThat(label.get("staleSince").isNull()).isFalse();
+    assertThat(label.get("staleFields").toString()).contains(tag).contains("Badge Reader");
+
+    // Re-affirming clears it, and re-applying with nothing changed doesn't flag it again.
+    rest.exchange(override, HttpMethod.PUT, json("{\"label\":\"PLC\",\"rationale\":\"still a PLC\"}"), JsonNode.class);
+    jdbc.update("UPDATE rule_evaluations SET rule_version = 0 WHERE rule_id = ?::uuid", ruleId); // force a re-check
+    JsonNode job3 = awaitJob(rest.postForEntity("/api/v1/rule-reapply-jobs", json("{\"fileId\":\"" + file + "\"}"), JsonNode.class)
+        .getBody().get("id").asText());
+    assertThat(job3.get("reclassifiedCount").asInt()).isZero();
+    assertThat(rest.getForEntity(override, JsonNode.class).getBody().get("staleSince").isNull()).isTrue();
+
+    // Deleting the rule takes its vote with it.
+    rest.exchange("/api/v1/detection-rules/" + ruleId, HttpMethod.DELETE, null, Void.class);
+    assertThat(deviceType(file, "10.99.0.2")).isNotEqualTo("Badge Reader");
+
     jdbc.update("DELETE FROM detection_rules WHERE name LIKE ?", tag + "%");
+  }
+
+  private String deviceType(String file, String ip) {
+    for (JsonNode h : rest.getForEntity("/api/v1/files/" + file + "/host-classifications", JsonNode.class).getBody()) {
+      if (ip.equals(h.get("ip").asText())) return h.get("deviceType").asText();
+    }
+    return null;
   }
 
   /**

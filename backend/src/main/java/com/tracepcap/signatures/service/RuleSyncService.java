@@ -45,6 +45,8 @@ public class RuleSyncService {
   private final CustomSignatureStore labelStore;
   private final FileRepository fileRepository;
   private final com.tracepcap.monitor.repository.NetworkSnapshotRepository snapshotRepository;
+  private final com.tracepcap.analysis.spi.RuleVoteRescorer rescorer;
+  private final com.tracepcap.config.security.CurrentActor currentActor;
 
   /** The install-wide picture, for the Detection rules tab. */
   @Transactional(readOnly = true)
@@ -101,15 +103,19 @@ public class RuleSyncService {
    * in its own transaction. Returns how many rules were checked (0 if it was already current or
    * isn't a completed capture).
    */
+  /** What re-checking one capture did: how many rules, and what re-scoring rule votes changed. */
+  public record ReapplyOutcome(int rulesChecked, com.tracepcap.analysis.spi.RuleVoteRescorer.Outcome rescore) {
+    static final ReapplyOutcome NONE = new ReapplyOutcome(0, com.tracepcap.analysis.spi.RuleVoteRescorer.Outcome.NONE);
+  }
+
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public int reapply(UUID fileId) {
+  public ReapplyOutcome reapply(UUID fileId, String actor) {
     FileEntity file = fileRepository.findById(fileId).orElse(null);
-    if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED) return 0;
+    if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED) return ReapplyOutcome.NONE;
     ruleSync.lockFile(fileId);
     List<DetectionRuleEntity> stale = staleRules(enabledRules(fileId), ruleSync.evaluationsForFile(fileId));
-    if (stale.isEmpty()) return 0;
-    check(file, stale);
-    return stale.size();
+    if (stale.isEmpty()) return ReapplyOutcome.NONE;
+    return new ReapplyOutcome(stale.size(), check(file, stale, actor));
   }
 
   /**
@@ -121,10 +127,11 @@ public class RuleSyncService {
     FileEntity file = fileRepository.findById(fileId).orElse(null);
     if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED || rules.isEmpty()) return;
     ruleSync.lockFile(fileId);
-    check(file, rules);
+    check(file, rules, currentActor.username());
   }
 
-  private void check(FileEntity file, List<DetectionRuleEntity> stale) {
+  private com.tracepcap.analysis.spi.RuleVoteRescorer.Outcome check(
+      FileEntity file, List<DetectionRuleEntity> stale, String actor) {
     UUID fileId = file.getId();
     boolean packetsGone = file.getPacketsPrunedAt() != null;
     List<DetectionRuleEntity> checkable = new ArrayList<>();
@@ -139,6 +146,28 @@ public class RuleSyncService {
     log.info(
         "Checked {} rule(s) on {}: {} checked, {} couldn't be re-checked (packets deleted)",
         stale.size(), fileId, checkable.size(), uncheckable.size());
+    // Network rules don't vote on device types, so checking only those can't change a vote.
+    boolean mayVote = stale.stream().anyMatch(r -> r.getScope() != DetectionRuleEntity.Scope.NETWORK);
+    return mayVote ? rescoreVotes(fileId, actor) : com.tracepcap.analysis.spi.RuleVoteRescorer.Outcome.NONE;
+  }
+
+  /**
+   * Re-scores the capture's hosts with the rules' current device-type votes (#925): every enabled
+   * global and capture rule that carries one, over its current matches. Joins the transaction.
+   */
+  private com.tracepcap.analysis.spi.RuleVoteRescorer.Outcome rescoreVotes(UUID fileId, String actor) {
+    List<DetectionRuleEntity> voting = new ArrayList<>();
+    voting.addAll(ruleRepository.findByScopeAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.GLOBAL));
+    voting.addAll(ruleRepository.findByScopeAndFileIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.CAPTURE, fileId));
+    voting.removeIf(r -> r.getDeviceType() == null || r.getDeviceType().isBlank());
+    Map<UUID, List<UUID>> matched = ruleSync.matchesForFile(fileId, voting.stream().map(DetectionRuleEntity::getId).toList());
+    Map<String, List<com.tracepcap.analysis.spi.ClassificationHint>> votes = Map.of();
+    if (!matched.isEmpty()) {
+      Map<UUID, ConversationInfo> byId = new java.util.HashMap<>();
+      for (ConversationInfo c : conversations(fileId)) byId.put(c.getEntityId(), c);
+      votes = matcher.classificationHints(voting, matched, byId);
+    }
+    return rescorer.rescore(fileId, votes, actor);
   }
 
   /**
@@ -150,6 +179,8 @@ public class RuleSyncService {
     for (UUID f : fileIds) {
       ruleSync.lockFile(f);
       labelStore.replaceForFile(f, ruleSync.labelsForFile(f));
+      // A rule switched off or deleted takes its device-type vote with it (#925).
+      rescoreVotes(f, currentActor.username());
     }
   }
 
@@ -184,7 +215,7 @@ public class RuleSyncService {
         ruleRepository.findByScopeAndNetworkIdAndEnabledTrueOrderByNameAsc(DetectionRuleEntity.Scope.NETWORK, networkId);
     if (rules.isEmpty()) return;
     ruleSync.lockFile(fileId);
-    check(file, rules);
+    check(file, rules, com.tracepcap.config.security.CurrentActor.SYSTEM);
   }
 
   /**
@@ -203,7 +234,7 @@ public class RuleSyncService {
     if (file == null || file.getStatus() != FileEntity.FileStatus.COMPLETED) return;
     ruleSync.lockFile(fileId);
     List<DetectionRuleEntity> stale = staleRules(rules, ruleSync.evaluationsForFile(fileId)); // under the lock
-    if (!stale.isEmpty()) check(file, stale);
+    if (!stale.isEmpty()) check(file, stale, com.tracepcap.config.security.CurrentActor.SYSTEM);
   }
 
   /** A capture left a network: drop that network's rule results for it (#925 phase 3). */

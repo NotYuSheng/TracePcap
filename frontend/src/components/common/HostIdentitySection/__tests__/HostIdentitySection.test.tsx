@@ -41,4 +41,12 @@ describe('HostIdentitySection identity checks (#918)', () => {
     expect(await screen.findByTestId('host-virtual-address')).toHaveTextContent('shared virtual address')
     expect(screen.queryByTestId('host-identity-warning')).not.toBeInTheDocument()
   })
+
+  it('says when Re-apply changed the device type, and from what (#925)', async () => {
+    serve({ reclassified: { at: '2026-11-11T10:00:00', from: 'IOT', by: 'alice', rules: 'rtsp' } })
+    render(<HostIdentitySection fileId="f1" ip="10.0.0.70" />)
+    const note = await screen.findByTestId('host-reclassified')
+    expect(note).toHaveTextContent('Device type changed by Re-apply')
+    expect(note).toHaveTextContent('(alice): it was IoT Device, until rule rtsp changed its vote')
+  })
 })

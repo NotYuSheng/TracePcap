@@ -262,6 +262,15 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
           This is a router failover pair's shared virtual address, not a machine of its own.
         </Alert>
       )}
+      {evidence.reclassified && (
+        <Alert variant="info" className="py-2 small mb-3" data-testid="host-reclassified">
+          <i className="bi bi-arrow-left-right me-1" aria-hidden="true" />
+          Device type changed by Re-apply on {new Date(evidence.reclassified.at).toLocaleString()}
+          {evidence.reclassified.by && <> ({evidence.reclassified.by})</>}: it was{' '}
+          <strong>{deviceTypeLabel(evidence.reclassified.from as DeviceType)}</strong>
+          {evidence.reclassified.rules && <>, until rule {evidence.reclassified.rules} changed its vote</>}.
+        </Alert>
+      )}
       {evidence.identityWarning && (
         <Alert variant="warning" className="py-2 small mb-3" data-testid="host-identity-warning">
           <i className="bi bi-exclamation-triangle me-1" aria-hidden="true" />

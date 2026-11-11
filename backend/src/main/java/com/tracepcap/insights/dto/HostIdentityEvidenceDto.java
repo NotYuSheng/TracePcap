@@ -58,6 +58,11 @@ public class HostIdentityEvidenceDto {
   String addressKind;
   /** Why this may be more than one machine (#918); null when nothing conflicts. */
   String identityWarning;
+  /**
+   * The last time Re-apply re-scored rule votes and changed the machine device type (#925): {at,
+   * from, by, rules}. Null if it never has.
+   */
+  java.util.Map<String, Object> reclassified;
 
   // ── Service facts ───────────────────────────────────────────────────────────
   /** Confirmed service roles (e.g. ["dns"]); never null, may be empty. */
