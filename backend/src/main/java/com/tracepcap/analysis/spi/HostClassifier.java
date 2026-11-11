@@ -23,6 +23,30 @@ public interface HostClassifier {
   List<HostClassificationEntity> classify(ClassificationRequest request);
 
   /**
+   * A host's whole score board (#925): points and reasons per device type, and the detection
+   * rules' votes counted in them. Kept so a rule change can be re-scored without the inputs.
+   */
+  record Board(Map<String, Integer> scores, Map<String, List<String>> reasons, List<ClassificationHint> ruleVotes) {}
+
+  /** A re-scored verdict, and the board it came from. */
+  record Verdict(
+      String deviceType,
+      int confidence,
+      Integer winnerScore,
+      String runnerUpType,
+      Integer runnerUpScore,
+      String winnerReasons,
+      String runnerUpReasons,
+      Board board) {}
+
+  /**
+   * Re-scores a stored board with the detection rules' current votes (#925): the old rule votes
+   * are taken back and {@code votes} counted, then the winner, confidence and runner-up are worked
+   * out again. Empty when the votes are the same as before.
+   */
+  java.util.Optional<Verdict> rescoreRuleVotes(Board stored, List<ClassificationHint> votes);
+
+  /**
    * Everything one classification run reads (#421), replacing an 8-argument call whose
    * same-typed maps were easy to pass in the wrong order.
    *
@@ -46,9 +70,27 @@ public interface HostClassifier {
       Map<String, List<ClassificationHint>> ruleHints,
       Map<String, HostnameResolverService.ResolvedHostname> hostnames,
       Map<String, Set<String>> serviceRolesByIp,
-      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
+      Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp,
+      Map<String, Board> boardsOut) {
+
+    /** Without a board sink: the boards (#925) aren't kept. */
+    public ClassificationRequest(
+        FileEntity file,
+        List<PcapParserService.ConversationInfo> conversations,
+        Map<String, Integer> hostTtls,
+        Map<String, String> hostMacs,
+        Map<String, List<ClassificationHint>> ruleHints,
+        Map<String, HostnameResolverService.ResolvedHostname> hostnames,
+        Map<String, Set<String>> serviceRolesByIp,
+        Map<String, List<WindowsIdentityResolverService.Claim>> windowsIdentityClaimsByIp) {
+      this(file, conversations, hostTtls, hostMacs, ruleHints, hostnames, serviceRolesByIp,
+          windowsIdentityClaimsByIp, null);
+    }
 
     public ClassificationRequest {
+      // Filled by the classifier with each host's score board, by IP, when the caller passes a
+      // map (#925); a fresh one otherwise, so the classifier never checks.
+      boardsOut = boardsOut == null ? new java.util.HashMap<>() : boardsOut;
       conversations = conversations == null ? List.of() : conversations;
       hostTtls = hostTtls == null ? Map.of() : hostTtls;
       hostMacs = hostMacs == null ? Map.of() : hostMacs;

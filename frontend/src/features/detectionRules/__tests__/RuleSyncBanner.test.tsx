@@ -57,6 +57,27 @@ describe('RuleSyncBanner (#925 phase 2)', () => {
     expect(screen.getByRole('button', { name: 'Show updated matches' })).toBeInTheDocument()
   })
 
+  it("lists the device types re-scoring changed, and the labels it flagged (#925)", async () => {
+    server.use(
+      http.get('*/files/f1/rule-status', () => HttpResponse.json(status({ staleCaptures: 1, staleRules: ['rtsp'] }))),
+      http.get('*/rule-reapply-jobs', () => HttpResponse.json([])),
+      http.post('*/rule-reapply-jobs', () =>
+        HttpResponse.json({ id: 'j2', status: 'RUNNING', total: 1, done: 0, failed: 0, requestedBy: 'alice', createdAt: '' }, { status: 201 })),
+      http.get('*/rule-reapply-jobs/j2', () =>
+        HttpResponse.json({
+          id: 'j2', status: 'DONE', total: 1, done: 1, failed: 0, requestedBy: 'alice', createdAt: '',
+          reclassifiedCount: 1, staleLabelsCount: 1,
+          reclassified: [{ fileId: 'f1', ip: '10.0.0.9', from: 'IOT', to: 'CCTV Camera', rules: ['rtsp'] }],
+        }))
+    )
+    render(<RuleSyncBanner fileId="f1" canReapply />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-apply to this capture' }))
+    const list = await screen.findByTestId('reapply-reclassified', {}, { timeout: 4000 })
+    expect(list).toHaveTextContent('1 host changed device type')
+    expect(list).toHaveTextContent('10.0.0.9: IOT → CCTV Camera (rule rtsp)')
+    expect(list).toHaveTextContent('1 analyst label now disagrees with the evidence and is marked stale')
+  })
+
   it("can't re-apply without permission, and says why", async () => {
     server.use(
       http.get('*/detection-rules/status', () => HttpResponse.json(status({ captures: 5, staleCaptures: 3 }))),

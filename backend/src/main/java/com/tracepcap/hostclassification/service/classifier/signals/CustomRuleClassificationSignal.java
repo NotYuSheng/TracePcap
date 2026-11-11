@@ -23,11 +23,18 @@ public class CustomRuleClassificationSignal implements DeviceClassificationSigna
   @Override
   public void contribute(HostContext ctx, ScoreBoard board) {
     for (ClassificationHint h : ctx.ruleHints()) {
-      if (h.deviceType() == null || h.deviceType().isBlank() || h.weight() <= 0) continue;
-      board.add(
-          h.deviceType(),
-          h.weight(),
-          "Custom rule \"" + h.source() + "\" → " + h.deviceType() + " +" + h.weight());
+      if (!votes(h)) continue;
+      board.add(h.deviceType(), h.weight(), reason(h));
     }
+  }
+
+  /** The evidence line a rule's vote adds; re-scoring (#925) takes back exactly this line. */
+  public static String reason(ClassificationHint h) {
+    return "Custom rule \"" + h.source() + "\" → " + h.deviceType() + " +" + h.weight();
+  }
+
+  /** Whether a hint casts a vote at all. */
+  public static boolean votes(ClassificationHint h) {
+    return h != null && h.deviceType() != null && !h.deviceType().isBlank() && h.weight() > 0;
   }
 }

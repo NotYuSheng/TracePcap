@@ -146,6 +146,38 @@ public class HostClassificationEntity {
   @Column(name = "runner_up_reasons", columnDefinition = "text")
   private String runnerUpReasons;
 
+  // ── Re-scoring rule votes (#925, V60) ─────────────────────────────────────────
+  // The full score board, so a detection rule's device-type vote can be re-scored after a rule
+  // change without the analysis-time inputs. Null on hosts classified before V60.
+
+  /** Points per device type. */
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+  @Column(name = "type_scores", columnDefinition = "jsonb")
+  private java.util.Map<String, Integer> typeScores;
+
+  /** Reasons per device type, in the order they were added. */
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+  @Column(name = "type_reasons", columnDefinition = "jsonb")
+  private java.util.Map<String, java.util.List<String>> typeReasons;
+
+  /** The detection rules' votes counted in {@link #typeScores}: [{rule, deviceType, weight}]. */
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+  @Column(name = "rule_votes", columnDefinition = "jsonb")
+  private java.util.List<java.util.Map<String, Object>> ruleVotes;
+
+  /** The last time re-scoring changed the device type, and from what, by whom, and which rules. */
+  @Column(name = "rescored_at")
+  private java.time.LocalDateTime rescoredAt;
+
+  @Column(name = "rescored_from", length = 100)
+  private String rescoredFrom;
+
+  @Column(name = "rescored_by", length = 255)
+  private String rescoredBy;
+
+  @Column(name = "rescored_rules", columnDefinition = "TEXT")
+  private String rescoredRules;
+
   /** Every TTL seen from this IP, lowest first (#918 item 1c). */
   @Column(name = "ttls", columnDefinition = "integer[]")
   private Integer[] ttls;

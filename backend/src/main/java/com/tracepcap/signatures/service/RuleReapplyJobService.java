@@ -74,10 +74,11 @@ public class RuleReapplyJobService {
 
     List<UUID> targets = fileId != null ? List.of(fileId) : sync.staleFiles();
     UUID id = UUID.randomUUID();
+    String actor = currentActor.username(); // the worker thread has no request to ask
     jdbc.update(
         "INSERT INTO rule_reapply_jobs (id, file_id, status, total, requested_by, created_at)"
             + " VALUES (?, ?, 'RUNNING', ?, ?, ?)",
-        id, fileId, targets.size(), currentActor.username(), Timestamp.valueOf(LocalDateTime.now()));
+        id, fileId, targets.size(), actor, Timestamp.valueOf(LocalDateTime.now()));
     Map<String, Object> after = new LinkedHashMap<>();
     after.put("captures", targets.size());
     if (fileId != null) after.put("fileId", fileId.toString());
@@ -88,7 +89,7 @@ public class RuleReapplyJobService {
         new TransactionSynchronization() {
           @Override
           public void afterCommit() {
-            executor.submit(() -> run(id, targets));
+            executor.submit(() -> run(id, targets, actor));
           }
         });
     return new Started(get(id).orElseThrow(), false);
@@ -109,19 +110,39 @@ public class RuleReapplyJobService {
         .findFirst();
   }
 
-  void run(UUID jobId, List<UUID> targets) {
-    int done = 0, failed = 0;
+  /** How many device-type changes a job lists in its result; the count is always exact. */
+  static final int MAX_LISTED_CHANGES = 100;
+
+  void run(UUID jobId, List<UUID> targets, String actor) {
+    int done = 0, failed = 0, reclassified = 0, staleLabels = 0;
+    List<Map<String, Object>> changes = new java.util.ArrayList<>();
     String lastError = null;
     for (UUID fileId : targets) {
       try {
-        sync.reapply(fileId);
+        RuleSyncService.ReapplyOutcome outcome = sync.reapply(fileId, actor);
         done++;
+        // Device types re-scored from the rules' votes (#925): listed in the job's result.
+        reclassified += outcome.rescore().changes().size();
+        staleLabels += outcome.rescore().staleLabels();
+        for (var c : outcome.rescore().changes()) {
+          if (changes.size() >= MAX_LISTED_CHANGES) break;
+          Map<String, Object> row = new LinkedHashMap<>();
+          row.put("fileId", c.fileId().toString());
+          row.put("ip", c.ip());
+          row.put("from", c.from());
+          row.put("to", c.to());
+          row.put("rules", c.rules());
+          changes.add(row);
+        }
       } catch (Exception e) {
         failed++;
         lastError = fileId + ": " + e.getMessage();
         log.warn("Re-apply failed for capture {}: {}", fileId, e.getMessage());
       }
-      jdbc.update("UPDATE rule_reapply_jobs SET done = ?, failed = ? WHERE id = ?", done, failed, jobId);
+      jdbc.update(
+          "UPDATE rule_reapply_jobs SET done = ?, failed = ?, reclassified_count = ?, stale_labels_count = ?,"
+              + " reclassified = ?::jsonb WHERE id = ?",
+          done, failed, reclassified, staleLabels, json(changes), jobId);
     }
     String status = failed > 0 && done == 0 ? "FAILED" : "DONE";
     jdbc.update(
@@ -145,6 +166,26 @@ public class RuleReapplyJobService {
     executor.shutdownNow();
   }
 
+  private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+  private static String json(Object o) {
+    try {
+      return JSON.writeValueAsString(o);
+    } catch (Exception e) {
+      return "[]";
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> parseChanges(String raw) {
+    if (raw == null || raw.isBlank()) return List.of();
+    try {
+      return JSON.readValue(raw, List.class);
+    } catch (Exception e) {
+      return List.of();
+    }
+  }
+
   private static final RowMapper<RuleReapplyJobDto> MAPPER =
       (rs, i) ->
           RuleReapplyJobDto.builder()
@@ -156,6 +197,9 @@ public class RuleReapplyJobService {
               .failed(rs.getInt("failed"))
               .error(rs.getString("error"))
               .requestedBy(rs.getString("requested_by"))
+              .reclassifiedCount(rs.getInt("reclassified_count"))
+              .staleLabelsCount(rs.getInt("stale_labels_count"))
+              .reclassified(parseChanges(rs.getString("reclassified")))
               .createdAt(rs.getTimestamp("created_at").toLocalDateTime())
               .finishedAt(rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toLocalDateTime())
               .build();

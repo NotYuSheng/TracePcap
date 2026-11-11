@@ -514,6 +514,8 @@ export interface HostIdentityEvidence {
   addressKind?: string | null;
   /** Why this may be more than one machine (#918); absent when nothing conflicts. */
   identityWarning?: string | null;
+  /** The last time Re-apply re-scored rule votes and changed the device type (#925). */
+  reclassified?: { at: string; from: string; by: string; rules: string } | null;
   // Service facts
   serviceRoles: string[];
   ndpiApps: string[];

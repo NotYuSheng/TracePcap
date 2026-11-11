@@ -27,6 +27,38 @@ public class ScoreBoard {
     reasons.computeIfAbsent(deviceType, k -> new ArrayList<>()).add(reason);
   }
 
+  /**
+   * Takes back points (and the reason given with them) toward {@code deviceType}: used when a
+   * stored board is re-scored after a detection rule's vote changed (#925). A type left with no
+   * points and no reasons is dropped.
+   */
+  public void remove(String deviceType, int weight, String reason) {
+    if (deviceType == null || weight == 0) return;
+    scores.computeIfPresent(deviceType, (k, v) -> v - weight);
+    List<String> r = reasons.get(deviceType);
+    if (r != null) {
+      r.remove(reason);
+      if (r.isEmpty()) reasons.remove(deviceType);
+    }
+    Integer left = scores.get(deviceType);
+    if (left != null && left == 0 && !reasons.containsKey(deviceType)) scores.remove(deviceType);
+  }
+
+  /** A board rebuilt from stored scores and reasons. */
+  public static ScoreBoard of(Map<String, Integer> scores, Map<String, List<String>> reasons) {
+    ScoreBoard b = new ScoreBoard();
+    if (scores != null) b.scores.putAll(scores);
+    if (reasons != null) reasons.forEach((k, v) -> b.reasons.put(k, new ArrayList<>(v)));
+    return b;
+  }
+
+  /** Every type's reasons (copied). */
+  public Map<String, List<String>> allReasons() {
+    Map<String, List<String>> out = new LinkedHashMap<>();
+    reasons.forEach((k, v) -> out.put(k, List.copyOf(v)));
+    return out;
+  }
+
   /** Raw per-type scores (mutable view not exposed; copy returned). */
   public Map<String, Integer> scores() {
     return new LinkedHashMap<>(scores);

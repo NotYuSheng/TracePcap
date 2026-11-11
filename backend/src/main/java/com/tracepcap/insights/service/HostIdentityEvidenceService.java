@@ -110,6 +110,7 @@ public class HostIdentityEvidenceService {
             .ttls(facts.ttls())
             .addressKind(facts.addressKind())
             .identityWarning(facts.identityWarning())
+            .reclassified(reclassified(facts.reclassified()))
             .serviceRoles(new ArrayList<>(facts.serviceRoles()))
             .ndpiApps(new ArrayList<>(apps))
             .initiatedConversations(initiated)
@@ -146,5 +147,16 @@ public class HostIdentityEvidenceService {
     }
 
     return Optional.of(b.build());
+  }
+
+  private static java.util.Map<String, Object> reclassified(
+      com.tracepcap.analysis.spi.HostClassificationLookup.Reclassified r) {
+    if (r == null) return null;
+    java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+    m.put("at", r.at().toString());
+    m.put("from", r.fromType());
+    m.put("by", r.by());
+    m.put("rules", r.rules());
+    return m;
   }
 }

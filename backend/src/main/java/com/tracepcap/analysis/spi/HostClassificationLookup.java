@@ -81,7 +81,31 @@ public interface HostClassificationLookup {
       List<String> serviceRoles,
       List<Integer> ttls,
       String addressKind,
-      String identityWarning) {
+      String identityWarning,
+      Reclassified reclassified) {
+
+    /** Without the #925 re-scoring record. */
+    public HostFacts(
+        String ip,
+        String mac,
+        String manufacturer,
+        String hostname,
+        String hostnameSource,
+        String loggedInUser,
+        String loggedInUserSource,
+        String loggedInUserRealName,
+        int loggedInUserCount,
+        Integer ttl,
+        String deviceType,
+        int confidence,
+        List<String> serviceRoles,
+        List<Integer> ttls,
+        String addressKind,
+        String identityWarning) {
+      this(ip, mac, manufacturer, hostname, hostnameSource, loggedInUser, loggedInUserSource,
+          loggedInUserRealName, loggedInUserCount, ttl, deviceType, confidence, serviceRoles,
+          ttls, addressKind, identityWarning, null);
+    }
 
     /** Without the #918 identity checks; they default to none. */
     public HostFacts(
@@ -103,6 +127,12 @@ public interface HostClassificationLookup {
           List.of(), null, null);
     }
   }
+
+  /**
+   * The last time re-scoring detection rules' votes changed this host's machine device type (#925):
+   * when, what it was, who ran Re-apply, and which rules' votes changed.
+   */
+  record Reclassified(java.time.LocalDateTime at, String fromType, String by, String rules) {}
 
   /** Never contains null elements — the adapter maps each persisted row to a fresh record. */
   List<ClassifiedHost> classifiedHosts(UUID fileId);

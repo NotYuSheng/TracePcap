@@ -89,6 +89,12 @@ export interface ReapplyJob {
   requestedBy: string;
   createdAt: string;
   finishedAt?: string | null;
+  /** Hosts whose machine device type re-scoring the rules' votes changed (#925). */
+  reclassifiedCount?: number;
+  /** Analyst labels flagged stale because the re-scored evidence points elsewhere. */
+  staleLabelsCount?: number;
+  /** The changes, up to 100. */
+  reclassified?: { fileId: string; ip: string; from: string; to: string; rules: string[] }[] | null;
 }
 
 /** Mirrors RulePreviewDto (#925 phase 4). */

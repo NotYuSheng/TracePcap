@@ -128,6 +128,24 @@ public class RuleSync {
     return out;
   }
 
+  /** Rule id → the conversations it matched in a capture, for the given rules (#925 re-scoring). */
+  public Map<UUID, List<UUID>> matchesForFile(UUID fileId, java.util.Collection<UUID> ruleIds) {
+    Map<UUID, List<UUID>> out = new LinkedHashMap<>();
+    if (ruleIds == null || ruleIds.isEmpty()) return out;
+    UUID[] ids = ruleIds.toArray(UUID[]::new);
+    jdbc.query(
+        con -> {
+          var ps = con.prepareStatement("SELECT rule_id, conversation_id FROM rule_matches WHERE file_id = ? AND rule_id = ANY (?)");
+          ps.setObject(1, fileId);
+          ps.setArray(2, con.createArrayOf("uuid", ids));
+          return ps;
+        },
+        rs -> {
+          out.computeIfAbsent(rs.getObject(1, UUID.class), k -> new ArrayList<>()).add(rs.getObject(2, UUID.class));
+        });
+    return out;
+  }
+
   /** Captures where {@code ruleId} has matches. */
   public List<UUID> filesMatchedBy(UUID ruleId) {
     return jdbc.queryForList("SELECT DISTINCT file_id FROM rule_matches WHERE rule_id = ?", UUID.class, ruleId);
