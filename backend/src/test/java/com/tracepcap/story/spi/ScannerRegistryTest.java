@@ -81,6 +81,16 @@ class ScannerRegistryTest {
     }
 
     @Bean
+    com.tracepcap.analysis.spi.DetectionRuleCatalog detectionRuleCatalog() {
+      return Mockito.mock(com.tracepcap.analysis.spi.DetectionRuleCatalog.class);
+    }
+
+    @Bean
+    com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay() {
+      return Mockito.mock(com.tracepcap.analysis.spi.NetworkRuleOverlay.class);
+    }
+
+    @Bean
     ExtractionManifest extractionManifest() {
       return Mockito.mock(ExtractionManifest.class);
     }
