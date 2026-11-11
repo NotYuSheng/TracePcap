@@ -1,3 +1,4 @@
+import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { NetworkContextPicker } from '@/features/detectionRules/NetworkContextPicker';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { describeLlmError } from '@utils/llmError';
@@ -100,6 +101,8 @@ export const AnalysisPage = () => {
   const location = useLocation();
   const { data, loading, error, refetch } = useAnalysisData(fileId!);
   const [activeTab, setActiveTab] = useState('overview');
+  // The "Viewing with" network (#925): the report includes its rules' matches.
+  const [networkContext] = useNetworkContext();
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportMemoryError, setReportMemoryError] = useState<{
@@ -365,6 +368,7 @@ export const AnalysisPage = () => {
           hierarchicalImage: diagrams.hierarchical,
           activeFilters: activeFilterLabels,
           nodeLimitNote,
+          networkId: networkContext,
         },
         { responseType: 'blob' }
       );

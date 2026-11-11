@@ -43,6 +43,7 @@ public class SnapshotService {
   private final SnapshotSubnetOverrideRepository subnetOverrideRepository;
   private final SubnetOverrideCarryForwardService subnetOverrideCarryForwardService;
   private final ConversationLookup conversationLookup;
+  private final com.tracepcap.analysis.spi.NetworkRuleOverlay networkRuleOverlay;
   private final org.springframework.context.ApplicationEventPublisher events;
 
   @Transactional(readOnly = true)
@@ -66,6 +67,7 @@ public class SnapshotService {
     // Batch absolute security-signal counts, keyed by fileId (one query for all snapshots)
     Map<UUID, Long> securityCounts =
         securitySignalCounts(
+            networkId,
             snapshots.stream().map(s -> s.getFile().getId()).distinct().collect(Collectors.toList()));
 
     // One query for every snapshot's insight flag, instead of one per row (#469).
@@ -167,7 +169,7 @@ public class SnapshotService {
     events.publishEvent(
         new com.tracepcap.monitor.event.SnapshotMembershipChangedEvent(networkId, fileId, true));
     return toDto(snapshot, changeCount, criticalCount,
-        securitySignalCount(snapshot.getFile().getId()), overrides);
+        securitySignalCount(snapshot), overrides);
   }
 
   public NetworkSnapshotDto patchSnapshot(UUID networkId, UUID snapshotId, PatchSnapshotRequest req) {
@@ -236,7 +238,7 @@ public class SnapshotService {
     long criticalCount = changeEventRepository.countCriticalByToSnapshotId(snapshotId);
     List<SnapshotSubnetOverrideDto> overrides = fetchOverrideDtos(snapshotId);
     return toDto(snapshot, changeCount, criticalCount,
-        securitySignalCount(snapshot.getFile().getId()), overrides);
+        securitySignalCount(snapshot), overrides);
   }
 
   public void removeSnapshot(UUID networkId, UUID snapshotId) {
@@ -355,14 +357,46 @@ public class SnapshotService {
         .build();
   }
 
-  /** Absolute distinct security-signal count for a single file (0 if none). */
-  private long securitySignalCount(UUID fileId) {
-    return securitySignalCounts(List.of(fileId)).getOrDefault(fileId, 0L);
+  /** Distinct security-signal count for a snapshot, as seen in its network (0 if none). */
+  private long securitySignalCount(NetworkSnapshotEntity snapshot) {
+    UUID fileId = snapshot.getFile().getId();
+    return securitySignalCounts(snapshot.getNetwork().getId(), List.of(fileId)).getOrDefault(fileId, 0L);
   }
 
-  /** Batched fileId → distinct security-signal count. Files with no signals are absent from the map. */
-  private Map<UUID, Long> securitySignalCounts(List<UUID> fileIds) {
+  /**
+   * Batched fileId → distinct security-signal count, as seen in the network (#925): the stored
+   * signals, minus the global rules this network suppresses, plus the network's own rules that
+   * matched. Files with no signals are absent from the map.
+   */
+  private Map<UUID, Long> securitySignalCounts(UUID networkId, List<UUID> fileIds) {
     if (fileIds.isEmpty()) return Map.of();
-    return conversationLookup.securitySignalCounts(fileIds);
+    Map<UUID, Long> base = conversationLookup.securitySignalCounts(fileIds);
+    Set<String> suppressed = networkRuleOverlay.suppressedNames(networkId);
+    Map<UUID, Set<String>> networkNames = networkRuleOverlay.matchedNamesByFile(networkId, fileIds);
+    if (suppressed.isEmpty() && networkNames.isEmpty()) return base;
+    Map<UUID, Set<String>> stored = conversationLookup.customSignatureNames(fileIds);
+    Map<UUID, Long> out = new java.util.HashMap<>();
+    for (UUID fileId : fileIds) {
+      long n =
+          adjustedCount(
+              base.getOrDefault(fileId, 0L),
+              stored.getOrDefault(fileId, Set.of()),
+              suppressed,
+              networkNames.getOrDefault(fileId, Set.of()));
+      if (n > 0) out.put(fileId, n);
+    }
+    return out;
+  }
+
+  /**
+   * The custom-rule part of a count, recomputed for a network: {@code base} counts each stored rule
+   * name once; drop the suppressed ones, and add network rule names not already counted.
+   */
+  static long adjustedCount(long base, Set<String> stored, Set<String> suppressed, Set<String> networkNames) {
+    Set<String> visible = new java.util.HashSet<>(stored);
+    visible.removeAll(suppressed);
+    long removed = stored.size() - visible.size();
+    long added = networkNames.stream().filter(n -> !visible.contains(n)).count();
+    return Math.max(0, base - removed + added);
   }
 }

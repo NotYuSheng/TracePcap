@@ -76,7 +76,7 @@ export const NetworkClusterPage = () => {
     let active = true;
     conversationService.getRiskTypes(fileId).then(v => { if (active) setPresentRiskTypes(v); }).catch(() => {});
     conversationService.getFileTypes(fileId).then(v => { if (active) setPresentFileTypes(v); }).catch(() => {});
-    conversationService.getCustomSignatures(fileId).then(v => { if (active) setPresentCustomSigs(v); }).catch(() => {});
+    conversationService.getCustomSignatures(fileId, networkId).then(v => { if (active) setPresentCustomSigs(v); }).catch(() => {});
     conversationService.getCountries(fileId).then(codes => {
       if (active) setPresentCountries(codes.map(c => c.split('|')[0]).filter(Boolean).sort());
     }).catch(() => {});

@@ -299,6 +299,13 @@ public interface ConversationLookup {
    */
   Map<UUID, Long> securitySignalCounts(Collection<UUID> fileIds);
 
+  /**
+   * The distinct stored custom-rule names (global and capture rules) per file, batched. Lets a
+   * network's view adjust {@link #securitySignalCounts} for the global rules it suppresses (#925).
+   * Files with none are absent.
+   */
+  Map<UUID, java.util.Set<String>> customSignatureNames(Collection<UUID> fileIds);
+
   record HostFanOut(String srcIp, long distinctDestinations, long totalFlows) {}
 
   /**

@@ -3554,6 +3554,10 @@
           "hierarchicalImage": {
             "type": "string"
           },
+          "networkId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "nodeLimitNote": {
             "type": "string"
           }
