@@ -74,4 +74,14 @@ describe('StoryPage', () => {
 
     expect(await screen.findByText('narrative')).toBeInTheDocument();
   });
+
+  it("says which network's detection rules the story used (#925)", async () => {
+    withStoryState({ story: { id: 's', narrative: [], networkId: 'n1', networkName: 'HQ' } });
+    const { rerender } = render(<StoryPage />);
+    expect(await screen.findByTestId('story-rules-scope')).toHaveTextContent("HQ's own");
+
+    withStoryState({ story: { id: 's', narrative: [] } });
+    rerender(<StoryPage />);
+    expect(await screen.findByTestId('story-rules-scope')).toHaveTextContent('Uses the shared detection rules.');
+  });
 });

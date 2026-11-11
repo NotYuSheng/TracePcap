@@ -248,7 +248,14 @@ export const StoryPage = () => {
       <div className="row mb-4">
         <div className="col-12">
           <div className="d-flex align-items-center justify-content-between">
-            <h4 className="mb-0">Network Traffic Story</h4>
+            <div>
+              <h4 className="mb-0">Network Traffic Story</h4>
+              <small className="text-muted" data-testid="story-rules-scope">
+                {story.networkId
+                  ? <>Uses the shared detection rules and <strong>{story.networkName ?? 'a network'}</strong>'s own.</>
+                  : <>Uses the shared detection rules. Pick a network in “Viewing with” and regenerate to include its rules.</>}
+              </small>
+            </div>
             <Button
               variant="outline-primary"
               size="sm"

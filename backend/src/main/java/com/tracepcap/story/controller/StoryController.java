@@ -43,7 +43,8 @@ public class StoryController {
             request.getAdditionalContext(),
             request.getCustomPrompt(),
             request.getMaxFindings(),
-            request.getMaxRiskMatrix());
+            request.getMaxRiskMatrix(),
+            request.getNetworkId());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(story);
   }

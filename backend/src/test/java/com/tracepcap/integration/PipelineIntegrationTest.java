@@ -78,6 +78,7 @@ class PipelineIntegrationTest {
   @Autowired private com.tracepcap.extraction.repository.ExtractedFileRepository extractedFiles;
   @Autowired private com.tracepcap.file.repository.FileRepository files;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+  @Autowired private com.tracepcap.story.service.FindingsService storyFindings;
 
   @Test
   void filesList_returnsPagedResponseEnvelope() {
@@ -1196,6 +1197,13 @@ class PipelineIntegrationTest {
         .as("in the network, the rule filter keeps its conversation").isNotEmpty();
     assertThat(rest.getForEntity(graph, JsonNode.class).getBody().get("clusters"))
         .as("outside it, nothing matches").isEmpty();
+
+    // Story uses the network's rules when generated in it, and not otherwise (#925).
+    java.util.UUID fileUuid = java.util.UUID.fromString(file);
+    assertThat(storyFindings.detectAll(fileUuid, 1, 1, java.util.UUID.fromString(net)))
+        .extracting(f -> f.getTitle()).contains("Detection rule: " + tag + "-r [" + tag + "]");
+    assertThat(storyFindings.detectAll(fileUuid, 1, 1, null))
+        .extracting(f -> f.getTitle()).noneMatch(t -> t.contains(tag + "-r"));
 
     // Switching the rule off hides its matches at once.
     rest.exchange("/api/v1/detection-rules/" + ruleId, HttpMethod.PUT,

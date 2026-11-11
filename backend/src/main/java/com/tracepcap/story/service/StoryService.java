@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoryService {
 
   private final StoryRepository storyRepository;
+  private final com.tracepcap.analysis.spi.DetectionRuleCatalog detectionRuleCatalog;
   private final FileRepository fileRepository;
   private final AnalysisSummaryLookup analysisSummaryLookup;
   private final ConversationLookup conversationLookup;
@@ -55,6 +56,13 @@ public class StoryService {
    * @param fileId the file ID
    * @return generated story response
    */
+  /** Records which network's rules the story used, so the page can say so. */
+  private void markNetwork(StoryResponse story, UUID networkId) {
+    if (networkId == null) return;
+    story.setNetworkId(networkId.toString());
+    story.setNetworkName(detectionRuleCatalog.networkName(networkId).orElse(null));
+  }
+
   public StoryResponse generateStory(UUID fileId, String additionalContext) {
     return generateStory(fileId, additionalContext, null, null, null);
   }
@@ -68,6 +76,12 @@ public class StoryService {
   // inside are each transactional by default (Spring's per-operation default).
   public StoryResponse generateStory(UUID fileId, String additionalContext, String customPrompt,
       Integer maxFindings, Integer maxRiskMatrix) {
+    return generateStory(fileId, additionalContext, customPrompt, maxFindings, maxRiskMatrix, null);
+  }
+
+  /** As above, viewed in a network (#925): the story uses the network's detection rules too. */
+  public StoryResponse generateStory(UUID fileId, String additionalContext, String customPrompt,
+      Integer maxFindings, Integer maxRiskMatrix, UUID networkId) {
     log.info("Generating story for file: {}", fileId);
 
     // Delete any existing stories for this file so we always generate fresh
@@ -99,7 +113,7 @@ public class StoryService {
         StoryAggregates aggregates = storyAggregatesService.compute(
             fileId, List.of(), totalConvsCustom);
         List<Finding> findings = findingsService.detectAll(
-            fileId, totalConvsCustom, analysis.totalBytes());
+            fileId, totalConvsCustom, analysis.totalBytes(), networkId);
 
         // Re-run Phase 1 so investigation steps are preserved in the response.
         // The custom prompt already encodes the narrative context, but structured
@@ -123,6 +137,7 @@ public class StoryService {
         StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
         storyResponse.setAggregates(aggregates);
         storyResponse.setFindings(findings);
+        markNetwork(storyResponse, networkId);
         storyResponse.setInvestigationSteps(investigationSteps.isEmpty() ? null : investigationSteps);
         addNarratorSections(storyResponse, fileId, analysis, findings, aggregates, additionalContext);
         StoryEntity story = StoryEntity.builder()
@@ -140,7 +155,7 @@ public class StoryService {
 
       // Run all deterministic detectors
       List<Finding> findings =
-          findingsService.detectAll(fileId, totalConversations, analysis.totalBytes());
+          findingsService.detectAll(fileId, totalConversations, analysis.totalBytes(), networkId);
       log.info("Detected {} findings for file: {}", findings.size(), fileId);
 
       // Pre-compute aggregates over the full dataset for the aggregates panel and prompt context
@@ -182,6 +197,7 @@ public class StoryService {
       StoryResponse storyResponse = parseStoryContent(storyContent, storyId, fileId);
       storyResponse.setAggregates(aggregates);
       storyResponse.setFindings(findings);
+      markNetwork(storyResponse, networkId);
       storyResponse.setInvestigationSteps(investigationSteps.isEmpty() ? null : investigationSteps);
       addNarratorSections(storyResponse, fileId, analysis, findings, aggregates, additionalContext);
 

@@ -171,7 +171,7 @@ export const AnalysisPage = () => {
       setStoryError(null);
       setStoryContextError(null);
       const generated = await storyService.generateStory(
-        fileId!, additionalContext, llmTimeoutMs, customPrompt, maxFindings, maxRiskMatrix
+        fileId!, additionalContext, llmTimeoutMs, customPrompt, maxFindings, maxRiskMatrix, networkContext
       );
       setStory(generated);
       if (generated.findings?.length) setTotalFindings(generated.findings.length);
@@ -198,7 +198,7 @@ export const AnalysisPage = () => {
     } finally {
       setStoryGenerating(false);
     }
-  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix]);
+  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix, networkContext]);
 
   // Load existing story once on mount
   useEffect(() => {

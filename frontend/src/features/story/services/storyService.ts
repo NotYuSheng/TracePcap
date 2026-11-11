@@ -70,13 +70,16 @@ export const storyService = {
     timeoutMs?: number,
     customPrompt?: string,
     maxFindings?: number,
-    maxRiskMatrix?: number
+    maxRiskMatrix?: number,
+    /** The "Viewing with" network (#925): the story uses its detection rules too. */
+    networkId?: string
   ): Promise<Story> => {
     const body: Record<string, string | number> = { fileId };
     if (additionalContext?.trim()) body.additionalContext = additionalContext.trim();
     if (customPrompt?.trim()) body.customPrompt = customPrompt.trim();
     if (maxFindings !== undefined) body.maxFindings = maxFindings;
     if (maxRiskMatrix !== undefined) body.maxRiskMatrix = maxRiskMatrix;
+    if (networkId) body.networkId = networkId;
     const response = await apiClient.post<Story>(API_ENDPOINTS.STORIES, body, {
       ...(timeoutMs !== undefined && { timeout: timeoutMs + 10000 }),
     });

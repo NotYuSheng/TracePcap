@@ -96,7 +96,8 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
   adds a network's rules to every tab that shows matches: the Overview, the
   conversations (list, filters and details), the network visualization, the
   Network Cluster's rule filter, and the PDF report's rule tags and rule
-  summary. Story doesn't use rule matches, in or out of a network.
+  summary, and Story (generated with the network picked, see
+  :doc:`story-mode`).
 - A snapshot's **security count** on the network page counts the network's own
   rules, and leaves out the global rules the network has switched off.
   The networks the capture is in are listed first, with a hint when it's in
