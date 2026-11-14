@@ -32,6 +32,15 @@ public class SubnetService {
   private final com.tracepcap.monitor.repository.NetworkRepository networkRepo;
   private final com.tracepcap.governance.PermissionService permissionService;
   private final com.tracepcap.governance.AuditLogService auditLog;
+  private final com.tracepcap.analysis.spi.NetworkSegmentLookup segmentLookup;
+
+  /**
+   * What a network entry layers over (#462): its CIDR and, when it's for one of several networks
+   * sharing the range, that network's segment. A default's key is its CIDR alone.
+   */
+  static String layerKey(SubnetDefinitionEntity e) {
+    return e.getCidr() + "|" + (e.getSegmentKey() == null ? "" : e.getSegmentKey());
+  }
 
   /** The shared default. */
   public List<SubnetDefinitionDto> list() {
@@ -45,7 +54,7 @@ public class SubnetService {
   public List<SubnetDefinitionDto> list(UUID networkId) {
     if (networkId == null) return list();
     java.util.Set<String> defaultCidrs =
-        subnetRepo.findByNetworkIdIsNullOrderByCidr().stream().map(SubnetDefinitionEntity::getCidr).collect(Collectors.toSet());
+        subnetRepo.findByNetworkIdIsNullOrderByCidr().stream().map(SubnetService::layerKey).collect(Collectors.toSet());
     return effective(networkId).stream()
         .sorted(Comparator.comparing(SubnetDefinitionEntity::getCidr))
         .map(e -> {
@@ -53,7 +62,7 @@ public class SubnetService {
           // Where the row comes from, so a network's views edit the right layer.
           boolean own = networkId.equals(e.getNetworkId());
           d.setScope(own ? "network" : "default");
-          d.setOverridesDefault(own && defaultCidrs.contains(e.getCidr()));
+          d.setOverridesDefault(own && defaultCidrs.contains(layerKey(e)));
           return d;
         })
         .toList();
@@ -66,7 +75,7 @@ public class SubnetService {
     return com.tracepcap.common.net.NetworkLayering.effective(
         defaults,
         subnetRepo.findByNetworkIdOrderByCidr(networkId),
-        SubnetDefinitionEntity::getCidr,
+        SubnetService::layerKey,
         SubnetDefinitionEntity::isHidden);
   }
 
@@ -163,24 +172,25 @@ public class SubnetService {
     requireNetwork(networkId);
     List<SubnetDefinitionEntity> defaults = subnetRepo.findByNetworkIdIsNullOrderByCidr();
     java.util.Set<String> defaultCidrs =
-        defaults.stream().map(SubnetDefinitionEntity::getCidr).collect(Collectors.toSet());
+        defaults.stream().map(SubnetService::layerKey).collect(Collectors.toSet());
     List<SubnetDefinitionEntity> own = subnetRepo.findByNetworkIdOrderByCidr(networkId);
-    java.util.Set<String> ownCidrs = own.stream().map(SubnetDefinitionEntity::getCidr).collect(Collectors.toSet());
+    java.util.Set<String> ownCidrs = own.stream().map(SubnetService::layerKey).collect(Collectors.toSet());
     List<SubnetDefinitionDto> out = new java.util.ArrayList<>();
     for (var e : own) {
       SubnetDefinitionDto d = toDto(e, networkId);
       d.setScope("network");
       d.setHidden(e.isHidden());
-      d.setOverridesDefault(defaultCidrs.contains(e.getCidr()));
+      d.setOverridesDefault(defaultCidrs.contains(layerKey(e)));
       out.add(d);
     }
     for (var e : defaults) {
-      if (ownCidrs.contains(e.getCidr())) continue;
+      if (ownCidrs.contains(layerKey(e))) continue;
       SubnetDefinitionDto d = toDto(e, networkId);
       d.setScope("default");
       out.add(d);
     }
-    out.sort(Comparator.comparing(SubnetDefinitionDto::getCidr));
+    out.sort(Comparator.comparing(SubnetDefinitionDto::getCidr)
+        .thenComparing(d -> d.getSegmentKey() == null ? "" : d.getSegmentKey()));
     return out;
   }
 
@@ -194,13 +204,19 @@ public class SubnetService {
     requireNetwork(networkId);
     String cidr = normaliseCidr(req.getCidr());
     req.setNetworkId(networkId);
+    String segment = req.getSegmentKey() == null || req.getSegmentKey().isBlank() ? null : req.getSegmentKey().trim();
+    if (req.isHidden() && segment != null) {
+      throw new IllegalArgumentException("Only the range as a whole can hide the default's subnet.");
+    }
     if (req.isHidden() && subnetRepo.findByCidrAndNetworkIdIsNull(cidr).isEmpty()) {
       throw new IllegalArgumentException("The default has no subnet " + cidr + " to hide.");
     }
     SubnetDefinitionEntity entity =
         subnetRepo
-            .findByNetworkIdAndCidr(networkId, cidr)
-            .orElseGet(() -> SubnetDefinitionEntity.builder().networkId(networkId).cidr(cidr).source("MANUAL").build());
+            .findForSegment(networkId, cidr, segment)
+            .orElseGet(() -> SubnetDefinitionEntity.builder().networkId(networkId).cidr(cidr).source("MANUAL")
+                .segmentKey(segment).build());
+    if (segment != null && req.getSegmentLabel() != null) entity.setSegmentLabel(req.getSegmentLabel());
     SubnetDefinitionDto before = entity.getId() == null ? null : toDto(entity, null);
     entity.setHidden(req.isHidden());
     SubnetDefinitionDto after;
@@ -216,7 +232,7 @@ public class SubnetService {
     after.setHidden(req.isHidden());
     auditLog.record(
         req.isHidden() ? "subnet.network.hide" : "subnet.network.set",
-        "network-subnet", networkId + "/" + cidr, before, after);
+        "network-subnet", networkId + "/" + cidr + (segment == null ? "" : "~" + segment), before, after);
     return after;
   }
 
@@ -255,7 +271,51 @@ public class SubnetService {
             .distinct()
             .collect(Collectors.toList());
 
-    return selectCandidates(ipInts, 1, 1);
+    return splitBySegment(selectCandidates(ipInts, 1, 1), segmentLookup.segments(fileId), 1, 1);
+  }
+
+  /**
+   * A detected range that more than one network uses (#462) becomes one candidate per network, each
+   * counting that network's own addresses in it. Other candidates are left as they are.
+   */
+  static List<SubnetDefinitionDto> splitBySegment(
+      List<SubnetDefinitionDto> candidates,
+      List<com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment> segments,
+      int snapshotsSeen,
+      int totalSnapshots) {
+    List<com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment> sharing =
+        segments.stream().filter(com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment::sharesRange).toList();
+    if (sharing.isEmpty()) return candidates;
+    List<SubnetDefinitionDto> out = new ArrayList<>();
+    for (SubnetDefinitionDto c : candidates) {
+      long[] range;
+      try {
+        range = CidrRange.of(c.getCidr());
+      } catch (Exception e) {
+        out.add(c);
+        continue;
+      }
+      List<SubnetDefinitionDto> split = new ArrayList<>();
+      for (var seg : sharing) {
+        long n = seg.addresses().stream().map(SubnetService::parseIp).filter(v -> v >= range[0] && v <= range[1]).count();
+        if (n == 0) continue;
+        split.add(
+            SubnetDefinitionDto.builder()
+                .cidr(c.getCidr())
+                .segmentKey(seg.key())
+                .segmentLabel(seg.label())
+                .source("AUTO")
+                .confirmed(false)
+                .hostCount((int) n)
+                .densityScore(c.getDensityScore())
+                .snapshotsSeen(snapshotsSeen)
+                .totalSnapshots(totalSnapshots)
+                .build());
+      }
+      if (split.size() > 1) out.addAll(split);
+      else out.add(c);
+    }
+    return out;
   }
 
   /**
@@ -275,10 +335,23 @@ public class SubnetService {
     // Per-snapshot detection: cidr -> number of snapshots it appeared in
     Map<String, Integer> cidrSnapshotCount = new LinkedHashMap<>();
 
+    // The networks across all snapshots (#462), merged by key: the same VLAN or DHCP server in
+    // every weekly capture is one network.
+    Map<String, com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment> segmentsByKey = new LinkedHashMap<>();
     for (UUID fileId : fileIds) {
       List<SubnetDefinitionDto> snapCandidates = detectFromFile(fileId);
       for (SubnetDefinitionDto c : snapCandidates) {
-        cidrSnapshotCount.merge(c.getCidr(), 1, Integer::sum);
+        cidrSnapshotCount.merge(candidateKey(c), 1, Integer::sum);
+      }
+      for (var seg : segmentLookup.segments(fileId)) {
+        segmentsByKey.merge(seg.key(), seg, (a, b) -> {
+          java.util.Set<String> addrs = new java.util.LinkedHashSet<>(a.addresses());
+          addrs.addAll(b.addresses());
+          java.util.Set<String> macs = new java.util.LinkedHashSet<>(a.macs());
+          macs.addAll(b.macs());
+          return new com.tracepcap.analysis.spi.NetworkSegmentLookup.Segment(
+              a.key(), a.label(), a.cidr(), addrs, macs, a.sharesRange() || b.sharesRange());
+        });
       }
     }
 
@@ -294,15 +367,18 @@ public class SubnetService {
             .distinct()
             .collect(Collectors.toList());
 
-    List<SubnetDefinitionDto> base = selectCandidates(allIps, 1, 1);
+    List<SubnetDefinitionDto> base =
+        splitBySegment(selectCandidates(allIps, 1, 1), new ArrayList<>(segmentsByKey.values()), 1, 1);
 
     // Merge consistency scores in
     List<SubnetDefinitionDto> result = new ArrayList<>();
     for (SubnetDefinitionDto c : base) {
-      int seen = cidrSnapshotCount.getOrDefault(c.getCidr(), 0);
+      int seen = cidrSnapshotCount.getOrDefault(candidateKey(c), 0);
       result.add(
           SubnetDefinitionDto.builder()
               .cidr(c.getCidr())
+              .segmentKey(c.getSegmentKey())
+              .segmentLabel(c.getSegmentLabel())
               .source("AUTO")
               .confirmed(false)
               .hostCount(c.getHostCount())
@@ -325,6 +401,10 @@ public class SubnetService {
             .thenComparing(SubnetDefinitionDto::getCidr));
 
     return result;
+  }
+
+  private static String candidateKey(SubnetDefinitionDto c) {
+    return c.getCidr() + "|" + (c.getSegmentKey() == null ? "" : c.getSegmentKey());
   }
 
   // ── core detection ────────────────────────────────────────────────────────
@@ -424,6 +504,8 @@ public class SubnetService {
     return SubnetDefinitionDto.builder()
         .id(e.getId())
         .cidr(e.getCidr())
+        .segmentKey(e.getSegmentKey())
+        .segmentLabel(e.getSegmentLabel())
         .label(e.getLabel())
         .description(e.getDescription())
         .source(e.getSource())

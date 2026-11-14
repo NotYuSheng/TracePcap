@@ -116,6 +116,19 @@ Click ``BR-TILL-01``:
    DHCP and ARP exchanges have exactly the same addresses and ports as HQ's router's, so they are
    one conversation to TracePcap (see the feature page's *Limits*).
 
+**In Monitor, each site's subnet gets its own label.** Add the capture to a monitored network
+and detect subnets (**Subnet Definitions** → **Scan All Snapshots**). The block both sites use is
+offered once per site, each counting its own machines: ``192.168.1.8/29`` on HQ (6 hosts) and on
+Branch (4). Save each with its own label:
+
+.. figure:: images/two-sites-subnets.png
+   :alt: The monitored network's Subnet Definitions: 192.168.1.8/29 on hq.corp.example (VLAN 10),
+         labelled HQ office LAN, and 192.168.1.8/29 on branch.corp.example (VLAN 20), labelled
+         Branch shop floor.
+
+   One CIDR, two subnets: "HQ office LAN" and "Branch shop floor". Each has its own staleness
+   baseline, counting only its own site's machines and conversations.
+
 Details: :doc:`../features/overlapping-networks`.
 
 

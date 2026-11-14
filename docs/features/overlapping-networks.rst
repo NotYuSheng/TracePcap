@@ -62,6 +62,21 @@ address that changed hands is one device per holder (:doc:`address-reuse`):
 Networks are ordered by when they first leased an address, so which machine
 keeps the bare address doesn't change between runs.
 
+Subnets in Monitor
+------------------
+
+In a monitored network, subnet detection (**Subnet Definitions** → detect)
+offers a range used by two networks **once per network**, each counting only that
+network's addresses, for example ``192.168.1.8/29 on hq.corp.example`` (6 hosts)
+and ``192.168.1.8/29 on branch.corp.example`` (4 hosts). Saved, each is its own
+subnet with its own label, and its own staleness: its composition (members,
+device types, protocols) counts only that network's machines and conversations.
+A label for the range as a whole can sit beside them.
+
+A network is recognised across snapshots by the same key (its VLAN, or its DHCP
+server's MAC), so a per-network label carries on while that site's router stays
+the same.
+
 Limits
 ------
 
@@ -75,8 +90,8 @@ Limits
   either network's machine.
 - Elsewhere (Story, reports, the network cluster view, the monitor views) the
   address is still one host, as for addresses that changed hands.
-- Subnet labels in Monitor are still per CIDR: one label for both sites'
-  ``192.168.1.0/24`` (#462).
+- Only a monitored network's own subnet entries can be per network; the shared
+  default (System → address defaults) is per CIDR.
 
 Try It
 ------

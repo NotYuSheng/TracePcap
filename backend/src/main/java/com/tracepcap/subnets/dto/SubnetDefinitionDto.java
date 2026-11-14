@@ -10,6 +10,9 @@ import lombok.Data;
 public class SubnetDefinitionDto {
   private Long id;
   private String cidr;
+  /** Which of several networks sharing this range it is (#462); null for the range as a whole. */
+  private String segmentKey;
+  private String segmentLabel;
   private String label;
   private String description;
   private String source;

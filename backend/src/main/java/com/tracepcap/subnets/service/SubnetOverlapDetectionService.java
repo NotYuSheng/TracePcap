@@ -50,13 +50,16 @@ public class SubnetOverlapDetectionService {
         com.tracepcap.common.net.NetworkLayering.effective(
             subnetRepo.findByNetworkIdIsNullOrderByCidr(),
             subnetRepo.findByNetworkIdOrderByCidr(networkId),
-            SubnetDefinitionEntity::getCidr,
+            SubnetService::layerKey,
             SubnetDefinitionEntity::isHidden);
     if (subnets.isEmpty()) return List.of();
 
     // Precompute CIDR integer ranges once.
     Map<SubnetDefinitionEntity, long[]> ranges = new LinkedHashMap<>();
     for (SubnetDefinitionEntity s : subnets) {
+      // A subnet for one of several networks sharing the range (#462) is the answer to this
+      // warning, not a case of it.
+      if (s.getSegmentKey() != null) continue;
       try {
         ranges.put(s, CidrRange.of(s.getCidr()));
       } catch (Exception ignored) {

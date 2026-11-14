@@ -924,6 +924,65 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Subnets per network (#462 phase 2b): in a monitored network whose snapshot holds HQ and Branch
+   * on one range, detection offers 192.168.1.0/24 once per site, each counting its own addresses,
+   * and each can carry its own label with its own composition baseline.
+   */
+  @Test
+  void subnets_aRangeSharedByTwoSites_isOneSubnetPerSite() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("two_sites_overlap_untagged.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"two-sites-net\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    rest.postForEntity("/api/v1/monitor/networks/" + net + "/snapshots", json("{\"fileId\":\"" + fileId + "\"}"), JsonNode.class);
+
+    JsonNode detected = rest.getForEntity("/api/v1/subnets/detect/network?networkId=" + net, JsonNode.class).getBody();
+    // Density picks the tightest block (.10–.15 → 192.168.1.8/29); it's offered once per site.
+    java.util.Map<String, JsonNode> bySite = new java.util.HashMap<>();
+    for (JsonNode c : detected) {
+      if (c.hasNonNull("segmentLabel")) bySite.put(c.get("segmentLabel").asText(), c);
+    }
+    assertThat(bySite).containsOnlyKeys("hq.corp.example", "branch.corp.example");
+    assertThat(bySite.get("hq.corp.example").get("cidr").asText())
+        .isEqualTo(bySite.get("branch.corp.example").get("cidr").asText());
+    assertThat(bySite.get("hq.corp.example").get("hostCount").asInt()).isEqualTo(6); // .10–.15
+    assertThat(bySite.get("branch.corp.example").get("hostCount").asInt()).isEqualTo(4); // .10–.13
+
+    JsonNode branch = bySite.get("branch.corp.example");
+    String body = "{\"cidr\":\"192.168.1.0/24\",\"label\":\"Branch LAN\",\"confirmed\":true,"
+        + "\"segmentKey\":\"" + branch.get("segmentKey").asText() + "\",\"segmentLabel\":\"branch.corp.example\"}";
+    ResponseEntity<JsonNode> saved = rest.postForEntity("/api/v1/monitor/networks/" + net + "/subnets", json(body), JsonNode.class);
+    assertThat(saved.getStatusCode().is2xxSuccessful()).isTrue();
+    String hq = "{\"cidr\":\"192.168.1.0/24\",\"label\":\"HQ LAN\",\"confirmed\":true,"
+        + "\"segmentKey\":\"" + bySite.get("hq.corp.example").get("segmentKey").asText() + "\",\"segmentLabel\":\"hq.corp.example\"}";
+    assertThat(rest.postForEntity("/api/v1/monitor/networks/" + net + "/subnets", json(hq), JsonNode.class)
+            .getStatusCode().is2xxSuccessful()).isTrue();
+
+    JsonNode list = rest.getForEntity("/api/v1/monitor/networks/" + net + "/subnets", JsonNode.class).getBody();
+    java.util.Map<String, String> labels = new java.util.HashMap<>();
+    for (JsonNode s : list) if (s.hasNonNull("segmentLabel")) labels.put(s.get("segmentLabel").asText(), s.get("label").asText());
+    assertThat(labels).containsEntry("branch.corp.example", "Branch LAN").containsEntry("hq.corp.example", "HQ LAN");
+    // Each has its own baseline: Branch counts 5 members, HQ 7.
+    Integer branchMembers = jdbc.queryForObject(
+        "SELECT (b.baseline_composition->>'memberCount')::int FROM subnet_network_baselines b"
+            + " JOIN subnet_definitions s ON s.id = b.subnet_id WHERE s.label = 'Branch LAN'", Integer.class);
+    assertThat(branchMembers).isEqualTo(5);
+    // The per-site subnets settle the "possibly two networks" warning rather than raise it.
+    JsonNode overlaps = rest.getForEntity("/api/v1/subnets/overlaps?networkId=" + net, JsonNode.class).getBody();
+    assertThat(overlaps.toString()).doesNotContain("Branch LAN").doesNotContain("HQ LAN");
+    for (JsonNode o : overlaps) {
+      Long id = o.get("subnetId").asLong();
+      String seg = jdbc.queryForObject("SELECT segment_key FROM subnet_definitions WHERE id = ?", String.class, id);
+      assertThat(seg).as("no overlap warning on a per-site subnet").isNull();
+    }
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

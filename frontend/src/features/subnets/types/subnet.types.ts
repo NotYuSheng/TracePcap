@@ -1,6 +1,9 @@
 export interface SubnetDefinition {
   id: number | null;
   cidr: string;
+  /** Which of several networks sharing this range it is (#462); absent for the range as a whole. */
+  segmentKey?: string | null;
+  segmentLabel?: string | null;
   label: string | null;
   description: string | null;
   source: 'AUTO' | 'MANUAL';
