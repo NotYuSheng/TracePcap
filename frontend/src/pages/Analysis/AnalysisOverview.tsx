@@ -90,6 +90,7 @@ export const AnalysisOverview = () => {
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [activity, setActivity] = useState<TimelineDataPoint[]>([]);
+  const [activityLoaded, setActivityLoaded] = useState(false);
   const { tops: hostTops } = useHostGroups(fileId, data);
   const [flagged, setFlagged] = useState({ total: 0, risks: 0, suricata: 0, custom: 0 });
 
@@ -100,6 +101,9 @@ export const AnalysisOverview = () => {
       .getTimelineData(fileId, undefined, 60)
       .then(points => {
         if (alive) setActivity(points);
+      })
+      .finally(() => {
+        if (alive) setActivityLoaded(true);
       })
       .catch(() => {});
     apiClient
@@ -241,38 +245,47 @@ export const AnalysisOverview = () => {
             </div>
           </section>
 
-          {activity.length > 1 && (
+          {
             <section className="ov-card" aria-labelledby="ov-activity">
-              <div className="ov-head">
-                <h2 id="ov-activity">Activity over time</h2>
-                <SourceTag id="src-activity" source="tshark" title="How activity is worked out">
-                  <p className="mb-0">
-                    Every packet's timestamp, as tshark read it from the capture, counted into equal
-                    time slices. Each bar is the packets in one slice; hover it for the count.
-                  </p>
-                </SourceTag>
-              </div>
-              <div
-                className="ov-activity"
-                role="img"
-                aria-label={`Packets over time, peak ${maxBin} in one slice`}
-              >
-                {activity.map(a => (
-                  <span
-                    key={a.timestamp}
-                    style={{ height: `${Math.max(4, (a.packetCount / maxBin) * 100)}%` }}
-                    title={`${new Date(a.timestamp).toLocaleTimeString()}: ${a.packetCount} packets`}
-                  />
-                ))}
-              </div>
-              <div className="ov-activity-axis">
-                <span>{new Date(activity[0].timestamp).toLocaleTimeString()}</span>
-                <span>
-                  {new Date(activity[activity.length - 1].timestamp).toLocaleTimeString()}
-                </span>
-              </div>
+              {activity.length > 1 ? (
+                <>
+                  <div className="ov-head">
+                    <h2 id="ov-activity">Activity over time</h2>
+                    <SourceTag id="src-activity" source="tshark" title="How activity is worked out">
+                      <p className="mb-0">
+                        Every packet's timestamp, as tshark read it from the capture, counted into
+                        equal time slices. Each bar is the packets in one slice; hover it for the
+                        count.
+                      </p>
+                    </SourceTag>
+                  </div>
+                  <div
+                    className="ov-activity"
+                    role="img"
+                    aria-label={`Packets over time, peak ${maxBin} in one slice`}
+                  >
+                    {activity.map(a => (
+                      <span
+                        key={a.timestamp}
+                        style={{ height: `${Math.max(4, (a.packetCount / maxBin) * 100)}%` }}
+                        title={`${new Date(a.timestamp).toLocaleTimeString()}: ${a.packetCount} packets`}
+                      />
+                    ))}
+                  </div>
+                  <div className="ov-activity-axis">
+                    <span>{new Date(activity[0].timestamp).toLocaleTimeString()}</span>
+                    <span>
+                      {new Date(activity[activity.length - 1].timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="small text-muted mb-0">
+                  {activityLoaded ? 'This capture is too short to chart over time.' : 'Loading…'}
+                </p>
+              )}
             </section>
-          )}
+          }
 
           {(protoRows.length > 0 || catRows.length > 0) && (
             <section className="ov-card" aria-labelledby="ov-mix">
