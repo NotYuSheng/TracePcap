@@ -835,7 +835,7 @@ test('README demo walkthrough', async ({ page }) => {
 
   // Hierarchical layout, then fit the view — a hierarchical graph is taller than
   // the viewport, and an unfitted one films as a wall of edges.
-  await showClick(page, page.locator('[title="Hierarchical layout"]').first());
+  await showClick(page, page.locator('[title^="Hierarchical layout"]').first());
   await timeline.fastForward('Hierarchical layout (ELK)', 2, async () => {
     await expect(page.getByText(/Computing layout/i)).toBeHidden({ timeout: 120_000 });
   });

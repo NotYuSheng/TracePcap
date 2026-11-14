@@ -1296,17 +1296,19 @@ export const NetworkGraph = memo(function NetworkGraph({
           <>
             <button
               className={`ng-ctrl-btn${layoutType === 'circular' ? ' active' : ''}`}
-              title="Circular layout"
+              title="Circular layout: devices around a ring, spread out so none overlap"
+              aria-label="Circular layout: devices around a ring, spread out so none overlap"
               onClick={() => onLayoutChange('circular')}
             >
-              <i className="bi bi-diagram-2" />
+              <i className="bi bi-diagram-2" aria-hidden="true" />
             </button>
             <button
               className={`ng-ctrl-btn${layoutType === 'hierarchicalTd' ? ' active' : ''}`}
-              title="Hierarchical layout"
+              title="Hierarchical layout: layered top to bottom by who talks to whom"
+              aria-label="Hierarchical layout: layered top to bottom by who talks to whom"
               onClick={() => onLayoutChange('hierarchicalTd')}
             >
-              <i className="bi bi-diagram-3" />
+              <i className="bi bi-diagram-3" aria-hidden="true" />
             </button>
             <button
               className={`ng-ctrl-btn${layoutType === 'grouped' ? ' active' : ''}`}
