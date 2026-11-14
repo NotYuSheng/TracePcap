@@ -175,7 +175,7 @@ export const HomePage = () => {
       </section>
       <div className="home-side">
         <RecentActivity retentionHours={retentionHours} />
-        <FileList />
+        <FileList defaultPageSize={5} />
       </div>
       {progress}
     </div>

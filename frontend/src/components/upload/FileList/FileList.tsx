@@ -41,7 +41,12 @@ function skippedStages(file: FileMetadata): string[] | null {
   return skipped.length > 0 ? skipped : null;
 }
 
-export const FileList = () => {
+interface FileListProps {
+  /** Rows per page to start with; the home page shows a short list. */
+  defaultPageSize?: number;
+}
+
+export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
   const navigate = useNavigate();
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +56,7 @@ export const FileList = () => {
   const [selectedFileNames, setSelectedFileNames] = useState<Map<string, string>>(new Map());
   const [hideMonitor, setHideMonitor] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
@@ -434,6 +439,7 @@ export const FileList = () => {
                 totalPages={totalPages}
                 totalItems={totalItems}
                 pageSize={pageSize}
+                pageSizeOptions={[...new Set([defaultPageSize, 10, 25, 50, 100])].sort((a, b) => a - b)}
                 onPageChange={setPage}
                 onPageSizeChange={size => { setPageSize(size); setPage(1); }}
               />

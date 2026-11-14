@@ -67,9 +67,9 @@ describe('buildActivity', () => {
     expect(events.map(e => e.tone)).toEqual(['failed', 'busy']);
   });
 
-  it('keeps the six newest', () => {
+  it('keeps the three newest', () => {
     const files = Array.from({ length: 9 }, (_, i) => file(`f${i}`, i + 1));
-    expect(buildActivity(files, [], null, NOW)).toHaveLength(6);
+    expect(buildActivity(files, [], null, NOW)).toHaveLength(3);
   });
 });
 
@@ -100,10 +100,10 @@ describe('change lines', () => {
     expect(events[0].meta).toMatch(/^3 changes, latest: /);
   });
 
-  it('keeps at most three change lines, so captures stay in view', () => {
+  it('keeps one change line, so captures stay in view', () => {
     const changes = [1, 2, 3, 4, 5].map(i => ({ ...change(i, i * 0.1), targetId: `r${i}` }));
     const events = buildActivity([file('a', 2), file('b', 3)], changes, null, NOW);
-    expect(events.filter(e => e.tone === 'change')).toHaveLength(3);
+    expect(events.filter(e => e.tone === 'change')).toHaveLength(1);
     expect(events.filter(e => e.tone === 'done')).toHaveLength(2);
   });
 });
