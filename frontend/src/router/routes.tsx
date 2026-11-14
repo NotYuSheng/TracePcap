@@ -1,7 +1,7 @@
 import { Navigate, createBrowserRouter, useLocation } from 'react-router-dom';
 import { MainLayout } from '@components/common/Layout';
 import { RouteErrorBoundary } from '@components/common/RouteErrorBoundary';
-import { UploadPage } from '@pages/Upload';
+import { HomePage } from '@pages/Home';
 import { AnalysisPage } from '@pages/Analysis';
 import { AnalysisOverview } from '@pages/Analysis/AnalysisOverview';
 import { ConversationPage } from '@pages/Conversation';
@@ -31,7 +31,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <UploadPage />,
+        element: <HomePage />,
       },
       {
         path: 'analysis/:fileId',

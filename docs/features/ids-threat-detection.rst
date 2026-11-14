@@ -30,8 +30,8 @@ Enabling Suricata
 
 Suricata detection is selected **per file** at upload time:
 
-- In the **upload analysis-options modal** shown after file selection, tick
-  **"Suricata IDS threat detection"**. It is **off by default** because it
+- On the home page, under **Analyse with**, tick **Intrusion alerts
+  (Suricata)** before choosing the file. It is **off by default** because it
   adds significant processing time.
 - The same toggle applies when merging PCAPs.
 

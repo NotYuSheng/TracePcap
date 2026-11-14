@@ -333,34 +333,25 @@ test('README demo walkthrough', async ({ page }) => {
   // Open on the upload screen: the product's actual front door, and the only
   // frame that needs no explanation.
   await page.goto('/');
-  // Two headings carry this text — the page title and the file-list card.
-  await expect(page.getByRole('heading', { name: /Upload PCAP Files/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Analyse a capture/i })).toBeVisible();
   await beat(page, HOLD);
 
-  // The drop zone's input is visually hidden, so set files on it directly —
-  // there is no OS file picker to drive, and none would be recorded anyway.
-  await page.locator('input[type="file"]').setInputFiles(demoFilePath());
-
   // ── 2. Analysis options ────────────────────────────────────────────────
-  // nDPI and file extraction default on; Suricata is the deliberate opt-in, so
-  // ticking it is the beat worth filming.
-  const optionsModal = page.getByRole('dialog');
-  await expect(optionsModal.getByText(/Analysis options/i)).toBeVisible({ timeout: 10_000 });
-  // The modal is a feature in its own right — what the analysis will actually
-  // run — so give it the full landing hold before acting on it.
-  await beat(page, FEATURE);
-
-  // Checkboxes carry no accessible name (their text lives in sibling divs), so
-  // target the Suricata one via the label block that owns it.
-  const suricata = optionsModal
-    .locator('label.tp-suricata-option input[type="checkbox"]');
+  // The stages sit under the drop zone, set before choosing files. nDPI and
+  // file extraction default on; Suricata is the deliberate opt-in, so ticking
+  // it is the beat worth filming.
+  const suricata = page.getByRole('checkbox', { name: /Intrusion alerts/i });
   await expect(suricata).not.toBeChecked();
+  await beat(page, FEATURE);
   await showClick(page, suricata);
   await expect(suricata).toBeChecked();
   // Just long enough for the tick to register on camera before moving on.
   await beat(page, HOLD);
 
-  await showClick(page, optionsModal.getByRole('button', { name: /Start upload/i }));
+  // The drop zone's input is visually hidden, so set files on it directly —
+  // there is no OS file picker to drive, and none would be recorded anyway.
+  // Choosing the file starts the upload.
+  await page.locator('input[type="file"]').setInputFiles(demoFilePath());
 
   // Show the upload/analysis wait briefly, then race through the rest. Suricata
   // makes this the longest wait in the demo (~50s+); the spinner stays on

@@ -12535,7 +12535,7 @@
             "description": "OK"
           }
         },
-        "summary": "Get runtime limits (upload size, analysis and LLM timeouts)",
+        "summary": "Get runtime limits (upload size, analysis and LLM timeouts, capture retention)",
         "tags": [
           "System"
         ]
