@@ -4,7 +4,15 @@ import { NetworkContextPicker } from '@/features/detectionRules/NetworkContextPi
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { describeLlmError } from '@utils/llmError';
 import { Alert } from '@components/common/Alert';
-import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
 import { Link, useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
@@ -66,7 +74,9 @@ export interface StoryGenerationState {
   error: string | null;
   setError: Dispatch<SetStateAction<string | null>>;
   contextError: { promptText: string; promptTokens: number; contextLength: number } | null;
-  setContextError: Dispatch<SetStateAction<{ promptText: string; promptTokens: number; contextLength: number } | null>>;
+  setContextError: Dispatch<
+    SetStateAction<{ promptText: string; promptTokens: number; contextLength: number } | null>
+  >;
   editablePrompt: string;
   setEditablePrompt: Dispatch<SetStateAction<string>>;
   elapsedSeconds: number;
@@ -99,13 +109,38 @@ export type { AnalysisData };
 /** The analysis page's sections, in rail order. */
 const RAIL_ITEMS: RailItem[] = [
   { key: 'overview', label: 'Overview', short: 'Overview', icon: 'bi-speedometer2' },
-  { key: 'conversations', label: 'Conversations', short: 'Conversations', icon: 'bi-arrow-left-right' },
+  {
+    key: 'conversations',
+    label: 'Conversations',
+    short: 'Conversations',
+    icon: 'bi-arrow-left-right',
+  },
   { key: 'story', label: 'Story', short: 'Story', icon: 'bi-journal-text' },
-  { key: 'network-diagram', label: 'Network Visualization', short: 'Network', icon: 'bi-diagram-3' },
-  { key: 'network-cluster', label: 'Network Cluster', short: 'Cluster', icon: 'bi-globe-europe-africa' },
-  { key: 'extracted-files', label: 'Extracted Files', short: 'Files', icon: 'bi-file-earmark-arrow-down' },
+  {
+    key: 'network-diagram',
+    label: 'Network Visualization',
+    short: 'Network',
+    icon: 'bi-diagram-3',
+  },
+  {
+    key: 'network-cluster',
+    label: 'Network Cluster',
+    short: 'Cluster',
+    icon: 'bi-globe-europe-africa',
+  },
+  {
+    key: 'extracted-files',
+    label: 'Extracted Files',
+    short: 'Files',
+    icon: 'bi-file-earmark-arrow-down',
+  },
   { key: 'filter-generator', label: 'Filter Generator', short: 'Filters', icon: 'bi-funnel' },
-  { key: 'file', label: 'Capture details', short: 'Capture', icon: 'bi-file-earmark-binary' },
+  {
+    key: 'file',
+    label: 'Capture, rules and report',
+    short: 'Capture',
+    icon: 'bi-file-earmark-binary',
+  },
 ];
 
 /** "913 packets · 26 min" for the capture bar. */
@@ -114,7 +149,13 @@ function captureFacts(d: { totalPackets?: number; timeRange?: [number, number] }
   if (d.totalPackets != null) parts.push(`${d.totalPackets.toLocaleString()} packets`);
   if (d.timeRange && d.timeRange[1] > d.timeRange[0]) {
     const s = Math.round((d.timeRange[1] - d.timeRange[0]) / 1000);
-    parts.push(s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round((s / 3600) * 10) / 10} h`);
+    parts.push(
+      s < 90
+        ? `${s} s`
+        : s < 5400
+          ? `${Math.round(s / 60)} min`
+          : `${Math.round((s / 3600) * 10) / 10} h`
+    );
   }
   return parts.join(' · ');
 }
@@ -140,7 +181,11 @@ export const AnalysisPage = () => {
   const [story, setStory] = useState<Story | null>(null);
   const [storyGenerating, setStoryGenerating] = useState(false);
   const [storyError, setStoryError] = useState<string | null>(null);
-  const [storyContextError, setStoryContextError] = useState<{ promptText: string; promptTokens: number; contextLength: number } | null>(null);
+  const [storyContextError, setStoryContextError] = useState<{
+    promptText: string;
+    promptTokens: number;
+    contextLength: number;
+  } | null>(null);
   const [storyEditablePrompt, setStoryEditablePrompt] = useState('');
   const [storyElapsedSeconds, setStoryElapsedSeconds] = useState(0);
   const [llmTimeoutMs, setLlmTimeoutMs] = useState<number>(300000);
@@ -154,7 +199,9 @@ export const AnalysisPage = () => {
   useEffect(() => {
     apiClient
       .get<{ llmTimeoutMs?: number }>('/system/limits')
-      .then(res => { if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs); })
+      .then(res => {
+        if (res.data.llmTimeoutMs) setLlmTimeoutMs(res.data.llmTimeoutMs);
+      })
       .catch(() => {});
   }, []);
 
@@ -163,76 +210,120 @@ export const AnalysisPage = () => {
       setStoryElapsedSeconds(0);
       storyTimerRef.current = setInterval(() => setStoryElapsedSeconds(s => s + 1), 1000);
     } else {
-      if (storyTimerRef.current) { clearInterval(storyTimerRef.current); storyTimerRef.current = null; }
+      if (storyTimerRef.current) {
+        clearInterval(storyTimerRef.current);
+        storyTimerRef.current = null;
+      }
     }
-    return () => { if (storyTimerRef.current) clearInterval(storyTimerRef.current); };
+    return () => {
+      if (storyTimerRef.current) clearInterval(storyTimerRef.current);
+    };
   }, [storyGenerating]);
 
-  const generateStory = useCallback(async (customPrompt?: string) => {
-    try {
-      setStoryGenerating(true);
-      setStoryError(null);
-      setStoryContextError(null);
-      const generated = await storyService.generateStory(
-        fileId!, additionalContext, llmTimeoutMs, customPrompt, maxFindings, maxRiskMatrix, networkContext
-      );
-      setStory(generated);
-      if (generated.findings?.length) setTotalFindings(generated.findings.length);
-      if (generated.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(generated.aggregates.protocolRiskMatrix.length);
-    } catch (err) {
-      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
-      if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
-        setStoryContextError({
-          promptText: (data.promptText as string) ?? '',
-          promptTokens: (data.promptTokens as number) ?? 0,
-          contextLength: (data.contextLength as number) ?? 0,
-        });
-        setStoryEditablePrompt((data.promptText as string) ?? '');
-      } else {
-        setStoryError(
-          describeLlmError(err, {
-            subject: 'Story generation',
-            timeoutMs: llmTimeoutMs,
-            timeoutHint: 'reduce the capture size',
-            fallback: 'Failed to generate story',
-          })
+  const generateStory = useCallback(
+    async (customPrompt?: string) => {
+      try {
+        setStoryGenerating(true);
+        setStoryError(null);
+        setStoryContextError(null);
+        const generated = await storyService.generateStory(
+          fileId!,
+          additionalContext,
+          llmTimeoutMs,
+          customPrompt,
+          maxFindings,
+          maxRiskMatrix,
+          networkContext
         );
+        setStory(generated);
+        if (generated.findings?.length) setTotalFindings(generated.findings.length);
+        if (generated.aggregates?.protocolRiskMatrix?.length)
+          setTotalRiskMatrix(generated.aggregates.protocolRiskMatrix.length);
+      } catch (err) {
+        const data =
+          (err as { response?: { data?: Record<string, unknown> } })?.response?.data ?? {};
+        if (data.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
+          setStoryContextError({
+            promptText: (data.promptText as string) ?? '',
+            promptTokens: (data.promptTokens as number) ?? 0,
+            contextLength: (data.contextLength as number) ?? 0,
+          });
+          setStoryEditablePrompt((data.promptText as string) ?? '');
+        } else {
+          setStoryError(
+            describeLlmError(err, {
+              subject: 'Story generation',
+              timeoutMs: llmTimeoutMs,
+              timeoutHint: 'reduce the capture size',
+              fallback: 'Failed to generate story',
+            })
+          );
+        }
+      } finally {
+        setStoryGenerating(false);
       }
-    } finally {
-      setStoryGenerating(false);
-    }
-  }, [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix, networkContext]);
+    },
+    [fileId, additionalContext, llmTimeoutMs, maxFindings, maxRiskMatrix, networkContext]
+  );
 
   // Load existing story once on mount
   useEffect(() => {
     if (!fileId) return;
-    storyService.getStoryByFileId(fileId)
+    storyService
+      .getStoryByFileId(fileId)
       .then(existing => {
         if (existing) {
           setStory(existing);
           if (existing.findings?.length) setTotalFindings(existing.findings.length);
-          if (existing.aggregates?.protocolRiskMatrix?.length) setTotalRiskMatrix(existing.aggregates.protocolRiskMatrix.length);
+          if (existing.aggregates?.protocolRiskMatrix?.length)
+            setTotalRiskMatrix(existing.aggregates.protocolRiskMatrix.length);
         }
       })
       .catch(err => console.error('Failed to load existing story:', err));
   }, [fileId]);
 
-  const storyState: StoryGenerationState = useMemo(() => ({
-    story, setStory,
-    generating: storyGenerating,
-    generateStory,
-    error: storyError, setError: setStoryError,
-    contextError: storyContextError, setContextError: setStoryContextError,
-    editablePrompt: storyEditablePrompt, setEditablePrompt: setStoryEditablePrompt,
-    elapsedSeconds: storyElapsedSeconds,
-    llmTimeoutMs,
-    additionalContext, setAdditionalContext,
-    maxFindings, setMaxFindings,
-    maxRiskMatrix, setMaxRiskMatrix,
-    totalFindings, setTotalFindings,
-    totalRiskMatrix, setTotalRiskMatrix,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [story, storyGenerating, generateStory, storyError, storyContextError, storyEditablePrompt, storyElapsedSeconds, llmTimeoutMs, additionalContext, maxFindings, maxRiskMatrix, totalFindings, totalRiskMatrix]);
+  const storyState: StoryGenerationState = useMemo(
+    () => ({
+      story,
+      setStory,
+      generating: storyGenerating,
+      generateStory,
+      error: storyError,
+      setError: setStoryError,
+      contextError: storyContextError,
+      setContextError: setStoryContextError,
+      editablePrompt: storyEditablePrompt,
+      setEditablePrompt: setStoryEditablePrompt,
+      elapsedSeconds: storyElapsedSeconds,
+      llmTimeoutMs,
+      additionalContext,
+      setAdditionalContext,
+      maxFindings,
+      setMaxFindings,
+      maxRiskMatrix,
+      setMaxRiskMatrix,
+      totalFindings,
+      setTotalFindings,
+      totalRiskMatrix,
+      setTotalRiskMatrix,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }),
+    [
+      story,
+      storyGenerating,
+      generateStory,
+      storyError,
+      storyContextError,
+      storyEditablePrompt,
+      storyElapsedSeconds,
+      llmTimeoutMs,
+      additionalContext,
+      maxFindings,
+      maxRiskMatrix,
+      totalFindings,
+      totalRiskMatrix,
+    ]
+  );
 
   // ── Network diagram filter state (lifted here so it survives tab switches) ──
   const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
@@ -251,20 +342,34 @@ export const AnalysisPage = () => {
   const [activeGhostFilters, setActiveGhostFilters] = useState<string[]>([]);
 
   const networkDiagramFilters: NetworkDiagramFilterState = {
-    nodeLimit, setNodeLimit,
-    ipFilter, setIpFilter,
-    portFilter, setPortFilter,
-    hasRisksOnly, setHasRisksOnly,
-    activeLegendProtocols, setActiveLegendProtocols,
-    activeNodeFilters, setActiveNodeFilters,
-    activeAppFilters, setActiveAppFilters,
-    activeL7Protocols, setActiveL7Protocols,
-    activeCategories, setActiveCategories,
-    activeRiskTypes, setActiveRiskTypes,
-    activeCustomSigs, setActiveCustomSigs,
-    activeFileTypes, setActiveFileTypes,
-    activeCountries, setActiveCountries,
-    activeGhostFilters, setActiveGhostFilters,
+    nodeLimit,
+    setNodeLimit,
+    ipFilter,
+    setIpFilter,
+    portFilter,
+    setPortFilter,
+    hasRisksOnly,
+    setHasRisksOnly,
+    activeLegendProtocols,
+    setActiveLegendProtocols,
+    activeNodeFilters,
+    setActiveNodeFilters,
+    activeAppFilters,
+    setActiveAppFilters,
+    activeL7Protocols,
+    setActiveL7Protocols,
+    activeCategories,
+    setActiveCategories,
+    activeRiskTypes,
+    setActiveRiskTypes,
+    activeCustomSigs,
+    setActiveCustomSigs,
+    activeFileTypes,
+    setActiveFileTypes,
+    activeCountries,
+    setActiveCountries,
+    activeGhostFilters,
+    setActiveGhostFilters,
   };
 
   // NetworkDiagramPage writes its current filtered nodes/edges here so the
@@ -305,15 +410,27 @@ export const AnalysisPage = () => {
     setReportMemoryError(null);
     setReportStep('Rendering network diagrams…');
     try {
-      const { filteredNodes, filteredEdges, nodeLimitNote: refNodeLimitNote } = networkGraphStateRef.current;
+      const {
+        filteredNodes,
+        filteredEdges,
+        nodeLimitNote: refNodeLimitNote,
+      } = networkGraphStateRef.current;
 
       // Build filter labels from the lifted state — always accurate regardless
       // of whether the Network Diagram tab has been visited.
       const activeFilterLabels = buildActiveFilterLabels({
-        ipFilter, portFilter, hasRisksOnly,
-        activeLegendProtocols, activeNodeFilters, activeAppFilters,
-        activeL7Protocols, activeCategories, activeRiskTypes,
-        activeCustomSigs, activeFileTypes, activeCountries,
+        ipFilter,
+        portFilter,
+        hasRisksOnly,
+        activeLegendProtocols,
+        activeNodeFilters,
+        activeAppFilters,
+        activeL7Protocols,
+        activeCategories,
+        activeRiskTypes,
+        activeCustomSigs,
+        activeFileTypes,
+        activeCountries,
         activeGhostFilters,
       });
 
@@ -326,29 +443,58 @@ export const AnalysisPage = () => {
       // matches what the user would see on the diagram tab.
       if (diagramNodes.length === 0) {
         setReportStep('Fetching network data…');
-        const { conversationService } = await import(
-          '@/features/conversation/services/conversationService'
-        );
+        const { conversationService } =
+          await import('@/features/conversation/services/conversationService');
         const { networkService } = await import('@/features/network/services/networkService');
         const [convResponse, hostClassifications] = await Promise.all([
           conversationService.getConversations(fileId, {
-            ip: '', port: '', payloadContains: '', protocols: [], l7Protocols: [], apps: [],
-            categories: [], hasRisks: false, fileTypes: [], riskTypes: [], customSignatures: [],
+            ip: '',
+            port: '',
+            payloadContains: '',
+            protocols: [],
+            l7Protocols: [],
+            apps: [],
+            categories: [],
+            hasRisks: false,
+            fileTypes: [],
+            riskTypes: [],
+            customSignatures: [],
             suricataAlerts: [],
-            deviceTypes: [], countries: [], sortBy: '', sortDir: 'asc', page: 1, pageSize: 10000,
+            deviceTypes: [],
+            countries: [],
+            sortBy: '',
+            sortDir: 'asc',
+            page: 1,
+            pageSize: 10000,
           }),
           conversationService.getHostClassifications(fileId).catch(() => undefined),
         ]);
         const graph = networkService.buildNetworkGraph(
-          convResponse.data, data ?? undefined, 500, hostClassifications, nodeLimit
+          convResponse.data,
+          data ?? undefined,
+          500,
+          hostClassifications,
+          nodeLimit
         );
 
         // Apply the same client-side filters the diagram tab would use.
         const { filteredNodes: fn, filteredEdges: fe } = networkService.applyNetworkFilters(
-          graph.nodes, graph.edges, {
-            hasRisksOnly, activeLegendProtocols, activeAppFilters, activeL7Protocols,
-            activeCategories, activeRiskTypes, activeCustomSigs, activeFileTypes,
-            activeCountries, activeNodeFilters, portFilter, ipFilter, activeGhostFilters,
+          graph.nodes,
+          graph.edges,
+          {
+            hasRisksOnly,
+            activeLegendProtocols,
+            activeAppFilters,
+            activeL7Protocols,
+            activeCategories,
+            activeRiskTypes,
+            activeCustomSigs,
+            activeFileTypes,
+            activeCountries,
+            activeNodeFilters,
+            portFilter,
+            ipFilter,
+            activeGhostFilters,
           }
         );
 
@@ -420,7 +566,11 @@ export const AnalysisPage = () => {
   if (loading) return <AnalysisLoadingView fileId={fileId!} />;
   if (error)
     return (
-      <ErrorMessage title="Failed to Load Analysis" message={error.message} onRetry={() => refetch()} />
+      <ErrorMessage
+        title="Failed to Load Analysis"
+        message={error.message}
+        onRetry={() => refetch()}
+      />
     );
   if (!data)
     return (
@@ -450,67 +600,106 @@ export const AnalysisPage = () => {
         </div>
       )}
       <div className="analysis-shell">
-        <AnalysisRail items={RAIL_ITEMS.map(i => (i.key === 'story' ? { ...i, busy: storyGenerating } : i))} active={activeTab} onSelect={handleTabChange} />
+        <AnalysisRail
+          items={RAIL_ITEMS.map(i => (i.key === 'story' ? { ...i, busy: storyGenerating } : i))}
+          active={activeTab}
+          onSelect={handleTabChange}
+        />
         <div className="analysis-main">
-      {/* The capture bar: which capture, and the page-wide controls. */}
-      <div className="analysis-capture-bar">
-        <div className="analysis-capture-id">
-          <div className="analysis-capture-crumb">
-            <Link to="/">Captures</Link>
-            <span aria-hidden="true" className="text-muted mx-1">›</span>
+          {/* The capture bar: which capture, and the page-wide controls. */}
+          <div className="analysis-capture-bar">
+            <div className="analysis-capture-id">
+              <div className="analysis-capture-crumb">
+                <Link to="/">Captures</Link>
+                <span aria-hidden="true" className="text-muted mx-1">
+                  ›
+                </span>
+              </div>
+              <h2 className="analysis-capture-name">{data.fileName}</h2>
+              <div className="analysis-capture-facts">{captureFacts(data)}</div>
+            </div>
           </div>
-          <h2 className="analysis-capture-name">{data.fileName}</h2>
-          <div className="analysis-capture-facts">{captureFacts(data)}</div>
-        </div>
-        <div className="analysis-capture-actions">
-          <NetworkContextPicker fileId={fileId!} />
-          <div className="d-flex flex-column align-items-end gap-1">
-            <Button variant="outline-primary" size="sm" onClick={handleDownloadReport} disabled={reportLoading}>
-              {reportLoading ? (
-                <>
-                  <Spinner animation="border" size="sm" className="me-2" />
-                  Generating report…
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
-                  Download report
-                </>
-              )}
-            </Button>
-            {reportError && <small className="text-danger">{reportError}</small>}
+
+          <div className="analysis-body">
+            {activeTab === 'file' && (
+              <Card className="mb-4">
+                <Card.Body>
+                  <h2 className="h6 mb-1">Detection rules and report</h2>
+                  <p className="small text-muted mb-3">
+                    Which custom detection rules apply to this capture, and a PDF of the whole
+                    analysis.
+                  </p>
+                  <div className="d-flex flex-wrap align-items-start gap-3">
+                    <NetworkContextPicker fileId={fileId!} />
+                    <div className="d-flex flex-column align-items-end gap-1">
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={handleDownloadReport}
+                        disabled={reportLoading}
+                      >
+                        {reportLoading ? (
+                          <>
+                            <Spinner animation="border" size="sm" className="me-2" />
+                            Generating report…
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
+                            Download report
+                          </>
+                        )}
+                      </Button>
+                      {reportError && <small className="text-danger">{reportError}</small>}
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
+            {reportMemoryError && (
+              <Alert
+                variant="danger"
+                className="mb-3"
+                onClose={() => setReportMemoryError(null)}
+                dismissible
+              >
+                <Alert.Heading>
+                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                  Report Too Large for This Deployment
+                </Alert.Heading>
+                <p className="mb-2">
+                  The network topology diagram was{' '}
+                  <strong>{reportMemoryError.attemptedSizeMb} MB</strong>, over what this deployment
+                  currently accepts in a single request.
+                </p>
+                {reportMemoryError.recommendedAppMemoryMb ? (
+                  <p className="mb-0">
+                    Raise <code>APP_MEMORY_MB</code> to at least{' '}
+                    <strong>{reportMemoryError.recommendedAppMemoryMb}</strong> in the backend's
+                    environment and restart it, then try downloading the report again. (Everything
+                    else in this app — the JVM heap, upload size, and analysis timeout — is derived
+                    from the same setting, so this also gives the backend more headroom overall.)
+                  </p>
+                ) : (
+                  <p className="mb-0">{reportMemoryError.message}</p>
+                )}
+              </Alert>
+            )}
+
+            {/* Tab Content */}
+            <Outlet
+              context={
+                {
+                  data,
+                  fileId: fileId!,
+                  networkGraphStateRef,
+                  networkDiagramFilters,
+                  storyState,
+                  refreshSummary: () => void refetch({ silent: true }),
+                } satisfies AnalysisOutletContext
+              }
+            />
           </div>
-        </div>
-      </div>
-
-      <div className="analysis-body">
-      {reportMemoryError && (
-        <Alert variant="danger" className="mb-3" onClose={() => setReportMemoryError(null)} dismissible>
-          <Alert.Heading>
-            <i className="bi bi-exclamation-triangle-fill me-2"></i>
-            Report Too Large for This Deployment
-          </Alert.Heading>
-          <p className="mb-2">
-            The network topology diagram was <strong>{reportMemoryError.attemptedSizeMb} MB</strong>,
-            over what this deployment currently accepts in a single request.
-          </p>
-          {reportMemoryError.recommendedAppMemoryMb ? (
-            <p className="mb-0">
-              Raise <code>APP_MEMORY_MB</code> to at least{' '}
-              <strong>{reportMemoryError.recommendedAppMemoryMb}</strong> in the backend's
-              environment and restart it, then try downloading the report again. (Everything else
-              in this app — the JVM heap, upload size, and analysis timeout — is derived from the
-              same setting, so this also gives the backend more headroom overall.)
-            </p>
-          ) : (
-            <p className="mb-0">{reportMemoryError.message}</p>
-          )}
-        </Alert>
-      )}
-
-      {/* Tab Content */}
-          <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState, refreshSummary: () => void refetch({ silent: true }) } satisfies AnalysisOutletContext} />
-      </div>
         </div>
       </div>
     </div>

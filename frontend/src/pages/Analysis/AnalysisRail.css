@@ -16,6 +16,7 @@
   box-sizing: border-box;
   width: 100%;
   max-width: 1480px;
+  margin: 0 auto;
   padding: 20px 24px 32px;
 }
 
@@ -153,7 +154,7 @@
   align-items: center;
   gap: 8px 20px;
   /* The strip runs full width; its contents line up with the content below. */
-  padding: 10px 24px;
+  padding: 10px max(24px, calc((100% - 1480px) / 2 + 24px));
   border-bottom: 1px solid var(--tp-border, #d8dce5);
   background: var(--tp-surface, #ffffff);
 }
