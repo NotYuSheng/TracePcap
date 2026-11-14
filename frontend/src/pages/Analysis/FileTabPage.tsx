@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { CaptureRulesCard } from '@/features/detectionRules/CaptureRulesCard';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -56,6 +57,7 @@ function apiMessage(err: unknown): string | null {
 export function FileTabPage() {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
+  const outlet = useOutletContext<{ refreshSummary?: () => void } | undefined>();
   const [versions, setVersions] = useState<FileVersion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [show, setShow] = useState(false);
@@ -119,6 +121,10 @@ export function FileTabPage() {
 
   return (
     <div data-testid="file-tab">
+      {/* This capture's own detection rules (#925 phase 3), beside the rules picker and the report. */}
+      <div className="mb-4">
+        <CaptureRulesCard fileId={fileId!} onChanged={() => outlet?.refreshSummary?.()} />
+      </div>
       {current.version && (
         <Alert variant="info" className="py-2 small">
           This is a re-analysis

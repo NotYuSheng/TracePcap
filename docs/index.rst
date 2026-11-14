@@ -29,6 +29,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
 
    features/pcap-upload
    features/analysis-navigation
+   features/analysis-overview
    features/reanalysis
    features/address-reuse
    features/network-devices
