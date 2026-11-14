@@ -1,3 +1,5 @@
+import { clusterApi } from '@/features/cluster/services/clusterApi';
+import { dnsNamesByIp } from '@/features/network/services/networkGroups';
 import { networkSegmentService, type NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
@@ -70,6 +72,7 @@ export const NetworkDiagramPage = () => {
   // The network map layout's grouping: networks from DHCP/VLANs, and what counts as local.
   const [networkSegments, setNetworkSegments] = useState<NetworkSegment[]>([]);
   const [customPrivateRanges, setCustomPrivateRanges] = useState<CustomPrivateRange[]>([]);
+  const [dnsNames, setDnsNames] = useState<Map<string, string> | undefined>(undefined);
   useEffect(() => {
     let live = true;
     networkSegmentService
@@ -80,6 +83,12 @@ export const NetworkDiagramPage = () => {
       .list()
       .then(r => live && setCustomPrivateRanges(r))
       .catch(() => live && setCustomPrivateRanges([]));
+    // Names internet hosts were looked up by, from every DNS server's query log.
+    clusterApi
+      .getDnsServers(fileId)
+      .then(servers => Promise.all(servers.map(s => clusterApi.getDnsQueryLog(fileId, s.serverIp))))
+      .then(logs => live && setDnsNames(dnsNamesByIp(logs)))
+      .catch(() => live && setDnsNames(undefined));
     return () => {
       live = false;
     };
@@ -643,6 +652,7 @@ export const NetworkDiagramPage = () => {
                 onFitViewRepeated={() => setFullscreenHint(n => n + 1)}
                 networkSegments={networkSegments}
                 customPrivateRanges={customPrivateRanges}
+                dnsNames={dnsNames}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 hiddenNodesList={hiddenNodesList}

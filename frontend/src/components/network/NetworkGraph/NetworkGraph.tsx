@@ -66,6 +66,8 @@ interface NetworkGraphProps {
   networkSegments?: NetworkSegment[];
   /** The user's private-range overrides: what counts as "Your networks" in the network map. */
   customPrivateRanges?: CustomPrivateRange[];
+  /** Address → the name clients looked it up by: the network map's domain for unnamed hosts. */
+  dnsNames?: Map<string, string>;
   /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
   bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
@@ -535,6 +537,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFitViewRepeated,
   networkSegments = EMPTY_SEGMENTS,
   customPrivateRanges = EMPTY_RANGES,
+  dnsNames,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -617,8 +620,11 @@ export const NetworkGraph = memo(function NetworkGraph({
   // The network map layout: its group boxes, drawn on a canvas under the graph.
   const groupsCanvasRef = useRef<HTMLCanvasElement>(null);
   const groupLayoutRef = useRef<GroupedLayout | null>(null);
-  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges });
-  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges };
+  // Dragged nodes keep their place until the layout runs again; this puts them back.
+  const [nodesMoved, setNodesMoved] = useState(false);
+  const resetLayoutRef = useRef<(() => void) | null>(null);
+  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames });
+  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames };
   const deviceLinksRef = useRef(deviceLinks);
   deviceLinksRef.current = deviceLinks;
   const darkRef = useRef(darkMode);
@@ -686,7 +692,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
     sigma.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [networkSegments, customPrivateRanges]);
+  }, [networkSegments, customPrivateRanges, dnsNames]);
 
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
@@ -979,6 +985,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     const onDragEnd = () => {
       if (!dragNode) return;
       suppressNextClick = dragMoved;
+      if (dragMoved) setNodesMoved(true);
       dragNode = null;
       dragMoved = false;
       sigma.getCamera().enable();
@@ -1067,6 +1074,21 @@ export const NetworkGraph = memo(function NetworkGraph({
         workerFactory: () => new Worker(ELK_WORKER_URL, { type: 'classic' }),
       });
     }
+
+    setNodesMoved(false);
+    resetLayoutRef.current = () => {
+      setNodesMoved(false);
+      if (layoutType === 'grouped') {
+        applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+        sigma.refresh();
+      } else if (layoutType === 'hierarchicalTd') {
+        applyHierarchicalLayout(graph, elkRef.current!).then(() => !cancelled && sigma.refresh());
+      } else {
+        circular.assign(graph, { scale: 1 });
+        noverlap.assign(graph, { maxIterations: 50, settings: { margin: 6 } });
+        sigma.refresh();
+      }
+    };
 
     if (layoutType === 'grouped') {
       applyGroupedLayout(sigma, nodes, groupingRef.current, groupLayoutRef);
@@ -1233,6 +1255,16 @@ export const NetworkGraph = memo(function NetworkGraph({
 
       {/* ── Bottom-right controls ────────────────────────────────────────── */}
       <div className="ng-overlay-controls">
+        {nodesMoved && (
+          <button
+            className="ng-ctrl-btn"
+            title="Reset positions"
+            aria-label="Reset positions: put dragged nodes back"
+            onClick={() => resetLayoutRef.current?.()}
+          >
+            <i className="bi bi-arrow-counterclockwise" aria-hidden="true" />
+          </button>
+        )}
         <button className="ng-ctrl-btn" title="Fit view" aria-label="Fit view" onClick={handleFitView}>
           <i className="bi bi-bounding-box-circles" aria-hidden="true" />
         </button>
@@ -1391,7 +1423,7 @@ function blendColor(hex: string, bg: string, alpha: number): string {
 function applyGroupedLayout(
   sigma: Sigma,
   nodes: GraphNode[],
-  grouping: { segments: NetworkSegment[]; customRanges: CustomPrivateRange[] },
+  grouping: { segments: NetworkSegment[]; customRanges: CustomPrivateRange[]; dnsNames?: Map<string, string> },
   out: { current: GroupedLayout | null },
 ): void {
   const graph = sigma.getGraph();

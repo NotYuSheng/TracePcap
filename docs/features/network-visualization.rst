@@ -373,6 +373,8 @@ Layout Controls
 - **Force-directed** — switch to ForceAtlas2 layout (default).
 - **Hierarchical** — switch to ELK Sugiyama layered layout (top-down).
 - **Network map** — switch to the grouped network map (:doc:`network-map`).
+- **Reset positions** — put dragged nodes back where the layout placed them;
+  shown once a node has been dragged.
 - **Fit view** — reset the camera to fit all nodes in the viewport. It isn't
   fullscreen: that's the button at the right of the graph card's header. Pressing
   Fit view twice more with the graph already fitted points that button out with
