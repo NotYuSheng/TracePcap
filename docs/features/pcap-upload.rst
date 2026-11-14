@@ -25,14 +25,14 @@ The home page has two columns:
 
 - **Analyse a capture** on the left: the drop zone, the analysis stages
   ("Analyse with", below), and how long captures are kept.
-- On the right, **Recent activity** with **All Uploads** under it.
+- On the right, **Recent activity** with **All Uploads** under it, five captures to a page.
 
-**Recent activity** shows the six latest events:
+**Recent activity** shows the three latest events:
 
 - captures analysed, still analysing or failed, each linking to its analysis;
 - captures due for deletion within three hours, at the top;
-- up to three lines of changes people made, taken from the audit log. A run of
-  edits to one network map is one line, linking to that capture's map.
+- the latest change people made, taken from the audit log. A run of edits to
+  one network map is one line, linking to that capture's map.
 
 **All changes** opens the full audit log in Settings.
 

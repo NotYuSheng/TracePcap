@@ -8,9 +8,9 @@ import { parseDateTime } from '@/utils/dateUtils';
 import { Spinner } from '@components/common/Spinner/Spinner';
 
 /** How many events the feed shows. */
-const SHOWN = 6;
+const SHOWN = 3;
 /** Lines of people's changes, at most, so captures keep a place in the feed. */
-const MAX_CHANGE_LINES = 3;
+const MAX_CHANGE_LINES = 1;
 /** Captures fetched: enough to name the ones edited and to catch any about to be deleted. */
 const FILES_FETCHED = 25;
 /** Audit entries fetched, grouped into change lines. */
