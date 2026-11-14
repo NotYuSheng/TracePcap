@@ -39,6 +39,10 @@ Each box sits inside the one above it:
 - **Broadcast and multicast**: ``0.0.0.0``, ``255.255.255.255`` and multicast
   addresses.
 
+Device labels are fitted to their cell, so neighbours never overlap: with the
+whole map in view a device shows its first lines (name and address), cut to fit,
+and zooming in shows the rest. Hover a device to read all of it.
+
 Each network has its own colour. A router that serves several networks from one
 MAC address shows once per network: each of its addresses goes in the network
 whose range holds it. A box's name shows how many devices it holds;
