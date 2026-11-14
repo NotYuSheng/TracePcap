@@ -61,10 +61,17 @@ export const meService = {
   getMe: async (): Promise<Me> => (await apiClient.get<Me>(API_ENDPOINTS.ME)).data,
   setPermissionLevel: async (action: PermissionAction, level: PermissionLevel): Promise<Permission> =>
     (await apiClient.put<Permission>(API_ENDPOINTS.PERMISSION(action), { level })).data,
-  getAuditLog: async (page: number, pageSize: number, search?: string): Promise<Paged<AuditLogEntry>> =>
+  getAuditLog: async (
+    page: number,
+    pageSize: number,
+    search?: string,
+    targetTypes?: string[],
+  ): Promise<Paged<AuditLogEntry>> =>
     (
       await apiClient.get<Paged<AuditLogEntry>>(API_ENDPOINTS.AUDIT_LOG, {
-        params: { page, pageSize, ...(search ? { search } : {}) },
+        params: { page, pageSize, ...(search ? { search } : {}), ...(targetTypes?.length ? { targetTypes } : {}) },
+        // targetTypes=a&targetTypes=b, as Spring reads a list.
+        paramsSerializer: { indexes: null },
       })
     ).data,
 };

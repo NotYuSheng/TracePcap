@@ -95,16 +95,20 @@ describe('AuditLogPanel (#915)', () => {
     );
     render(<AuditLogPanel />);
 
-    const row = (await screen.findByText('network.settings.update')).closest('tr')!;
-    expect(within(row).getByText('alice')).toBeInTheDocument();
-    // Readable: the action in words, and only the field that changed, old → new.
-    expect(within(row).getByText('Network · settings update')).toBeInTheDocument();
-    expect(within(row).getByText('Inactivity threshold')).toBeInTheDocument();
-    expect(within(row).getByText('1').tagName).toBe('DEL');
-    expect(within(row).getByText('7').tagName).toBe('INS');
+    // One line per change: the kind, the verb, what it was about, the fields that changed.
+    const summary = await screen.findByRole('button', { name: /Changed n1: Inactivity threshold/ });
+    expect(within(summary.closest('tr')!).getByText('alice')).toBeInTheDocument();
+    // Selecting it shows the details: the field, before and after.
+    await userEvent.click(summary);
+    const details = screen.getByRole('complementary', { name: /Changed n1/ });
+    expect(within(details).getByText('Inactivity threshold')).toBeInTheDocument();
+    expect(within(details).getByText('1')).toHaveClass('audit-old-text');
+    expect(within(details).getByText('7')).toHaveClass('audit-new-text');
+    await userEvent.click(within(details).getByRole('button', { name: 'Close the details' }));
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Search the audit log'), 'nothing');
-    expect(await screen.findByText('No entries match "nothing".')).toBeInTheDocument();
+    expect(await screen.findByText('No entries match.')).toBeInTheDocument();
     expect(searches).toContain('nothing');
   });
 });

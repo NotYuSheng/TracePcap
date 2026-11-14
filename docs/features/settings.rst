@@ -157,11 +157,14 @@ as the change, so a change is never saved without its entry.
 Read it on the Settings page's **Audit log** tab: newest first, paged, and searchable by
 who, action or target. It's also available from the API at ``GET /api/v1/audit-log``.
 
-Each entry shows **what changed**, not the raw record: on an update only the fields
-that differ, as old → new (old struck through, new highlighted); on a creation or
-removal the fields it had, marked *Added* or *Removed*. Nested values read as paths
-(*Match › Dst port*), bookkeeping (ids, internal timestamps, version counters) is
-left out, and long entries fold after a few lines (*Show N more*).
+Each change is one line: when, who, a tag for the kind of thing (*Rule*, *Map*,
+*Device*, *Address*, *Setting*) and what happened in words (*Changed live_check_tcp:
+Enabled*, *Moved 1 device*, *Added the group “Point of sale”*). Narrow it with the
+chips (**Rules**, **Maps**, **Devices**, **Addresses**, **Settings and access**) and
+the search box. **Select a line** for its details beside the table: when, who, what
+it was about, and each field that changed with its old value (struck through) and
+new one, or the fields it had when it was added or removed. **Show the raw record**
+gives the stored before/after as JSON. Escape closes the details.
 
 Users
 -----
