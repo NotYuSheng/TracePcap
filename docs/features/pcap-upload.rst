@@ -75,9 +75,47 @@ and return later.
 Managing Uploads
 ----------------
 
-The main file list shows all uploaded PCAPs with their status, size, upload
-date, and detected statistics. You can delete a file from this view, which
-removes both the database metadata and the object from MinIO.
+The main file list shows each capture with its size, packet count and upload
+time. You can delete a capture from this view, which removes both the database
+metadata and the object from MinIO.
+
+Each capture has exactly one **status**, in its own column:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 50 30
+
+   * - Status
+     - Means
+     - Button
+   * - Queued
+     - Uploaded, waiting for analysis to start.
+     - Watch
+   * - Analysing
+     - Being analysed.
+     - Watch
+   * - Ready
+     - Analysed and kept.
+     - Open
+   * - Expiring soon
+     - Ready, but deleted within two hours by file retention. The row says
+       how long is left.
+     - Open, Keep it
+   * - Failed
+     - Analysis stopped. Open it to see why.
+     - See why
+
+Anything else is a grey **note** under the name, only when it applies:
+
+- **Kept with <network>**: the capture is a snapshot of that monitored network,
+  so file retention never deletes it. The note links to the network.
+- **Without Suricata** (or nDPI, or file extraction): that tool was switched
+  off at upload. This is a choice, not a fault.
+- **Rules changed since**: detection rules changed after the capture was
+  analysed. The note links to the rules in Settings, where you can re-apply
+  them.
+- **Packets removed**: packet retention deleted the raw packets. The
+  conversations and results remain.
 
 Monitor Network files are **hidden by default** in this list to reduce clutter
 when many snapshots have been uploaded. Use the **Show Monitor files** toggle
@@ -96,3 +134,5 @@ entirely (see :doc:`../configuration/environment-variables`).
    Monitor Network files are **exempt by default** from automatic deletion.
    They persist until you manually delete the network or the individual
    snapshot, unless a custom monitor retention period is explicitly configured.
+   This includes a capture uploaded for analysis and later added to a network:
+   from then on it follows the monitor retention, not ``FILE_RETENTION_HOURS``.

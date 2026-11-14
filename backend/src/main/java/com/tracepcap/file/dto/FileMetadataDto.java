@@ -47,6 +47,8 @@ public class FileMetadataDto {
   private Integer estimatedAnalysisSeconds;
 
   private Integer packetCount;
+  /** The raw packets were pruned by packet retention; conversations and results remain (#394). */
+  private boolean packetsRemoved;
 
   private Long duration;
 

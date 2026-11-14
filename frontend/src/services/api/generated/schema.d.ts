@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.
          */
-        get: operations["list_13"];
+        get: operations["list_14"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,7 +478,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_12"];
+        get: operations["list_13"];
         put?: never;
         /**
          * Set a custom private range in the shared default
@@ -522,7 +522,7 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         /** Create a global detection rule (audited) */
         post: operations["create_5"];
@@ -586,6 +586,23 @@ export interface paths {
          * @description Returns the number of matching conversations and a sample. Nothing is stored, so it's 200 rather than 201, and needs no edit permission.
          */
         post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/detection-rules/stale-captures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The captures out of date with at least one enabled rule, by id */
+        get: operations["staleCaptures"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -849,7 +866,7 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
         post: operations["create_4"];
@@ -1214,7 +1231,7 @@ export interface paths {
             cookie?: never;
         };
         /** The networks this capture is a snapshot of */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1254,7 +1271,7 @@ export interface paths {
          * Every address that more than one device held
          * @description Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.
          */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1419,7 +1436,7 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /**
          * Set an IP organization rule in the shared default
@@ -1514,7 +1531,7 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         /** Create an annotation */
         post: operations["create_2"];
@@ -1660,7 +1677,7 @@ export interface paths {
             cookie?: never;
         };
         /** This network's own rules */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         /**
          * Add a rule to this network (audited)
@@ -1799,7 +1816,7 @@ export interface paths {
          * A network's devices across its snapshots
          * @description One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.
          */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1816,7 +1833,7 @@ export interface paths {
             cookie?: never;
         };
         /** List external events for a network */
-        get: operations["list_3"];
+        get: operations["list_4"];
         put?: never;
         /** Create an external event */
         post: operations["create"];
@@ -2021,7 +2038,7 @@ export interface paths {
          * A network's subnets: its own entries and the default's
          * @description Each row's scope is network (the network's own entry, possibly hiding or overriding the default's) or default.
          */
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         /**
          * Set the network's subnet for a CIDR, or hide the default's
@@ -2049,6 +2066,23 @@ export interface paths {
          * @description Needs NETWORK_SETTINGS. Audited.
          */
         delete: operations["revert"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/network-memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every capture that is a snapshot of a monitored network, with the network */
+        get: operations["list_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3299,6 +3333,7 @@ export interface components {
             fileSize?: number;
             /** Format: int32 */
             packetCount?: number;
+            packetsRemoved?: boolean;
             source?: string;
             /** Format: date-time */
             startTime?: string;
@@ -3770,6 +3805,13 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             updatedBy?: string;
+        };
+        NetworkMembership: {
+            /** Format: uuid */
+            fileId?: string;
+            /** Format: uuid */
+            networkId?: string;
+            networkName?: string;
         };
         NetworkRef: {
             /** Format: uuid */
@@ -4637,7 +4679,7 @@ export interface operations {
             };
         };
     };
-    list_13: {
+    list_14: {
         parameters: {
             query?: {
                 page?: number;
@@ -5273,7 +5315,7 @@ export interface operations {
             };
         };
     };
-    list_12: {
+    list_13: {
         parameters: {
             query?: never;
             header?: never;
@@ -5337,7 +5379,7 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    list_12: {
         parameters: {
             query?: {
                 fileId?: string;
@@ -5449,6 +5491,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RulePreviewDto"];
+                };
+            };
+        };
+    };
+    staleCaptures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
                 };
             };
         };
@@ -6018,7 +6080,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: never;
             header?: never;
@@ -6528,7 +6590,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -6572,7 +6634,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -6793,7 +6855,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -6989,7 +7051,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -7277,7 +7339,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -7482,7 +7544,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: {
                 q?: string;
@@ -7509,7 +7571,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -7916,7 +7978,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -7982,6 +8044,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkMembership"][];
+                };
             };
         };
     };

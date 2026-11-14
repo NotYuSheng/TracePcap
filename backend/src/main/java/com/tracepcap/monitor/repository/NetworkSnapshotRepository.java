@@ -25,6 +25,10 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
   @Query("SELECT s.network.id, s.file.id FROM NetworkSnapshotEntity s")
   List<Object[]> findAllMemberships();
 
+  /** Every (capture id, network id, network name) membership, for the captures list. */
+  @Query("SELECT s.file.id, s.network.id, s.network.name FROM NetworkSnapshotEntity s")
+  List<Object[]> findAllMembershipsWithNames();
+
   long countByNetworkId(UUID networkId);
 
   /** Snapshot count per network, for the networks list in one query (#469). */

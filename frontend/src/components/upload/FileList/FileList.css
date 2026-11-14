@@ -16,3 +16,60 @@
 .file-list-card .list-group-item:hover {
   background-color: var(--tp-surface-hover, #f8f9fa);
 }
+
+/* One status per capture, then quiet notes. Colour only for what needs you. */
+.file-list-card .min-w-0 {
+  min-width: 0;
+}
+.file-list-card .file-name {
+  overflow-wrap: anywhere;
+}
+.file-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 112px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.file-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.file-status-queued { color: var(--tp-text-muted, #4b5563); }
+.file-status-queued .file-status-dot { background: #9ca3af; }
+.file-status-analysing { color: #3b1891; }
+.file-status-analysing .file-status-dot { background: #5925dc; }
+.file-status-ready { color: #166534; }
+.file-status-ready .file-status-dot { background: #16a34a; }
+.file-status-expiring { color: #92400e; }
+.file-status-expiring .file-status-dot { background: #d97706; }
+.file-status-failed { color: #991b1b; }
+.file-status-failed .file-status-dot { background: #dc2626; }
+[data-theme='dark'] .file-status-analysing { color: #c9b8ff; }
+[data-theme='dark'] .file-status-ready { color: #86efac; }
+[data-theme='dark'] .file-status-expiring { color: #fcd34d; }
+[data-theme='dark'] .file-status-failed { color: #fca5a5; }
+.file-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 2px;
+  font-size: 0.78rem;
+}
+.file-note {
+  color: var(--tp-text-muted, #4b5563);
+}
+a.file-note {
+  text-decoration: underline;
+  text-decoration-color: rgba(75, 85, 99, 0.4);
+}
+.file-note-kept {
+  color: #166534;
+}
+[data-theme='dark'] .file-note-kept {
+  color: #86efac;
+}
