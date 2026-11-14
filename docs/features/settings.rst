@@ -21,7 +21,7 @@ TracePcap's settings are grouped by who they affect:
      - that network
      - Such as when a device counts as no longer seen (see :doc:`network-monitor`).
 
-Open the **Settings** page from the header. Everyone can open it; anything you can't change
+Open the **Settings** page from the gear icon at the right of the header. Everyone can open it; anything you can't change
 is shown greyed out with a lock, and clicking it says why. (It was two places before: a
 Settings dialog for personal settings and a System page; old ``/system`` links still work.)
 
