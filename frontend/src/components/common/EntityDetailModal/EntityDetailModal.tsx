@@ -173,7 +173,11 @@ export function EntityDetailModal({
                 {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
 
                 {entityType === 'IP' && fileId && (
-                  <HostIdentitySection fileId={fileId} ip={entityKey} />
+                  <HostIdentitySection
+                    fileId={fileId}
+                    ip={entityKey}
+                    occupancyIdx={graphNode?.data.occupancy?.idx}
+                  />
                 )}
 
                 {/* Graph host detail: traffic counters, protocol chips, per-peer Connections table. */}

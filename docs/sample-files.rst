@@ -23,6 +23,12 @@ Included Files
      - Crafted PCAP that triggers all 17 custom signature demo rules defined
        in ``signatures.sample.yml``. Use this to verify that custom signature
        matching is working correctly.
+   * - ``dhcp_address_reuse.pcap``
+     - One address held by two devices in turn: a Dell laptop until 10:59, then
+       a Samsung phone that starts beaconing at 11:32. Shows each device as its
+       own node, classified from its own traffic (see
+       :doc:`features/address-reuse`). Regenerate with
+       ``python3 sample-files/gen_dhcp_reuse.py``.
    * - ``monitor_large/week1_baseline.pcap`` … ``week8_near_baseline.pcap``
      - Eight weekly captures from the **Office Audit demo scenario**. Used to
        demonstrate the Network Monitor, subnet detection, node role annotation,

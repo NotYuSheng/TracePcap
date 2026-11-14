@@ -18,6 +18,28 @@ export interface Occupancy {
   boundaryKey?: string | null;
   automatic: boolean;
   conversations: number;
+  /** This device's own classification, from its stretch's traffic only (#918 slice 2). */
+  classification?: OccupancyClassification | null;
+}
+
+/** Mirrors HostOccupancyResponse.Classification. */
+export interface OccupancyClassification {
+  deviceType: string;
+  confidence?: number | null;
+  winnerScore?: number | null;
+  winnerReasons?: string | null;
+  runnerUpType?: string | null;
+  runnerUpScore?: number | null;
+  runnerUpReasons?: string | null;
+  manufacturer?: string | null;
+  ttl?: number | null;
+  loggedInUser?: string | null;
+}
+
+/** Mirrors HostOccupancyResponse.Address: an address and the devices that held it, in time order. */
+export interface ReusedAddress {
+  ip: string;
+  occupancies: Occupancy[];
 }
 
 export interface OccupancyDecision {
@@ -60,6 +82,10 @@ export function toInputValue(dt: ApiDateTime | null | undefined): string {
 }
 
 export const occupancyService = {
+  /** Addresses that more than one device held in the capture; empty when none did. */
+  listForFile: async (fileId: string): Promise<ReusedAddress[]> =>
+    (await apiClient.get<ReusedAddress[]>(API_ENDPOINTS.FILE_OCCUPANCIES(fileId))).data,
+
   get: async (fileId: string, ip: string): Promise<HostOccupancy> =>
     (await apiClient.get<HostOccupancy>(API_ENDPOINTS.HOST_OCCUPANCIES(fileId, ip))).data,
 

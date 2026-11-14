@@ -648,6 +648,50 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Per-device classification (#918 slice 2) on identity-cases.pcap: each device that held
+   * 10.0.0.50 is classified from its own stretch's traffic, so the laptop keeps TTL 128 and the
+   * phone gets its own 64. A manual split is classified the same way, at once.
+   */
+  @Test
+  void occupancy_eachDeviceIsClassifiedFromItsOwnTraffic() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    JsonNode list = rest.getForEntity("/api/v1/files/" + fileId + "/occupancies", JsonNode.class).getBody();
+    JsonNode address = null;
+    for (JsonNode a : list) if ("10.0.0.50".equals(a.get("ip").asText())) address = a;
+    assertThat(address).as("10.0.0.50 is listed as reused").isNotNull();
+    for (JsonNode a : list) assertThat(a.get("ip").asText()).isNotEqualTo("10.0.0.70"); // one MAC: not reused
+    JsonNode laptop = address.get("occupancies").get(0).get("classification");
+    JsonNode phone = address.get("occupancies").get(1).get("classification");
+    assertThat(laptop.get("ttl").asInt()).isEqualTo(128);
+    assertThat(phone.get("ttl").asInt()).isEqualTo(64);
+    assertThat(laptop.get("deviceType").asText()).isNotBlank();
+    assertThat(phone.get("deviceType").asText()).isNotBlank();
+    assertThat(laptop.get("winnerReasons").asText()).contains("TTL 128");
+    assertThat(phone.get("winnerReasons").asText()).doesNotContain("TTL 128");
+
+    // A manual split of the cloned VMs: both halves are classified straight away.
+    String base = "/api/v1/files/" + fileId + "/hosts/10.0.0.70/";
+    java.util.Map<String, Object> split = new java.util.HashMap<>();
+    split.put("action", "split");
+    split.put("reason", "two VMs cloned from one image");
+    split.put("at", java.time.LocalDateTime.ofInstant(
+        java.time.Instant.ofEpochSecond(1730000000L + 302), java.time.ZoneId.systemDefault()).toString());
+    ResponseEntity<JsonNode> created = rest.postForEntity(base + "occupancy-decisions", split, JsonNode.class);
+    assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    JsonNode halves = created.getBody().get("occupancies");
+    assertThat(halves).hasSize(2);
+    assertThat(halves.get(0).get("classification").get("deviceType").asText()).isNotBlank();
+    assertThat(halves.get(1).get("classification").get("deviceType").asText()).isNotBlank();
+    rest.delete(base + "occupancy-decisions/" + created.getBody().get("decisions").get(0).get("id").asLong());
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

@@ -112,3 +112,58 @@ describe('buildNetworkGraph', () => {
     expect(result.stats.totalNodes).toBe(0)
   })
 })
+
+describe('buildNetworkGraph: an address more than one device held (#918 slice 2)', () => {
+  // 10.0.0.50 is a laptop until 11:00, then a phone. Times are wall-clock arrays, as the API sends.
+  const boundary = [2026, 11, 10, 11, 0, 0]
+  const before = new Date(2026, 10, 10, 10, 30, 0).getTime()
+  const after = new Date(2026, 10, 10, 11, 30, 0).getTime()
+  const reused = [
+    {
+      ip: '10.0.0.50',
+      occupancies: [
+        {
+          idx: 0, mac: 'f8:bc:12:00:00:01', hostname: 'LAPTOP-ALICE', endsAt: boundary, automatic: false, conversations: 1,
+          classification: { deviceType: 'LAPTOP_DESKTOP', confidence: 100, manufacturer: 'Dell Inc.', ttl: 128 },
+        },
+        {
+          idx: 1, mac: '8c:71:f8:00:00:02', hostname: 'Galaxy-S24', startsAt: boundary, automatic: true, conversations: 1,
+          classification: { deviceType: 'MOBILE', confidence: 67, manufacturer: 'Samsung Electronics Co.,Ltd', ttl: 64 },
+        },
+      ],
+    },
+  ]
+  const convs = () => [
+    conversation('10.0.0.50', '52.97.1.10', { id: 'laptop-mail', startTime: before }),
+    conversation('10.0.0.50', '185.220.101.77', { id: 'phone-beacon', startTime: after }),
+  ]
+  const addressRow = [{ ip: '10.0.0.50', deviceType: 'LAPTOP_DESKTOP', confidence: 100, hostname: 'LAPTOP-ALICE', mac: 'f8:bc:12:00:00:01' }]
+
+  it('draws one node per device, and puts each conversation on the device that held the address then', () => {
+    const g = buildNetworkGraph(convs(), undefined, 500, addressRow as never, 0, undefined, undefined, reused as never)
+
+    const ids = g.nodes.map(n => n.id).sort()
+    expect(ids).toEqual(['10.0.0.50@0', '10.0.0.50@1', '185.220.101.77', '52.97.1.10'])
+    expect(g.edges.find(e => e.id === 'laptop-mail')!.source).toBe('10.0.0.50@0')
+    // The beacon is the phone's, not the laptop's: the whole point of splitting.
+    expect(g.edges.find(e => e.id === 'phone-beacon')!.source).toBe('10.0.0.50@1')
+  })
+
+  it("gives each device its own name, MAC and classification, not the address's blend", () => {
+    const g = buildNetworkGraph(convs(), undefined, 500, addressRow as never, 0, undefined, undefined, reused as never)
+    const phone = g.nodes.find(n => n.id === '10.0.0.50@1')!
+
+    expect(phone.label).toBe('Galaxy-S24')
+    expect(phone.data.ip).toBe('10.0.0.50')
+    expect(phone.data.mac).toBe('8c:71:f8:00:00:02')
+    expect(phone.data.deviceType).toBe('MOBILE')
+    expect(phone.data.identityLabel).toBe('MOBILE')
+    expect(phone.data.ttl).toBe(64)
+    expect(phone.data.occupancy).toMatchObject({ idx: 1, of: 2 })
+  })
+
+  it('keeps one node keyed by IP for an address one device held', () => {
+    const g = buildNetworkGraph(convs(), undefined, 500, addressRow as never, 0, undefined, undefined, [])
+    expect(g.nodes.filter(n => n.data.ip === '10.0.0.50').map(n => n.id)).toEqual(['10.0.0.50'])
+  })
+})

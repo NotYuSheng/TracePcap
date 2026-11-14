@@ -58,7 +58,8 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
   // Per-peer summary: peerIp → { packets, bytes, apps }
   const peerMap = new Map<string, { packets: number; bytes: number; apps: Set<string> }>();
   connectedEdges.forEach(edge => {
-    const peer = edge.source === node.id ? edge.target : edge.source;
+    // A device on a reused address has the id `ip@idx` (#918 slice 2); the peer is still the address.
+    const peer = (edge.source === node.id ? edge.target : edge.source).replace(/@\d+$/, '');
     const existing = peerMap.get(peer) ?? { packets: 0, bytes: 0, apps: new Set() };
     existing.packets += edge.data.packetCount;
     existing.bytes += edge.data.totalBytes;
