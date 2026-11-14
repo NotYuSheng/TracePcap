@@ -370,11 +370,14 @@ export const NetworkDiagramPage = () => {
   useEffect(() => setTimeWindow(null), [fileId]);
   // Nodes not seen yet by the window's end are hidden when that option is on.
   const [appearWhenSeen, setAppearWhenSeen] = useState(false);
+  const [unseenStyle, setUnseenStyle] = useState<'hide' | 'faint'>('hide');
   const windowActive = useMemo(() => {
     if (!timeWindow) return null;
     const active = activeInWindow(filteredEdges, timeWindow);
-    return appearWhenSeen ? { ...active, hiddenNodeIds: unseenByWindowEnd(filteredEdges, timeWindow) } : active;
-  }, [filteredEdges, timeWindow, appearWhenSeen]);
+    if (!appearWhenSeen) return active;
+    const unseen = unseenByWindowEnd(filteredEdges, timeWindow);
+    return unseenStyle === 'faint' ? { ...active, faintNodeIds: unseen } : { ...active, hiddenNodeIds: unseen };
+  }, [filteredEdges, timeWindow, appearWhenSeen, unseenStyle]);
   // Same-device links between nodes both still shown after the filters.
   const shownDeviceLinks = useMemo(() => {
     const ids = new Set(filteredNodes.map(n => n.id));
@@ -646,6 +649,8 @@ export const NetworkDiagramPage = () => {
                       onAnimateChange={setAnimateTraffic}
                       appearWhenSeen={appearWhenSeen}
                       onAppearWhenSeenChange={setAppearWhenSeen}
+                      unseenStyle={unseenStyle}
+                      onUnseenStyleChange={setUnseenStyle}
                     />
                   ) : undefined
                 }

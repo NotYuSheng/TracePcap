@@ -249,3 +249,7 @@
     min-width: 0;
   }
 }
+
+.ts-segmented-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
