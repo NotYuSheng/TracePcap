@@ -167,6 +167,15 @@ public interface HostClassificationLookup {
   }
 
   /**
+   * Every host in the file as devices (#918 slice 4): like {@link #hostFacts}, except that an
+   * address more than one device held is replaced by its devices, each keyed by {@link DeviceKeys}
+   * with its own MAC, vendor, hostname and type. One entry per device, never per blended address.
+   */
+  default List<HostFacts> deviceInventory(UUID fileId) {
+    return hostFacts(fileId);
+  }
+
+  /**
    * Where the device with this MAC is in a file (#918 slice 3): its device key when it was one of
    * several devices on an address, else the IP of the host with that MAC. What a device's label
    * follows from one snapshot to the next, since its address and times change.

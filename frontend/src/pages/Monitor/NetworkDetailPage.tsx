@@ -11,6 +11,7 @@ import { monitorService } from '@/features/monitor/services/monitorService';
 import { NetworkSettingsModal } from '@/components/monitor/NetworkSettingsModal/NetworkSettingsModal';
 import { NetworkRulesModal } from '@/features/detectionRules/NetworkRulesModal';
 import { NetworkAddressConfigModal } from '@/features/networkAddress/NetworkAddressConfigModal';
+import { NetworkDevicesModal } from '@/features/networkDevices/NetworkDevicesModal';
 import { SubnetsPanel } from '@/components/monitor/SubnetsPanel/SubnetsPanel';
 import { BaselineDefinitionPanel } from '@/components/monitor/BaselineDefinitionPanel/BaselineDefinitionPanel';
 import { ExternalEventsPanel } from '@/components/monitor/ExternalEventsPanel/ExternalEventsPanel';
@@ -39,6 +40,7 @@ export const NetworkDetailPage = () => {
   const [showManage, setShowManage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAddresses, setShowAddresses] = useState(false);
+  const [showDevices, setShowDevices] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
   const navSections: SectionDef[] = [
@@ -123,6 +125,14 @@ export const NetworkDetailPage = () => {
               onClick={() => setShowAddresses(true)}
             >
               <i className="bi bi-diagram-3 me-1" aria-hidden="true"></i>Addresses
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline-secondary"
+              onClick={() => setShowDevices(true)}
+            >
+              <i className="bi bi-pc-display me-1" aria-hidden="true"></i>Devices
             </Button>
             <Button
               type="button"
@@ -418,6 +428,15 @@ export const NetworkDetailPage = () => {
           networkId={network.id}
           networkName={network.name}
           onHide={() => setShowRules(false)}
+        />
+      )}
+      {network && showDevices && (
+        <NetworkDevicesModal
+          show={showDevices}
+          networkId={network.id}
+          networkName={network.name}
+          snapshots={snapshots}
+          onHide={() => setShowDevices(false)}
         />
       )}
       {network && (

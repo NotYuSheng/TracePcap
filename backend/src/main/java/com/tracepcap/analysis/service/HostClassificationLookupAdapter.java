@@ -88,6 +88,21 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
   }
 
   @Override
+  public List<HostFacts> deviceInventory(UUID fileId) {
+    List<HostFacts> hosts = hostFacts(fileId);
+    var rows = occupancies.findByFileIdOrderByIpAscIdxAsc(fileId);
+    if (rows.isEmpty()) return hosts;
+    java.util.Set<String> reused = new java.util.HashSet<>();
+    for (var o : rows) reused.add(o.getIp());
+    List<HostFacts> out = new java.util.ArrayList<>();
+    for (HostFacts h : hosts) if (!reused.contains(h.ip())) out.add(h);
+    for (var o : rows) {
+      deviceFacts(fileId, com.tracepcap.analysis.spi.DeviceKeys.key(o.getIp(), o.getStartsAt())).ifPresent(out::add);
+    }
+    return out;
+  }
+
+  @Override
   public Optional<String> keyForMac(UUID fileId, String mac) {
     if (mac == null) return Optional.empty();
     for (var o : occupancies.findByFileIdAndMacIgnoreCaseOrderByIpAscIdxAsc(fileId, mac)) {
