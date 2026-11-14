@@ -180,7 +180,7 @@ The graph is rendered with **Sigma.js** (WebGL) using **graphology** as the
 underlying graph model. No external tile servers or map services are used — the
 topology is a pure data-driven graph rendered in the browser.
 
-Two layout algorithms are available:
+Three layouts are available:
 
 - **Force-directed** (default) — ForceAtlas2 run in a Web Worker, followed by
   a de-overlapping pass. Surfaces natural clusters and hub-and-spoke structure.
@@ -190,6 +190,8 @@ Two layout algorithms are available:
   disconnected components are placed side-by-side. This layout makes
   client → server traffic flow and parent/child relationships immediately
   visible.
+- **Network map** — devices in nested boxes: network, subnet, device type; the
+  internet by domain. See :doc:`network-map`.
 
 Grouping Modes
 --------------
@@ -370,6 +372,7 @@ Layout Controls
 
 - **Force-directed** — switch to ForceAtlas2 layout (default).
 - **Hierarchical** — switch to ELK Sugiyama layered layout (top-down).
+- **Network map** — switch to the grouped network map (:doc:`network-map`).
 - **Fit view** — reset the camera to fit all nodes in the viewport. It isn't
   fullscreen: that's the button at the right of the graph card's header. Pressing
   Fit view twice more with the graph already fitted points that button out with

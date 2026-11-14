@@ -1,3 +1,4 @@
+import type { GraphLayoutType } from '@/features/network/types';
 import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -122,7 +123,7 @@ export const ComparePage = () => {
     setHasRisksOnly(false);
   };
 
-  const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>(
+  const [layoutType, setLayoutType] = useState<GraphLayoutType>(
     'circular'
   );
 

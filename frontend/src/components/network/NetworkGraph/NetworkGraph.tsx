@@ -11,7 +11,11 @@ import { animatedEdges, drawDeviceLinks, drawEffects, drawParticles, windowEffec
 const EMPTY_LINKS: { from: string; to: string; label: string }[] = [];
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
-import type { GraphNode, GraphEdge } from '@/features/network/types';
+import type { GraphNode, GraphEdge, GraphLayoutType } from '@/features/network/types';
+import { buildGroupTree, layoutGroups, type GroupedLayout } from '@/features/network/services/networkGroups';
+import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
+import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
+import { drawGroupBoxes } from './groupBoxes';
 import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, buildAppLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
 import { getAppColor } from '@/utils/appColors';
 import { makeVolumeEdgeColor } from '@/utils/volumeColor';
@@ -38,8 +42,8 @@ interface NetworkGraphProps {
   edges: GraphEdge[];
   onNodeClick?: (node: GraphNode) => void;
   onClusterClick?: (clusterId: string) => void;
-  layoutType?: 'circular' | 'hierarchicalTd';
-  onLayoutChange?: (layout: 'circular' | 'hierarchicalTd') => void;
+  layoutType?: GraphLayoutType;
+  onLayoutChange?: (layout: GraphLayoutType) => void;
   onLayoutComplete?: () => void;
   primarySource?: string;
   hiddenNodesList?: GraphNode[];
@@ -58,6 +62,10 @@ interface NetworkGraphProps {
    * the user is probably after the header's fullscreen button (the two used to share an icon).
    */
   onFitViewRepeated?: () => void;
+  /** Networks found from DHCP/VLANs (#462): the network map layout's second level. */
+  networkSegments?: NetworkSegment[];
+  /** The user's private-range overrides: what counts as "Your networks" in the network map. */
+  customPrivateRanges?: CustomPrivateRange[];
   /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
   bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
@@ -503,6 +511,9 @@ async function applyHierarchicalLayout(graph: Graph, elk: InstanceType<typeof EL
 // Main component
 // ---------------------------------------------------------------------------
 
+const EMPTY_SEGMENTS: NetworkSegment[] = [];
+const EMPTY_RANGES: CustomPrivateRange[] = [];
+
 export const NetworkGraph = memo(function NetworkGraph({
   nodes,
   edges,
@@ -522,6 +533,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   bottomBar,
   deviceLinks = EMPTY_LINKS,
   onFitViewRepeated,
+  networkSegments = EMPTY_SEGMENTS,
+  customPrivateRanges = EMPTY_RANGES,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -555,6 +568,20 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, []);
 
   const sigmaRef = useRef<Sigma | null>(null);
+  // Sigma only re-measures on window resizes; a CSS fullscreen or a resized card would leave its
+  // canvases stretched (and the network map's boxes, drawn at the real size, out of line).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const sigma = sigmaRef.current;
+      if (!sigma) return;
+      sigma.resize();
+      sigma.refresh();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const graphRef = useRef<Graph | null>(null);
   const nodeTypeByLabel = useRef<Map<string, string>>(new Map());
   const deviceTypeByLabel = useRef<Map<string, string>>(new Map());
@@ -587,6 +614,11 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   // Traffic dots: an overlay canvas over Sigma's, redrawn every frame while on (and the tab shows).
   const particlesRef = useRef<HTMLCanvasElement>(null);
+  // The network map layout: its group boxes, drawn on a canvas under the graph.
+  const groupsCanvasRef = useRef<HTMLCanvasElement>(null);
+  const groupLayoutRef = useRef<GroupedLayout | null>(null);
+  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges });
+  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges };
   const deviceLinksRef = useRef(deviceLinks);
   deviceLinksRef.current = deviceLinks;
   const darkRef = useRef(darkMode);
@@ -646,6 +678,15 @@ export const NetworkGraph = memo(function NetworkGraph({
     activeInWindowRef.current = activeInWindow;
     sigmaRef.current?.refresh();
   }, [activeInWindow]);
+
+  // The network map's grouping can arrive after the graph (segments load separately): regroup.
+  useEffect(() => {
+    const sigma = sigmaRef.current;
+    if (layoutType !== 'grouped' || !sigma) return;
+    applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+    sigma.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [networkSegments, customPrivateRanges]);
 
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
@@ -811,6 +852,20 @@ export const NetworkGraph = memo(function NetworkGraph({
     });
 
     sigmaRef.current = sigma;
+    groupLayoutRef.current = null;
+    sigma.on('afterRender', () => {
+      const canvas = groupsCanvasRef.current;
+      const layout = groupLayoutRef.current;
+      if (!canvas) return;
+      drawGroupBoxes(
+        canvas,
+        sigma,
+        layout?.boxes ?? [],
+        layout?.headerFor ?? (() => 0),
+        darkMode,
+        activeInWindowRef.current?.nodeIds ?? null,
+      );
+    });
 
     // Test seam for the README demo recording (frontend/e2e/demo.spec.ts).
     //
@@ -957,7 +1012,9 @@ export const NetworkGraph = memo(function NetworkGraph({
 
     // Override background color via the canvas element behind WebGL
     const canvas = containerRef.current.querySelector('canvas');
-    if (canvas) (canvas as HTMLCanvasElement).style.background = bgColor;
+    // In the network map the group boxes sit under the graph, so its canvas stays clear (the
+    // wrapper behind it carries the same background colour).
+    if (canvas) (canvas as HTMLCanvasElement).style.background = layoutType === 'grouped' ? 'transparent' : bgColor;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -1011,7 +1068,14 @@ export const NetworkGraph = memo(function NetworkGraph({
       });
     }
 
-    if (layoutType === 'hierarchicalTd') {
+    if (layoutType === 'grouped') {
+      applyGroupedLayout(sigma, nodes, groupingRef.current, groupLayoutRef);
+      sigma.refresh();
+      requestAnimationFrame(() => {
+        revealCanvas();
+        onLayoutCompleteRef.current?.();
+      });
+    } else if (layoutType === 'hierarchicalTd') {
       setLayouting(true);
       applyHierarchicalLayout(graph, elkRef.current!).then(() => {
         if (cancelled) return;
@@ -1136,6 +1200,13 @@ export const NetworkGraph = memo(function NetworkGraph({
       style={{ background: darkMode ? DARK_BG : LIGHT_BG }}
     >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
+      {/* Network map group boxes, under the graph. */}
+      <canvas
+        ref={groupsCanvasRef}
+        className="network-graph-groups"
+        aria-hidden="true"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      />
       <div className="network-graph-canvas" ref={containerRef} />
       {/* Traffic dots, drawn over the graph; clicks go through to it. */}
       <canvas
@@ -1180,6 +1251,14 @@ export const NetworkGraph = memo(function NetworkGraph({
               onClick={() => onLayoutChange('hierarchicalTd')}
             >
               <i className="bi bi-diagram-3" />
+            </button>
+            <button
+              className={`ng-ctrl-btn${layoutType === 'grouped' ? ' active' : ''}`}
+              title="Network map: grouped by network"
+              aria-label="Network map: grouped by network"
+              onClick={() => onLayoutChange('grouped')}
+            >
+              <i className="bi bi-grid-1x2" aria-hidden="true" />
             </button>
           </>
         )}
@@ -1303,4 +1382,35 @@ function blendColor(hex: string, bg: string, alpha: number): string {
   const g = Math.round(g1 * alpha + g2 * (1 - alpha));
   const b = Math.round(b1 * alpha + b2 * (1 - alpha));
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * The network map layout: nested group boxes (networks, subnets, device types), each device in a
+ * grid cell of its innermost group. Boxes are kept for the under-graph canvas to draw.
+ */
+function applyGroupedLayout(
+  sigma: Sigma,
+  nodes: GraphNode[],
+  grouping: { segments: NetworkSegment[]; customRanges: CustomPrivateRange[] },
+  out: { current: GroupedLayout | null },
+): void {
+  const graph = sigma.getGraph();
+  const present = nodes.filter(n => graph.hasNode(n.id));
+  const layout = layoutGroups(buildGroupTree(present, grouping));
+  layout.positions.forEach((p, id) => {
+    if (!graph.hasNode(id)) return;
+    graph.setNodeAttribute(id, 'x', p.x);
+    graph.setNodeAttribute(id, 'y', -p.y);
+  });
+  out.current = layout;
+  // Frame the boxes, not just the nodes: the camera fits the bounding box, and the outer boxes and
+  // their names reach past the outermost devices.
+  if (layout.boxes.length) {
+    const xs = layout.boxes.flatMap(b => [b.x, b.x + b.w]);
+    const ys = layout.boxes.flatMap(b => [-b.y, -(b.y + b.h)]);
+    const [top, bottom] = [Math.max(...ys), Math.min(...ys)];
+    // Extra room at the bottom, where the time axis bar sits over the graph.
+    const below = (top - bottom) * 0.08;
+    sigma.setCustomBBox({ x: [Math.min(...xs), Math.max(...xs)], y: [bottom - below, top] });
+  }
 }

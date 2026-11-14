@@ -1,3 +1,7 @@
+import { networkSegmentService, type NetworkSegment } from '@/features/networkSegments/networkSegmentService';
+import { customPrivateRangeService } from '@/features/cluster/services/customPrivateRangeService';
+import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
+import type { GraphLayoutType } from '@/features/network/types';
 import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -63,6 +67,24 @@ export const NetworkDiagramPage = () => {
   const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges, deviceLinks } =
     useNetworkData(fileId, data, nodeLimit, networkContext);
 
+  // The network map layout's grouping: networks from DHCP/VLANs, and what counts as local.
+  const [networkSegments, setNetworkSegments] = useState<NetworkSegment[]>([]);
+  const [customPrivateRanges, setCustomPrivateRanges] = useState<CustomPrivateRange[]>([]);
+  useEffect(() => {
+    let live = true;
+    networkSegmentService
+      .get(fileId)
+      .then(r => live && setNetworkSegments(r.segments))
+      .catch(() => live && setNetworkSegments([]));
+    customPrivateRangeService
+      .list()
+      .then(r => live && setCustomPrivateRanges(r))
+      .catch(() => live && setCustomPrivateRanges([]));
+    return () => {
+      live = false;
+    };
+  }, [fileId]);
+
   const navigate = useNavigate();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
@@ -93,7 +115,7 @@ export const NetworkDiagramPage = () => {
     setHasRisksOnly(false);
   };
 
-  const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>(
+  const [layoutType, setLayoutType] = useState<GraphLayoutType>(
     'circular'
   );
 
@@ -619,6 +641,8 @@ export const NetworkDiagramPage = () => {
               <NetworkGraph
                 key={layoutType}
                 onFitViewRepeated={() => setFullscreenHint(n => n + 1)}
+                networkSegments={networkSegments}
+                customPrivateRanges={customPrivateRanges}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 hiddenNodesList={hiddenNodesList}
