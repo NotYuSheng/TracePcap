@@ -59,7 +59,7 @@ export const NetworkDiagramPage = () => {
   const [showLabelModal, setShowLabelModal] = useState(false);
   // In a network, its own detection rules' matches show on the edges too (#925 phase 3).
   const [networkContext] = useNetworkContext();
-  const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges } =
+  const { nodes, edges, stats, loading, error, refetch, hiddenNodes, hiddenNodesList, crossEdges, deviceLinks } =
     useNetworkData(fileId, data, nodeLimit, networkContext);
 
   const navigate = useNavigate();
@@ -372,6 +372,11 @@ export const NetworkDiagramPage = () => {
     () => (timeWindow ? activeInWindow(filteredEdges, timeWindow) : null),
     [filteredEdges, timeWindow],
   );
+  // Same-device links between nodes both still shown after the filters.
+  const shownDeviceLinks = useMemo(() => {
+    const ids = new Set(filteredNodes.map(n => n.id));
+    return deviceLinks.filter(l => ids.has(l.from) && ids.has(l.to));
+  }, [deviceLinks, filteredNodes]);
   const windowedEdges = useMemo(
     () => (windowActive ? filteredEdges.filter(e => windowActive.edgeIds.has(e.id)) : filteredEdges),
     [filteredEdges, windowActive],
@@ -639,6 +644,7 @@ export const NetworkDiagramPage = () => {
                 highlightedNodes={highlightedNodes}
                 activeInWindow={windowActive}
                 animateTraffic={animateTraffic}
+                deviceLinks={shownDeviceLinks}
               />
             </Card.Body>
           </Card>

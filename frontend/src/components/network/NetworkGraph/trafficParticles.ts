@@ -89,3 +89,50 @@ export function drawParticles(
   }
   ctx.globalAlpha = 1;
 }
+
+/** One device on two nodes (it moved to another address): a dashed line and a label between them. */
+export function drawDeviceLinks(
+  ctx: CanvasRenderingContext2D,
+  sigma: Sigma,
+  links: { from: string; to: string; label: string }[],
+  dark: boolean,
+): void {
+  if (links.length === 0) return;
+  const ratio = window.devicePixelRatio || 1;
+  const graph = sigma.getGraph();
+  ctx.save();
+  ctx.setLineDash([6 * ratio, 5 * ratio]);
+  ctx.lineWidth = 1.6 * ratio;
+  const stroke = dark ? '#b9a6ff' : '#5925dc';
+  ctx.strokeStyle = stroke;
+  ctx.font = `${11 * ratio}px Inter, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const l of links) {
+    if (!graph.hasNode(l.from) || !graph.hasNode(l.to)) continue;
+    const a = sigma.getNodeDisplayData(l.from);
+    const b = sigma.getNodeDisplayData(l.to);
+    if (!a || !b) continue;
+    const pa = sigma.framedGraphToViewport({ x: a.x, y: a.y });
+    const pb = sigma.framedGraphToViewport({ x: b.x, y: b.y });
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(pa.x * ratio, pa.y * ratio);
+    ctx.lineTo(pb.x * ratio, pb.y * ratio);
+    ctx.stroke();
+    // The label on a pill at the midpoint, so it reads over edges.
+    const mx = ((pa.x + pb.x) / 2) * ratio;
+    const my = ((pa.y + pb.y) / 2) * ratio;
+    const w = ctx.measureText(l.label).width + 10 * ratio;
+    const h = 16 * ratio;
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
+    ctx.fillStyle = dark ? '#1e2130' : '#ffffff';
+    ctx.fillRect(mx - w / 2, my - h / 2, w, h);
+    ctx.strokeRect(mx - w / 2, my - h / 2, w, h);
+    ctx.fillStyle = stroke;
+    ctx.fillText(l.label, mx, my);
+    ctx.setLineDash([6 * ratio, 5 * ratio]);
+  }
+  ctx.restore();
+}

@@ -30,6 +30,17 @@ public class HostOccupancyController {
     return service.listForFile(fileId);
   }
 
+  @GetMapping("/{fileId}/device-moves")
+  @Operation(
+      summary = "Devices that moved to another address in the capture",
+      description =
+          "The same MAC on one address, then another (a new DHCP lease, a re-plugged cable), with"
+              + " when it left, when it arrived, its hostname on each, and each side's device key."
+              + " A MAC on two addresses at once (multi-homed) isn't a move.")
+  public java.util.List<com.tracepcap.analysis.dto.occupancy.DeviceMoveDto> moves(@PathVariable UUID fileId) {
+    return service.moves(fileId);
+  }
+
   @GetMapping("/{fileId}/hosts/{ip}/occupancies")
   @Operation(
       summary = "Which devices held this address, and when",

@@ -6,6 +6,7 @@ import { useEntityNote } from './hooks/useEntityNote';
 import { useEntityHistory } from './hooks/useEntityHistory';
 import { useIpSnapshotHistory } from './hooks/useIpSnapshotHistory';
 import { RoleSection } from './sections/RoleSection';
+import { Alert } from '@components/common/Alert';
 import { HostIdentitySection } from '@components/common/HostIdentitySection';
 import { EntityStatsSection } from './sections/EntityStatsSection';
 import { SnapshotHistoryTable } from './sections/SnapshotHistoryTable';
@@ -183,6 +184,30 @@ export function EntityDetailModal({
                 {/* Multi-snapshot context: role is edited per-snapshot in the history table below,
                     so the top card is a read-only present-day summary. */}
                 {showRole && <RoleSection fileId={fileId} role={role} readOnly={showSnapshotHistory} />}
+
+          {/* The same device on another address in this capture (it moved). */}
+          {(graphNode?.data.moves?.length ?? 0) > 0 && (
+            <Alert variant="info" className="d-flex align-items-start gap-2 p-2 mb-3 small" data-testid="node-moves">
+              <i className="bi bi-arrow-left-right mt-1 flex-shrink-0" aria-hidden="true" />
+              <div>
+                {(graphNode?.data.moves ?? []).map(m => (
+                  <div key={`${m.direction}${m.ip}${m.at}`}>
+                    {m.direction === 'to' ? (
+                      <>
+                        This device moved to <span className="font-monospace">{m.ip}</span> at {new Date(m.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </>
+                    ) : (
+                      <>
+                        This device was on <span className="font-monospace">{m.ip}</span> before {new Date(m.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </>
+                    )}
+                    {m.hostname && <> (as {m.hostname})</>}
+                    <span className="text-muted"> · same MAC, {m.evidence}</span>
+                  </div>
+                ))}
+              </div>
+            </Alert>
+          )}
 
                 {entityType === 'IP' && fileId && (
                   <HostIdentitySection

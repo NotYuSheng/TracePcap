@@ -95,6 +95,8 @@ export interface NodeData {
    *   'ttl-exceeded'     — only appeared as src of unidirectional ICMP (traceroute hop)
    */
   ghostFlags?: string[];
+  /** Other addresses this device used in the capture (#same MAC): where it moved to or from. */
+  moves?: { ip: string; direction: 'to' | 'from'; at: number; hostname?: string; evidence: string }[];
   /**
    * Set when this node is one of several devices that held the same address (#918 slice 2): the
    * node stands for that device's stretch only, and `ip` is the shared address. `of` is how many
@@ -170,6 +172,22 @@ export interface NetworkGraphData {
   hiddenNodesList?: GraphNode[];
   /** Edges where exactly one endpoint is a hidden node (cross-boundary edges). */
   crossEdges?: GraphEdge[];
+  /** One device on two shown nodes: it moved to another address in the capture. */
+  deviceLinks?: DeviceLink[];
+}
+
+/**
+ * The same device (by MAC) on two nodes: it left one address and took another during the capture.
+ * Drawn as a dashed line between the nodes, labelled with when it moved.
+ */
+export interface DeviceLink {
+  from: string;
+  to: string;
+  mac: string;
+  /** When it arrived on the new address, epoch ms. */
+  at: number;
+  /** "moved 11:05", plus a rename when its hostname changed. */
+  label: string;
 }
 
 export interface NetworkStats {

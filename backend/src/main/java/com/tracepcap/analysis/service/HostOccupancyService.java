@@ -231,6 +231,37 @@ public class HostOccupancyService {
     return out;
   }
 
+  /**
+   * Devices that moved to another address within the capture (same MAC, one address then another),
+   * with each side's device key so the graph can link the two nodes.
+   */
+  @Transactional(readOnly = true)
+  public List<com.tracepcap.analysis.dto.occupancy.DeviceMoveDto> moves(UUID fileId) {
+    requireFile(fileId);
+    var found = DeviceMoves.of(observations.findByFileId(fileId), leases.findByFileId(fileId));
+    if (found.isEmpty()) return List.of();
+    Map<String, List<IpOccupancyEntity>> rowsByIp = new HashMap<>();
+    for (var o : occupancies.findByFileIdOrderByIpAscIdxAsc(fileId)) {
+      rowsByIp.computeIfAbsent(o.getIp(), k -> new ArrayList<>()).add(o);
+    }
+    List<com.tracepcap.analysis.dto.occupancy.DeviceMoveDto> out = new ArrayList<>();
+    for (var m : found) {
+      out.add(
+          new com.tracepcap.analysis.dto.occupancy.DeviceMoveDto(
+              m.mac(), m.fromIp(), keyFor(rowsByIp, m.fromIp(), m.mac()), m.fromHostname(), m.left(),
+              m.toIp(), keyFor(rowsByIp, m.toIp(), m.mac()), m.toHostname(), m.arrived(), m.evidence()));
+    }
+    return out;
+  }
+
+  /** The device key for {@code mac} on {@code ip}: its occupancy's when the address was shared, else the IP. */
+  private static String keyFor(Map<String, List<IpOccupancyEntity>> rowsByIp, String ip, String mac) {
+    for (var o : rowsByIp.getOrDefault(ip, List.of())) {
+      if (o.getMac() != null && o.getMac().equalsIgnoreCase(mac)) return o.key();
+    }
+    return ip;
+  }
+
   private static HostOccupancyResponse.OccupancyClassification classificationOf(IpOccupancyEntity o) {
     if (o == null || o.getDeviceType() == null) return null;
     return HostOccupancyResponse.OccupancyClassification.builder()

@@ -5,6 +5,9 @@ Office Wi-Fi, 10:00 to 12:00. Alice's Windows laptop is leased 10.0.0.50 at 10:0
 browses and uses a file share, then releases the address at 10:59. At 11:00 a visitor's Android
 phone is leased the same address. From 11:32 the phone beacons to a suspicious domain once a minute.
 
+At 11:05 Alice's laptop comes back and is leased a different address, 10.0.0.73, and carries on
+with mail and the file share until 12:00: the same device on a new address.
+
 A static host (10.0.0.20, a printer) talks throughout, so the capture also has an address that
 never changes hands.
 
@@ -12,7 +15,9 @@ What TracePcap should show:
 - the host 10.0.0.50 has two occupancies: f8:bc:12:... (Dell, LAPTOP-ALICE) then 8c:71:f8:... (Samsung, Galaxy-S24),
   split by the DHCP lease to a different MAC at 11:00;
 - with per-occupancy classification (#918 slice 2), the laptop and the phone are classified
-  separately, and the beacon conversations belong to the phone.
+  separately, and the beacon conversations belong to the phone;
+- the laptop moved from 10.0.0.50 to 10.0.0.73 (same MAC, a new DHCP lease at 11:05): the graph
+  links its two nodes as one device.
 """
 import os
 from datetime import datetime, timezone
@@ -111,6 +116,20 @@ for m in range(1, 58, 4):
 add(Ether(src=LAPTOP_MAC, dst=ROUTER_MAC) / IP(src=SHARED_IP, dst=ROUTER_IP, ttl=128) / UDP(sport=68, dport=67)
     / BOOTP(op=1, ciaddr=SHARED_IP, chaddr=bytes.fromhex(LAPTOP_MAC.replace(":", "")), xid=0x1A2B0002)
     / DHCP(options=[("message-type", "release"), ("server_id", ROUTER_IP), "end"]), at(59, 0))
+
+# ── 11:05–12:00 Alice's laptop is back, on a new address ─────────────────────────
+NEW_IP = "10.0.0.73"
+dhcp_handshake(at(65, 1), LAPTOP_MAC, LAPTOP_NAME, NEW_IP, 0x1A2B0003)
+arp_announce(at(65, 2), LAPTOP_MAC, NEW_IP)
+port = 51000
+for m in range(66, 120, 4):
+    arp_announce(at(m, 0), LAPTOP_MAC, NEW_IP)
+    dns(at(m, 1), LAPTOP_MAC, NEW_IP, 128, "outlook.office365.com", "52.97.1.10", port)
+    tcp_session(at(m, 2), LAPTOP_MAC, NEW_IP, ROUTER_MAC, "52.97.1.10", port + 1, 443, 128,
+                b"\x16\x03\x01\x00\x05hello", b"\x16\x03\x03\x00\x05hello")
+    tcp_session(at(m, 3), LAPTOP_MAC, NEW_IP, FILESRV_MAC, FILESRV_IP, port + 2, 445, 128,
+                b"\x00\x00\x00\x2f\xfeSMB", b"\x00\x00\x00\x2f\xfeSMB")
+    port += 3
 
 # ── 11:00–12:00 the visitor's Android phone ────────────────────────────────────
 dhcp_handshake(at(60, 1), PHONE_MAC, PHONE_NAME, SHARED_IP, 0x3C4D0001)

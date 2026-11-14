@@ -859,6 +859,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/device-moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Devices that moved to another address in the capture
+         * @description The same MAC on one address, then another (a new DHCP lease, a re-plugged cable), with when it left, when it arrived, its hostname on each, and each side's device key. A MAC on two addresses at once (multi-homed) isn't a move.
+         */
+        get: operations["moves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/download": {
         parameters: {
             query?: never;
@@ -3083,6 +3103,20 @@ export interface components {
             macB?: string;
             nameA?: string;
             nameB?: string;
+        };
+        DeviceMoveDto: {
+            /** Format: date-time */
+            arrived?: string;
+            evidence?: string;
+            fromHostname?: string;
+            fromIp?: string;
+            fromKey?: string;
+            /** Format: date-time */
+            left?: string;
+            mac?: string;
+            toHostname?: string;
+            toIp?: string;
+            toKey?: string;
         };
         DnsQueryEntryDto: {
             /** Format: int64 */
@@ -5927,6 +5961,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["DetectionRuleDto"];
+                };
+            };
+        };
+    };
+    moves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DeviceMoveDto"][];
                 };
             };
         };
