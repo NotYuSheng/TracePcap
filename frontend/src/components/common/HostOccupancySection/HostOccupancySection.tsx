@@ -190,7 +190,14 @@ export function HostOccupancySection({ fileId, ip, focusIdx, focusLabel = 'this 
         </ol>
       ) : (
         <p className="text-muted mb-2" style={{ fontSize: '0.78rem' }}>
-          One device for the whole capture.
+          {data.networks && data.networks.length > 1 ? (
+            <>
+              A different machine on each of {data.networks.length} networks that share this range:{' '}
+              {data.networks.join(', ')}. They aren't split by time, since they were on the network at once.
+            </>
+          ) : (
+            'One device for the whole capture.'
+          )}
           {data.overlapping && (
             <> Two MACs claimed it at the same time, so it wasn't split automatically.</>
           )}

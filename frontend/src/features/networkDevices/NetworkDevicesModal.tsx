@@ -258,6 +258,7 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
                     <Button
                       type="button"
                       size="sm"
+                      variant="primary"
                       onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'same' })}
                     >
                       Same device
@@ -425,7 +426,7 @@ function DecisionModal({
         <Button type="button" variant="outline-secondary" onClick={onHide}>
           Cancel
         </Button>
-        <Button type="button" onClick={save} disabled={busy || !reason.trim()}>
+        <Button type="button" variant="primary" onClick={save} disabled={busy || !reason.trim()}>
           {same ? 'Link as one device' : 'Mark as different'}
         </Button>
       </Modal.Footer>

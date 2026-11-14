@@ -89,3 +89,4 @@ merge or link devices** permission (see :ref:`settings-permissions`).
 ``sample-files/private_mac_week1.pcap`` and ``private_mac_week2.pcap`` show it:
 add both to one network, in order, and Bob's phone (two private MACs) is
 suggested as one device while Carol's phone isn't.
+A walkthrough with screenshots: :doc:`../demos/devices-on-a-dhcp-network`.

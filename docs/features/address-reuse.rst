@@ -129,6 +129,8 @@ spread to the laptop that held the address before it.
 Try It
 ------
 
+A walkthrough with screenshots: :doc:`../demos/devices-on-a-dhcp-network`.
+
 ``sample-files/dhcp_address_reuse.pcap`` is an office Wi-Fi capture from 10:00
 to 12:00: Alice's Dell laptop holds ``10.0.0.50`` until 10:59, and a visitor's
 Samsung phone gets the same address at 11:00 and starts beaconing to a

@@ -33,6 +33,15 @@ const single = {
 }
 
 describe('HostOccupancySection (#918 item 3)', () => {
+  it('says an address used on two networks is a machine on each, not one device (#462)', async () => {
+    server.use(http.get('*/files/f1/hosts/:ip/occupancies', () =>
+      HttpResponse.json({ ...single, suggestions: [], networks: ['hq.corp.example', 'branch.corp.example'] })))
+    render(<HostOccupancySection fileId="f1" ip="192.168.1.10" />)
+    expect(await screen.findByText(/A different machine on each of 2 networks/)).toHaveTextContent('hq.corp.example, branch.corp.example')
+    expect(screen.queryByText('One device for the whole capture.')).not.toBeInTheDocument()
+  })
+
+
   it('picks another device by its key: the bare IP for the first, ip@start for a later one', async () => {
     const picked: string[] = []
     server.use(http.get('*/files/f1/hosts/:ip/occupancies', () => HttpResponse.json(reused)))
