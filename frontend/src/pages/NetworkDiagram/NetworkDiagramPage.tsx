@@ -14,6 +14,8 @@ import { edgeMatchesLegendKey } from '@/features/network/services/networkService
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
+import { TrafficTimeline } from '@/features/network/components/TrafficTimeline';
+import { activeInWindow, timeBounds, type TimeWindow } from '@/features/network/services/timeWindow';
 import type { EdgeColorMode, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
 import { edgeBytesRange } from '@components/network/NetworkGraph/NetworkGraph';
 import { VolumeHeatmap } from '@components/network/VolumeHeatmap';
@@ -358,6 +360,23 @@ export const NetworkDiagramPage = () => {
   // edges it explains.
   const edgeRange = useMemo(() => edgeBytesRange(filteredEdges), [filteredEdges]);
 
+  // Time axis: the capture's span, and what was active in the chosen window (null = all of it).
+  const [timeWindow, setTimeWindow] = useState<TimeWindow | null>(null);
+  const bounds = useMemo(() => timeBounds(edges), [edges]);
+  useEffect(() => setTimeWindow(null), [fileId]);
+  const windowActive = useMemo(
+    () => (timeWindow ? activeInWindow(filteredEdges, timeWindow) : null),
+    [filteredEdges, timeWindow],
+  );
+  const windowedEdges = useMemo(
+    () => (windowActive ? filteredEdges.filter(e => windowActive.edgeIds.has(e.id)) : filteredEdges),
+    [filteredEdges, windowActive],
+  );
+  const windowedNodes = useMemo(
+    () => (windowActive ? filteredNodes.filter(n => windowActive.nodeIds.has(n.id)) : filteredNodes),
+    [filteredNodes, windowActive],
+  );
+
   // Cross-filter: a selected heatmap cell highlights that pair in the diagram.
   // `highlightedNodes` is keyed by node *label*, not id, so translate first.
   const highlightedNodes = useMemo(() => {
@@ -587,6 +606,17 @@ export const NetworkDiagramPage = () => {
                 </Button>
               </div>
             </Card.Header>
+            {bounds && bounds.to > bounds.from && (
+              <div className="px-2 pt-2">
+                <TrafficTimeline
+                  edges={filteredEdges}
+                  bounds={bounds}
+                  window={timeWindow}
+                  onWindowChange={setTimeWindow}
+                  activeCount={windowActive ? windowActive.edgeIds.size : filteredEdges.length}
+                />
+              </div>
+            )}
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
@@ -601,6 +631,7 @@ export const NetworkDiagramPage = () => {
                 activeFilterCount={activeFilterCount}
                 edgeColorMode={edgeColorMode}
                 highlightedNodes={highlightedNodes}
+                activeInWindow={windowActive}
               />
             </Card.Body>
           </Card>
@@ -622,8 +653,8 @@ export const NetworkDiagramPage = () => {
           </Modal.Header>
           <Modal.Body className="tp-heatmap-body">
             <VolumeHeatmap
-              nodes={filteredNodes}
-              edges={filteredEdges}
+              nodes={windowedNodes}
+              edges={windowedEdges}
               dark={isDark}
               focusedHost={selectedNode?.id ?? null}
               selectedPair={selectedPair}
@@ -668,8 +699,8 @@ export const NetworkDiagramPage = () => {
           {showHeatmap && (
             <Card.Body className="tp-heatmap-body">
               <VolumeHeatmap
-                nodes={filteredNodes}
-                edges={filteredEdges}
+                nodes={windowedNodes}
+                edges={windowedEdges}
                 dark={isDark}
                 focusedHost={selectedNode?.id ?? null}
                 selectedPair={selectedPair}

@@ -46,6 +46,11 @@ interface NetworkGraphProps {
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
   /**
+   * The time axis's window: what was active in it. Nodes outside it are dimmed and edges outside it
+   * hidden, by redrawing only, so the layout never moves while the window plays. Null shows all.
+   */
+  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string> } | null;
+  /**
    * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
    * volume shades each edge by `totalBytes` on the shared volume scale — the same
    * ramp the node-to-node heatmap uses. Note an edge is one protocol/app between a
@@ -493,6 +498,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  activeInWindow = null,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -555,6 +561,12 @@ export const NetworkGraph = memo(function NetworkGraph({
     highlightedNodesRef.current = highlightedNodes;
     sigmaRef.current?.refresh();
   }, [highlightedNodes]);
+
+  const activeInWindowRef = useRef(activeInWindow);
+  useEffect(() => {
+    activeInWindowRef.current = activeInWindow;
+    sigmaRef.current?.refresh();
+  }, [activeInWindow]);
 
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
@@ -667,6 +679,13 @@ export const NetworkGraph = memo(function NetworkGraph({
           res['label'] = '';
         }
 
+        // Time axis: quiet in the window → dimmed, label kept so the node is still findable.
+        const win = activeInWindowRef.current;
+        if (win && !win.nodeIds.has(node)) {
+          res['color'] = dimColor;
+          res['zIndex'] = 0;
+        }
+
         // Compare-mode secondary
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.4);
@@ -685,6 +704,13 @@ export const NetworkGraph = memo(function NetworkGraph({
         }
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.5);
+        }
+        // Time axis: a conversation outside the window isn't drawn. An edge standing for several
+        // conversations between the same pair (deduplicateEdges joins their ids with '|') is
+        // drawn when any of them is in the window.
+        const win = activeInWindowRef.current;
+        if (win && !win.edgeIds.has(edge) && !edge.split('|').some(id => win.edgeIds.has(id))) {
+          res['hidden'] = true;
         }
         return res;
       },

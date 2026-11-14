@@ -146,6 +146,8 @@ function createEdge(conversation: Conversation, srcIp: string, dstIp: string): G
       totalBytes: conversation.totalBytes,
       conversationId: conversation.id,
       bidirectional: conversation.direction === 'bidirectional',
+      startTime: conversation.startTime,
+      endTime: conversation.endTime,
       srcPort: conversation.endpoints[0]?.port,
       dstPort: conversation.endpoints[1]?.port,
       l7Protocol: conversation.tsharkProtocol,
