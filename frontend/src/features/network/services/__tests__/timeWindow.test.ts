@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphEdge } from '../../types'
-import { activeInWindow, bytesHistogram, clampWindow, timeBounds } from '../timeWindow'
+import { activeInWindow, bytesHistogram, clampWindow, timeBounds, unseenByWindowEnd } from '../timeWindow'
 
 function edge(id: string, src: string, dst: string, start?: number, end?: number, bytes = 100): GraphEdge {
   return { id, source: src, target: dst, label: '', data: { protocol: 'TCP', packetCount: 1, totalBytes: bytes, conversationId: id, bidirectional: true, startTime: start, endTime: end } } as GraphEdge
@@ -42,5 +42,14 @@ describe('timeWindow', () => {
     expect(clampWindow(5500, 1000, { from: 1000, to: 6000 })).toEqual({ from: 5000, to: 6000 })
     expect(clampWindow(0, 1000, { from: 1000, to: 6000 })).toEqual({ from: 1000, to: 2000 })
     expect(clampWindow(0, 99999, { from: 1000, to: 6000 })).toEqual({ from: 1000, to: 6000 })
+  })
+})
+
+describe('unseenByWindowEnd', () => {
+  it('is the nodes none of whose conversations had started by the window end', () => {
+    const e = (id: string, s: string, t: string, start: number) =>
+      ({ id, source: s, target: t, label: '', data: { protocol: 'TCP', packetCount: 1, totalBytes: 1, conversationId: id, bidirectional: true, startTime: start, endTime: start + 10 } }) as never
+    const unseen = unseenByWindowEnd([e('a', 'laptop', 'mail', 100), e('b', 'phone', 'c2', 900)], { from: 0, to: 500 })
+    expect([...unseen].sort()).toEqual(['c2', 'phone'])
   })
 })

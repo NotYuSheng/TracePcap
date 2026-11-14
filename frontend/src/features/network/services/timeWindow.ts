@@ -79,3 +79,24 @@ export function clampWindow(from: number, width: number, bounds: TimeWindow): Ti
   const start = Math.min(Math.max(from, bounds.from), bounds.to - w);
   return { from: start, to: start + w };
 }
+
+/**
+ * Nodes not seen yet by the end of a window: none of their conversations had started. Hidden when
+ * the "nodes appear when first seen" option is on, so playing the window grows the network.
+ */
+export function unseenByWindowEnd(edges: GraphEdge[], w: TimeWindow): Set<string> {
+  const seen = new Set<string>();
+  const all = new Set<string>();
+  for (const e of edges) {
+    all.add(e.source);
+    all.add(e.target);
+    const s = startOf(e);
+    if (s == null || s <= 0 || s <= w.to) {
+      seen.add(e.source);
+      seen.add(e.target);
+    }
+  }
+  const out = new Set<string>();
+  for (const n of all) if (!seen.has(n)) out.add(n);
+  return out;
+}

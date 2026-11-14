@@ -112,7 +112,8 @@ export function drawDeviceLinks(
     if (!graph.hasNode(l.from) || !graph.hasNode(l.to)) continue;
     const a = sigma.getNodeDisplayData(l.from);
     const b = sigma.getNodeDisplayData(l.to);
-    if (!a || !b) continue;
+    // Not drawn while either end is hidden (not seen yet in the time window, or filtered).
+    if (!a || !b || a.hidden || b.hidden) continue;
     const pa = sigma.framedGraphToViewport({ x: a.x, y: a.y });
     const pb = sigma.framedGraphToViewport({ x: b.x, y: b.y });
     ctx.globalAlpha = 0.9;
