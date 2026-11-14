@@ -1,7 +1,7 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
+import { Button, Container, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
 import { usePreferencesSync } from '@/features/preferences/usePreferencesSync';
 import { AuthMenu } from '@/auth/AuthMenu';
@@ -179,17 +179,10 @@ export const MainLayout = () => {
         </Navbar>
       </header>
       <main className={`main-content${isFlush ? ' main-content-flush' : ''}`}>{mainContent}</main>
-      <footer className="main-footer mt-auto py-4">
-        <Container>
-          <Row>
-            <Col className="text-center text-muted">
-              <small>TracePcap &copy; 2026 - Network Traffic Analysis and Visualization Tool</small>
-              <br />
-              <small className="text-muted opacity-75">
-                {__APP_VERSION__}
-              </small>
-            </Col>
-          </Row>
+      <footer className="main-footer mt-auto">
+        <Container fluid className="main-navbar-inner d-flex justify-content-between flex-wrap gap-2 text-muted">
+          <span>TracePcap · network traffic analysis</span>
+          <span className="opacity-75">{__APP_VERSION__}</span>
         </Container>
       </footer>
     </div>
