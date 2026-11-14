@@ -19,6 +19,8 @@ public enum PermissionAction {
       "The shared subnet labels, internal/external ranges and organisations every network starts from."),
   NETWORK_SETTINGS(PermissionLevel.ANALYST, "Edit network settings",
       "Per-network settings such as when a device counts as no longer seen."),
+  NETWORK_MAP(PermissionLevel.ANALYST, "Edit network maps",
+      "Move devices between groups on a capture's network map, and reset it to automatic."),
   ANALYSIS_POLICY(PermissionLevel.ANALYST, "Edit analysis policy",
       "Which analysis tools run and how, for new analyses."),
   RETENTION(PermissionLevel.ADMIN, "Edit retention",

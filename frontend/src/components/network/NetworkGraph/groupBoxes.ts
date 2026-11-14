@@ -60,6 +60,8 @@ export function drawGroupBoxes(
   headerFor: (level: number) => number,
   dark: boolean,
   active?: Set<string> | null,
+  /** The box a dragged device would be moved into: drawn as the drop target. */
+  dropTarget?: string | null,
 ): void {
   const ratio = window.devicePixelRatio || 1;
   const w = Math.round(canvas.clientWidth * ratio);
@@ -95,6 +97,14 @@ export function drawGroupBoxes(
     ctx.strokeStyle = s.stroke;
     ctx.stroke();
     ctx.setLineDash([]);
+    if (b.id === dropTarget) {
+      const accent = dark ? '#a993ff' : '#5925dc';
+      ctx.fillStyle = hexA(accent, 0.12);
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = accent;
+      ctx.stroke();
+    }
 
     // The name, in the header band the layout left for it; shrinks with zoom, gone when unreadable.
     const band = headerFor(b.level) * scale;
@@ -105,9 +115,9 @@ export function drawGroupBoxes(
     const room = bw - padX * 2;
     if (room < 30) continue;
     const n = active ? b.memberIds.filter(id => active.has(id)).length : b.count;
-    const count = active
-      ? `${n} of ${b.count} active`
-      : `${b.count} ${b.count === 1 ? 'device' : 'devices'}`;
+    const count =
+      (active ? `${n} of ${b.count} active` : `${b.count} ${b.count === 1 ? 'device' : 'devices'}`) +
+      (b.moved ? ` · ${b.moved} moved here` : '');
     const lineY = top + Math.min(band * 0.5, size * 1.4);
     ctx.textBaseline = 'middle';
     ctx.font = `600 ${size}px Inter, system-ui, sans-serif`;

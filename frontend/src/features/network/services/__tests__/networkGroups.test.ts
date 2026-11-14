@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphNode } from '../../types'
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService'
-import { buildGroupTree, dnsNamesByIp, domainOf, layoutGroups, subnetOf, type GroupNode } from '../networkGroups'
+import { buildGroupTree, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
 
 const node = (id: string, data: Partial<GraphNode['data']> = {}): GraphNode =>
   ({ id, label: id, data: { ip: id.split(/[@~]/)[0], deviceType: 'LAPTOP_DESKTOP', ...data } }) as unknown as GraphNode
@@ -125,5 +125,26 @@ describe('networkGroups', () => {
     ])
     const types = tree[0].children[0].children[0].children
     expect(types.map(g => [g.label, g.nodeIds.length])).toEqual([['Phones and tablets', 1], ['Servers', 3]])
+  })
+
+  it("the analyst's moves: a device goes to the group it was put in; an emptied group goes", () => {
+    const nodes = [node('10.0.0.5'), node('10.0.0.53', { deviceType: 'DNS_SERVER' }), node('10.0.0.6')]
+    const auto = leafGroups(buildGroupTree(nodes))
+    const servers = [...auto.values()].find(g => g.label === 'Servers')!
+    const laptops = [...auto.values()].find(g => g.label === 'Laptops and desktops')!
+    const tree = buildGroupTree(nodes, { placements: { '10.0.0.5': servers.id, '10.0.0.6': servers.id } })
+    const leaves = leafGroups(tree)
+    expect(leaves.get(servers.id)?.nodeIds).toEqual(['10.0.0.53', '10.0.0.5', '10.0.0.6'])
+    expect(leaves.get(servers.id)?.movedIds).toEqual(['10.0.0.5', '10.0.0.6'])
+    expect(leaves.has(laptops.id)).toBe(false)
+    const box = layoutGroups(tree).boxes.find(b => b.id === servers.id)!
+    expect(box.leaf).toBe(true)
+    expect(box.moved).toBe(2)
+  })
+
+  it('a move to a group no longer on the map is skipped', () => {
+    const nodes = [node('10.0.0.5')]
+    const tree = buildGroupTree(nodes, { placements: { '10.0.0.5': 'type:gone:10.9.9.0/24:Servers', '10.9.9.9': 'x' } })
+    expect([...leafGroups(tree).values()].map(g => g.nodeIds)).toEqual([['10.0.0.5']])
   })
 })

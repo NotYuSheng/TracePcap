@@ -68,6 +68,13 @@ interface NetworkGraphProps {
   customPrivateRanges?: CustomPrivateRange[];
   /** Address → the name clients looked it up by: the network map's domain for unnamed hosts. */
   dnsNames?: Map<string, string>;
+  /** The analyst's moves on the network map (#649): device → the group they put it in. */
+  mapPlacements?: Record<string, string>;
+  /**
+   * Called when a device is dropped onto another box of the network map: move it there. Without it
+   * (no permission) a dropped device goes back to its box.
+   */
+  onMoveToGroup?: (nodeId: string, groupId: string) => void;
   /**
    * Packet replay's current moment: its packets fly along their edges. A new `key` launches them;
    * null when the replay is off.
@@ -497,6 +504,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   networkSegments = EMPTY_SEGMENTS,
   customPrivateRanges = EMPTY_RANGES,
   dnsNames,
+  mapPlacements,
+  onMoveToGroup,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -587,8 +596,12 @@ export const NetworkGraph = memo(function NetworkGraph({
   // Legend highlight: click a node type or an edge colour to pick out its nodes and edges.
   const [legendFocus, setLegendFocus] = useState<LegendFocus | null>(null);
   const legendMatchRef = useRef<{ nodes: Set<string>; edges: Set<string> } | null>(null);
-  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames });
-  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames };
+  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames, placements: mapPlacements });
+  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, placements: mapPlacements };
+  const onMoveToGroupRef = useRef(onMoveToGroup);
+  onMoveToGroupRef.current = onMoveToGroup;
+  // While a device is dragged on the network map: the box it would be dropped into.
+  const dropTargetRef = useRef<string | null>(null);
   const deviceLinksRef = useRef(deviceLinks);
   deviceLinksRef.current = deviceLinks;
   const darkRef = useRef(darkMode);
@@ -670,7 +683,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
     sigma.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [networkSegments, customPrivateRanges, dnsNames]);
+  }, [networkSegments, customPrivateRanges, dnsNames, mapPlacements]);
 
   // Work out what the legend highlight picks out, whenever it or the graph changes. A frame
   // later, so a graph rebuilt or repainted by the effects below is the one matched.
@@ -906,6 +919,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         layout?.headerFor ?? (() => 0),
         darkMode,
         activeInWindowRef.current?.nodeIds ?? null,
+        dropTargetRef.current,
       );
     });
 
@@ -1015,13 +1029,34 @@ export const NetworkGraph = memo(function NetworkGraph({
       const pos = sigma.viewportToGraph({ x, y });
       graph.setNodeAttribute(dragNode, 'x', pos.x);
       graph.setNodeAttribute(dragNode, 'y', pos.y);
+      // Network map: the innermost box under the pointer is where the device would go.
+      const layout = groupLayoutRef.current;
+      if (layout) {
+        const hit = layout.boxes.filter(b => b.leaf && pos.x >= b.x && pos.x <= b.x + b.w && -pos.y >= b.y && -pos.y <= b.y + b.h);
+        dropTargetRef.current = hit[0]?.id ?? null;
+      }
       sigma.refresh();
     };
 
     const onDragEnd = () => {
       if (!dragNode) return;
       suppressNextClick = dragMoved;
-      if (dragMoved) setNodesMoved(true);
+      const layout = groupLayoutRef.current;
+      if (layout && dragMoved) {
+        // Network map: a device always sits in a box. Dropped on another one, it moves there;
+        // anywhere else (or without the right to edit) it goes back to its own.
+        const target = dropTargetRef.current;
+        const home = layout.boxes.find(b => b.leaf && b.memberIds.includes(dragNode!));
+        dropTargetRef.current = null;
+        if (target && home && target !== home.id && onMoveToGroupRef.current) {
+          onMoveToGroupRef.current(dragNode, target);
+        } else {
+          applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+          sigma.refresh();
+        }
+      } else if (dragMoved) {
+        setNodesMoved(true);
+      }
       dragNode = null;
       dragMoved = false;
       sigma.getCamera().enable();
@@ -1331,8 +1366,8 @@ export const NetworkGraph = memo(function NetworkGraph({
             </button>
             <button
               className={`ng-ctrl-btn${layoutType === 'grouped' ? ' active' : ''}`}
-              title="Network map: grouped by network"
-              aria-label="Network map: grouped by network"
+              title="Network map: grouped by network. Drag a device onto another box to move it there"
+              aria-label="Network map: grouped by network. Drag a device onto another box to move it there"
               onClick={() => onLayoutChange('grouped')}
             >
               <i className="bi bi-grid-1x2" aria-hidden="true" />
@@ -1473,7 +1508,12 @@ function blendColor(hex: string, bg: string, alpha: number): string {
 function applyGroupedLayout(
   sigma: Sigma,
   nodes: GraphNode[],
-  grouping: { segments: NetworkSegment[]; customRanges: CustomPrivateRange[]; dnsNames?: Map<string, string> },
+  grouping: {
+    segments: NetworkSegment[];
+    customRanges: CustomPrivateRange[];
+    dnsNames?: Map<string, string>;
+    placements?: Record<string, string>;
+  },
   out: { current: GroupedLayout | null },
 ): void {
   const graph = sigma.getGraph();

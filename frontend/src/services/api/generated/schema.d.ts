@@ -1158,6 +1158,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/network-map-edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A capture's network map edits
+         * @description Which group each moved device was put in. Empty when the map was never edited.
+         */
+        get: operations["getNetworkMapEdits"];
+        /**
+         * Save a capture's network map edits
+         * @description Replaces the edits. Needs the NETWORK_MAP permission. Audited.
+         */
+        put: operations["saveNetworkMapEdits"];
+        post?: never;
+        /**
+         * Reset a capture's network map to automatic
+         * @description Drops every edit. Needs the NETWORK_MAP permission. Audited.
+         */
+        delete: operations["resetNetworkMapEdits"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/network-segments": {
         parameters: {
             query?: never;
@@ -3725,6 +3753,17 @@ export interface components {
             status?: string;
             summary?: string;
         };
+        NetworkMapEdits: {
+            placements: {
+                [key: string]: string;
+            };
+        };
+        NetworkMapEditsResponse: {
+            edits?: components["schemas"]["NetworkMapEdits"];
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+        };
         NetworkRef: {
             /** Format: uuid */
             id?: string;
@@ -3959,7 +3998,7 @@ export interface components {
         };
         PermissionDto: {
             /** @enum {string} */
-            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
             allowed?: boolean;
             /** @enum {string} */
             defaultLevel?: "ANALYST" | "ADMIN";
@@ -6386,6 +6425,74 @@ export interface operations {
             };
         };
     };
+    getNetworkMapEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkMapEditsResponse"];
+                };
+            };
+        };
+    };
+    saveNetworkMapEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkMapEdits"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkMapEditsResponse"];
+                };
+            };
+        };
+    };
+    resetNetworkMapEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     segments: {
         parameters: {
             query?: never;
@@ -8068,7 +8175,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "ANALYSIS_POLICY" | "RETENTION";
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
             };
             cookie?: never;
         };
