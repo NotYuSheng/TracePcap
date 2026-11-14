@@ -25,6 +25,9 @@ export const API_ENDPOINTS = {
   NETWORK_SUBNET: (networkId: string, subnetId: number) => `/monitor/networks/${networkId}/subnets/${subnetId}`,
   NETWORK_PRIVATE_RANGES: (networkId: string) => `/monitor/networks/${networkId}/custom-private-ranges`,
   NETWORK_PRIVATE_RANGE: (networkId: string, id: number) => `/monitor/networks/${networkId}/custom-private-ranges/${id}`,
+  /** A network's devices across its snapshots, by MAC (#918 slice 4). */
+  NETWORK_DEVICES: (networkId: string) => `/monitor/networks/${networkId}/devices`,
+  NETWORK_DEVICE_COUNTS: (networkId: string) => `/monitor/networks/${networkId}/device-counts`,
   NETWORK_ORG_RULES: (networkId: string) => `/monitor/networks/${networkId}/ip-org-rules`,
   NETWORK_ORG_RULE: (networkId: string, id: number) => `/monitor/networks/${networkId}/ip-org-rules/${id}`,
   /** Every address more than one device held, with each device's classification (#918 slice 2). */

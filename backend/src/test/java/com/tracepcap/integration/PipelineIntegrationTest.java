@@ -750,6 +750,50 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * A network's devices across snapshots (#918 slice 4a): grouped by MAC, a reused address counts
+   * per device, and a MAC answering as two machines is flagged.
+   */
+  @Test
+  void networkDevices_groupByMac_perDevice_withIrregularities() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"devices-net\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    assertThat(rest.postForEntity("/api/v1/monitor/networks/" + net + "/snapshots",
+            json("{\"fileId\":\"" + fileId + "\"}"), JsonNode.class).getStatusCode().is2xxSuccessful()).isTrue();
+
+    JsonNode page = rest.getForEntity("/api/v1/monitor/networks/" + net + "/devices?pageSize=100", JsonNode.class).getBody();
+    java.util.Map<String, JsonNode> byMac = new java.util.HashMap<>();
+    for (JsonNode d : page.get("data")) byMac.put(d.get("mac").asText(), d);
+    // The laptop and the phone shared 10.0.0.50 but are two devices.
+    assertThat(byMac).containsKeys("bb:bb:bb:00:00:01", "cc:cc:cc:00:00:02");
+    assertThat(byMac.get("cc:cc:cc:00:00:02").get("name").asText()).isEqualTo("iPhone-Bob");
+    assertThat(byMac.get("cc:cc:cc:00:00:02").get("lastKey").asText()).startsWith("10.0.0.50@");
+    assertThat(byMac.get("bb:bb:bb:00:00:01").get("addresses").get(0).get("ip").asText()).isEqualTo("10.0.0.50");
+    // The cloned VMs: one MAC answering as Linux and Windows at once.
+    JsonNode clone = byMac.get("ee:ee:ee:00:00:09");
+    assertThat(clone).isNotNull();
+    assertThat(clone.get("flags").toString()).contains("duplicate-mac");
+    // A router failover pair's shared address isn't a device.
+    assertThat(byMac).doesNotContainKey("00:00:5e:00:01:0a");
+
+    JsonNode irregular = rest.getForEntity("/api/v1/monitor/networks/" + net + "/devices?show=irregular", JsonNode.class).getBody();
+    assertThat(irregular.get("data").toString()).contains("ee:ee:ee:00:00:09").doesNotContain("bb:bb:bb:00:00:01");
+    JsonNode searched = rest.getForEntity("/api/v1/monitor/networks/" + net + "/devices?q=iphone", JsonNode.class).getBody();
+    assertThat(searched.get("total").asLong()).isEqualTo(1);
+    JsonNode counts = rest.getForEntity("/api/v1/monitor/networks/" + net + "/device-counts", JsonNode.class).getBody();
+    assertThat(counts.get("all").asLong()).isEqualTo(page.get("total").asLong());
+    assertThat(counts.get("irregular").asLong()).isPositive();
+    assertThat(rest.getForEntity("/api/v1/monitor/networks/" + java.util.UUID.randomUUID() + "/devices", JsonNode.class)
+            .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

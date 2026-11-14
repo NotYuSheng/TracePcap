@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_12"];
+        get: operations["list_13"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,7 +478,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         /**
          * Set a custom private range in the shared default
@@ -522,7 +522,7 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         /** Create a global detection rule (audited) */
         post: operations["create_5"];
@@ -849,7 +849,7 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
         post: operations["create_4"];
@@ -1146,7 +1146,7 @@ export interface paths {
             cookie?: never;
         };
         /** The networks this capture is a snapshot of */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1186,7 +1186,7 @@ export interface paths {
          * Every address that more than one device held
          * @description Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.
          */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1331,7 +1331,7 @@ export interface paths {
             cookie?: never;
         };
         /** List IP organization rules */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         /**
          * Set an IP organization rule in the shared default
@@ -1426,7 +1426,7 @@ export interface paths {
             cookie?: never;
         };
         /** List annotations for a network */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         /** Create an annotation */
         post: operations["create_2"];
@@ -1572,7 +1572,7 @@ export interface paths {
             cookie?: never;
         };
         /** This network's own rules */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         /**
          * Add a rule to this network (audited)
@@ -1618,6 +1618,43 @@ export interface paths {
         post?: never;
         /** Switch a global rule back on in this network's views (audited) */
         delete: operations["unsuppress"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many devices a network has: all, irregular, and with a private MAC */
+        get: operations["counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A network's devices across its snapshots
+         * @description One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.
+         */
+        get: operations["list_4"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2459,6 +2496,13 @@ export interface components {
             fileId: string;
             subnetOverrides?: components["schemas"]["SubnetOverrideInput"][];
         };
+        Address: {
+            /** Format: int32 */
+            firstSnapshot?: number;
+            ip?: string;
+            /** Format: int32 */
+            lastSnapshot?: number;
+        };
         AnalysisProgressResponse: {
             /** Format: int32 */
             percent?: number;
@@ -3126,6 +3170,11 @@ export interface components {
             source?: string;
             summary?: string;
         };
+        Flag: {
+            kind?: string;
+            severity?: string;
+            text?: string;
+        };
         GenerateInsightRequest: {
             audience?: string;
             focus?: string;
@@ -3416,6 +3465,28 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        NetworkDeviceCountsDto: {
+            /** Format: int64 */
+            all?: number;
+            /** Format: int64 */
+            irregular?: number;
+            /** Format: int64 */
+            privateMac?: number;
+        };
+        NetworkDeviceDto: {
+            addresses?: components["schemas"]["Address"][];
+            deviceType?: string;
+            flags?: components["schemas"]["Flag"][];
+            label?: string;
+            /** Format: uuid */
+            lastFileId?: string;
+            lastKey?: string;
+            mac?: string;
+            macKind?: string;
+            name?: string;
+            seenInFileIds?: string[];
+            vendor?: string;
+        };
         NetworkDto: {
             /** Format: date-time */
             createdAt?: string;
@@ -3651,6 +3722,17 @@ export interface components {
         };
         PagedResponseFileMetadataDto: {
             data?: components["schemas"]["FileMetadataDto"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PagedResponseNetworkDeviceDto: {
+            data?: components["schemas"]["NetworkDeviceDto"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -4263,7 +4345,7 @@ export interface operations {
             };
         };
     };
-    list_12: {
+    list_13: {
         parameters: {
             query?: {
                 page?: number;
@@ -4898,7 +4980,7 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    list_12: {
         parameters: {
             query?: never;
             header?: never;
@@ -4962,7 +5044,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: {
                 fileId?: string;
@@ -5643,7 +5725,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -6041,7 +6123,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -6085,7 +6167,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -6280,7 +6362,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -6476,7 +6558,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -6764,7 +6846,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -6875,6 +6957,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkDeviceCountsDto"];
+                };
+            };
+        };
+    };
+    list_4: {
+        parameters: {
+            query?: {
+                q?: string;
+                show?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseNetworkDeviceDto"];
+                };
             };
         };
     };

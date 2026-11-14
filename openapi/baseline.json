@@ -35,6 +35,22 @@
         ],
         "type": "object"
       },
+      "Address": {
+        "properties": {
+          "firstSnapshot": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "lastSnapshot": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "AnalysisProgressResponse": {
         "properties": {
           "percent": {
@@ -1882,6 +1898,20 @@
         },
         "type": "object"
       },
+      "Flag": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GenerateInsightRequest": {
         "properties": {
           "audience": {
@@ -2707,6 +2737,72 @@
         },
         "type": "object"
       },
+      "NetworkDeviceCountsDto": {
+        "properties": {
+          "all": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "irregular": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "privateMac": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NetworkDeviceDto": {
+        "properties": {
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "type": "array"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/Flag"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": "string"
+          },
+          "lastFileId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lastKey": {
+            "type": "string"
+          },
+          "mac": {
+            "type": "string"
+          },
+          "macKind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "seenInFileIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "vendor": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NetworkDto": {
         "properties": {
           "createdAt": {
@@ -3321,6 +3417,33 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/FileMetadataDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseNetworkDeviceDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkDeviceDto"
             },
             "type": "array"
           },
@@ -4935,7 +5058,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_12",
+        "operationId": "list_13",
         "parameters": [
           {
             "in": "query",
@@ -6445,7 +6568,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_11",
+        "operationId": "list_12",
         "responses": {
           "200": {
             "content": {
@@ -6526,7 +6649,7 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_10",
+        "operationId": "list_11",
         "parameters": [
           {
             "in": "query",
@@ -7687,7 +7810,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_9",
+        "operationId": "list_10",
         "parameters": [
           {
             "in": "path",
@@ -8374,7 +8497,7 @@
     },
     "/api/v1/files/{fileId}/networks": {
       "get": {
-        "operationId": "list_8",
+        "operationId": "list_9",
         "parameters": [
           {
             "in": "path",
@@ -8447,7 +8570,7 @@
     "/api/v1/files/{fileId}/occupancies": {
       "get": {
         "description": "Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.",
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "path",
@@ -8772,7 +8895,7 @@
     },
     "/api/v1/ip-org-rules": {
       "get": {
-        "operationId": "list_6",
+        "operationId": "list_7",
         "responses": {
           "200": {
             "content": {
@@ -9021,7 +9144,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/annotations": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_6",
         "parameters": [
           {
             "in": "path",
@@ -9504,7 +9627,7 @@
     },
     "/api/v1/monitor/networks/{networkId}/detection-rules": {
       "get": {
-        "operationId": "list_4",
+        "operationId": "list_5",
         "parameters": [
           {
             "in": "path",
@@ -9687,6 +9810,107 @@
         "summary": "Switch a global rule off in this network's views (audited, idempotent)",
         "tags": [
           "Network Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/device-counts": {
+      "get": {
+        "operationId": "counts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkDeviceCountsDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "How many devices a network has: all, irregular, and with a private MAC",
+        "tags": [
+          "Network Devices"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/devices": {
+      "get": {
+        "description": "One row per MAC: the addresses it used, the snapshots it was seen in, its label and any irregularities (duplicate MAC, virtual machine or container MAC, private MAC). show = irregular or private narrows the list; q searches name, MAC, address, vendor and label. Most recently seen first.",
+        "operationId": "list_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "show",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseNetworkDeviceDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A network's devices across its snapshots",
+        "tags": [
+          "Network Devices"
         ]
       }
     },
@@ -12008,6 +12232,10 @@
     {
       "description": "The current caller: identity, admin status and permissions",
       "name": "Me"
+    },
+    {
+      "description": "Devices across a monitored network's snapshots",
+      "name": "Network Devices"
     },
     {
       "description": "Packet-level conversation trace with AI explanations",
