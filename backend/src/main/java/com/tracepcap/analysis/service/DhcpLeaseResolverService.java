@@ -44,12 +44,27 @@ public class DhcpLeaseResolverService {
    */
   public record Lease(
       String ip, String mac, String hostname, LocalDateTime firstSeen, LocalDateTime lastSeen,
-      String fingerprint, String vendorClass) {
+      String fingerprint, String vendorClass, Network network) {
 
     public Lease(String ip, String mac, String hostname, LocalDateTime firstSeen, LocalDateTime lastSeen) {
-      this(ip, mac, hostname, firstSeen, lastSeen, null, null);
+      this(ip, mac, hostname, firstSeen, lastSeen, null, null, null);
+    }
+
+    public Lease(
+        String ip, String mac, String hostname, LocalDateTime firstSeen, LocalDateTime lastSeen,
+        String fingerprint, String vendorClass) {
+      this(ip, mac, hostname, firstSeen, lastSeen, fingerprint, vendorClass, null);
     }
   }
+
+  /**
+   * Which network the lease came from (#462), from the server's ACK: the server's MAC and
+   * identifier (option 54), the router (3), domain (15), lease time in seconds (51), subnet mask (1),
+   * and the 802.1Q VLAN the ACK was tagged with. Two networks using one range differ here.
+   */
+  public record Network(
+      String serverMac, String serverId, String router, String domain, Long leaseSeconds,
+      String subnetMask, Integer vlanId) {}
 
   public List<Lease> resolve(File pcapFile) {
     Map<String, Lease> leases = new LinkedHashMap<>();
@@ -87,7 +102,21 @@ public class DhcpLeaseResolverService {
             "-e",
             "dhcp.option.request_list_item",
             "-e",
-            "dhcp.option.vendor_class_id");
+            "dhcp.option.vendor_class_id",
+            "-e",
+            "eth.src",
+            "-e",
+            "dhcp.option.dhcp_server_id",
+            "-e",
+            "dhcp.option.router",
+            "-e",
+            "dhcp.option.domain_name",
+            "-e",
+            "dhcp.option.ip_address_lease_time",
+            "-e",
+            "dhcp.option.subnet_mask",
+            "-e",
+            "vlan.id");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -162,6 +191,8 @@ public class DhcpLeaseResolverService {
     String vendorClass = f.length > 8 && !f[8].isBlank() ? first(f[8]) : null;
     if (vendorClass != null && vendorClass.length() > 255) vendorClass = vendorClass.substring(0, 255);
     f = java.util.Arrays.stream(f).map(DhcpLeaseResolverService::first).toArray(String[]::new);
+    // The network the server's ACK names (#462); a REQUEST's eth.src is the client, so ACKs only.
+    Network network = "5".equals(f[1].trim()) && f.length > 15 ? network(f) : null;
     LocalDateTime at;
     try {
       double epoch = Double.parseDouble(f[0].trim());
@@ -185,7 +216,7 @@ public class DhcpLeaseResolverService {
     String key = ip + "|" + mac;
     Lease prev = leases.get(key);
     if (prev == null) {
-      leases.put(key, new Lease(ip, mac, hostname, at, at, fingerprint, vendorClass));
+      leases.put(key, new Lease(ip, mac, hostname, at, at, fingerprint, vendorClass, network));
     } else {
       leases.put(
           key,
@@ -196,8 +227,39 @@ public class DhcpLeaseResolverService {
               at.isBefore(prev.firstSeen()) ? at : prev.firstSeen(),
               at.isAfter(prev.lastSeen()) ? at : prev.lastSeen(),
               fingerprint != null ? fingerprint : prev.fingerprint(),
-              vendorClass != null ? vendorClass : prev.vendorClass()));
+              vendorClass != null ? vendorClass : prev.vendorClass(),
+              network != null ? network : prev.network()));
     }
+  }
+
+  private static Network network(String[] f) {
+    String serverMac = blank(f[9]) ? null : f[9].trim().toLowerCase();
+    Long lease = null;
+    try {
+      if (!blank(f[13])) lease = Long.parseLong(f[13].trim());
+    } catch (NumberFormatException ignored) {
+      // tshark may print the lease as text; leave it unknown
+    }
+    Integer vlan = null;
+    try {
+      if (f.length > 15 && !blank(f[15])) vlan = Integer.parseInt(f[15].trim());
+    } catch (NumberFormatException ignored) {
+      // not a VLAN id
+    }
+    Network n =
+        new Network(serverMac, cut(f[10], 45), cut(f[11], 45), cut(f[12], 255), lease,
+            f.length > 14 ? cut(f[14], 45) : null, vlan);
+    return n.serverMac() == null && n.serverId() == null && n.vlanId() == null ? null : n;
+  }
+
+  private static boolean blank(String s) {
+    return s == null || s.isBlank();
+  }
+
+  private static String cut(String s, int max) {
+    if (blank(s)) return null;
+    String t = s.trim();
+    return t.length() > max ? t.substring(0, max) : t;
   }
 
   /** The first of an aggregated field's values. */

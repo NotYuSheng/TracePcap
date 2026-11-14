@@ -17,6 +17,11 @@ public class HostOccupancyResponse {
   boolean overlapping;
   /** A failover virtual address: shared by design, never split automatically. */
   boolean virtualAddress;
+  /**
+   * The networks this address was leased on, when more than one network uses its range (#462):
+   * then it's a different machine on each, and isn't split into devices over time.
+   */
+  List<String> networks;
   List<Occupancy> occupancies;
   List<Decision> decisions;
   List<Suggestion> suggestions;

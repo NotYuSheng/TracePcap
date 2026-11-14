@@ -1138,6 +1138,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/network-segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The networks a capture holds
+         * @description Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.
+         */
+        get: operations["segments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/networks": {
         parameters: {
             query?: never;
@@ -2716,6 +2736,11 @@ export interface components {
             direction?: string;
             text?: string;
         };
+        Client: {
+            hostname?: string;
+            ip?: string;
+            mac?: string;
+        };
         ClusterEdgeDto: {
             /** Format: int64 */
             conversationCount?: number;
@@ -3382,6 +3407,7 @@ export interface components {
             ip?: string;
             /** Format: date-time */
             lastActivity?: string;
+            networks?: string[];
             occupancies?: components["schemas"]["Occupancy"][];
             overlapping?: boolean;
             suggestions?: components["schemas"]["Suggestion"][];
@@ -3646,6 +3672,10 @@ export interface components {
             id?: string;
             name?: string;
         };
+        NetworkSegmentsResponse: {
+            overlaps?: components["schemas"]["Overlap"][];
+            segments?: components["schemas"]["Segment"][];
+        };
         NetworkSettingsDto: {
             /** @enum {string} */
             inactivityMode: "SNAPSHOTS" | "DAYS";
@@ -3740,6 +3770,11 @@ export interface components {
             /** Format: date-time */
             at: string;
             reason: string;
+        };
+        Overlap: {
+            cidr?: string;
+            segmentKeys?: string[];
+            sharedAddresses?: string[];
         };
         OverrideDto: {
             actor?: string;
@@ -4028,6 +4063,19 @@ export interface components {
             srcIp?: string;
             /** Format: int32 */
             srcPort?: number;
+        };
+        Segment: {
+            cidr?: string;
+            clients?: components["schemas"]["Client"][];
+            domains?: string[];
+            key?: string;
+            label?: string;
+            leaseSeconds?: number[];
+            routers?: string[];
+            serverIds?: string[];
+            serverMac?: string;
+            /** Format: int32 */
+            vlanId?: number;
         };
         ServiceServerSummaryDto: {
             /** Format: double */
@@ -6218,6 +6266,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CaseKnowledgeResponse"];
+                };
+            };
+        };
+    };
+    segments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NetworkSegmentsResponse"];
                 };
             };
         };

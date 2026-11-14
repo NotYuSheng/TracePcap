@@ -43,6 +43,35 @@ public class DhcpLeaseEntity {
   @Column(name = "vendor_class", length = 255)
   private String vendorClass;
 
+  // ── The network the lease came from (#462), from the server's ACK ─────────────
+
+  @Column(name = "server_mac", length = 50)
+  private String serverMac;
+
+  /** DHCP option 54. */
+  @Column(name = "server_id", length = 45)
+  private String serverId;
+
+  /** DHCP option 3. */
+  @Column(length = 45)
+  private String router;
+
+  /** DHCP option 15. */
+  @Column(length = 255)
+  private String domain;
+
+  /** DHCP option 51. */
+  @Column(name = "lease_seconds")
+  private Long leaseSeconds;
+
+  /** DHCP option 1. */
+  @Column(name = "subnet_mask", length = 45)
+  private String subnetMask;
+
+  /** The 802.1Q VLAN the ACK was tagged with. */
+  @Column(name = "vlan_id")
+  private Integer vlanId;
+
   @Column(name = "first_seen", nullable = false)
   private LocalDateTime firstSeen;
 

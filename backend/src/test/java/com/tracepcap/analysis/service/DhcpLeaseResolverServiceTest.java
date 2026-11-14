@@ -61,4 +61,16 @@ class DhcpLeaseResolverServiceTest {
         .extracting(DhcpLeaseResolverService.Lease::fingerprint)
         .containsExactly("1,121,3,6,15,108,114,119,252");
   }
+
+  /** The network each ACK names (#462): the real tshark pass over two sites on one range. */
+  @Test
+  void readsWhichNetworkEachLeaseCameFrom() throws Exception {
+    assumeTrue(new ProcessBuilder("tshark", "-v").start().waitFor() == 0, "tshark not installed");
+    var found = new DhcpLeaseResolverService().resolve(new File("src/test/resources/fixtures/two_sites_overlap_untagged.pcap"));
+    assertThat(found)
+        .filteredOn(l -> l.ip().equals("192.168.1.10") && l.network() != null)
+        .extracting(l -> l.network().domain() + "|" + l.network().serverMac() + "|" + l.network().leaseSeconds())
+        .containsExactlyInAnyOrder(
+            "hq.corp.example|00:1b:21:aa:00:01|86400", "branch.corp.example|00:1b:21:bb:00:01|3600");
+  }
 }

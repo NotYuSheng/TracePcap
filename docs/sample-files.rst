@@ -35,6 +35,11 @@ Included Files
        its own. Add both to one network to see the suggestion (see
        :doc:`features/network-devices`). Regenerate with
        ``python3 sample-files/gen_private_mac_rotation.py``.
+   * - ``two_sites_overlap.pcap``, ``two_sites_overlap_untagged.pcap``
+     - Two sites, HQ and Branch, both on ``192.168.1.0/24``, in one capture:
+       with VLAN tags, and without. TracePcap tells them apart by VLAN or by
+       each site's DHCP server (see :doc:`features/overlapping-networks`).
+       Regenerate with ``python3 sample-files/gen_overlapping_sites.py``.
    * - ``monitor_large/week1_baseline.pcap`` … ``week8_near_baseline.pcap``
      - Eight weekly captures from the **Office Audit demo scenario**. Used to
        demonstrate the Network Monitor, subnet detection, node role annotation,
