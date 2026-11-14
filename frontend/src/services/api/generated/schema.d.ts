@@ -1167,7 +1167,7 @@ export interface paths {
         };
         /**
          * A capture's network map edits
-         * @description Which group each moved device was put in. Empty when the map was never edited.
+         * @description Which group each moved device was put in, the analyst's own groups, and the names and notes they gave groups. Empty when the map was never edited.
          */
         get: operations["getNetworkMapEdits"];
         /**
@@ -3754,7 +3754,14 @@ export interface components {
             summary?: string;
         };
         NetworkMapEdits: {
-            placements: {
+            groups?: components["schemas"]["UserGroup"][];
+            names?: {
+                [key: string]: string;
+            };
+            notes?: {
+                [key: string]: string;
+            };
+            placements?: {
                 [key: string]: string;
             };
         };
@@ -4514,6 +4521,11 @@ export interface components {
             networkId?: string;
             segmentKey?: string;
             segmentLabel?: string;
+        };
+        UserGroup: {
+            id: string;
+            name: string;
+            parentId: string;
         };
         WebServerDetailResponse: {
             api?: boolean;

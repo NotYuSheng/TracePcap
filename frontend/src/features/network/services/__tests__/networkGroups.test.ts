@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GraphNode } from '../../types'
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService'
-import { buildGroupTree, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
+import { allGroups, buildGroupTree, dnsNamesByIp, domainOf, layoutGroups, leafGroups, subnetOf, type GroupNode } from '../networkGroups'
 
 const node = (id: string, data: Partial<GraphNode['data']> = {}): GraphNode =>
   ({ id, label: id, data: { ip: id.split(/[@~]/)[0], deviceType: 'LAPTOP_DESKTOP', ...data } }) as unknown as GraphNode
@@ -146,5 +146,33 @@ describe('networkGroups', () => {
     const nodes = [node('10.0.0.5')]
     const tree = buildGroupTree(nodes, { placements: { '10.0.0.5': 'type:gone:10.9.9.0/24:Servers', '10.9.9.9': 'x' } })
     expect([...leafGroups(tree).values()].map(g => g.nodeIds)).toEqual([['10.0.0.5']])
+  })
+
+  it("the analyst's own groups: inside their parent, kept when empty, devices can be moved in", () => {
+    const nodes = [node('10.0.0.5'), node('10.0.0.6')]
+    const net = buildGroupTree(nodes)[0].children[0]
+    const mine = { id: 'user:a1', name: 'Payments', parentId: net.id }
+    const empty = buildGroupTree(nodes, { userGroups: [mine] })
+    const g = allGroups(empty).get('user:a1')!
+    expect(g).toMatchObject({ kind: 'user', label: 'Payments', level: net.level + 1, nodeIds: [] })
+    expect(layoutGroups(empty).boxes.find(b => b.id === 'user:a1')).toMatchObject({ leaf: true, count: 0 })
+    const moved = buildGroupTree(nodes, { userGroups: [mine], placements: { '10.0.0.5': 'user:a1' } })
+    expect(allGroups(moved).get('user:a1')!.nodeIds).toEqual(['10.0.0.5'])
+  })
+
+  it('a group of your own inside a box of devices is skipped (boxes hold groups or devices)', () => {
+    const nodes = [node('10.0.0.5')]
+    const leaf = [...leafGroups(buildGroupTree(nodes)).values()][0]
+    const tree = buildGroupTree(nodes, { userGroups: [{ id: 'user:x', name: 'X', parentId: leaf.id }] })
+    expect(allGroups(tree).has('user:x')).toBe(false)
+  })
+
+  it('names and notes: a renamed group keeps its automatic name; the note goes on the box', () => {
+    const nodes = [node('10.0.0.5')]
+    const tree = buildGroupTree(nodes, { names: { local: 'Head office' }, notes: { local: 'Floor 3' } })
+    expect(tree[0]).toMatchObject({ label: 'Head office', autoLabel: 'Your networks', note: 'Floor 3' })
+    const box = layoutGroups(tree).boxes.find(b => b.id === 'local')!
+    expect(box.note).toBe('Floor 3')
+    expect(box.header).toBeGreaterThan(layoutGroups(buildGroupTree(nodes)).boxes.find(b => b.id === 'local')!.header)
   })
 })
