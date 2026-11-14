@@ -33,6 +33,8 @@ Part 1: one address, two devices
      - The laptop releases the address and leaves.
    * - 11:00
      - A visitor's Samsung phone is leased the same ``10.0.0.50`` as ``Galaxy-S24``.
+   * - 11:05
+     - Alice's laptop comes back and gets a **new** address, ``10.0.0.73``.
    * - 11:32
      - The phone starts **beaconing** to ``update-check.cdn-telemetry.top`` once a minute.
 
@@ -48,7 +50,8 @@ tool blames Alice.
          and Galaxy-S24 (Mobile, Samsung).
 
    ``LAPTOP-ALICE`` (Laptop / Desktop, Dell, TTL 128) and ``Galaxy-S24`` (Mobile, Samsung, TTL 64)
-   both on ``10.0.0.50``. The beacon's edges, to ``185.220.101.77``, are on the phone.
+   both on ``10.0.0.50``. The beacon's edges, to ``185.220.101.77``, are on the phone. The dashed
+   line joins the laptop's two nodes: it moved to ``10.0.0.73`` at 11:05.
 
 Each conversation goes to the device that held the address when it started, so the beacon lands on
 the phone and Alice's laptop is clean.
@@ -69,6 +72,16 @@ chart, or press **Play**:
          its beacon to 185.220.101.77 and its Google traffic; the laptop's traffic is gone.
 
    Late in the capture the phone holds it, and its beaconing to ``185.220.101.77`` shows up.
+
+**The laptop moved, too.** When Alice came back she got ``10.0.0.73``. Same MAC, new DHCP lease:
+TracePcap links the two nodes as one device, and the new address's details say where it came from
+(see :doc:`../features/device-moves`):
+
+.. figure:: images/moved-node.png
+   :alt: The host details for 10.0.0.73: "This device was on 10.0.0.50 before 11:05 (as
+         LAPTOP-ALICE), same MAC, DHCP lease", above its identity.
+
+   ``10.0.0.73`` is Alice's laptop, back on a new lease.
 
 **Why TracePcap split it.** Click the phone's node. Under **Devices on this address**:
 

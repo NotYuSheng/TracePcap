@@ -6,7 +6,9 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import { EdgeArrowProgram } from 'sigma/rendering';
 import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
-import { animatedEdges, drawParticles } from './trafficParticles';
+import { animatedEdges, drawDeviceLinks, drawParticles } from './trafficParticles';
+
+const EMPTY_LINKS: { from: string; to: string; label: string }[] = [];
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
@@ -53,6 +55,8 @@ interface NetworkGraphProps {
   activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string> } | null;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
   animateTraffic?: boolean;
+  /** One device on two nodes (it moved to another address): drawn as dashed links. */
+  deviceLinks?: { from: string; to: string; label: string }[];
   /**
    * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
    * volume shades each edge by `totalBytes` on the shared volume scale — the same
@@ -169,7 +173,7 @@ function buildNodeLines(node: GraphNode, cfg: NodeLabelConfig): string[] {
 
 function drawNodeLabel(
   ctx: CanvasRenderingContext2D,
-  data: { x: number; y: number; size: number; label: string | null; color: string },
+  data: { key?: string; x: number; y: number; size: number; label: string | null; color: string },
   labelColor: string,
   nodeFill: string,
   ntMap: Map<string, string>,
@@ -179,10 +183,14 @@ function drawNodeLabel(
   contestedMap?: Map<string, boolean>,
 ): void {
   const { x, y, size, label, color: accentColor } = data;
-  const nodeType = ntMap.get(label ?? '') ?? 'unknown';
-  const deviceType = dtMap.get(label ?? '') ?? '';
+  // The per-node sidecars are keyed by node id: two nodes can share a label (one device that moved
+  // to another address, or two devices that shared one, both named by the same hostname).
+  const id = data.key ?? label ?? '';
+  const nodeType = ntMap.get(id) ?? 'unknown';
+  const deviceType = dtMap.get(id) ?? '';
+  // Change highlights (Monitor) name nodes by their label (IP or MAC).
   const highlight = label ? hlMap?.get(label) : undefined;
-  const contested = label ? contestedMap?.get(label) ?? false : false;
+  const contested = contestedMap?.get(id) ?? false;
 
   // Outer glow ring for highlighted (changed) nodes
   if (highlight) {
@@ -230,7 +238,7 @@ function drawNodeLabel(
 
   // Text label(s) below — one line per configured field.
   // An empty label means the node is dimmed (hover) and should draw no text.
-  const lines = label ? linesMap.get(label) ?? [label] : [];
+  const lines = label ? linesMap.get(id) ?? linesMap.get(label) ?? [label] : [];
   if (lines.length > 0) {
     ctx.font = `500 11px Inter, system-ui, sans-serif`;
     ctx.fillStyle = labelColor;
@@ -504,6 +512,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   highlightedNodes,
   activeInWindow = null,
   animateTraffic = false,
+  deviceLinks = EMPTY_LINKS,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -569,8 +578,13 @@ export const NetworkGraph = memo(function NetworkGraph({
 
   // Traffic dots: an overlay canvas over Sigma's, redrawn every frame while on (and the tab shows).
   const particlesRef = useRef<HTMLCanvasElement>(null);
+  const deviceLinksRef = useRef(deviceLinks);
+  deviceLinksRef.current = deviceLinks;
+  const darkRef = useRef(darkMode);
+  darkRef.current = darkMode;
+  const hasLinks = deviceLinks.length > 0;
   useEffect(() => {
-    if (!animateTraffic) {
+    if (!animateTraffic && !hasLinks) {
       const c = particlesRef.current;
       c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
       return;
@@ -599,11 +613,14 @@ export const NetworkGraph = memo(function NetworkGraph({
         lastSize = size;
       }
       const ctx = canvas.getContext('2d');
-      if (ctx) drawParticles(ctx, sigma, edges, now);
+      if (!ctx) return;
+      if (animateTraffic) drawParticles(ctx, sigma, edges, now);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawDeviceLinks(ctx, sigma, deviceLinksRef.current, darkRef.current);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [animateTraffic]);
+  }, [animateTraffic, hasLinks]);
 
   const activeInWindowRef = useRef(activeInWindow);
   useEffect(() => {
@@ -614,7 +631,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
     const lines = new Map<string, string[]>();
-    for (const n of nodesRef.current) lines.set(n.label, buildNodeLines(n, nodeLabelConfig));
+    for (const n of nodesRef.current) lines.set(n.id, buildNodeLines(n, nodeLabelConfig));
     nodeLinesByLabel.current = lines;
     sigmaRef.current?.refresh();
   }, [nodeLabelConfig]);
@@ -677,7 +694,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     // config change alone doesn't force a full graph rebuild + relayout (handled below).
     const initialCfg = useStore.getState().nodeLabelConfig;
     const initialLines = new Map<string, string[]>();
-    for (const n of nodes) initialLines.set(n.label, buildNodeLines(n, initialCfg));
+    for (const n of nodes) initialLines.set(n.id, buildNodeLines(n, initialCfg));
     nodeLinesByLabel.current = initialLines;
 
     const bgColor = darkMode ? DARK_BG : LIGHT_BG;
@@ -888,12 +905,10 @@ export const NetworkGraph = memo(function NetworkGraph({
       nodeTypeByLabel.current.clear();
       deviceTypeByLabel.current.clear();
       contestedByLabel.current.clear();
-      graph.forEachNode((_node, attrs) => {
-        const label = attrs['label'] as string ?? '';
-        if (!label) return;
-        nodeTypeByLabel.current.set(label, attrs['nodeType'] as string ?? 'unknown');
-        deviceTypeByLabel.current.set(label, attrs['deviceType'] as string ?? '');
-        if (attrs['identityContested']) contestedByLabel.current.set(label, true);
+      graph.forEachNode((node, attrs) => {
+        nodeTypeByLabel.current.set(node, attrs['nodeType'] as string ?? 'unknown');
+        deviceTypeByLabel.current.set(node, attrs['deviceType'] as string ?? '');
+        if (attrs['identityContested']) contestedByLabel.current.set(node, true);
       });
     });
 

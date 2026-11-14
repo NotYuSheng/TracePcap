@@ -4,6 +4,7 @@ import type {
   GraphNode,
   GraphEdge,
   NetworkGraphData,
+  DeviceLink,
   NetworkStats,
   NodeData,
   NodeMap,
@@ -11,7 +12,7 @@ import type {
 } from '../types';
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { parseDateTime } from '@/utils/dateUtils';
-import type { Occupancy, ReusedAddress } from '@/features/occupancy/occupancyService';
+import type { DeviceMove, Occupancy, ReusedAddress } from '@/features/occupancy/occupancyService';
 
 /** One device's stretch on a reused address, with its times as epoch ms like a conversation's. */
 interface OccupancySpan {
@@ -307,7 +308,9 @@ export function buildNetworkGraph(
   hostIdentities?: HostIdentity[],
   nodeRoles?: NodeRole[],
   /** Addresses more than one device held: drawn as one node per device (#918 slice 2). */
-  reusedAddresses?: ReusedAddress[]
+  reusedAddresses?: ReusedAddress[],
+  /** Devices that moved to another address: their two nodes are linked as one device. */
+  deviceMoves?: DeviceMove[]
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const spans = occupancySpans(reusedAddresses);
@@ -649,9 +652,12 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
     stats.totalPackets = analysisSummary.totalPackets;
   }
 
+  const deviceLinks = linkMovedDevices(significantNodes, deviceMoves);
+
   return {
     nodes: significantNodes,
     edges: significantEdges,
+    deviceLinks,
     stats,
     isLimited: conversations.length > maxConversations,
     totalConversations: conversations.length,
@@ -660,6 +666,46 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
     hiddenNodesList,
     crossEdges,
   };
+}
+
+/**
+ * Links the two nodes of a device that moved to another address, and notes the move on both. A
+ * node is found by its device key: the address, or its device's key when the address was shared
+ * (#918). Moves whose nodes aren't both shown get no link, but the node that is shown still says
+ * where the device went.
+ */
+export function linkMovedDevices(nodes: GraphNode[], moves?: DeviceMove[]): DeviceLink[] {
+  if (!moves || moves.length === 0) return [];
+  const byKey = new Map<string, GraphNode>();
+  for (const n of nodes) {
+    byKey.set(n.data.occupancy?.key ?? n.id, n);
+    if (!n.data.occupancy) byKey.set(n.data.ip, n);
+  }
+  const fmt = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const links: DeviceLink[] = [];
+  for (const m of moves) {
+    const at = parseDateTime(m.arrived);
+    const from = byKey.get(m.fromKey);
+    const to = byKey.get(m.toKey);
+    if (from) {
+      from.data.moves = [...(from.data.moves ?? []), {
+        ip: m.toIp, direction: 'to', at, hostname: m.toHostname ?? undefined, evidence: m.evidence,
+      }];
+    }
+    if (to) {
+      to.data.moves = [...(to.data.moves ?? []), {
+        ip: m.fromIp, direction: 'from', at, hostname: m.fromHostname ?? undefined, evidence: m.evidence,
+      }];
+    }
+    if (from && to && from.id !== to.id) {
+      const renamed =
+        m.fromHostname && m.toHostname && m.fromHostname.toLowerCase() !== m.toHostname.toLowerCase()
+          ? `, renamed ${m.fromHostname} → ${m.toHostname}`
+          : '';
+      links.push({ from: from.id, to: to.id, mac: m.mac, at, label: `same device, moved ${fmt(at)}${renamed}` });
+    }
+  }
+  return links;
 }
 
 /** Returns true if an edge's protocol/app matches a legend key (e.g. HTTPS, ICMP, STP). */

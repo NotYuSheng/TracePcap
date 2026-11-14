@@ -1450,6 +1450,43 @@
         },
         "type": "object"
       },
+      "DeviceMoveDto": {
+        "properties": {
+          "arrived": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "fromHostname": {
+            "type": "string"
+          },
+          "fromIp": {
+            "type": "string"
+          },
+          "fromKey": {
+            "type": "string"
+          },
+          "left": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "mac": {
+            "type": "string"
+          },
+          "toHostname": {
+            "type": "string"
+          },
+          "toIp": {
+            "type": "string"
+          },
+          "toKey": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "DnsQueryEntryDto": {
         "properties": {
           "frame": {
@@ -8146,6 +8183,42 @@
         "summary": "Add a rule to this capture; it's checked at once (audited)",
         "tags": [
           "Capture Detection Rules"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/device-moves": {
+      "get": {
+        "description": "The same MAC on one address, then another (a new DHCP lease, a re-plugged cable), with when it left, when it arrived, its hostname on each, and each side's device key. A MAC on two addresses at once (multi-homed) isn't a move.",
+        "operationId": "moves",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceMoveDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Devices that moved to another address in the capture",
+        "tags": [
+          "Host Occupancy"
         ]
       }
     },

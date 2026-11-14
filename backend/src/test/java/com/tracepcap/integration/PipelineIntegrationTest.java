@@ -983,6 +983,32 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * A device that moved to another address in the capture: Alice's laptop leaves 10.0.0.50 (which
+   * the phone then gets) and comes back on 10.0.0.73. Its two device keys are given, so the graph
+   * can link the right nodes even though 10.0.0.50 was shared.
+   */
+  @Test
+  void deviceMoves_aLaptopBackOnANewAddress_isOneDeviceMoving() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("dhcp_address_reuse.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    JsonNode moves = rest.getForEntity("/api/v1/files/" + fileId + "/device-moves", JsonNode.class).getBody();
+    assertThat(moves).hasSize(1);
+    JsonNode m = moves.get(0);
+    assertThat(m.get("mac").asText()).isEqualTo("f8:bc:12:00:00:01");
+    assertThat(m.get("fromIp").asText()).isEqualTo("10.0.0.50");
+    assertThat(m.get("fromKey").asText()).isEqualTo("10.0.0.50"); // the first device on the shared address
+    assertThat(m.get("toIp").asText()).isEqualTo("10.0.0.73");
+    assertThat(m.get("toHostname").asText()).isEqualTo("LAPTOP-ALICE");
+    assertThat(m.get("evidence").asText()).isEqualTo("DHCP lease");
+    // The phone that got 10.0.0.50 didn't move.
+    assertThat(moves.toString()).doesNotContain("8c:71:f8:00:00:02");
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

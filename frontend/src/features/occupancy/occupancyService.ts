@@ -89,7 +89,25 @@ export function toInputValue(dt: ApiDateTime | null | undefined): string {
   return `${y}-${p(mo)}-${p(d)}T${p(h)}:${p(mi)}:${p(s)}`;
 }
 
+/** Mirrors DeviceMoveDto: the same MAC on one address, then another. */
+export interface DeviceMove {
+  mac: string;
+  fromIp: string;
+  fromKey: string;
+  fromHostname?: string | null;
+  left?: ApiDateTime | null;
+  toIp: string;
+  toKey: string;
+  toHostname?: string | null;
+  arrived: ApiDateTime;
+  evidence: string;
+}
+
 export const occupancyService = {
+  /** Devices that moved to another address in the capture. */
+  moves: async (fileId: string): Promise<DeviceMove[]> =>
+    (await apiClient.get<DeviceMove[]>(API_ENDPOINTS.FILE_DEVICE_MOVES(fileId))).data,
+
   /** Addresses that more than one device held in the capture; empty when none did. */
   listForFile: async (fileId: string): Promise<ReusedAddress[]> =>
     (await apiClient.get<ReusedAddress[]>(API_ENDPOINTS.FILE_OCCUPANCIES(fileId))).data,
