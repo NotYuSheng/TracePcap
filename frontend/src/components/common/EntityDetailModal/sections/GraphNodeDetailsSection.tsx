@@ -1,9 +1,6 @@
 import { useState } from 'react';
-import { Badge } from '@govtechsg/sgds-react';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import { getProtocolColor } from '@/features/network/constants';
-import { HostnameSourceBadge } from '@components/common/HostnameSourceBadge/HostnameSourceBadge';
-import { LoggedInUserSourceBadge } from '@components/common/LoggedInUserSourceBadge/LoggedInUserSourceBadge';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { WindowsLogonTimeline } from '@components/common/WindowsLogonTimeline';
 import { Alert } from '@components/common/Alert';
@@ -18,21 +15,31 @@ const PEERS_PAGE_SIZE = 15;
 function ghostMessages(flags: string[]): string[] {
   const msgs: string[] = [];
   if (flags.includes('arp-no-reply')) msgs.push('ARP request target — never replied.');
-  if (flags.includes('ttl-exceeded')) msgs.push('Traceroute intermediate hop — only appeared via ICMP TTL-exceeded replies.');
-  if (flags.includes('icmp-unreachable') && !flags.includes('arp-no-reply') && !flags.includes('ttl-exceeded')) {
+  if (flags.includes('ttl-exceeded'))
+    msgs.push('Traceroute intermediate hop — only appeared via ICMP TTL-exceeded replies.');
+  if (
+    flags.includes('icmp-unreachable') &&
+    !flags.includes('arp-no-reply') &&
+    !flags.includes('ttl-exceeded')
+  ) {
     msgs.push('ICMP probe target — never responded.');
   }
-  if (flags.includes('no-response') && !flags.includes('arp-no-reply') && !flags.includes('icmp-unreachable') && !flags.includes('ttl-exceeded')) {
+  if (
+    flags.includes('no-response') &&
+    !flags.includes('arp-no-reply') &&
+    !flags.includes('icmp-unreachable') &&
+    !flags.includes('ttl-exceeded')
+  ) {
     msgs.push('Scan target — received traffic but never sent a reply.');
   }
   return msgs;
 }
 
 const GHOST_META: Record<string, { label: string; color: string }> = {
-  'no-response':      { label: 'No response',      color: '#e74c3c' },
-  'arp-no-reply':     { label: 'ARP no-reply',     color: '#e67e22' },
+  'no-response': { label: 'No response', color: '#e74c3c' },
+  'arp-no-reply': { label: 'ARP no-reply', color: '#e67e22' },
   'icmp-unreachable': { label: 'ICMP unreachable', color: '#c0392b' },
-  'ttl-exceeded':     { label: 'TTL exceeded',     color: '#8e44ad' },
+  'ttl-exceeded': { label: 'TTL exceeded', color: '#8e44ad' },
 };
 
 interface Props {
@@ -46,9 +53,8 @@ interface Props {
 }
 
 /**
- * The network-graph-only host detail — measured traffic counters, protocol chips, and the per-peer
- * Connections table (derived from graph edges). Extracted verbatim from the former standalone
- * NodeDetails so EntityDetailModal can host the same content when it is given graph context (#578).
+ * The node dialog's Traffic tab: measured counters, protocol chips, and who it talked to (derived
+ * from graph edges), each peer with a bar for its share. Who the host is lives in GraphNodeIdentityCard.
  */
 export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNavigate }: Props) {
   const [peersPage, setPeersPage] = useState(1);
@@ -68,11 +74,12 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
   });
 
   const peers = Array.from(peerMap.entries()).sort((a, b) => b[1].bytes - a[1].bytes);
+  const maxBytes = Math.max(1, ...peers.map(([, p]) => p.bytes));
   const peersTotalPages = Math.ceil(peers.length / PEERS_PAGE_SIZE);
   const peersPageClamped = Math.min(peersPage, Math.max(1, peersTotalPages));
   const visiblePeers = peers.slice(
     (peersPageClamped - 1) * PEERS_PAGE_SIZE,
-    peersPageClamped * PEERS_PAGE_SIZE,
+    peersPageClamped * PEERS_PAGE_SIZE
   );
 
   return (
@@ -88,7 +95,11 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
               {node.data.ghostFlags.map(flag => {
                 const { label, color } = GHOST_META[flag] ?? { label: flag, color: '#6c757d' };
                 return (
-                  <span key={flag} className="badge" style={{ backgroundColor: color, color: '#fff', fontSize: '0.7rem' }}>
+                  <span
+                    key={flag}
+                    className="badge"
+                    style={{ backgroundColor: color, color: '#fff', fontSize: '0.7rem' }}
+                  >
                     {label}
                   </span>
                 );
@@ -98,122 +109,107 @@ export function GraphNodeDetailsSection({ node, edges, fileId, onOpenPeer, onNav
         </Alert>
       )}
 
-      {/* Identity + measured traffic counters */}
-      <div className="row mb-3">
-        <div className="col-sm-6">
-          <dl className="row mb-0 small">
-            <dt className="col-5 text-muted">IP</dt>
-            <dd className="col-7 font-monospace mb-1">{node.data.ip}</dd>
-            {node.data.mac && (
-              <>
-                <dt className="col-5 text-muted">MAC</dt>
-                <dd className="col-7 font-monospace mb-1">{node.data.mac}</dd>
-              </>
-            )}
-            {node.data.hostname && (
-              <>
-                <dt className="col-5 text-muted">Hostname</dt>
-                <dd className="col-7 mb-1 d-flex align-items-center gap-1">
-                  <span>{node.data.hostname}</span>
-                  <HostnameSourceBadge source={node.data.hostnameSource} />
-                </dd>
-              </>
-            )}
-            {(node.data.loggedInUserCount ?? 0) > 1 ? (
-              <>
-                <dt className="col-5 text-muted">Windows accounts</dt>
-                <dd className="col-7 mb-1">
-                  {node.data.loggedInUserCount} accounts. See the timeline below.
-                </dd>
-              </>
-            ) : (
-              node.data.loggedInUser && (
-                <>
-                  {/* "Looked up" for LDAP-only evidence: a lookup isn't proof of a sign-in (#812). */}
-                  <dt className="col-5 text-muted">
-                    {node.data.loggedInUserSource === 'ldap_dn' ? 'Looked-up user' : 'Signed-in user'}
-                  </dt>
-                  <dd className="col-7 mb-1 d-flex align-items-center gap-1">
-                    <span>{node.data.loggedInUser}</span>
-                    <LoggedInUserSourceBadge source={node.data.loggedInUserSource} />
-                  </dd>
-                </>
-              )
-            )}
-          </dl>
+      {/* Measured traffic counters. Who the host is sits in the identity card beside this. */}
+      <div className="node-stats mb-3" data-testid="node-stats">
+        <div className="node-stat">
+          <div className="node-stat-value">{formatNumber(node.data.packetsSent)}</div>
+          <div className="node-stat-label">packets sent</div>
         </div>
-        <div className="col-sm-6">
-          <dl className="row mb-0 small">
-            <dt className="col-7 text-muted">Packets sent</dt>
-            <dd className="col-5 mb-1">{formatNumber(node.data.packetsSent)}</dd>
-            <dt className="col-7 text-muted">Packets received</dt>
-            <dd className="col-5 mb-1">{formatNumber(node.data.packetsReceived)}</dd>
-            <dt className="col-7 text-muted">Bytes sent</dt>
-            <dd className="col-5 mb-1">{formatBytes(node.data.bytesSent)}</dd>
-            <dt className="col-7 text-muted">Bytes received</dt>
-            <dd className="col-5 mb-1">{formatBytes(node.data.bytesReceived)}</dd>
-            <dt className="col-7 text-muted fw-bold">Total bytes</dt>
-            <dd className="col-5 mb-1 fw-bold">{formatBytes(node.data.totalBytes)}</dd>
-          </dl>
+        <div className="node-stat">
+          <div className="node-stat-value">{formatNumber(node.data.packetsReceived)}</div>
+          <div className="node-stat-label">received</div>
+        </div>
+        <div className="node-stat">
+          <div className="node-stat-value">{formatBytes(node.data.totalBytes)}</div>
+          <div className="node-stat-label">in total</div>
+          <div className="node-stat-sub">
+            {formatBytes(node.data.bytesSent)} out · {formatBytes(node.data.bytesReceived)} in
+          </div>
+        </div>
+        <div className="node-stat">
+          <div className="node-stat-value">{formatNumber(peers.length)}</div>
+          <div className="node-stat-label">peer{peers.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
 
       <WindowsLogonTimeline fileId={fileId} ip={node.data.ip} deviceType={node.data.deviceType} />
 
       {/* Protocols */}
-      <div className="mb-3">
-        <h6 className="border-bottom pb-1 mb-2">Protocols</h6>
-        <div className="d-flex flex-wrap gap-1">
-          {node.data.protocols.map(p => (
-            <span key={p} className="badge" style={{ backgroundColor: getProtocolColor(p), color: '#fff' }}>
-              {p}
-            </span>
-          ))}
-        </div>
+      <div className="d-flex flex-wrap align-items-center gap-1 mb-3 small">
+        <span className="text-muted me-1">Protocols</span>
+        {node.data.protocols.map(p => (
+          <span
+            key={p}
+            className="badge"
+            style={{ backgroundColor: getProtocolColor(p), color: '#fff' }}
+          >
+            {p}
+          </span>
+        ))}
       </div>
 
-      {/* Connections table */}
+      {/* Who it talked to, biggest first, each bar scaled to the biggest peer. */}
       <div>
-        <h6 className="border-bottom pb-1 mb-2">
-          Connections ({peers.length} peer{peers.length !== 1 ? 's' : ''})
+        <h6 className="mb-2">
+          Peers <span className="text-muted fw-normal small">· click an address to inspect it</span>
         </h6>
-        <div className="table-responsive rounded border overflow-hidden">
-          <table className="table table-sm table-hover mb-0">
-            <thead className="table-light" style={{ fontSize: '0.8rem' }}>
+        <div className="table-responsive">
+          <table className="table table-sm mb-0 small align-middle node-peers">
+            <thead>
               <tr>
-                <th>Peer IP</th>
-                <th>Application / Protocol</th>
-                <th className="text-end">Packets</th>
-                <th className="text-end">Bytes</th>
+                <th scope="col">Peer</th>
+                <th scope="col">App</th>
+                <th scope="col" className="node-peers-traffic">
+                  Traffic
+                </th>
+                <th scope="col" className="text-end">
+                  Packets
+                </th>
+                <th scope="col">
+                  <span className="visually-hidden">Conversations</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {visiblePeers.map(([ip, info]) => (
-                <tr
-                  key={ip}
-                  className="node-details-peer-row"
-                  title="Click to view conversations"
-                  onClick={() =>
-                    onNavigate?.(`/analysis/${fileId}/conversations?srcIp=${node.data.ip}&peerIp=${ip}`)
-                  }
-                >
-                  <td className="font-monospace small">
+                <tr key={ip}>
+                  <td>
                     <button
+                      type="button"
                       className="btn btn-link btn-sm p-0 font-monospace text-start"
                       style={{ fontSize: 'inherit' }}
-                      onClick={e => { e.stopPropagation(); onOpenPeer(ip); }}
+                      onClick={() => onOpenPeer(ip)}
                     >
                       {ip}
                     </button>
-                    <i className="bi bi-arrow-right-circle ms-1 text-muted node-details-peer-icon" aria-hidden="true"></i>
                   </td>
+                  <td className="text-muted">{Array.from(info.apps).join(', ')}</td>
                   <td>
-                    {Array.from(info.apps).map(app => (
-                      <Badge key={app} bg="light" text="dark" className="me-1 border">{app}</Badge>
-                    ))}
+                    <div className="node-peer-bar-row">
+                      <div className="node-peer-bar" aria-hidden="true">
+                        <div
+                          className="node-peer-bar-fill"
+                          style={{ width: `${Math.max(2, (info.bytes / maxBytes) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="node-peer-bytes">{formatBytes(info.bytes)}</span>
+                    </div>
                   </td>
-                  <td className="text-end small">{formatNumber(info.packets)}</td>
-                  <td className="text-end small">{formatBytes(info.bytes)}</td>
+                  <td className="text-end text-muted">{formatNumber(info.packets)}</td>
+                  <td className="text-end">
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0"
+                      aria-label={`Conversations with ${ip}`}
+                      onClick={() =>
+                        onNavigate?.(
+                          `/analysis/${fileId}/conversations?srcIp=${node.data.ip}&peerIp=${ip}`
+                        )
+                      }
+                    >
+                      <i className="bi bi-arrow-right-circle" aria-hidden="true" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

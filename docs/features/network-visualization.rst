@@ -148,7 +148,7 @@ sources:
        for hosts on the other side of a router.
    * - **Vendor**
      - The MAC address OUI prefix (first 3 octets) resolved against the bundled
-       Wireshark ``manuf`` database. Shown in the Node Detail Panel. Not
+       Wireshark ``manuf`` database. Shown in the node details dialog. Not
        available if the MAC address is absent, locally-administered
        (randomised), or belongs to a virtual adapter.
    * - **Node colour and icon**
@@ -256,20 +256,40 @@ genuinely present. Four flag types are detected:
 The **Ghost Node Filters** section in the control panel only shows the flag
 types actually present in the current capture. Each is a pill that toggles a
 **hide** filter — selecting it removes nodes carrying that flag from the graph.
-A ghost-flag banner in the Node Detail modal explains why a node was flagged.
+A ghost-flag banner in the node details dialog explains why a node was flagged.
 The active ghost filters are also honoured when exporting the topology to a PDF
 report.
 
-Click a node to open the **Node Detail Panel**, which shows:
+Click a node to open its **details dialog**. It has two halves.
 
-- IP address and MAC address
-- Hostname (SNI extracted from TLS ClientHello, if available)
-- **Identity** — the adjudicated verdict for "what is this host?" (see below)
-- **Evidence weighed** — the measured facts behind the verdict (see below)
-- **Role** — the analyst-assigned name for the host (e.g. *Finance DB*)
-- Packets sent / received and bytes sent / received / total
-- Protocols used across all conversations
-- Connections table: per-peer breakdown sorted by bytes, with application labels
+**On the left, what the host is.** Its name and device type, with whether that
+type is *confirmed*, *not confirmed* or *the signals disagree*. Under it are the
+facts that identify it: address, MAC, maker, where the name came from, the
+signed-in Windows user and the TTL. Then come the **Role** (the analyst-assigned
+name, e.g. *Finance DB*) and **Show its conversations**, which opens the
+Conversations page filtered to this host.
+
+While the type is a machine guess, a **Confirm what it is** box lists the top
+candidates with their scores. Click one to confirm it. This sets the same human
+override as *I disagree*. **Other…** opens the Identity evidence tab to pick
+any other type.
+
+**On the right, the detail in tabs:**
+
+- **Traffic**:
+  - packets sent and received, total bytes (out and in) and the peer count;
+  - the protocols seen;
+  - a **Peers** table, biggest first. Each peer's bar shows its traffic
+    against the busiest peer. Click an address to inspect that host, or the
+    arrow to open the conversations between the two.
+  - Phantom-node and device-move notes also appear here.
+- **Identity evidence**: the adjudicated **Identity** verdict, the devices that
+  held this address, and the **Evidence weighed** (see below).
+- **History**: this host across other captures.
+- **Notes**: a free-text note on the host.
+- A tab per service the host was seen serving (e.g. **DNS**), with its log.
+
+On a narrow screen the two halves stack, with the identity card on top.
 
 Identity & Evidence (facts → votes → verdict)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

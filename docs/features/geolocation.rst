@@ -34,7 +34,7 @@ These fields appear in:
 
 - The **Conversations** tab (src country, dst country columns).
 - The **Network Visualization** — flag badge on external host nodes.
-- The **Node Detail Panel**.
+- The **node details dialog** on the network map.
 - The **Overview** tab — top countries by conversation count.
 
 Private / Reserved IPs
