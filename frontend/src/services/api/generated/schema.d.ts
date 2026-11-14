@@ -2466,7 +2466,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get runtime limits (upload size, analysis and LLM timeouts) */
+        /** Get runtime limits (upload size, analysis and LLM timeouts, capture retention) */
         get: operations["getLimits"];
         put?: never;
         post?: never;

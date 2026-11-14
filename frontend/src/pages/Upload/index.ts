@@ -1,1 +1,0 @@
-export { UploadPage } from './UploadPage';

@@ -30,6 +30,13 @@ public class SystemController {
   @Value("${llm.api.timeout-seconds:300}")
   private int llmTimeoutSeconds;
 
+  // How long an analysis capture is kept, so the home page can say when one will be deleted.
+  @Value("${tracepcap.cleanup.retention-hours:12}")
+  private int fileRetentionHours;
+
+  @Value("${tracepcap.cleanup.enabled:true}")
+  private boolean cleanupEnabled;
+
   /** Returns the server's current local datetime (ISO-8601, no timezone offset). */
   @GetMapping("/time")
   @Operation(summary = "Get the server's current local datetime")
@@ -43,7 +50,7 @@ public class SystemController {
    * values. Consumed by the upload page and the analysis polling hook.
    */
   @GetMapping("/limits")
-  @Operation(summary = "Get runtime limits (upload size, analysis and LLM timeouts)")
+  @Operation(summary = "Get runtime limits (upload size, analysis and LLM timeouts, capture retention)")
   public ResponseEntity<Map<String, Object>> getLimits() {
     return ResponseEntity.ok(
         Map.of(
@@ -57,6 +64,9 @@ public class SystemController {
             "analysisTimeoutMs",
             (long) analysisTimeoutSeconds * 1000,
             "llmTimeoutMs",
-            (long) llmTimeoutSeconds * 1000));
+            (long) llmTimeoutSeconds * 1000,
+            // 0 means captures are never deleted.
+            "fileRetentionHours",
+            cleanupEnabled ? Math.max(fileRetentionHours, 0) : 0));
   }
 }

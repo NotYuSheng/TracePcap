@@ -18,23 +18,42 @@ The default maximum file size is **512 MB**. It is derived from the
 ``APP_MEMORY_MB`` memory budget (max upload = 25% of it), not set directly —
 see :doc:`../configuration/environment-variables`.
 
-Upload Options
---------------
+The Home Page
+-------------
 
-Both analysis stages run automatically on every upload by default:
+The home page has two columns:
 
-- **Protocol & application classification** (nDPI) — application
-  identification, risk detection, TLS metadata, JA3/JA3S fingerprints
-  (see :doc:`ndpi-analysis`).
-- **Embedded file extraction** — HTTP object and raw stream extraction from
-  TCP/UDP payloads (see :doc:`file-extraction`).
+- **Analyse a capture** on the left: the drop zone, the analysis stages
+  ("Analyse with", below), and how long captures are kept.
+- On the right, **Recent activity** with **All Uploads** under it.
 
-An **Analysis options** modal appears after file selection, allowing each
-stage to be enabled or disabled individually for that upload (useful for
-reducing processing time on large captures). Protocol/application
-classification and embedded file extraction are enabled by default;
-**Suricata IDS is off by default** because it adds significant processing
-time.
+**Recent activity** shows the six latest events:
+
+- captures analysed, still analysing or failed, each linking to its analysis;
+- captures due for deletion within three hours, at the top;
+- up to three lines of changes people made, taken from the audit log. A run of
+  edits to one network map is one line, linking to that capture's map.
+
+**All changes** opens the full audit log in Settings.
+
+With no captures yet, the page is a first-run screen instead: what TracePcap
+does, the same drop zone and stages, and the three steps.
+
+Analyse With
+------------
+
+The stages to run are on the home page, under the drop zone. Set them before
+you choose files; there is no popup afterwards.
+
+- **Protocols and apps** (nDPI): application identification, risk detection,
+  TLS metadata, and JA3/JA3S fingerprints (see :doc:`ndpi-analysis`). On by
+  default.
+- **Intrusion alerts** (Suricata): known attack signatures. **Off by
+  default**, because it is the slowest stage.
+- **Files in the traffic**: HTTP object and raw stream extraction from
+  TCP/UDP payloads (see :doc:`file-extraction`). On by default.
+
+Turning a stage off shortens analysis of a large capture.
 
 Duplicate Detection
 -------------------
@@ -47,7 +66,8 @@ analysis. This prevents redundant processing and storage.
 Processing Progress
 -------------------
 
-After upload, you are redirected to a progress view showing each analysis
+A single upload opens its analysis as soon as it is uploaded. With several
+files, a dialog shows each one's progress. After upload you see a progress view showing each analysis
 stage (packet parsing, nDPI analysis, geolocation, file extraction, …) with
 a percentage indicator. Analysis runs asynchronously — you can navigate away
 and return later.
