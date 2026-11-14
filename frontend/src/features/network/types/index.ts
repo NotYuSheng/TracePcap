@@ -180,6 +180,9 @@ export interface NetworkGraphData {
  * The same device (by MAC) on two nodes: it left one address and took another during the capture.
  * Drawn as a dashed line between the nodes, labelled with when it moved.
  */
+/** The network graph's layouts: circular, hierarchical (ELK), and the grouped network map. */
+export type GraphLayoutType = 'circular' | 'hierarchicalTd' | 'grouped';
+
 export interface DeviceLink {
   from: string;
   to: string;

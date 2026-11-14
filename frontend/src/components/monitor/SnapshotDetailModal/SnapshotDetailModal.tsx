@@ -1,3 +1,4 @@
+import type { GraphLayoutType } from '@/features/network/types';
 import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -137,7 +138,7 @@ export const SnapshotDetailModal = ({
   const sorted = useMemo(() => [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder), [snapshots]);
   const [diagramSnapshotId, setDiagramSnapshotId] = useState(snapshot.id);
   const [fullscreenHint, setFullscreenHint] = useState(0);
-  const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>('circular');
+  const [layoutType, setLayoutType] = useState<GraphLayoutType>('circular');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
