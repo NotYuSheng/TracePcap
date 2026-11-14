@@ -279,3 +279,73 @@ export function drawEffects(ctx: CanvasRenderingContext2D, sigma: Sigma, effects
   }
   ctx.restore();
 }
+
+// ── Packet replay: each packet flies along its edge ─────────────────────────────────────────────
+
+export interface LiveFlight {
+  from: string;
+  to: string;
+  color: string;
+  t0: number;
+  dur: number;
+}
+
+/** Draws in-flight packets (a dot with a short trail, a ring where it lands); drops finished ones in place. */
+export function drawFlights(ctx: CanvasRenderingContext2D, sigma: Sigma, flights: LiveFlight[], now: number): void {
+  for (let i = flights.length - 1; i >= 0; i--) if (now - flights[i].t0 > flights[i].dur * 1.5) flights.splice(i, 1);
+  if (flights.length === 0) return;
+  const ratio = window.devicePixelRatio || 1;
+  const graph = sigma.getGraph();
+  const at = (node: string) => {
+    if (!graph.hasNode(node)) return null;
+    const d = sigma.getNodeDisplayData(node);
+    if (!d || d.hidden) return null;
+    const p = sigma.framedGraphToViewport({ x: d.x, y: d.y });
+    return { x: p.x * ratio, y: p.y * ratio, r: sigma.scaleSize(d.size) * ratio };
+  };
+  ctx.save();
+  for (const f of flights) {
+    const a = at(f.from);
+    const b = at(f.to);
+    if (!a || !b) continue;
+    const p = (now - f.t0) / f.dur;
+    ctx.fillStyle = f.color;
+    ctx.strokeStyle = f.color;
+    if (p <= 1) {
+      // Ease out, so a packet visibly leaves and settles in.
+      const k = 1 - Math.pow(1 - p, 2);
+      const x = a.x + (b.x - a.x) * k;
+      const y = a.y + (b.y - a.y) * k;
+      const tk = Math.max(0, k - 0.12);
+      const g = ctx.createLinearGradient(a.x + (b.x - a.x) * tk, a.y + (b.y - a.y) * tk, x, y);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, f.color);
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 3 * ratio;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(a.x + (b.x - a.x) * tk, a.y + (b.y - a.y) * tk);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(x, y, 9 * ratio, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5 * ratio, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Landed: a ring opens on the receiver.
+      const q = (p - 1) / 0.5;
+      ctx.globalAlpha = (1 - q) * 0.8;
+      ctx.lineWidth = 2 * ratio;
+      ctx.strokeStyle = f.color;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r + q * 14 * ratio, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}

@@ -3705,6 +3705,33 @@
         },
         "type": "object"
       },
+      "PagedResponseReplayPacket": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayPacket"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PatchSnapshotRequest": {
         "properties": {
           "context": {
@@ -3951,6 +3978,47 @@
           },
           "to": {
             "$ref": "#/components/schemas/EntityRefDto"
+          }
+        },
+        "type": "object"
+      },
+      "ReplayPacket": {
+        "properties": {
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "dstIp": {
+            "type": "string"
+          },
+          "dstPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "info": {
+            "type": "string"
+          },
+          "number": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "srcIp": {
+            "type": "string"
+          },
+          "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         "type": "object"
@@ -8975,6 +9043,71 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/packets": {
+      "get": {
+        "description": "One page of packets, headers only: frame number, time, addresses and ports, protocol, size, conversation and the dissector's summary. Pages run in frame order. With `at`, the page returned is the one holding the first packet captured at or after that time (its number is in `page`), so a replay can start anywhere. 404 when the capture's packets were pruned.",
+        "operationId": "packets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 2000,
+              "format": "int32",
+              "maximum": 5000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "at",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseReplayPacket"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A capture's packets, in capture order",
+        "tags": [
+          "Packet Replay"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/reanalyses": {
       "post": {
         "description": "Creates a new capture (its own copy in storage, derivedFrom the original) and analyses it with the given options. The original and its analysis are kept. The capture's own detection rules are copied to the version.",
@@ -12582,6 +12715,10 @@
     {
       "description": "AI-generated insights for a monitored network",
       "name": "Network Insights"
+    },
+    {
+      "description": "A capture's packets in capture order, for replaying them on the network graph",
+      "name": "Packet Replay"
     },
     {
       "description": "Server time and runtime limits",

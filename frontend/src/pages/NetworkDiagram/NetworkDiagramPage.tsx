@@ -1,3 +1,8 @@
+import { usePacketReplay } from '@/features/network/hooks/usePacketReplay';
+import { PacketReplayBar } from '@/features/network/components/PacketReplayBar';
+import type { AxisMode } from '@/features/network/components/PlayByControl';
+import { flightsFor, type ConversationEnds } from '@/features/network/services/packetReplay';
+import { getProtocolColor } from '@/features/network/constants';
 import { clusterApi } from '@/features/cluster/services/clusterApi';
 import { dnsNamesByIp } from '@/features/network/services/networkGroups';
 import { networkSegmentService, type NetworkSegment } from '@/features/networkSegments/networkSegmentService';
@@ -403,13 +408,43 @@ export const NetworkDiagramPage = () => {
   const [appearWhenSeen, setAppearWhenSeen] = useState(false);
   const [fullscreenHint, setFullscreenHint] = useState(0);
   const [unseenStyle, setUnseenStyle] = useState<'hide' | 'faint'>('hide');
+  // Play by a sliding time window, or packet by packet (replay).
+  const [axisMode, setAxisMode] = useState<AxisMode>('window');
+  useEffect(() => setAxisMode('window'), [fileId]);
+  const replay = usePacketReplay(fileId, axisMode === 'packets');
+  // In replay, the graph shows the instant of the current moment: the conversations open then.
+  const replayT = axisMode === 'packets' ? replay.moment?.t : undefined;
+  const axisWindow = useMemo<TimeWindow | null>(
+    () => (axisMode === 'packets' ? (replayT != null ? { from: replayT, to: replayT } : null) : timeWindow),
+    [axisMode, replayT, timeWindow],
+  );
   const windowActive = useMemo(() => {
-    if (!timeWindow) return null;
-    const active = { ...activeInWindow(filteredEdges, timeWindow), window: timeWindow };
+    if (!axisWindow) return null;
+    const active = { ...activeInWindow(filteredEdges, axisWindow), window: axisWindow };
     if (!appearWhenSeen) return active;
-    const unseen = unseenByWindowEnd(filteredEdges, timeWindow);
+    const unseen = unseenByWindowEnd(filteredEdges, axisWindow);
     return unseenStyle === 'faint' ? { ...active, faintNodeIds: unseen } : { ...active, hiddenNodeIds: unseen };
-  }, [filteredEdges, timeWindow, appearWhenSeen, unseenStyle]);
+  }, [filteredEdges, axisWindow, appearWhenSeen, unseenStyle]);
+  // Each conversation's ends on the graph, so a replayed packet knows which edge to fly along.
+  const conversationEnds = useMemo(() => {
+    const ipOf = new Map(filteredNodes.map(n => [n.id, n.data.ip]));
+    const m = new Map<string, ConversationEnds>();
+    for (const e of filteredEdges) {
+      m.set(e.data.conversationId, { source: e.source, target: e.target, sourceIp: ipOf.get(e.source) ?? '' });
+    }
+    return m;
+  }, [filteredEdges, filteredNodes]);
+  const replayFlights = useMemo(() => {
+    const m = replay.moment;
+    if (axisMode !== 'packets' || !m) return null;
+    const flights = flightsFor(m, conversationEnds).map(f => ({ from: f.from, to: f.to, color: getProtocolColor(f.protocol) }));
+    return {
+      key: m.packets[0].number,
+      flights,
+      durationMs: Math.min(900, Math.max(180, 800 / replay.speed)),
+      offGraph: m.packets.length - flights.length,
+    };
+  }, [axisMode, replay.moment, replay.speed, conversationEnds]);
   // Same-device links between nodes both still shown after the filters.
   const shownDeviceLinks = useMemo(() => {
     const ids = new Set(filteredNodes.map(n => n.id));
@@ -664,10 +699,20 @@ export const NetworkDiagramPage = () => {
                 edgeColorMode={edgeColorMode}
                 highlightedNodes={highlightedNodes}
                 activeInWindow={windowActive}
-                animateTraffic={animateTraffic}
+                animateTraffic={animateTraffic && axisMode === 'window'}
+                packetFlights={replayFlights}
                 bottomBar={
-                  bounds && bounds.to > bounds.from ? (
+                  bounds && bounds.to > bounds.from && axisMode === 'packets' ? (
+                    <PacketReplayBar
+                      edges={filteredEdges}
+                      bounds={bounds}
+                      replay={replay}
+                      onModeChange={setAxisMode}
+                      offGraph={replayFlights?.offGraph ?? 0}
+                    />
+                  ) : bounds && bounds.to > bounds.from ? (
                     <TimeScrubber
+                      onModeChange={setAxisMode}
                       edges={filteredEdges}
                       bounds={bounds}
                       window={timeWindow}

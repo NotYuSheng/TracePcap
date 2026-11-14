@@ -1235,6 +1235,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{fileId}/packets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A capture's packets, in capture order
+         * @description One page of packets, headers only: frame number, time, addresses and ports, protocol, size, conversation and the dissector's summary. Pages run in frame order. With `at`, the page returned is the one holding the first packet captured at or after that time (its number is in `page`), so a replay can start anywhere. 404 when the capture's packets were pruned.
+         */
+        get: operations["packets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/{fileId}/reanalyses": {
         parameters: {
             query?: never;
@@ -3917,6 +3937,17 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PagedResponseReplayPacket: {
+            data?: components["schemas"]["ReplayPacket"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PatchSnapshotRequest: {
             context?: string;
             notes?: string;
@@ -3999,6 +4030,24 @@ export interface components {
             predicate?: string;
             source?: string;
             to?: components["schemas"]["EntityRefDto"];
+        };
+        ReplayPacket: {
+            /** Format: uuid */
+            conversationId?: string;
+            dstIp?: string;
+            /** Format: int32 */
+            dstPort?: number;
+            info?: string;
+            /** Format: int64 */
+            number?: number;
+            protocol?: string;
+            /** Format: int32 */
+            size?: number;
+            srcIp?: string;
+            /** Format: int32 */
+            srcPort?: number;
+            /** Format: date-time */
+            timestamp?: string;
         };
         ReportRequest: {
             activeFilters?: string[];
@@ -6421,6 +6470,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ReusedAddress"][];
+                };
+            };
+        };
+    };
+    packets: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                at?: string;
+            };
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedResponseReplayPacket"];
                 };
             };
         };

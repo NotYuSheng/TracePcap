@@ -240,3 +240,37 @@
 .ts-segmented-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+/* Packet-by-packet replay */
+.ts-segmented-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.pr-playhead {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--ts-accent);
+  box-shadow: 0 0 0 2px var(--ts-accent-tint);
+  pointer-events: none;
+}
+
+.pr-readout {
+  min-width: 0;
+  flex: 0 1 380px;
+  overflow: hidden;
+}
+
+.pr-readout span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ts-play:disabled,
+.ts-icon-btn:disabled {
+  opacity: 0.45;
+}

@@ -6,7 +6,7 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import { EdgeArrowProgram } from 'sigma/rendering';
 import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
-import { animatedEdges, drawDeviceLinks, drawEffects, drawParticles, windowEffects, type GraphEffect } from './trafficParticles';
+import { animatedEdges, drawDeviceLinks, drawEffects, drawFlights, drawParticles, windowEffects, type GraphEffect, type LiveFlight } from './trafficParticles';
 
 const EMPTY_LINKS: { from: string; to: string; label: string }[] = [];
 import circular from 'graphology-layout/circular';
@@ -68,6 +68,11 @@ interface NetworkGraphProps {
   customPrivateRanges?: CustomPrivateRange[];
   /** Address → the name clients looked it up by: the network map's domain for unnamed hosts. */
   dnsNames?: Map<string, string>;
+  /**
+   * Packet replay's current moment: its packets fly along their edges. A new `key` launches them;
+   * null when the replay is off.
+   */
+  packetFlights?: { key: number; flights: { from: string; to: string; color: string }[]; durationMs: number } | null;
   /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
   bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
@@ -550,6 +555,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   bottomBar,
   deviceLinks = EMPTY_LINKS,
   onFitViewRepeated,
+  packetFlights = null,
   networkSegments = EMPTY_SEGMENTS,
   customPrivateRanges = EMPTY_RANGES,
   dnsNames,
@@ -648,10 +654,23 @@ export const NetworkGraph = memo(function NetworkGraph({
   darkRef.current = darkMode;
   const hasLinks = deviceLinks.length > 0;
   const hasWindow = activeInWindow != null;
+  const hasFlights = packetFlights != null;
+  // Packet replay: the moment's packets, launched when its key changes.
+  const flightsRef = useRef<LiveFlight[]>([]);
+  const flightKey = packetFlights?.key;
+  useEffect(() => {
+    if (!packetFlights) {
+      flightsRef.current.length = 0;
+      return;
+    }
+    const now = performance.now();
+    for (const f of packetFlights.flights) flightsRef.current.push({ ...f, t0: now, dur: packetFlights.durationMs });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flightKey]);
   // Appear rings and device-move animations, set off as the time window crosses them.
   const effectsRef = useRef<GraphEffect[]>([]);
   useEffect(() => {
-    if (!animateTraffic && !hasLinks && !hasWindow) {
+    if (!animateTraffic && !hasLinks && !hasWindow && !hasFlights) {
       const c = particlesRef.current;
       c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
       return;
@@ -685,10 +704,11 @@ export const NetworkGraph = memo(function NetworkGraph({
       else ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawDeviceLinks(ctx, sigma, deviceLinksRef.current, darkRef.current);
       drawEffects(ctx, sigma, effectsRef.current, now, darkRef.current);
+      drawFlights(ctx, sigma, flightsRef.current, now);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [animateTraffic, hasLinks, hasWindow]);
+  }, [animateTraffic, hasLinks, hasWindow, hasFlights]);
 
   const activeInWindowRef = useRef(activeInWindow);
   useEffect(() => {
