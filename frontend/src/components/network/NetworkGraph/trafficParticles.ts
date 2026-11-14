@@ -137,3 +137,145 @@ export function drawDeviceLinks(
   }
   ctx.restore();
 }
+
+// ── Time-axis effects: a node appearing, a device moving ────────────────────────────────────────
+
+/** What the time axis showed at one moment (the NetworkGraph's activeInWindow, plus the window). */
+export interface WindowState {
+  nodeIds: Set<string>;
+  hiddenNodeIds?: Set<string>;
+  faintNodeIds?: Set<string>;
+  window?: { from: number; to: number };
+}
+
+export type GraphEffect =
+  | { kind: 'appear'; node: string; t0: number }
+  | { kind: 'move'; from: string; to: string; note: string; t0: number };
+
+export const APPEAR_MS = 900;
+export const MOVE_MS = 1400;
+/** Linger after the dot lands, so the note can be read. */
+const NOTE_MS = 1600;
+/** A big jump would light up the whole graph; past this many, appear rings are skipped. */
+const MAX_APPEAR = 30;
+
+/** The address part of a device key: `10.0.0.73@1700000000` / `10.0.0.73~site-b` → `10.0.0.73`. */
+function addressOf(nodeId: string): string {
+  return nodeId.split(/[@~]/)[0];
+}
+
+/** The note shown as a device lands on its new address: where it went, and a rename if any. */
+export function moveNote(to: string, label: string): string {
+  const rename = /renamed (.+)$/.exec(label);
+  return `moved → ${addressOf(to)}${rename ? `, renamed ${rename[1]}` : ''}`;
+}
+
+/**
+ * The effects a window change sets off. Only for changes the window crossed going forward: no
+ * effects when the window is cleared, first set, or moved back — a jump is not an event.
+ */
+export function windowEffects(
+  prev: WindowState | null | undefined,
+  cur: WindowState | null | undefined,
+  links: { from: string; to: string; at?: number; label: string }[],
+  now: number,
+): GraphEffect[] {
+  if (!prev?.window || !cur?.window || cur.window.to <= prev.window.to) return [];
+  const out: GraphEffect[] = [];
+  const prevUnseen = prev.hiddenNodeIds ?? prev.faintNodeIds;
+  const curUnseen = cur.hiddenNodeIds ?? cur.faintNodeIds;
+  if (prevUnseen && curUnseen) {
+    const appeared: string[] = [];
+    for (const n of prevUnseen) if (!curUnseen.has(n)) appeared.push(n);
+    if (appeared.length <= MAX_APPEAR) {
+      for (const node of appeared) out.push({ kind: 'appear', node, t0: now });
+    }
+  }
+  const { to: prevTo } = prev.window;
+  const { to: curTo } = cur.window;
+  for (const l of links) {
+    if (l.at != null && l.at > prevTo && l.at <= curTo) {
+      out.push({ kind: 'move', from: l.from, to: l.to, note: moveNote(l.to, l.label), t0: now });
+    }
+  }
+  return out;
+}
+
+/** True while an effect still has frames to draw. */
+export function effectAlive(e: GraphEffect, now: number): boolean {
+  return now - e.t0 < (e.kind === 'appear' ? APPEAR_MS : MOVE_MS + NOTE_MS);
+}
+
+function ring(ctx: CanvasRenderingContext2D, x: number, y: number, r0: number, p: number, colour: string, ratio: number) {
+  ctx.globalAlpha = (1 - p) * 0.85;
+  ctx.lineWidth = 2.5 * ratio;
+  ctx.strokeStyle = colour;
+  ctx.beginPath();
+  ctx.arc(x, y, r0 + p * 26 * ratio, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/** Draws live effects over the graph; drops finished ones from `effects` in place. */
+export function drawEffects(ctx: CanvasRenderingContext2D, sigma: Sigma, effects: GraphEffect[], now: number, dark: boolean): void {
+  for (let i = effects.length - 1; i >= 0; i--) if (!effectAlive(effects[i], now)) effects.splice(i, 1);
+  if (effects.length === 0) return;
+  const ratio = window.devicePixelRatio || 1;
+  const graph = sigma.getGraph();
+  const accent = dark ? '#b9a6ff' : '#5925dc';
+  const point = (node: string) => {
+    if (!graph.hasNode(node)) return null;
+    const d = sigma.getNodeDisplayData(node);
+    if (!d || d.hidden) return null;
+    const p = sigma.framedGraphToViewport({ x: d.x, y: d.y });
+    // Node size is in viewport pixels already (sigma scales it for the camera).
+    return { x: p.x * ratio, y: p.y * ratio, r: sigma.scaleSize(d.size) * ratio, color: d.color };
+  };
+  ctx.save();
+  ctx.setLineDash([]);
+  for (const e of effects) {
+    const t = now - e.t0;
+    if (e.kind === 'appear') {
+      const p = point(e.node);
+      if (p) ring(ctx, p.x, p.y, p.r, t / APPEAR_MS, accent, ratio);
+      continue;
+    }
+    const a = point(e.from);
+    const b = point(e.to);
+    if (!a || !b) continue;
+    if (t < MOVE_MS) {
+      // Ease in-out, a glowing dot from the old address to the new one.
+      const p = t / MOVE_MS;
+      const k = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const x = a.x + (b.x - a.x) * k;
+      const y = a.y + (b.y - a.y) * k;
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(x, y, 10 * ratio, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5 * ratio, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+    const after = t - MOVE_MS;
+    if (after < APPEAR_MS) ring(ctx, b.x, b.y, b.r, after / APPEAR_MS, accent, ratio);
+    // The note above the new node: fades in fast, holds, fades out.
+    const fade = Math.min(1, after / 200, (MOVE_MS + NOTE_MS - t) / 400);
+    ctx.globalAlpha = Math.max(0, fade);
+    ctx.font = `600 ${12 * ratio}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(e.note).width + 14 * ratio;
+    const h = 20 * ratio;
+    const ny = b.y - b.r - 22 * ratio;
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.roundRect(b.x - w / 2, ny - h / 2, w, h, 10 * ratio);
+    ctx.fill();
+    ctx.fillStyle = dark ? '#1a1530' : '#ffffff';
+    ctx.fillText(e.note, b.x, ny);
+  }
+  ctx.restore();
+}

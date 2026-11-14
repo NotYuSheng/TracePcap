@@ -27,6 +27,8 @@ interface Props {
   /** Hide nodes until their first conversation has started, so playing grows the network. */
   appearWhenSeen: boolean;
   onAppearWhenSeenChange: (on: boolean) => void;
+  unseenStyle: 'hide' | 'faint';
+  onUnseenStyleChange: (style: 'hide' | 'faint') => void;
 }
 
 function clock(ms: number, withDate: boolean, seconds = false): string {
@@ -65,6 +67,8 @@ export function TimeScrubber({
   onAnimateChange,
   appearWhenSeen,
   onAppearWhenSeenChange,
+  unseenStyle,
+  onUnseenStyleChange,
 }: Props) {
   const [playing, setPlaying] = useState(false);
   const [widthShare, setWidthShare] = useState(0.1);
@@ -231,8 +235,20 @@ export function TimeScrubber({
             onChange={e => onAppearWhenSeenChange(e.target.checked)}
           />
           <label className="form-check-label" htmlFor="ts-appear">Nodes appear when first seen</label>
-          <div className="ts-hint">Hide a node until its first conversation, so playing grows the network.</div>
+          <div className="ts-hint">Until its first conversation a node is hidden or faint, so playing grows the network.</div>
         </div>
+        {appearWhenSeen && (
+          <div className="ts-setting" role="group" aria-label="Nodes not seen yet">
+            <span className="ts-setting-label">Nodes not seen yet</span>
+            <div className="ts-segmented ts-segmented-2">
+              {(['hide', 'faint'] as const).map(s => (
+                <button key={s} type="button" aria-pressed={unseenStyle === s} onClick={() => onUnseenStyleChange(s)}>
+                  {s === 'hide' ? 'Hide them' : 'Show them faint'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <button type="button" className="ts-wide-btn" onClick={showAll} disabled={!win}>
           Show the whole capture
         </button>

@@ -16,6 +16,7 @@ const bounds = { from: 1_000_000, to: 1_000_000 + 3 * 600_000 + 1000 }
 function Harness({ onChange }: { onChange?: (w: TimeWindow | null) => void }) {
   const [w, setW] = useState<TimeWindow | null>(null)
   const [appear, setAppear] = useState(false)
+  const [unseen, setUnseen] = useState<'hide' | 'faint'>('hide')
   return (
     <TimeScrubber
       edges={edges}
@@ -27,6 +28,8 @@ function Harness({ onChange }: { onChange?: (w: TimeWindow | null) => void }) {
       onAnimateChange={() => {}}
       appearWhenSeen={appear}
       onAppearWhenSeenChange={setAppear}
+      unseenStyle={unseen}
+      onUnseenStyleChange={setUnseen}
     />
   )
 }
@@ -77,7 +80,12 @@ describe('TimeScrubber', () => {
     expect(screen.getByTestId('timeline-readout')).not.toHaveTextContent('Whole capture')
     const appear = screen.getByRole('switch', { name: 'Nodes appear when first seen' })
     expect(appear).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Show them faint' })).not.toBeInTheDocument()
     await user.click(appear)
     expect(appear).toBeChecked()
+    // Not-seen nodes: hidden by default, or faint.
+    expect(screen.getByRole('button', { name: 'Hide them' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Show them faint' }))
+    expect(screen.getByRole('button', { name: 'Show them faint' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
