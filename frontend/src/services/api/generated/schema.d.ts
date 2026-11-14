@@ -2821,6 +2821,7 @@ export interface components {
             customSignatures?: string[];
             dstGeo?: components["schemas"]["GeoInfo"];
             dstIp?: string;
+            dstMac?: string;
             /** Format: int32 */
             dstPort?: number;
             /** Format: int64 */
@@ -2841,6 +2842,7 @@ export interface components {
             protocol?: string;
             srcGeo?: components["schemas"]["GeoInfo"];
             srcIp?: string;
+            srcMac?: string;
             /** Format: int32 */
             srcPort?: number;
             /** Format: date-time */
@@ -2888,6 +2890,7 @@ export interface components {
             dstAccount?: components["schemas"]["AccountAtTime"];
             dstGeo?: components["schemas"]["GeoInfo"];
             dstIp?: string;
+            dstMac?: string;
             /** Format: int32 */
             dstPort?: number;
             /** Format: int64 */
@@ -2908,6 +2911,7 @@ export interface components {
             srcAccount?: components["schemas"]["AccountAtTime"];
             srcGeo?: components["schemas"]["GeoInfo"];
             srcIp?: string;
+            srcMac?: string;
             /** Format: int32 */
             srcPort?: number;
             /** Format: date-time */
@@ -3743,7 +3747,10 @@ export interface components {
             hostname?: string;
             /** Format: int32 */
             idx?: number;
+            key?: string;
             mac?: string;
+            network?: string;
+            networkMacs?: string[];
             startEvidence?: string;
             startSource?: string;
             /** Format: date-time */

@@ -883,14 +883,42 @@ class PipelineIntegrationTest {
     assertThat(overlap.get("sharedAddresses").toString())
         .contains("192.168.1.1\"").contains("192.168.1.10").contains("192.168.1.13").doesNotContain("192.168.1.14");
 
+    // One device per network (phase 2a), told apart by MAC, not split by time.
     JsonNode occ = rest.getForEntity(files + "/hosts/192.168.1.10/occupancies", JsonNode.class).getBody();
-    assertThat(occ.get("occupancies")).hasSize(1); // two networks, not a hand-over
     assertThat(occ.get("networks")).hasSize(2);
+    assertThat(occ.get("occupancies")).hasSize(2);
+    JsonNode hq = occ.get("occupancies").get(0);
+    JsonNode branch = occ.get("occupancies").get(1);
+    assertThat(hq.get("key").asText()).isEqualTo("192.168.1.10");
+    assertThat(hq.get("hostname").asText()).isEqualTo("HQ-LAPTOP-01");
+    assertThat(branch.get("key").asText()).isEqualTo("192.168.1.10~server:00:1b:21:bb:00:01");
+    assertThat(branch.get("hostname").asText()).isEqualTo("BR-TILL-01");
+    assertThat(branch.get("network").asText()).isEqualTo("branch.corp.example");
+    // Each classified from its own network's traffic (the vendor needs the OUI file, absent here).
+    assertThat(branch.get("mac").asText()).isEqualTo("8c:71:f8:20:00:00");
+    assertThat(hq.get("mac").asText()).isEqualTo("f8:bc:12:10:00:00");
+    assertThat(branch.get("conversations").asLong()).isPositive();
+    assertThat(hq.get("conversations").asLong()).isPositive();
+    assertThat(branch.get("classification").get("deviceType").asText()).isNotBlank();
+    // And has its own identity, under its key.
+    String branchKey = branch.get("key").asText();
+    boolean found = false;
+    for (JsonNode h : rest.getForEntity(files + "/host-identities", JsonNode.class).getBody()) {
+      if (branchKey.equals(h.get("ip").asText())) found = true;
+    }
+    assertThat(found).as("the Branch till has its own identity").isTrue();
+    // A time split doesn't apply to it.
+    java.util.Map<String, Object> split = new java.util.HashMap<>();
+    split.put("action", "split");
+    split.put("reason", "x");
+    split.put("at", java.time.LocalDateTime.now().toString());
+    assertThat(rest.postForEntity(files + "/hosts/192.168.1.10/occupancy-decisions", split, JsonNode.class).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
     String warning = null;
     for (JsonNode h : rest.getForEntity(files + "/host-classifications", JsonNode.class).getBody()) {
       if ("192.168.1.10".equals(h.get("ip").asText())) warning = h.get("identityWarning").asText();
     }
-    assertThat(warning).contains("2 networks").contains("hq.corp.example");
+    assertThat(warning).contains("2 networks").contains("hq.corp.example").contains("one device per network");
     assertThat(rest.getForEntity("/api/v1/files/" + java.util.UUID.randomUUID() + "/network-segments", JsonNode.class)
             .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
   }

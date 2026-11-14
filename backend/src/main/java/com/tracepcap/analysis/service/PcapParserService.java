@@ -60,7 +60,7 @@ public class PcapParserService {
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
     // When each ARP claim (ip, mac) was first and last seen (#918 item 3): [first, last].
     Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
-    Map<String, Map<Integer, TtlWindow>> hostTtlWindows = new HashMap<>();
+    Map<String, Map<String, TtlWindow>> hostTtlWindows = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
     // Discarded with the parse; see pooled().
@@ -274,9 +274,12 @@ public class PcapParserService {
               if (seen.size() < 16) seen.add(ttl); // a handful is enough to see a conflict
               // When each TTL was sent (#918 slice 2), so a device holding the address part of the
               // time gets its own TTL. Capped like the observations above.
-              Map<Integer, TtlWindow> byTtl = hostTtlWindows.computeIfAbsent(srcIp, k -> new HashMap<>());
-              TtlWindow tw = byTtl.get(ttl);
-              if (tw == null && byTtl.size() < 16) byTtl.put(ttl, tw = new TtlWindow(timestamp));
+              // Per TTL and sending MAC (#462), so two machines on one address on two networks
+              // each get their own.
+              Map<String, TtlWindow> byTtl = hostTtlWindows.computeIfAbsent(srcIp, k -> new HashMap<>());
+              String twKey = ttl + "|" + (srcMac == null ? "" : srcMac);
+              TtlWindow tw = byTtl.get(twKey);
+              if (tw == null && byTtl.size() < 16) byTtl.put(twKey, tw = new TtlWindow(timestamp, ttl, srcMac));
               if (tw != null) tw.see(timestamp);
             }
             if (srcMac != null) ethMacsByIp.computeIfAbsent(srcIp, k -> new LinkedHashSet<>()).add(srcMac);
@@ -354,6 +357,12 @@ public class PcapParserService {
                     });
             conv.setPacketCount(conv.getPacketCount() + 1);
             conv.setTotalBytes(conv.getTotalBytes() + packetSize);
+            // Each side's MAC (#462): the first eth.src seen from it. A local host's own MAC, or for
+            // traffic from outside the site's router MAC, which says which network it was on.
+            if (srcMac != null) {
+              if (fSrcIp.equals(conv.getSrcIp()) && conv.getSrcMac() == null) conv.setSrcMac(srcMac);
+              else if (fSrcIp.equals(conv.getDstIp()) && conv.getDstMac() == null) conv.setDstMac(srcMac);
+            }
             if (timestamp.isAfter(conv.getEndTime())) conv.setEndTime(timestamp);
 
             // Who opened this connection (#496). SYN without ACK is the opening packet; SYN+ACK is
@@ -636,7 +645,7 @@ public class PcapParserService {
     private Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
 
     /** Per source IP, per TTL: when it was first and last sent, and how often (#918 slice 2). */
-    private Map<String, Map<Integer, TtlWindow>> hostTtlWindows = new HashMap<>();
+    private Map<String, Map<String, TtlWindow>> hostTtlWindows = new HashMap<>();
   }
 
   /** When one TTL was first and last seen from an address, and in how many packets. */
@@ -644,10 +653,22 @@ public class PcapParserService {
     private LocalDateTime first;
     private LocalDateTime last;
     private long packets;
+    private final int ttl;
+    private final String mac;
 
-    public TtlWindow(LocalDateTime at) {
+    public TtlWindow(LocalDateTime at, int ttl, String mac) {
       this.first = at;
       this.last = at;
+      this.ttl = ttl;
+      this.mac = mac;
+    }
+
+    public int ttl() {
+      return ttl;
+    }
+
+    public String mac() {
+      return mac;
     }
 
     void see(LocalDateTime at) {
@@ -701,6 +722,9 @@ public class PcapParserService {
     private List<String> httpUserAgents = new ArrayList<>();
     private String category;
     private String hostname;
+    /** Each side's MAC (#462): the first eth.src seen from srcIp, and from dstIp. */
+    private String srcMac;
+    private String dstMac;
     private String ja3Client;
     private String ja3Server;
     private String tlsIssuer;

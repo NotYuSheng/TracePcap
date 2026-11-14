@@ -37,23 +37,46 @@ What It Shows
 Then the **addresses used on more than one** of them, including the routers'
 when they share one. Each is a different machine on each network.
 
-On those addresses:
+One Device per Network
+----------------------
 
-- The host's details warn **Used on 2 networks that share this range (…): a
-  different machine on each.**
-- They aren't split into devices over time (see :doc:`address-reuse`). Two
-  networks at once aren't one device handing an address to another.
+An address used on two networks is **one device per network**, the same way an
+address that changed hands is one device per holder (:doc:`address-reuse`):
 
-What This Doesn't Change Yet
-----------------------------
+- **Network graph:** one node per network, labelled with the machine's hostname
+  there (for example ``HQ-LAPTOP-01`` and ``BR-TILL-01`` for ``192.168.1.10``).
+- **Which conversation is whose** is told by **MAC**: each conversation records
+  the MAC on each side. That's the machine itself, or for traffic from outside,
+  the site's router. Both are known per network from the DHCP leases.
+- **Classification:** each machine is classified from its own network's
+  conversations, MAC and TTLs.
+- **Host details:** **Devices on this address** lists the machine on each
+  network. The **Identity**, label, role and evidence are for the one you pick,
+  under its own key (the first network's machine keeps the address,
+  ``192.168.1.10``; the other is ``192.168.1.10~<network>``).
+- The host warns **Used on 2 networks that share this range (…): a different
+  machine on each, shown as one device per network.**
+- They aren't split or merged by time: two machines at once aren't one device
+  handing an address over.
 
-Outside the Overview panel and that warning, an address used on two networks is
-still **one host**: one classification, one graph node, and one set of labels,
-mixing both machines. Keeping them apart everywhere, with the network as part of
-a host's identity, is planned (#462).
+Networks are ordered by when they first leased an address, so which machine
+keeps the bare address doesn't change between runs.
 
-Only addresses that got a DHCP lease (and the routers) can be placed on a
-network. A static address with no lease isn't assigned to either.
+Limits
+------
+
+- Only addresses that got a DHCP lease, and the routers, can be placed on a
+  network. A static address with no lease isn't assigned to either.
+- Two conversations with the same addresses, ports and protocol on both networks
+  are one conversation to TracePcap, recorded under the MAC seen first. Real
+  machines pick their own ephemeral ports, so this is rare except for fixed-port
+  traffic such as DHCP.
+- A Windows sign-in records no MAC, so on a shared address it isn't placed on
+  either network's machine.
+- Elsewhere (Story, reports, the network cluster view, the monitor views) the
+  address is still one host, as for addresses that changed hands.
+- Subnet labels in Monitor are still per CIDR: one label for both sites'
+  ``192.168.1.0/24`` (#462).
 
 Try It
 ------

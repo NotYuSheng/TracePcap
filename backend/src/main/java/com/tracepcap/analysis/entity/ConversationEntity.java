@@ -63,6 +63,13 @@ public class ConversationEntity {
   @Column(name = "initiator_ip", length = 45)
   private String initiatorIp;
 
+  /** Each side's MAC (#462): the machine, or for outside traffic the site's router. */
+  @Column(name = "src_mac", length = 50)
+  private String srcMac;
+
+  @Column(name = "dst_mac", length = 50)
+  private String dstMac;
+
   @Column(name = "initiator_port")
   private Integer initiatorPort;
 

@@ -48,4 +48,8 @@ public class HostTtlWindowEntity {
 
   @Column(nullable = false)
   private long packets;
+
+  /** The MAC the TTL was sent from (#462); null on rows from before it was recorded. */
+  @Column(length = 50)
+  private String mac;
 }

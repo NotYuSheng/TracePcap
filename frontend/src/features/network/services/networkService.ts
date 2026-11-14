@@ -42,14 +42,25 @@ function occupancySpans(reused?: ReusedAddress[]): Map<string, OccupancySpan[]> 
   return out;
 }
 
-/** The node id for an address in one conversation: the IP, or `ip@idx` for the device holding it then. */
-export function occupancyNodeId(ip: string, startTime: number, spans: Map<string, OccupancySpan[]>): string {
+/**
+ * The node id for an address in one conversation: the IP, or `ip@idx` for its device then. A device
+ * on one of several networks sharing the range (#462) is picked by the MAC on the address's side of
+ * the conversation; one over time, by when the conversation started.
+ */
+export function occupancyNodeId(
+  ip: string,
+  startTime: number,
+  spans: Map<string, OccupancySpan[]>,
+  mac?: string,
+): string {
   const list = spans.get(ip);
   if (!list) return ip;
-  const hit =
-    list.find(
-      s => (s.startsAt == null || startTime >= s.startsAt) && (s.endsAt == null || startTime < s.endsAt),
-    ) ?? list[0];
+  const byNetwork = list.some(s => s.occ.networkMacs && s.occ.networkMacs.length > 0);
+  const hit = byNetwork
+    ? (mac ? list.find(s => s.occ.networkMacs?.includes(mac.toLowerCase())) : undefined) ?? list[0]
+    : list.find(
+        s => (s.startsAt == null || startTime >= s.startsAt) && (s.endsAt == null || startTime < s.endsAt),
+      ) ?? list[0];
   return `${ip}@${hit.occ.idx}`;
 }
 
@@ -298,7 +309,8 @@ export function buildNetworkGraph(
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
   const spans = occupancySpans(reusedAddresses);
-  const keyOf = (ip: string, conv: Conversation) => occupancyNodeId(ip, conv.startTime, spans);
+  const keyOf = (ip: string, conv: Conversation) =>
+    occupancyNodeId(ip, conv.startTime, spans, conv.endpoints.find(e => e.ip === ip)?.mac);
   /** Creates the node for `key`, which is an address or one device's stretch on it. */
   const ensureNode = (key: string, ip: string, hostname?: string, mac?: string) => {
     if (nodeMap[key]) return nodeMap[key];
@@ -311,14 +323,15 @@ export function buildNetworkGraph(
         node.data.occupancy = {
           idx: span.occ.idx,
           of: list.length,
-          key: span.occ.startsAt && span.occ.boundaryKey ? `${ip}@${span.occ.boundaryKey}` : ip,
+          key: span.occ.key ?? (span.occ.startsAt && span.occ.boundaryKey ? `${ip}@${span.occ.boundaryKey}` : ip),
           startsAt: span.startsAt,
           endsAt: span.endsAt,
         };
         // This device's own MAC and DHCP name, not whichever the address's conversations carried first.
         node.data.mac = span.occ.mac ?? undefined;
         node.data.hostname = span.occ.hostname ?? undefined;
-        node.label = span.occ.hostname || `${ip} · ${span.occ.idx + 1}/${list.length}`;
+        node.label =
+          span.occ.hostname || (span.occ.network ? `${ip} · ${span.occ.network}` : `${ip} · ${span.occ.idx + 1}/${list.length}`);
       }
     }
     nodeMap[key] = node;

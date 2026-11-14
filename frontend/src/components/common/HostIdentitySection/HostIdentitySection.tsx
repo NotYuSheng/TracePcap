@@ -295,7 +295,7 @@ export function HostIdentitySection({
         <>
           <Alert variant="info" className="py-2 small mb-2" data-testid="host-one-device">
             <i className="bi bi-phone me-1" aria-hidden="true" />
-            More than one device held {ip} in this capture
+            More than one device used {ip} in this capture, in turn or on networks that share its range
             {fromGraphNode ? ', so the graph shows each one as its own node' : ''}. The identity, label
             and evidence below are for the device marked{' '}
             <strong>{isThisNode ? 'this node' : 'showing'}</strong>, classified from its own traffic.

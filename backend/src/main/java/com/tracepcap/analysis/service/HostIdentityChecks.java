@@ -87,7 +87,7 @@ final class HostIdentityChecks {
       if (networks != null && networks.size() > 1) {
         h.setIdentityWarning(
             "Used on " + networks.size() + " networks that share this range (" + String.join(", ", networks)
-                + "): a different machine on each. TracePcap shows them as one host.");
+                + "): a different machine on each, shown as one device per network.");
         continue;
       }
 

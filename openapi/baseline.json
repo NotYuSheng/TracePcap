@@ -705,6 +705,9 @@
           "dstIp": {
             "type": "string"
           },
+          "dstMac": {
+            "type": "string"
+          },
           "dstPort": {
             "format": "int32",
             "type": "integer"
@@ -762,6 +765,9 @@
             "$ref": "#/components/schemas/GeoInfo"
           },
           "srcIp": {
+            "type": "string"
+          },
+          "srcMac": {
             "type": "string"
           },
           "srcPort": {
@@ -895,6 +901,9 @@
           "dstIp": {
             "type": "string"
           },
+          "dstMac": {
+            "type": "string"
+          },
           "dstPort": {
             "format": "int32",
             "type": "integer"
@@ -949,6 +958,9 @@
             "$ref": "#/components/schemas/GeoInfo"
           },
           "srcIp": {
+            "type": "string"
+          },
+          "srcMac": {
             "type": "string"
           },
           "srcPort": {
@@ -3288,8 +3300,20 @@
             "format": "int32",
             "type": "integer"
           },
+          "key": {
+            "type": "string"
+          },
           "mac": {
             "type": "string"
+          },
+          "network": {
+            "type": "string"
+          },
+          "networkMacs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "startEvidence": {
             "type": "string"

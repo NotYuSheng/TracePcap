@@ -20,6 +20,12 @@ export interface Occupancy {
   conversations: number;
   /** This device's own classification, from its stretch's traffic only (#918 slice 2). */
   classification?: OccupancyClassification | null;
+  /** The device's key: the bare IP for the first, ip@start or ip~network for another. */
+  key?: string | null;
+  /** The network it was on, when the address is used on several that share its range (#462). */
+  network?: string | null;
+  /** That network's MACs: a conversation is this device's when its side's MAC is one of them. */
+  networkMacs?: string[] | null;
 }
 
 /** Mirrors HostOccupancyResponse.Classification. */

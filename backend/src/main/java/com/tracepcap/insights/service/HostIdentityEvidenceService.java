@@ -88,7 +88,7 @@ public class HostIdentityEvidenceService {
     Set<String> peers = new LinkedHashSet<>();
     Set<String> apps = new LinkedHashSet<>();
     for (ConversationFacts c : conversationLookup.conversationFactsForIp(fileId, address)) {
-      if (span.isPresent() && !inSpan(c.flow().startTime(), span.get())) continue;
+      if (span.isPresent() && !span.get().contains(c.flow().startTime(), c.flow().macOf(address))) continue;
       conversationCount++;
       String src = c.flow().srcIp();
       String dst = c.flow().dstIp();
@@ -155,12 +155,6 @@ public class HostIdentityEvidenceService {
     }
 
     return Optional.of(b.build());
-  }
-
-  /** Whether a conversation that started at {@code t} belongs to the device's stretch. */
-  private static boolean inSpan(java.time.LocalDateTime t, HostClassificationLookup.DeviceSpan s) {
-    if (t == null) return s.startsAt() == null;
-    return (s.startsAt() == null || !t.isBefore(s.startsAt())) && (s.endsAt() == null || t.isBefore(s.endsAt()));
   }
 
   private static java.util.Map<String, Object> reclassified(

@@ -117,13 +117,16 @@ public class HostOccupancyService {
       if (w.stream().map(OccupancyBuilder.MacWindow::mac).distinct().count() > 1) ips.add(ip);
     });
     Set<String> virtual = virtualIps != null ? virtualIps : virtualIps(fileId);
-    // An address used on two networks at once (#462) is two machines, not one handing over.
-    Map<String, List<String>> multi = severalNetworks(fileId);
+    // An address used on two networks at once (#462) is a different machine on each: one device
+    // per network, not devices handing the address over in time.
+    Map<String, List<NetworkSegments.NetDevice>> perNetwork = segments(fileId).devicesOnSeveralNetworks();
     Map<String, Integer> counts = new TreeMap<>();
     for (String ip : ips) {
-      var result = OccupancyBuilder.build(windows.get(ip), decided.get(ip), !virtual.contains(ip) && !multi.containsKey(ip));
+      if (perNetwork.containsKey(ip)) continue;
+      var result = OccupancyBuilder.build(windows.get(ip), decided.get(ip), !virtual.contains(ip));
       if (save(fileId, ip, result) > 1) counts.put(ip, result.occupancies().size());
     }
+    perNetwork.forEach((ip, devices) -> counts.put(ip, saveNetworkDevices(fileId, ip, devices)));
     return counts;
   }
 
@@ -132,6 +135,8 @@ public class HostOccupancyService {
   @Transactional(readOnly = true)
   public HostOccupancyResponse view(UUID fileId, String ip) {
     requireFile(fileId);
+    List<String> onNetworks = severalNetworks(fileId).get(ip);
+    if (onNetworks != null) return networkView(fileId, ip, onNetworks);
     var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
     List<OccupancyDecisionEntity> ds = decisions.findByFileIdAndIpOrderByAt(fileId, ip);
     boolean virtual = virtualIps(fileId).contains(ip);
@@ -167,6 +172,7 @@ public class HostOccupancyService {
               .automatic(o.startsAt() != null && automatic.contains(o.startsAt()))
               .conversations(n)
               .classification(sameStretch && result.occupancies().size() > 1 ? classificationOf(row) : null)
+              .key(com.tracepcap.analysis.spi.DeviceKeys.key(ip, o.startsAt()))
               .build());
     }
     Set<LocalDateTime> boundaries = new HashSet<>();
@@ -196,6 +202,10 @@ public class HostOccupancyService {
   public List<HostOccupancyResponse.ReusedAddress> listForFile(UUID fileId) {
     requireFile(fileId);
     Map<String, List<HostOccupancyResponse.Occupancy>> byIp = new LinkedHashMap<>();
+    var seg = segments(fileId);
+    Map<String, String> labels = new HashMap<>();
+    seg.segments().forEach(x -> labels.put(x.key(), x.label()));
+    Map<String, Set<String>> macs = seg.macsBySegment();
     for (IpOccupancyEntity o : occupancies.findByFileIdOrderByIpAscIdxAsc(fileId)) {
       byIp.computeIfAbsent(o.getIp(), k -> new ArrayList<>())
           .add(
@@ -211,6 +221,9 @@ public class HostOccupancyService {
                   .automatic(!"manual".equals(o.getStartSource()) && o.getStartsAt() != null)
                   .conversations(o.getConversationCount() == null ? 0 : o.getConversationCount())
                   .classification(classificationOf(o))
+                  .key(o.key())
+                  .network(o.getSegmentKey() == null ? null : labels.get(o.getSegmentKey()))
+                  .networkMacs(o.getSegmentKey() == null ? null : new ArrayList<>(macs.getOrDefault(o.getSegmentKey(), Set.of())))
                   .build());
     }
     List<HostOccupancyResponse.ReusedAddress> out = new ArrayList<>();
@@ -241,6 +254,12 @@ public class HostOccupancyService {
   public HostOccupancyResponse decide(UUID fileId, String ip, OccupancyDecisionRequest request) {
     permissionService.require(PermissionAction.HOST_OCCUPANCY);
     requireFile(fileId);
+    List<String> networks = severalNetworks(fileId).get(ip);
+    if (networks != null) {
+      throw new IllegalArgumentException(
+          ip + " is a different machine on each of " + networks.size()
+              + " networks that share its range, so it isn't split or merged by time.");
+    }
     LocalDateTime at = request.getAt();
     String action = request.getAction();
     if (OccupancyDecisionEntity.SPLIT.equals(action)) {
@@ -316,6 +335,12 @@ public class HostOccupancyService {
 
   private void recomputeOne(UUID fileId, String ip) {
     occupancies.deleteByFileIdAndIp(fileId, ip);
+    var perNetwork = segments(fileId).devicesOnSeveralNetworks().get(ip);
+    if (perNetwork != null) {
+      saveNetworkDevices(fileId, ip, perNetwork);
+      occupancyClassification.classifyAddress(fileId, ip);
+      return;
+    }
     var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
     var ds = decisions.findByFileIdAndIpOrderByAt(fileId, ip).stream().map(HostOccupancyService::toDecision).toList();
     var result = OccupancyBuilder.build(windows, ds, autoSplitAllowed(fileId, ip));
@@ -346,6 +371,7 @@ public class HostOccupancyService {
               .endsAt(o.endsAt())
               .startSource(o.startSource())
               .startEvidence(o.startEvidence())
+              .deviceKey(com.tracepcap.analysis.spi.DeviceKeys.key(ip, o.startsAt()))
               .build());
     }
     occupancies.saveAll(rows);
@@ -370,6 +396,77 @@ public class HostOccupancyService {
     return out;
   }
 
+  /** An address used on several networks: one device per network, from the stored rows (#462). */
+  private HostOccupancyResponse networkView(UUID fileId, String ip, List<String> networks) {
+    var seg = segments(fileId);
+    Map<String, String> labels = new HashMap<>();
+    seg.segments().forEach(x -> labels.put(x.key(), x.label()));
+    Map<String, Set<String>> macs = seg.macsBySegment();
+    List<LocalDateTime[]> times = conversationTimes(fileId, ip);
+    List<HostOccupancyResponse.Occupancy> occ = new ArrayList<>();
+    for (IpOccupancyEntity o : occupancies.findByFileIdAndIpOrderByIdx(fileId, ip)) {
+      occ.add(
+          HostOccupancyResponse.Occupancy.builder()
+              .idx(o.getIdx())
+              .mac(o.getMac())
+              .hostname(o.getHostname())
+              .startSource(o.getStartSource())
+              .startEvidence(o.getStartEvidence())
+              .automatic(false)
+              .conversations(o.getConversationCount() == null ? 0 : o.getConversationCount())
+              .classification(classificationOf(o))
+              .key(o.key())
+              .network(o.getSegmentKey() == null ? null : labels.get(o.getSegmentKey()))
+              .networkMacs(o.getSegmentKey() == null ? null : new ArrayList<>(macs.getOrDefault(o.getSegmentKey(), Set.of())))
+              .build());
+    }
+    return HostOccupancyResponse.builder()
+        .ip(ip)
+        .firstActivity(times.isEmpty() ? null : times.get(0)[0])
+        .lastActivity(lastActivity(times))
+        .overlapping(false)
+        .virtualAddress(false)
+        .networks(networks)
+        .occupancies(occ)
+        .decisions(List.of())
+        .suggestions(List.of())
+        .canEdit(false)
+        .editReason("A different machine on each network that shares this range, so it isn't split or merged by time.")
+        .build();
+  }
+
+  /**
+   * One device per network for an address used on several networks that share its range (#462
+   * phase 2a). The first network's device keeps the bare IP; the others are ip~network. Returns how
+   * many there are.
+   */
+  private int saveNetworkDevices(UUID fileId, String ip, List<NetworkSegments.NetDevice> devices) {
+    List<IpOccupancyEntity> rows = new ArrayList<>();
+    for (int i = 0; i < devices.size(); i++) {
+      var d = devices.get(i);
+      rows.add(
+          IpOccupancyEntity.builder()
+              .fileId(fileId)
+              .ip(ip)
+              .idx(i)
+              .segmentKey(d.segmentKey())
+              .mac(d.mac())
+              .hostname(d.hostname())
+              .startSource("network")
+              // The network heads the device in the list; nothing to add as evidence.
+              .startEvidence(null)
+              .deviceKey(i == 0 ? ip : com.tracepcap.analysis.spi.DeviceKeys.key(ip, d.segmentKey(), null))
+              .build());
+    }
+    occupancies.saveAll(rows);
+    return rows.size();
+  }
+
+  /** The capture's networks, from its DHCP leases (#462). */
+  private NetworkSegments.Result segments(UUID fileId) {
+    return NetworkSegments.of(leases.findByFileId(fileId));
+  }
+
   /** Not a failover address, and not used on several networks at once (#462). */
   private boolean autoSplitAllowed(UUID fileId, String ip) {
     return !virtualIps(fileId).contains(ip) && !severalNetworks(fileId).containsKey(ip);
@@ -377,7 +474,7 @@ public class HostOccupancyService {
 
   /** Addresses leased on more than one network with overlapping ranges, with those networks (#462). */
   public Map<String, List<String>> severalNetworks(UUID fileId) {
-    return NetworkSegments.of(leases.findByFileId(fileId)).addressesOnSeveralNetworks();
+    return segments(fileId).addressesOnSeveralNetworks();
   }
 
   private Set<String> virtualIps(UUID fileId) {

@@ -25,6 +25,8 @@ interface ConversationApiResponse {
   dstPort: number | null;
   /** Who sent SYN without ACK (#496). Null when unknown — no handshake, or capture joined mid-flow. */
   initiatorIp?: string | null;
+  srcMac?: string | null;
+  dstMac?: string | null;
   initiatorPort?: number | null;
   protocol: string;
   appName?: string | null;
@@ -105,8 +107,9 @@ function transformConversation(
   apiData: ConversationApiResponse,
   packets: Packet[] = []
 ): Conversation {
-  const srcEndpoint: NetworkEndpoint = { ip: apiData.srcIp, port: apiData.srcPort ?? 0 };
-  const dstEndpoint: NetworkEndpoint = { ip: apiData.dstIp, port: apiData.dstPort ?? 0 };
+  // Each side's MAC (#462): the machine, or for outside traffic the site's router.
+  const srcEndpoint: NetworkEndpoint = { ip: apiData.srcIp, port: apiData.srcPort ?? 0, mac: apiData.srcMac ?? undefined };
+  const dstEndpoint: NetworkEndpoint = { ip: apiData.dstIp, port: apiData.dstPort ?? 0, mac: apiData.dstMac ?? undefined };
 
   return {
     id: apiData.conversationId,

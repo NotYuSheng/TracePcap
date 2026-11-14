@@ -141,7 +141,24 @@ public interface HostClassificationLookup {
    * One device's stretch on an address that more than one device held (#918 slice 3): its key
    * ({@link DeviceKeys}), and [startsAt, endsAt), null = capture start or end.
    */
-  record DeviceSpan(String ip, String key, int idx, int of, java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt) {}
+  record DeviceSpan(
+      String ip, String key, int idx, int of, java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt,
+      java.util.Set<String> networkMacs) {
+
+    public DeviceSpan(String ip, String key, int idx, int of, java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt) {
+      this(ip, key, idx, of, startsAt, endsAt, null);
+    }
+
+    /**
+     * Whether a flow is this device's: on its network when it's one of several sharing the range
+     * (#462), by that side's MAC (unknown counts for the first); else started in its stretch.
+     */
+    public boolean contains(java.time.LocalDateTime start, String mac) {
+      if (networkMacs != null) return mac == null ? idx == 0 : networkMacs.contains(mac.toLowerCase());
+      if (start == null) return startsAt == null;
+      return (startsAt == null || !start.isBefore(startsAt)) && (endsAt == null || start.isBefore(endsAt));
+    }
+  }
 
   /**
    * Every device on every address more than one device held, each classified from its own traffic

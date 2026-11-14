@@ -17,6 +17,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
 
   private final HostClassificationRepository repository;
   private final com.tracepcap.analysis.repository.IpOccupancyRepository occupancies;
+  private final com.tracepcap.analysis.repository.DhcpLeaseRepository leases;
 
   @Override
   public List<ClassifiedHost> classifiedHosts(UUID fileId) {
@@ -42,7 +43,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
       if (o.getDeviceType() == null) continue; // not classified (no traffic in its stretch)
       out.add(
           new ClassifiedHost(
-              com.tracepcap.analysis.spi.DeviceKeys.key(o.getIp(), o.getStartsAt()),
+              o.key(),
               o.getDeviceType(),
               o.getConfidence() == null ? 0 : o.getConfidence(),
               o.getWinnerScore(),
@@ -56,8 +57,15 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
 
   @Override
   public Optional<DeviceSpan> deviceSpan(UUID fileId, String key) {
-    return occupancyFor(fileId, key).map(found -> new DeviceSpan(
-        found.row().getIp(), key, found.row().getIdx(), found.of(), found.row().getStartsAt(), found.row().getEndsAt()));
+    return occupancyFor(fileId, key).map(found -> {
+      var o = found.row();
+      // A device on one of several networks sharing the range (#462): its network's MACs.
+      java.util.Set<String> macs =
+          o.getSegmentKey() == null
+              ? null
+              : NetworkSegments.of(leases.findByFileId(fileId)).macsBySegment().getOrDefault(o.getSegmentKey(), java.util.Set.of());
+      return new DeviceSpan(o.getIp(), key, o.getIdx(), found.of(), o.getStartsAt(), o.getEndsAt(), macs);
+    });
   }
 
   @Override
@@ -97,7 +105,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
     List<HostFacts> out = new java.util.ArrayList<>();
     for (HostFacts h : hosts) if (!reused.contains(h.ip())) out.add(h);
     for (var o : rows) {
-      deviceFacts(fileId, com.tracepcap.analysis.spi.DeviceKeys.key(o.getIp(), o.getStartsAt())).ifPresent(out::add);
+      deviceFacts(fileId, o.key()).ifPresent(out::add);
     }
     return out;
   }
@@ -106,7 +114,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
   public Optional<String> keyForMac(UUID fileId, String mac) {
     if (mac == null) return Optional.empty();
     for (var o : occupancies.findByFileIdAndMacIgnoreCaseOrderByIpAscIdxAsc(fileId, mac)) {
-      return Optional.of(com.tracepcap.analysis.spi.DeviceKeys.key(o.getIp(), o.getStartsAt()));
+      return Optional.of(o.key());
     }
     return hostFactsByMac(fileId, mac).map(HostFacts::ip);
   }
@@ -119,7 +127,7 @@ public class HostClassificationLookupAdapter implements HostClassificationLookup
     var rows = occupancies.findByFileIdAndIpOrderByIdx(fileId, ip);
     if (rows.size() < 2) return Optional.empty();
     for (var o : rows) {
-      if (com.tracepcap.analysis.spi.DeviceKeys.key(ip, o.getStartsAt()).equals(key)) return Optional.of(new Found(o, rows.size()));
+      if (o.key().equals(key)) return Optional.of(new Found(o, rows.size()));
     }
     return Optional.empty();
   }

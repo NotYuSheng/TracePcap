@@ -44,6 +44,7 @@ interface Props {
 
 /** A device's key (#918 slice 3): the bare IP for the first, `ip@<start>` for a later one. */
 export function deviceKey(ip: string, o: Occupancy): string {
+  if (o.key) return o.key;
   return o.startsAt && o.boundaryKey ? `${ip}@${o.boundaryKey}` : ip;
 }
 
@@ -137,7 +138,7 @@ export function HostOccupancySection({ fileId, ip, focusIdx, focusLabel = 'this 
               data-testid="occupancy-row"
             >
               <div>
-                <strong>{range(o)}</strong>
+                <strong>{o.network ? `On ${o.network}` : range(o)}</strong>
                 {focusIdx === o.idx && (
                   <span className="badge bg-primary-subtle text-primary-emphasis ms-2" data-testid="occupancy-this-node">
                     {focusLabel}
