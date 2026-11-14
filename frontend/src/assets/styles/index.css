@@ -70,9 +70,17 @@ body {
   flex-direction: column;
 }
 
-/* Container width - consistent with MeetMemo */
+/* One page width for every centred page (home, Monitor, Settings), under the full-width header. */
 .container {
-  max-width: 1200px;
+  max-width: 1280px;
+}
+
+/* The design system's line-height of 2 made text and table rows loose; 1.5 reads better. */
+body {
+  line-height: 1.5;
+}
+.table > :not(caption) > * > * {
+  padding: 0.6rem 0.75rem;
 }
 
 /* Main Layout Styles */
@@ -122,6 +130,9 @@ body {
 }
 
 .main-footer {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  font-size: 0.78rem;
   border-top: 1px solid var(--tp-border);
   background-color: var(--tp-footer-bg) !important;
   color: var(--tp-text-muted);
@@ -287,7 +298,7 @@ body {
 .upload-page,
 .network-diagram-page,
 .not-found-page {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
