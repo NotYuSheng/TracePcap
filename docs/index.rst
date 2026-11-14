@@ -31,6 +31,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/reanalysis
    features/address-reuse
    features/network-devices
+   features/overlapping-networks
    features/network-address-config
    features/network-visualization
    features/network-cluster

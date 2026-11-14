@@ -2,6 +2,7 @@ import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { RuleScopeTag } from '@/features/detectionRules/RuleScopeTag';
 import { CaptureRulesCard } from '@/features/detectionRules/CaptureRulesCard';
 import { RuleSyncBanner } from '@/features/detectionRules/RuleSyncBanner';
+import { NetworkSegmentsPanel } from '@/features/networkSegments/NetworkSegmentsPanel';
 import { usePermission } from '@/features/me/useMe';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import { useState, useEffect } from 'react';
@@ -193,6 +194,9 @@ export const AnalysisOverview = () => {
         reason={rulesPermission.reason}
       />
       <AnalysisSummary summary={data} extractedFilesCount={extractedFilesCount} />
+
+      {/* Two networks on one range in this capture (#462): shown only when there are. */}
+      <NetworkSegmentsPanel fileId={fileId} />
 
       {/* This capture's own detection rules (#925 phase 3). */}
       <div className="mt-4">

@@ -85,6 +85,13 @@ public class HostOccupancyService {
               .hostname(l.hostname())
               .fingerprint(l.fingerprint())
               .vendorClass(l.vendorClass())
+              .serverMac(l.network() == null ? null : l.network().serverMac())
+              .serverId(l.network() == null ? null : l.network().serverId())
+              .router(l.network() == null ? null : l.network().router())
+              .domain(l.network() == null ? null : l.network().domain())
+              .leaseSeconds(l.network() == null ? null : l.network().leaseSeconds())
+              .subnetMask(l.network() == null ? null : l.network().subnetMask())
+              .vlanId(l.network() == null ? null : l.network().vlanId())
               .firstSeen(l.firstSeen())
               .lastSeen(l.lastSeen())
               .build());
@@ -110,9 +117,11 @@ public class HostOccupancyService {
       if (w.stream().map(OccupancyBuilder.MacWindow::mac).distinct().count() > 1) ips.add(ip);
     });
     Set<String> virtual = virtualIps != null ? virtualIps : virtualIps(fileId);
+    // An address used on two networks at once (#462) is two machines, not one handing over.
+    Map<String, List<String>> multi = severalNetworks(fileId);
     Map<String, Integer> counts = new TreeMap<>();
     for (String ip : ips) {
-      var result = OccupancyBuilder.build(windows.get(ip), decided.get(ip), !virtual.contains(ip));
+      var result = OccupancyBuilder.build(windows.get(ip), decided.get(ip), !virtual.contains(ip) && !multi.containsKey(ip));
       if (save(fileId, ip, result) > 1) counts.put(ip, result.occupancies().size());
     }
     return counts;
@@ -126,7 +135,10 @@ public class HostOccupancyService {
     var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
     List<OccupancyDecisionEntity> ds = decisions.findByFileIdAndIpOrderByAt(fileId, ip);
     boolean virtual = virtualIps(fileId).contains(ip);
-    var result = OccupancyBuilder.build(windows, ds.stream().map(HostOccupancyService::toDecision).toList(), !virtual);
+    List<String> networks = severalNetworks(fileId).get(ip);
+    var result =
+        OccupancyBuilder.build(
+            windows, ds.stream().map(HostOccupancyService::toDecision).toList(), !virtual && networks == null);
     Set<LocalDateTime> automatic = new HashSet<>(result.automaticBoundaries());
 
     List<LocalDateTime[]> times = conversationTimes(fileId, ip);
@@ -167,6 +179,7 @@ public class HostOccupancyService {
         .lastActivity(lastActivity(times))
         .overlapping(result.overlapping())
         .virtualAddress(virtual)
+        .networks(networks == null ? List.of() : networks)
         .occupancies(occ)
         .decisions(ds.stream().map(HostOccupancyService::toDto).toList())
         .suggestions(suggestions(windows, times, boundaries))
@@ -241,7 +254,8 @@ public class HostOccupancyService {
       }
     } else {
       var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
-      var auto = OccupancyBuilder.build(windows, List.of(), !virtualIps(fileId).contains(ip)).automaticBoundaries();
+      var auto =
+          OccupancyBuilder.build(windows, List.of(), autoSplitAllowed(fileId, ip)).automaticBoundaries();
       if (!auto.contains(at)) {
         throw new IllegalArgumentException("There's no automatic boundary at " + at + " to merge.");
       }
@@ -304,7 +318,7 @@ public class HostOccupancyService {
     occupancies.deleteByFileIdAndIp(fileId, ip);
     var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
     var ds = decisions.findByFileIdAndIpOrderByAt(fileId, ip).stream().map(HostOccupancyService::toDecision).toList();
-    var result = OccupancyBuilder.build(windows, ds, !virtualIps(fileId).contains(ip));
+    var result = OccupancyBuilder.build(windows, ds, autoSplitAllowed(fileId, ip));
     save(fileId, ip, result);
     // Each device the address is now split into, classified from its own traffic (slice 2).
     occupancyClassification.classifyAddress(fileId, ip);
@@ -354,6 +368,16 @@ public class HostOccupancyService {
           .add(new OccupancyBuilder.MacWindow(l.getMac(), l.getFirstSeen(), l.getLastSeen(), "dhcp", l.getHostname()));
     }
     return out;
+  }
+
+  /** Not a failover address, and not used on several networks at once (#462). */
+  private boolean autoSplitAllowed(UUID fileId, String ip) {
+    return !virtualIps(fileId).contains(ip) && !severalNetworks(fileId).containsKey(ip);
+  }
+
+  /** Addresses leased on more than one network with overlapping ranges, with those networks (#462). */
+  public Map<String, List<String>> severalNetworks(UUID fileId) {
+    return NetworkSegments.of(leases.findByFileId(fileId)).addressesOnSeveralNetworks();
   }
 
   private Set<String> virtualIps(UUID fileId) {

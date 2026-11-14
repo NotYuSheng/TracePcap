@@ -37,6 +37,22 @@ final class HostIdentityChecks {
       Map<String, FailoverAddressResolverService.VirtualAddress> failover,
       Map<String, ? extends Collection<String>> arpMacs,
       Set<String> reusedAddresses) {
+    apply(hosts, ttlObservations, hostnameClaims, failover, arpMacs, reusedAddresses, Map.of());
+  }
+
+  /**
+   * As above, and {@code severalNetworks}: addresses leased on more than one network that uses the
+   * same range (#462), with those networks. Each is a different machine per network, which the
+   * warning says plainly instead of guessing at cloned VMs or reuse.
+   */
+  static void apply(
+      List<HostClassificationEntity> hosts,
+      Map<String, ? extends Collection<Integer>> ttlObservations,
+      List<HostnameResolverService.Claim> hostnameClaims,
+      Map<String, FailoverAddressResolverService.VirtualAddress> failover,
+      Map<String, ? extends Collection<String>> arpMacs,
+      Set<String> reusedAddresses,
+      Map<String, List<String>> severalNetworks) {
     // The routers sending adverts are members, not virtual addresses, even though VRRP sends its
     // adverts from the virtual MAC.
     Set<String> members = new java.util.HashSet<>();
@@ -65,6 +81,14 @@ final class HostIdentityChecks {
       if (advertised != null || macProtocol != null) {
         markVirtual(h, advertised != null ? advertised.protocol() : macProtocol, advertised);
         continue; // a shared address: the per-machine checks below don't apply
+      }
+
+      List<String> networks = severalNetworks == null ? null : severalNetworks.get(h.getIp());
+      if (networks != null && networks.size() > 1) {
+        h.setIdentityWarning(
+            "Used on " + networks.size() + " networks that share this range (" + String.join(", ", networks)
+                + "): a different machine on each. TracePcap shows them as one host.");
+        continue;
       }
 
       List<String> warnings = new ArrayList<>();

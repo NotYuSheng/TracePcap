@@ -861,6 +861,41 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Two networks on one range (#462 phase 1): HQ and Branch both use 192.168.1.0/24, merged into one
+   * untagged capture. They're told apart by their DHCP servers' MACs, domains and lease times; the
+   * addresses used on both are listed, aren't mistaken for one device handing over, and carry a
+   * plain warning.
+   */
+  @Test
+  void networkSegments_tellTwoSitesOnOneRangeApart() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("two_sites_overlap_untagged.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    String files = "/api/v1/files/" + fileId;
+    JsonNode seg = rest.getForEntity(files + "/network-segments", JsonNode.class).getBody();
+    assertThat(seg.get("segments")).hasSize(2);
+    assertThat(seg.get("segments").toString()).contains("hq.corp.example").contains("branch.corp.example");
+    JsonNode overlap = seg.get("overlaps").get(0);
+    assertThat(overlap.get("cidr").asText()).isEqualTo("192.168.1.0/24");
+    assertThat(overlap.get("sharedAddresses").toString())
+        .contains("192.168.1.1\"").contains("192.168.1.10").contains("192.168.1.13").doesNotContain("192.168.1.14");
+
+    JsonNode occ = rest.getForEntity(files + "/hosts/192.168.1.10/occupancies", JsonNode.class).getBody();
+    assertThat(occ.get("occupancies")).hasSize(1); // two networks, not a hand-over
+    assertThat(occ.get("networks")).hasSize(2);
+    String warning = null;
+    for (JsonNode h : rest.getForEntity(files + "/host-classifications", JsonNode.class).getBody()) {
+      if ("192.168.1.10".equals(h.get("ip").asText())) warning = h.get("identityWarning").asText();
+    }
+    assertThat(warning).contains("2 networks").contains("hq.corp.example");
+    assertThat(rest.getForEntity("/api/v1/files/" + java.util.UUID.randomUUID() + "/network-segments", JsonNode.class)
+            .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

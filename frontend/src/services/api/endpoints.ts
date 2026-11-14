@@ -33,6 +33,8 @@ export const API_ENDPOINTS = {
   NETWORK_DEVICE_LINK: (networkId: string, linkId: number) => `/monitor/networks/${networkId}/device-links/${linkId}`,
   NETWORK_ORG_RULES: (networkId: string) => `/monitor/networks/${networkId}/ip-org-rules`,
   NETWORK_ORG_RULE: (networkId: string, id: number) => `/monitor/networks/${networkId}/ip-org-rules/${id}`,
+  /** The networks a capture holds, told apart by their DHCP leases (#462). */
+  FILE_NETWORK_SEGMENTS: (fileId: string) => `/files/${fileId}/network-segments`,
   /** Every address more than one device held, with each device's classification (#918 slice 2). */
   FILE_OCCUPANCIES: (fileId: string) => `/files/${fileId}/occupancies`,
   /** Which devices held an address when, and the analyst's split/merge decisions (#918). */

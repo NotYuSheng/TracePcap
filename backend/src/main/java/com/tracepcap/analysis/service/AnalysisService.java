@@ -594,9 +594,11 @@ public class AnalysisService {
     // Which device held each address when (#918 item 3), from the ARP claims above and the DHCP
     // leases, plus any split/merge decisions (a re-analysis version inherits them).
     Map<String, Integer> occupancyCounts = Map.of();
+    Map<String, List<String>> severalNetworks = Map.of();
     try {
       hostOccupancyService.saveLeases(fileId, run.dhcpLeases);
       occupancyCounts = hostOccupancyService.recompute(fileId, run.failoverAddresses.keySet());
+      severalNetworks = hostOccupancyService.severalNetworks(fileId);
     } catch (Exception e) {
       log.warn("Failed to compute host occupancies for file {}: {}", fileId, e.getMessage());
     }
@@ -606,7 +608,8 @@ public class AnalysisService {
         hostnameClaims,
         run.failoverAddresses,
         run.parseResult.getHostMacObservations(),
-        occupancyCounts.keySet());
+        occupancyCounts.keySet(),
+        severalNetworks);
     hostClassificationRepository.saveAll(hostClassifications);
 
     try {

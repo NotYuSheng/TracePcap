@@ -461,6 +461,20 @@
         },
         "type": "object"
       },
+      "Client": {
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "mac": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ClusterEdgeDto": {
         "properties": {
           "conversationCount": {
@@ -2339,6 +2353,12 @@
             "format": "date-time",
             "type": "string"
           },
+          "networks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "occupancies": {
             "items": {
               "$ref": "#/components/schemas/Occupancy"
@@ -3081,6 +3101,23 @@
         },
         "type": "object"
       },
+      "NetworkSegmentsResponse": {
+        "properties": {
+          "overlaps": {
+            "items": {
+              "$ref": "#/components/schemas/Overlap"
+            },
+            "type": "array"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "NetworkSettingsDto": {
         "properties": {
           "inactivityMode": {
@@ -3327,6 +3364,26 @@
           "at",
           "reason"
         ],
+        "type": "object"
+      },
+      "Overlap": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "segmentKeys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sharedAddresses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
         "type": "object"
       },
       "OverrideDto": {
@@ -4112,6 +4169,58 @@
             "type": "string"
           },
           "srcPort": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Segment": {
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "clients": {
+            "items": {
+              "$ref": "#/components/schemas/Client"
+            },
+            "type": "array"
+          },
+          "domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "leaseSeconds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "routers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "serverIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "serverMac": {
+            "type": "string"
+          },
+          "vlanId": {
             "format": "int32",
             "type": "integer"
           }
@@ -8616,6 +8725,39 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/network-segments": {
+      "get": {
+        "description": "Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.",
+        "operationId": "segments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkSegmentsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The networks a capture holds",
+        "tags": [
+          "Network Segments"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/networks": {
       "get": {
         "operationId": "list_9",
@@ -12463,6 +12605,10 @@
     {
       "description": "A human's final answer to an adjudicated question — outranks the machine vote",
       "name": "Adjudication Overrides"
+    },
+    {
+      "description": "Networks in a capture, told apart by their DHCP leases",
+      "name": "Network Segments"
     },
     {
       "description": "The current caller: identity, admin status and permissions",
