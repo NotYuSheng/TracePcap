@@ -73,6 +73,32 @@ appeared, it stays, greyed out while it's quiet. A same-device link (see
 
    Early in ``dhcp_address_reuse.pcap``: the phone and ``10.0.0.73`` haven't appeared yet.
 
+With the option on, **Nodes not seen yet** picks how those nodes look:
+
+- **Hide them** (the default): not drawn until they appear.
+- **Show them faint**: drawn very pale, label too, so the whole layout is there from
+  the start and you can see where devices will turn up. A node is then in one of
+  three states: faint (no conversation yet), grey (seen, quiet in the window) and
+  normal (active in the window).
+
+Animations
+----------
+
+As the window moves forward over a change, the graph marks it:
+
+- **A node appearing** (with Nodes appear when first seen on): a ring pulses out
+  from it as its first conversation starts.
+- **A device moving** (see :doc:`device-moves`): when the window passes the time a
+  device arrived on its new address, a dot travels along the dashed same-device
+  link from the old node to the new one, the new node pulses, and a note such as
+  *moved → 10.0.0.73* (with the rename, when its hostname changed) shows above it
+  for a moment.
+
+They mark changes the window passes going forward, by playing or dragging. Moving
+the window back, setting it or showing the whole capture doesn't replay them, and a
+jump that reveals more than 30 nodes at once skips the appear rings. They're off
+when the system asks for reduced motion.
+
 What the Window Does
 --------------------
 

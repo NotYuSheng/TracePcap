@@ -373,7 +373,7 @@ export const NetworkDiagramPage = () => {
   const [unseenStyle, setUnseenStyle] = useState<'hide' | 'faint'>('hide');
   const windowActive = useMemo(() => {
     if (!timeWindow) return null;
-    const active = activeInWindow(filteredEdges, timeWindow);
+    const active = { ...activeInWindow(filteredEdges, timeWindow), window: timeWindow };
     if (!appearWhenSeen) return active;
     const unseen = unseenByWindowEnd(filteredEdges, timeWindow);
     return unseenStyle === 'faint' ? { ...active, faintNodeIds: unseen } : { ...active, hiddenNodeIds: unseen };

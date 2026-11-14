@@ -6,7 +6,7 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import { EdgeArrowProgram } from 'sigma/rendering';
 import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
-import { animatedEdges, drawDeviceLinks, drawParticles } from './trafficParticles';
+import { animatedEdges, drawDeviceLinks, drawEffects, drawParticles, windowEffects, type GraphEffect } from './trafficParticles';
 
 const EMPTY_LINKS: { from: string; to: string; label: string }[] = [];
 import circular from 'graphology-layout/circular';
@@ -52,13 +52,13 @@ interface NetworkGraphProps {
    * The time axis's window: what was active in it. Nodes outside it are dimmed and edges outside it
    * hidden, by redrawing only, so the layout never moves while the window plays. Null shows all.
    */
-  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string>; hiddenNodeIds?: Set<string>; faintNodeIds?: Set<string> } | null;
+  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string>; hiddenNodeIds?: Set<string>; faintNodeIds?: Set<string>; window?: { from: number; to: number } } | null;
   /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
   bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
   animateTraffic?: boolean;
   /** One device on two nodes (it moved to another address): drawn as dashed links. */
-  deviceLinks?: { from: string; to: string; label: string }[];
+  deviceLinks?: { from: string; to: string; at?: number; label: string }[];
   /**
    * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
    * volume shades each edge by `totalBytes` on the shared volume scale — the same
@@ -586,8 +586,11 @@ export const NetworkGraph = memo(function NetworkGraph({
   const darkRef = useRef(darkMode);
   darkRef.current = darkMode;
   const hasLinks = deviceLinks.length > 0;
+  const hasWindow = activeInWindow != null;
+  // Appear rings and device-move animations, set off as the time window crosses them.
+  const effectsRef = useRef<GraphEffect[]>([]);
   useEffect(() => {
-    if (!animateTraffic && !hasLinks) {
+    if (!animateTraffic && !hasLinks && !hasWindow) {
       const c = particlesRef.current;
       c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
       return;
@@ -620,13 +623,20 @@ export const NetworkGraph = memo(function NetworkGraph({
       if (animateTraffic) drawParticles(ctx, sigma, edges, now);
       else ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawDeviceLinks(ctx, sigma, deviceLinksRef.current, darkRef.current);
+      drawEffects(ctx, sigma, effectsRef.current, now, darkRef.current);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [animateTraffic, hasLinks]);
+  }, [animateTraffic, hasLinks, hasWindow]);
 
   const activeInWindowRef = useRef(activeInWindow);
   useEffect(() => {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (!reduced) {
+      const fresh = windowEffects(activeInWindowRef.current, activeInWindow, deviceLinksRef.current, performance.now());
+      if (fresh.length) effectsRef.current.push(...fresh);
+    }
+    if (!activeInWindow) effectsRef.current.length = 0;
     activeInWindowRef.current = activeInWindow;
     sigmaRef.current?.refresh();
   }, [activeInWindow]);
