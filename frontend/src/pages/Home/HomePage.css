@@ -29,39 +29,164 @@
   font-size: 0.9rem;
   color: var(--tp-text-muted, #4b5563);
 }
-.home-drop {
-  min-height: 160px;
-  padding: 20px;
-  border: 2px dashed #b9a6ff;
-  border-radius: 12px;
-  background: #faf8ff;
+/* The whole start panel is the drop target (Upload A). */
+.home-drop-target {
+  position: relative;
+}
+.home-drop-target.drag-active {
+  border-color: #5925dc;
+  box-shadow: 0 0 0 6px rgba(89, 37, 220, 0.12);
+}
+.home-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: rgba(89, 37, 220, 0.92);
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
-.home-drop.drag-active {
-  border-color: #5925dc;
-  background: #f1ecff;
+.home-drop-overlay b {
+  font-size: 1.15rem;
 }
-.home-drop.drag-reject {
-  border-color: var(--sgds-danger, #d7260f);
-  background: #fff8f7;
-}
-.home-drop.disabled {
-  opacity: 0.55;
+.home-drop {
+  min-height: 112px;
+  padding: 0 18px;
+  border: 1.5px dashed #c4b5fd;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.9rem;
 }
 .home-drop-icon {
-  font-size: 1.9rem;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  background: #ede9fe;
   color: #5925dc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
 }
 .home-drop-hint {
   font-size: 0.78rem;
   color: var(--tp-text-muted, #4b5563);
 }
+.home-choose {
+  font-weight: 600;
+}
+
+/* The files on their way, one row each. */
+.upload-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.upload-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.upload-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--tp-border, #eceef3);
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+.upload-row-ok {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.upload-row-warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+.upload-row-bad {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.upload-row-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.upload-row-meta {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.upload-row-meta-busy {
+  color: #3b1891;
+  font-weight: 500;
+}
+.upload-row-meta-ok {
+  color: #166534;
+}
+.upload-row-warn .upload-row-meta {
+  color: #92400e;
+}
+.upload-row-bad .upload-row-meta {
+  color: #991b1b;
+}
+.upload-row-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.upload-row-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: #16a34a;
+}
+.upload-row-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--tp-border, #eceef3);
+  overflow: hidden;
+}
+.upload-row-fill {
+  height: 6px;
+  border-radius: 3px;
+  background: #5925dc;
+  transition: width 0.4s ease;
+}
+.upload-row-fill-busy {
+  background: #a78bfa;
+}
+[data-theme='dark'] .upload-row-ok {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+[data-theme='dark'] .upload-row-warn {
+  border-color: rgba(252, 211, 77, 0.35);
+  background: rgba(252, 211, 77, 0.08);
+}
+[data-theme='dark'] .upload-row-bad {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+[data-theme='dark'] .upload-row-meta-busy { color: #c9b8ff; }
+[data-theme='dark'] .upload-row-meta-ok { color: #86efac; }
+[data-theme='dark'] .upload-row-warn .upload-row-meta { color: #fcd34d; }
+[data-theme='dark'] .upload-row-bad .upload-row-meta { color: #fca5a5; }
+
 .home-stages {
   border: 0;
   margin: 0;
@@ -223,16 +348,10 @@
 
 [data-theme='dark'] .home-drop {
   border-color: rgba(155, 125, 255, 0.5);
-  background: rgba(89, 37, 220, 0.08);
-}
-[data-theme='dark'] .home-drop.drag-active {
-  background: rgba(89, 37, 220, 0.2);
-}
-[data-theme='dark'] .home-drop.drag-reject {
-  background: #2d0f0f;
 }
 [data-theme='dark'] .home-drop-icon {
-  color: #b9a6ff;
+  background: rgba(155, 125, 255, 0.18);
+  color: #c9b8ff;
 }
 [data-theme='dark'] .home-step-n {
   background: rgba(155, 125, 255, 0.2);

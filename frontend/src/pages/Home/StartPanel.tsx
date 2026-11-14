@@ -1,8 +1,9 @@
+import { useState, type ReactNode } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Link } from 'react-router-dom';
-import { Alert } from '@components/common/Alert';
+import type { UploadEntry } from '@features/upload/hooks/useFileUpload';
+import { UploadQueue, type Rejected } from './UploadQueue';
 import type { AnalysisOptions } from '@features/upload/services/uploadService';
-import { formatBytes } from '@/utils/formatters';
 
 const STAGES: {
   key: 'enableNdpi' | 'enableSuricata' | 'enableFileExtraction';
@@ -35,7 +36,14 @@ interface Props {
   /** Hours a capture is kept; 0 means forever. */
   retentionHours: number | null;
   acceptedTypes: string[];
-  disabled?: boolean;
+  /** The files on their way, shown as rows in the panel. */
+  uploads: UploadEntry[];
+  onClearUploads: () => void;
+  /** The panel's own heading, inside the drop target. */
+  heading?: ReactNode;
+  className?: string;
+  labelledBy?: string;
+  label?: string;
 }
 
 /** Retention in words: "12 hours", "2 days". */
@@ -44,9 +52,18 @@ export function retentionText(hours: number): string {
   return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
+/** What the analysis will run with, in a few words: "nDPI and file extraction". */
+export function stagesText(o: AnalysisOptions): string {
+  const on = [o.enableNdpi && 'nDPI', o.enableSuricata && 'Suricata', o.enableFileExtraction && 'file extraction'].filter(
+    (x): x is string => !!x,
+  );
+  if (on.length === 0) return 'the basic analysis only';
+  return on.length === 1 ? on[0] : `${on.slice(0, -1).join(', ')} and ${on[on.length - 1]}`;
+}
+
 /**
- * Start here: drop or choose captures, with the analysis stages to run in view beforehand, so
- * nothing about the upload is decided in a popup after the files are picked.
+ * Start here: drop or choose captures, with the stages to run in view beforehand. The whole panel
+ * is the drop target, and each file then shows as a row in it until it is ready to open.
  */
 export function StartPanel({
   onFiles,
@@ -56,67 +73,79 @@ export function StartPanel({
   maxPackets,
   retentionHours,
   acceptedTypes,
-  disabled,
+  uploads,
+  onClearUploads,
+  heading,
+  className,
+  labelledBy,
+  label,
 }: Props) {
-  const { getRootProps, getInputProps, isDragActive, isDragReject, fileRejections, open } =
-    useDropzone({
-      onDrop: files => {
-        if (files.length > 0) onFiles(files);
-      },
-      accept: { 'application/vnd.tcpdump.pcap': acceptedTypes },
-      maxSize: maxBytes,
-      multiple: true,
-      disabled,
-      noClick: true,
-      noKeyboard: true,
-    });
+  const [dragCount, setDragCount] = useState(0);
+  const [rejected, setRejected] = useState<Rejected[]>([]);
+  const mb = Math.round(maxBytes / 1024 / 1024);
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDragEnter: e => setDragCount(e.dataTransfer?.items?.length ?? 0),
+    onDrop: (files, rejections) => {
+      setRejected(
+        rejections.map(({ file, errors }) => ({
+          name: file.name,
+          reason: errors.some(e => e.code === 'file-too-large')
+            ? `Too big: the limit is ${mb} MB. Split it with editcap -c and upload the parts.`
+            : errors.some(e => e.code === 'file-invalid-type')
+              ? `Not a capture. Only ${acceptedTypes.join(', ')} files can be analysed.`
+              : errors.map(e => e.message).join('; '),
+        })),
+      );
+      if (files.length > 0) onFiles(files);
+    },
+    accept: { 'application/vnd.tcpdump.pcap': acceptedTypes },
+    maxSize: maxBytes,
+    multiple: true,
+    noClick: true,
+    noKeyboard: true,
+  });
 
   return (
-    <>
-      <div
-        {...getRootProps()}
-        className={`home-drop${isDragActive ? ' drag-active' : ''}${isDragReject ? ' drag-reject' : ''}${disabled ? ' disabled' : ''}`}
-        data-testid="home-drop"
-      >
-        <input {...getInputProps()} />
-        <i className="bi bi-upload home-drop-icon" aria-hidden="true" />
-        {isDragActive && !isDragReject ? (
-          <div className="fw-semibold">Drop to upload</div>
-        ) : isDragReject ? (
-          <div className="fw-semibold text-danger">That isn’t a capture file</div>
-        ) : (
-          <div>
-            <button
-              type="button"
-              className="btn btn-link p-0 fw-semibold align-baseline"
-              onClick={open}
-              disabled={disabled}
-            >
-              Choose files
-            </button>{' '}
-            or drop them here
+    <section
+      {...getRootProps({ className: `${className ?? ''} home-drop-target${isDragActive ? ' drag-active' : ''}` })}
+      aria-labelledby={labelledBy}
+      aria-label={label}
+      data-testid="home-drop"
+    >
+      <input {...getInputProps()} />
+      {heading}
+      {isDragActive && (
+        <div className="home-drop-overlay" aria-hidden="true">
+          <b>
+            Drop to analyse {dragCount > 1 ? `${dragCount} captures` : 'the capture'}
+          </b>
+          <span>with {stagesText(options)}</span>
+        </div>
+      )}
+      <div className="home-drop">
+        <span className="home-drop-icon" aria-hidden="true">
+          <i className="bi bi-upload" />
+        </span>
+        <div>
+          <div className="fw-semibold">Drop captures here</div>
+          <div className="home-drop-hint">
+            {acceptedTypes.join(', ')} · {mb} MB
+            {maxPackets > 0 ? ` and ${maxPackets.toLocaleString()} packets` : ''} each
           </div>
-        )}
-        <div className="home-drop-hint">
-          {acceptedTypes.join(', ')} · up to {Math.round(maxBytes / 1024 / 1024)} MB
-          {maxPackets > 0 ? ` and ${maxPackets.toLocaleString()} packets` : ''} each
         </div>
       </div>
+      <button type="button" className="btn btn-outline-primary home-choose" onClick={open}>
+        {uploads.length > 0 ? 'Add more' : 'Choose files'}
+      </button>
 
-      {fileRejections.map(({ file, errors }) => (
-        <Alert key={file.name} variant="danger" className="small mb-0">
-          <strong>{file.name}</strong>:{' '}
-          {errors
-            .map(e =>
-              e.code === 'file-invalid-type'
-                ? `only ${acceptedTypes.join(', ')} files can be analysed`
-                : e.code === 'file-too-large'
-                  ? `larger than ${formatBytes(maxBytes)}`
-                  : e.message
-            )
-            .join('; ')}
-        </Alert>
-      ))}
+      <UploadQueue
+        uploads={uploads}
+        rejected={rejected}
+        onClear={() => {
+          setRejected([]);
+          onClearUploads();
+        }}
+      />
 
       <fieldset className="home-stages">
         <legend>Analyse with</legend>
@@ -149,6 +178,6 @@ export function StartPanel({
           )}
         </p>
       )}
-    </>
+    </section>
   );
 }
