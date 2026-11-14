@@ -80,6 +80,8 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
 
    sample-files
    demos/strrat-you-dirty-rat
+   demos/devices-on-a-dhcp-network
+   demos/two-sites-one-range
 
 .. toctree::
    :maxdepth: 1

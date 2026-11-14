@@ -65,6 +65,8 @@ export interface HostOccupancy {
   lastActivity?: ApiDateTime | null;
   overlapping: boolean;
   virtualAddress: boolean;
+  /** The networks this address was used on, when more than one shares its range (#462). */
+  networks?: string[];
   occupancies: Occupancy[];
   decisions: OccupancyDecision[];
   suggestions: OccupancySuggestion[];

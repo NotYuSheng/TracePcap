@@ -58,6 +58,8 @@ network. A static address with no lease isn't assigned to either.
 Try It
 ------
 
+A walkthrough with screenshots: :doc:`../demos/two-sites-one-range`.
+
 ``sample-files/two_sites_overlap.pcap`` has two sites, HQ (VLAN 10) and Branch
 (VLAN 20), both on ``192.168.1.0/24`` with a router at ``192.168.1.1``. HQ has
 six DHCP clients (``.10``–``.15``) and Branch four (``.10``–``.13``).
