@@ -81,10 +81,12 @@ def build(tagged):
             # Some traffic out through the site's router.
             for k in range(5):
                 tt = t + 1 + k * 30
+                # Each machine picks its own ephemeral ports, so the two sites' .10s don't collide.
+                port = 40000 + s_i * 10000 + c_i * 10 + k
                 add(site, Ether(src=mac, dst=gw) / IP(src=ip, dst="93.184.216.34", ttl=128)
-                    / TCP(sport=40000 + c_i * 10 + k, dport=443, flags="S"), tt)
+                    / TCP(sport=port, dport=443, flags="S"), tt)
                 add(site, Ether(src=gw, dst=mac) / IP(src="93.184.216.34", dst=ip, ttl=52)
-                    / TCP(sport=443, dport=40000 + c_i * 10 + k, flags="SA"), tt + 0.02)
+                    / TCP(sport=443, dport=port, flags="SA"), tt + 0.02)
 
     pkts.sort(key=lambda p: float(p.time))
     name = "two_sites_overlap.pcap" if tagged else "two_sites_overlap_untagged.pcap"

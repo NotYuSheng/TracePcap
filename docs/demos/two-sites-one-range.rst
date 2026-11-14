@@ -3,7 +3,7 @@ Two sites, one range: telling networks apart
 
 .. note::
 
-   **Captured against TracePcap** ``v0.2.0-338`` **(dev, 14 November 2026).** TracePcap changes
+   **Captured against TracePcap** ``v0.2.0-341`` **(dev, 14 November 2026).** TracePcap changes
    quickly, so this walkthrough is a point-in-time record. Which network each address belongs to,
    and the evidence for it, are stable across versions; screenshots and UI details reflect *that*
    build, and a later one may differ. Re-verify against the current build before quoting a figure.
@@ -85,21 +85,36 @@ Leases are grouped per VLAN, or with no VLAN, per DHCP server MAC. Upload the **
 and the result is the same two networks, told apart by their servers' MACs, domains and lease times
 alone.
 
-**On each shared address**, the host's details say so plainly:
+**Each shared address is one device per network.** Open **Network Visualization**: every address
+used on both sites is two nodes, named by each machine's own hostname.
 
-.. figure:: images/two-sites-host-warning.png
-   :alt: The host details for 192.168.1.10: a warning that it is used on 2 networks that share this
-         range, a different machine on each, and the device list saying the same.
+.. figure:: images/two-sites-graph.png
+   :alt: The topology diagram: HQ-LAPTOP-01 and BR-TILL-01 are separate nodes for 192.168.1.10, and
+         likewise for .11 to .13, each with its own MAC and type.
 
-   ``192.168.1.10``: a different machine on each network. It isn't split into devices over time,
-   since both were on the network at once.
+   ``HQ-LAPTOP-01`` (Dell, Laptop / Desktop) and ``BR-TILL-01`` (Samsung, Mobile) are both
+   ``192.168.1.10``, and are two nodes. So are ``.11``–``.13``.
+
+TracePcap knows which conversation was whose from the **MAC** on each side: the machine's own, or
+for traffic from outside, the site's router's. It knows both per network from the DHCP leases.
+Each machine is then classified from its own network's traffic.
+
+Click ``BR-TILL-01``:
+
+.. figure:: images/two-sites-branch-device.png
+   :alt: The host details for the Branch till's node: two devices on 192.168.1.10, one on
+         hq.corp.example (VLAN 10) and one on branch.corp.example (VLAN 20) marked "this node",
+         each with its own type, vendor, MAC, hostname and conversations.
+
+   ``192.168.1.10`` on each network, the Branch till marked **this node**. The Identity below is
+   the till's own; a label set on it stays on the till and doesn't touch HQ's laptop.
 
 .. note::
 
-   The **Identity** above the warning (Laptop / Desktop, Dell) is the HQ machine's. Outside the
-   Overview panel and this warning, TracePcap still treats a shared address as one host: one
-   classification, one node in the graph, one set of labels. Keeping the two apart everywhere is the
-   next step (#462 phase 2).
+   The tills classify weakly (Mobile, low confidence): the synthetic capture gives them little
+   besides a Samsung MAC. Branch's router, also ``192.168.1.1``, has no node of its own here: its
+   DHCP and ARP exchanges have exactly the same addresses and ports as HQ's router's, so they are
+   one conversation to TracePcap (see the feature page's *Limits*).
 
 Details: :doc:`../features/overlapping-networks`.
 

@@ -42,6 +42,11 @@ public class ConversationResponse {
    */
   private String initiatorIp;
 
+  /** Each side's MAC (#462): the machine, or for outside traffic the site's router. */
+  private String srcMac;
+
+  private String dstMac;
+
   private Integer initiatorPort;
 
   private String protocol;

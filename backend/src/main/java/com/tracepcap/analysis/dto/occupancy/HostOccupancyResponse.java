@@ -46,6 +46,12 @@ public class HostOccupancyResponse {
     long conversations;
     /** This device's own classification (#918 slice 2); null until classified. */
     OccupancyClassification classification;
+    /** The device's key: the bare IP for the first, ip@start or ip~network for another (#918, #462). */
+    String key;
+    /** The network it was on, when the address is used on several that share its range (#462). */
+    String network;
+    /** That network's MACs: which conversations are this device's is decided by them (#462). */
+    List<String> networkMacs;
   }
 
   /** One address and the devices that held it, in time order. */

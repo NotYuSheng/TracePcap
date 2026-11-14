@@ -685,6 +685,8 @@ public class AnalysisService {
       ConversationEntity conversation =
           entityManager.getReference(ConversationEntity.class, convInfo.getEntityId());
       conversation.setInitiatorIp(convInfo.getInitiatorIp());
+      conversation.setSrcMac(convInfo.getSrcMac());
+      conversation.setDstMac(convInfo.getDstMac());
       conversation.setInitiatorPort(convInfo.getInitiatorPort());
       conversation.setAppName(convInfo.getAppName());
       conversation.setTsharkProtocol(convInfo.getTsharkProtocol());
@@ -1166,14 +1168,15 @@ public class AnalysisService {
     if (!rows.isEmpty()) ipMacObservationRepository.saveAll(rows);
   }
 
-  private void persistTtlWindows(UUID fileId, Map<String, Map<Integer, PcapParserService.TtlWindow>> windows) {
+  private void persistTtlWindows(UUID fileId, Map<String, Map<String, PcapParserService.TtlWindow>> windows) {
     if (windows == null || windows.isEmpty()) return;
     List<HostTtlWindowEntity> rows = new ArrayList<>();
-    windows.forEach((ip, byTtl) -> byTtl.forEach((ttl, w) -> rows.add(
+    windows.forEach((ip, byTtl) -> byTtl.forEach((k, w) -> rows.add(
         HostTtlWindowEntity.builder()
             .fileId(fileId)
             .ip(ip)
-            .ttl(ttl)
+            .ttl(w.ttl())
+            .mac(w.mac())
             .firstSeen(w.first())
             .lastSeen(w.last())
             .packets(w.packets())

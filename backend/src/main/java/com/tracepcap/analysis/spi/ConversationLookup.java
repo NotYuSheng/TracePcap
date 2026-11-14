@@ -63,7 +63,25 @@ public interface ConversationLookup {
       long packetCount,
       long totalBytes,
       LocalDateTime startTime,
-      LocalDateTime endTime) {}
+      LocalDateTime endTime,
+      String srcMac,
+      String dstMac) {
+
+    /** Without each side's MAC (#462): they default to unknown. */
+    public FlowIdentity(
+        String srcIp, Integer srcPort, String dstIp, Integer dstPort, String initiatorIp,
+        Integer initiatorPort, String protocol, long packetCount, long totalBytes,
+        LocalDateTime startTime, LocalDateTime endTime) {
+      this(srcIp, srcPort, dstIp, dstPort, initiatorIp, initiatorPort, protocol, packetCount,
+          totalBytes, startTime, endTime, null, null);
+    }
+
+    /** The MAC on {@code ip}'s side of the flow, when recorded (#462). */
+    public String macOf(String ip) {
+      if (ip == null) return null;
+      return ip.equals(srcIp) ? srcMac : ip.equals(dstIp) ? dstMac : null;
+    }
+  }
 
   /**
    * What a party claimed on the wire — testimony, not measurement. Every field is nullable: absent

@@ -62,6 +62,7 @@ public class OccupancyClassificationService {
   private final HostClassificationRepository hostClassifications;
   private final FileRepository files;
   private final HostClassifier classifier;
+  private final com.tracepcap.analysis.repository.DhcpLeaseRepository leases;
 
   /** Classifies every occupancy in the capture. Never throws: a failure leaves them unclassified. */
   @Transactional(noRollbackFor = RuntimeException.class)
@@ -99,13 +100,19 @@ public class OccupancyClassificationService {
     List<WindowsLogonEntity> signIns = logons.findByFileIdAndIpOrderByFirstSeenAscIdAsc(fileId, ip);
     HostClassificationEntity address = hostClassifications.findFirstByFileIdAndIpOrderByIdAsc(fileId, ip).orElse(null);
     Set<String> roles = roles(address);
+    // Devices on different networks that share the range (#462): which network a conversation was
+    // on is told by that side's MAC, so each network's MACs decide what's whose.
+    boolean byNetwork = occ.stream().anyMatch(o -> o.getSegmentKey() != null);
+    Map<String, Set<String>> macsBySegment =
+        byNetwork ? NetworkSegments.of(leases.findByFileId(fileId)).macsBySegment() : Map.of();
     List<ClassificationHint> addressVotes = RuleVoteRescoreService.boardOf(address == null ? new HostClassificationEntity() : address).ruleVotes();
 
     for (IpOccupancyEntity o : occ) {
       List<PcapParserService.ConversationInfo> mine = new ArrayList<>();
       Set<String> rulesSeen = new HashSet<>();
+      Set<String> netMacs = o.getSegmentKey() == null ? null : macsBySegment.getOrDefault(o.getSegmentKey(), Set.of());
       for (ConversationEntity c : convs) {
-        if (!within(c.getStartTime(), o)) continue;
+        if (netMacs != null ? !onNetwork(c, ip, netMacs, o.getIdx() == 0) : !within(c.getStartTime(), o)) continue;
         mine.add(toInfo(c));
         if (c.getCustomSignatures() != null) rulesSeen.addAll(Arrays.asList(c.getCustomSignatures()));
       }
@@ -114,6 +121,8 @@ public class OccupancyClassificationService {
       String user = null;
       int userSeen = -1;
       for (WindowsLogonEntity l : signIns) {
+        // A sign-in records no MAC, so on a shared address it can't be placed on one network.
+        if (netMacs != null) break;
         if (!within(l.getFirstSeen(), o) || "CUSTOM".equals(l.getFolderKind())) continue;
         claims.add(new WindowsIdentityResolverService.Claim(ip, l.getUsername(), l.getSource()));
         if (l.getSeenCount() > userSeen) {
@@ -121,7 +130,8 @@ public class OccupancyClassificationService {
           userSeen = l.getSeenCount();
         }
       }
-      Integer ttl = ttlFor(ttls, o);
+      Integer ttl =
+          ttlFor(netMacs == null ? ttls : ttls.stream().filter(w -> w.getMac() != null && netMacs.contains(w.getMac())).toList(), o);
 
       Map<String, Integer> ttlMap = new LinkedHashMap<>();
       if (ttl != null) ttlMap.put(ip, ttl);
@@ -168,6 +178,16 @@ public class OccupancyClassificationService {
       o.setManufacturer(h.getManufacturer());
     }
     occupancies.saveAll(occ);
+  }
+
+  /**
+   * Whether a conversation was on a network (#462): the MAC on {@code ip}'s side is one of the
+   * network's. A side with no MAC recorded counts for the first network's device.
+   */
+  static boolean onNetwork(ConversationEntity c, String ip, Set<String> netMacs, boolean first) {
+    String mac = ip.equals(c.getSrcIp()) ? c.getSrcMac() : ip.equals(c.getDstIp()) ? c.getDstMac() : null;
+    if (mac == null) return first;
+    return netMacs.contains(mac.toLowerCase());
   }
 
   /** Whether {@code t} falls in the occupancy's [startsAt, endsAt); an unknown time counts for the first. */

@@ -25,4 +25,18 @@ class DeviceKeysTest {
     assertThat(DeviceKeys.startOf("10.0.0.50")).isNull();
     assertThat(DeviceKeys.startOf("10.0.0.50@not-a-time")).isNull();
   }
+
+  @Test
+  void aDeviceOnAnotherNetwork_isIpTildeNetwork_andCanAlsoHaveAStart() {
+    String k = DeviceKeys.key("192.168.1.10", "server:00:1b:21:bb:00:01", null);
+    assertThat(k).isEqualTo("192.168.1.10~server:00:1b:21:bb:00:01");
+    assertThat(DeviceKeys.isDeviceKey(k)).isTrue();
+    assertThat(DeviceKeys.ipOf(k)).isEqualTo("192.168.1.10");
+    assertThat(DeviceKeys.networkOf(k)).isEqualTo("server:00:1b:21:bb:00:01");
+    assertThat(DeviceKeys.startOf(k)).isNull();
+    String both = DeviceKeys.key("192.168.1.10", "vlan:20", T);
+    assertThat(DeviceKeys.ipOf(both)).isEqualTo("192.168.1.10");
+    assertThat(DeviceKeys.networkOf(both)).isEqualTo("vlan:20");
+    assertThat(DeviceKeys.startOf(both)).isEqualTo(T);
+  }
 }

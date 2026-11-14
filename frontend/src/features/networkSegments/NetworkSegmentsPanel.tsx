@@ -116,7 +116,8 @@ function Overlap({ overlap, segments }: { overlap: NetworkSegmentOverlap; segmen
               more than one of these networks:
             </strong>{' '}
             <span className="font-monospace">{overlap.sharedAddresses.join(', ')}</span>. Each is a different machine
-            on each network, but the rest of TracePcap still shows it as one host, so its details mix both.
+            on each network, and TracePcap keeps them apart: one device per network, with its own node in the graph,
+            its own classification and its own labels.
           </Alert>
         )}
       </div>

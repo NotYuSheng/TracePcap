@@ -39,6 +39,18 @@ public class IpOccupancyEntity {
   @Column(nullable = false)
   private Integer idx;
 
+  /**
+   * The device's key ({@link com.tracepcap.analysis.spi.DeviceKeys}): the bare IP for the first,
+   * ip@start for a later one in time, ip~network for one on another network (#462).
+   */
+  @Column(name = "device_key", length = 255)
+  private String deviceKey;
+
+  /** This row's key, worked out for rows from before it was stored. */
+  public String key() {
+    return deviceKey != null ? deviceKey : com.tracepcap.analysis.spi.DeviceKeys.key(ip, startsAt);
+  }
+
   @Column(length = 50)
   private String mac;
 

@@ -42,6 +42,9 @@ public final class NetworkSegments {
 
   public record Client(String ip, String mac, String hostname) {}
 
+  /** One machine on a shared address: which network, and its MAC and hostname there. */
+  public record NetDevice(String segmentKey, String label, String mac, String hostname) {}
+
   /** Networks whose ranges overlap, and the addresses leased in more than one of them. */
   public record Overlap(String cidr, List<String> segmentKeys, List<String> sharedAddresses) {}
 
@@ -51,6 +54,43 @@ public final class NetworkSegments {
     public Map<String, String> segmentByMac() {
       Map<String, String> out = new LinkedHashMap<>();
       for (Segment s : segments) for (Client c : s.clients()) out.put(c.mac(), s.key());
+      return out;
+    }
+
+    /**
+     * For each address used on more than one overlapping network, the machine on each (#462 phase
+     * 2a): the network's key and label, and the machine's MAC and hostname there. A router's address
+     * has the router's MAC. Networks in the order they were found.
+     */
+    public Map<String, List<NetDevice>> devicesOnSeveralNetworks() {
+      Map<String, Segment> byKey = new LinkedHashMap<>();
+      segments.forEach(s -> byKey.put(s.key(), s));
+      Map<String, List<NetDevice>> out = new LinkedHashMap<>();
+      for (Overlap o : overlaps) {
+        for (String ip : o.sharedAddresses()) {
+          List<NetDevice> devices = new ArrayList<>();
+          for (String k : o.segmentKeys()) {
+            Segment s = byKey.get(k);
+            if (s == null) continue;
+            Client c = s.clients().stream().filter(x -> x.ip().equals(ip)).findFirst().orElse(null);
+            if (c != null) devices.add(new NetDevice(s.key(), s.label(), c.mac(), c.hostname()));
+            else if (s.routers().contains(ip)) devices.add(new NetDevice(s.key(), s.label(), s.serverMac(), null));
+          }
+          if (devices.size() > 1) out.put(ip, devices);
+        }
+      }
+      return out;
+    }
+
+    /** The MACs seen on each network: its DHCP clients' and its server's (the router, usually). */
+    public Map<String, Set<String>> macsBySegment() {
+      Map<String, Set<String>> out = new LinkedHashMap<>();
+      for (Segment s : segments) {
+        Set<String> macs = new LinkedHashSet<>();
+        if (s.serverMac() != null) macs.add(s.serverMac());
+        s.clients().forEach(c -> macs.add(c.mac()));
+        out.put(s.key(), macs);
+      }
       return out;
     }
 
@@ -84,6 +124,7 @@ public final class NetworkSegments {
     final Set<String> domains = new TreeSet<>();
     final Set<Long> leaseSeconds = new TreeSet<>();
     String mask;
+    java.time.LocalDateTime firstLease;
     final Map<String, Client> clients = new LinkedHashMap<>();
 
     Acc(String key) {
@@ -109,6 +150,9 @@ public final class NetworkSegments {
       if (l.getDomain() != null) a.domains.add(l.getDomain());
       if (l.getLeaseSeconds() != null) a.leaseSeconds.add(l.getLeaseSeconds());
       if (l.getSubnetMask() != null) a.mask = l.getSubnetMask();
+      if (l.getFirstSeen() != null && (a.firstLease == null || l.getFirstSeen().isBefore(a.firstLease))) {
+        a.firstLease = l.getFirstSeen();
+      }
       a.clients.put(l.getMac(), new Client(l.getIp(), l.getMac(), l.getHostname()));
       keyByMac.put(l.getMac(), key);
     }
@@ -121,8 +165,14 @@ public final class NetworkSegments {
       a.clients.put(l.getMac(), new Client(prev != null ? prev.ip() : l.getIp(), l.getMac(), hostname));
     }
 
+    // Networks in the order they first leased an address (then by key), so which network's machine
+    // keeps an address's bare key is stable from run to run.
+    List<Acc> ordered = new ArrayList<>(byKey.values());
+    ordered.sort(
+        Comparator.comparing((Acc a) -> a.firstLease, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(a -> a.key));
     List<Segment> segments = new ArrayList<>();
-    for (Acc a : byKey.values()) {
+    for (Acc a : ordered) {
       List<Client> clients = new ArrayList<>(a.clients.values());
       clients.sort(Comparator.comparingLong(c -> ipValue(c.ip())));
       segments.add(

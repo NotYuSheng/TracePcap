@@ -195,3 +195,32 @@ describe('buildNetworkGraph: an address more than one device held (#918 slice 2)
     expect(laptop.data.roleLabel).toBeUndefined()
   })
 })
+
+describe('buildNetworkGraph: an address used on two networks that share a range (#462)', () => {
+  const hqRouter = '00:1b:21:aa:00:01'
+  const brRouter = '00:1b:21:bb:00:01'
+  const reused = [{
+    ip: '192.168.1.10',
+    occupancies: [
+      { idx: 0, mac: 'f8:bc:12:10:00:00', hostname: 'HQ-LAPTOP-01', automatic: false, conversations: 1,
+        key: '192.168.1.10', network: 'hq.corp.example', networkMacs: [hqRouter, 'f8:bc:12:10:00:00'] },
+      { idx: 1, mac: '8c:71:f8:20:00:00', hostname: 'BR-TILL-01', automatic: false, conversations: 1,
+        key: '192.168.1.10~server:00:1b:21:bb:00:01', network: 'branch.corp.example', networkMacs: [brRouter, '8c:71:f8:20:00:00'] },
+    ],
+  }]
+  const at = (id: string, mac: string) => conversation('192.168.1.10', '93.184.216.34', {
+    id, startTime: 1000,
+    endpoints: [{ ip: '192.168.1.10', port: 40000, mac }, { ip: '93.184.216.34', port: 443 }],
+  } as never)
+
+  it("puts each conversation on the machine whose network its MAC is on, not by time", () => {
+    const g = buildNetworkGraph(
+      [at('hq', 'f8:bc:12:10:00:00'), at('branch', '8c:71:f8:20:00:00')],
+      undefined, 500, [] as never, 0, undefined, undefined, reused as never)
+    expect(g.edges.find(e => e.id === 'hq')!.source).toBe('192.168.1.10@0')
+    expect(g.edges.find(e => e.id === 'branch')!.source).toBe('192.168.1.10@1')
+    const branch = g.nodes.find(n => n.id === '192.168.1.10@1')!
+    expect(branch.label).toBe('BR-TILL-01')
+    expect(branch.data.occupancy?.key).toBe('192.168.1.10~server:00:1b:21:bb:00:01')
+  })
+})

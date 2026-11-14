@@ -315,7 +315,9 @@ public class ConversationLookupAdapter implements ConversationLookup {
             e.getPacketCount() == null ? 0 : e.getPacketCount(),
             e.getTotalBytes() == null ? 0 : e.getTotalBytes(),
             e.getStartTime(),
-            e.getEndTime()),
+            e.getEndTime(),
+            e.getSrcMac(),
+            e.getDstMac()),
         new TlsFacts(
             e.getHostname(),
             e.getTlsIssuer(),
