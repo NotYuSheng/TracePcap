@@ -101,7 +101,7 @@ so they survive the result being recomputed, and a
 :doc:`re-analysis <reanalysis>` version starts with its original's corrections.
 
 Who can make corrections is the **Split, merge or link devices** permission
-on the System page's **Permissions** tab (default: analysts; see
+on the Settings page's **Permissions** tab (default: analysts; see
 :ref:`settings-permissions`).
 
 Labels on One Device

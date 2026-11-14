@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Form } from '@govtechsg/sgds-react';
+import { Link } from 'react-router-dom';
 import { monitorService } from '@/features/monitor/services/monitorService';
 import { detectionRulesService } from './detectionRulesService';
 import { useNetworkContext } from './useNetworkContext';
@@ -10,7 +11,7 @@ interface NetworkRef {
 }
 
 /**
- * "Viewing with" (#925 phase 3): view the capture with only its global and capture rules (the
+ * "Custom detection rules" (#925 phase 3; was "Viewing with"): view the capture with only its global and capture rules (the
  * default), or in a network, adding that network's rules. Lists the networks the capture is in
  * first, then the rest.
  */
@@ -41,8 +42,8 @@ export function NetworkContextPicker({ fileId }: { fileId: string }) {
   return (
     <div className="d-flex flex-wrap align-items-center gap-2 small">
       <Form.Label htmlFor="network-context" className="mb-0 text-muted">
-        <i className="bi bi-diagram-3 me-1" aria-hidden="true" />
-        Viewing with
+        <i className="bi bi-shield-check me-1" aria-hidden="true" />
+        Custom detection rules
       </Form.Label>
       <Form.Select
         id="network-context"
@@ -77,6 +78,9 @@ export function NetworkContextPicker({ fileId }: { fileId: string }) {
           This capture is in {mine.map(n => n.name).join(', ')}: pick it to include that network's rules.
         </span>
       )}
+      <span className="text-muted">
+        Create custom rules in <Link to="/settings?tab=rules">Settings › Detection rules</Link>.
+      </span>
     </div>
   );
 }

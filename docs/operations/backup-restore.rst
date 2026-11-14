@@ -9,7 +9,7 @@ TracePcap holds three things that cannot be regenerated:
 - **config volume** — only the old ``signatures.yml``, if you upgraded from a
   version that kept detection rules there. Rules now live in PostgreSQL.
   Restoring an old ``signatures.yml`` doesn't re-import it; use **Import** on
-  the System page's **Detection rules** tab.
+  the Settings page's **Detection rules** tab.
 
 ``scripts/backup.sh`` captures all three into one timestamped archive, and
 ``scripts/restore.sh`` puts them back.

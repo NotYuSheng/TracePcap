@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { Card, Container } from '@govtechsg/sgds-react';
 import { SystemSettingsTab } from '@components/settings/SettingsModal/SystemSettingsTab';
+import { PersonalSettingsTab } from '@components/settings/SettingsModal/PersonalSettingsTab';
 import { env } from '@/config/env';
 import { useMe } from '@/features/me/useMe';
 import { AddressDefaultsPanel } from './AddressDefaultsPanel';
@@ -16,11 +17,13 @@ function keycloakUsersUrl(): string {
 }
 
 /**
- * The System console (#915): everything that applies to the whole install. Everyone can open it;
- * what the caller can't change is greyed out with the reason.
+ * The Settings page: your own settings, and (#915) everything that applies to the whole install.
+ * Everyone can open it; what the caller can't change is greyed out with the reason. Per-network
+ * settings stay on each network's page.
  */
 const TABS = [
-  { key: 'settings', title: 'Settings' },
+  { key: 'personal', title: 'Personal' },
+  { key: 'system', title: 'System' },
   { key: 'rules', title: 'Detection rules' },
   { key: 'addresses', title: 'Address defaults' },
   { key: 'permissions', title: 'Permissions' },
@@ -36,15 +39,18 @@ export function SystemPage() {
   // The tab is in the URL (?tab=rules), so other pages can link straight to it.
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
-  const tab: TabKey = TABS.some(t => t.key === requested) ? (requested as TabKey) : 'settings';
+  // `?tab=settings` was the System tab before the two pages became one.
+  const asked = requested === 'settings' ? 'system' : requested;
+  const tab: TabKey = TABS.some(t => t.key === asked) ? (asked as TabKey) : 'personal';
   const setTab = (key: TabKey) =>
-    setParams(key === 'settings' ? {} : { tab: key }, { replace: true });
+    setParams(key === 'personal' ? {} : { tab: key }, { replace: true });
   return (
     <Container className="py-4">
-      <h2 className="mb-1">System</h2>
+      <h2 className="mb-1">Settings</h2>
       <p className="text-muted">
-        Settings that apply to everyone using this install, who may change them, and a record of
-        every change.
+        Your own settings, the settings for everyone using this install, custom detection rules,
+        address defaults (subnet labels, internal ranges, organisations), who may change them, and a
+        record of every change. A network's own settings are on its page.
         {me && (
           <>
             {' '}
@@ -74,7 +80,8 @@ export function SystemPage() {
           </ul>
         </div>
         <Card.Body role="tabpanel" id={`system-panel-${tab}`} aria-labelledby={`system-tab-${tab}`}>
-          {tab === 'settings' && <SystemSettingsTab />}
+          {tab === 'personal' && <PersonalSettingsTab />}
+          {tab === 'system' && <SystemSettingsTab />}
           {tab === 'rules' && <DetectionRulesPanel />}
           {tab === 'addresses' && <AddressDefaultsPanel />}
           {tab === 'permissions' && <PermissionsPanel />}

@@ -62,7 +62,7 @@ The script produces ``sample-files/demo_all_rules.pcap``.
 Walkthrough: Custom Signature Demo
 ------------------------------------
 
-1. Import ``signatures.sample.yml``: on the **System** page open
+1. Import ``signatures.sample.yml``: on the **Settings** page open
    **Detection rules** → **Import**, choose the file, and click **Import**.
 
 2. Upload ``demo_all_rules.pcap`` with **nDPI Analysis** enabled.

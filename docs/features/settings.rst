@@ -10,18 +10,20 @@ TracePcap's settings are grouped by who they affect:
    * - Where
      - Affects
      - Notes
-   * - **Settings** button (header)
+   * - **Settings** page, **Personal** tab
      - you (or everyone, with login off)
      - Personal look and layout only. Never changes analysis results.
-   * - **System** page (header)
+   * - **Settings** page, other tabs
      - everyone using the install
-     - Deploy-time settings, who may change what, the audit log, and users.
+     - Deploy-time settings, custom detection rules, address defaults (subnet labels,
+       internal ranges, organisations), who may change what, the audit log, and users.
    * - A network's **Settings** button
      - that network
      - Such as when a device counts as no longer seen (see :doc:`network-monitor`).
 
-Everyone can open the System page. Anything you can't change is shown greyed out with a
-lock, and clicking it says why.
+Open the **Settings** page from the header. Everyone can open it; anything you can't change
+is shown greyed out with a lock, and clicking it says why. (It was two places before: a
+Settings dialog for personal settings and a System page; old ``/system`` links still work.)
 
 
 Personal
@@ -46,13 +48,13 @@ columns) is uploaded, so nobody's existing setup is lost. **Recent files** stay 
 browser: they're history, not a preference.
 
 
-System page
------------
+For Everyone
+------------
 
-The **System** page has four tabs: **Settings**, **Permissions**, **Audit log** and
-**Users**.
+The **Settings** page's other tabs: **System**, **Detection rules**, **Address defaults**,
+**Permissions**, **Audit log** and **Users**.
 
-**Settings.** Every deploy-time setting (each environment variable in :doc:`../configuration/environment-variables`)
+**System.** Every deploy-time setting (each environment variable in :doc:`../configuration/environment-variables`)
 is listed with its **effective value**, including values derived from ``APP_MEMORY_MB``
 such as the upload cap. They are grouped as:
 
@@ -137,7 +139,7 @@ the defaults favour analysts:
   the server sets ``SYSTEM_SETTINGS_EDITABLE=true``, and by no one otherwise (the
   default).
 
-Change these on the System page's **Permissions** tab. An admin picks *Analysts* or
+Change these on the Settings page's **Permissions** tab. An admin picks *Analysts* or
 *Admins only* for each item; an item changed from its default is marked *changed*. For
 everyone else the tab is read-only, and clicking an item says why.
 
@@ -152,7 +154,7 @@ Every change to these items is recorded with **who** made it, **when**, and the 
 ``system``, because there are no accounts. Entries are recorded in the same transaction
 as the change, so a change is never saved without its entry.
 
-Read it on the System page's **Audit log** tab: newest first, paged, and searchable by
+Read it on the Settings page's **Audit log** tab: newest first, paged, and searchable by
 who, action or target. It's also available from the API at ``GET /api/v1/audit-log``.
 
 Users

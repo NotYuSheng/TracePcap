@@ -51,7 +51,7 @@ network.
 Editing the Default
 -------------------
 
-The shared default is edited on the **System** page, **Address defaults** tab:
+The shared default is edited on the **Settings** page, **Address defaults** tab:
 add, edit or delete entries for every network at once. Saving an entry for a
 CIDR that's already there changes it rather than adding a second one.
 
@@ -65,7 +65,7 @@ Where Each Applies
 - **Monitor views** (a network's snapshots, change detection, subnets): that
   network's lists.
 - **Analysis page**: the default, or a network's lists when it's picked in the
-  **Viewing with** picker at the top of the page. The Network Cluster view
+  **Custom detection rules** picker at the top of the page. The Network Cluster view
   follows the picker; Story still uses the default.
 - **Captures in no network**: the default.
 

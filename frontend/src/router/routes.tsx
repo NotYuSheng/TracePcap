@@ -1,4 +1,4 @@
-import { Navigate, createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter, useLocation } from 'react-router-dom';
 import { MainLayout } from '@components/common/Layout';
 import { RouteErrorBoundary } from '@components/common/RouteErrorBoundary';
 import { UploadPage } from '@pages/Upload';
@@ -16,6 +16,12 @@ import { NotFoundPage } from '@pages/NotFound';
 import { MonitorPage } from '@pages/Monitor/MonitorPage';
 import { NetworkDetailPage } from '@pages/Monitor/NetworkDetailPage';
 import { SystemPage } from '@pages/System';
+
+/** /system (and /system?tab=…) to the Settings page it became. */
+function SystemRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/settings${search}`} replace />;
+}
 
 export const router = createBrowserRouter([
   {
@@ -95,8 +101,13 @@ export const router = createBrowserRouter([
         element: <NetworkDetailPage />,
       },
       {
-        path: 'system',
+        path: 'settings',
         element: <SystemPage />,
+      },
+      {
+        // The System page became Settings: old links still land there, tab and all.
+        path: 'system',
+        element: <SystemRedirect />,
       },
       {
         path: '*',

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
@@ -89,8 +90,8 @@ export function CaptureRulesCard({ fileId, onChanged }: CaptureRulesCardProps) {
           </Button>
         </div>
         <p className="small text-muted mb-2">
-          Flag conversations in this capture only, straight away. Rules for every capture are on the
-          System page.
+          Flag conversations in this capture only, straight away. Rules for every capture are in{' '}
+          <Link to="/settings?tab=rules">Settings › Detection rules</Link>.
           {!canEdit && capturePerm.reason && <> You can't add rules here: {capturePerm.reason}</>}
         </p>
         {error && (
@@ -216,7 +217,7 @@ export function CaptureRulesCard({ fileId, onChanged }: CaptureRulesCardProps) {
               if (r)
                 await run(
                   () => detectionRulesService.promote(r.id, keepOriginal),
-                  `${r.name} is now a global rule. Re-apply on the System page to check other captures.`
+                  `${r.name} is now a global rule. Re-apply in Settings › Detection rules to check other captures.`
                 );
             }}
           >

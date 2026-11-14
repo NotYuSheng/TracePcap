@@ -412,8 +412,8 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
       {showAddForm && (
         <form onSubmit={handleAdd} className="border rounded p-3 bg-light mt-3">
           <p className="small text-muted mb-2">
-            Adds to this network only. Subnets for every network are set in the System console's
-            address defaults.
+            Adds to this network only. Subnets for every network are set in Settings › Address
+            defaults.
           </p>
           <div className="row g-2">
             <div className="col-sm-4">

@@ -253,7 +253,7 @@ export const StoryPage = () => {
               <small className="text-muted" data-testid="story-rules-scope">
                 {story.networkId
                   ? <>Uses the shared detection rules and <strong>{story.networkName ?? 'a network'}</strong>'s own.</>
-                  : <>Uses the shared detection rules. Pick a network in “Viewing with” and regenerate to include its rules.</>}
+                  : <>Uses the shared detection rules. Pick a network under “Custom detection rules” and regenerate to include its rules.</>}
               </small>
             </div>
             <Button

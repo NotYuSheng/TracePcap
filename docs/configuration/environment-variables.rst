@@ -166,7 +166,7 @@ documented in its own section below with the surrounding detail.
    governed by ``LLM_API_BASE_URL`` — point it at a reachable local inference
    server to enable them; the production overlays require it to be set
    explicitly. Custom detection rules are not configured here at all: they live
-   in the database and are edited on the System page (see
+   in the database and are edited on the Settings page (see
    :doc:`signature-rules`).
 
 File Retention
@@ -203,7 +203,7 @@ content whose file has already been deleted.
 Deletion is only ever triggered by these settings; nothing else in the
 application removes captures or packets on its own.
 
-The three retention hours can also be changed in the app, on the System page,
+The three retention hours can also be changed in the app, on the Settings page,
 by an admin (see :ref:`settings-permissions`). The value here stays the
 default, and the app refuses ``FILE_RETENTION_HOURS`` below ``1``.
 

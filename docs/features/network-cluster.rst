@@ -42,8 +42,8 @@ Select a strategy from the **Group by** dropdown:
      - Predicted device class from the multi-signal classifier (Router, Mobile,
        Server, etc.) — see :doc:`geolocation` for the scoring algorithm.
    * - **Network Labels**
-     - Custom CIDR-to-label mappings defined in the **Network Labels** tab of
-       the Custom Detection Rules modal — see :doc:`custom-signatures`. Only
+     - Custom CIDR-to-label mappings: the organisations in **Settings ›
+       Address defaults › Organisations** — see :doc:`custom-signatures`. Only
        conversations where at least one endpoint is a labelled IP are shown;
        unlabelled-only traffic is suppressed.
 
