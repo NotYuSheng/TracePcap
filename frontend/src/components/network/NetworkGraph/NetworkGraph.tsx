@@ -617,6 +617,9 @@ export const NetworkGraph = memo(function NetworkGraph({
   // The network map layout: its group boxes, drawn on a canvas under the graph.
   const groupsCanvasRef = useRef<HTMLCanvasElement>(null);
   const groupLayoutRef = useRef<GroupedLayout | null>(null);
+  // Dragged nodes keep their place until the layout runs again; this puts them back.
+  const [nodesMoved, setNodesMoved] = useState(false);
+  const resetLayoutRef = useRef<(() => void) | null>(null);
   const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges });
   groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges };
   const deviceLinksRef = useRef(deviceLinks);
@@ -979,6 +982,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     const onDragEnd = () => {
       if (!dragNode) return;
       suppressNextClick = dragMoved;
+      if (dragMoved) setNodesMoved(true);
       dragNode = null;
       dragMoved = false;
       sigma.getCamera().enable();
@@ -1067,6 +1071,21 @@ export const NetworkGraph = memo(function NetworkGraph({
         workerFactory: () => new Worker(ELK_WORKER_URL, { type: 'classic' }),
       });
     }
+
+    setNodesMoved(false);
+    resetLayoutRef.current = () => {
+      setNodesMoved(false);
+      if (layoutType === 'grouped') {
+        applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
+        sigma.refresh();
+      } else if (layoutType === 'hierarchicalTd') {
+        applyHierarchicalLayout(graph, elkRef.current!).then(() => !cancelled && sigma.refresh());
+      } else {
+        circular.assign(graph, { scale: 1 });
+        noverlap.assign(graph, { maxIterations: 50, settings: { margin: 6 } });
+        sigma.refresh();
+      }
+    };
 
     if (layoutType === 'grouped') {
       applyGroupedLayout(sigma, nodes, groupingRef.current, groupLayoutRef);
@@ -1233,6 +1252,16 @@ export const NetworkGraph = memo(function NetworkGraph({
 
       {/* ── Bottom-right controls ────────────────────────────────────────── */}
       <div className="ng-overlay-controls">
+        {nodesMoved && (
+          <button
+            className="ng-ctrl-btn"
+            title="Reset positions"
+            aria-label="Reset positions: put dragged nodes back"
+            onClick={() => resetLayoutRef.current?.()}
+          >
+            <i className="bi bi-arrow-counterclockwise" aria-hidden="true" />
+          </button>
+        )}
         <button className="ng-ctrl-btn" title="Fit view" aria-label="Fit view" onClick={handleFitView}>
           <i className="bi bi-bounding-box-circles" aria-hidden="true" />
         </button>

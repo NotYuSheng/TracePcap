@@ -58,3 +58,12 @@ active*.
 
 Edges, the traffic animation and the same-device links of :doc:`device-moves`
 draw as in the other layouts.
+
+Moving Devices
+--------------
+
+Drag a device to move it, for a screenshot or to untangle a corner; its boxes
+stay where they are. **Reset positions** (the arrow among the layout controls,
+shown once something has been dragged) puts every device back in its place.
+Positions aren't saved yet: changing a filter or the layout, or reloading,
+lays the map out afresh.
