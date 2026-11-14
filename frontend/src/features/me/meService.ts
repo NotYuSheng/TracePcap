@@ -9,6 +9,7 @@ export type PermissionAction =
   | 'HOST_OCCUPANCY'
   | 'ADDRESS_DEFAULTS'
   | 'NETWORK_SETTINGS'
+  | 'NETWORK_MAP'
   | 'ANALYSIS_POLICY'
   | 'RETENTION';
 

@@ -126,11 +126,24 @@ The diagram opens laid out the way TracePcap drew it. It always uses the
 network map's grouping, whichever layout is showing, and only the devices the
 current filters leave on the graph.
 
-Moving Devices
---------------
+Moving Devices Between Groups
+-----------------------------
 
-Drag a device to move it, for a screenshot or to untangle a corner; its boxes
-stay where they are. **Reset positions** (the arrow among the layout controls,
-shown once something has been dragged) puts every device back in its place.
-Positions aren't saved yet: changing a filter or the layout, or reloading,
-lays the map out afresh.
+The automatic grouping is a starting point. To put a device somewhere else (a
+static server the map filed under *Other local addresses*, a phone you know
+belongs with the tills), **drag it onto another box**: while you drag, the box
+it would go into lights up; drop it there and it moves. Dropped anywhere else,
+it goes back to its own box: a device always sits in a box.
+
+- The move is **saved with the capture**, for everyone who opens it, and kept
+  when filters, the time axis or packet replay change what's shown. A box a
+  device was moved into says so (*2 moved here*).
+- **Undo move** (in the graph card's header) takes back your last moves, one at
+  a time. **Reset map** puts every moved device back in its automatic group,
+  after asking.
+- Moving needs the **Edit network maps** permission (analysts, by default);
+  without it a dropped device goes back. Every change is in the audit log.
+- If a move no longer fits (the device is filtered away, or re-analysis files
+  it under a different group), it's skipped and the device shows in its
+  automatic group.
+- The draw.io download includes the moves.

@@ -1,5 +1,7 @@
+import { usePermission } from '@/features/me/useMe';
+import { networkMapEditsService } from '@/features/network/services/networkMapEdits';
 import { useStore } from '@/store';
-import { buildGroupTree, layoutGroups } from '@/features/network/services/networkGroups';
+import { buildGroupTree, layoutGroups, leafGroups } from '@/features/network/services/networkGroups';
 import { downloadDrawio, toDrawio } from '@components/network/NetworkGraph/drawioExport';
 import { buildNodeLines } from '@components/network/NetworkGraph/nodeLines';
 import { usePacketReplay } from '@/features/network/hooks/usePacketReplay';
@@ -103,10 +105,66 @@ export const NetworkDiagramPage = () => {
     };
   }, [fileId]);
 
+  // The analyst's edits to the network map (#649): devices moved between groups. Saved per capture.
+  const mapPermission = usePermission('NETWORK_MAP');
+  const [mapPlacements, setMapPlacements] = useState<Record<string, string>>({});
+  const [mapHistory, setMapHistory] = useState<Record<string, string>[]>([]);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [confirmMapReset, setConfirmMapReset] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setMapPlacements({});
+    setMapHistory([]);
+    networkMapEditsService
+      .get(fileId)
+      .then(e => live && setMapPlacements(e.placements ?? {}))
+      .catch(() => live && setMapPlacements({}));
+    return () => {
+      live = false;
+    };
+  }, [fileId]);
+  const saveMap = (next: Record<string, string>, previous: Record<string, string>) => {
+    setMapPlacements(next);
+    setMapError(null);
+    networkMapEditsService.save(fileId, { placements: next }).catch(() => {
+      setMapPlacements(previous);
+      setMapError("The network map change couldn't be saved, so it was undone.");
+    });
+  };
+  const moveDevice = (nodeId: string, groupId: string) => {
+    // Back into its automatic group: no placement needed.
+    const auto = leafGroups(buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames }));
+    const automatic = [...auto.values()].find(g => g.nodeIds.includes(nodeId))?.id;
+    const next = { ...mapPlacements };
+    if (groupId === automatic) delete next[nodeId];
+    else next[nodeId] = groupId;
+    setMapHistory(h => [...h.slice(-49), mapPlacements]);
+    saveMap(next, mapPlacements);
+  };
+  const undoMapEdit = () => {
+    const previous = mapHistory[mapHistory.length - 1];
+    if (!previous) return;
+    setMapHistory(h => h.slice(0, -1));
+    saveMap(previous, mapPlacements);
+  };
+  const resetMap = () => {
+    setConfirmMapReset(false);
+    const previous = mapPlacements;
+    setMapPlacements({});
+    setMapHistory([]);
+    networkMapEditsService.reset(fileId).catch(() => {
+      setMapPlacements(previous);
+      setMapError("The network map couldn't be reset.");
+    });
+  };
+  const mapEdited = Object.keys(mapPlacements).length > 0;
+
   // The network map, as a draw.io diagram: grouped the same way, whatever layout is showing.
   const nodeLabelConfig = useStore(st => st.nodeLabelConfig);
   const downloadMap = () => {
-    const layout = layoutGroups(buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames }));
+    const layout = layoutGroups(
+      buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, placements: mapPlacements }),
+    );
     const name = (data?.fileName ?? 'capture').replace(/\.(pcapng|pcap|cap)$/i, '');
     downloadDrawio(toDrawio(layout, filteredNodes, filteredEdges, n => buildNodeLines(n, nodeLabelConfig), `${name} — network map`), `${name}-network-map`);
   };
@@ -680,6 +738,17 @@ export const NetworkDiagramPage = () => {
                     label="Edge volume"
                   />
                 )}
+                {layoutType === 'grouped' && mapHistory.length > 0 && (
+                  <Button variant="link" size="sm" className="p-0 text-muted" onClick={undoMapEdit}>
+                    <i className="bi bi-arrow-90deg-left me-1" aria-hidden="true" />
+                    Undo move
+                  </Button>
+                )}
+                {layoutType === 'grouped' && mapEdited && mapPermission.allowed && (
+                  <Button variant="link" size="sm" className="p-0 text-muted" onClick={() => setConfirmMapReset(true)}>
+                    Reset map
+                  </Button>
+                )}
                 <Button
                   variant="link"
                   size="sm"
@@ -703,6 +772,11 @@ export const NetworkDiagramPage = () => {
                 <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} hintSignal={fullscreenHint} hintId="fullscreen-hint-diagram" />
               </div>
             </Card.Header>
+            {mapError && (
+              <Alert variant="danger" className="m-2 mb-0" dismissible onClose={() => setMapError(null)}>
+                {mapError}
+              </Alert>
+            )}
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
@@ -710,6 +784,8 @@ export const NetworkDiagramPage = () => {
                 networkSegments={networkSegments}
                 customPrivateRanges={customPrivateRanges}
                 dnsNames={dnsNames}
+                mapPlacements={mapPlacements}
+                onMoveToGroup={mapPermission.allowed ? moveDevice : undefined}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 hiddenNodesList={hiddenNodesList}
@@ -841,6 +917,24 @@ export const NetworkDiagramPage = () => {
           onClose={() => setSelectedNode(null)}
         />
       )}
+
+      <Modal show={confirmMapReset} onHide={() => setConfirmMapReset(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Reset the network map?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Every device you moved goes back to its automatic group, for everyone who opens this capture.
+          This can't be undone.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setConfirmMapReset(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={resetMap}>
+            Reset map
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <NodeLabelSettingsModal
         show={showLabelModal}

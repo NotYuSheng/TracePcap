@@ -36,6 +36,7 @@ export const API_ENDPOINTS = {
   /** The networks a capture holds, told apart by their DHCP leases (#462). */
   FILE_NETWORK_SEGMENTS: (fileId: string) => `/files/${fileId}/network-segments`,
   FILE_PACKETS: (fileId: string) => `/files/${fileId}/packets`,
+  FILE_NETWORK_MAP_EDITS: (fileId: string) => `/files/${fileId}/network-map-edits`,
   /** Devices that moved to another address within a capture (same MAC, a new address). */
   FILE_DEVICE_MOVES: (fileId: string) => `/files/${fileId}/device-moves`,
   /** Every address more than one device held, with each device's classification (#918 slice 2). */

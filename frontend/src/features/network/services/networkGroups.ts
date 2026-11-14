@@ -31,6 +31,8 @@ export interface GroupNode {
   nodeIds: string[];
   /** Index of the network among its siblings, so each network gets its own colour. */
   tone?: number;
+  /** Devices the analyst moved into this group. */
+  movedIds?: string[];
 }
 
 export interface GroupBox {
@@ -42,6 +44,10 @@ export interface GroupBox {
   tone?: number;
   /** Members, deep: every device in the box. */
   count: number;
+  /** An innermost box: it holds devices, and a device can be moved into it. */
+  leaf: boolean;
+  /** Devices the analyst moved into this box. */
+  moved: number;
   memberIds: string[];
   /** Layout units, y pointing down. */
   x: number;
@@ -62,6 +68,8 @@ interface Options {
   customRanges?: CustomPrivateRange[];
   /** Names clients looked these addresses up by (forward DNS): the domain when a host has no hostname. */
   dnsNames?: Map<string, string>;
+  /** The analyst's moves (#649): device → the group they put it in. Applied over the automatic grouping. */
+  placements?: Record<string, string>;
 }
 
 /**
@@ -196,6 +204,47 @@ const byLabel = (a: GroupNode, b: GroupNode) => a.label.localeCompare(b.label, u
 
 /** The group tree for a set of nodes. Empty groups are never made. */
 export function buildGroupTree(
+  nodes: GraphNode[],
+  { segments = [], customRanges = [], dnsNames, placements }: Options = {},
+): GroupNode[] {
+  const tops = automaticTree(nodes, { segments, customRanges, dnsNames });
+  return placements && Object.keys(placements).length ? applyPlacements(tops, placements) : tops;
+}
+
+/** Every innermost group (the ones that hold devices), by id. */
+export function leafGroups(tops: GroupNode[]): Map<string, GroupNode> {
+  const out = new Map<string, GroupNode>();
+  const walk = (g: GroupNode) => (g.children.length ? g.children.forEach(walk) : out.set(g.id, g));
+  tops.forEach(walk);
+  return out;
+}
+
+/**
+ * Moves each placed device into the group it was put in. A placement whose device or group is no
+ * longer on the map (filtered away, regrouped after re-analysis) is skipped, so the device stays in
+ * its automatic group. Groups a move empties are dropped.
+ */
+export function applyPlacements(tops: GroupNode[], placements: Record<string, string>): GroupNode[] {
+  const leaves = leafGroups(tops);
+  const home = new Map<string, GroupNode>();
+  leaves.forEach(g => g.nodeIds.forEach(id => home.set(id, g)));
+  for (const [nodeId, groupId] of Object.entries(placements)) {
+    const from = home.get(nodeId);
+    const to = leaves.get(groupId);
+    if (!from || !to || from === to) continue;
+    from.nodeIds = from.nodeIds.filter(id => id !== nodeId);
+    to.nodeIds = [...to.nodeIds, nodeId];
+    to.movedIds = [...(to.movedIds ?? []), nodeId];
+    home.set(nodeId, to);
+  }
+  const prune = (gs: GroupNode[]): GroupNode[] =>
+    gs
+      .map(g => ({ ...g, children: prune(g.children) }))
+      .filter(g => g.nodeIds.length > 0 || g.children.length > 0);
+  return prune(tops);
+}
+
+function automaticTree(
   nodes: GraphNode[],
   { segments = [], customRanges = [], dnsNames }: Options = {},
 ): GroupNode[] {
@@ -384,6 +433,8 @@ export function layoutGroups(tops: GroupNode[]): GroupedLayout {
       level: s.group.level,
       tone: t,
       count: memberIds.length,
+      leaf: s.group.children.length === 0,
+      moved: s.group.movedIds?.length ?? 0,
       memberIds,
       x,
       y,

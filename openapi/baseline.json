@@ -3138,6 +3138,35 @@
         },
         "type": "object"
       },
+      "NetworkMapEdits": {
+        "properties": {
+          "placements": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "placements"
+        ],
+        "type": "object"
+      },
+      "NetworkMapEditsResponse": {
+        "properties": {
+          "edits": {
+            "$ref": "#/components/schemas/NetworkMapEdits"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NetworkRef": {
         "properties": {
           "id": {
@@ -3774,6 +3803,7 @@
               "HOST_OCCUPANCY",
               "ADDRESS_DEFAULTS",
               "NETWORK_SETTINGS",
+              "NETWORK_MAP",
               "ANALYSIS_POLICY",
               "RETENTION"
             ],
@@ -8902,6 +8932,104 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/network-map-edits": {
+      "delete": {
+        "description": "Drops every edit. Needs the NETWORK_MAP permission. Audited.",
+        "operationId": "resetNetworkMapEdits",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Reset a capture's network map to automatic",
+        "tags": [
+          "Network Map"
+        ]
+      },
+      "get": {
+        "description": "Which group each moved device was put in. Empty when the map was never edited.",
+        "operationId": "getNetworkMapEdits",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkMapEditsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "A capture's network map edits",
+        "tags": [
+          "Network Map"
+        ]
+      },
+      "put": {
+        "description": "Replaces the edits. Needs the NETWORK_MAP permission. Audited.",
+        "operationId": "saveNetworkMapEdits",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkMapEdits"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkMapEditsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Save a capture's network map edits",
+        "tags": [
+          "Network Map"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/network-segments": {
       "get": {
         "description": "Leases grouped by the network that handed them out: its 802.1Q VLAN, else its DHCP server's MAC, with the router, domain and lease time it gave. Overlaps are networks using the same range, with the addresses leased on more than one; each such address is a different machine per network.",
@@ -11651,6 +11779,7 @@
                 "HOST_OCCUPANCY",
                 "ADDRESS_DEFAULTS",
                 "NETWORK_SETTINGS",
+                "NETWORK_MAP",
                 "ANALYSIS_POLICY",
                 "RETENTION"
               ],
@@ -12839,6 +12968,10 @@
     {
       "description": "The assembled knowledge board for a file — entities, relationships, and findings",
       "name": "Knowledge"
+    },
+    {
+      "description": "The analyst's edits to a capture's network map",
+      "name": "Network Map"
     },
     {
       "description": "Free-text annotations on a monitored network",
