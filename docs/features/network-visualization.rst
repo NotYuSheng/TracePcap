@@ -388,4 +388,6 @@ Export
 ------
 
 The topology can be captured as part of the PDF report via the **Export PDF**
-button (see :doc:`../operations/backup-restore`).
+button (see :doc:`../operations/backup-restore`). The **download** button in the
+graph card's header saves the network map as a draw.io diagram to finish by hand
+(see :doc:`network-map`).
