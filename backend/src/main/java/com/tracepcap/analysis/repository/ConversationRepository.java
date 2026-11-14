@@ -27,6 +27,12 @@ public interface ConversationRepository
   long countByFileId(UUID fileId);
 
   /** All conversations in a file in which the given IP is either endpoint (initiator or peer). */
+  /** Each conversation's MAC and address on both ends, its start and end, and packet count: when a MAC used an address. */
+  @Query(
+      "SELECT c.srcMac, c.srcIp, c.dstMac, c.dstIp, c.startTime, c.endTime, c.packetCount FROM ConversationEntity c"
+          + " WHERE c.file.id = :fileId AND (c.srcMac IS NOT NULL OR c.dstMac IS NOT NULL)")
+  List<Object[]> findMacUseByFileId(@Param("fileId") UUID fileId);
+
   @Query(
       "SELECT c FROM ConversationEntity c WHERE c.file.id = :fileId"
           + " AND (c.srcIp = :ip OR c.dstIp = :ip)"

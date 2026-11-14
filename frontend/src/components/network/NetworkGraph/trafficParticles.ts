@@ -94,7 +94,7 @@ export function drawParticles(
 export function drawDeviceLinks(
   ctx: CanvasRenderingContext2D,
   sigma: Sigma,
-  links: { from: string; to: string; label: string }[],
+  links: { from: string; to: string; label: string; hideLabel?: boolean }[],
   dark: boolean,
 ): void {
   if (links.length === 0) return;
@@ -121,6 +121,7 @@ export function drawDeviceLinks(
     ctx.moveTo(pa.x * ratio, pa.y * ratio);
     ctx.lineTo(pb.x * ratio, pb.y * ratio);
     ctx.stroke();
+    if (l.hideLabel) continue;
     // The label on a pill at the midpoint, so it reads over edges.
     const mx = ((pa.x + pb.x) / 2) * ratio;
     const my = ((pa.y + pb.y) / 2) * ratio;

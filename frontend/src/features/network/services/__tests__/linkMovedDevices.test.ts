@@ -29,4 +29,18 @@ describe('linkMovedDevices', () => {
     expect(linkMovedDevices(nodes, [move])).toHaveLength(0)
     expect(nodes[0].data.moves).toHaveLength(1)
   })
+
+  it('there and back again: one label listing both moves, each move still its own link', () => {
+    const nodes = [node('10.0.0.50', '10.0.0.50'), node('10.0.0.73', '10.0.0.73')]
+    const back = {
+      ...move, fromIp: '10.0.0.73', fromKey: '10.0.0.73', fromHostname: 'ALICE-WS01',
+      toIp: '10.0.0.50', toKey: '10.0.0.50', toHostname: 'ALICE-WS01', arrived: [2026, 11, 10, 11, 40, 0],
+    }
+    const links = linkMovedDevices(nodes, [move, back])
+    expect(links).toHaveLength(2)
+    expect(links[1]).toMatchObject({ from: '10.0.0.73', to: '10.0.0.50', hideLabel: true })
+    expect(links[0].hideLabel).toBeUndefined()
+    expect(links[0].label).toMatch(/moved .+, renamed LAPTOP-ALICE → ALICE-WS01, .+/)
+    expect(nodes[0].data.moves).toHaveLength(2)
+  })
 })

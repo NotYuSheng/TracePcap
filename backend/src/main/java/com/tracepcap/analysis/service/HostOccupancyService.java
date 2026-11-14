@@ -238,7 +238,21 @@ public class HostOccupancyService {
   @Transactional(readOnly = true)
   public List<com.tracepcap.analysis.dto.occupancy.DeviceMoveDto> moves(UUID fileId) {
     requireFile(fileId);
-    var found = DeviceMoves.of(observations.findByFileId(fileId), leases.findByFileId(fileId));
+    // Conversations say when each address was actually in use, so a device that came back to an
+    // address it had before reads as moving back, not as being on both.
+    List<DeviceMoves.Sighting> uses = new ArrayList<>();
+    for (Object[] r : conversations.findMacUseByFileId(fileId)) {
+      var start = (java.time.LocalDateTime) r[4];
+      var end = (java.time.LocalDateTime) r[5];
+      // Continuous when its packets fill its span (about one a minute or more); a sparse one, like
+      // DHCP renewals on the same ports, only marks its two ends.
+      long packets = r[6] == null ? 0 : ((Number) r[6]).longValue();
+      long seconds = start == null || end == null ? 0 : java.time.Duration.between(start, end).getSeconds();
+      boolean continuous = packets >= Math.max(2, seconds / 60);
+      if (r[0] != null) uses.add(new DeviceMoves.Sighting((String) r[0], (String) r[1], start, end, continuous));
+      if (r[2] != null) uses.add(new DeviceMoves.Sighting((String) r[2], (String) r[3], start, end, continuous));
+    }
+    var found = DeviceMoves.of(observations.findByFileId(fileId), leases.findByFileId(fileId), uses);
     if (found.isEmpty()) return List.of();
     Map<String, List<IpOccupancyEntity>> rowsByIp = new HashMap<>();
     for (var o : occupancies.findByFileIdOrderByIpAscIdxAsc(fileId)) {

@@ -78,7 +78,7 @@ interface NetworkGraphProps {
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
   animateTraffic?: boolean;
   /** One device on two nodes (it moved to another address): drawn as dashed links. */
-  deviceLinks?: { from: string; to: string; at?: number; label: string }[];
+  deviceLinks?: { from: string; to: string; at?: number; label: string; hideLabel?: boolean }[];
   /**
    * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
    * volume shades each edge by `totalBytes` on the shared volume scale — the same
