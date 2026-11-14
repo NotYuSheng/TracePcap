@@ -124,9 +124,8 @@ export const NetworkDiagramPage = () => {
     setHasRisksOnly(false);
   };
 
-  const [layoutType, setLayoutType] = useState<GraphLayoutType>(
-    'circular'
-  );
+  // The network map is the default here: devices grouped by network, subnet and type.
+  const [layoutType, setLayoutType] = useState<GraphLayoutType>('grouped');
 
   const isDark = useResolvedDark();
   const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('transport');
