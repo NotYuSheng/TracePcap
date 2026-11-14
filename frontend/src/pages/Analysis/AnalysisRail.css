@@ -15,9 +15,8 @@
 .analysis-body {
   box-sizing: border-box;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 20px 28px 32px;
+  max-width: 1480px;
+  padding: 20px 24px 32px;
 }
 
 .analysis-rail {
@@ -154,12 +153,12 @@
   align-items: center;
   gap: 8px 20px;
   /* The strip runs full width; its contents line up with the content below. */
-  padding: 10px max(28px, calc((100% - 1280px) / 2 + 28px));
+  padding: 10px 24px;
   border-bottom: 1px solid var(--tp-border, #d8dce5);
   background: var(--tp-surface, #ffffff);
 }
 .analysis-capture-id {
-  flex: 1 1 320px;
+  flex: 1 1 260px;
   min-width: 0;
 }
 .analysis-capture-crumb {

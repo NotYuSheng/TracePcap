@@ -91,6 +91,26 @@ body {
   z-index: 100;
 }
 
+/* The header runs full width, one slim row, its edge lined up with the rail and the page. */
+.main-navbar {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+.main-navbar-inner {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+.main-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 28px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: inherit !important;
+  text-decoration: none;
+}
+
 .main-content {
   flex: 1;
   padding: 2rem;

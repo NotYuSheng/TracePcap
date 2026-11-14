@@ -128,7 +128,7 @@
   padding: 8px 18px;
   border-top: 1px solid var(--tp-border, #eceef3);
 }
-.captures-status-inline {
+.captures-table .captures-status-inline {
   display: none;
 }
 @media (max-width: 575.98px) {
@@ -137,7 +137,7 @@
   .captures-table .captures-open {
     display: none;
   }
-  .captures-status-inline {
+  .captures-table .captures-status-inline {
     display: inline-flex;
     min-width: 0;
   }
