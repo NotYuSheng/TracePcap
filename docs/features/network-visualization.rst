@@ -158,8 +158,11 @@ sources:
        ``unknown``) use the hardware device classification colour instead
        (IoT = pink, Mobile = violet, Laptop/Desktop = blue, Server = emerald,
        Router = orange). The legend in the graph reflects exactly which colours
-       are present in the current view. See the *Classification* section below
-       for how each signal is derived.
+       are present in the current view. Click a legend entry to highlight it: a
+       node type picks out those devices and their conversations, an edge colour
+       picks out those conversations and the devices at both ends; everything
+       else fades. Click the entry again to clear it. See the *Classification*
+       section below for how each signal is derived.
    * - **Country flag**
      - Shown on external (non-RFC-1918) IP nodes only. Sourced from ipinfo.io
        (online) or the bundled DB-IP Lite MMDB (offline fallback). RFC-1918,
