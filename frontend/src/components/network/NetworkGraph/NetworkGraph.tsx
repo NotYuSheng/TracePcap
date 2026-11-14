@@ -646,6 +646,9 @@ export const NetworkGraph = memo(function NetworkGraph({
   const resetLayoutRef = useRef<(() => void) | null>(null);
   // The network map's cell size on screen, refreshed each render: labels are fitted to it.
   const labelFitRef = useRef<{ w: number; below: number } | null>(null);
+  // Legend highlight: click a node type or an edge colour to pick out its nodes and edges.
+  const [legendFocus, setLegendFocus] = useState<LegendFocus | null>(null);
+  const legendMatchRef = useRef<{ nodes: Set<string>; edges: Set<string> } | null>(null);
   const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames });
   groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames };
   const deviceLinksRef = useRef(deviceLinks);
@@ -730,6 +733,47 @@ export const NetworkGraph = memo(function NetworkGraph({
     sigma.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkSegments, customPrivateRanges, dnsNames]);
+
+  // Work out what the legend highlight picks out, whenever it or the graph changes. A frame
+  // later, so a graph rebuilt or repainted by the effects below is the one matched.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const sigma = sigmaRef.current;
+      if (!sigma) return;
+      if (!legendFocus) {
+        legendMatchRef.current = null;
+        sigma.refresh();
+        return;
+      }
+      const graph = sigma.getGraph();
+      const matchNodes = new Set<string>();
+      const matchEdges = new Set<string>();
+      if (legendFocus.kind === 'node') {
+        graph.forEachNode((id, a) => {
+          if (legendNodeMatches(legendFocus.key, a['nodeType'] as string | undefined, a['deviceType'] as string | undefined)) matchNodes.add(id);
+        });
+        graph.forEachEdge((id, _a, src, tgt) => {
+          if (matchNodes.has(src) || matchNodes.has(tgt)) matchEdges.add(id);
+        });
+      } else {
+        graph.forEachEdge((id, a, src, tgt) => {
+          if (a['color'] === legendFocus.color) {
+            matchEdges.add(id);
+            matchNodes.add(src);
+            matchNodes.add(tgt);
+          }
+        });
+      }
+      // The picked type is gone from the graph (filtered away): drop the highlight.
+      if (matchNodes.size === 0) {
+        setLegendFocus(null);
+        return;
+      }
+      legendMatchRef.current = { nodes: matchNodes, edges: matchEdges };
+      sigma.refresh();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [legendFocus, nodes, edges, edgeColorMode, layoutType]);
 
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
@@ -850,6 +894,18 @@ export const NetworkGraph = memo(function NetworkGraph({
           res['label'] = '';
         }
 
+        // Legend highlight: everything but the picked type (or the ends of the picked edges) fades.
+        const lm = legendMatchRef.current;
+        if (lm && !lm.nodes.has(node)) {
+          res['color'] = dimColor;
+          res['label'] = '';
+          res['zIndex'] = 0;
+        } else if (lm) {
+          // Drawn in full (icon and label) even where the label grid would skip it.
+          res['forceLabel'] = true;
+          res['zIndex'] = 2;
+        }
+
         // Time axis: quiet in the window → dimmed, label kept so the node is still findable.
         const win = activeInWindowRef.current;
         if (win?.hiddenNodeIds?.has(node)) {
@@ -882,6 +938,11 @@ export const NetworkGraph = memo(function NetworkGraph({
         }
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.5);
+        }
+        const lmEdges = legendMatchRef.current?.edges;
+        if (lmEdges && !lmEdges.has(edge)) {
+          res['color'] = blendColor(data['color'] as string, bgColor, 0.12);
+          res['zIndex'] = 0;
         }
         // Time axis: a conversation outside the window isn't drawn. An edge standing for several
         // conversations between the same pair (deduplicateEdges joins their ids with '|') is
@@ -1382,23 +1443,27 @@ export const NetworkGraph = memo(function NetworkGraph({
       {/* ── Node-type legend — data-driven, matches getNodeColor/getNodeIcon ── */}
       {/* Scrollable on-screen so a long protocol list can't overflow the canvas; the PDF-capture
           render (forceLight) keeps the full height so nothing is clipped in the export. */}
-      <div className={`ng-legend${forceLight ? '' : ' ng-legend--scroll'}`}>
+      <div
+        className={`ng-legend${forceLight ? '' : ' ng-legend--scroll'}${legendFocus ? ' ng-legend--focused' : ''}`}
+        role="group"
+        aria-label="Legend: click an entry to highlight it"
+      >
         {/* Specific service nodeTypes present in this graph */}
         {Object.entries(NODE_TYPE_CONFIG)
           .filter(([type]) => !GENERIC_NODE_TYPES.has(type) && type !== 'cluster' &&
             nodes.some(n => !n.data.isCluster && (n.data.nodeType ?? 'unknown') === type))
           .map(([type, cfg]) => (
-            <div key={type} className="ng-legend-item">
-              <i className={`bi ${cfg.icon} ng-legend-icon`} style={{ color: cfg.color }} />
+            <LegendButton key={type} focus={legendFocus} value={{ kind: 'node', key: `type:${type}` }} onPick={setLegendFocus}>
+              <i className={`bi ${cfg.icon} ng-legend-icon`} style={{ color: cfg.color }} aria-hidden="true" />
               <span className="ng-legend-label">{cfg.label}</span>
-            </div>
+            </LegendButton>
           ))}
         {/* Device types present among generic (client/unknown) nodes */}
         {DEVICE_TYPES
           .filter(dt => dt !== 'UNKNOWN' &&
             nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && n.data.deviceType === dt))
           .map(dt => (
-            <div key={dt} className="ng-legend-item">
+            <LegendButton key={dt} focus={legendFocus} value={{ kind: 'node', key: `device:${dt}` }} onPick={setLegendFocus}>
               {/*
                 Swatch matches what the node actually renders. Generic nodes (client/unknown) now
                 take their colour from NODE_TYPE_CONFIG[nodeType], not from deviceTypeColor — so
@@ -1408,16 +1473,17 @@ export const NetworkGraph = memo(function NetworkGraph({
               <i
                 className={`bi ${deviceTypeIcon(dt)} ng-legend-icon`}
                 style={{ color: NODE_TYPE_CONFIG['client'].color }}
+                aria-hidden="true"
               />
               <span className="ng-legend-label">{deviceTypeLabel(dt)}</span>
-            </div>
+            </LegendButton>
           ))}
         {/* Fallback: show Unknown only if generic nodes exist with no specific deviceType */}
         {nodes.some(n => GENERIC_NODE_TYPES.has(n.data.nodeType ?? 'unknown') && (!n.data.deviceType || n.data.deviceType === 'UNKNOWN')) && (
-          <div className="ng-legend-item">
-            <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} />
+          <LegendButton focus={legendFocus} value={{ kind: 'node', key: 'unknown' }} onPick={setLegendFocus}>
+            <i className="bi bi-question-circle ng-legend-icon" style={{ color: NODE_TYPE_CONFIG['unknown'].color }} aria-hidden="true" />
             <span className="ng-legend-label">Unknown</span>
-          </div>
+          </LegendButton>
         )}
 
         {/* ── Edge-protocol colours — line swatches, driven by PROTOCOL_COLORS ── */}
@@ -1426,16 +1492,16 @@ export const NetworkGraph = memo(function NetworkGraph({
             <div className="ng-legend-divider" />
             <div className="ng-legend-heading">Edges</div>
             {protocolLegend.entries.map(({ color, label }) => (
-              <div key={color} className="ng-legend-item">
-                <span className="ng-legend-line" style={{ background: color }} />
+              <LegendButton key={color} focus={legendFocus} value={{ kind: 'edge', color }} onPick={setLegendFocus}>
+                <span className="ng-legend-line" style={{ background: color }} aria-hidden="true" />
                 <span className="ng-legend-label">{label}</span>
-              </div>
+              </LegendButton>
             ))}
             {protocolLegend.hasUnmapped && (
-              <div className="ng-legend-item">
-                <span className="ng-legend-line" style={{ background: DEFAULT_EDGE_COLOR }} />
+              <LegendButton focus={legendFocus} value={{ kind: 'edge', color: DEFAULT_EDGE_COLOR }} onPick={setLegendFocus}>
+                <span className="ng-legend-line" style={{ background: DEFAULT_EDGE_COLOR }} aria-hidden="true" />
                 <span className="ng-legend-label">Other</span>
-              </div>
+              </LegendButton>
             )}
           </>
         )}
@@ -1491,4 +1557,41 @@ function applyGroupedLayout(
     const below = (top - bottom) * 0.08;
     sigma.setCustomBBox({ x: [Math.min(...xs), Math.max(...xs)], y: [bottom - below, top] });
   }
+}
+
+/** What a legend click picks out: a node type (`type:<nodeType>`, `device:<deviceType>`, `unknown`) or an edge colour. */
+type LegendFocus = { kind: 'node'; key: string } | { kind: 'edge'; color: string };
+
+/** Mirrors how the legend lists node types: specific service types, else generic nodes by device type. */
+function legendNodeMatches(key: string, nodeType: string | undefined, deviceType: string | undefined): boolean {
+  const nt = nodeType ?? 'unknown';
+  if (key.startsWith('type:')) return nt === key.slice(5);
+  const generic = GENERIC_NODE_TYPES.has(nt);
+  if (key.startsWith('device:')) return generic && deviceType === key.slice(7);
+  return generic && (!deviceType || deviceType === 'UNKNOWN');
+}
+
+function sameFocus(a: LegendFocus | null, b: LegendFocus): boolean {
+  if (!a || a.kind !== b.kind) return false;
+  return a.kind === 'node' ? a.key === (b as { key: string }).key : a.color === (b as { color: string }).color;
+}
+
+/** A legend entry: a toggle that highlights its nodes or edges; pressing it again clears. */
+function LegendButton({
+  focus,
+  value,
+  onPick,
+  children,
+}: {
+  focus: LegendFocus | null;
+  value: LegendFocus;
+  onPick: (f: LegendFocus | null) => void;
+  children: import('react').ReactNode;
+}) {
+  const on = sameFocus(focus, value);
+  return (
+    <button type="button" className="ng-legend-item ng-legend-btn" aria-pressed={on} onClick={() => onPick(on ? null : value)}>
+      {children}
+    </button>
+  );
 }
