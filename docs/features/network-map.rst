@@ -3,8 +3,9 @@ Network Map Layout
 
 The **network map** is a layout of the network graph that draws the capture the
 way an analyst would by hand: devices grouped into nested boxes by where they
-are, every level shown. Pick it with the **Network map** button among the
-graph's layout controls (bottom right), next to circular and hierarchical.
+are, every level shown. It's the layout the Network Visualization page opens
+in; the layout controls (bottom right) switch to circular or hierarchical and
+back. The compare page and the monitor's snapshot dialog open in circular.
 
 .. figure:: images/network-map-two-sites.png
    :alt: The network map of two_sites_one_range.pcap: Your networks holds two networks,

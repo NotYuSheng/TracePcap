@@ -182,16 +182,15 @@ topology is a pure data-driven graph rendered in the browser.
 
 Three layouts are available:
 
-- **Force-directed** (default) — ForceAtlas2 run in a Web Worker, followed by
-  a de-overlapping pass. Surfaces natural clusters and hub-and-spoke structure.
+- **Circular** — devices around a ring, followed by a de-overlapping pass.
 - **Hierarchical** — ELK (Eclipse Layout Kernel) ``layered`` algorithm, which
   implements the **Sugiyama method**: nodes are ranked into horizontal layers by
   longest-path analysis, edge crossings between layers are minimised, and
   disconnected components are placed side-by-side. This layout makes
   client → server traffic flow and parent/child relationships immediately
   visible.
-- **Network map** — devices in nested boxes: network, subnet, device type; the
-  internet by domain. See :doc:`network-map`.
+- **Network map** (default) — devices in nested boxes: network, subnet, device
+  type; the internet by domain. See :doc:`network-map`.
 
 Grouping Modes
 --------------
@@ -370,9 +369,10 @@ is attached to the node and available as a label field, with no active probing.
 Layout Controls
 ---------------
 
-- **Force-directed** — switch to ForceAtlas2 layout (default).
+- **Circular** — switch to the circular layout.
 - **Hierarchical** — switch to ELK Sugiyama layered layout (top-down).
-- **Network map** — switch to the grouped network map (:doc:`network-map`).
+- **Network map** — switch to the grouped network map (:doc:`network-map`), the
+  layout the page opens in.
 - **Reset positions** — put dragged nodes back where the layout placed them;
   shown once a node has been dragged.
 - **Fit view** — reset the camera to fit all nodes in the viewport. It isn't
