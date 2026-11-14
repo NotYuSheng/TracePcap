@@ -36,6 +36,7 @@ Designed for air-gapped and offline deployments — GeoIP lookups use a bundled 
    features/network-visualization
    features/network-time-axis
    features/network-map
+   features/packet-replay
    features/device-moves
    features/network-cluster
    features/comparison
