@@ -78,7 +78,26 @@ class PipelineIntegrationTest {
   @Autowired private com.tracepcap.extraction.repository.ExtractedFileRepository extractedFiles;
   @Autowired private com.tracepcap.file.repository.FileRepository files;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+  @Autowired private com.tracepcap.analysis.repository.IpGeoInfoRepository geoCache;
   @Autowired private com.tracepcap.story.service.FindingsService storyFindings;
+
+  /**
+   * Two analyses caching the same external IP at once: the second write must update the row, not
+   * violate its key. A plain insert did, and aborted the second analysis.
+   */
+  @Test
+  void geoCache_writeForAnIpAlreadyCached_updatesInsteadOfFailing() {
+    var first = com.tracepcap.analysis.entity.IpGeoInfoEntity.builder()
+        .ip("203.0.113.77").country("Singapore").countryCode("SG").geoSource("mmdb")
+        .lookedUpAt(java.time.LocalDateTime.now()).build();
+    geoCache.upsert(first);
+    var second = com.tracepcap.analysis.entity.IpGeoInfoEntity.builder()
+        .ip("203.0.113.77").country("Japan").countryCode("JP").geoSource("ipinfo")
+        .lookedUpAt(java.time.LocalDateTime.now()).build();
+    geoCache.upsert(second);
+    assertThat(jdbc.queryForObject("SELECT country_code FROM ip_geo_cache WHERE ip = '203.0.113.77'", String.class))
+        .isEqualTo("JP");
+  }
 
   @Test
   void filesList_returnsPagedResponseEnvelope() {

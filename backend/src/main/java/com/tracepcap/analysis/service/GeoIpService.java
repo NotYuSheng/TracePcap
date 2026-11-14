@@ -177,7 +177,8 @@ public class GeoIpService {
           toSave.add(buildEntity(ip, r));
         }
       }
-      if (!toSave.isEmpty()) geoInfoRepository.saveAll(toSave);
+      // Upsert, not insert: another analysis may cache the same IP at the same time (see upsert).
+      for (IpGeoInfoEntity e : toSave) geoInfoRepository.upsert(e);
     }
 
     return result;
@@ -330,6 +331,7 @@ public class GeoIpService {
         .lat(r.lat())
         .lon(r.lon())
         .geoSource(r.geoSource())
+        .lookedUpAt(LocalDateTime.now())
         .build();
   }
 
