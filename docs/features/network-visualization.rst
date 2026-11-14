@@ -62,10 +62,23 @@ node positions are preserved.
 The control is available in both the analysis-mode diagram and the monitor-mode
 snapshot diagram, which share the same underlying graph component.
 
-Node-to-Node Volume Heatmap
----------------------------
+Traffic Card
+------------
 
-Below the diagram, the **Node-to-Node Volume** panel renders a src×dst matrix of
+Above the diagram, the **Traffic** card shows the diagram's totals (hosts,
+connections, packets, bytes) and how many are shown after filters. It has two
+tabs, both collapsed until you open one; the open tab is remembered:
+
+- **Busiest pairs**: the eight host pairs carrying the most bytes, both
+  directions together, with their apps and a bar each. Click a pair to
+  highlight it in the diagram.
+- **Matrix**: the node-to-node volume heatmap, below. The corner button shows
+  it full screen.
+
+Node-to-Node Volume Heatmap
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The **Matrix** tab renders a src×dst matrix of
 the displayed hosts, each cell shaded by the volume between that pair on the
 :ref:`shared volume color scale <shared-volume-scale>`. The diagram answers
 *who talks to whom*; the matrix answers *how much*, which a force-directed

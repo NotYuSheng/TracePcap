@@ -868,10 +868,10 @@ test('README demo walkthrough', async ({ page }) => {
   // Close the section on the node-to-node volume heatmap: the same traffic the
   // topology draws as edges, read as a matrix instead — which pairs actually
   // carry the bytes. Collapsed by default, so it has to be opened.
-  const heatmapCard = cardOf(page.getByText('Node-to-Node Volume').first());
+  const heatmapCard = page.locator('.traffic-card').first();
   await expect(heatmapCard, 'heatmap card not found').toBeVisible({ timeout: 15_000 });
   await frameCardTop(heatmapCard);
-  await showClick(page, heatmapCard.getByRole('button', { name: /^Show/ }).first());
+  await showClick(page, heatmapCard.getByRole('tab', { name: 'Matrix' }));
   await expect(page.locator('.tp-heatmap-body'), 'heatmap did not expand').toBeVisible({
     timeout: 20_000,
   });
