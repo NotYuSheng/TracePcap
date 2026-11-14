@@ -66,11 +66,30 @@ analysis. This prevents redundant processing and storage.
 Processing Progress
 -------------------
 
-A single upload opens its analysis as soon as it is uploaded. With several
-files, a dialog shows each one's progress. After upload you see a progress view showing each analysis
-stage (packet parsing, nDPI analysis, geolocation, file extraction, …) with
-a percentage indicator. Analysis runs asynchronously — you can navigate away
-and return later.
+The whole **Analyse a capture** panel is the drop target. While you drag
+files over it, it says how many captures will be analysed and with which
+stages.
+
+Each file then becomes a row in the panel, with no dialog, so the rest of the
+page stays usable:
+
+- **Uploading**: a bar and how much has been sent.
+- **Analysing**: the current stage, e.g. "Stage 2 of 5: Detecting applications
+  & threats".
+- **Ready**: the packet count and an **Open** button.
+
+Problems stay as rows with a plain reason:
+
+- a file **already analysed** is not uploaded again, and the row links to its
+  analysis;
+- a file that is **too big** or **not a capture** says so, and what to do.
+
+**Clear these** removes the finished rows. **Add more** picks more files while
+others are still going.
+
+A single file opens its analysis as soon as it is uploaded, on a progress view
+that shows each stage. Analysis runs in the background, so you can leave and
+come back.
 
 Managing Uploads
 ----------------
