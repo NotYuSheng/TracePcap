@@ -32,16 +32,36 @@ Each box sits inside the one above it:
       - **Device type**: the device's classification (Laptop / Desktop,
         Mobile, Server…), or **Unclassified**.
 
-- **Internet**: public addresses, grouped by **domain** from their hostname
-  (``cdn.example.com`` and ``www.example.com`` share ``example.com``), or **No
-  hostname**.
+- **Internet**: public addresses, grouped by **domain** (``cdn.example.com``
+  and ``www.example.com`` share ``example.com``). The domain comes from the
+  host's name, else from the name clients looked its address up by in the
+  capture's DNS traffic; with neither, **No hostname**.
 - **Broadcast and multicast**: ``0.0.0.0``, ``255.255.255.255`` and multicast
   addresses.
 
-Each network has its own colour. A box's name shows how many devices it holds;
+Each network has its own colour. A router that serves several networks from one
+MAC address shows once per network: each of its addresses goes in the network
+whose range holds it. A box's name shows how many devices it holds;
 when it's too small to read at the current zoom, it's left out until you zoom
 in. Two networks that use the same range stay apart: a device on the second one
 is placed by its device key, else by its MAC.
+
+Trying It Out
+-------------
+
+``sample-files/small_office.pcap`` (made by ``gen_small_office.py``) fills every
+level: three DHCP networks (staff, devices, guest), a statically addressed
+server network, internet hosts named by DNS lookups, traffic between the
+networks, and 26 minutes for the time axis to play (the cameras start at 5
+minutes, a visitor's phone joins at 15).
+
+.. figure:: images/network-map-small-office.png
+   :alt: The network map of small_office.pcap: staff, devices and guest networks with their
+         subnets and device-type groups, Other local addresses holding the servers, and the
+         internet grouped into bbc.co.uk, example.co.uk, github.com, google.com, microsoft.com
+         and office365.com.
+
+   ``small_office.pcap``.
 
 With the Time Axis
 ------------------
