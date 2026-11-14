@@ -1,0 +1,81 @@
+.audit-changes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.audit-fields {
+  display: grid;
+  grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 2px;
+  margin: 0;
+}
+.audit-field {
+  display: contents;
+}
+.audit-field dt {
+  font-weight: 500;
+  color: var(--tp-text-muted, #4b5563);
+}
+.audit-field dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.audit-old {
+  color: #9f1239;
+  background: rgba(225, 29, 72, 0.08);
+  text-decoration: line-through;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.audit-new {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.1);
+  text-decoration: none;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+[data-theme='dark'] .audit-old {
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.16);
+}
+[data-theme='dark'] .audit-new {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.16);
+}
+.audit-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.audit-tag-added {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.12);
+}
+.audit-tag-removed {
+  color: #9f1239;
+  background: rgba(225, 29, 72, 0.1);
+}
+[data-theme='dark'] .audit-tag-added {
+  color: #86efac;
+}
+[data-theme='dark'] .audit-tag-removed {
+  color: #fda4af;
+}
+.audit-code {
+  font-size: 11px;
+}
+
+/* Give the change room: the target id wraps within a capped column instead of taking it. */
+.audit-what {
+  width: 30%;
+  max-width: 320px;
+}
+.audit-change {
+  width: 50%;
+}
+.audit-target {
+  overflow-wrap: anywhere;
+}

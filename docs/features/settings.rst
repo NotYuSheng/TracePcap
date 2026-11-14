@@ -157,6 +157,12 @@ as the change, so a change is never saved without its entry.
 Read it on the Settings page's **Audit log** tab: newest first, paged, and searchable by
 who, action or target. It's also available from the API at ``GET /api/v1/audit-log``.
 
+Each entry shows **what changed**, not the raw record: on an update only the fields
+that differ, as old → new (old struck through, new highlighted); on a creation or
+removal the fields it had, marked *Added* or *Removed*. Nested values read as paths
+(*Match › Dst port*), bookkeeping (ids, internal timestamps, version counters) is
+left out, and long entries fold after a few lines (*Show N more*).
+
 Users
 -----
 

@@ -65,7 +65,7 @@ describe('PermissionsPanel (#915)', () => {
 });
 
 describe('AuditLogPanel (#915)', () => {
-  it('lists entries with before and after, and searches', async () => {
+  it('lists entries with what changed, readably, and searches', async () => {
     const searches: (string | null)[] = [];
     server.use(
       http.get('*/audit-log', ({ request }) => {
@@ -97,8 +97,11 @@ describe('AuditLogPanel (#915)', () => {
 
     const row = (await screen.findByText('network.settings.update')).closest('tr')!;
     expect(within(row).getByText('alice')).toBeInTheDocument();
-    expect(row).toHaveTextContent('inactivityThreshold: 1');
-    expect(row).toHaveTextContent('inactivityThreshold: 7');
+    // Readable: the action in words, and only the field that changed, old → new.
+    expect(within(row).getByText('Network · settings update')).toBeInTheDocument();
+    expect(within(row).getByText('Inactivity threshold')).toBeInTheDocument();
+    expect(within(row).getByText('1').tagName).toBe('DEL');
+    expect(within(row).getByText('7').tagName).toBe('INS');
 
     await userEvent.type(screen.getByLabelText('Search the audit log'), 'nothing');
     expect(await screen.findByText('No entries match "nothing".')).toBeInTheDocument();
