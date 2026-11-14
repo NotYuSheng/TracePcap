@@ -1,3 +1,4 @@
+import { AnalysisRail, type RailItem } from './AnalysisRail';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { NetworkContextPicker } from '@/features/detectionRules/NetworkContextPicker';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -5,7 +6,7 @@ import { describeLlmError } from '@utils/llmError';
 import { Alert } from '@components/common/Alert';
 import { useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button, Card } from '@govtechsg/sgds-react';
-import { useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { AnalysisLoadingView } from './AnalysisLoadingView';
@@ -95,6 +96,29 @@ export interface AnalysisOutletContext {
 // Re-export so NetworkDiagramPage can import from one place
 export type { AnalysisData };
 
+/** The analysis page's sections, in rail order. */
+const RAIL_ITEMS: RailItem[] = [
+  { key: 'overview', label: 'Overview', short: 'Overview', icon: 'bi-speedometer2' },
+  { key: 'conversations', label: 'Conversations', short: 'Conversations', icon: 'bi-arrow-left-right' },
+  { key: 'story', label: 'Story', short: 'Story', icon: 'bi-journal-text' },
+  { key: 'network-diagram', label: 'Network Visualization', short: 'Network', icon: 'bi-diagram-3' },
+  { key: 'network-cluster', label: 'Network Cluster', short: 'Cluster', icon: 'bi-globe-europe-africa' },
+  { key: 'extracted-files', label: 'Extracted Files', short: 'Files', icon: 'bi-file-earmark-arrow-down' },
+  { key: 'filter-generator', label: 'Filter Generator', short: 'Filters', icon: 'bi-funnel' },
+  { key: 'file', label: 'Capture details', short: 'Capture', icon: 'bi-file-earmark-binary' },
+];
+
+/** "913 packets · 26 min" for the capture bar. */
+function captureFacts(d: { totalPackets?: number; timeRange?: [number, number] }): string {
+  const parts: string[] = [];
+  if (d.totalPackets != null) parts.push(`${d.totalPackets.toLocaleString()} packets`);
+  if (d.timeRange && d.timeRange[1] > d.timeRange[0]) {
+    const s = Math.round((d.timeRange[1] - d.timeRange[0]) / 1000);
+    parts.push(s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round((s / 3600) * 10) / 10} h`);
+  }
+  return parts.join(' · ');
+}
+
 export const AnalysisPage = () => {
   const { fileId } = useParams<{ fileId: string }>();
   const navigate = useNavigate();
@@ -126,27 +150,6 @@ export const AnalysisPage = () => {
   const [totalFindings, setTotalFindings] = useState<number | undefined>(undefined);
   const [totalRiskMatrix, setTotalRiskMatrix] = useState<number | undefined>(undefined);
   const storyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tabsRef = useRef<HTMLUListElement | null>(null);
-  const tabsRoRef = useRef<ResizeObserver | null>(null);
-  const [tabsScrolledRight, setTabsScrolledRight] = useState(false);
-  const [tabsOverflows, setTabsOverflows] = useState(false);
-  const [tabsAtEnd, setTabsAtEnd] = useState(false);
-
-  const tabsRefCallback = useCallback((el: HTMLUListElement | null) => {
-    tabsRef.current = el;
-    tabsRoRef.current?.disconnect();
-    if (!el) return;
-    const check = () => {
-      setTabsOverflows(el.scrollWidth > el.clientWidth);
-      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
-    };
-    check();
-    setTimeout(check, 50);
-    setTimeout(check, 300);
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    tabsRoRef.current = ro;
-  }, []);
 
   useEffect(() => {
     apiClient
@@ -446,32 +449,37 @@ export const AnalysisPage = () => {
           </Card>
         </div>
       )}
-      <div className="analysis-header mb-4 d-flex justify-content-between align-items-start">
-        <div>
-          <h2>Network Traffic Analysis</h2>
-          <p className="text-muted mb-2">File ID: {fileId}</p>
-          <NetworkContextPicker fileId={fileId!} />
+      <div className="analysis-shell">
+        <AnalysisRail items={RAIL_ITEMS.map(i => (i.key === 'story' ? { ...i, busy: storyGenerating } : i))} active={activeTab} onSelect={handleTabChange} />
+        <div className="analysis-main">
+      {/* The capture bar: which capture, and the page-wide controls. */}
+      <div className="analysis-capture-bar">
+        <div className="analysis-capture-id">
+          <div className="analysis-capture-crumb">
+            <Link to="/">Captures</Link>
+            <span aria-hidden="true" className="text-muted mx-1">›</span>
+          </div>
+          <h2 className="analysis-capture-name">{data.fileName}</h2>
+          <div className="analysis-capture-facts">{captureFacts(data)}</div>
         </div>
-        <div className="d-flex flex-column align-items-end gap-1">
-          <Button
-            variant="outline-primary"
-            size="sm"
-            onClick={handleDownloadReport}
-            disabled={reportLoading}
-          >
-            {reportLoading ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-2" />
-                Generating report…
-              </>
-            ) : (
-              <>
-                <i className="bi bi-file-earmark-pdf me-2"></i>
-                Download Report
-              </>
-            )}
-          </Button>
-          {reportError && <small className="text-danger">{reportError}</small>}
+        <div className="analysis-capture-actions">
+          <NetworkContextPicker fileId={fileId!} />
+          <div className="d-flex flex-column align-items-end gap-1">
+            <Button variant="outline-primary" size="sm" onClick={handleDownloadReport} disabled={reportLoading}>
+              {reportLoading ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Generating report…
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-file-earmark-pdf me-2" aria-hidden="true"></i>
+                  Download report
+                </>
+              )}
+            </Button>
+            {reportError && <small className="text-danger">{reportError}</small>}
+          </div>
         </div>
       </div>
 
@@ -499,118 +507,14 @@ export const AnalysisPage = () => {
         </Alert>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="nav-tabs-scroll-wrapper">
-        <button
-          className="nav-tabs-scroll-btn"
-          style={{ visibility: tabsScrolledRight ? 'visible' : 'hidden' }}
-          onClick={() => { tabsRef.current?.scrollBy({ left: -150, behavior: 'smooth' }); }}
-          aria-label="Scroll tabs left"
-        >
-          <i className="bi bi-chevron-left"></i>
-        </button>
-        <ul
-          ref={tabsRefCallback}
-          className="nav nav-tabs"
-          style={{ paddingTop: '1px', paddingBottom: '1px' }}
-          onScroll={e => {
-            const el = e.currentTarget as HTMLUListElement;
-            const s = el.scrollLeft;
-            if ((tabsScrolledRight) !== (s > 0)) setTabsScrolledRight(s > 0);
-            setTabsAtEnd(s + el.clientWidth >= el.scrollWidth - 1);
-          }}
-        >
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => handleTabChange('overview')}
-          >
-            <i className="bi bi-speedometer2 me-2"></i>Overview
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'conversations' ? 'active' : ''}`}
-            onClick={() => handleTabChange('conversations')}
-          >
-            <i className="bi bi-arrow-left-right me-2"></i>Conversations
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'story' ? 'active' : ''}`}
-            onClick={() => handleTabChange('story')}
-          >
-            <i className="bi bi-journal-text me-2"></i>Story
-            {storyGenerating && <Spinner animation="border" size="sm" className="ms-2" style={{ width: 10, height: 10, borderWidth: 2 }} />}
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'filter-generator' ? 'active' : ''}`}
-            onClick={() => handleTabChange('filter-generator')}
-          >
-            <i className="bi bi-funnel me-2"></i>Filter Generator
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'extracted-files' ? 'active' : ''}`}
-            onClick={() => handleTabChange('extracted-files')}
-          >
-            <i className="bi bi-file-earmark-arrow-down me-2"></i>Extracted Files
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'network-diagram' ? 'active' : ''}`}
-            onClick={() => handleTabChange('network-diagram')}
-          >
-            <i className="bi bi-diagram-3 me-2"></i>Network Visualization
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'network-cluster' ? 'active' : ''}`}
-            onClick={() => handleTabChange('network-cluster')}
-          >
-            <i className="bi bi-globe-europe-africa me-2"></i>Network Cluster
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            style={{ whiteSpace: 'nowrap' }}
-            className={`nav-link ${activeTab === 'file' ? 'active' : ''}`}
-            onClick={() => handleTabChange('file')}
-          >
-            <i className="bi bi-file-earmark-binary me-2"></i>File
-          </button>
-        </li>
-        </ul>
-        <button
-          className="nav-tabs-scroll-btn"
-          style={{ visibility: tabsOverflows && !tabsAtEnd ? 'visible' : 'hidden' }}
-          onClick={() => { tabsRef.current?.scrollBy({ left: 150, behavior: 'smooth' }); }}
-          aria-label="Scroll tabs right"
-          tabIndex={tabsOverflows && !tabsAtEnd ? 0 : -1}
-        >
-          <i className="bi bi-chevron-right"></i>
-        </button>
-      </div>
-
       {/* Tab Content */}
       <Card>
         <Card.Body>
           <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState, refreshSummary: () => void refetch({ silent: true }) } satisfies AnalysisOutletContext} />
         </Card.Body>
       </Card>
+        </div>
+      </div>
     </div>
   );
 };
