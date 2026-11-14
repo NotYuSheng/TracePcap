@@ -112,9 +112,15 @@ export function TimeScrubber({
     setPlaying(true);
   };
 
+  // The window before "Show the whole capture", so switching it back off returns to it.
+  const lastWindow = useRef<TimeWindow | null>(null);
   const showAll = () => {
     setPlaying(false);
+    if (win) lastWindow.current = win;
     set(null);
+  };
+  const showWindow = () => {
+    set(lastWindow.current ?? clampWindow(bounds.from, span * widthShare, bounds));
   };
 
   const chooseWidth = (share: number) => {
@@ -249,9 +255,18 @@ export function TimeScrubber({
             </div>
           </div>
         )}
-        <button type="button" className="ts-wide-btn" onClick={showAll} disabled={!win}>
-          Show the whole capture
-        </button>
+        <div className="form-check form-switch ts-setting-row">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="ts-whole"
+            checked={!win}
+            onChange={e => (e.target.checked ? showAll() : showWindow())}
+          />
+          <label className="form-check-label" htmlFor="ts-whole">Show the whole capture</label>
+          <div className="ts-hint">Off goes back to the window you had.</div>
+        </div>
       </Popover.Body>
     </Popover>
   );

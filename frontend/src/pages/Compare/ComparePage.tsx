@@ -1,3 +1,4 @@
+import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Badge, Button, Card, Form } from '@govtechsg/sgds-react';
@@ -127,6 +128,7 @@ export const ComparePage = () => {
 
   const graphCardRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenHint, setFullscreenHint] = useState(0);
 
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -619,19 +621,12 @@ export const ComparePage = () => {
           <Card ref={graphCardRef}>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <strong>Topology Diagram</strong>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-muted"
-                onClick={toggleFullscreen}
-                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              >
-                <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-              </Button>
+              <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} hintSignal={fullscreenHint} hintId="fullscreen-hint-compare" />
             </Card.Header>
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
+                onFitViewRepeated={() => setFullscreenHint(n => n + 1)}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 onNodeClick={node => setSelectedNode(node)}

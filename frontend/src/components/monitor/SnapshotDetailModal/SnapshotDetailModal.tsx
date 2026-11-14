@@ -1,3 +1,4 @@
+import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Form, Modal } from '@govtechsg/sgds-react';
@@ -135,6 +136,7 @@ export const SnapshotDetailModal = ({
   // Diagram tab state
   const sorted = useMemo(() => [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder), [snapshots]);
   const [diagramSnapshotId, setDiagramSnapshotId] = useState(snapshot.id);
+  const [fullscreenHint, setFullscreenHint] = useState(0);
   const [layoutType, setLayoutType] = useState<'circular' | 'hierarchicalTd'>('circular');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -602,15 +604,7 @@ export const SnapshotDetailModal = ({
               >
                 <i className="bi bi-tags" />
               </Button>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-muted"
-                onClick={() => setIsDiagramFullscreen(f => !f)}
-                title={isDiagramFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              >
-                <i className={`bi ${isDiagramFullscreen ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}`} />
-              </Button>
+              <FullscreenToggle isFullscreen={isDiagramFullscreen} onToggle={() => setIsDiagramFullscreen(f => !f)} hintSignal={fullscreenHint} hintId="fullscreen-hint-snapshot" />
             </div>
             <div
               className="monitor-diagram-graph"
@@ -623,6 +617,7 @@ export const SnapshotDetailModal = ({
               ) : (
                 <NetworkGraph
                   key={diagramSnap.id}
+                  onFitViewRepeated={() => setFullscreenHint(n => n + 1)}
                   nodes={filteredNodes}
                   edges={filteredEdges}
                   highlightedNodes={highlightedNodes}

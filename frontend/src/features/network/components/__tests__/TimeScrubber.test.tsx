@@ -48,6 +48,24 @@ describe('TimeScrubber', () => {
     expect(screen.getByTestId('timeline-readout')).toHaveTextContent('Whole capture')
   })
 
+  it('the whole-capture switch goes back to the window you had when turned off', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const slider = screen.getByRole('slider', { name: 'Time window' })
+    slider.focus()
+    await user.keyboard('{End}')
+    const had = slider.getAttribute('aria-valuetext')
+    await user.click(screen.getByRole('button', { name: 'Time axis settings' }))
+    const whole = await screen.findByRole('switch', { name: 'Show the whole capture' })
+    expect(whole).not.toBeChecked()
+    await user.click(whole)
+    expect(whole).toBeChecked()
+    expect(screen.getByTestId('timeline-readout')).toHaveTextContent('Whole capture')
+    await user.click(whole)
+    expect(whole).not.toBeChecked()
+    expect(slider).toHaveAttribute('aria-valuetext', had)
+  })
+
   it('Escape on the slider shows the whole capture again', async () => {
     const user = userEvent.setup()
     render(<Harness />)

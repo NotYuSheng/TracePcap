@@ -39,8 +39,9 @@ A bar along the bottom of the graph, inside it, so it stays there in fullscreen:
   - **Speed**: 1× crosses the whole capture in about 30 seconds, up to 8×;
   - **Animate traffic** (below);
   - **Nodes appear when first seen** (below);
-  - **Show the whole capture**: no window at all, so every node and
-    conversation is shown, as without the time axis.
+  - **Show the whole capture**: a switch. On, there's no window at all, so every
+    node and conversation is shown, as without the time axis. Off goes back to
+    the window you had (or one at the start of the capture).
 
 Traffic Dots
 ------------

@@ -370,7 +370,10 @@ Layout Controls
 
 - **Force-directed** — switch to ForceAtlas2 layout (default).
 - **Hierarchical** — switch to ELK Sugiyama layered layout (top-down).
-- **Fit view** — reset the camera to fit all nodes in the viewport.
+- **Fit view** — reset the camera to fit all nodes in the viewport. It isn't
+  fullscreen: that's the button at the right of the graph card's header. Pressing
+  Fit view twice more with the graph already fitted points that button out with
+  a short hint.
 - **Filters** — open the filter panel (also accessible in fullscreen mode).
 
 Export
