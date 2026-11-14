@@ -812,6 +812,9 @@ export const NetworkGraph = memo(function NetworkGraph({
       },
       labelDensity: 1,
       labelGridCellSize: 60,
+      // Finer zoom: each wheel step scales by 1.2 (sigma's default, 1.7, jumps too far at a time).
+      zoomingRatio: 1.2,
+      zoomDuration: 150,
       labelRenderedSizeThreshold: -Infinity, // always call drawNodeLabel at every zoom level
       minEdgeThickness: 0.5,
       zIndex: true,
