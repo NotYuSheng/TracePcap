@@ -17,7 +17,7 @@ import type { DeviceType } from '@/types';
  * the graph only has to place nodes and draw the boxes.
  */
 
-export type GroupKind = 'local' | 'internet' | 'special' | 'network' | 'subnet' | 'type' | 'domain';
+export type GroupKind = 'local' | 'internet' | 'special' | 'network' | 'subnet' | 'type' | 'domain' | 'user';
 
 export interface GroupNode {
   id: string;
@@ -33,6 +33,10 @@ export interface GroupNode {
   tone?: number;
   /** Devices the analyst moved into this group. */
   movedIds?: string[];
+  /** The automatic name, when the analyst renamed the group. */
+  autoLabel?: string;
+  /** The analyst's note on the group. */
+  note?: string;
 }
 
 export interface GroupBox {
@@ -48,6 +52,10 @@ export interface GroupBox {
   leaf: boolean;
   /** Devices the analyst moved into this box. */
   moved: number;
+  /** The analyst's note, drawn under the name. */
+  note?: string;
+  /** This box's header band (layout units): taller when it carries a note. */
+  header: number;
   memberIds: string[];
   /** Layout units, y pointing down. */
   x: number;
@@ -70,6 +78,12 @@ interface Options {
   dnsNames?: Map<string, string>;
   /** The analyst's moves (#649): device → the group they put it in. Applied over the automatic grouping. */
   placements?: Record<string, string>;
+  /** The analyst's own groups, each inside a group of the map. */
+  userGroups?: { id: string; name: string; parentId: string }[];
+  /** Group id → the name the analyst gave it. */
+  names?: Record<string, string>;
+  /** Group id → the analyst's note. */
+  notes?: Record<string, string>;
 }
 
 /**
@@ -205,10 +219,48 @@ const byLabel = (a: GroupNode, b: GroupNode) => a.label.localeCompare(b.label, u
 /** The group tree for a set of nodes. Empty groups are never made. */
 export function buildGroupTree(
   nodes: GraphNode[],
-  { segments = [], customRanges = [], dnsNames, placements }: Options = {},
+  { segments = [], customRanges = [], dnsNames, placements, userGroups = [], names = {}, notes = {} }: Options = {},
 ): GroupNode[] {
-  const tops = automaticTree(nodes, { segments, customRanges, dnsNames });
-  return placements && Object.keys(placements).length ? applyPlacements(tops, placements) : tops;
+  let tops = automaticTree(nodes, { segments, customRanges, dnsNames });
+  if (userGroups.length) addUserGroups(tops, userGroups);
+  if (placements && Object.keys(placements).length) tops = applyPlacements(tops, placements);
+  if (Object.keys(names).length || Object.keys(notes).length) nameAndNote(tops, names, notes);
+  return tops;
+}
+
+/** Every group, by id, at any depth. */
+export function allGroups(tops: GroupNode[]): Map<string, GroupNode> {
+  const out = new Map<string, GroupNode>();
+  const walk = (g: GroupNode) => {
+    out.set(g.id, g);
+    g.children.forEach(walk);
+  };
+  tops.forEach(walk);
+  return out;
+}
+
+/** Puts each of the analyst's groups inside its parent, when the parent is on the map and holds groups, not devices. */
+function addUserGroups(tops: GroupNode[], userGroups: { id: string; name: string; parentId: string }[]): void {
+  const groups = allGroups(tops);
+  for (const u of userGroups) {
+    const parent = groups.get(u.parentId);
+    if (!parent || parent.children.length === 0 || groups.has(u.id)) continue;
+    const g: GroupNode = { id: u.id, kind: 'user', label: u.name, level: parent.level + 1, children: [], nodeIds: [], tone: parent.tone };
+    parent.children.push(g);
+    groups.set(g.id, g);
+  }
+}
+
+function nameAndNote(tops: GroupNode[], names: Record<string, string>, notes: Record<string, string>): void {
+  allGroups(tops).forEach(g => {
+    const name = names[g.id]?.trim();
+    if (name && name !== g.label) {
+      g.autoLabel = g.label;
+      g.label = name;
+    }
+    const note = notes[g.id]?.trim();
+    if (note) g.note = note;
+  });
 }
 
 /** Every innermost group (the ones that hold devices), by id. */
@@ -240,7 +292,7 @@ export function applyPlacements(tops: GroupNode[], placements: Record<string, st
   const prune = (gs: GroupNode[]): GroupNode[] =>
     gs
       .map(g => ({ ...g, children: prune(g.children) }))
-      .filter(g => g.nodeIds.length > 0 || g.children.length > 0);
+      .filter(g => g.nodeIds.length > 0 || g.children.length > 0 || g.kind === 'user');
   return prune(tops);
 }
 
@@ -383,10 +435,18 @@ function pack(children: { w: number; h: number }[], gap: number): { xs: number[]
   return { xs, ys, w, h: y + rowH };
 }
 
+/** A group's header band: room for its name, and its note when it has one. */
+const headerOf = (g: GroupNode) => headerFor(g.level) + (g.note ? 22 : 0);
+/** An empty group of the analyst's still needs room to drop devices into. */
+const EMPTY_H = 90;
+
 function size(group: GroupNode): Sized {
-  const header = headerFor(group.level);
+  const header = headerOf(group);
   if (group.children.length === 0) {
     const n = group.nodeIds.length;
+    if (n === 0) {
+      return { group, w: Math.max(CELL_W + PAD * 2, minWidthFor(group), 280), h: header + EMPTY_H, place: [], cells: [] };
+    }
     const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.5)));
     const rows = Math.ceil(n / cols);
     // A node's label hangs below it, so the node sits near the top of its cell.
@@ -435,6 +495,8 @@ export function layoutGroups(tops: GroupNode[]): GroupedLayout {
       count: memberIds.length,
       leaf: s.group.children.length === 0,
       moved: s.group.movedIds?.length ?? 0,
+      note: s.group.note,
+      header: headerOf(s.group),
       memberIds,
       x,
       y,

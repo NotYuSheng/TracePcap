@@ -1,5 +1,6 @@
 import { usePermission } from '@/features/me/useMe';
-import { networkMapEditsService } from '@/features/network/services/networkMapEdits';
+import { EMPTY_MAP_EDITS, groupingEdits, networkMapEditsService, type NetworkMapEdits } from '@/features/network/services/networkMapEdits';
+import { NetworkMapGroupsModal } from '@/features/network/components/NetworkMapGroupsModal';
 import { useStore } from '@/store';
 import { buildGroupTree, layoutGroups, leafGroups } from '@/features/network/services/networkGroups';
 import { downloadDrawio, toDrawio } from '@components/network/NetworkGraph/drawioExport';
@@ -105,65 +106,79 @@ export const NetworkDiagramPage = () => {
     };
   }, [fileId]);
 
-  // The analyst's edits to the network map (#649): devices moved between groups. Saved per capture.
+  // The analyst's edits to the network map (#649): moves, their own groups, names and notes. Saved per capture.
   const mapPermission = usePermission('NETWORK_MAP');
-  const [mapPlacements, setMapPlacements] = useState<Record<string, string>>({});
-  const [mapHistory, setMapHistory] = useState<Record<string, string>[]>([]);
+  const [mapEdits, setMapEdits] = useState<NetworkMapEdits>(EMPTY_MAP_EDITS);
+  const [mapHistory, setMapHistory] = useState<NetworkMapEdits[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [confirmMapReset, setConfirmMapReset] = useState(false);
+  // The Groups dialog, and the group it opened on (from a click on a box's name).
+  const [groupsDialog, setGroupsDialog] = useState<{ focus?: string } | null>(null);
   useEffect(() => {
     let live = true;
-    setMapPlacements({});
+    setMapEdits(EMPTY_MAP_EDITS);
     setMapHistory([]);
     networkMapEditsService
       .get(fileId)
-      .then(e => live && setMapPlacements(e.placements ?? {}))
-      .catch(() => live && setMapPlacements({}));
+      .then(e => live && setMapEdits(e))
+      .catch(() => live && setMapEdits(EMPTY_MAP_EDITS));
     return () => {
       live = false;
     };
   }, [fileId]);
-  const saveMap = (next: Record<string, string>, previous: Record<string, string>) => {
-    setMapPlacements(next);
+  /** Applies a change now, saves it, and keeps the previous version for Undo. */
+  const editMap = (next: NetworkMapEdits) => {
+    const previous = mapEdits;
+    setMapHistory(h => [...h.slice(-49), previous]);
+    setMapEdits(next);
     setMapError(null);
-    networkMapEditsService.save(fileId, { placements: next }).catch(() => {
-      setMapPlacements(previous);
+    networkMapEditsService.save(fileId, next).catch(() => {
+      setMapEdits(previous);
+      setMapHistory(h => h.slice(0, -1));
       setMapError("The network map change couldn't be saved, so it was undone.");
     });
   };
+  const baseGrouping = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames };
   const moveDevice = (nodeId: string, groupId: string) => {
     // Back into its automatic group: no placement needed.
-    const auto = leafGroups(buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames }));
+    const auto = leafGroups(buildGroupTree(filteredNodes, { ...baseGrouping, userGroups: mapEdits.groups }));
     const automatic = [...auto.values()].find(g => g.nodeIds.includes(nodeId))?.id;
-    const next = { ...mapPlacements };
-    if (groupId === automatic) delete next[nodeId];
-    else next[nodeId] = groupId;
-    setMapHistory(h => [...h.slice(-49), mapPlacements]);
-    saveMap(next, mapPlacements);
+    const placements = { ...mapEdits.placements };
+    if (groupId === automatic) delete placements[nodeId];
+    else placements[nodeId] = groupId;
+    editMap({ ...mapEdits, placements });
   };
   const undoMapEdit = () => {
     const previous = mapHistory[mapHistory.length - 1];
     if (!previous) return;
+    const current = mapEdits;
     setMapHistory(h => h.slice(0, -1));
-    saveMap(previous, mapPlacements);
+    setMapEdits(previous);
+    networkMapEditsService.save(fileId, previous).catch(() => {
+      setMapEdits(current);
+      setMapError("The undo couldn't be saved.");
+    });
   };
   const resetMap = () => {
     setConfirmMapReset(false);
-    const previous = mapPlacements;
-    setMapPlacements({});
+    const previous = mapEdits;
+    setMapEdits(EMPTY_MAP_EDITS);
     setMapHistory([]);
     networkMapEditsService.reset(fileId).catch(() => {
-      setMapPlacements(previous);
+      setMapEdits(previous);
       setMapError("The network map couldn't be reset.");
     });
   };
-  const mapEdited = Object.keys(mapPlacements).length > 0;
+  const mapEdited =
+    Object.keys(mapEdits.placements).length > 0 || mapEdits.groups.length > 0 ||
+    Object.keys(mapEdits.names).length > 0 || Object.keys(mapEdits.notes).length > 0;
+
 
   // The network map, as a draw.io diagram: grouped the same way, whatever layout is showing.
   const nodeLabelConfig = useStore(st => st.nodeLabelConfig);
   const downloadMap = () => {
     const layout = layoutGroups(
-      buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, placements: mapPlacements }),
+      buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, ...groupingEdits(mapEdits) }),
     );
     const name = (data?.fileName ?? 'capture').replace(/\.(pcapng|pcap|cap)$/i, '');
     downloadDrawio(toDrawio(layout, filteredNodes, filteredEdges, n => buildNodeLines(n, nodeLabelConfig), `${name} — network map`), `${name}-network-map`);
@@ -738,6 +753,12 @@ export const NetworkDiagramPage = () => {
                     label="Edge volume"
                   />
                 )}
+                {layoutType === 'grouped' && (
+                  <Button variant="link" size="sm" className="p-0 text-muted" onClick={() => setGroupsDialog({})}>
+                    <i className="bi bi-collection me-1" aria-hidden="true" />
+                    Groups
+                  </Button>
+                )}
                 {layoutType === 'grouped' && mapHistory.length > 0 && (
                   <Button variant="link" size="sm" className="p-0 text-muted" onClick={undoMapEdit}>
                     <i className="bi bi-arrow-90deg-left me-1" aria-hidden="true" />
@@ -784,7 +805,8 @@ export const NetworkDiagramPage = () => {
                 networkSegments={networkSegments}
                 customPrivateRanges={customPrivateRanges}
                 dnsNames={dnsNames}
-                mapPlacements={mapPlacements}
+                mapEdits={mapEdits}
+                onGroupClick={layoutType === 'grouped' ? id => setGroupsDialog({ focus: id }) : undefined}
                 onMoveToGroup={mapPermission.allowed ? moveDevice : undefined}
                 nodes={filteredNodes}
                 edges={filteredEdges}
@@ -918,6 +940,17 @@ export const NetworkDiagramPage = () => {
         />
       )}
 
+      {groupsDialog && (
+        <NetworkMapGroupsModal
+          tops={buildGroupTree(filteredNodes, { ...baseGrouping, ...groupingEdits(mapEdits) })}
+          edits={mapEdits}
+          focus={groupsDialog.focus}
+          canEdit={mapPermission.allowed}
+          cannotEditReason={mapPermission.reason ?? undefined}
+          onChange={editMap}
+          onHide={() => setGroupsDialog(null)}
+        />
+      )}
       <Modal show={confirmMapReset} onHide={() => setConfirmMapReset(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Reset the network map?</Modal.Title>

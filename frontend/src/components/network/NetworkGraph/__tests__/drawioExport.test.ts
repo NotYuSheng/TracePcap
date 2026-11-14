@@ -50,4 +50,11 @@ describe('toDrawio', () => {
     // The attribute decodes to an html label whose text still shows "A & <B>" literally.
     expect(web.getAttribute('value')).toBe('www.example.com<br>93.184.216.34<br>A &amp; &lt;B&gt;')
   })
+
+  it("carries the analyst's group names and notes", () => {
+    const tree = buildGroupTree(nodes, { names: { local: 'Head office' }, notes: { local: 'Floor 3, IT' } })
+    const d = parse(toDrawio(layoutGroups(tree), nodes, edges, n => [n.id]))
+    const box = [...d.querySelectorAll('mxCell')].find(c => (c.getAttribute('value') ?? '').startsWith('Head office'))!
+    expect(box.getAttribute('value')).toBe('Head office · 2 devices<br>Floor 3, IT')
+  })
 })

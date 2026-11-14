@@ -34,6 +34,8 @@ function styleFor(b: GroupBox, dark: boolean): Style {
       return { fill: hexA(tone, dark ? 0.1 : 0.06), stroke: tone, dash: [7, 5], text: tone, muted };
     case 'subnet':
       return { fill: dark ? 'rgba(15, 18, 28, 0.55)' : 'rgba(255, 255, 255, 0.78)', stroke: hexA(tone, 0.45), text, muted };
+    case 'user':
+      return { fill: dark ? 'rgba(89, 37, 220, 0.12)' : 'rgba(89, 37, 220, 0.06)', stroke: dark ? '#a993ff' : '#5925dc', text: dark ? '#c9b8ff' : '#3b1891', muted };
     case 'domain':
       return { fill: dark ? 'rgba(15, 18, 28, 0.55)' : '#ffffff', stroke: dark ? '#2b4470' : '#b7cdf5', text: dark ? '#bcd3ff' : '#1e3a8a', muted };
     default:
@@ -107,7 +109,7 @@ export function drawGroupBoxes(
     }
 
     // The name, in the header band the layout left for it; shrinks with zoom, gone when unreadable.
-    const band = headerFor(b.level) * scale;
+    const band = (b.header ?? headerFor(b.level)) * scale;
     const max = b.level === 1 ? 16 : b.level === 2 ? 15 : 13;
     const size = Math.min(max, band * 0.42);
     if (size < 7) continue;
@@ -128,9 +130,24 @@ export function drawGroupBoxes(
     ctx.font = `400 ${size}px Inter, system-ui, sans-serif`;
     ctx.fillStyle = s.muted;
     ctx.fillText(fitText(ctx, ` · ${count}`, room - nameW), left + padX + nameW, lineY);
+    let nextY = lineY + size * 1.25;
     if (b.detail && band > size * 2.6) {
       ctx.font = `400 ${size * 0.82}px Inter, system-ui, sans-serif`;
-      ctx.fillText(fitText(ctx, b.detail, room), left + padX, lineY + size * 1.25);
+      ctx.fillText(fitText(ctx, b.detail, room), left + padX, nextY);
+      nextY += size * 1.1;
+    }
+    if (b.note && band > (nextY - top) + size * 0.5) {
+      ctx.font = `italic 400 ${size * 0.82}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = s.text;
+      ctx.fillText(fitText(ctx, b.note, room), left + padX, nextY);
+    }
+    // An empty group of the analyst's: say what it's for.
+    if (b.leaf && b.count === 0) {
+      ctx.font = `400 ${Math.min(13, size)}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = s.muted;
+      ctx.textAlign = 'center';
+      ctx.fillText('Drop devices here', left + bw / 2, top + band + (bh - band) / 2);
+      ctx.textAlign = 'left';
     }
   }
   ctx.restore();

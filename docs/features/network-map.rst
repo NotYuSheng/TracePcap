@@ -126,6 +126,27 @@ The diagram opens laid out the way TracePcap drew it. It always uses the
 network map's grouping, whichever layout is showing, and only the devices the
 current filters leave on the graph.
 
+Your Own Groups, Names and Notes
+--------------------------------
+
+**Groups** (in the graph card's header, with the network map showing) lists every
+group of the map as a tree. There you can:
+
+- **Add a group of your own**: give it a name (``Payments (PCI scope)``) and pick
+  the group it goes **inside** (a network, a subnet, *Your networks*…: any box that
+  holds groups rather than devices). It shows as a box saying *Drop devices here*;
+  drag devices into it on the map.
+- **Rename** any group: *staff.office.example (VLAN 10)* can read *Staff*. The list
+  keeps the automatic name (*renamed from …*); clear the name to go back to it.
+- **Add a note** to any group (owner, location, purpose). It shows under the
+  group's name on the map, when zoomed in enough to read it.
+- **Delete** a group of your own. Devices moved into it go back to their automatic
+  groups.
+
+Clicking a box's name on the map opens the list on that group. Names, notes and
+your groups are saved with the capture like moves, are in the draw.io download,
+and need the same **Edit network maps** permission; **Reset map** clears them too.
+
 Moving Devices Between Groups
 -----------------------------
 

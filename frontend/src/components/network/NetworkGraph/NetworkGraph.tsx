@@ -16,6 +16,7 @@ import { buildGroupTree, layoutGroups, CELL_H, CELL_W, NODE_TOP, type GroupedLay
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 import { drawGroupBoxes } from './groupBoxes';
+import { groupingEdits, type NetworkMapEdits } from '@/features/network/services/networkMapEdits';
 import { getProtocolColor, NODE_TYPE_CONFIG, buildProtocolLegend, buildAppLegend, DEFAULT_EDGE_COLOR } from '@/features/network/constants';
 import { getAppColor } from '@/utils/appColors';
 import { makeVolumeEdgeColor } from '@/utils/volumeColor';
@@ -68,8 +69,10 @@ interface NetworkGraphProps {
   customPrivateRanges?: CustomPrivateRange[];
   /** Address → the name clients looked it up by: the network map's domain for unnamed hosts. */
   dnsNames?: Map<string, string>;
-  /** The analyst's moves on the network map (#649): device → the group they put it in. */
-  mapPlacements?: Record<string, string>;
+  /** The analyst's edits to the network map (#649): moves, their own groups, names and notes. */
+  mapEdits?: NetworkMapEdits;
+  /** Called when a box's name on the network map is clicked: to rename it, add a note… */
+  onGroupClick?: (groupId: string) => void;
   /**
    * Called when a device is dropped onto another box of the network map: move it there. Without it
    * (no permission) a dropped device goes back to its box.
@@ -504,7 +507,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   networkSegments = EMPTY_SEGMENTS,
   customPrivateRanges = EMPTY_RANGES,
   dnsNames,
-  mapPlacements,
+  mapEdits,
+  onGroupClick,
   onMoveToGroup,
   edgeColorMode = 'transport',
   forceLight = false,
@@ -596,8 +600,11 @@ export const NetworkGraph = memo(function NetworkGraph({
   // Legend highlight: click a node type or an edge colour to pick out its nodes and edges.
   const [legendFocus, setLegendFocus] = useState<LegendFocus | null>(null);
   const legendMatchRef = useRef<{ nodes: Set<string>; edges: Set<string> } | null>(null);
-  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames, placements: mapPlacements });
-  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, placements: mapPlacements };
+  const grouping = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames, ...(mapEdits ? groupingEdits(mapEdits) : {}) };
+  const groupingRef = useRef(grouping);
+  groupingRef.current = grouping;
+  const onGroupClickRef = useRef(onGroupClick);
+  onGroupClickRef.current = onGroupClick;
   const onMoveToGroupRef = useRef(onMoveToGroup);
   onMoveToGroupRef.current = onMoveToGroup;
   // While a device is dragged on the network map: the box it would be dropped into.
@@ -683,7 +690,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
     sigma.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [networkSegments, customPrivateRanges, dnsNames, mapPlacements]);
+  }, [networkSegments, customPrivateRanges, dnsNames, mapEdits]);
 
   // Work out what the legend highlight picks out, whenever it or the graph changes. A frame
   // later, so a graph rebuilt or repainted by the effects below is the one matched.
@@ -1139,6 +1146,19 @@ export const NetworkGraph = memo(function NetworkGraph({
       onNodeClick?.(original);
     });
 
+    // Network map: a click on a box's name opens it (rename, note…). The deepest box whose header
+    // band holds the click wins.
+    sigma.on('clickStage', ({ event }) => {
+      const layout = groupLayoutRef.current;
+      if (!layout || !onGroupClickRef.current) return;
+      const p = sigma.viewportToGraph({ x: event.x, y: event.y });
+      const y = -p.y;
+      const hit = layout.boxes
+        .filter(b => p.x >= b.x && p.x <= b.x + b.w && y >= b.y && y <= b.y + b.header)
+        .sort((a, b) => b.level - a.level)[0];
+      if (hit) onGroupClickRef.current(hit.id);
+    });
+
     // Double-click to zoom into node
     sigma.on('doubleClickNode', ({ node }) => {
       const cam = sigma.getCamera();
@@ -1511,12 +1531,7 @@ function blendColor(hex: string, bg: string, alpha: number): string {
 function applyGroupedLayout(
   sigma: Sigma,
   nodes: GraphNode[],
-  grouping: {
-    segments: NetworkSegment[];
-    customRanges: CustomPrivateRange[];
-    dnsNames?: Map<string, string>;
-    placements?: Record<string, string>;
-  },
+  grouping: Parameters<typeof buildGroupTree>[1],
   out: { current: GroupedLayout | null },
 ): void {
   const graph = sigma.getGraph();

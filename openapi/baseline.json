@@ -3140,6 +3140,26 @@
       },
       "NetworkMapEdits": {
         "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/UserGroup"
+            },
+            "maxItems": 500,
+            "minItems": 0,
+            "type": "array"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "notes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "placements": {
             "additionalProperties": {
               "type": "string"
@@ -3147,9 +3167,6 @@
             "type": "object"
           }
         },
-        "required": [
-          "placements"
-        ],
         "type": "object"
       },
       "NetworkMapEditsResponse": {
@@ -5257,6 +5274,30 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "UserGroup": {
+        "properties": {
+          "id": {
+            "pattern": "user:[A-Za-z0-9-]{1,64}",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string"
+          },
+          "parentId": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parentId"
+        ],
         "type": "object"
       },
       "WebServerDetailResponse": {
@@ -8958,7 +8999,7 @@
         ]
       },
       "get": {
-        "description": "Which group each moved device was put in. Empty when the map was never edited.",
+        "description": "Which group each moved device was put in, the analyst's own groups, and the names and notes they gave groups. Empty when the map was never edited.",
         "operationId": "getNetworkMapEdits",
         "parameters": [
           {

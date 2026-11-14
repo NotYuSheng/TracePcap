@@ -78,7 +78,7 @@ export function toDrawio(
     const x = p ? b.x - p.x : b.x;
     const y = p ? b.y - p.y : b.y;
     const name = `${b.label} · ${b.count} ${b.count === 1 ? 'device' : 'devices'}`;
-    const value = label(b.detail ? [name, b.detail] : [name]);
+    const value = label([name, b.detail, b.note].filter((x): x is string => !!x));
     cells.push(
       `<mxCell id="${cellId.get(b.id)}" value="${value}" style="${boxStyle(b)}" vertex="1" parent="${p ? cellId.get(p.id) : '1'}">` +
         `<mxGeometry x="${Math.round(x)}" y="${Math.round(y)}" width="${Math.round(b.w)}" height="${Math.round(b.h)}" as="geometry"/></mxCell>`,

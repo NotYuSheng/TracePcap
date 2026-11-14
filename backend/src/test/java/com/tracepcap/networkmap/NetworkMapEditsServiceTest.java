@@ -53,7 +53,7 @@ class NetworkMapEditsServiceTest {
   @Test
   void save_needsThePermission_isAudited_andRecordsWho() {
     when(repo.findById(fileId)).thenReturn(Optional.empty());
-    var edits = new NetworkMapEdits(Map.of("10.0.0.5", "type:other:10.0.0.0/24:Servers"));
+    var edits = new NetworkMapEdits(Map.of("10.0.0.5", "type:other:10.0.0.0/24:Servers"), java.util.List.of(), Map.of(), Map.of());
     var r = service.save(fileId, edits);
     verify(permissions).require(PermissionAction.NETWORK_MAP);
     verify(audit).record(eq("network-map.edit"), eq("network-map"), eq(fileId.toString()), isNull(), eq(edits));
@@ -70,7 +70,7 @@ class NetworkMapEditsServiceTest {
 
   @Test
   void reset_dropsTheEdits_andAuditsWhatWasThere() {
-    var edits = new NetworkMapEdits(Map.of("a", "b"));
+    var edits = new NetworkMapEdits(Map.of("a", "b"), null, null, null);
     var e = NetworkMapEditsEntity.builder().fileId(fileId).edits(edits).build();
     when(repo.findById(fileId)).thenReturn(Optional.of(e));
     service.reset(fileId);
@@ -82,5 +82,22 @@ class NetworkMapEditsServiceTest {
   void unknownCapture_is404() {
     UUID other = UUID.randomUUID();
     assertThatThrownBy(() -> service.get(other)).isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  void oldDocumentsWithoutTheNewParts_readAsEmptyParts() {
+    var e = new NetworkMapEdits(Map.of("a", "b"), null, null, null);
+    assertThat(e.groups()).isEmpty();
+    assertThat(e.names()).isEmpty();
+    assertThat(e.notes()).isEmpty();
+  }
+
+  @Test
+  void aUserGroupIdMustBeOneOfTheAnalysts() {
+    var validator = jakarta.validation.Validation.buildDefaultValidatorFactory().getValidator();
+    var ok = new NetworkMapEdits.UserGroup("user:abc-123", "Payments", "network:vlan:10");
+    var bad = new NetworkMapEdits.UserGroup("network:vlan:10", "Payments", "local");
+    assertThat(validator.validate(ok)).isEmpty();
+    assertThat(validator.validate(bad)).isNotEmpty();
   }
 }

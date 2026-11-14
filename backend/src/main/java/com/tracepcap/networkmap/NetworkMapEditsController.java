@@ -26,7 +26,7 @@ public class NetworkMapEditsController {
   @GetMapping("/{fileId}/network-map-edits")
   @Operation(
       summary = "A capture's network map edits",
-      description = "Which group each moved device was put in. Empty when the map was never edited.")
+      description = "Which group each moved device was put in, the analyst's own groups, and the names and notes they gave groups. Empty when the map was never edited.")
   public NetworkMapEditsResponse getNetworkMapEdits(@PathVariable UUID fileId) {
     return service.get(fileId);
   }
