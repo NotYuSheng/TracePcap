@@ -66,7 +66,7 @@ export interface paths {
          * List audited changes, newest first
          * @description search matches the actor, action, target type or target id.
          */
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,7 +478,7 @@ export interface paths {
             cookie?: never;
         };
         /** List custom private ranges */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         /**
          * Set a custom private range in the shared default
@@ -522,7 +522,7 @@ export interface paths {
          * List the global detection rules, by name
          * @description With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.
          */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         /** Create a global detection rule (audited) */
         post: operations["create_5"];
@@ -849,7 +849,7 @@ export interface paths {
             cookie?: never;
         };
         /** This capture's own rules */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         /** Add a rule to this capture; it's checked at once (audited) */
         post: operations["create_4"];
@@ -1146,7 +1146,7 @@ export interface paths {
             cookie?: never;
         };
         /** The networks this capture is a snapshot of */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1167,6 +1167,26 @@ export interface paths {
          * @description Bulk read for graph-wide display (node labels). Confirmed labels only — unaccepted AI suggestions are excluded. Single-entity reads/writes live under /node-roles.
          */
         get: operations["listFileNodeRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{fileId}/occupancies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every address that more than one device held
+         * @description Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.
+         */
+        get: operations["list_7"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3515,6 +3535,7 @@ export interface components {
         Occupancy: {
             automatic?: boolean;
             boundaryKey?: string;
+            classification?: components["schemas"]["OccupancyClassification"];
             /** Format: int64 */
             conversations?: number;
             /** Format: date-time */
@@ -3527,6 +3548,22 @@ export interface components {
             startSource?: string;
             /** Format: date-time */
             startsAt?: string;
+        };
+        OccupancyClassification: {
+            /** Format: int32 */
+            confidence?: number;
+            deviceType?: string;
+            loggedInUser?: string;
+            manufacturer?: string;
+            runnerUpReasons?: string;
+            /** Format: int32 */
+            runnerUpScore?: number;
+            runnerUpType?: string;
+            /** Format: int32 */
+            ttl?: number;
+            winnerReasons?: string;
+            /** Format: int32 */
+            winnerScore?: number;
         };
         OccupancyDecisionRequest: {
             action: string;
@@ -3713,6 +3750,10 @@ export interface components {
             /** Format: uuid */
             networkId?: string;
             nodeLimitNote?: string;
+        };
+        ReusedAddress: {
+            ip?: string;
+            occupancies?: components["schemas"]["Occupancy"][];
         };
         RoleSuggestionDto: {
             roleDescription?: string;
@@ -4222,7 +4263,7 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    list_12: {
         parameters: {
             query?: {
                 page?: number;
@@ -4857,7 +4898,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: never;
             header?: never;
@@ -4921,7 +4962,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: {
                 fileId?: string;
@@ -5602,7 +5643,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -6000,7 +6041,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -6040,6 +6081,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NodeRoleDto"][];
+                };
+            };
+        };
+    };
+    list_7: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReusedAddress"][];
                 };
             };
         };

@@ -60,6 +60,7 @@ public class PcapParserService {
     Map<String, LinkedHashSet<String>> hostMacObservations = new HashMap<>();
     // When each ARP claim (ip, mac) was first and last seen (#918 item 3): [first, last].
     Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
+    Map<String, Map<Integer, TtlWindow>> hostTtlWindows = new HashMap<>();
 
     Map<String, ConversationInfo> conversationMap = new HashMap<>();
     // Discarded with the parse; see pooled().
@@ -271,6 +272,12 @@ public class PcapParserService {
               hostTtls.putIfAbsent(srcIp, ttl);
               java.util.TreeSet<Integer> seen = hostTtlObservations.computeIfAbsent(srcIp, k -> new java.util.TreeSet<>());
               if (seen.size() < 16) seen.add(ttl); // a handful is enough to see a conflict
+              // When each TTL was sent (#918 slice 2), so a device holding the address part of the
+              // time gets its own TTL. Capped like the observations above.
+              Map<Integer, TtlWindow> byTtl = hostTtlWindows.computeIfAbsent(srcIp, k -> new HashMap<>());
+              TtlWindow tw = byTtl.get(ttl);
+              if (tw == null && byTtl.size() < 16) byTtl.put(ttl, tw = new TtlWindow(timestamp));
+              if (tw != null) tw.see(timestamp);
             }
             if (srcMac != null) ethMacsByIp.computeIfAbsent(srcIp, k -> new LinkedHashSet<>()).add(srcMac);
           }
@@ -438,6 +445,7 @@ public class PcapParserService {
     result.setHostMacs(attributeMacs(ethMacsByIp, hostMacObservations));
     result.setHostMacObservations(hostMacObservations);
     result.setArpClaimWindows(arpClaimWindows);
+    result.setHostTtlWindows(hostTtlWindows);
 
     log.info(
         "PCAP analysis completed: {} packets, {} bytes, {} conversations",
@@ -626,6 +634,39 @@ public class PcapParserService {
 
     /** Per IP, per ARP-claimed MAC: when the claim was first and last seen (#918 item 3). */
     private Map<String, Map<String, LocalDateTime[]>> arpClaimWindows = new HashMap<>();
+
+    /** Per source IP, per TTL: when it was first and last sent, and how often (#918 slice 2). */
+    private Map<String, Map<Integer, TtlWindow>> hostTtlWindows = new HashMap<>();
+  }
+
+  /** When one TTL was first and last seen from an address, and in how many packets. */
+  public static final class TtlWindow {
+    private LocalDateTime first;
+    private LocalDateTime last;
+    private long packets;
+
+    public TtlWindow(LocalDateTime at) {
+      this.first = at;
+      this.last = at;
+    }
+
+    void see(LocalDateTime at) {
+      if (at.isBefore(first)) first = at;
+      if (at.isAfter(last)) last = at;
+      packets++;
+    }
+
+    public LocalDateTime first() {
+      return first;
+    }
+
+    public LocalDateTime last() {
+      return last;
+    }
+
+    public long packets() {
+      return packets;
+    }
   }
 
   @lombok.Data

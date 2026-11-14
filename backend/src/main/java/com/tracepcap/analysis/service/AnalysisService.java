@@ -8,6 +8,7 @@ import com.tracepcap.analysis.dto.ProtocolStatsResponse;
 import com.tracepcap.analysis.entity.AnalysisResultEntity;
 import com.tracepcap.analysis.entity.ConversationEntity;
 import com.tracepcap.analysis.entity.HostClassificationEntity;
+import com.tracepcap.analysis.entity.HostTtlWindowEntity;
 import com.tracepcap.analysis.entity.PacketEntity;
 import com.tracepcap.analysis.entity.IpMacObservationEntity;
 import com.tracepcap.analysis.repository.AnalysisResultRepository;
@@ -179,6 +180,8 @@ public class AnalysisService {
   private final FailoverAddressResolverService failoverAddressResolverService;
   private final DhcpLeaseResolverService dhcpLeaseResolverService;
   private final HostOccupancyService hostOccupancyService;
+  private final OccupancyClassificationService occupancyClassificationService;
+  private final com.tracepcap.analysis.repository.HostTtlWindowRepository hostTtlWindowRepository;
   private final WindowsLogonWriter windowsLogonWriter;
   private final com.tracepcap.analysis.spi.WindowsLogonLookup windowsLogonLookup;
   private final org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -256,6 +259,9 @@ public class AnalysisService {
                   enrichAndClassify(run);
                   persistAnalysisResult(run);
                   persistConversationsAndPackets(run);
+                  // Each device that held a reused address, classified from its own traffic (#918
+                  // slice 2). After stage 6, because it reads the finished conversation rows.
+                  occupancyClassificationService.classifyFile(run.fileId);
                   extractEmbeddedFiles(run);
                   completeFile(run);
                 });
@@ -579,6 +585,11 @@ public class AnalysisService {
     } catch (Exception e) {
       // Quiet, low-false-positive supplementary signal — never fail the whole analysis for it.
       log.warn("Failed to persist IP/MAC observations for file {}: {}", fileId, e.getMessage());
+    }
+    try {
+      persistTtlWindows(fileId, run.parseResult.getHostTtlWindows());
+    } catch (Exception e) {
+      log.warn("Failed to persist TTL windows for file {}: {}", fileId, e.getMessage());
     }
     // Which device held each address when (#918 item 3), from the ARP claims above and the DHCP
     // leases, plus any split/merge decisions (a re-analysis version inherits them).
@@ -1150,6 +1161,21 @@ public class AnalysisService {
                           .build());
                 }));
     if (!rows.isEmpty()) ipMacObservationRepository.saveAll(rows);
+  }
+
+  private void persistTtlWindows(UUID fileId, Map<String, Map<Integer, PcapParserService.TtlWindow>> windows) {
+    if (windows == null || windows.isEmpty()) return;
+    List<HostTtlWindowEntity> rows = new ArrayList<>();
+    windows.forEach((ip, byTtl) -> byTtl.forEach((ttl, w) -> rows.add(
+        HostTtlWindowEntity.builder()
+            .fileId(fileId)
+            .ip(ip)
+            .ttl(ttl)
+            .firstSeen(w.first())
+            .lastSeen(w.last())
+            .packets(w.packets())
+            .build())));
+    hostTtlWindowRepository.saveAll(rows);
   }
 
   private void applyServiceLogSuspicions(

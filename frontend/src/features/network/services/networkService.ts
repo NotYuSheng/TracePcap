@@ -5,10 +5,53 @@ import type {
   GraphEdge,
   NetworkGraphData,
   NetworkStats,
+  NodeData,
   NodeMap,
   NodeType,
 } from '../types';
 import { nodeIdentityKey } from '@/utils/deviceType';
+import { parseDateTime } from '@/utils/dateUtils';
+import type { Occupancy, ReusedAddress } from '@/features/occupancy/occupancyService';
+
+/** One device's stretch on a reused address, with its times as epoch ms like a conversation's. */
+interface OccupancySpan {
+  occ: Occupancy;
+  startsAt?: number;
+  endsAt?: number;
+}
+
+/**
+ * Addresses that more than one device held (#918 slice 2), by IP: each device's stretch, in time
+ * order. An address one device held throughout isn't in the map and keeps one node keyed by its IP.
+ */
+function occupancySpans(reused?: ReusedAddress[]): Map<string, OccupancySpan[]> {
+  const out = new Map<string, OccupancySpan[]>();
+  for (const a of reused ?? []) {
+    if (!a.occupancies || a.occupancies.length < 2) continue;
+    out.set(
+      a.ip,
+      [...a.occupancies]
+        .sort((x, y) => x.idx - y.idx)
+        .map(occ => ({
+          occ,
+          startsAt: occ.startsAt ? parseDateTime(occ.startsAt) : undefined,
+          endsAt: occ.endsAt ? parseDateTime(occ.endsAt) : undefined,
+        })),
+    );
+  }
+  return out;
+}
+
+/** The node id for an address in one conversation: the IP, or `ip@idx` for the device holding it then. */
+export function occupancyNodeId(ip: string, startTime: number, spans: Map<string, OccupancySpan[]>): string {
+  const list = spans.get(ip);
+  if (!list) return ip;
+  const hit =
+    list.find(
+      s => (s.startsAt == null || startTime >= s.startsAt) && (s.endsAt == null || startTime < s.endsAt),
+    ) ?? list[0];
+  return `${ip}@${hit.occ.idx}`;
+}
 
 /** MAC address regex — identifies nodes that have no IP and are addressed by MAC only */
 const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
@@ -249,9 +292,32 @@ export function buildNetworkGraph(
   hostClassifications?: HostClassification[],
   maxNodes: number = 50,
   hostIdentities?: HostIdentity[],
-  nodeRoles?: NodeRole[]
+  nodeRoles?: NodeRole[],
+  /** Addresses more than one device held: drawn as one node per device (#918 slice 2). */
+  reusedAddresses?: ReusedAddress[]
 ): NetworkGraphData {
   const nodeMap: NodeMap = {};
+  const spans = occupancySpans(reusedAddresses);
+  const keyOf = (ip: string, conv: Conversation) => occupancyNodeId(ip, conv.startTime, spans);
+  /** Creates the node for `key`, which is an address or one device's stretch on it. */
+  const ensureNode = (key: string, ip: string, hostname?: string, mac?: string) => {
+    if (nodeMap[key]) return nodeMap[key];
+    const node = createNode(ip, hostname, mac);
+    if (key !== ip) {
+      const list = spans.get(ip) ?? [];
+      const span = list.find(x => `${ip}@${x.occ.idx}` === key);
+      node.id = key;
+      if (span) {
+        node.data.occupancy = { idx: span.occ.idx, of: list.length, startsAt: span.startsAt, endsAt: span.endsAt };
+        // This device's own MAC and DHCP name, not whichever the address's conversations carried first.
+        node.data.mac = span.occ.mac ?? undefined;
+        node.data.hostname = span.occ.hostname ?? undefined;
+        node.label = span.occ.hostname || `${ip} · ${span.occ.idx + 1}/${list.length}`;
+      }
+    }
+    nodeMap[key] = node;
+    return node;
+  };
   const edges: GraphEdge[] = [];
 
   // ndpiAppSets[ip] = distinct nDPI appName values seen in any conversation involving ip
@@ -269,7 +335,8 @@ export function buildNetworkGraph(
   // the conversation rendering limit below.
   if (analysisSummary?.uniqueHosts) {
     for (const host of analysisSummary.uniqueHosts) {
-      if (host.ip && !nodeMap[host.ip]) {
+      // A reused address gets its per-device nodes from its conversations instead.
+      if (host.ip && !nodeMap[host.ip] && !spans.has(host.ip)) {
         nodeMap[host.ip] = createNode(host.ip, host.hostname);
       }
     }
@@ -283,20 +350,17 @@ export function buildNetworkGraph(
 
   // Build nodes and edges from conversations
   limitedConversations.forEach(conv => {
-    const [src, dst] = conv.endpoints;
+    const [srcEp, dstEp] = conv.endpoints;
     const protocol = conv.protocol.name.toUpperCase();
+    // Node ids: the address, or the device that held it at the conversation's start (#918 slice 2).
+    const src = { ...srcEp, ip: keyOf(srcEp.ip, conv) };
+    const dst = { ...dstEp, ip: keyOf(dstEp.ip, conv) };
 
     // Create or update source node
-    if (!nodeMap[src.ip]) {
-      nodeMap[src.ip] = createNode(src.ip, src.hostname, src.mac);
-    }
-    updateNodeStats(nodeMap[src.ip], conv, 'sent', protocol);
+    updateNodeStats(ensureNode(src.ip, srcEp.ip, srcEp.hostname, srcEp.mac), conv, 'sent', protocol);
 
     // Create or update destination node
-    if (!nodeMap[dst.ip]) {
-      nodeMap[dst.ip] = createNode(dst.ip, dst.hostname, dst.mac);
-    }
-    updateNodeStats(nodeMap[dst.ip], conv, 'received', protocol);
+    updateNodeStats(ensureNode(dst.ip, dstEp.ip, dstEp.hostname, dstEp.mac), conv, 'received', protocol);
 
     // Create edge
     edges.push(createEdge(conv, src.ip, dst.ip));
@@ -326,16 +390,17 @@ export function buildNetworkGraph(
   // view, which is exactly what #521 removed everywhere else. A node whose only flows were capped
   // out has no entry in nodeMap and is skipped: it is not on the diagram to label.
   conversations.forEach(conv => {
-    const [s0, d0] = conv.endpoints;
-    if (nodeMap[s0.ip]) applyRoleFromInitiator(nodeMap[s0.ip], conv);
-    if (nodeMap[d0.ip]) applyRoleFromInitiator(nodeMap[d0.ip], conv);
+    const sKey = keyOf(conv.endpoints[0].ip, conv);
+    const dKey = keyOf(conv.endpoints[1].ip, conv);
+    if (nodeMap[sKey]) applyRoleFromInitiator(nodeMap[sKey], conv);
+    if (nodeMap[dKey]) applyRoleFromInitiator(nodeMap[dKey], conv);
 
     // Accumulate nDPI appName on BOTH endpoints — the identification is a fact about the
     // conversation, and either side "did WhatsApp on the wire" (mirrors the backend's symmetric
     // profile accumulation). Runs over the FULL conversation set, like role above: a fact must
     // not appear or vanish depending on what fit under the rendering cap (#521).
     if (conv.appName) {
-      for (const ip of [s0.ip, d0.ip]) {
+      for (const ip of [sKey, dKey]) {
         if (!nodeMap[ip]) continue; // not on the diagram — nothing to annotate
         if (!ndpiAppSets[ip]) ndpiAppSets[ip] = new Set();
         ndpiAppSets[ip].add(conv.appName.toUpperCase());
@@ -415,6 +480,8 @@ export function buildNetworkGraph(
   if (hostClassifications) {
     const classMap = new Map(hostClassifications.map(c => [c.ip, c]));
     Object.keys(nodeMap).forEach(ip => {
+      // One device on a reused address takes its own classification below instead.
+      if (nodeMap[ip].data.occupancy) return;
       const c = classMap.get(ip);
       if (c) {
         nodeMap[ip].data.deviceType = c.deviceType;
@@ -465,8 +532,32 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
   return IDENTITY_LABEL_TO_NODE_TYPE[label] ?? 'unknown';
 }
 
+  // A device on a reused address: its own classification, from its own stretch's traffic (#918
+  // slice 2). The address's classification and identity blend every device that held it, so neither
+  // is applied here.
+  Object.values(nodeMap).forEach(node => {
+    const o = node.data.occupancy;
+    if (!o) return;
+    const span = spans.get(node.data.ip)?.find(x => x.occ.idx === o.idx);
+    const c = span?.occ.classification;
+    const address = hostClassifications?.find(h => h.ip === node.data.ip);
+    if (address) node.data.serviceRoles = address.serviceRoles;
+    if (!c) return;
+    node.data.deviceType = c.deviceType as NodeData['deviceType'];
+    node.data.deviceConfidence = c.confidence ?? undefined;
+    node.data.manufacturer = c.manufacturer ?? undefined;
+    node.data.ttl = c.ttl ?? undefined;
+    node.data.loggedInUser = c.loggedInUser ?? undefined;
+    node.data.loggedInUserCount = c.loggedInUser ? 1 : 0;
+    node.data.identityLabel = c.deviceType;
+    node.data.identityBasis = 'MACHINE';
+    node.data.identityConfidence = c.confidence ?? undefined;
+    node.data.nodeType = nodeTypeFromIdentityLabel(c.deviceType);
+  });
+
   if (identityMap) {
     Object.keys(nodeMap).forEach(ip => {
+      if (nodeMap[ip].data.occupancy) return;
       const identity = identityMap.get(ip);
       if (!identity) return;
       const d = nodeMap[ip].data;
@@ -497,6 +588,15 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
     }
     for (const r of nodeRoles) {
       if (!r.roleLabel) continue;
+      const roleLabel = r.roleLabel;
+      if (r.entityType === 'IP' && spans.has(r.entityKey)) {
+        // A role on a reused address is still on the address, so each of its devices shows it
+        // until roles can be put on one device (#918 slice 3).
+        Object.values(nodeMap).forEach(n => {
+          if (n.data.occupancy && n.data.ip === r.entityKey) n.data.roleLabel = roleLabel;
+        });
+        continue;
+      }
       const node =
         r.entityType === 'IP' ? nodeMap[r.entityKey] : nodeByMac.get(r.entityKey.toLowerCase());
       if (node) node.data.roleLabel = r.roleLabel;

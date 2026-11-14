@@ -163,6 +163,12 @@ interface Props {
   ip: string;
   /** Called after an override/evidence change, so a parent (e.g. the graph) can refresh its copy. */
   onChanged?: () => void;
+  /**
+   * Set when a graph node stands for one of several devices that held this address (#918 slice 2).
+   * The devices, each with its own classification, then come first; the Identity below them is the
+   * whole address's.
+   */
+  occupancyIdx?: number;
 }
 
 /**
@@ -174,7 +180,7 @@ interface Props {
  * graph node all render the same explainable classification, so users see how a verdict was derived
  * and can correct or append to it everywhere, not only in the graph.
  */
-export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
+export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Props) {
   const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -236,8 +242,22 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
 
   const nodeData = toNodeData(evidence);
 
+  const oneDevice = occupancyIdx != null;
+
   return (
     <>
+      {oneDevice && (
+        <>
+          <Alert variant="info" className="py-2 small mb-2" data-testid="host-one-device">
+            <i className="bi bi-phone me-1" aria-hidden="true" />
+            More than one device held {ip} in this capture, so the graph shows each one as its own node.
+            This node is the one marked below, classified from its own traffic only. The Identity
+            further down covers the whole address, every device's traffic together.
+          </Alert>
+          <HostOccupancySection fileId={fileId} ip={ip} focusIdx={occupancyIdx} />
+        </>
+      )}
+
       {/* Adjudicated identity — verdict, override, evidence, "why". */}
       <AdjudicationPanel
         fileId={fileId}
@@ -280,7 +300,7 @@ export function HostIdentitySection({ fileId, ip, onChanged }: Props) {
       )}
 
       {/* Which devices held this address, and when (#918 item 3). */}
-      <HostOccupancySection fileId={fileId} ip={ip} />
+      {!oneDevice && <HostOccupancySection fileId={fileId} ip={ip} />}
 
       {/* Evidence weighed — the independent measured signals behind the verdict. */}
       <div className="mb-4">

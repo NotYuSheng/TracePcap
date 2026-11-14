@@ -20,6 +20,16 @@ public class HostOccupancyController {
 
   private final HostOccupancyService service;
 
+  @GetMapping("/{fileId}/occupancies")
+  @Operation(
+      summary = "Every address that more than one device held",
+      description =
+          "Each address with its devices in time order, and each device's own classification from"
+              + " the traffic in its stretch. Addresses one device held throughout aren't listed.")
+  public java.util.List<HostOccupancyResponse.ReusedAddress> list(@PathVariable UUID fileId) {
+    return service.listForFile(fileId);
+  }
+
   @GetMapping("/{fileId}/hosts/{ip}/occupancies")
   @Operation(
       summary = "Which devices held this address, and when",

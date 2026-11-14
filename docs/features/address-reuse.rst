@@ -3,9 +3,9 @@ Devices on an Address
 
 An IP address can pass from one device to another during a capture. DHCP hands
 a laptop's address to a phone once the laptop leaves, or a machine is replaced
-mid-capture. TracePcap still treats an address as one host, but it shows which
-devices held the address and when, so their traffic isn't mistaken for one
-machine's.
+mid-capture. TracePcap works out which devices held the address and when,
+classifies each one from its own traffic, and draws each as its own node in the
+network graph, so one device's traffic isn't blamed on another.
 
 Where It Shows
 --------------
@@ -17,10 +17,25 @@ time order:
 - the time range it held the address;
 - its MAC and, when DHCP gave one, its hostname;
 - how many of the address's conversations started in that range;
+- its own device type, confidence, vendor and TTL, for example
+  ``Mobile · 67% · Samsung Electronics · TTL 64`` (see below);
 - the evidence for the change, for example
   ``ARP: bb:bb:bb:00:00:01 last seen 10:59:58, then cc:cc:cc:00:00:02 from 11:00:02``.
 
 An address held by one device says **One device for the whole capture**.
+
+In the Network Graph
+~~~~~~~~~~~~~~~~~~~~
+
+An address more than one device held is drawn as **one node per device**,
+labelled with the device's hostname (or ``10.0.0.50 · 2/2`` when it has none).
+Each conversation goes to the device that held the address when the
+conversation started, so the edges, traffic totals and alerts sit on the right
+device. An address one device held throughout stays a single node.
+
+Clicking a device's node opens the address's details with **this node** marked
+in the device list. The **Identity** further down is still the whole
+address's, worked out from every device's traffic together.
 
 How Changes Are Found
 ---------------------
@@ -49,6 +64,24 @@ When an address is split, it shows its devices instead of the *Possibly more
 than one machine* warning, because the differing TTLs and names belong to
 different devices.
 
+Each Device's Own Classification
+--------------------------------
+
+Each device is classified by the same classifier as any host, from only what
+happened while it held the address:
+
+- the address's conversations that started in its time range;
+- its own MAC, so the vendor (Dell, Samsung…) is its own;
+- the TTL the address sent with during its range, so a Windows laptop's 128
+  isn't counted for the phone that came after it;
+- its DHCP hostname, and Windows sign-ins first seen in its range;
+- votes from detection rules that matched one of its conversations.
+
+Service roles, such as a DNS server, are the address's, since the service logs
+aren't split by time.
+
+Splitting or merging by hand (below) classifies the new devices straight away.
+
 Correcting It
 -------------
 
@@ -72,9 +105,26 @@ Who can make corrections is the **Split or merge a host's devices** permission
 on the System page's **Permissions** tab (default: analysts; see
 :ref:`settings-permissions`).
 
+Try It
+------
+
+``sample-files/dhcp_address_reuse.pcap`` is an office Wi-Fi capture from 10:00
+to 12:00: Alice's Dell laptop holds ``10.0.0.50`` until 10:59, and a visitor's
+Samsung phone gets the same address at 11:00 and starts beaconing to a
+suspicious domain at 11:32. Upload it and open the Network Graph: the address
+is two nodes, ``LAPTOP-ALICE`` and ``Galaxy-S24``, and the beacon's edges are on
+the phone. :doc:`../sample-files` has the generator script.
+
 What This Doesn't Change Yet
 ----------------------------
 
-The address is still one host everywhere else: one classification, one node in
-the graph, and labels and notes attach to the address. Classifying each device
-separately, and showing one graph node per device, are planned (#918).
+Outside the network graph and the device list, the address is still one host:
+
+- its **Identity**, and the labels, roles and notes you put on it, are the
+  whole address's. A role on the address shows on each of its devices' nodes;
+- Story, reports, the network cluster view and the monitor views use the
+  address's classification;
+- re-applying detection rules re-scores the address, not each device.
+
+Putting labels, roles and notes on one device, and recognising the same device
+across captures, are planned (#918).

@@ -33,6 +33,25 @@ const single = {
 }
 
 describe('HostOccupancySection (#918 item 3)', () => {
+  it("shows each device's own classification, and marks the device a graph node stands for", async () => {
+    const classified = {
+      ...reused,
+      occupancies: [
+        { ...reused.occupancies[0], classification: { deviceType: 'LAPTOP_DESKTOP', confidence: 100, manufacturer: 'Dell Inc.', ttl: 128 } },
+        { ...reused.occupancies[1], classification: { deviceType: 'MOBILE', confidence: 67, ttl: 64 } },
+      ],
+    }
+    server.use(http.get('*/files/f1/hosts/:ip/occupancies', () => HttpResponse.json(classified)))
+    render(<HostOccupancySection fileId="f1" ip="10.0.0.50" focusIdx={1} />)
+    const verdicts = await screen.findAllByTestId('occupancy-verdict')
+    expect(verdicts[0]).toHaveTextContent('100% · Dell Inc. · TTL 128')
+    expect(verdicts[1]).toHaveTextContent('67% · TTL 64')
+    const rows = screen.getAllByTestId('occupancy-row')
+    expect(rows[1]).toContainElement(screen.getByTestId('occupancy-this-node'))
+    expect(rows[0]).not.toHaveTextContent('this node')
+  })
+
+
   it('shows each device on a reused address with its evidence', async () => {
     server.use(http.get('*/files/f1/hosts/:ip/occupancies', () => HttpResponse.json(reused)))
     render(<HostOccupancySection fileId="f1" ip="10.0.0.50" />)

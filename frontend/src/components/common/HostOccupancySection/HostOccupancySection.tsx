@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { parseDateTime } from '@/utils/dateUtils';
+import { deviceTypeLabel } from '@/utils/deviceType';
+import type { DeviceType } from '@/types';
 import {
   occupancyService,
   toInputValue,
@@ -27,6 +29,20 @@ function range(o: Occupancy): string {
 interface Props {
   fileId: string;
   ip: string;
+  /** The device a graph node stands for (#918 slice 2): its row is marked "this node". */
+  focusIdx?: number;
+}
+
+/** One device's own verdict: "Mobile · 67% · Samsung · TTL 64". */
+function verdictLine(o: Occupancy): string | null {
+  const c = o.classification;
+  if (!c) return null;
+  const parts = [deviceTypeLabel(c.deviceType as DeviceType)];
+  if (c.confidence != null) parts.push(`${c.confidence}%`);
+  if (c.manufacturer) parts.push(c.manufacturer);
+  if (c.ttl != null) parts.push(`TTL ${c.ttl}`);
+  if (c.loggedInUser) parts.push(`signed in: ${c.loggedInUser}`);
+  return parts.join(' · ');
 }
 
 /**
@@ -35,7 +51,7 @@ interface Props {
  * split an address the evidence didn't (a cloned VM, an off-subnet address), or merge away a split
  * that's wrong (a phone rotating its private MAC). Decisions are kept and audited.
  */
-export function HostOccupancySection({ fileId, ip }: Props) {
+export function HostOccupancySection({ fileId, ip, focusIdx }: Props) {
   const [data, setData] = useState<HostOccupancy | null>(null);
   const [failed, setFailed] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
@@ -99,10 +115,25 @@ export function HostOccupancySection({ fileId, ip }: Props) {
       {multiple ? (
         <ol className="list-unstyled mb-2" style={{ fontSize: '0.8rem' }}>
           {data.occupancies.map(o => (
-            <li key={o.idx} className="mb-2" data-testid="occupancy-row">
+            <li
+              key={o.idx}
+              className={`mb-2${focusIdx === o.idx ? ' border-start border-3 border-primary ps-2' : ''}`}
+              data-testid="occupancy-row"
+            >
               <div>
                 <strong>{range(o)}</strong>
+                {focusIdx === o.idx && (
+                  <span className="badge bg-primary-subtle text-primary-emphasis ms-2" data-testid="occupancy-this-node">
+                    this node
+                  </span>
+                )}
               </div>
+              {verdictLine(o) && (
+                <div data-testid="occupancy-verdict">
+                  <i className="bi bi-cpu me-1 text-muted" aria-hidden="true" />
+                  {verdictLine(o)}
+                </div>
+              )}
               <div>
                 {o.mac ? <span className="font-monospace">{o.mac}</span> : <span className="text-muted">MAC unknown</span>}
                 {o.hostname && <> · {o.hostname}</>}

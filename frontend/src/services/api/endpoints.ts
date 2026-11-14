@@ -27,6 +27,8 @@ export const API_ENDPOINTS = {
   NETWORK_PRIVATE_RANGE: (networkId: string, id: number) => `/monitor/networks/${networkId}/custom-private-ranges/${id}`,
   NETWORK_ORG_RULES: (networkId: string) => `/monitor/networks/${networkId}/ip-org-rules`,
   NETWORK_ORG_RULE: (networkId: string, id: number) => `/monitor/networks/${networkId}/ip-org-rules/${id}`,
+  /** Every address more than one device held, with each device's classification (#918 slice 2). */
+  FILE_OCCUPANCIES: (fileId: string) => `/files/${fileId}/occupancies`,
   /** Which devices held an address when, and the analyst's split/merge decisions (#918). */
   HOST_OCCUPANCIES: (fileId: string, ip: string) =>
     `/files/${fileId}/hosts/${encodeURIComponent(ip)}/occupancies`,

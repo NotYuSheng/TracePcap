@@ -3016,6 +3016,9 @@
           "boundaryKey": {
             "type": "string"
           },
+          "classification": {
+            "$ref": "#/components/schemas/OccupancyClassification"
+          },
           "conversations": {
             "format": "int64",
             "type": "integer"
@@ -3043,6 +3046,45 @@
           "startsAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OccupancyClassification": {
+        "properties": {
+          "confidence": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "deviceType": {
+            "type": "string"
+          },
+          "loggedInUser": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "runnerUpReasons": {
+            "type": "string"
+          },
+          "runnerUpScore": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "runnerUpType": {
+            "type": "string"
+          },
+          "ttl": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "winnerReasons": {
+            "type": "string"
+          },
+          "winnerScore": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -3571,6 +3613,20 @@
           },
           "nodeLimitNote": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReusedAddress": {
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "occupancies": {
+            "items": {
+              "$ref": "#/components/schemas/Occupancy"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -4879,7 +4935,7 @@
     "/api/v1/audit-log": {
       "get": {
         "description": "search matches the actor, action, target type or target id.",
-        "operationId": "list_11",
+        "operationId": "list_12",
         "parameters": [
           {
             "in": "query",
@@ -6389,7 +6445,7 @@
     },
     "/api/v1/custom-private-ranges": {
       "get": {
-        "operationId": "list_10",
+        "operationId": "list_11",
         "responses": {
           "200": {
             "content": {
@@ -6470,7 +6526,7 @@
     "/api/v1/detection-rules": {
       "get": {
         "description": "With fileId, also that capture's own rules (scope CAPTURE): every rule that labels it.",
-        "operationId": "list_9",
+        "operationId": "list_10",
         "parameters": [
           {
             "in": "query",
@@ -7631,7 +7687,7 @@
     },
     "/api/v1/files/{fileId}/detection-rules": {
       "get": {
-        "operationId": "list_8",
+        "operationId": "list_9",
         "parameters": [
           {
             "in": "path",
@@ -8318,7 +8374,7 @@
     },
     "/api/v1/files/{fileId}/networks": {
       "get": {
-        "operationId": "list_7",
+        "operationId": "list_8",
         "parameters": [
           {
             "in": "path",
@@ -8385,6 +8441,42 @@
         "tags": [
           "Node Roles",
           "Host Identities"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/occupancies": {
+      "get": {
+        "description": "Each address with its devices in time order, and each device's own classification from the traffic in its stretch. Addresses one device held throughout aren't listed.",
+        "operationId": "list_7",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReusedAddress"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Every address that more than one device held",
+        "tags": [
+          "Host Occupancy"
         ]
       }
     },

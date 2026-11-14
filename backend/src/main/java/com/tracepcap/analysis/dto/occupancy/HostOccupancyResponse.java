@@ -39,6 +39,27 @@ public class HostOccupancyResponse {
     /** Whether the boundary starting this occupancy was found automatically (so it can be merged). */
     boolean automatic;
     long conversations;
+    /** This device's own classification (#918 slice 2); null until classified. */
+    OccupancyClassification classification;
+  }
+
+  /** One address and the devices that held it, in time order. */
+  public record ReusedAddress(String ip, List<Occupancy> occupancies) {}
+
+  /** One occupancy's device type and the evidence for it, from its own traffic only. */
+  @Value
+  @Builder
+  public static class OccupancyClassification {
+    String deviceType;
+    Integer confidence;
+    Integer winnerScore;
+    String winnerReasons;
+    String runnerUpType;
+    Integer runnerUpScore;
+    String runnerUpReasons;
+    String manufacturer;
+    Integer ttl;
+    String loggedInUser;
   }
 
   @Value

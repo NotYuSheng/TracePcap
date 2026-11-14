@@ -95,6 +95,17 @@ export interface NodeData {
    *   'ttl-exceeded'     — only appeared as src of unidirectional ICMP (traceroute hop)
    */
   ghostFlags?: string[];
+  /**
+   * Set when this node is one of several devices that held the same address (#918 slice 2): the
+   * node stands for that device's stretch only, and `ip` is the shared address. `of` is how many
+   * devices held it.
+   */
+  occupancy?: {
+    idx: number;
+    of: number;
+    startsAt?: number;
+    endsAt?: number;
+  };
   // ── Cluster fields — only set on synthetic cluster nodes ─────────────────
   /** True when this node represents a collapsed /24 subnet cluster. */
   isCluster?: boolean;

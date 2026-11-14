@@ -62,6 +62,7 @@ public class HostOccupancyService {
   private final PermissionService permissionService;
   private final AuditLogService auditLog;
   private final CurrentActor currentActor;
+  private final OccupancyClassificationService occupancyClassification;
 
   // ── Analysis ────────────────────────────────────────────────────────────────
 
@@ -126,8 +127,12 @@ public class HostOccupancyService {
     Set<LocalDateTime> automatic = new HashSet<>(result.automaticBoundaries());
 
     List<LocalDateTime[]> times = conversationTimes(fileId, ip);
+    Map<Integer, IpOccupancyEntity> stored = new HashMap<>();
+    for (var row : occupancies.findByFileIdAndIpOrderByIdx(fileId, ip)) stored.put(row.getIdx(), row);
     List<HostOccupancyResponse.Occupancy> occ = new ArrayList<>();
     for (var o : result.occupancies()) {
+      IpOccupancyEntity row = stored.get(o.idx());
+      boolean sameStretch = row != null && java.util.Objects.equals(row.getStartsAt(), o.startsAt());
       long n =
           times.stream()
               .filter(t -> t[0] != null)
@@ -146,6 +151,7 @@ public class HostOccupancyService {
               .boundaryKey(o.startsAt() == null ? null : o.startsAt().toString())
               .automatic(o.startsAt() != null && automatic.contains(o.startsAt()))
               .conversations(n)
+              .classification(sameStretch && result.occupancies().size() > 1 ? classificationOf(row) : null)
               .build());
     }
     Set<LocalDateTime> boundaries = new HashSet<>();
@@ -163,6 +169,52 @@ public class HostOccupancyService {
         .suggestions(suggestions(windows, times, boundaries))
         .canEdit(canEdit)
         .editReason(canEdit ? null : permissionService.reason(PermissionAction.HOST_OCCUPANCY))
+        .build();
+  }
+
+  /**
+   * Every address in the capture that more than one device held, with each device's stretch and
+   * classification (#918 slice 2). What the network graph reads to draw one node per device.
+   */
+  @Transactional(readOnly = true)
+  public List<HostOccupancyResponse.ReusedAddress> listForFile(UUID fileId) {
+    requireFile(fileId);
+    Map<String, List<HostOccupancyResponse.Occupancy>> byIp = new LinkedHashMap<>();
+    for (IpOccupancyEntity o : occupancies.findByFileIdOrderByIpAscIdxAsc(fileId)) {
+      byIp.computeIfAbsent(o.getIp(), k -> new ArrayList<>())
+          .add(
+              HostOccupancyResponse.Occupancy.builder()
+                  .idx(o.getIdx())
+                  .mac(o.getMac())
+                  .hostname(o.getHostname())
+                  .startsAt(o.getStartsAt())
+                  .endsAt(o.getEndsAt())
+                  .startSource(o.getStartSource())
+                  .startEvidence(o.getStartEvidence())
+                  .boundaryKey(o.getStartsAt() == null ? null : o.getStartsAt().toString())
+                  .automatic(!"manual".equals(o.getStartSource()) && o.getStartsAt() != null)
+                  .conversations(o.getConversationCount() == null ? 0 : o.getConversationCount())
+                  .classification(classificationOf(o))
+                  .build());
+    }
+    List<HostOccupancyResponse.ReusedAddress> out = new ArrayList<>();
+    byIp.forEach((ip, occ) -> out.add(new HostOccupancyResponse.ReusedAddress(ip, occ)));
+    return out;
+  }
+
+  private static HostOccupancyResponse.OccupancyClassification classificationOf(IpOccupancyEntity o) {
+    if (o == null || o.getDeviceType() == null) return null;
+    return HostOccupancyResponse.OccupancyClassification.builder()
+        .deviceType(o.getDeviceType())
+        .confidence(o.getConfidence())
+        .winnerScore(o.getWinnerScore())
+        .winnerReasons(o.getWinnerReasons())
+        .runnerUpType(o.getRunnerUpType())
+        .runnerUpScore(o.getRunnerUpScore())
+        .runnerUpReasons(o.getRunnerUpReasons())
+        .manufacturer(o.getManufacturer())
+        .ttl(o.getTtl())
+        .loggedInUser(o.getLoggedInUser())
         .build();
   }
 
@@ -250,6 +302,8 @@ public class HostOccupancyService {
     var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
     var ds = decisions.findByFileIdAndIpOrderByAt(fileId, ip).stream().map(HostOccupancyService::toDecision).toList();
     save(fileId, ip, OccupancyBuilder.build(windows, ds, !virtualIps(fileId).contains(ip)));
+    // Each device the address is now split into, classified from its own traffic (slice 2).
+    occupancyClassification.classifyAddress(fileId, ip);
   }
 
   /** Saves the occupancies when there's more than one; returns how many there are. */

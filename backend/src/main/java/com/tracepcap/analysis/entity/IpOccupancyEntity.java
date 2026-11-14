@@ -57,4 +57,38 @@ public class IpOccupancyEntity {
 
   @Column(name = "start_evidence", columnDefinition = "TEXT")
   private String startEvidence;
+
+  // ── This occupancy's own classification (#918 slice 2) ──────────────────────
+  // Worked out from the traffic in [startsAt, endsAt) only. Null until classified.
+
+  @Column(name = "device_type", length = 50)
+  private String deviceType;
+
+  private Integer confidence;
+
+  @Column(name = "winner_score")
+  private Integer winnerScore;
+
+  @Column(name = "winner_reasons", columnDefinition = "TEXT")
+  private String winnerReasons;
+
+  @Column(name = "runner_up_type", length = 50)
+  private String runnerUpType;
+
+  @Column(name = "runner_up_score")
+  private Integer runnerUpScore;
+
+  @Column(name = "runner_up_reasons", columnDefinition = "TEXT")
+  private String runnerUpReasons;
+
+  @Column(length = 255)
+  private String manufacturer;
+
+  private Integer ttl;
+
+  @Column(name = "logged_in_user", length = 255)
+  private String loggedInUser;
+
+  @Column(name = "conversation_count")
+  private Long conversationCount;
 }
