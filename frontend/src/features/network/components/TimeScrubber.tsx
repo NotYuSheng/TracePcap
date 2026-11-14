@@ -3,6 +3,7 @@ import { Popover } from '@govtechsg/sgds-react';
 import { EscapableOverlayTrigger } from '@components/common/EscapableOverlayTrigger';
 import type { GraphEdge } from '../types';
 import { bytesHistogram, clampWindow, type TimeWindow } from '../services/timeWindow';
+import { PlayByControl, type AxisMode } from './PlayByControl';
 import './TimeScrubber.css';
 
 const BUCKETS = 120;
@@ -29,6 +30,8 @@ interface Props {
   onAppearWhenSeenChange: (on: boolean) => void;
   unseenStyle: 'hide' | 'faint';
   onUnseenStyleChange: (style: 'hide' | 'faint') => void;
+  /** Switch to packet-by-packet replay (shown only where replay is available). */
+  onModeChange?: (mode: AxisMode) => void;
 }
 
 function clock(ms: number, withDate: boolean, seconds = false): string {
@@ -69,6 +72,7 @@ export function TimeScrubber({
   onAppearWhenSeenChange,
   unseenStyle,
   onUnseenStyleChange,
+  onModeChange,
 }: Props) {
   const [playing, setPlaying] = useState(false);
   const [widthShare, setWidthShare] = useState(0.1);
@@ -199,6 +203,7 @@ export function TimeScrubber({
   const settings = (
     <Popover id="time-scrubber-settings" className="ts-popover">
       <Popover.Body>
+        {onModeChange && <PlayByControl mode="window" onChange={onModeChange} />}
         <div className="ts-setting">
           <span className="ts-setting-label" id="ts-width-label">Window</span>
           <div className="ts-segmented" role="group" aria-labelledby="ts-width-label">
