@@ -53,6 +53,11 @@ interface NetworkGraphProps {
    * hidden, by redrawing only, so the layout never moves while the window plays. Null shows all.
    */
   activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string>; hiddenNodeIds?: Set<string>; faintNodeIds?: Set<string>; window?: { from: number; to: number } } | null;
+  /**
+   * Called when Fit view is pressed again with the graph already fitted: nothing visibly happens, so
+   * the user is probably after the header's fullscreen button (the two used to share an icon).
+   */
+  onFitViewRepeated?: () => void;
   /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
   bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
@@ -516,6 +521,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   animateTraffic = false,
   bottomBar,
   deviceLinks = EMPTY_LINKS,
+  onFitViewRepeated,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -1094,8 +1100,26 @@ export const NetworkGraph = memo(function NetworkGraph({
   }, [edgeColorMode]);
 
   // Fit view
+  const onFitViewRepeatedRef = useRef(onFitViewRepeated);
+  onFitViewRepeatedRef.current = onFitViewRepeated;
+  const noopFits = useRef<number[]>([]);
   const handleFitView = useCallback(() => {
-    sigmaRef.current?.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
+    const camera = sigmaRef.current?.getCamera();
+    if (!camera) return;
+    const { x, y, ratio } = camera.getState();
+    const fitted = Math.abs(x - 0.5) < 1e-3 && Math.abs(y - 0.5) < 1e-3 && Math.abs(ratio - 1) < 1e-3;
+    if (fitted) {
+      // Two presses that changed nothing, close together: point the user at fullscreen.
+      const now = Date.now();
+      noopFits.current = [...noopFits.current.filter(t => now - t < 5000), now];
+      if (noopFits.current.length >= 2) {
+        noopFits.current = [];
+        onFitViewRepeatedRef.current?.();
+      }
+      return;
+    }
+    noopFits.current = [];
+    camera.animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 300 });
   }, []);
 
   return (
@@ -1138,8 +1162,8 @@ export const NetworkGraph = memo(function NetworkGraph({
 
       {/* ── Bottom-right controls ────────────────────────────────────────── */}
       <div className="ng-overlay-controls">
-        <button className="ng-ctrl-btn" title="Fit view" onClick={handleFitView}>
-          <i className="bi bi-fullscreen" />
+        <button className="ng-ctrl-btn" title="Fit view" aria-label="Fit view" onClick={handleFitView}>
+          <i className="bi bi-bounding-box-circles" aria-hidden="true" />
         </button>
         {onLayoutChange && (
           <>

@@ -221,19 +221,6 @@
   margin: 0;
 }
 
-.ts-wide-btn {
-  height: 32px;
-  border: 1px solid var(--tp-border, #d8dce5);
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font-size: 13px;
-}
-
-.ts-wide-btn:disabled {
-  opacity: 0.5;
-}
-
 /* Narrow graphs: drop the edge times, keep the chart usable. */
 @container (max-width: 640px) {
   .ts-edge-time {

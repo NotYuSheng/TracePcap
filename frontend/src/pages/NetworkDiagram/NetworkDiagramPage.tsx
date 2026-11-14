@@ -1,3 +1,4 @@
+import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -370,6 +371,7 @@ export const NetworkDiagramPage = () => {
   useEffect(() => setTimeWindow(null), [fileId]);
   // Nodes not seen yet by the window's end are hidden when that option is on.
   const [appearWhenSeen, setAppearWhenSeen] = useState(false);
+  const [fullscreenHint, setFullscreenHint] = useState(0);
   const [unseenStyle, setUnseenStyle] = useState<'hide' | 'faint'>('hide');
   const windowActive = useMemo(() => {
     if (!timeWindow) return null;
@@ -610,20 +612,13 @@ export const NetworkDiagramPage = () => {
                 >
                   <i className="bi bi-tags" />
                 </Button>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 text-muted"
-                  onClick={toggleFullscreen}
-                  title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                >
-                  <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} />
-                </Button>
+                <FullscreenToggle isFullscreen={isFullscreen} onToggle={toggleFullscreen} hintSignal={fullscreenHint} hintId="fullscreen-hint-diagram" />
               </div>
             </Card.Header>
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
+                onFitViewRepeated={() => setFullscreenHint(n => n + 1)}
                 nodes={filteredNodes}
                 edges={filteredEdges}
                 hiddenNodesList={hiddenNodesList}
