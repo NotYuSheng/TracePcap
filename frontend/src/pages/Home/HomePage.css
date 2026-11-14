@@ -12,8 +12,6 @@
 }
 .home-start {
   line-height: 1.45;
-  position: sticky;
-  top: 16px;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -32,6 +30,14 @@
 /* The whole start panel is the drop target (Upload A). */
 .home-drop-target {
   position: relative;
+}
+/* Beside the captures, the panel stays in view while the right column scrolls: it sits just under
+   the sticky header and scrolls inside itself if the window is shorter than it. */
+.home-page .home-start.home-drop-target {
+  position: sticky;
+  top: calc(var(--tp-header-h, 112px) + 16px);
+  max-height: calc(100vh - var(--tp-header-h, 112px) - 32px);
+  overflow-y: auto;
 }
 .home-drop-target.drag-active {
   border-color: #5925dc;
@@ -362,8 +368,11 @@
   .home-page {
     grid-template-columns: minmax(0, 1fr);
   }
-  .home-start {
-    position: static;
+  .home-page .home-start.home-drop-target {
+    position: relative;
+    top: auto;
+    max-height: none;
+    overflow-y: visible;
   }
   .home-steps {
     grid-template-columns: minmax(0, 1fr);

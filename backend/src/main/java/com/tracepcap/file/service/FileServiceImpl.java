@@ -393,6 +393,13 @@ public class FileServiceImpl implements FileService {
 
   @Override
   @Transactional(readOnly = true)
+  public Page<FileMetadataDto> getAllFiles(
+      Pageable pageable, com.tracepcap.file.repository.FileListFilter filter) {
+    return fileRepository.findAll(filter.toSpecification(), pageable).map(fileMapper::toMetadataDto);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public InputStream downloadFile(UUID fileId) {
     FileEntity fileEntity =
         fileRepository

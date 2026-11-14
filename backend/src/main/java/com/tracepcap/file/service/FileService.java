@@ -49,6 +49,9 @@ public interface FileService {
    */
   Page<FileMetadataDto> getAllFiles(Pageable pageable, FileSource source);
 
+  /** The captures list, narrowed by {@link FileListFilter}. */
+  Page<FileMetadataDto> getAllFiles(Pageable pageable, com.tracepcap.file.repository.FileListFilter filter);
+
   /**
    * Download a file
    *

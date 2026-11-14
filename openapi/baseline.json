@@ -7633,7 +7633,7 @@
     },
     "/api/v1/files": {
       "get": {
-        "description": "Get all uploaded files with pagination",
+        "description": "Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).",
         "operationId": "getAllFiles",
         "parameters": [
           {
@@ -7675,6 +7675,64 @@
                 "MONITOR"
               ],
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "items": {
+                "enum": [
+                  "UPLOADING",
+                  "PROCESSING",
+                  "COMPLETED",
+                  "FAILED"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fileIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludeFileIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "uploadedBefore",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
             }
           }
         ],

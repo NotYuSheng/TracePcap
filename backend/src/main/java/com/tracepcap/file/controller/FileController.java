@@ -5,11 +5,17 @@ import com.tracepcap.file.dto.FileMetadataDto;
 import com.tracepcap.file.dto.FileUploadResponse;
 import com.tracepcap.file.dto.MergeFilesRequest;
 import com.tracepcap.file.entity.FileEntity.FileSource;
+import com.tracepcap.file.entity.FileEntity.FileStatus;
+import com.tracepcap.file.repository.FileListFilter;
 import com.tracepcap.file.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.InputStream;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,12 +65,21 @@ public class FileController {
   }
 
   @GetMapping
-  @Operation(summary = "Get all files", description = "Get all uploaded files with pagination")
+  @Operation(
+      summary = "Get all files",
+      description =
+          "Get all uploaded files with pagination. Optional filters: search (name contains),"
+              + " status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).")
   public ResponseEntity<PagedResponse<FileMetadataDto>> getAllFiles(
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "20") int pageSize,
       @RequestParam(defaultValue = "uploadedAt,desc") String sort,
-      @RequestParam(required = false) FileSource source) {
+      @RequestParam(required = false) FileSource source,
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) List<FileStatus> status,
+      @RequestParam(required = false) List<UUID> fileIds,
+      @RequestParam(required = false) List<UUID> excludeFileIds,
+      @RequestParam(required = false) Long uploadedBefore) {
 
     if (page < 1) page = 1;
     if (pageSize < 1) pageSize = 20;
@@ -82,7 +97,17 @@ public class FileController {
     // PageRequest is 0-indexed; the public API is 1-indexed (matches PagedResponse).
     Pageable pageable = PageRequest.of(page - 1, pageSize, Sort.by(direction, sortField));
 
-    Page<FileMetadataDto> files = fileService.getAllFiles(pageable, source);
+    FileListFilter filter =
+        new FileListFilter(
+            source,
+            search,
+            status,
+            fileIds,
+            excludeFileIds,
+            uploadedBefore == null
+                ? null
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(uploadedBefore), ZoneId.systemDefault()));
+    Page<FileMetadataDto> files = fileService.getAllFiles(pageable, filter);
 
     return ResponseEntity.ok(
         PagedResponse.of(files.getContent(), files.getTotalElements(), page, pageSize));
