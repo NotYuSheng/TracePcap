@@ -80,6 +80,29 @@ The Networks Page
 Chips filter the table to **Needs review** or **No captures**, and the search
 box matches network names.
 
+A Network's Page
+----------------
+
+A network's page has the same layout as a capture's analysis (see
+:doc:`analysis-navigation`):
+
+- **The bar on top** shows the network's name and its captures' date range.
+  It also has how many changes are waiting (click it to open them), a refresh
+  button, **Settings** and **Add a capture**.
+- **Settings** holds the inactivity rule, the network's detection rules,
+  address and device labels, and how often the page refreshes.
+- **The rail down the left** has the results first: **Overview**, **Changes**
+  (with the count to review), **Captures**, **Devices**, **Addresses**,
+  **Apps** and **Insights**. Below a *Set up* divider are the things you
+  maintain: **Expected** (baseline definitions), **Subnets**, **Events**
+  (outside events) and **Notes**.
+- **Overview** puts it together: capture, device and to-review counts, what
+  changed in the latest capture (mark items reviewed there), the capture
+  timeline and the traffic chart.
+
+The section is in the address (``?section=changes``), so a link can open a
+network straight on its changes.
+
 .. note::
    Only files with status **COMPLETED** can be added as snapshots. Upload and
    analyse the file first via the standard PCAP upload flow.
@@ -754,11 +777,9 @@ Polling / Auto-Refresh
 ----------------------
 
 The Monitor networks page refreshes itself every 30 seconds and shows when it
-last did. The network detail page has the controls:
-
-- A **last updated** timestamp shows when data was last fetched.
-- A **refresh** button triggers an immediate reload.
-- An **interval dropdown** lets you choose the polling frequency:
+last did. A network's page shows when it last fetched data and has a
+**refresh** button in its top bar. Its polling frequency is under
+**Settings › Refresh**:
 
   - 10 seconds
   - 30 seconds

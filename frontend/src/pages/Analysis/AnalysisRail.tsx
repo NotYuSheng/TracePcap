@@ -10,13 +10,17 @@ export interface RailItem {
   short: string;
   icon: string;
   busy?: boolean;
+  /** A count to flag on the icon, e.g. changes to review. */
+  badge?: number;
+  /** Starts a group: a divider and this label go above the item. */
+  group?: string;
 }
 
-const EXPANDED_KEY = 'tracepcap.analysisRail.expanded';
+const DEFAULT_EXPANDED_KEY = 'tracepcap.analysisRail.expanded';
 
-function readExpanded(): boolean {
+function readExpanded(key: string): boolean {
   try {
-    return localStorage.getItem(EXPANDED_KEY) === '1';
+    return localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
@@ -30,16 +34,22 @@ export function AnalysisRail({
   items,
   active,
   onSelect,
+  label = 'Analysis sections',
+  storageKey = DEFAULT_EXPANDED_KEY,
 }: {
   items: RailItem[];
   active: string;
   onSelect: (key: string) => void;
+  /** The nav's accessible name. */
+  label?: string;
+  /** Where the widened/narrowed choice is remembered, per page. */
+  storageKey?: string;
 }) {
-  const [expanded, setExpanded] = useState(readExpanded);
+  const [expanded, setExpanded] = useState(() => readExpanded(storageKey));
   const toggle = () => {
     setExpanded(e => {
       try {
-        localStorage.setItem(EXPANDED_KEY, e ? '0' : '1');
+        localStorage.setItem(storageKey, e ? '0' : '1');
       } catch {
         // Not remembered: the rail still works.
       }
@@ -47,20 +57,26 @@ export function AnalysisRail({
     });
   };
   return (
-    <nav className={`analysis-rail${expanded ? ' analysis-rail-expanded' : ''}`} aria-label="Analysis sections">
+    <nav className={`analysis-rail${expanded ? ' analysis-rail-expanded' : ''}`} aria-label={label}>
       <ul className="analysis-rail-list">
         {items.map(i => (
           <li key={i.key}>
+            {i.group && (
+              <div className="analysis-rail-group">
+                <span>{i.group}</span>
+              </div>
+            )}
             <button
               type="button"
               className={`analysis-rail-item${active === i.key ? ' active' : ''}`}
               aria-current={active === i.key ? 'page' : undefined}
-              aria-label={expanded ? undefined : i.label}
+              aria-label={i.badge ? `${i.label}, ${i.badge}` : expanded ? undefined : i.label}
               onClick={() => onSelect(i.key)}
             >
               <span className="analysis-rail-icon" aria-hidden="true">
                 <i className={`bi ${i.icon}`} />
                 {i.busy && <Spinner animation="border" size="sm" className="analysis-rail-busy" />}
+                {!!i.badge && <span className="analysis-rail-badge">{i.badge}</span>}
               </span>
               <span className="analysis-rail-label" aria-hidden={expanded ? undefined : true}>
                 {expanded ? i.label : i.short}
