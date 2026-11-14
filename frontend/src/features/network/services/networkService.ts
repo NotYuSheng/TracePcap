@@ -702,7 +702,15 @@ export function linkMovedDevices(nodes: GraphNode[], moves?: DeviceMove[]): Devi
         m.fromHostname && m.toHostname && m.fromHostname.toLowerCase() !== m.toHostname.toLowerCase()
           ? `, renamed ${m.fromHostname} → ${m.toHostname}`
           : '';
-      links.push({ from: from.id, to: to.id, mac: m.mac, at, label: `same device, moved ${fmt(at)}${renamed}` });
+      // A device that went back and forth between the same two nodes: one label, listing every move;
+      // the later moves keep their own entry (for the move animation) without a second label.
+      const same = links.find(l => !l.hideLabel && ((l.from === from.id && l.to === to.id) || (l.from === to.id && l.to === from.id)));
+      if (same) {
+        same.label = `${same.label}, ${fmt(at)}${renamed}`;
+        links.push({ from: from.id, to: to.id, mac: m.mac, at, label: same.label, hideLabel: true });
+      } else {
+        links.push({ from: from.id, to: to.id, mac: m.mac, at, label: `same device, moved ${fmt(at)}${renamed}` });
+      }
     }
   }
   return links;

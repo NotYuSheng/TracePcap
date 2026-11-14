@@ -191,6 +191,8 @@ export interface DeviceLink {
   at: number;
   /** "moved 11:05", plus a rename when its hostname changed. */
   label: string;
+  /** A later move between the same two nodes: drawn under the first one's label, not with its own. */
+  hideLabel?: boolean;
 }
 
 export interface NetworkStats {
