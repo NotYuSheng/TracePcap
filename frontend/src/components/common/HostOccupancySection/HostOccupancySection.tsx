@@ -29,8 +29,22 @@ function range(o: Occupancy): string {
 interface Props {
   fileId: string;
   ip: string;
-  /** The device a graph node stands for (#918 slice 2): its row is marked "this node". */
+  /** The device being looked at (#918): its row is marked. */
   focusIdx?: number;
+  /** How the marked row is labelled: "this node" in the graph, "showing" in the device picker. */
+  focusLabel?: string;
+  /**
+   * When set, each other device has a "Show" button that picks it (#918 slice 3), with its key:
+   * the bare IP for the first device, `ip@<start>` for a later one.
+   */
+  onSelect?: (o: Occupancy, key: string) => void;
+  /** Called with the number of devices once loaded, and after a split or merge. */
+  onDevices?: (count: number) => void;
+}
+
+/** A device's key (#918 slice 3): the bare IP for the first, `ip@<start>` for a later one. */
+export function deviceKey(ip: string, o: Occupancy): string {
+  return o.startsAt && o.boundaryKey ? `${ip}@${o.boundaryKey}` : ip;
 }
 
 /** One device's own verdict: "Mobile · 67% · Samsung · TTL 64". */
@@ -51,7 +65,7 @@ function verdictLine(o: Occupancy): string | null {
  * split an address the evidence didn't (a cloned VM, an off-subnet address), or merge away a split
  * that's wrong (a phone rotating its private MAC). Decisions are kept and audited.
  */
-export function HostOccupancySection({ fileId, ip, focusIdx }: Props) {
+export function HostOccupancySection({ fileId, ip, focusIdx, focusLabel = 'this node', onSelect, onDevices }: Props) {
   const [data, setData] = useState<HostOccupancy | null>(null);
   const [failed, setFailed] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
@@ -66,7 +80,9 @@ export function HostOccupancySection({ fileId, ip, focusIdx }: Props) {
     occupancyService
       .get(fileId, ip)
       .then(d => {
-        if (currentIp.current === ip) setData(d);
+        if (currentIp.current !== ip) return;
+        setData(d);
+        onDevices?.(d.occupancies.length);
       })
       .catch(() => {
         if (currentIp.current === ip) setFailed(true);
@@ -124,8 +140,18 @@ export function HostOccupancySection({ fileId, ip, focusIdx }: Props) {
                 <strong>{range(o)}</strong>
                 {focusIdx === o.idx && (
                   <span className="badge bg-primary-subtle text-primary-emphasis ms-2" data-testid="occupancy-this-node">
-                    this node
+                    {focusLabel}
                   </span>
+                )}
+                {onSelect && focusIdx !== o.idx && (
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 ms-2 align-baseline"
+                    style={{ fontSize: '0.75rem' }}
+                    onClick={() => onSelect(o, deviceKey(ip, o))}
+                  >
+                    Show this device
+                  </button>
                 )}
               </div>
               {verdictLine(o) && (
@@ -225,6 +251,7 @@ export function HostOccupancySection({ fileId, ip, focusIdx }: Props) {
         onSubmit={async (at, reason) => {
           const updated = await occupancyService.decide(fileId, ip, { at, action: 'split', reason });
           setData(updated);
+          onDevices?.(updated.occupancies.length);
           setSplitOpen(false);
         }}
       />
@@ -239,6 +266,7 @@ export function HostOccupancySection({ fileId, ip, focusIdx }: Props) {
             reason,
           });
           setData(updated);
+          onDevices?.(updated.occupancies.length);
           setMergeTarget(null);
         }}
       />
@@ -314,7 +342,10 @@ function SplitModal({
         <Modal.Title style={{ fontSize: '1rem' }}>Split {data.ip} by time</Modal.Title>
       </Modal.Header>
       <Modal.Body style={{ fontSize: '0.85rem' }}>
-        <p>From the time you pick, this address is treated as a different device.</p>
+        <p>
+          From the time you pick, this address is treated as a different device. Labels, roles and
+          evidence already on the device stay with the part before that time.
+        </p>
         <Form.Group className="mb-3">
           <Form.Label className="small text-muted mb-1">Where</Form.Label>
           {data.suggestions.map(s => (
@@ -426,6 +457,10 @@ function MergeModal({
         <p>
           This joins the device from {target ? fmt(target.startsAt) : ''} with the one before it.
           {target?.startEvidence && <> The split came from: {target.startEvidence}.</>}
+        </p>
+        <p>
+          Labels, roles and evidence on the later device move to the joined one. If it already has its
+          own, the later device's are kept aside. Undoing the merge moves them back.
         </p>
         <Form.Label htmlFor="merge-reason" className="small text-muted mb-1">
           Why (kept with the merge)

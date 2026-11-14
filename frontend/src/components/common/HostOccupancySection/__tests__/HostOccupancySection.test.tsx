@@ -33,6 +33,23 @@ const single = {
 }
 
 describe('HostOccupancySection (#918 item 3)', () => {
+  it('picks another device by its key: the bare IP for the first, ip@start for a later one', async () => {
+    const picked: string[] = []
+    server.use(http.get('*/files/f1/hosts/:ip/occupancies', () => HttpResponse.json(reused)))
+    const user = userEvent.setup()
+    const { rerender } = render(
+      <HostOccupancySection fileId="f1" ip="10.0.0.50" focusIdx={0} focusLabel="showing" onSelect={(_, k) => picked.push(k)} />,
+    )
+    const show = await screen.findAllByRole('button', { name: 'Show this device' })
+    expect(show).toHaveLength(1) // not on the device already showing
+    await user.click(show[0])
+    expect(picked).toEqual(['10.0.0.50@2024-10-27T04:33:20'])
+    rerender(<HostOccupancySection fileId="f1" ip="10.0.0.50" focusIdx={1} focusLabel="showing" onSelect={(_, k) => picked.push(k)} />)
+    await user.click(await screen.findByRole('button', { name: 'Show this device' }))
+    expect(picked[1]).toBe('10.0.0.50')
+  })
+
+
   it("shows each device's own classification, and marks the device a graph node stands for", async () => {
     const classified = {
       ...reused,

@@ -63,6 +63,7 @@ public class HostOccupancyService {
   private final AuditLogService auditLog;
   private final CurrentActor currentActor;
   private final OccupancyClassificationService occupancyClassification;
+  private final org.springframework.context.ApplicationEventPublisher events;
 
   // ── Analysis ────────────────────────────────────────────────────────────────
 
@@ -301,9 +302,15 @@ public class HostOccupancyService {
     occupancies.deleteByFileIdAndIp(fileId, ip);
     var windows = windowsByIp(fileId, ip).getOrDefault(ip, List.of());
     var ds = decisions.findByFileIdAndIpOrderByAt(fileId, ip).stream().map(HostOccupancyService::toDecision).toList();
-    save(fileId, ip, OccupancyBuilder.build(windows, ds, !virtualIps(fileId).contains(ip)));
+    var result = OccupancyBuilder.build(windows, ds, !virtualIps(fileId).contains(ip));
+    save(fileId, ip, result);
     // Each device the address is now split into, classified from its own traffic (slice 2).
     occupancyClassification.classifyAddress(fileId, ip);
+    // Labels on a device whose start went away follow the time to the device covering it, and
+    // each device's identity is re-answered (slice 3).
+    List<LocalDateTime> starts = new ArrayList<>();
+    for (var o : result.occupancies()) starts.add(o.startsAt());
+    events.publishEvent(new com.tracepcap.common.event.HostOccupanciesChangedEvent(fileId, ip, starts));
   }
 
   /** Saves the occupancies when there's more than one; returns how many there are. */

@@ -164,11 +164,16 @@ interface Props {
   /** Called after an override/evidence change, so a parent (e.g. the graph) can refresh its copy. */
   onChanged?: () => void;
   /**
-   * Set when a graph node stands for one of several devices that held this address (#918 slice 2).
-   * The devices, each with its own classification, then come first; the Identity below them is the
-   * whole address's.
+   * The device being looked at when several devices held this address (#918): its position and
+   * key (the bare IP for the first, `ip@<start>` for a later one). A graph node for one device sets
+   * them; otherwise the first device is shown and the analyst can pick another.
    */
   occupancyIdx?: number;
+  deviceKey?: string;
+  /** Called when the analyst picks another device, so the parent's role section follows it. */
+  onSelectDevice?: (idx: number, key: string) => void;
+  /** Where the panel was opened from: a graph node for one device, or the address. */
+  fromGraphNode?: boolean;
 }
 
 /**
@@ -180,7 +185,23 @@ interface Props {
  * graph node all render the same explainable classification, so users see how a verdict was derived
  * and can correct or append to it everywhere, not only in the graph.
  */
-export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Props) {
+export function HostIdentitySection({
+  fileId,
+  ip,
+  onChanged,
+  occupancyIdx,
+  deviceKey,
+  onSelectDevice,
+  fromGraphNode,
+}: Props) {
+  // Which device's identity is shown (#918 slice 3). The identity, override and evidence are keyed by
+  // the device, so a label set here is that device's, not the whole address's.
+  const [selected, setSelected] = useState<{ idx?: number; key: string }>({ idx: occupancyIdx, key: deviceKey ?? ip });
+  const [deviceCount, setDeviceCount] = useState(0);
+  useEffect(() => {
+    setSelected({ idx: occupancyIdx, key: deviceKey ?? ip });
+  }, [ip, occupancyIdx, deviceKey]);
+  const identityKey = selected.key;
   const [evidence, setEvidence] = useState<HostIdentityEvidence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,24 +217,25 @@ export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Pro
   }, []);
 
   // Guard against a slow response landing after the section has moved to another host.
-  const currentIpRef = useRef(ip);
-  currentIpRef.current = ip;
+  const currentIpRef = useRef(identityKey);
+  currentIpRef.current = identityKey;
 
   const load = () => {
+    const key = identityKey;
     setLoading(true);
     setError(null);
     conversationService
-      .getHostIdentityEvidence(fileId, ip)
+      .getHostIdentityEvidence(fileId, key)
       .then(ev => {
-        if (ip !== currentIpRef.current) return;
+        if (key !== currentIpRef.current) return;
         setEvidence(ev);
       })
       .catch(() => {
-        if (ip !== currentIpRef.current) return;
+        if (key !== currentIpRef.current) return;
         setError('Could not load this host’s classification.');
       })
       .finally(() => {
-        if (ip === currentIpRef.current) setLoading(false);
+        if (key === currentIpRef.current) setLoading(false);
       });
   };
 
@@ -221,7 +243,7 @@ export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Pro
     setExpandedAxis(null);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId, ip]);
+  }, [fileId, identityKey]);
 
   const handleChanged = () => {
     // Re-fetch our own copy so the verdict reflects the override, then let the parent refresh too.
@@ -242,19 +264,44 @@ export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Pro
 
   const nodeData = toNodeData(evidence);
 
-  const oneDevice = occupancyIdx != null;
+  // More than one device held the address (#918): pick which one the identity below is about.
+  const reused = deviceCount > 1 || occupancyIdx != null;
+  const focusIdx = selected.idx ?? (reused ? 0 : undefined);
+  const isThisNode = fromGraphNode && selected.key === (deviceKey ?? ip);
+  const devices = (
+    <HostOccupancySection
+      fileId={fileId}
+      ip={ip}
+      focusIdx={focusIdx}
+      focusLabel={isThisNode ? 'this node' : 'showing'}
+      onSelect={(o, key) => {
+        setSelected({ idx: o.idx, key });
+        onSelectDevice?.(o.idx, key);
+      }}
+      onDevices={n => {
+        setDeviceCount(n);
+        // Merged back into one device: show the address.
+        if (n < 2 && selected.key !== ip) {
+          setSelected({ key: ip });
+          onSelectDevice?.(0, ip);
+        }
+      }}
+    />
+  );
 
   return (
     <>
-      {oneDevice && (
+      {reused && (
         <>
           <Alert variant="info" className="py-2 small mb-2" data-testid="host-one-device">
             <i className="bi bi-phone me-1" aria-hidden="true" />
-            More than one device held {ip} in this capture, so the graph shows each one as its own node.
-            This node is the one marked below, classified from its own traffic only. The Identity
-            further down covers the whole address, every device's traffic together.
+            More than one device held {ip} in this capture
+            {fromGraphNode ? ', so the graph shows each one as its own node' : ''}. The identity, label
+            and evidence below are for the device marked{' '}
+            <strong>{isThisNode ? 'this node' : 'showing'}</strong>, classified from its own traffic.
+            Use <strong>Show this device</strong> to look at another.
           </Alert>
-          <HostOccupancySection fileId={fileId} ip={ip} focusIdx={occupancyIdx} />
+          {devices}
         </>
       )}
 
@@ -262,7 +309,7 @@ export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Pro
       <AdjudicationPanel
         fileId={fileId}
         question="host-identity"
-        entityKey={ip}
+        entityKey={identityKey}
         title="Identity"
         labelOptions={DEVICE_LABELS}
         verdict={{
@@ -300,7 +347,7 @@ export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Pro
       )}
 
       {/* Which devices held this address, and when (#918 item 3). */}
-      {!oneDevice && <HostOccupancySection fileId={fileId} ip={ip} />}
+      {!reused && devices}
 
       {/* Evidence weighed — the independent measured signals behind the verdict. */}
       <div className="mb-4">
@@ -390,7 +437,7 @@ export function HostIdentitySection({ fileId, ip, onChanged, occupancyIdx }: Pro
       </div>
 
       {/* Geolocation — external-host country/ASN/org, restored from the old conversation modal. */}
-      <GeoBlock ev={evidence} isPrivate={isPrivateIp(evidence.ip, customRanges)} />
+      <GeoBlock ev={evidence} isPrivate={isPrivateIp(ip, customRanges)} />
 
       {/* Explainer modal — how Identity and the evidence axes relate (#499). */}
       <Modal show={evidenceInfoOpen} onHide={() => setEvidenceInfoOpen(false)} centered>

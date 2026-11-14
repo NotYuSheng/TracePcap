@@ -103,6 +103,8 @@ export interface NodeData {
   occupancy?: {
     idx: number;
     of: number;
+    /** The device's key (#918 slice 3): the bare IP for the first, `ip@<start>` for a later one. */
+    key: string;
     startsAt?: number;
     endsAt?: number;
   };

@@ -308,7 +308,13 @@ export function buildNetworkGraph(
       const span = list.find(x => `${ip}@${x.occ.idx}` === key);
       node.id = key;
       if (span) {
-        node.data.occupancy = { idx: span.occ.idx, of: list.length, startsAt: span.startsAt, endsAt: span.endsAt };
+        node.data.occupancy = {
+          idx: span.occ.idx,
+          of: list.length,
+          key: span.occ.startsAt && span.occ.boundaryKey ? `${ip}@${span.occ.boundaryKey}` : ip,
+          startsAt: span.startsAt,
+          endsAt: span.endsAt,
+        };
         // This device's own MAC and DHCP name, not whichever the address's conversations carried first.
         node.data.mac = span.occ.mac ?? undefined;
         node.data.hostname = span.occ.hostname ?? undefined;
@@ -557,8 +563,9 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
 
   if (identityMap) {
     Object.keys(nodeMap).forEach(ip => {
-      if (nodeMap[ip].data.occupancy) return;
-      const identity = identityMap.get(ip);
+      // A device on a reused address has its own identity, under its key (#918 slice 3), so an
+      // analyst's label on one device shows on that device's node only.
+      const identity = identityMap.get(nodeMap[ip].data.occupancy?.key ?? ip);
       if (!identity) return;
       const d = nodeMap[ip].data;
       d.identityLabel = identity.primaryLabel;
@@ -589,11 +596,12 @@ function nodeTypeFromIdentityLabel(label: string | undefined): NodeType {
     for (const r of nodeRoles) {
       if (!r.roleLabel) continue;
       const roleLabel = r.roleLabel;
-      if (r.entityType === 'IP' && spans.has(r.entityKey)) {
-        // A role on a reused address is still on the address, so each of its devices shows it
-        // until roles can be put on one device (#918 slice 3).
+      const ipOfKey = r.entityKey.replace(/@.*$/, '');
+      if (r.entityType === 'IP' && spans.has(ipOfKey)) {
+        // A role on one device of a reused address (#918 slice 3): its key is the bare IP for the
+        // first device and `ip@<start>` for a later one.
         Object.values(nodeMap).forEach(n => {
-          if (n.data.occupancy && n.data.ip === r.entityKey) n.data.roleLabel = roleLabel;
+          if (n.data.occupancy?.key === r.entityKey) n.data.roleLabel = roleLabel;
         });
         continue;
       }

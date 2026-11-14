@@ -94,7 +94,8 @@ public class HostIdentityService implements Adjudicator {
 
   @Transactional
   public void adjudicateFile(UUID fileId) {
-    List<ClassifiedHost> hosts = hostClassificationLookup.classifiedHosts(fileId);
+    List<ClassifiedHost> hosts = withDevices(
+        hostClassificationLookup.classifiedHosts(fileId), hostClassificationLookup.deviceHosts(fileId));
     if (hosts.isEmpty()) {
       // A re-analysis that classified nothing must not leave the previous run's identities
       // standing — stale verdicts about hosts that no longer exist are worse than none.
@@ -170,6 +171,20 @@ public class HostIdentityService implements Adjudicator {
         contestedCount,
         overrideByIp.size(),
         humanByIp.size());
+  }
+
+  /**
+   * The hosts to adjudicate (#918 slice 3): an address more than one device held is replaced by
+   * its devices, each classified from its own traffic and keyed by {@link
+   * com.tracepcap.analysis.spi.DeviceKeys} (the first device keeps the bare IP). So an analyst's
+   * label, evidence or axis correction on a device's key decides that device only.
+   */
+  static List<ClassifiedHost> withDevices(List<ClassifiedHost> addresses, List<ClassifiedHost> devices) {
+    if (devices.isEmpty()) return addresses;
+    Map<String, ClassifiedHost> byKey = new java.util.LinkedHashMap<>();
+    for (ClassifiedHost h : addresses) byKey.put(h.ip(), h);
+    for (ClassifiedHost d : devices) byKey.put(d.ip(), d); // the first device replaces its address
+    return new ArrayList<>(byKey.values());
   }
 
   private HostIdentityEntity fromOverride(

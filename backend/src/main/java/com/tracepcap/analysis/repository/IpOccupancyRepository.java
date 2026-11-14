@@ -14,6 +14,8 @@ public interface IpOccupancyRepository extends JpaRepository<IpOccupancyEntity, 
 
   List<IpOccupancyEntity> findByFileIdOrderByIpAscIdxAsc(UUID fileId);
 
+  List<IpOccupancyEntity> findByFileIdAndMacIgnoreCaseOrderByIpAscIdxAsc(UUID fileId, String mac);
+
   @Modifying
   @Query("DELETE FROM IpOccupancyEntity o WHERE o.fileId = :fileId")
   void deleteByFileId(@Param("fileId") UUID fileId);
