@@ -66,6 +66,8 @@ interface NetworkGraphProps {
   networkSegments?: NetworkSegment[];
   /** The user's private-range overrides: what counts as "Your networks" in the network map. */
   customPrivateRanges?: CustomPrivateRange[];
+  /** Address → the name clients looked it up by: the network map's domain for unnamed hosts. */
+  dnsNames?: Map<string, string>;
   /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
   bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
@@ -535,6 +537,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFitViewRepeated,
   networkSegments = EMPTY_SEGMENTS,
   customPrivateRanges = EMPTY_RANGES,
+  dnsNames,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -620,8 +623,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   // Dragged nodes keep their place until the layout runs again; this puts them back.
   const [nodesMoved, setNodesMoved] = useState(false);
   const resetLayoutRef = useRef<(() => void) | null>(null);
-  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges });
-  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges };
+  const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames });
+  groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames };
   const deviceLinksRef = useRef(deviceLinks);
   deviceLinksRef.current = deviceLinks;
   const darkRef = useRef(darkMode);
@@ -689,7 +692,7 @@ export const NetworkGraph = memo(function NetworkGraph({
     applyGroupedLayout(sigma, nodesRef.current, groupingRef.current, groupLayoutRef);
     sigma.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [networkSegments, customPrivateRanges]);
+  }, [networkSegments, customPrivateRanges, dnsNames]);
 
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
@@ -1420,7 +1423,7 @@ function blendColor(hex: string, bg: string, alpha: number): string {
 function applyGroupedLayout(
   sigma: Sigma,
   nodes: GraphNode[],
-  grouping: { segments: NetworkSegment[]; customRanges: CustomPrivateRange[] },
+  grouping: { segments: NetworkSegment[]; customRanges: CustomPrivateRange[]; dnsNames?: Map<string, string> },
   out: { current: GroupedLayout | null },
 ): void {
   const graph = sigma.getGraph();

@@ -1,7 +1,7 @@
 import type { GraphNode } from '../types';
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
-import { isPrivateIp } from '@/utils/ipClassification';
+import { ipInCidr, isPrivateIp } from '@/utils/ipClassification';
 import { deviceTypeLabel, nodeIdentityKey } from '@/utils/deviceType';
 import type { DeviceType } from '@/types';
 
@@ -60,6 +60,27 @@ export interface GroupedLayout {
 interface Options {
   segments?: NetworkSegment[];
   customRanges?: CustomPrivateRange[];
+  /** Names clients looked these addresses up by (forward DNS): the domain when a host has no hostname. */
+  dnsNames?: Map<string, string>;
+}
+
+/**
+ * Address → the name clients looked it up by, from the DNS query logs. Where several names
+ * resolved to one address (a CDN, a shared front end), the most-queried one wins.
+ */
+export function dnsNamesByIp(
+  logs: { entries: { queryName: string; resolvedIps: string[]; queryCount: number }[] }[],
+): Map<string, string> {
+  const best = new Map<string, { name: string; count: number }>();
+  for (const log of logs) {
+    for (const e of log.entries) {
+      for (const ip of e.resolvedIps) {
+        const cur = best.get(ip);
+        if (!cur || e.queryCount > cur.count) best.set(ip, { name: e.queryName.replace(/\.$/, ''), count: e.queryCount });
+      }
+    }
+  }
+  return new Map([...best].map(([ip, v]) => [ip, v.name]));
 }
 
 /** The address part of a node id: `10.0.0.73@1700…` / `192.168.1.10~vlan:20` → the address. */
@@ -111,7 +132,12 @@ function segmentDetail(s: NetworkSegment): string {
   return parts.join(' · ');
 }
 
-/** Which network a node belongs to: its device key names it, else its MAC, else an address only one network leased. */
+/**
+ * Which network a node belongs to: its device key names it; else, among the networks whose range
+ * holds its address, the one that leased to its MAC, then the one whose gateway or DHCP server it
+ * is, then the only one that leased its address. The range check matters for a router that serves
+ * several VLANs with one MAC: each interface goes to its own network.
+ */
 function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment | undefined {
   const tilde = node.id.indexOf('~');
   if (tilde !== -1) {
@@ -119,15 +145,16 @@ function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment
     const s = segments.find(x => x.key === key);
     if (s) return s;
   }
+  const ip = addressOf(node.id);
+  const inRange = segments.filter(x => !x.cidr || ipInCidr(ip, x.cidr));
   const mac = node.data.mac?.toLowerCase();
   if (mac) {
-    const s = segments.find(x => x.clients.some(c => c.mac.toLowerCase() === mac) || x.serverMac?.toLowerCase() === mac);
+    const s = inRange.find(x => x.clients.some(c => c.mac.toLowerCase() === mac));
     if (s) return s;
   }
-  const ip = addressOf(node.id);
-  const holders = segments.filter(
-    x => x.clients.some(c => c.ip === ip) || x.routers.includes(ip) || x.serverIds.includes(ip),
-  );
+  const infra = inRange.filter(x => x.routers.includes(ip) || x.serverIds.includes(ip));
+  if (infra.length === 1) return infra[0];
+  const holders = inRange.filter(x => x.clients.some(c => c.ip === ip));
   return holders.length === 1 ? holders[0] : undefined;
 }
 
@@ -145,7 +172,10 @@ function bucket<T>(items: T[], keyOf: (t: T) => string): Map<string, T[]> {
 const byLabel = (a: GroupNode, b: GroupNode) => a.label.localeCompare(b.label, undefined, { numeric: true });
 
 /** The group tree for a set of nodes. Empty groups are never made. */
-export function buildGroupTree(nodes: GraphNode[], { segments = [], customRanges = [] }: Options = {}): GroupNode[] {
+export function buildGroupTree(
+  nodes: GraphNode[],
+  { segments = [], customRanges = [], dnsNames }: Options = {},
+): GroupNode[] {
   const local: GraphNode[] = [];
   const internet: GraphNode[] = [];
   const special: GraphNode[] = [];
@@ -201,7 +231,10 @@ export function buildGroupTree(nodes: GraphNode[], { segments = [], customRanges
   }
 
   if (internet.length) {
-    const byDomain = bucket(internet, n => (n.data.hostname ? domainOf(n.data.hostname) : ''));
+    const byDomain = bucket(internet, n => {
+      const name = n.data.hostname ?? dnsNames?.get(addressOf(n.id));
+      return name ? domainOf(name) : '';
+    });
     const domains: GroupNode[] = [...byDomain].map(([d, ms]) => ({
       id: `domain:${d || 'none'}`,
       kind: 'domain' as const,
