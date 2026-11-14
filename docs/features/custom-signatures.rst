@@ -424,7 +424,7 @@ country.
 How to Add a Label
 ~~~~~~~~~~~~~~~~~~
 
-1. Open **Settings** in the header, then **Address defaults** › **Organisations**
+1. Open **Settings** (the gear at the right of the header), then **Address defaults** › **Organisations**
    (for every network). For one network only, use its page's **Addresses** button
    instead.
 2. Enter a label name (e.g. ``Corporate LAN``, ``DMZ``, ``Guest Wi-Fi``) and

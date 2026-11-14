@@ -139,9 +139,6 @@ export const MainLayout = () => {
                 <Nav.Link as={Link} to="/monitor" active={isMonitorActive}>
                   <i className="bi bi-activity me-1"></i>Monitor
                 </Nav.Link>
-                <Nav.Link as={Link} to="/settings" active={isSystemActive}>
-                  <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
-                </Nav.Link>
               </Nav>
 
               <div className="d-flex align-items-center gap-2 ms-auto">
@@ -155,6 +152,16 @@ export const MainLayout = () => {
                 >
                   <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
                 </Button>
+                {/* Settings: a page (your own, and the install's), opened from the gear on the right. */}
+                <Link
+                  to="/settings"
+                  className={`btn btn-sm ${isSystemActive ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                  aria-label="Settings"
+                  title="Settings"
+                  aria-current={isSystemActive ? 'page' : undefined}
+                >
+                  <i className="bi bi-gear" aria-hidden="true"></i>
+                </Link>
                 {env.AUTH_ENABLED && <AuthMenu />}
               </div>
             </Navbar.Collapse>
