@@ -105,4 +105,14 @@ describe('networkGroups', () => {
     const tree = buildGroupTree([node('140.82.112.6'), node('142.250.4.100'), node('8.8.4.4')], { dnsNames })
     expect(tree[0].children.map(g => g.label)).toEqual(['github.com', 'google.com', 'No hostname'])
   })
+
+  it('a static host joins the one network whose range holds it, not when ranges overlap', () => {
+    const one = [seg('vlan:10', 'HQ', [['192.168.10.21', 'aa:00:00:00:00:01']], '192.168.10')]
+    expect(find(buildGroupTree([node('192.168.10.10')], { segments: one }), 'network:vlan:10')).toBeDefined()
+    const two = [
+      seg('vlan:10', 'HQ', [['192.168.1.21', 'aa:00:00:00:00:01']]),
+      seg('vlan:20', 'Branch', [['192.168.1.22', 'bb:00:00:00:00:01']]),
+    ]
+    expect(buildGroupTree([node('192.168.1.10')], { segments: two })[0].children[0].label).toBe('Other local addresses')
+  })
 })
