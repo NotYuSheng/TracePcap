@@ -1011,12 +1011,12 @@ test('README demo walkthrough', async ({ page }) => {
   // ── 10. Monitor ────────────────────────────────────────────────────────
   // Same machinery, applied over time instead of within one capture.
   await page.goto('/monitor');
-  await expect(page.getByRole('heading', { name: /Network Monitor/i }).first()).toBeVisible({
+  await expect(page.getByRole('heading', { name: /Monitored networks/i }).first()).toBeVisible({
     timeout: 20_000,
   });
   await beat(page, HOLD);
 
-  const card = page.getByText(NETWORK_NAME, { exact: true }).first();
+  const card = page.getByRole('link', { name: NETWORK_NAME, exact: true }).first();
   await expect(card, 'demo network card not found').toBeVisible({ timeout: 15_000 });
   await showClick(page, card);
   await page.waitForURL(/\/monitor\/[0-9a-f-]{36}/, { timeout: 30_000 });

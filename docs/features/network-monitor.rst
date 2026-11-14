@@ -50,13 +50,35 @@ Getting Started
 ---------------
 
 1. Navigate to **Monitor** in the top navigation bar.
-2. Click **Create Network** and give it a name and optional description.
-3. Open the network card to enter the detail view.
+2. Click **New network** and give it a name and optional description.
+3. Click the network's name in the table to enter the detail view, or use
+   **Add the first capture** on its row.
 4. Click **Manage PCAPs** to open the PCAP management modal, then **Add PCAP**
    and select a file that has already been analysed (status: *Completed*).
    Repeat for each capture. The same modal lets you **remove** a snapshot from
    the network later.
 5. Change events appear automatically once two or more snapshots exist.
+
+The Networks Page
+-----------------
+
+**Monitor** lists every network in one table:
+
+- **Status**, one per network:
+  - **No captures yet**;
+  - **Baseline set** (one capture, nothing to compare yet);
+  - **N changes to review** or **N critical to review**;
+  - **Up to date**.
+- **Captures**: one dot per capture, oldest first. The colour is the most
+  severe change it brought: blue for the baseline, green for none, amber for
+  changes, red for a critical change.
+- **Last capture**: when it was captured, and its file.
+- **Devices**: how many devices the network has seen.
+- **One next action** per row: **Review**, **Add a capture** or **Open**.
+  **Rename** and **Delete** are in the row's **⋯** menu.
+
+Chips filter the table to **Needs review** or **No captures**, and the search
+box matches network names.
 
 .. note::
    Only files with status **COMPLETED** can be added as snapshots. Upload and
@@ -246,8 +268,8 @@ Severity Levels
      - Informational. Examples: new ASN or cloud provider seen, new protocol or
        application appeared.
 
-The network card on the Monitor list page shows **Unreviewed Critical** and
-**Unreviewed Warnings** counts so resolved events do not inflate the numbers.
+The status on the Monitor networks page counts only **unreviewed** critical
+and warning events, so resolved events do not inflate the numbers.
 
 Change Event Feed
 -----------------
@@ -278,8 +300,8 @@ Marking as Reviewed
 ~~~~~~~~~~~~~~~~~~~
 
 Click the checkbox on any event to mark it as reviewed. Add a note to record
-the reason (e.g. "Known DHCP lease renewal — expected"). The network card
-unreviewed counts update immediately.
+the reason (e.g. "Known DHCP lease renewal — expected"). The network's
+status on the networks page updates on its next refresh.
 
 Capture Timeline
 ----------------
@@ -731,7 +753,8 @@ spoof", "New device"). Click a highlighted node to open its details.
 Polling / Auto-Refresh
 ----------------------
 
-Both the Monitor list page and the network detail page support auto-refresh:
+The Monitor networks page refreshes itself every 30 seconds and shows when it
+last did. The network detail page has the controls:
 
 - A **last updated** timestamp shows when data was last fetched.
 - A **refresh** button triggers an immediate reload.
