@@ -116,7 +116,7 @@ What the Window Does
 - **Nodes** with no conversation in the window are greyed out but stay where they
   are, so the layout doesn't jump as the window moves. Their labels stay, so a
   quiet host is still findable.
-- **Node-to-Node Volume** below the graph counts only the window's
+- The **Traffic** card's busiest pairs and matrix count only the window's
   conversations.
 - The window works on top of the graph's other filters (protocol, application,
   risks and so on): the chart shows the filtered traffic, and the window picks

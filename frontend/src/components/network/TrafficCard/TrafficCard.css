@@ -1,0 +1,110 @@
+.traffic-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.traffic-totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 28px;
+  font-size: 0.85rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.traffic-totals b {
+  font-size: 1.3rem;
+  color: var(--tp-text, #1f2937);
+  margin-right: 4px;
+}
+.traffic-shown {
+  margin-left: auto;
+  font-size: 0.8rem;
+}
+.traffic-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+.traffic-tab {
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 0.85rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.traffic-tab.active {
+  border-bottom-color: #5925dc;
+  color: #3b1891;
+  font-weight: 600;
+}
+[data-theme='dark'] .traffic-tab.active {
+  color: #c9b8ff;
+}
+.traffic-panel {
+  padding: 14px 16px 16px;
+}
+.traffic-pairs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.traffic-pair {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr) 84px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+  border: 0;
+  border-top: 1px solid var(--tp-border, #eceef3);
+  background: none;
+  color: inherit;
+  text-align: left;
+  font-size: 0.85rem;
+}
+.traffic-pair:hover,
+.traffic-pair.active {
+  background: rgba(89, 37, 220, 0.06);
+}
+.traffic-pair-hosts {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.traffic-pair-apps {
+  color: var(--tp-text-muted, #4b5563);
+  overflow-wrap: anywhere;
+}
+.traffic-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--tp-border, #eceef3);
+  overflow: hidden;
+}
+.traffic-bar span {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #1d4ed8;
+}
+.traffic-pair-bytes {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--tp-text-muted, #4b5563);
+}
+@media (max-width: 575.98px) {
+  .traffic-pair {
+    grid-template-columns: minmax(0, 1fr) 72px;
+  }
+  .traffic-pair-apps,
+  .traffic-bar {
+    display: none;
+  }
+  .traffic-shown {
+    margin-left: 0;
+  }
+}

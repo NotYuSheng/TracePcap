@@ -31,18 +31,17 @@ import {
 import { buildActiveFilterLabels, toggleSet } from '@/features/network/constants';
 import { edgeMatchesLegendKey } from '@/features/network/services/networkService';
 import { nodeIdentityKey } from '@/utils/deviceType';
-import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
 import { TimeScrubber } from '@/features/network/components/TimeScrubber';
 import { activeInWindow, timeBounds, unseenByWindowEnd, type TimeWindow } from '@/features/network/services/timeWindow';
 import type { EdgeColorMode, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
 import { edgeBytesRange } from '@components/network/NetworkGraph/NetworkGraph';
-import { VolumeHeatmap } from '@components/network/VolumeHeatmap';
 import type { VolumePair } from '@components/network/VolumeHeatmap';
 import { VolumeLegend } from '@components/network/VolumeLegend';
 import { useResolvedDark } from '@/utils/useResolvedDark';
 import { useEscapeLayer } from '@/utils/useEscapeLayer';
 import { NetworkControls } from '@components/network/NetworkControls';
+import { TrafficCard } from '@components/network/TrafficCard';
 import { EntityDetailModal, graphNodeEntity } from '@components/common/EntityDetailModal';
 import { NodeLabelSettingsModal } from '@components/network/NodeLabelSettingsModal';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
@@ -219,8 +218,6 @@ export const NetworkDiagramPage = () => {
 
   const isDark = useResolvedDark();
   const [edgeColorMode, setEdgeColorMode] = useState<EdgeColorMode>('transport');
-  const [showHeatmap, setShowHeatmap] = useState(false);
-  const [isHeatmapFullscreen, setIsHeatmapFullscreen] = useState(false);
   const [selectedPair, setSelectedPair] = useState<VolumePair | null>(null);
 
   const graphCardRef = useRef<HTMLDivElement>(null);
@@ -615,32 +612,18 @@ export const NetworkDiagramPage = () => {
           </Alert>
         ))}
 
-      {/* Row 1: Network Statistics */}
-      <Card className="mb-3">
-        <Card.Header>
-          <strong>Diagram Overview</strong>
-        </Card.Header>
-        <Card.Body className="py-2 px-3">
-          <div className="d-flex align-items-center gap-3 flex-wrap">
-            {[
-              { label: 'Nodes', value: stats.totalNodes.toLocaleString() },
-              { label: 'Connections', value: stats.totalEdges.toLocaleString() },
-              { label: 'Packets', value: stats.totalPackets.toLocaleString() },
-              { label: 'Data', value: formatBytes(stats.totalBytes) },
-            ].map(({ label, value }) => (
-              <div key={label} className="text-center px-3 py-1 tp-stat-box rounded border">
-                <div style={{ fontSize: '0.7rem', color: '#6c757d', textTransform: 'uppercase' }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: '1rem', fontWeight: 600 }}>{value}</div>
-              </div>
-            ))}
-            <div className="ms-auto text-muted small">
-              {filteredNodes.length} nodes · {filteredEdges.length} connections shown
-            </div>
-          </div>
-        </Card.Body>
-      </Card>
+      {/* Traffic: the totals, with the busiest pairs and the node-to-node matrix as tabs. */}
+      <TrafficCard
+        totals={{ nodes: stats.totalNodes, edges: stats.totalEdges, packets: stats.totalPackets, bytes: stats.totalBytes }}
+        shown={{ nodes: filteredNodes.length, edges: filteredEdges.length }}
+        nodes={windowedNodes}
+        edges={windowedEdges}
+        dark={isDark}
+        focusedHost={selectedNode?.id ?? null}
+        selectedPair={selectedPair}
+        onSelectPair={setSelectedPair}
+        onHostClick={setSelectedNode}
+      />
 
       {stats.totalNodes > MAX_DIAGRAM_NODES &&
         (() => {
@@ -854,80 +837,6 @@ export const NetworkDiagramPage = () => {
           </Card>
         </div>
       </div>
-
-      {/* Row 3: Node-to-node volume matrix.
-          The diagram answers "who talks to whom"; this answers "how much", which a
-          force-directed layout cannot show. Both read the same filtered edges. */}
-      {isHeatmapFullscreen ? (
-        <Modal show onHide={() => setIsHeatmapFullscreen(false)} fullscreen>
-          <Modal.Header closeButton>
-            <Modal.Title>
-              <strong>Node-to-Node Volume</strong>
-              <span className="text-muted small ms-2">
-                Traffic between each pair of displayed hosts
-              </span>
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body className="tp-heatmap-body">
-            <VolumeHeatmap
-              nodes={windowedNodes}
-              edges={windowedEdges}
-              dark={isDark}
-              focusedHost={selectedNode?.id ?? null}
-              selectedPair={selectedPair}
-              onCellClick={setSelectedPair}
-              onHostClick={setSelectedNode}
-            />
-          </Modal.Body>
-        </Modal>
-      ) : (
-        <Card className="mt-3">
-          <Card.Header className="d-flex justify-content-between align-items-center">
-            <div>
-              <strong>Node-to-Node Volume</strong>
-              <span className="text-muted small ms-2">
-                Traffic between each pair of displayed hosts
-              </span>
-            </div>
-            <div className="d-flex align-items-center gap-3">
-              {showHeatmap && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 text-muted"
-                  onClick={() => setIsHeatmapFullscreen(true)}
-                  title="Fullscreen"
-                >
-                  <i className="bi bi-fullscreen" />
-                </Button>
-              )}
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-muted"
-                onClick={() => setShowHeatmap(s => !s)}
-                aria-expanded={showHeatmap}
-              >
-                {showHeatmap ? 'Hide' : 'Show'}
-                <i className={`bi ms-1 ${showHeatmap ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-              </Button>
-            </div>
-          </Card.Header>
-          {showHeatmap && (
-            <Card.Body className="tp-heatmap-body">
-              <VolumeHeatmap
-                nodes={windowedNodes}
-                edges={windowedEdges}
-                dark={isDark}
-                focusedHost={selectedNode?.id ?? null}
-                selectedPair={selectedPair}
-                onCellClick={setSelectedPair}
-                onHostClick={setSelectedNode}
-              />
-            </Card.Body>
-          )}
-        </Card>
-      )}
 
       {selectedNode && (
         <EntityDetailModal
