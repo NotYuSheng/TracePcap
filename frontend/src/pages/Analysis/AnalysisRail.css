@@ -11,7 +11,12 @@
   display: flex;
   flex-direction: column;
 }
+/* The content keeps a readable width beside the rail, centred in the space that's left. */
 .analysis-body {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
   padding: 20px 28px 32px;
 }
 
@@ -148,7 +153,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 20px;
-  padding: 10px 28px;
+  /* The strip runs full width; its contents line up with the content below. */
+  padding: 10px max(28px, calc((100% - 1280px) / 2 + 28px));
   border-bottom: 1px solid var(--tp-border, #d8dce5);
   background: var(--tp-surface, #ffffff);
 }
