@@ -31,7 +31,7 @@ describe('networkGroups', () => {
     const net = tree[0].children[0]
     expect(net.label).toBe('Local network')
     expect(net.children[0].label).toBe('192.168.1.0/24')
-    expect(net.children[0].children.map(g => g.label)).toEqual(['Laptop / Desktop', 'Printer'])
+    expect(net.children[0].children.map(g => g.label)).toEqual(['Laptops and desktops', 'Printer'])
     expect(find(tree, 'domain:example.com')?.nodeIds).toEqual(['93.184.216.34'])
   })
 
@@ -114,5 +114,16 @@ describe('networkGroups', () => {
       seg('vlan:20', 'Branch', [['192.168.1.22', 'bb:00:00:00:00:01']]),
     ]
     expect(buildGroupTree([node('192.168.1.10')], { segments: two })[0].children[0].label).toBe('Other local addresses')
+  })
+
+  it('groups device types by family: a DNS server and a server are both servers', () => {
+    const tree = buildGroupTree([
+      node('10.0.0.53', { deviceType: 'DNS_SERVER' }),
+      node('10.0.0.10', { deviceType: 'SERVER' }),
+      node('10.0.0.80', { deviceType: 'WEB_SERVER' }),
+      node('10.0.0.21', { deviceType: 'MOBILE' }),
+    ])
+    const types = tree[0].children[0].children[0].children
+    expect(types.map(g => [g.label, g.nodeIds.length])).toEqual([['Phones and tablets', 1], ['Servers', 3]])
   })
 })
