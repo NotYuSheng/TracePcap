@@ -10,7 +10,7 @@ back. The compare page and the monitor's snapshot dialog open in circular.
 .. figure:: images/network-map-two-sites.png
    :alt: The network map of two_sites_one_range.pcap: Your networks holds two networks,
          hq.corp.example (VLAN 10) and branch.corp.example (VLAN 20), each with its 192.168.1.0/24
-         subnet and device-type groups; Internet and Broadcast and multicast sit beside it.
+         subnet and device-family groups; Internet and Broadcast and multicast sit beside it.
 
    ``two_sites_one_range.pcap``: two sites on the same range, each in its own box.
 
@@ -32,8 +32,11 @@ Each box sits inside the one above it:
 
     - **Subnet**: the /24 (IPv4) or /64 (IPv6).
 
-      - **Device type**: the device's classification (Laptop / Desktop,
-        Mobile, Server…), or **Unclassified**.
+      - **Device family**: the kind of device, by its classification:
+        Servers (DNS, web, API and other servers together), Routers,
+        Laptops and desktops, Phones and tablets, IoT devices, Layer-2
+        devices, Virtual addresses, or Unclassified. Each device's own label
+        still gives its exact type.
 
 - **Internet**: public addresses, grouped by **domain** (``cdn.example.com``
   and ``www.example.com`` share ``example.com``). The domain comes from the
@@ -64,7 +67,7 @@ minutes, a visitor's phone joins at 15).
 
 .. figure:: images/network-map-small-office.png
    :alt: The network map of small_office.pcap: staff, devices and guest networks with their
-         subnets and device-type groups, Other local addresses holding the servers, and the
+         subnets and device-family groups, Other local addresses holding the servers, and the
          internet grouped into bbc.co.uk, example.co.uk, github.com, google.com, microsoft.com
          and office365.com.
 

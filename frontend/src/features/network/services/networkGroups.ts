@@ -9,7 +9,7 @@ import type { DeviceType } from '@/types';
  * The "Network map" layout: devices grouped the way an analyst would draw them by hand — nested
  * boxes, every level shown.
  *
- *   Your networks ▸ network (DHCP / VLAN segment) ▸ subnet ▸ device type ▸ devices
+ *   Your networks ▸ network (DHCP / VLAN segment) ▸ subnet ▸ device family ▸ devices
  *   Internet      ▸ domain (from the hostname)                         ▸ hosts
  *   Broadcast and multicast                                            ▸ addresses
  *
@@ -116,11 +116,30 @@ export function domainOf(hostname: string): string {
   return parts.slice(-keep).join('.');
 }
 
-function typeLabel(node: GraphNode): string {
+/**
+ * The device-type level groups by family, not by exact classification: a DNS server and a web
+ * server are both servers. The exact type stays on each device's own label.
+ */
+const FAMILIES: Record<string, string> = {
+  SERVER: 'Servers',
+  DNS_SERVER: 'Servers',
+  WEB_SERVER: 'Servers',
+  API_SERVER: 'Servers',
+  ROUTER: 'Routers',
+  LAPTOP_DESKTOP: 'Laptops and desktops',
+  MOBILE: 'Phones and tablets',
+  IOT: 'IoT devices',
+  L2_DEVICE: 'Layer-2 devices',
+  VIRTUAL_ADDRESS: 'Virtual addresses',
+  UNKNOWN: 'Unclassified',
+};
+
+export function familyOf(node: GraphNode): string {
   const key = nodeIdentityKey(node.data);
-  if (key === 'UNKNOWN') return 'Unclassified';
+  const family = FAMILIES[key];
+  if (family) return family;
   const label = deviceTypeLabel(key as DeviceType);
-  // A custom classification value (#926) passes through raw: PRINTER_A3 → Printer a3.
+  // A custom classification value (#926) is its own group: PRINTER_A3 → Printer a3.
   return /^[A-Z0-9_]+$/.test(label) ? label.charAt(0) + label.slice(1).toLowerCase().replace(/_/g, ' ') : label;
 }
 
@@ -200,7 +219,7 @@ export function buildGroupTree(
       const subnets = bucket(members, n => (n.data.isL2 ? 'No IP address' : subnetOf(addressOf(n.id))));
       const subnetGroups: GroupNode[] = [];
       for (const [subnet, inSubnet] of subnets) {
-        const types = bucket(inSubnet, typeLabel);
+        const types = bucket(inSubnet, familyOf);
         const typeGroups: GroupNode[] = [...types].map(([t, ms]) => ({
           id: `type:${segKey}:${subnet}:${t}`,
           kind: 'type' as const,
