@@ -114,7 +114,7 @@ the defaults favour analysts:
      - Default
    * - Global, network and capture detection rules
      - analysts
-   * - Splitting or merging a host's devices (:doc:`address-reuse`)
+   * - Splitting, merging or linking devices (:doc:`address-reuse`, :doc:`network-devices`)
      - analysts
    * - Network settings, including a network's own address entries
        (:doc:`network-address-config`)

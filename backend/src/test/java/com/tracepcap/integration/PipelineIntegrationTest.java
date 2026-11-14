@@ -813,6 +813,54 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Private MACs (#918 slice 4b): a phone that changed its private MAC between two weekly snapshots
+   * is suggested as one device on its DHCP fingerprint and hostname; a different phone isn't. Linking
+   * shows them as one device, two MACs active at once can't be linked, and undo splits them again.
+   */
+  @Test
+  void networkDevices_suggestAndLinkAPhonesRotatedPrivateMacs() throws Exception {
+    String net =
+        rest.postForEntity("/api/v1/monitor/networks", json("{\"name\":\"private-mac-net\"}"), JsonNode.class)
+            .getBody().get("id").asText();
+    for (String fixture : java.util.List.of("private_mac_week1.pcap", "private_mac_week2.pcap")) {
+      ResponseEntity<JsonNode> upload = uploadFixture(fixture);
+      String fileId =
+          upload.getStatusCode() == HttpStatus.CREATED
+              ? upload.getBody().get("fileId").asText()
+              : upload.getBody().get("existingFileId").asText();
+      assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+      rest.postForEntity("/api/v1/monitor/networks/" + net + "/snapshots", json("{\"fileId\":\"" + fileId + "\"}"), JsonNode.class);
+    }
+    String base = "/api/v1/monitor/networks/" + net;
+    JsonNode suggestions = rest.getForEntity(base + "/device-link-suggestions", JsonNode.class).getBody();
+    assertThat(suggestions).hasSize(1);
+    JsonNode s = suggestions.get(0);
+    assertThat(s.get("macA").asText()).isEqualTo("3a:1f:9c:52:0e:11");
+    assertThat(s.get("macB").asText()).isEqualTo("7e:02:41:9a:c3:07");
+    assertThat(s.get("evidence").toString()).contains("Same DHCP fingerprint").contains("Same hostname");
+    assertThat(suggestions.toString()).doesNotContain("6a:44:10:7c:21:5e"); // Carol's phone
+
+    // Two MACs active at the same time can't be one device.
+    ResponseEntity<JsonNode> refused = rest.postForEntity(base + "/device-links",
+        json("{\"macA\":\"6a:44:10:7c:21:5e\",\"macB\":\"7e:02:41:9a:c3:07\",\"decision\":\"same\",\"reason\":\"x\"}"), JsonNode.class);
+    assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+    ResponseEntity<JsonNode> linked = rest.postForEntity(base + "/device-links",
+        json("{\"macA\":\"7e:02:41:9a:c3:07\",\"macB\":\"3a:1f:9c:52:0e:11\",\"decision\":\"same\",\"reason\":\"rotated\"}"), JsonNode.class);
+    assertThat(linked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    JsonNode devices = rest.getForEntity(base + "/devices?q=bobs", JsonNode.class).getBody();
+    assertThat(devices.get("total").asLong()).isEqualTo(1);
+    assertThat(devices.get("data").get(0).get("macs")).hasSize(2);
+    assertThat(devices.get("data").get(0).get("addresses")).hasSize(2);
+    assertThat(rest.getForEntity(base + "/device-link-suggestions", JsonNode.class).getBody()).isEmpty();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action = 'network-device.link.same'", Integer.class))
+        .isPositive();
+
+    rest.delete(base + "/device-links/" + linked.getBody().get("id").asLong());
+    assertThat(rest.getForEntity(base + "/devices?q=bobs", JsonNode.class).getBody().get("total").asLong()).isEqualTo(2);
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

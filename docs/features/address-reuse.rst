@@ -100,7 +100,7 @@ recorded in the audit log. Corrections are kept apart from the computed result,
 so they survive the result being recomputed, and a
 :doc:`re-analysis <reanalysis>` version starts with its original's corrections.
 
-Who can make corrections is the **Split or merge a host's devices** permission
+Who can make corrections is the **Split, merge or link devices** permission
 on the System page's **Permissions** tab (default: analysts; see
 :ref:`settings-permissions`).
 

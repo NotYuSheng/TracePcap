@@ -28,6 +28,9 @@ export const API_ENDPOINTS = {
   /** A network's devices across its snapshots, by MAC (#918 slice 4). */
   NETWORK_DEVICES: (networkId: string) => `/monitor/networks/${networkId}/devices`,
   NETWORK_DEVICE_COUNTS: (networkId: string) => `/monitor/networks/${networkId}/device-counts`,
+  NETWORK_DEVICE_LINK_SUGGESTIONS: (networkId: string) => `/monitor/networks/${networkId}/device-link-suggestions`,
+  NETWORK_DEVICE_LINKS: (networkId: string) => `/monitor/networks/${networkId}/device-links`,
+  NETWORK_DEVICE_LINK: (networkId: string, linkId: number) => `/monitor/networks/${networkId}/device-links/${linkId}`,
   NETWORK_ORG_RULES: (networkId: string) => `/monitor/networks/${networkId}/ip-org-rules`,
   NETWORK_ORG_RULE: (networkId: string, id: number) => `/monitor/networks/${networkId}/ip-org-rules/${id}`,
   /** Every address more than one device held, with each device's classification (#918 slice 2). */

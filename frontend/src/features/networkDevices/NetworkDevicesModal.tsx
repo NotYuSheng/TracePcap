@@ -8,10 +8,30 @@ import type { DeviceType } from '@/types';
 import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import {
   networkDeviceService,
+  type DeviceLink,
+  type DeviceLinkSuggestion,
   type DeviceShow,
   type NetworkDevice,
   type NetworkDeviceCounts,
 } from './networkDeviceService';
+
+function apiMessage(err: unknown): string | null {
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? null;
+}
+
+const STRENGTH_BADGE: Record<string, string> = {
+  strong: 'bg-primary-subtle text-primary-emphasis',
+  medium: 'bg-info-subtle text-info-emphasis',
+  weak: 'bg-body-secondary text-body',
+};
+
+/** A decision being made: which two MACs, and same or not. */
+interface Pending {
+  macA: string;
+  macB: string;
+  name: string;
+  decision: 'same' | 'not_same';
+}
 
 const PAGE_SIZE = 20;
 
@@ -56,6 +76,11 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<NetworkDevice | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<DeviceLinkSuggestion[]>([]);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // Bumped after a decision, so the list, counts and suggestions are read again.
+  const [version, setVersion] = useState(0);
 
   // Search as you type, without a request per keystroke.
   useEffect(() => {
@@ -69,7 +94,8 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
   useEffect(() => {
     if (!show) return;
     networkDeviceService.counts(networkId).then(setCounts).catch(() => setCounts(null));
-  }, [show, networkId]);
+    networkDeviceService.suggestions(networkId).then(setSuggestions).catch(() => setSuggestions([]));
+  }, [show, networkId, version]);
 
   useEffect(() => {
     if (!show) return;
@@ -93,7 +119,25 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
     return () => {
       alive = false;
     };
-  }, [show, networkId, query, filter, page]);
+  }, [show, networkId, query, filter, page, version]);
+
+  const decide = async (p: Pending, reason: string) => {
+    await networkDeviceService.decide(networkId, { macA: p.macA, macB: p.macB, decision: p.decision, reason });
+    setPending(null);
+    setSelected(null);
+    setVersion(v => v + 1);
+  };
+
+  const undo = async (link: DeviceLink) => {
+    setActionError(null);
+    try {
+      await networkDeviceService.undo(networkId, link.id);
+      setSelected(null);
+      setVersion(v => v + 1);
+    } catch (e) {
+      setActionError(apiMessage(e) ?? "Couldn't undo that.");
+    }
+  };
 
   const chips: { key: DeviceShow; label: string; count?: number }[] = [
     { key: 'all', label: 'All', count: counts?.all },
@@ -102,6 +146,7 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
   ];
 
   return (
+    <>
     <Modal show={show} onHide={selected ? () => setSelected(null) : onHide} size="xl" scrollable>
       <Modal.Header closeButton>
         <Modal.Title as="h5" className="d-flex align-items-center gap-2">
@@ -132,7 +177,10 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
       </Modal.Header>
       <Modal.Body>
         {selected ? (
-          <DeviceDetail device={selected} snapshots={snapshots} onNavigate={onHide} />
+          <>
+            {actionError && <Alert variant="danger" className="small py-2">{actionError}</Alert>}
+            <DeviceDetail device={selected} snapshots={snapshots} onNavigate={onHide} onUndo={undo} />
+          </>
         ) : (
           <>
             <p className="text-muted small mb-2">
@@ -186,6 +234,50 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
 
             {error && <Alert variant="danger" className="small py-2">{error}</Alert>}
 
+            {filter === 'all' && !query && suggestions.slice(0, 3).map(sg => (
+              <Alert key={sg.macA + sg.macB} variant="warning" className="small py-2" data-testid="device-suggestion">
+                <div className="d-flex flex-wrap gap-2 align-items-start justify-content-between">
+                  <div style={{ flex: '1 1 420px', minWidth: 0 }}>
+                    <strong>
+                      2 private MACs look like one device{sg.nameB ? `: ${sg.nameB}` : ''}
+                    </strong>
+                    <div>
+                      <span className="font-monospace">{sg.macA}</span> in {range({ firstSnapshot: sg.firstSnapshotA, lastSnapshot: sg.lastSnapshotA })},
+                      then <span className="font-monospace">{sg.macB}</span> in {range({ firstSnapshot: sg.firstSnapshotB, lastSnapshot: sg.lastSnapshotB })}.
+                    </div>
+                    <ul className="list-unstyled mb-0 mt-1">
+                      {sg.evidence.map(e => (
+                        <li key={e.what} className="d-flex gap-2 align-items-start">
+                          <span className={`badge ${STRENGTH_BADGE[e.strength] ?? ''}`} style={{ minWidth: 58 }}>{e.strength}</span>
+                          <span><strong>{e.what}.</strong> {e.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="d-flex gap-2 flex-shrink-0">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'same' })}
+                    >
+                      Same device
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline-secondary"
+                      onClick={() => setPending({ macA: sg.macA, macB: sg.macB, name: sg.nameB ?? sg.macB, decision: 'not_same' })}
+                    >
+                      Not the same
+                    </Button>
+                  </div>
+                </div>
+              </Alert>
+            ))}
+            {filter === 'all' && !query && suggestions.length > 3 && (
+              <p className="small text-muted">And {suggestions.length - 3} more possible matches.</p>
+            )}
+
             {!error && !loading && rows.length === 0 && (
               <p className="text-muted small" data-testid="devices-empty">
                 {query || filter !== 'all'
@@ -223,7 +315,9 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
                           )}
                         </td>
                         <td>
-                          <div className="font-monospace">{d.mac}</div>
+                          {d.macs.map(m => (
+                            <div key={m} className="font-monospace">{m}</div>
+                          ))}
                           {d.vendor && <div className="text-muted">{d.vendor}</div>}
                           {MAC_KIND_BADGE[d.macKind] && (
                             <span className={`badge ${MAC_KIND_BADGE[d.macKind]!.cls}`}>
@@ -266,6 +360,75 @@ export function NetworkDevicesModal({ show, networkId, networkName, snapshots, o
           </>
         )}
       </Modal.Body>
+    </Modal>
+    <DecisionModal pending={pending} onHide={() => setPending(null)} onSubmit={decide} />
+    </>
+  );
+}
+
+/** Asks for the reason behind a same / not-the-same decision, and records it. */
+function DecisionModal({
+  pending,
+  onHide,
+  onSubmit,
+}: {
+  pending: Pending | null;
+  onHide: () => void;
+  onSubmit: (p: Pending, reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    setReason('');
+    setErr(null);
+  }, [pending]);
+  if (!pending) return null;
+  const same = pending.decision === 'same';
+  const save = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSubmit(pending, reason.trim());
+    } catch (e) {
+      setErr(apiMessage(e) ?? "Couldn't save that.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal show onHide={onHide} centered>
+      <Modal.Header closeButton>
+        <Modal.Title as="h5">{same ? 'Same device?' : 'Not the same device?'}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body className="small">
+        <p>
+          <span className="font-monospace">{pending.macA}</span> and{' '}
+          <span className="font-monospace">{pending.macB}</span>
+          {same
+            ? ' will show as one device, in every snapshot. Its label then applies under both MACs.'
+            : " won't be suggested as one device again."}{' '}
+          Your reason is kept and audited, and you can undo it from the device.
+        </p>
+        {err && <Alert variant="danger" className="py-2">{err}</Alert>}
+        <Form.Label htmlFor="device-link-reason">Reason</Form.Label>
+        <Form.Control
+          id="device-link-reason"
+          as="textarea"
+          rows={2}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder={same ? "e.g. Bob's phone rotated its private address" : 'e.g. two staff with the same phone model'}
+        />
+      </Modal.Body>
+      <Modal.Footer>
+        <Button type="button" variant="outline-secondary" onClick={onHide}>
+          Cancel
+        </Button>
+        <Button type="button" onClick={save} disabled={busy || !reason.trim()}>
+          {same ? 'Link as one device' : 'Mark as different'}
+        </Button>
+      </Modal.Footer>
     </Modal>
   );
 }
@@ -317,17 +480,19 @@ function DeviceDetail({
   device,
   snapshots,
   onNavigate,
+  onUndo,
 }: {
   device: NetworkDevice;
   snapshots: NetworkSnapshot[];
   onNavigate: () => void;
+  onUndo: (link: DeviceLink) => void;
 }) {
   const seen = new Set(device.seenInFileIds);
   const badge = MAC_KIND_BADGE[device.macKind];
   return (
     <div className="small" data-testid="device-detail">
       <p className="text-muted mb-3">
-        <span className="font-monospace">{device.mac}</span>
+        <span className="font-monospace">{device.macs.join(', ')}</span>
         {device.vendor && <> · {device.vendor}</>}
         {device.deviceType && <> · {deviceTypeLabel(device.deviceType as DeviceType)}</>}
         {badge && <span className={`badge ms-2 ${badge.cls}`}>{badge.text}</span>}
@@ -373,6 +538,26 @@ function DeviceDetail({
       <div className="mb-3">
         <Flags device={device} />
       </div>
+
+      {device.links.length > 0 && (
+        <>
+          <h6 className="text-muted fw-normal border-bottom pb-1">Your decisions</h6>
+          <ul className="list-unstyled mb-3" data-testid="device-links">
+            {device.links.map(l => (
+              <li key={l.id} className="mb-1">
+                <strong>{l.decision === 'same' ? 'Same device' : 'Not the same'}:</strong>{' '}
+                <span className="font-monospace">{l.macA}</span> and <span className="font-monospace">{l.macB}</span>
+                {' · '}
+                {l.reason}
+                {l.actor && <span className="text-muted"> ({l.actor})</span>}
+                <button type="button" className="btn btn-link p-0 ms-2 align-baseline small" onClick={() => onUndo(l)}>
+                  Undo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h6 className="text-muted fw-normal border-bottom pb-1">Label</h6>
       <p className="mb-3">

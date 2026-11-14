@@ -12,7 +12,10 @@ import lombok.Value;
 @Value
 @Builder
 public class NetworkDeviceDto {
+  /** The MAC it was last seen with. */
   String mac;
+  /** Every MAC it was seen with: more than one when an analyst linked them as one device. */
+  List<String> macs;
   /** Its hostname in the latest snapshot it was seen in, else its address there. */
   String name;
   String deviceType;
@@ -28,6 +31,8 @@ public class NetworkDeviceDto {
   UUID lastFileId;
   String lastKey;
   List<Flag> flags;
+  /** The analyst's same / not-the-same decisions about its MACs. */
+  List<Link> links;
 
   /** An address it used, from the first to the last snapshot it used it in (1 = the first snapshot). */
   @Value
@@ -36,6 +41,19 @@ public class NetworkDeviceDto {
     String ip;
     int firstSnapshot;
     int lastSnapshot;
+  }
+
+  /** An analyst's decision about two MACs: {@code decision} is same or not_same. */
+  @Value
+  @Builder
+  public static class Link {
+    Long id;
+    String macA;
+    String macB;
+    String decision;
+    String reason;
+    String actor;
+    java.time.LocalDateTime createdAt;
   }
 
   /** An irregularity: high (likely two machines), medium (worth knowing) or info. */

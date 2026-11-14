@@ -12,8 +12,9 @@ public enum PermissionAction {
       "Rules that belong to one network and flag conversations in its captures."),
   DETECTION_RULES_CAPTURE(PermissionLevel.ANALYST, "Edit capture detection rules",
       "Rules that apply to a single capture."),
-  HOST_OCCUPANCY(PermissionLevel.ANALYST, "Split or merge a host's devices",
-      "Correct where one device ends and the next begins on an address in a capture."),
+  HOST_OCCUPANCY(PermissionLevel.ANALYST, "Split, merge or link devices",
+      "Correct where one device ends and the next begins on an address in a capture, and whether"
+          + " two MACs in a network are one device."),
   ADDRESS_DEFAULTS(PermissionLevel.ANALYST, "Edit address defaults",
       "The shared subnet labels, internal/external ranges and organisations every network starts from."),
   NETWORK_SETTINGS(PermissionLevel.ANALYST, "Edit network settings",
