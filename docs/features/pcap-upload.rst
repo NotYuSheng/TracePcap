@@ -94,9 +94,27 @@ come back.
 Managing Uploads
 ----------------
 
-The main file list shows each capture with its size, packet count and upload
-time. You can delete a capture from this view, which removes both the database
-metadata and the object from MinIO.
+**Your captures**, on the home page under Recent activity, lists each capture.
+Each row has its name (a link to its analysis), its size, packet count and
+upload time, its status, and a **⋯** menu with **Open**, **Re-analyse…** and
+**Delete**. Deleting removes both the database metadata and the object from
+MinIO.
+
+Above the list:
+
+- **Search** matches capture names.
+- **Chips** narrow it to **Expiring soon**, **Kept with a network** or
+  **Failed**, each with its count.
+- **Show monitor uploads** adds captures uploaded straight into a monitored
+  network. They are hidden by default.
+
+Tick captures to select them, across pages if you like. A bar then appears at
+the foot of the list:
+
+- **Compare**: view two or more together (see :doc:`comparison`).
+- **Merge into one**: combine them into a new capture and analyse it.
+- **Delete N**: delete the selected captures.
+- **Clear**: drop the selection.
 
 Each capture has exactly one **status**, in its own column:
 
@@ -135,10 +153,6 @@ Anything else is a grey **note** under the name, only when it applies:
   them.
 - **Packets removed**: packet retention deleted the raw packets. The
   conversations and results remain.
-
-Monitor Network files are **hidden by default** in this list to reduce clutter
-when many snapshots have been uploaded. Use the **Show Monitor files** toggle
-(top-right of the file list) to include them.
 
 File Retention
 ~~~~~~~~~~~~~~

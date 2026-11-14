@@ -710,7 +710,7 @@ export interface paths {
         };
         /**
          * Get all files
-         * @description Get all uploaded files with pagination
+         * @description Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).
          */
         get: operations["getAllFiles"];
         put?: never;
@@ -5737,6 +5737,11 @@ export interface operations {
                 pageSize?: number;
                 sort?: string;
                 source?: "ANALYSIS" | "MONITOR";
+                search?: string;
+                status?: ("UPLOADING" | "PROCESSING" | "COMPLETED" | "FAILED")[];
+                fileIds?: string[];
+                excludeFileIds?: string[];
+                uploadedBefore?: number;
             };
             header?: never;
             path?: never;

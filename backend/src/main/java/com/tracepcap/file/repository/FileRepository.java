@@ -8,11 +8,13 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 /** Repository for FileEntity */
 @Repository
-public interface FileRepository extends JpaRepository<FileEntity, UUID> {
+public interface FileRepository
+    extends JpaRepository<FileEntity, UUID>, JpaSpecificationExecutor<FileEntity> {
 
   /** Find all files with pagination and sorting */
   Page<FileEntity> findAll(Pageable pageable);

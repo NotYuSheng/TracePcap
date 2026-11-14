@@ -1,29 +1,159 @@
-/* Multi-select action modal buttons */
-.multiselect-action-btn:hover .text-muted,
-.multiselect-action-btn:hover small {
-  color: inherit !important;
+/* Your captures (All uploads A, in the home page). */
+.captures-card {
+  background: var(--tp-surface, #fff);
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 14px;
+  overflow: hidden;
 }
-
-/* File List Card Styles */
-.file-list-card {
-  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+.captures-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px 10px;
 }
-
-.file-list-card .list-group-item {
-  transition: background-color 0.2s ease;
+.captures-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
-
-.file-list-card .list-group-item:hover {
-  background-color: var(--tp-surface-hover, #f8f9fa);
+.captures-count {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.captures-head .captures-search {
+  width: 220px;
+  flex: none;
+  margin-left: auto;
+}
+.captures-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 0 18px 12px;
+}
+.captures-chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #374151);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.captures-chip.active {
+  border-color: #c4b5fd;
+  background: #ede9fe;
+  color: #3b1891;
+}
+[data-theme='dark'] .captures-chip.active {
+  border-color: rgba(155, 125, 255, 0.5);
+  background: rgba(155, 125, 255, 0.18);
+  color: #c9b8ff;
+}
+.captures-monitor {
+  margin: 0 0 0 auto;
+  font-size: 0.78rem;
+}
+.captures-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--tp-text-muted, #4b5563);
+  background: var(--tp-bg-subtle, #f7f8fb);
+  padding: 8px 12px;
+}
+.captures-table td {
+  padding: 10px 12px;
+}
+.captures-table th:first-child,
+.captures-table td:first-child {
+  padding-left: 18px;
+}
+.captures-table th:last-child,
+.captures-table td:last-child {
+  padding-right: 18px;
+}
+.captures-check {
+  width: 40px;
+}
+.captures-check .form-check {
+  margin: 0;
+  min-height: 0;
+}
+.captures-status-col {
+  width: 140px;
+}
+.captures-row-selected td {
+  background: rgba(89, 37, 220, 0.06);
+}
+.captures-name {
+  font-weight: 600;
+  color: var(--tp-text, #1f2937);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.captures-name:hover {
+  text-decoration: underline;
+}
+.captures-meta {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.captures-more::after {
+  display: none;
+}
+.captures-selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 18px;
+  background: #1f2937;
+  color: #ffffff;
+  font-size: 0.85rem;
+}
+.captures-selection .captures-delete-selected {
+  color: #fca5a5;
+  border-color: rgba(252, 165, 165, 0.6);
+}
+.captures-clear {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: #d1d5db;
+  font-size: 0.85rem;
+}
+.captures-foot {
+  padding: 8px 18px;
+  border-top: 1px solid var(--tp-border, #eceef3);
+}
+.captures-status-inline {
+  display: none;
+}
+@media (max-width: 575.98px) {
+  .captures-status-col,
+  .captures-status-cell,
+  .captures-table .captures-open {
+    display: none;
+  }
+  .captures-status-inline {
+    display: inline-flex;
+    min-width: 0;
+  }
+  .captures-head {
+    flex-wrap: wrap;
+  }
+  .captures-head .captures-search {
+    width: 100%;
+    margin-left: 0;
+  }
+  .captures-monitor {
+    margin-left: 0;
+  }
 }
 
 /* One status per capture, then quiet notes. Colour only for what needs you. */
-.file-list-card .min-w-0 {
-  min-width: 0;
-}
-.file-list-card .file-name {
-  overflow-wrap: anywhere;
-}
 .file-status {
   display: inline-flex;
   align-items: center;
