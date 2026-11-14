@@ -362,6 +362,10 @@ export const NetworkDiagramPage = () => {
 
   // Time axis: the capture's span, and what was active in the chosen window (null = all of it).
   const [timeWindow, setTimeWindow] = useState<TimeWindow | null>(null);
+  // Traffic dots along the edges: on unless the system asks for reduced motion.
+  const [animateTraffic, setAnimateTraffic] = useState(
+    () => !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+  );
   const bounds = useMemo(() => timeBounds(edges), [edges]);
   useEffect(() => setTimeWindow(null), [fileId]);
   const windowActive = useMemo(
@@ -614,6 +618,8 @@ export const NetworkDiagramPage = () => {
                   window={timeWindow}
                   onWindowChange={setTimeWindow}
                   activeCount={windowActive ? windowActive.edgeIds.size : filteredEdges.length}
+                  animate={animateTraffic}
+                  onAnimateChange={setAnimateTraffic}
                 />
               </div>
             )}
@@ -632,6 +638,7 @@ export const NetworkDiagramPage = () => {
                 edgeColorMode={edgeColorMode}
                 highlightedNodes={highlightedNodes}
                 activeInWindow={windowActive}
+                animateTraffic={animateTraffic}
               />
             </Card.Body>
           </Card>

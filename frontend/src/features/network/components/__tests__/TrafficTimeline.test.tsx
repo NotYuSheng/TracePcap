@@ -22,6 +22,8 @@ function Harness({ onChange }: { onChange?: (w: TimeWindow | null) => void }) {
       window={w}
       onWindowChange={x => { setW(x); onChange?.(x) }}
       activeCount={w ? 1 : edges.length}
+      animate={false}
+      onAnimateChange={() => {}}
     />
   )
 }

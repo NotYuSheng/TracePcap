@@ -25,6 +25,9 @@ interface Props {
   onWindowChange: (w: TimeWindow | null) => void;
   /** How many of the conversations are active in the window, for the readout. */
   activeCount: number;
+  /** Dots moving along the edges, on or off. */
+  animate: boolean;
+  onAnimateChange: (on: boolean) => void;
 }
 
 function clock(ms: number, withDate: boolean): string {
@@ -49,7 +52,15 @@ function duration(ms: number): string {
  * keeps its layout and only dims what's outside the window, so what changes over time stays where
  * it was on screen.
  */
-export function TrafficTimeline({ edges, bounds, window: win, onWindowChange, activeCount }: Props) {
+export function TrafficTimeline({
+  edges,
+  bounds,
+  window: win,
+  onWindowChange,
+  activeCount,
+  animate,
+  onAnimateChange,
+}: Props) {
   const [playing, setPlaying] = useState(false);
   const [widthShare, setWidthShare] = useState(0.1);
   const [speed, setSpeed] = useState(1);
@@ -144,6 +155,14 @@ export function TrafficTimeline({ edges, bounds, window: win, onWindowChange, ac
             <option key={s} value={s}>{s}×</option>
           ))}
         </Form.Select>
+        <Form.Check
+          type="switch"
+          id="timeline-animate"
+          label="Animate traffic"
+          className="mb-0 ms-1"
+          checked={animate}
+          onChange={e => onAnimateChange(e.target.checked)}
+        />
         <Button
           type="button"
           size="sm"

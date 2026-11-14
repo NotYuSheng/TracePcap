@@ -30,6 +30,22 @@ Above the graph on **Network Visualization**:
 The readout gives the window's times and how many of the conversations were
 active in it.
 
+Traffic Dots
+------------
+
+With **Animate traffic** on (the default, unless your system asks for reduced
+motion), dots move along every edge shown, in the edge's colour:
+
+- **More dots** on busier conversations: one for a trickle, up to four for the
+  heaviest.
+- **Both ways** when the conversation went both ways: every other dot runs back.
+- They follow the edge's own shape, curved or straight, and only edges in the
+  time window (and not hidden by hovering a node) have them.
+
+Played together, the window and the dots show traffic starting, moving and
+stopping over the capture. On a very large graph only the 400 busiest edges
+animate, so it stays smooth. Animation stops while the browser tab is hidden.
+
 What the Window Does
 --------------------
 

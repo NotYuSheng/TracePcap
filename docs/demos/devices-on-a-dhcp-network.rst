@@ -53,8 +53,9 @@ tool blames Alice.
 Each conversation goes to the device that held the address when it started, so the beacon lands on
 the phone and Alice's laptop is clean.
 
-**Watch it happen.** The time axis above the graph picks a window of the capture (see
-:doc:`../features/network-time-axis`). Click early in the chart, or press **Play**:
+**Watch it happen.** The time axis above the graph picks a window of the capture, and dots move
+along the conversations active in it (see :doc:`../features/network-time-axis`). Click early in the
+chart, or press **Play**:
 
 .. figure:: images/timeline-laptop.png
    :alt: The time axis with a window early in the capture, and the graph: LAPTOP-ALICE is active
