@@ -125,6 +125,7 @@ public class FileMapper {
         .derivedFrom(entity.getDerivedFrom() != null ? entity.getDerivedFrom().toString() : null)
         .version(entity.isVersion())
         .packetCount(entity.getPacketCount())
+        .packetsRemoved(entity.getPacketsPrunedAt() != null)
         .duration(entity.getDuration())
         .startTime(entity.getStartTime())
         .endTime(entity.getEndTime())

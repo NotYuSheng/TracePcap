@@ -1,8 +1,8 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { isAxiosError } from 'axios';
-import { Badge, Button, Card, Form, Modal, Tooltip } from '@govtechsg/sgds-react';
+import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { AlertCircle } from 'lucide-react';
 import { apiClient } from '@/services/api/client';
@@ -10,6 +10,7 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { parseDateTime } from '@/utils/dateUtils';
 import './FileList.css';
+import { actionOf, expiresAt, notesOf, statusOf } from './fileStatus';
 import { formatBytes } from '@/utils/formatters';
 
 type MultiSelectAction = 'analyze' | 'merge';
@@ -26,19 +27,16 @@ export interface FileMetadata {
   enableNdpi?: boolean;
   enableSuricata?: boolean;
   enableFileExtraction?: boolean;
+  packetCount?: number | null;
+  packetsRemoved?: boolean;
 }
 
-/**
- * Lists the analysis stages that were skipped for a file, or null if the file ran the full
- * pipeline. Older files predating these flags return them as undefined, which we treat as
- * "enabled" so they are not mislabelled as partial.
- */
-function skippedStages(file: FileMetadata): string[] | null {
-  const skipped: string[] = [];
-  if (file.enableNdpi === false) skipped.push('Protocol & application classification (nDPI)');
-  if (file.enableSuricata === false) skipped.push('Suricata IDS threat detection');
-  if (file.enableFileExtraction === false) skipped.push('Embedded file extraction');
-  return skipped.length > 0 ? skipped : null;
+/** "2 hours", "40 minutes": how long until a capture is deleted. */
+function expiresIn(ms: number): string {
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'}`;
+  const hours = Math.round(mins / 60);
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
 interface FileListProps {
@@ -57,6 +55,12 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
   const [hideMonitor, setHideMonitor] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
+  // What the statuses need beyond the page itself: retention, network memberships, and which
+  // captures the detection rules have changed for. Each is optional: without it, the list shows less.
+  const [retentionHours, setRetentionHours] = useState<number | null>(null);
+  const [memberships, setMemberships] = useState<Map<string, { networkId: string; networkName: string }[]>>(new Map());
+  const [staleIds, setStaleIds] = useState<Set<string>>(new Set());
+  const [now, setNow] = useState(() => Date.now());
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
@@ -158,6 +162,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
         },
       });
       setFiles(res.data.data ?? []);
+      setNow(Date.now());
       setTotalItems(res.data.total ?? 0);
       setTotalPages(res.data.totalPages ?? 0);
     } catch (err) {
@@ -170,6 +175,25 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
   useEffect(() => {
     fetchFiles();
   }, [fetchFiles]);
+
+  useEffect(() => {
+    apiClient
+      .get<{ fileRetentionHours?: number }>(API_ENDPOINTS.SYSTEM_LIMITS)
+      .then(r => setRetentionHours(r.data.fileRetentionHours ?? null))
+      .catch(() => {});
+    apiClient
+      .get<{ fileId: string; networkId: string; networkName: string }[]>(API_ENDPOINTS.NETWORK_MEMBERSHIPS)
+      .then(r => {
+        const m = new Map<string, { networkId: string; networkName: string }[]>();
+        for (const x of r.data) m.set(x.fileId, [...(m.get(x.fileId) ?? []), x]);
+        setMemberships(m);
+      })
+      .catch(() => {});
+    apiClient
+      .get<string[]>(API_ENDPOINTS.STALE_CAPTURES)
+      .then(r => setStaleIds(new Set(r.data)))
+      .catch(() => {});
+  }, []);
 
 
   const formatDate = (timestamp: number): string => {
@@ -237,7 +261,7 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                   <Card.Body className="py-2 px-3">
                     <p className="mb-1">
                       <i className="bi bi-graph-up me-1 text-primary"></i>
-                      Click <strong>Analyze</strong> on any file to open its individual analysis.
+                      Click <strong>Open</strong> on a capture to see its analysis. Each one has one status (Queued, Analysing, Ready, Expiring soon or Failed); the grey notes under its name say anything else worth knowing.
                     </p>
                     <p className="mb-0">
                       <i className="bi bi-diagram-3 me-1 text-primary"></i>
@@ -333,6 +357,16 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                 {files.map(file => {
                   const isSelected = selectedForCompare.has(file.fileId);
                   const isCompleted = file.status.toLowerCase() === 'completed';
+                  const ctx = {
+                    retentionHours,
+                    keptWith: memberships.get(file.fileId) ?? [],
+                    rulesChanged: staleIds.has(file.fileId),
+                    now,
+                  };
+                  const statusFile = { ...file, uploadedAt: parseDateTime(file.uploadedAt) };
+                  const status = statusOf(statusFile, ctx);
+                  const notes = notesOf(statusFile, ctx);
+                  const expiry = expiresAt(statusFile, ctx);
                   return (
                     <div
                       key={file.fileId}
@@ -354,73 +388,68 @@ export const FileList = ({ defaultPageSize = 25 }: FileListProps = {}) => {
                         }
                       }}
                     >
-                      <div className="flex-grow-1">
+                      <div className="flex-grow-1 min-w-0">
                         <div className="d-flex align-items-center gap-2">
                           <i
                             className="bi bi-file-earmark-binary text-primary"
                             style={{ fontSize: '1.2rem' }}
+                            aria-hidden="true"
                           ></i>
-                          <div>
-                            <div className="fw-medium d-flex align-items-center gap-2">
-                              {file.fileName}
-                              {file.source === 'MONITOR' && (
-                                <Badge bg="info" text="dark" style={{ fontSize: '0.65rem' }}>
-                                  Monitor
-                                </Badge>
-                              )}
-                              {isCompleted &&
-                                (() => {
-                                  const skipped = skippedStages(file);
-                                  if (!skipped) return null;
-                                  const tip = `Partial analysis — stages skipped at upload:\n• ${skipped.join('\n• ')}`;
-                                  return (
-                                    <Tooltip content={tip} type="hover">
-                                      <Badge
-                                        bg="warning"
-                                        text="dark"
-                                        style={{ fontSize: '0.65rem', cursor: 'help' }}
-                                      >
-                                        <i className="bi bi-exclamation-triangle me-1" />
-                                        Partial
-                                      </Badge>
-                                    </Tooltip>
-                                  );
-                                })()}
-                            </div>
+                          <div className="min-w-0">
+                            <div className="fw-medium file-name">{file.fileName}</div>
                             <small className="text-muted">
-                              {formatBytes(file.fileSize)} •{' '}
+                              {formatBytes(file.fileSize)}
+                              {file.packetCount != null && <> · {file.packetCount.toLocaleString()} packets</>}
+                              {' · '}
                               {formatDate(parseDateTime(file.uploadedAt))}
-                              {!isCompleted && (
-                                <Badge
-                                  bg="secondary"
-                                  className="ms-2"
-                                  style={{ fontSize: '0.7rem' }}
-                                >
-                                  {file.status.toLowerCase()}
-                                </Badge>
+                              {status.key === 'expiring' && expiry != null && (
+                                <> · deleted in {expiresIn(expiry - now)}</>
                               )}
                             </small>
+                            {notes.length > 0 && (
+                              <div className="file-notes" onClick={e => e.stopPropagation()}>
+                                {notes.map(n =>
+                                  n.to ? (
+                                    <Link key={n.key} to={n.to} className={`file-note${n.tone ? ` file-note-${n.tone}` : ''}`}>
+                                      {n.label}
+                                    </Link>
+                                  ) : (
+                                    <span key={n.key} className="file-note">
+                                      {n.label}
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                       <div
-                        className="d-flex gap-2 align-items-center"
+                        className="d-flex gap-3 align-items-center flex-shrink-0"
                         onClick={e => e.stopPropagation()}
                       >
+                        <span className={`file-status file-status-${status.key}`}>
+                          <span className="file-status-dot" aria-hidden="true" />
+                          {status.label}
+                        </span>
+                        {status.key === 'expiring' && (
+                          <Link to="/monitor" className="btn btn-outline-warning btn-sm">
+                            Keep it
+                          </Link>
+                        )}
                         <Button
-                          variant="outline-primary"
+                          variant={status.key === 'ready' ? 'outline-primary' : 'outline-secondary'}
                           size="sm"
                           onClick={() => navigate(`/analysis/${file.fileId}`)}
                         >
-                          <i className="bi bi-graph-up me-1"></i>
-                          Analyze
+                          {actionOf(status.key)}
                         </Button>
                         <Button
                           variant="link"
                           size="sm"
                           className="p-0 text-danger"
                           onClick={() => setPendingDeleteFile(file)}
-                          title="Delete this file"
+                          aria-label={`Delete ${file.fileName}`}
                         >
                           <i className="bi bi-trash"></i>
                         </Button>

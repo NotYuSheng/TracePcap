@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.tracepcap.common.settings.EditablePolicy;
+import com.tracepcap.common.settings.RuntimePolicy;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -30,12 +32,16 @@ public class SystemController {
   @Value("${llm.api.timeout-seconds:300}")
   private int llmTimeoutSeconds;
 
-  // How long an analysis capture is kept, so the home page can say when one will be deleted.
-  @Value("${tracepcap.cleanup.retention-hours:12}")
-  private int fileRetentionHours;
+  // How long an analysis capture is kept, so the home page can say when one will be deleted. Read
+  // per request: retention is editable in the app (#915 phase 5).
+  private final RuntimePolicy runtimePolicy;
 
   @Value("${tracepcap.cleanup.enabled:true}")
   private boolean cleanupEnabled;
+
+  public SystemController(RuntimePolicy runtimePolicy) {
+    this.runtimePolicy = runtimePolicy;
+  }
 
   /** Returns the server's current local datetime (ISO-8601, no timezone offset). */
   @GetMapping("/time")
@@ -67,6 +73,8 @@ public class SystemController {
             (long) llmTimeoutSeconds * 1000,
             // 0 means captures are never deleted.
             "fileRetentionHours",
-            cleanupEnabled ? Math.max(fileRetentionHours, 0) : 0));
+            cleanupEnabled
+                ? Math.max(runtimePolicy.getInt(EditablePolicy.FILE_RETENTION_HOURS), 0)
+                : 0));
   }
 }

@@ -34,6 +34,12 @@ public class RuleSyncController {
     return sync.overall();
   }
 
+  @GetMapping("/detection-rules/stale-captures")
+  @Operation(summary = "The captures out of date with at least one enabled rule, by id")
+  public List<UUID> staleCaptures() {
+    return sync.staleFiles();
+  }
+
   @GetMapping("/files/{fileId}/rule-status")
   @Operation(summary = "Which enabled rules one capture is out of date for, or couldn't re-check")
   public RuleSyncStatusDto fileStatus(@PathVariable UUID fileId) {

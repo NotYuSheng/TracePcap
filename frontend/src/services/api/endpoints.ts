@@ -142,6 +142,8 @@ export const API_ENDPOINTS = {
   PERMISSIONS: '/permissions',
   PERMISSION: (action: string) => `/permissions/${action}`,
   AUDIT_LOG: '/audit-log',
+  NETWORK_MEMBERSHIPS: '/network-memberships',
+  STALE_CAPTURES: '/detection-rules/stale-captures',
   DETECTION_RULES: '/detection-rules',
   DETECTION_RULE: (id: string) => `/detection-rules/${id}`,
   DETECTION_RULES_EXPORT: '/detection-rules/export',
