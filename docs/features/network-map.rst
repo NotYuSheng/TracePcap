@@ -107,6 +107,25 @@ active*.
 Edges, the traffic animation and the same-device links of :doc:`device-moves`
 draw as in the other layouts.
 
+Exporting to draw.io
+--------------------
+
+The **download** button in the graph card's header saves the network map as a
+draw.io diagram (``<capture>-network-map.drawio``), to open in draw.io (desktop
+or web) and finish by hand:
+
+- every box is a draw.io container, nested as on the map, so moving a box
+  carries everything in it;
+- every device is one of draw.io's network shapes (server, router, laptop,
+  phone, switch; a circle when the type is unknown), labelled with the same
+  lines as on screen (see *Customize node labels*);
+- every pair of devices that talked is joined by one line, in its protocol's
+  colour.
+
+The diagram opens laid out the way TracePcap drew it. It always uses the
+network map's grouping, whichever layout is showing, and only the devices the
+current filters leave on the graph.
+
 Moving Devices
 --------------
 

@@ -1,3 +1,7 @@
+import { useStore } from '@/store';
+import { buildGroupTree, layoutGroups } from '@/features/network/services/networkGroups';
+import { downloadDrawio, toDrawio } from '@components/network/NetworkGraph/drawioExport';
+import { buildNodeLines } from '@components/network/NetworkGraph/nodeLines';
 import { usePacketReplay } from '@/features/network/hooks/usePacketReplay';
 import { PacketReplayBar } from '@/features/network/components/PacketReplayBar';
 import type { AxisMode } from '@/features/network/components/PlayByControl';
@@ -98,6 +102,14 @@ export const NetworkDiagramPage = () => {
       live = false;
     };
   }, [fileId]);
+
+  // The network map, as a draw.io diagram: grouped the same way, whatever layout is showing.
+  const nodeLabelConfig = useStore(st => st.nodeLabelConfig);
+  const downloadMap = () => {
+    const layout = layoutGroups(buildGroupTree(filteredNodes, { segments: networkSegments, customRanges: customPrivateRanges, dnsNames }));
+    const name = (data?.fileName ?? 'capture').replace(/\.(pcapng|pcap|cap)$/i, '');
+    downloadDrawio(toDrawio(layout, filteredNodes, filteredEdges, n => buildNodeLines(n, nodeLabelConfig), `${name} — network map`), `${name}-network-map`);
+  };
 
   const navigate = useNavigate();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -668,6 +680,17 @@ export const NetworkDiagramPage = () => {
                     label="Edge volume"
                   />
                 )}
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 text-muted"
+                  onClick={downloadMap}
+                  disabled={filteredNodes.length === 0}
+                  title="Download the network map as a draw.io diagram"
+                  aria-label="Download the network map as a draw.io diagram"
+                >
+                  <i className="bi bi-download" aria-hidden="true" />
+                </Button>
                 <Button
                   variant="link"
                   size="sm"

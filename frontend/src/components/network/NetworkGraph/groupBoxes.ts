@@ -2,7 +2,7 @@ import type Sigma from 'sigma';
 import type { GroupBox } from '@/features/network/services/networkGroups';
 
 /** One colour per network, told apart by lightness as well as hue. */
-const TONES_LIGHT = ['#6d4fd8', '#c2410c', '#0f766e', '#1d4ed8', '#be185d', '#4d7c0f'];
+export const TONES_LIGHT = ['#6d4fd8', '#c2410c', '#0f766e', '#1d4ed8', '#be185d', '#4d7c0f'];
 const TONES_DARK = ['#a993ff', '#fb923c', '#2dd4bf', '#7aa2ff', '#f472b6', '#a3e635'];
 
 interface Style {
