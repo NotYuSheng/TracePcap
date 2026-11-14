@@ -1,0 +1,164 @@
+/* The analysis page: sections on a rail down the left, the page beside it. */
+.analysis-shell {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.analysis-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.analysis-rail {
+  position: sticky;
+  top: 16px;
+  flex: none;
+  width: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 14px;
+  background: var(--tp-surface, #ffffff);
+}
+.analysis-rail-expanded {
+  width: 220px;
+}
+.analysis-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.analysis-rail-item {
+  width: 100%;
+  min-height: 60px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tp-text-muted, #4b5563);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 13px;
+  text-align: center;
+}
+.analysis-rail-expanded .analysis-rail-item {
+  min-height: 42px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 12px;
+  font-size: 14px;
+  text-align: left;
+}
+.analysis-rail-item:hover {
+  background: rgba(89, 37, 220, 0.06);
+  color: #3b1891;
+}
+.analysis-rail-item.active {
+  background: rgba(89, 37, 220, 0.12);
+  color: #3b1891;
+  font-weight: 600;
+}
+.analysis-rail-item:focus-visible {
+  outline: 2px solid #5925dc;
+  outline-offset: 1px;
+}
+.analysis-rail-icon {
+  position: relative;
+  font-size: 19px;
+  line-height: 1;
+}
+.analysis-rail-busy {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  width: 10px !important;
+  height: 10px !important;
+  border-width: 2px !important;
+}
+.analysis-rail-toggle {
+  height: 32px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tp-text-muted, #4b5563);
+}
+[data-theme='dark'] .analysis-rail-item:hover,
+[data-theme='dark'] .analysis-rail-item.active {
+  color: #c9b8ff;
+}
+[data-theme='dark'] .analysis-rail-item.active {
+  background: rgba(155, 125, 255, 0.18);
+}
+
+/* The capture bar: which capture, its facts, and the page-wide controls. */
+.analysis-capture-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 12px;
+  background: var(--tp-surface, #ffffff);
+}
+.analysis-capture-id {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.analysis-capture-crumb {
+  font-size: 12px;
+}
+.analysis-capture-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.analysis-capture-facts {
+  font-size: 13px;
+  color: var(--tp-text-muted, #4b5563);
+}
+.analysis-capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+/* Narrow screens: the rail becomes a row of sections above the page. */
+@media (max-width: 767.98px) {
+  .analysis-shell {
+    flex-direction: column;
+  }
+  .analysis-rail,
+  .analysis-rail-expanded {
+    position: static;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .analysis-rail-list {
+    flex-direction: row;
+  }
+  .analysis-rail-item,
+  .analysis-rail-expanded .analysis-rail-item {
+    min-width: 76px;
+    flex-direction: column;
+    font-size: 11px;
+  }
+  .analysis-rail-toggle {
+    display: none;
+  }
+}

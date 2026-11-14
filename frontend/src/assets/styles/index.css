@@ -260,10 +260,15 @@ body {
 /* Page Styles */
 .home-page,
 .upload-page,
-.analysis-page,
 .network-diagram-page,
 .not-found-page {
   max-width: 1200px;
+  margin: 0 auto;
+}
+
+.analysis-page {
+  /* Wider than the other pages: the section rail sits beside the content. */
+  max-width: 1400px;
   margin: 0 auto;
 }
 

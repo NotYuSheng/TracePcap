@@ -91,7 +91,7 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
   the network: they show as out of date, as for a global rule, until the rules
   are re-applied.
 - Switching a network rule off hides its matches at once.
-- On a capture's **Analysis** page, **Custom detection rules** (under the file ID)
+- On a capture's **Analysis** page, **Custom detection rules** (in the capture bar above every section)
   adds a network's rules to every tab that shows matches: the Overview, the
   conversations (list, filters and details), the network visualization, the
   Network Cluster's rule filter, and the PDF report's rule tags and rule
