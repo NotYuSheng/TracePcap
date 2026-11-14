@@ -1,0 +1,67 @@
+/* Network B: the analysis page's rail and capture bar, for a monitored network. */
+.network-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 12px;
+}
+.network-review-pill {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+[data-theme='dark'] .network-review-pill {
+  background: rgba(252, 211, 77, 0.16);
+  color: #fcd34d;
+}
+.network-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.network-stat {
+  padding: 16px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 12px;
+  background: var(--tp-surface, #fff);
+  text-align: left;
+  color: var(--tp-text, #1f2937);
+}
+.network-stat-button {
+  font: inherit;
+}
+.network-stat-button:hover {
+  border-color: #5925dc;
+}
+.network-stat-warn {
+  border-color: #fde68a;
+}
+.network-stat-label {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+.network-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.network-stat-warn .network-stat-value {
+  color: #b45309;
+}
+[data-theme='dark'] .network-stat-warn .network-stat-value {
+  color: #fcd34d;
+}
+.network-stat-sub {
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767.98px) {
+  .network-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
