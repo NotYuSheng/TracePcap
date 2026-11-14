@@ -36,8 +36,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class DhcpLeaseResolverService {
 
-  /** One (ip, client MAC) lease with its first and last time and the hostname asked under. */
-  public record Lease(String ip, String mac, String hostname, LocalDateTime firstSeen, LocalDateTime lastSeen) {}
+  /**
+   * One (ip, client MAC) lease with its first and last time and the hostname asked under, plus the
+   * client's DHCP fingerprint (#918 slice 4b): the options it asked for, in order (option 55), and
+   * its vendor class (option 60). The fingerprint names the client's OS and often its model, and
+   * stays the same when a phone changes its private MAC.
+   */
+  public record Lease(
+      String ip, String mac, String hostname, LocalDateTime firstSeen, LocalDateTime lastSeen,
+      String fingerprint, String vendorClass) {
+
+    public Lease(String ip, String mac, String hostname, LocalDateTime firstSeen, LocalDateTime lastSeen) {
+      this(ip, mac, hostname, firstSeen, lastSeen, null, null);
+    }
+  }
 
   public List<Lease> resolve(File pcapFile) {
     Map<String, Lease> leases = new LinkedHashMap<>();
@@ -53,7 +65,11 @@ public class DhcpLeaseResolverService {
             "-E",
             "separator=|",
             "-E",
-            "occurrence=f",
+            // Every occurrence, so option 55's list comes through whole; the single-valued fields
+            // take their first.
+            "occurrence=a",
+            "-E",
+            "aggregator=;",
             "-e",
             "frame.time_epoch",
             "-e",
@@ -67,7 +83,11 @@ public class DhcpLeaseResolverService {
             "-e",
             "dhcp.hw.mac_addr",
             "-e",
-            "dhcp.option.hostname");
+            "dhcp.option.hostname",
+            "-e",
+            "dhcp.option.request_list_item",
+            "-e",
+            "dhcp.option.vendor_class_id");
     pb.redirectErrorStream(false);
 
     Process process = null;
@@ -136,6 +156,12 @@ public class DhcpLeaseResolverService {
    */
   static void parseRow(String[] f, Map<String, Lease> leases) {
     if (f.length < 7) return;
+    // Fields 0–6 hold one value each; with every occurrence on, keep the first.
+    String fingerprint = f.length > 7 && !f[7].isBlank() ? f[7].trim().replace(';', ',') : null;
+    if (fingerprint != null && fingerprint.length() > 255) fingerprint = fingerprint.substring(0, 255);
+    String vendorClass = f.length > 8 && !f[8].isBlank() ? first(f[8]) : null;
+    if (vendorClass != null && vendorClass.length() > 255) vendorClass = vendorClass.substring(0, 255);
+    f = java.util.Arrays.stream(f).map(DhcpLeaseResolverService::first).toArray(String[]::new);
     LocalDateTime at;
     try {
       double epoch = Double.parseDouble(f[0].trim());
@@ -159,7 +185,7 @@ public class DhcpLeaseResolverService {
     String key = ip + "|" + mac;
     Lease prev = leases.get(key);
     if (prev == null) {
-      leases.put(key, new Lease(ip, mac, hostname, at, at));
+      leases.put(key, new Lease(ip, mac, hostname, at, at, fingerprint, vendorClass));
     } else {
       leases.put(
           key,
@@ -168,8 +194,17 @@ public class DhcpLeaseResolverService {
               mac,
               hostname != null ? hostname : prev.hostname(),
               at.isBefore(prev.firstSeen()) ? at : prev.firstSeen(),
-              at.isAfter(prev.lastSeen()) ? at : prev.lastSeen()));
+              at.isAfter(prev.lastSeen()) ? at : prev.lastSeen(),
+              fingerprint != null ? fingerprint : prev.fingerprint(),
+              vendorClass != null ? vendorClass : prev.vendorClass()));
     }
+  }
+
+  /** The first of an aggregated field's values. */
+  private static String first(String field) {
+    if (field == null) return "";
+    int i = field.indexOf(';');
+    return (i < 0 ? field : field.substring(0, i)).trim();
   }
 
   private static boolean usable(String ip) {

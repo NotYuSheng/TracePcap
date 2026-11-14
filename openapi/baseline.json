@@ -1357,6 +1357,73 @@
         ],
         "type": "object"
       },
+      "DeviceLinkRequest": {
+        "properties": {
+          "decision": {
+            "pattern": "same|not_same",
+            "type": "string"
+          },
+          "macA": {
+            "pattern": "(?i)([0-9a-f]{2}[:-]){5}[0-9a-f]{2}",
+            "type": "string"
+          },
+          "macB": {
+            "pattern": "(?i)([0-9a-f]{2}[:-]){5}[0-9a-f]{2}",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "macA",
+          "macB",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "DeviceLinkSuggestionDto": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array"
+          },
+          "firstSnapshotA": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "firstSnapshotB": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lastSnapshotA": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lastSnapshotB": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "macA": {
+            "type": "string"
+          },
+          "macB": {
+            "type": "string"
+          },
+          "nameA": {
+            "type": "string"
+          },
+          "nameB": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "DnsQueryEntryDto": {
         "properties": {
           "frame": {
@@ -1516,6 +1583,20 @@
           "totalBytes": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Evidence": {
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2570,6 +2651,34 @@
         },
         "type": "object"
       },
+      "Link": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "macA": {
+            "type": "string"
+          },
+          "macB": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Match": {
         "properties": {
           "app": {
@@ -2781,11 +2890,23 @@
           "lastKey": {
             "type": "string"
           },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "type": "array"
+          },
           "mac": {
             "type": "string"
           },
           "macKind": {
             "type": "string"
+          },
+          "macs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "name": {
             "type": "string"
@@ -8242,7 +8363,7 @@
     "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions": {
       "post": {
         "description": "Needs the HOST_OCCUPANCY permission. Audited. Returns the updated occupancies.",
-        "operationId": "decide",
+        "operationId": "decide_1",
         "parameters": [
           {
             "in": "path",
@@ -8293,7 +8414,7 @@
     "/api/v1/files/{fileId}/hosts/{ip}/occupancy-decisions/{decisionId}": {
       "delete": {
         "description": "Needs the HOST_OCCUPANCY permission. Audited.",
-        "operationId": "undo",
+        "operationId": "undo_1",
         "parameters": [
           {
             "in": "path",
@@ -9840,6 +9961,120 @@
           }
         },
         "summary": "How many devices a network has: all, irregular, and with a private MAC",
+        "tags": [
+          "Network Devices"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/device-link-suggestions": {
+      "get": {
+        "description": "Pairs of private (device-chosen) MACs where one stopped before the other began and they share a DHCP fingerprint, hostname, TLS fingerprints or signed-in user, with nothing against it. Suggestions only; undecided pairs, strongest first.",
+        "operationId": "suggestions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceLinkSuggestionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Private MACs that look like one device",
+        "tags": [
+          "Network Devices"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/device-links": {
+      "post": {
+        "description": "Needs the HOST_OCCUPANCY permission. Audited. Linked MACs show as one device.",
+        "operationId": "decide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Link"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Record that two MACs are one device, or not",
+        "tags": [
+          "Network Devices"
+        ]
+      }
+    },
+    "/api/v1/monitor/networks/{networkId}/device-links/{linkId}": {
+      "delete": {
+        "description": "Needs the HOST_OCCUPANCY permission. Audited.",
+        "operationId": "undo",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "networkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "linkId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Undo a same / not-the-same decision",
         "tags": [
           "Network Devices"
         ]

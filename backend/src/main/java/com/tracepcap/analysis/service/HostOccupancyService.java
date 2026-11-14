@@ -83,6 +83,8 @@ public class HostOccupancyService {
               .ip(l.ip())
               .mac(l.mac())
               .hostname(l.hostname())
+              .fingerprint(l.fingerprint())
+              .vendorClass(l.vendorClass())
               .firstSeen(l.firstSeen())
               .lastSeen(l.lastSeen())
               .build());

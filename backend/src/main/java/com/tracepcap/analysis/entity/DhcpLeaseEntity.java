@@ -35,6 +35,14 @@ public class DhcpLeaseEntity {
   @Column(length = 255)
   private String hostname;
 
+  /** The options the client asked for, in order (DHCP option 55), comma-joined (#918 slice 4b). */
+  @Column(length = 255)
+  private String fingerprint;
+
+  /** The client's vendor class (DHCP option 60), e.g. "android-dhcp-14". */
+  @Column(name = "vendor_class", length = 255)
+  private String vendorClass;
+
   @Column(name = "first_seen", nullable = false)
   private LocalDateTime firstSeen;
 

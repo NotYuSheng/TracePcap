@@ -37,4 +37,28 @@ class DhcpLeaseResolverServiceTest {
         .extracting(DhcpLeaseResolverService.Lease::hostname)
         .containsExactlyInAnyOrder("LAPTOP-ALICE", "iPhone-Bob");
   }
+
+  @Test
+  void keepsTheDhcpFingerprint_withEveryOccurrenceOn() {
+    Map<String, DhcpLeaseResolverService.Lease> leases = new LinkedHashMap<>();
+    // occurrence=a: single-valued fields still come once; option 55 comes as a list.
+    DhcpLeaseResolverService.parseRow(
+        "1730000000.0|3|0.0.0.0|0.0.0.0|10.0.0.61|3a:1f:9c:52:0e:11|Bobs-iPhone|1;121;3;6;15;108;114;119;252|".split("\\|", -1),
+        leases);
+    var l = leases.values().iterator().next();
+    assertThat(l.fingerprint()).isEqualTo("1,121,3,6,15,108,114,119,252");
+    assertThat(l.vendorClass()).isNull();
+    assertThat(l.hostname()).isEqualTo("Bobs-iPhone");
+  }
+
+  /** The real tshark pass reads option 55 from the private-MAC fixture. */
+  @Test
+  void readsTheFingerprintFromACapture() throws Exception {
+    assumeTrue(new ProcessBuilder("tshark", "-v").start().waitFor() == 0, "tshark not installed");
+    var found = new DhcpLeaseResolverService().resolve(new File("src/test/resources/fixtures/private_mac_week1.pcap"));
+    assertThat(found)
+        .filteredOn(l -> "Bobs-iPhone".equals(l.hostname()))
+        .extracting(DhcpLeaseResolverService.Lease::fingerprint)
+        .containsExactly("1,121,3,6,15,108,114,119,252");
+  }
 }

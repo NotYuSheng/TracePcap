@@ -1,12 +1,21 @@
 package com.tracepcap.monitor.controller;
 
 import com.tracepcap.common.dto.PagedResponse;
+import com.tracepcap.monitor.dto.DeviceLinkRequest;
+import com.tracepcap.monitor.dto.DeviceLinkSuggestionDto;
 import com.tracepcap.monitor.dto.NetworkDeviceCountsDto;
 import com.tracepcap.monitor.dto.NetworkDeviceDto;
 import com.tracepcap.monitor.service.NetworkDeviceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,5 +53,32 @@ public class NetworkDeviceController {
   @Operation(summary = "How many devices a network has: all, irregular, and with a private MAC")
   public NetworkDeviceCountsDto counts(@PathVariable UUID networkId) {
     return service.counts(networkId);
+  }
+
+  @GetMapping("/{networkId}/device-link-suggestions")
+  @Operation(
+      summary = "Private MACs that look like one device",
+      description =
+          "Pairs of private (device-chosen) MACs where one stopped before the other began and they"
+              + " share a DHCP fingerprint, hostname, TLS fingerprints or signed-in user, with"
+              + " nothing against it. Suggestions only; undecided pairs, strongest first.")
+  public List<DeviceLinkSuggestionDto> suggestions(@PathVariable UUID networkId) {
+    return service.suggestions(networkId);
+  }
+
+  @PostMapping("/{networkId}/device-links")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(
+      summary = "Record that two MACs are one device, or not",
+      description = "Needs the HOST_OCCUPANCY permission. Audited. Linked MACs show as one device.")
+  public NetworkDeviceDto.Link decide(@PathVariable UUID networkId, @Valid @RequestBody DeviceLinkRequest request) {
+    return service.decide(networkId, request);
+  }
+
+  @DeleteMapping("/{networkId}/device-links/{linkId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Undo a same / not-the-same decision", description = "Needs the HOST_OCCUPANCY permission. Audited.")
+  public void undo(@PathVariable UUID networkId, @PathVariable Long linkId) {
+    service.undo(networkId, linkId);
   }
 }

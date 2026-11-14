@@ -29,6 +29,12 @@ Included Files
        own node, classified from its own traffic (see
        :doc:`features/address-reuse`). Regenerate with
        ``python3 sample-files/gen_dhcp_reuse.py``.
+   * - ``private_mac_week1.pcap``, ``private_mac_week2.pcap``
+     - Two weekly snapshots: Bob's iPhone changes its private MAC between
+       them, keeping its DHCP fingerprint and hostname; Carol's Pixel keeps
+       its own. Add both to one network to see the suggestion (see
+       :doc:`features/network-devices`). Regenerate with
+       ``python3 sample-files/gen_private_mac_rotation.py``.
    * - ``monitor_large/week1_baseline.pcap`` … ``week8_near_baseline.pcap``
      - Eight weekly captures from the **Office Audit demo scenario**. Used to
        demonstrate the Network Monitor, subnet detection, node role annotation,

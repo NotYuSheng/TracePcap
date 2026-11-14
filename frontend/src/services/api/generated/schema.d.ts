@@ -1037,7 +1037,7 @@ export interface paths {
          * Split the address at a time, or merge away an automatic boundary
          * @description Needs the HOST_OCCUPANCY permission. Audited. Returns the updated occupancies.
          */
-        post: operations["decide"];
+        post: operations["decide_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1058,7 +1058,7 @@ export interface paths {
          * Undo a split or merge
          * @description Needs the HOST_OCCUPANCY permission. Audited.
          */
-        delete: operations["undo"];
+        delete: operations["undo_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1635,6 +1635,66 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-link-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Private MACs that look like one device
+         * @description Pairs of private (device-chosen) MACs where one stopped before the other began and they share a DHCP fingerprint, hostname, TLS fingerprints or signed-in user, with nothing against it. Suggestions only; undecided pairs, strongest first.
+         */
+        get: operations["suggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that two MACs are one device, or not
+         * @description Needs the HOST_OCCUPANCY permission. Audited. Linked MACs show as one device.
+         */
+        post: operations["decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/monitor/networks/{networkId}/device-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo a same / not-the-same decision
+         * @description Needs the HOST_OCCUPANCY permission. Audited.
+         */
+        delete: operations["undo"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2974,6 +3034,27 @@ export interface components {
             payloadRegex?: components["schemas"]["RegexPattern"][];
             severity: string;
         };
+        DeviceLinkRequest: {
+            decision: string;
+            macA: string;
+            macB: string;
+            reason: string;
+        };
+        DeviceLinkSuggestionDto: {
+            evidence?: components["schemas"]["Evidence"][];
+            /** Format: int32 */
+            firstSnapshotA?: number;
+            /** Format: int32 */
+            firstSnapshotB?: number;
+            /** Format: int32 */
+            lastSnapshotA?: number;
+            /** Format: int32 */
+            lastSnapshotB?: number;
+            macA?: string;
+            macB?: string;
+            nameA?: string;
+            nameB?: string;
+        };
         DnsQueryEntryDto: {
             /** Format: int64 */
             frame?: number;
@@ -3037,6 +3118,11 @@ export interface components {
             topPeers?: components["schemas"]["TopPeer"][];
             /** Format: int64 */
             totalBytes?: number;
+        };
+        Evidence: {
+            detail?: string;
+            strength?: string;
+            what?: string;
         };
         EvidenceDto: {
             actor?: string;
@@ -3409,6 +3495,17 @@ export interface components {
             overridesDefault?: boolean;
             scope?: string;
         };
+        Link: {
+            actor?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            decision?: string;
+            /** Format: int64 */
+            id?: number;
+            macA?: string;
+            macB?: string;
+            reason?: string;
+        };
         Match: {
             app?: string;
             cidr?: string;
@@ -3481,8 +3578,10 @@ export interface components {
             /** Format: uuid */
             lastFileId?: string;
             lastKey?: string;
+            links?: components["schemas"]["Link"][];
             mac?: string;
             macKind?: string;
+            macs?: string[];
             name?: string;
             seenInFileIds?: string[];
             vendor?: string;
@@ -5980,7 +6079,7 @@ export interface operations {
             };
         };
     };
-    decide: {
+    decide_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6007,7 +6106,7 @@ export interface operations {
             };
         };
     };
-    undo: {
+    undo_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6979,6 +7078,75 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["NetworkDeviceCountsDto"];
                 };
+            };
+        };
+    };
+    suggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DeviceLinkSuggestionDto"][];
+                };
+            };
+        };
+    };
+    decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Link"];
+                };
+            };
+        };
+    };
+    undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                networkId: string;
+                linkId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

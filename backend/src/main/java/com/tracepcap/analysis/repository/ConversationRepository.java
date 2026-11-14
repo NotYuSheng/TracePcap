@@ -40,6 +40,16 @@ public interface ConversationRepository
           + " AND (c.srcIp = :ip OR c.dstIp = :ip) ORDER BY c.startTime")
   List<Object[]> findTimesByFileIdAndIp(@Param("fileId") UUID fileId, @Param("ip") String ip);
 
+  /**
+   * TLS client fingerprints (JA3) of the connections this IP opened, with when (#918 slice 4b).
+   * Rows: start time, JA3. An unknown initiator counts when the IP is the lower-port side.
+   */
+  @Query(
+      "SELECT c.startTime, c.ja3Client FROM ConversationEntity c WHERE c.file.id = :fileId"
+          + " AND c.ja3Client IS NOT NULL AND (c.initiatorIp = :ip"
+          + " OR (c.initiatorIp IS NULL AND c.srcIp = :ip))")
+  List<Object[]> findClientJa3ByFileIdAndIp(@Param("fileId") UUID fileId, @Param("ip") String ip);
+
   /** Returns the distinct detected file types present in packets for the given file. */
   @Query(
       "SELECT DISTINCT p.detectedFileType FROM PacketEntity p"

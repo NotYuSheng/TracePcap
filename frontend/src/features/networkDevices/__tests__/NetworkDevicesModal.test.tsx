@@ -10,12 +10,12 @@ import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types'
 const snapshots = [1, 2, 3].map(n => ({ id: `s${n}`, fileId: `f${n}`, fileName: `week${n}.pcap`, snapshotOrder: n })) as unknown as NetworkSnapshot[]
 
 const laptop = {
-  mac: 'f8:bc:12:00:00:01', name: 'LAPTOP-ALICE', deviceType: 'LAPTOP_DESKTOP', vendor: 'Dell Inc.', macKind: 'HARDWARE',
+  mac: 'f8:bc:12:00:00:01', macs: ['f8:bc:12:00:00:01'], links: [], name: 'LAPTOP-ALICE', deviceType: 'LAPTOP_DESKTOP', vendor: 'Dell Inc.', macKind: 'HARDWARE',
   label: "Alice's laptop", addresses: [{ ip: '10.0.0.50', firstSnapshot: 1, lastSnapshot: 2 }, { ip: '10.0.0.73', firstSnapshot: 3, lastSnapshot: 3 }],
   seenInFileIds: ['f1', 'f2', 'f3'], lastFileId: 'f3', lastKey: '10.0.0.73', flags: [],
 }
 const clone = {
-  mac: '00:50:56:a1:3c:09', name: 'web-vm-a', deviceType: 'SERVER', vendor: 'VMware', macKind: 'VIRTUAL_MACHINE',
+  mac: '00:50:56:a1:3c:09', macs: ['00:50:56:a1:3c:09'], links: [], name: 'web-vm-a', deviceType: 'SERVER', vendor: 'VMware', macKind: 'VIRTUAL_MACHINE',
   addresses: [{ ip: '10.0.0.70', firstSnapshot: 1, lastSnapshot: 3 }], seenInFileIds: ['f1', 'f3'], lastFileId: 'f3', lastKey: '10.0.0.70',
   flags: [
     { kind: 'duplicate-mac', severity: 'high', text: 'Duplicate MAC? Possibly more than one machine' },
@@ -40,6 +40,7 @@ describe('NetworkDevicesModal (#918 slice 4)', () => {
     server.use(
       http.get('*/monitor/networks/n1/devices', () => HttpResponse.json(page([laptop, clone]))),
       http.get('*/monitor/networks/n1/device-counts', () => HttpResponse.json({ all: 2, irregular: 1, privateMac: 0 })),
+      http.get('*/monitor/networks/n1/device-link-suggestions', () => HttpResponse.json([])),
     )
     renderModal()
     const rows = await screen.findAllByTestId('device-row')
@@ -62,6 +63,7 @@ describe('NetworkDevicesModal (#918 slice 4)', () => {
         return HttpResponse.json(page(u.searchParams.get('show') === 'irregular' ? [clone] : [laptop, clone]))
       }),
       http.get('*/monitor/networks/n1/device-counts', () => HttpResponse.json({ all: 2, irregular: 1, privateMac: 0 })),
+      http.get('*/monitor/networks/n1/device-link-suggestions', () => HttpResponse.json([])),
     )
     const user = userEvent.setup()
     renderModal()
@@ -76,6 +78,7 @@ describe('NetworkDevicesModal (#918 slice 4)', () => {
     server.use(
       http.get('*/monitor/networks/n1/devices', () => HttpResponse.json(page([laptop]))),
       http.get('*/monitor/networks/n1/device-counts', () => HttpResponse.json({ all: 1, irregular: 0, privateMac: 0 })),
+      http.get('*/monitor/networks/n1/device-link-suggestions', () => HttpResponse.json([])),
     )
     const user = userEvent.setup()
     renderModal()
@@ -85,5 +88,44 @@ describe('NetworkDevicesModal (#918 slice 4)', () => {
     expect(within(detail).getByRole('link', { name: 'Open the latest snapshot it was seen in' })).toHaveAttribute('href', '/analysis/f3')
     await user.click(screen.getByRole('button', { name: 'Devices' }))
     expect(await screen.findAllByTestId('device-row')).toHaveLength(1)
+  })
+
+  it('suggests two private MACs as one phone, and links them with a reason (#918 slice 4b)', async () => {
+    const bobA = { ...laptop, mac: '3a:1f:9c:52:0e:11', macs: ['3a:1f:9c:52:0e:11'], name: 'Bobs-iPhone', macKind: 'PRIVATE', label: null, addresses: [{ ip: '10.0.0.61', firstSnapshot: 1, lastSnapshot: 1 }], seenInFileIds: ['f1'] }
+    const bobB = { ...bobA, mac: '7e:02:41:9a:c3:07', macs: ['7e:02:41:9a:c3:07'], addresses: [{ ip: '10.0.0.88', firstSnapshot: 2, lastSnapshot: 3 }], seenInFileIds: ['f2', 'f3'] }
+    const linked = { ...bobB, macs: [bobA.mac, bobB.mac], links: [{ id: 9, macA: bobA.mac, macB: bobB.mac, decision: 'same', reason: 'rotated', actor: 'ana' }] }
+    let isLinked = false
+    let body: Record<string, unknown> | null = null
+    server.use(
+      http.get('*/monitor/networks/n1/devices', () => HttpResponse.json(page(isLinked ? [linked] : [bobB, bobA]))),
+      http.get('*/monitor/networks/n1/device-counts', () => HttpResponse.json({ all: isLinked ? 1 : 2, irregular: 0, privateMac: isLinked ? 1 : 2 })),
+      http.get('*/monitor/networks/n1/device-link-suggestions', () => HttpResponse.json(isLinked ? [] : [{
+        macA: bobA.mac, nameA: 'Bobs-iPhone', firstSnapshotA: 1, lastSnapshotA: 1,
+        macB: bobB.mac, nameB: 'Bobs-iPhone', firstSnapshotB: 2, lastSnapshotB: 3,
+        evidence: [
+          { strength: 'strong', what: 'Same DHCP fingerprint', detail: 'Same options in the same order.' },
+          { strength: 'medium', what: 'Same hostname', detail: 'Both called themselves "Bobs-iPhone".' },
+        ],
+      }])),
+      http.post('*/monitor/networks/n1/device-links', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>
+        isLinked = true
+        return HttpResponse.json(linked.links[0], { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderModal()
+    const suggestion = await screen.findByTestId('device-suggestion')
+    expect(suggestion).toHaveTextContent('2 private MACs look like one device: Bobs-iPhone')
+    expect(suggestion).toHaveTextContent('Same DHCP fingerprint')
+    await user.click(within(suggestion).getByRole('button', { name: 'Same device' }))
+    const link = await screen.findByRole('button', { name: 'Link as one device' })
+    expect(link).toBeDisabled() // a reason is required
+    await user.type(screen.getByLabelText('Reason'), 'rotated its private address')
+    await user.click(link)
+    expect(body).toEqual({ macA: bobA.mac, macB: bobB.mac, decision: 'same', reason: 'rotated its private address' })
+    await waitFor(() => expect(screen.getAllByTestId('device-row')).toHaveLength(1))
+    expect(screen.getByTestId('device-row')).toHaveTextContent(bobA.mac)
+    expect(screen.queryByTestId('device-suggestion')).not.toBeInTheDocument()
   })
 })
