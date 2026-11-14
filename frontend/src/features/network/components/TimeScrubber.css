@@ -1,0 +1,251 @@
+/* The time axis, as a bar along the bottom of the network graph (design A). Colours follow the
+   graph's own theme (data-graph-theme on .network-graph-wrapper), not the page's. */
+.time-scrubber {
+  --ts-bg: rgba(255, 255, 255, 0.94);
+  --ts-border: #d8dce5;
+  --ts-text: #1f2937;
+  --ts-muted: #4b5563;
+  --ts-accent: #5925dc;
+  --ts-accent-tint: rgba(89, 37, 220, 0.12);
+  --ts-bar: #a3aab8;
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 11;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 8px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ts-bg);
+  color: var(--ts-text);
+  border: 1px solid var(--ts-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+}
+
+[data-graph-theme='dark'] .time-scrubber {
+  --ts-bg: rgba(22, 25, 36, 0.92);
+  --ts-border: #2e3349;
+  --ts-text: #e2e8f0;
+  --ts-muted: #a3adbf;
+  --ts-accent: #9b7dff;
+  --ts-accent-tint: rgba(155, 125, 255, 0.16);
+  --ts-bar: #4b5366;
+}
+
+.ts-play {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ts-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.ts-edge-time {
+  flex: none;
+  font-family: ui-monospace, 'JetBrains Mono', monospace;
+  color: var(--ts-muted);
+}
+
+.ts-chart {
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  height: 32px;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 4px;
+}
+
+.ts-chart:focus-visible {
+  outline: 2px solid var(--ts-accent);
+  outline-offset: 3px;
+}
+
+.ts-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.ts-bar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 1px;
+  background: var(--ts-bar);
+}
+
+.ts-bar-in {
+  background: var(--ts-accent);
+}
+
+.ts-window {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  box-sizing: border-box;
+  background: var(--ts-accent-tint);
+  border: 1.5px solid var(--ts-accent);
+  border-radius: 5px;
+  cursor: grab;
+}
+
+.ts-handle {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 3px;
+  background: var(--ts-accent);
+  cursor: ew-resize;
+}
+
+.ts-handle-from {
+  left: -5px;
+}
+
+.ts-handle-to {
+  right: -5px;
+}
+
+.ts-divider {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--ts-border);
+}
+
+.ts-readout {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 150px;
+}
+
+.ts-readout-time {
+  font-family: ui-monospace, 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+.ts-readout-count {
+  font-size: 11px;
+  color: var(--ts-muted);
+}
+
+.ts-icon-btn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ts-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ts-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ts-icon-btn:hover,
+.ts-icon-btn[aria-describedby] {
+  border-color: var(--ts-accent);
+  color: var(--ts-accent);
+}
+
+/* Settings popover */
+.ts-popover {
+  min-width: 260px;
+}
+
+.ts-popover .popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.ts-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ts-setting-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tp-text-muted, #4b5563);
+}
+
+.ts-segmented {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.ts-segmented button {
+  height: 28px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+.ts-segmented button[aria-pressed='true'] {
+  border-color: #5925dc;
+  background: #5925dc;
+  color: #fff;
+}
+
+.ts-hint {
+  font-size: 11px;
+  color: var(--tp-text-muted, #6b7280);
+}
+
+.ts-setting-row {
+  margin: 0;
+}
+
+.ts-wide-btn {
+  height: 32px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+
+.ts-wide-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Narrow graphs: drop the edge times, keep the chart usable. */
+@container (max-width: 640px) {
+  .ts-edge-time {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .ts-edge-time,
+  .ts-divider {
+    display: none;
+  }
+  .ts-readout {
+    min-width: 0;
+  }
+}

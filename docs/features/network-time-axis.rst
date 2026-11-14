@@ -10,25 +10,37 @@ capture.
 The Time Axis
 -------------
 
-Above the graph on **Network Visualization**:
+A bar along the bottom of the graph, inside it, so it stays there in fullscreen:
+
+.. figure:: images/time-axis-settings.png
+   :alt: The network graph with the time-axis bar along its bottom: play, a traffic chart with a
+         window over the first quarter, the window's times and conversation count, a reset button
+         and the settings button, whose popover shows window width, speed, Animate traffic, Nodes
+         appear when first seen, and Show the whole capture.
+
+   The bar, with its settings open.
 
 - **The chart** is the capture's traffic: bytes per interval from its first to
-  its last conversation. A conversation's bytes are spread over its duration, so
-  a long download fills every interval it spans rather than one spike where it
-  started.
-- **The window** is the shaded part of the chart. Set it by:
+  its last conversation, each conversation's bytes spread over its duration. The
+  shaded box on it is the **window**:
 
-  - clicking the chart, which centres the window there;
-  - dragging **From** and **To** (they also work from the keyboard);
-  - choosing a **Window** width (5% to 50% of the capture, with its length).
+  - drag the box to move it, or drag its edges to resize it;
+  - click anywhere else on the chart to centre the window there;
+  - from the keyboard (it's a slider): ← and → move the window, Shift moves it
+    further, Home and End jump to the ends, Escape shows the whole capture.
 
-- **Play** slides the window from the start of the capture to the end, at the
-  chosen **Speed** (1× crosses the whole capture in about 30 seconds). **Pause**
-  stops it where it is.
-- **Show all** goes back to the whole capture.
+- **Play** slides the window from where it is to the end of the capture.
+  **Pause** stops it.
+- The **readout** gives the window's times and how many conversations were
+  active in it. **×** next to it shows the whole capture again.
+- **Settings** (the sliders button):
 
-The readout gives the window's times and how many of the conversations were
-active in it.
+  - **Window** width: 5% to 50% of the capture, with how long that is;
+  - **Speed**: 1× crosses the whole capture in about 30 seconds, up to 8×;
+  - **Animate traffic** (below);
+  - **Nodes appear when first seen** (below);
+  - **Show the whole capture**: no window at all, so every node and
+    conversation is shown, as without the time axis.
 
 Traffic Dots
 ------------
@@ -45,6 +57,21 @@ motion), dots move along every edge shown, in the edge's colour:
 Played together, the window and the dots show traffic starting, moving and
 stopping over the capture. On a very large graph only the 400 busiest edges
 animate, so it stays smooth. Animation stops while the browser tab is hidden.
+
+Nodes Appearing When First Seen
+-------------------------------
+
+Off by default. On, a node is hidden until its first conversation has started:
+with the window early in the capture, devices that only turn up later aren't on
+the graph yet, and playing it shows the network growing. Once a node has
+appeared, it stays, greyed out while it's quiet. A same-device link (see
+:doc:`device-moves`) shows once both its nodes have appeared.
+
+.. figure:: images/time-axis-first-seen.png
+   :alt: The graph early in the capture with Nodes appear when first seen on: only the laptop on
+         10.0.0.50 and its peers are drawn; the phone and the laptop's later address aren't there yet.
+
+   Early in ``dhcp_address_reuse.pcap``: the phone and ``10.0.0.73`` haven't appeared yet.
 
 What the Window Does
 --------------------

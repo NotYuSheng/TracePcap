@@ -330,3 +330,12 @@
   flex: 1;
   min-height: 0;
 }
+
+/* With the time axis along the bottom, the corner controls, legend and layout note sit above it. */
+.network-graph-wrapper[data-has-bottom-bar='true'] .ng-overlay-controls,
+.network-graph-wrapper[data-has-bottom-bar='true'] .ng-legend {
+  bottom: 72px;
+}
+.network-graph-wrapper[data-has-bottom-bar='true'] .ng-layouting {
+  bottom: 112px;
+}

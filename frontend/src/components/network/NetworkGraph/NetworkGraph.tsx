@@ -52,7 +52,9 @@ interface NetworkGraphProps {
    * The time axis's window: what was active in it. Nodes outside it are dimmed and edges outside it
    * hidden, by redrawing only, so the layout never moves while the window plays. Null shows all.
    */
-  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string> } | null;
+  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string>; hiddenNodeIds?: Set<string> } | null;
+  /** A bar along the bottom of the graph (the time axis); the legend and controls move up for it. */
+  bottomBar?: import('react').ReactNode;
   /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
   animateTraffic?: boolean;
   /** One device on two nodes (it moved to another address): drawn as dashed links. */
@@ -512,6 +514,7 @@ export const NetworkGraph = memo(function NetworkGraph({
   highlightedNodes,
   activeInWindow = null,
   animateTraffic = false,
+  bottomBar,
   deviceLinks = EMPTY_LINKS,
   edgeColorMode = 'transport',
   forceLight = false,
@@ -741,7 +744,10 @@ export const NetworkGraph = memo(function NetworkGraph({
 
         // Time axis: quiet in the window → dimmed, label kept so the node is still findable.
         const win = activeInWindowRef.current;
-        if (win && !win.nodeIds.has(node)) {
+        if (win?.hiddenNodeIds?.has(node)) {
+          // Not seen yet (the "appear when first seen" option): not drawn at all.
+          res['hidden'] = true;
+        } else if (win && !win.nodeIds.has(node)) {
           res['color'] = dimColor;
           res['zIndex'] = 0;
         }
@@ -1080,6 +1086,7 @@ export const NetworkGraph = memo(function NetworkGraph({
        * The canvas is the thing they sit on, so the canvas is what they follow.
        */
       data-graph-theme={darkMode ? 'dark' : 'light'}
+      data-has-bottom-bar={bottomBar ? 'true' : undefined}
       style={{ background: darkMode ? DARK_BG : LIGHT_BG }}
     >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
@@ -1104,6 +1111,8 @@ export const NetworkGraph = memo(function NetworkGraph({
           </p>
         </div>
       )}
+
+      {bottomBar}
 
       {/* ── Bottom-right controls ────────────────────────────────────────── */}
       <div className="ng-overlay-controls">

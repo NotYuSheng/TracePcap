@@ -14,8 +14,8 @@ import { edgeMatchesLegendKey } from '@/features/network/services/networkService
 import { nodeIdentityKey } from '@/utils/deviceType';
 import { formatBytes } from '@/utils/formatters';
 import { NetworkGraph } from '@components/network/NetworkGraph';
-import { TrafficTimeline } from '@/features/network/components/TrafficTimeline';
-import { activeInWindow, timeBounds, type TimeWindow } from '@/features/network/services/timeWindow';
+import { TimeScrubber } from '@/features/network/components/TimeScrubber';
+import { activeInWindow, timeBounds, unseenByWindowEnd, type TimeWindow } from '@/features/network/services/timeWindow';
 import type { EdgeColorMode, NodeHighlight } from '@components/network/NetworkGraph/NetworkGraph';
 import { edgeBytesRange } from '@components/network/NetworkGraph/NetworkGraph';
 import { VolumeHeatmap } from '@components/network/VolumeHeatmap';
@@ -368,10 +368,13 @@ export const NetworkDiagramPage = () => {
   );
   const bounds = useMemo(() => timeBounds(edges), [edges]);
   useEffect(() => setTimeWindow(null), [fileId]);
-  const windowActive = useMemo(
-    () => (timeWindow ? activeInWindow(filteredEdges, timeWindow) : null),
-    [filteredEdges, timeWindow],
-  );
+  // Nodes not seen yet by the window's end are hidden when that option is on.
+  const [appearWhenSeen, setAppearWhenSeen] = useState(false);
+  const windowActive = useMemo(() => {
+    if (!timeWindow) return null;
+    const active = activeInWindow(filteredEdges, timeWindow);
+    return appearWhenSeen ? { ...active, hiddenNodeIds: unseenByWindowEnd(filteredEdges, timeWindow) } : active;
+  }, [filteredEdges, timeWindow, appearWhenSeen]);
   // Same-device links between nodes both still shown after the filters.
   const shownDeviceLinks = useMemo(() => {
     const ids = new Set(filteredNodes.map(n => n.id));
@@ -615,19 +618,6 @@ export const NetworkDiagramPage = () => {
                 </Button>
               </div>
             </Card.Header>
-            {bounds && bounds.to > bounds.from && (
-              <div className="px-2 pt-2">
-                <TrafficTimeline
-                  edges={filteredEdges}
-                  bounds={bounds}
-                  window={timeWindow}
-                  onWindowChange={setTimeWindow}
-                  activeCount={windowActive ? windowActive.edgeIds.size : filteredEdges.length}
-                  animate={animateTraffic}
-                  onAnimateChange={setAnimateTraffic}
-                />
-              </div>
-            )}
             <Card.Body className="p-0 network-diagram-graph-body">
               <NetworkGraph
                 key={layoutType}
@@ -644,6 +634,21 @@ export const NetworkDiagramPage = () => {
                 highlightedNodes={highlightedNodes}
                 activeInWindow={windowActive}
                 animateTraffic={animateTraffic}
+                bottomBar={
+                  bounds && bounds.to > bounds.from ? (
+                    <TimeScrubber
+                      edges={filteredEdges}
+                      bounds={bounds}
+                      window={timeWindow}
+                      onWindowChange={setTimeWindow}
+                      activeCount={windowActive ? windowActive.edgeIds.size : filteredEdges.length}
+                      animate={animateTraffic}
+                      onAnimateChange={setAnimateTraffic}
+                      appearWhenSeen={appearWhenSeen}
+                      onAppearWhenSeenChange={setAppearWhenSeen}
+                    />
+                  ) : undefined
+                }
                 deviceLinks={shownDeviceLinks}
               />
             </Card.Body>
