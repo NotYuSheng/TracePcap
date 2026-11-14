@@ -94,6 +94,12 @@ As the window moves forward over a change, the graph marks it:
   *moved → 10.0.0.73* (with the rename, when its hostname changed) shows above it
   for a moment.
 
+.. figure:: images/time-axis-device-move.png
+   :alt: The laptop's new node 10.0.0.73 with a "moved → 10.0.0.73" note above it, at the end of
+         the dashed same-device link from 10.0.0.50.
+
+   The window crossing 11:05 in ``dhcp_address_reuse.pcap``: the laptop lands on ``10.0.0.73``.
+
 They mark changes the window passes going forward, by playing or dragging. Moving
 the window back, setting it or showing the whole capture doesn't replay them, and a
 jump that reveals more than 30 nodes at once skips the appear rings. They're off
