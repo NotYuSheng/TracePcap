@@ -509,11 +509,7 @@ export const AnalysisPage = () => {
       )}
 
       {/* Tab Content */}
-      <Card>
-        <Card.Body>
           <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState, refreshSummary: () => void refetch({ silent: true }) } satisfies AnalysisOutletContext} />
-        </Card.Body>
-      </Card>
       </div>
         </div>
       </div>

@@ -133,16 +133,11 @@ export const MainLayout = () => {
   return (
     <div className="main-layout">
       <header className="main-header" ref={headerRef}>
-        <Navbar expand="lg" hasBorderBottom style={{ paddingTop: '1rem', paddingBottom: '1rem' }}>
-          <Container>
-            <Navbar.Brand as={Link} to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div className="d-flex align-items-center gap-3">
-                <Activity size={28} className="text-primary" />
-                <div>
-                  <h4 className="mb-0">TracePcap</h4>
-                  <small className="text-muted">Network Analysis</small>
-                </div>
-              </div>
+        <Navbar expand="lg" hasBorderBottom className="main-navbar">
+          <Container fluid className="main-navbar-inner">
+            <Navbar.Brand as={Link} to="/" className="main-brand">
+              <Activity size={22} className="text-primary" aria-hidden="true" />
+              <span>TracePcap</span>
             </Navbar.Brand>
 
             <Navbar.Toggle />
