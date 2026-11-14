@@ -66,7 +66,7 @@ nDPI data surfaces across multiple views:
   and risk alerts.
 - **Conversations tab** — per-row columns for Application, Category, Risk,
   JA3C, JA3S, and SNI; filterable by any of these fields.
-- **Node Detail Panel** — risk badges on individual host nodes in the network
+- **Node details dialog** — risk badges on individual host nodes in the network
   graph.
 
 Risk Flags
