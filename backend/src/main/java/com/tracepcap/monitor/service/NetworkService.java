@@ -6,6 +6,9 @@ import com.tracepcap.governance.PermissionService;
 import com.tracepcap.monitor.dto.NetworkSettingsDto;
 import java.util.Set;
 import java.util.Map;
+import com.tracepcap.monitor.entity.NetworkChangeEventEntity;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import com.tracepcap.common.exception.ResourceNotFoundException;
 import com.tracepcap.monitor.dto.NetworkDto;
@@ -142,6 +145,24 @@ public class NetworkService {
     }
     Set<UUID> withInsights = insightPresence.networksWithInsights(ids);
 
+    // The capture track: each capture's most severe change, two queries for the whole list.
+    Map<UUID, NetworkChangeEventEntity.Severity> worst = new HashMap<>();
+    for (Object[] row : changeEventRepository.severitiesBySnapshotRaw(ids)) {
+      NetworkChangeEventEntity.Severity s = (NetworkChangeEventEntity.Severity) row[1];
+      worst.merge((UUID) row[0], s, (a, b) -> a.ordinal() >= b.ordinal() ? a : b);
+    }
+    Map<UUID, List<NetworkDto.CaptureMark>> captures = new HashMap<>();
+    for (Object[] row : snapshotRepository.findCaptureMarksRaw(ids)) {
+      UUID networkId = (UUID) row[0];
+      UUID snapshotId = (UUID) row[1];
+      List<NetworkDto.CaptureMark> list = captures.computeIfAbsent(networkId, k -> new ArrayList<>());
+      LocalDateTime at = row[3] != null ? (LocalDateTime) row[3] : (LocalDateTime) row[4];
+      NetworkChangeEventEntity.Severity s = worst.get(snapshotId);
+      list.add(
+          new NetworkDto.CaptureMark(
+              snapshotId, (String) row[2], at, list.isEmpty(), s == null ? "NONE" : s.name()));
+    }
+
     return networks.stream()
         .map(
             e ->
@@ -153,6 +174,7 @@ public class NetworkService {
                     .criticalChanges(critical.getOrDefault(e.getId(), 0L))
                     .warningChanges(warning.getOrDefault(e.getId(), 0L))
                     .hasInsights(withInsights.contains(e.getId()))
+                    .captures(captures.getOrDefault(e.getId(), List.of()))
                     .settings(settingsOf(e))
                     .createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt())

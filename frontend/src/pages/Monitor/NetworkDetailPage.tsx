@@ -36,7 +36,10 @@ export const NetworkDetailPage = () => {
     insight, subnets, loading, error, lastUpdated, pollInterval, setPollInterval, reload,
   } = data;
 
-  const [showAddSnapshot, setShowAddSnapshot] = useState(false);
+  // `?add=1` (from the networks table's "Add a capture") opens the add dialog straight away.
+  const [showAddSnapshot, setShowAddSnapshot] = useState(
+    () => new URLSearchParams(window.location.search).get('add') === '1',
+  );
   const [showManage, setShowManage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAddresses, setShowAddresses] = useState(false);

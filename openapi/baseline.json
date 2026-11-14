@@ -345,6 +345,28 @@
         },
         "type": "object"
       },
+      "CaptureMark": {
+        "properties": {
+          "baseline": {
+            "type": "boolean"
+          },
+          "capturedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "changes": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CaseKnowledgeResponse": {
         "properties": {
           "entities": {
@@ -2998,6 +3020,12 @@
       },
       "NetworkDto": {
         "properties": {
+          "captures": {
+            "items": {
+              "$ref": "#/components/schemas/CaptureMark"
+            },
+            "type": "array"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"

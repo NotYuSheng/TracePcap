@@ -90,6 +90,12 @@ public interface NetworkChangeEventRepository
           + " GROUP BY e.network.id, e.severity")
   List<Object[]> countUnreviewedBySeverityRaw(@Param("ids") java.util.Collection<UUID> ids);
 
+  /** Which severities each capture's changes reached, for the networks table's track. */
+  @Query(
+      "SELECT e.toSnapshot.id, e.severity FROM NetworkChangeEventEntity e"
+          + " WHERE e.network.id IN :ids GROUP BY e.toSnapshot.id, e.severity")
+  List<Object[]> severitiesBySnapshotRaw(@Param("ids") java.util.Collection<UUID> ids);
+
   default Map<UUID, Long> countByToSnapshotIds(List<UUID> ids) {
     Map<UUID, Long> result = new HashMap<>();
     for (Object[] row : countRawByToSnapshotIds(ids)) result.put((UUID) row[0], (Long) row[1]);

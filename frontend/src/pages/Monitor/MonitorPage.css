@@ -1,0 +1,126 @@
+/* Monitor B: one table of networks. */
+.monitor-title {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.monitor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.monitor-toolbar .monitor-search {
+  width: 260px;
+  flex: none;
+  margin-left: auto;
+}
+.monitor-chip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--tp-border, #d8dce5);
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #374151);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.monitor-chip.active {
+  border-color: #c4b5fd;
+  background: #ede9fe;
+  color: #3b1891;
+}
+[data-theme='dark'] .monitor-chip.active {
+  border-color: rgba(155, 125, 255, 0.5);
+  background: rgba(155, 125, 255, 0.18);
+  color: #c9b8ff;
+}
+.monitor-table-card {
+  background: var(--tp-surface, #fff);
+  border: 1px solid var(--tp-border, #d8dce5);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.monitor-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--tp-text-muted, #4b5563);
+  background: var(--tp-bg-subtle, #f7f8fb);
+  white-space: nowrap;
+}
+.monitor-table td,
+.monitor-table th {
+  padding: 14px 16px;
+}
+.monitor-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--tp-text, #1f2937);
+  text-decoration: none;
+}
+.monitor-name:hover {
+  text-decoration: underline;
+}
+.monitor-file {
+  max-width: 220px;
+}
+.monitor-num {
+  font-variant-numeric: tabular-nums;
+}
+.monitor-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.monitor-pill-review { background: #fef3c7; color: #92400e; }
+.monitor-pill-critical { background: #fee2e2; color: #991b1b; }
+.monitor-pill-baseline { background: #dbeafe; color: #1d4ed8; }
+.monitor-pill-clear { background: #dcfce7; color: #166534; }
+.monitor-pill-empty { background: #f1f2f4; color: #4b5563; }
+[data-theme='dark'] .monitor-pill-review { background: rgba(252, 211, 77, 0.16); color: #fcd34d; }
+[data-theme='dark'] .monitor-pill-critical { background: rgba(248, 113, 113, 0.16); color: #fca5a5; }
+[data-theme='dark'] .monitor-pill-baseline { background: rgba(96, 165, 250, 0.16); color: #93c5fd; }
+[data-theme='dark'] .monitor-pill-clear { background: rgba(34, 197, 94, 0.16); color: #86efac; }
+[data-theme='dark'] .monitor-pill-empty { background: rgba(255, 255, 255, 0.08); color: #cbd5e1; }
+.monitor-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.monitor-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.monitor-track .monitor-dot {
+  margin-right: 0;
+}
+.monitor-dot-baseline { background: #1d4ed8; }
+.monitor-dot-none { background: #16a34a; }
+.monitor-dot-warning { background: #d97706; }
+.monitor-dot-critical { background: #dc2626; }
+.monitor-more::after {
+  display: none;
+}
+.monitor-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: var(--tp-text-muted, #4b5563);
+}
+@media (max-width: 575.98px) {
+  .monitor-toolbar .monitor-search {
+    width: 100%;
+    margin-left: 0;
+  }
+}

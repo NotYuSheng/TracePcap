@@ -29,6 +29,12 @@ public interface NetworkSnapshotRepository extends JpaRepository<NetworkSnapshot
   @Query("SELECT s.file.id, s.network.id, s.network.name FROM NetworkSnapshotEntity s")
   List<Object[]> findAllMembershipsWithNames();
 
+  /** Each network's captures in order, with file name and time, for the networks table. */
+  @Query(
+      "SELECT s.network.id, s.id, f.fileName, f.startTime, f.uploadedAt FROM NetworkSnapshotEntity s"
+          + " JOIN s.file f WHERE s.network.id IN :ids ORDER BY s.network.id, s.snapshotOrder")
+  List<Object[]> findCaptureMarksRaw(@Param("ids") java.util.Collection<UUID> ids);
+
   long countByNetworkId(UUID networkId);
 
   /** Snapshot count per network, for the networks list in one query (#469). */

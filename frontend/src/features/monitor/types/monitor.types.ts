@@ -10,6 +10,16 @@ export interface Network {
   updatedAt: string;
   /** Per-network settings (#488). Absent on old responses: treat as DEFAULT_NETWORK_SETTINGS. */
   settings?: NetworkSettings;
+  /** Each capture in order, with the most severe change it brought (the first is the baseline). */
+  captures?: CaptureMark[];
+}
+
+export interface CaptureMark {
+  snapshotId: string;
+  fileName: string;
+  capturedAt: string | number[] | null;
+  baseline: boolean;
+  changes: 'NONE' | 'INFO' | 'WARNING' | 'CRITICAL';
 }
 
 /**

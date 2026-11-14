@@ -2793,6 +2793,15 @@ export interface components {
             protocol?: string;
             srcIp?: string;
         };
+        CaptureMark: {
+            baseline?: boolean;
+            /** Format: date-time */
+            capturedAt?: string;
+            changes?: string;
+            fileName?: string;
+            /** Format: uuid */
+            snapshotId?: string;
+        };
         CaseKnowledgeResponse: {
             entities?: components["schemas"]["EntityDto"][];
             findings?: components["schemas"]["FindingDto"][];
@@ -3734,6 +3743,7 @@ export interface components {
             vendor?: string;
         };
         NetworkDto: {
+            captures?: components["schemas"]["CaptureMark"][];
             /** Format: date-time */
             createdAt?: string;
             /** Format: int64 */
