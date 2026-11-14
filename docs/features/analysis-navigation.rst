@@ -1,8 +1,9 @@
 Getting Around a Capture
 ========================
 
-A capture's analysis has eight sections. They're on a **rail down the left** of
-the page, each an icon over a short name:
+A capture's analysis has eight sections. They're on a **rail down the left edge**
+of the window, each an icon over a short name. The rail stays in place under the
+header as you scroll:
 
 .. list-table::
    :header-rows: 1

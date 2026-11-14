@@ -1,5 +1,5 @@
 import { Spinner } from '@components/common/Spinner/Spinner';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
@@ -92,6 +92,21 @@ export const MainLayout = () => {
   const location = useLocation();
   const isMonitorActive = location.pathname.startsWith('/monitor');
   const isSystemActive = location.pathname.startsWith('/settings') || location.pathname.startsWith('/system');
+  // Pages with a section rail (a capture's analysis, a monitored network) run edge to edge: the
+  // rail sits flush against the window's left side, under the header.
+  const isFlush = /^\/(analysis|monitor)\/[^/]+/.test(location.pathname);
+
+  // The header's height, so a sticky rail can sit right under it whatever the header wraps to.
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const set = () => document.documentElement.style.setProperty('--tp-header-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Keeps the shared Escape coordinator alive for the whole session (#535).
   useEscapeLayerRoot();
@@ -117,7 +132,7 @@ export const MainLayout = () => {
 
   return (
     <div className="main-layout">
-      <header className="main-header">
+      <header className="main-header" ref={headerRef}>
         <Navbar expand="lg" hasBorderBottom style={{ paddingTop: '1rem', paddingBottom: '1rem' }}>
           <Container>
             <Navbar.Brand as={Link} to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -168,7 +183,7 @@ export const MainLayout = () => {
           </Container>
         </Navbar>
       </header>
-      <main className="main-content">{mainContent}</main>
+      <main className={`main-content${isFlush ? ' main-content-flush' : ''}`}>{mainContent}</main>
       <footer className="main-footer mt-auto py-4">
         <Container>
           <Row>

@@ -1,8 +1,6 @@
 /* Network B: the analysis page's rail and capture bar, for a monitored network. */
 .network-page {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px 12px;
+  width: 100%;
 }
 .network-review-pill {
   height: 28px;

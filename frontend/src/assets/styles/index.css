@@ -96,6 +96,11 @@ body {
   padding: 2rem;
 }
 
+/* A page with a section rail runs edge to edge: the rail is flush with the window's left side. */
+.main-content.main-content-flush {
+  padding: 0;
+}
+
 .main-footer {
   border-top: 1px solid var(--tp-border);
   background-color: var(--tp-footer-bg) !important;
@@ -267,9 +272,8 @@ body {
 }
 
 .analysis-page {
-  /* Wider than the other pages: the section rail sits beside the content. */
-  max-width: 1400px;
-  margin: 0 auto;
+  /* Edge to edge: the section rail sits flush against the window's left side. */
+  width: 100%;
 }
 
 @keyframes spin {

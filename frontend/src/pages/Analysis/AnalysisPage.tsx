@@ -483,6 +483,7 @@ export const AnalysisPage = () => {
         </div>
       </div>
 
+      <div className="analysis-body">
       {reportMemoryError && (
         <Alert variant="danger" className="mb-3" onClose={() => setReportMemoryError(null)} dismissible>
           <Alert.Heading>
@@ -513,6 +514,7 @@ export const AnalysisPage = () => {
           <Outlet context={{ data, fileId: fileId!, networkGraphStateRef, networkDiagramFilters, storyState, refreshSummary: () => void refetch({ silent: true }) } satisfies AnalysisOutletContext} />
         </Card.Body>
       </Card>
+      </div>
         </div>
       </div>
     </div>
