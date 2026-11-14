@@ -6,6 +6,7 @@ import { usePermission } from '@/features/me/useMe';
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import type { AnalysisData, TimelineDataPoint } from '@/types';
+import { useHostGroups, groupSize } from '@/features/network/hooks/useHostGroups';
 import { SourceTag } from '@components/analysis/Overview/SourceTag';
 import { MixBar, type MixRow } from '@components/analysis/Overview/MixBar';
 import '@components/analysis/Overview/Overview.css';
@@ -89,6 +90,8 @@ export const AnalysisOverview = () => {
   const [extractedFilesCount, setExtractedFilesCount] = useState<number | undefined>(undefined);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [activity, setActivity] = useState<TimelineDataPoint[]>([]);
+  const [activityLoaded, setActivityLoaded] = useState(false);
+  const { tops: hostTops } = useHostGroups(fileId, data);
   const [flagged, setFlagged] = useState({ total: 0, risks: 0, suricata: 0, custom: 0 });
 
   // Packets over time for the activity chart, and how the flagged conversations were flagged.
@@ -98,6 +101,9 @@ export const AnalysisOverview = () => {
       .getTimelineData(fileId, undefined, 60)
       .then(points => {
         if (alive) setActivity(points);
+      })
+      .finally(() => {
+        if (alive) setActivityLoaded(true);
       })
       .catch(() => {});
     apiClient
@@ -218,7 +224,11 @@ export const AnalysisOverview = () => {
         <div className="ov-col">
           <section className="ov-card ov-totals" aria-label="Totals">
             <div>
-              <b>{Array.isArray(data.uniqueHosts) ? data.uniqueHosts.length.toLocaleString() : (data.uniqueHosts ?? '—')}</b>
+              <b>
+                {Array.isArray(data.uniqueHosts)
+                  ? data.uniqueHosts.length.toLocaleString()
+                  : (data.uniqueHosts ?? '—')}
+              </b>
               <span>hosts</span>
             </div>
             <div>
@@ -235,38 +245,47 @@ export const AnalysisOverview = () => {
             </div>
           </section>
 
-          {activity.length > 1 && (
+          {
             <section className="ov-card" aria-labelledby="ov-activity">
-              <div className="ov-head">
-                <h2 id="ov-activity">Activity over time</h2>
-                <SourceTag id="src-activity" source="tshark" title="How activity is worked out">
-                  <p className="mb-0">
-                    Every packet's timestamp, as tshark read it from the capture, counted into equal
-                    time slices. Each bar is the packets in one slice; hover it for the count.
-                  </p>
-                </SourceTag>
-              </div>
-              <div
-                className="ov-activity"
-                role="img"
-                aria-label={`Packets over time, peak ${maxBin} in one slice`}
-              >
-                {activity.map(a => (
-                  <span
-                    key={a.timestamp}
-                    style={{ height: `${Math.max(4, (a.packetCount / maxBin) * 100)}%` }}
-                    title={`${new Date(a.timestamp).toLocaleTimeString()}: ${a.packetCount} packets`}
-                  />
-                ))}
-              </div>
-              <div className="ov-activity-axis">
-                <span>{new Date(activity[0].timestamp).toLocaleTimeString()}</span>
-                <span>
-                  {new Date(activity[activity.length - 1].timestamp).toLocaleTimeString()}
-                </span>
-              </div>
+              {activity.length > 1 ? (
+                <>
+                  <div className="ov-head">
+                    <h2 id="ov-activity">Activity over time</h2>
+                    <SourceTag id="src-activity" source="tshark" title="How activity is worked out">
+                      <p className="mb-0">
+                        Every packet's timestamp, as tshark read it from the capture, counted into
+                        equal time slices. Each bar is the packets in one slice; hover it for the
+                        count.
+                      </p>
+                    </SourceTag>
+                  </div>
+                  <div
+                    className="ov-activity"
+                    role="img"
+                    aria-label={`Packets over time, peak ${maxBin} in one slice`}
+                  >
+                    {activity.map(a => (
+                      <span
+                        key={a.timestamp}
+                        style={{ height: `${Math.max(4, (a.packetCount / maxBin) * 100)}%` }}
+                        title={`${new Date(a.timestamp).toLocaleTimeString()}: ${a.packetCount} packets`}
+                      />
+                    ))}
+                  </div>
+                  <div className="ov-activity-axis">
+                    <span>{new Date(activity[0].timestamp).toLocaleTimeString()}</span>
+                    <span>
+                      {new Date(activity[activity.length - 1].timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="small text-muted mb-0">
+                  {activityLoaded ? 'This capture is too short to chart over time.' : 'Loading…'}
+                </p>
+              )}
             </section>
-          )}
+          }
 
           {(protoRows.length > 0 || catRows.length > 0) && (
             <section className="ov-card" aria-labelledby="ov-mix">
@@ -287,7 +306,9 @@ export const AnalysisOverview = () => {
                   </p>
                 </SourceTag>
               </div>
-              {protoRows.length > 0 && <MixBar title="Protocols" column="Protocol" rows={protoRows} />}
+              {protoRows.length > 0 && (
+                <MixBar title="Protocols" column="Protocol" rows={protoRows} />
+              )}
               {catRows.length > 0 && <MixBar title="Categories" column="Category" rows={catRows} />}
             </section>
           )}
@@ -317,10 +338,11 @@ export const AnalysisOverview = () => {
               <ol className="ov-busiest">
                 {topConvs.map((c, i) => (
                   <li key={c.id ?? i}>
-                    <span className="ov-busiest-hosts">
-                      {ends(c)}
+                    <span className="ov-busiest-hosts">{ends(c)}</span>
+                    <span className="ov-busiest-app">
+                      {c.appName ??
+                        (typeof c.protocol === 'string' ? c.protocol : c.protocol?.name)}
                     </span>
-                    <span className="ov-busiest-app">{c.appName ?? (typeof c.protocol === 'string' ? c.protocol : c.protocol?.name)}</span>
                     <span className="ov-bar" aria-hidden="true">
                       <span style={{ width: `${Math.max(2, (c.totalBytes / maxConv) * 100)}%` }} />
                     </span>
@@ -385,12 +407,12 @@ export const AnalysisOverview = () => {
                 </button>
                 {riskTypes.length > 0 && (
                   <div className="ov-sub">
-                    <h3>nDPI risks</h3>
+                    <h3>Risks flagged by nDPI</h3>
                     <div className="d-flex flex-wrap gap-2">
                       {riskTypes.map(risk => (
                         <button
                           key={risk}
-                          className="badge rounded-pill px-3 py-2 fs-6 border-0"
+                          className="badge rounded-pill border-0 ov-badge"
                           style={{
                             backgroundColor: RISK_BADGE.bg,
                             color: RISK_BADGE.text,
@@ -409,16 +431,27 @@ export const AnalysisOverview = () => {
                     </div>
                   </div>
                 )}
-                {triggeredRules.length > 0 && (
-                  <div className="ov-sub">
-                    <h3>Custom rules matched</h3>
+                <div className="ov-sub">
+                  <h3>Custom rules matched</h3>
+                  {triggeredRules.length === 0 ? (
+                    <p className="small mb-0">
+                      None.{' '}
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 align-baseline"
+                        onClick={() => navigate(`/analysis/${fileId}/file`)}
+                      >
+                        Add a rule for this capture
+                      </button>
+                    </p>
+                  ) : (
                     <div className="d-flex flex-wrap gap-2">
                       {triggeredRules.map(rule => {
                         const { bg, text } = getSeverityColor(signatureSeverities[rule]);
                         return (
                           <button
                             key={rule}
-                            className="badge rounded-pill px-3 py-2 fs-6 border-0"
+                            className="badge rounded-pill border-0 ov-badge"
                             style={{ backgroundColor: bg, color: text, cursor: 'pointer' }}
                             title="Click to filter conversations by this rule"
                             onClick={() =>
@@ -433,8 +466,8 @@ export const AnalysisOverview = () => {
                         );
                       })}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
             {extractedFilesCount != null && extractedFilesCount > 0 && (
@@ -471,7 +504,7 @@ export const AnalysisOverview = () => {
                       return (
                         <button
                           key={app.name}
-                          className="badge rounded-pill px-3 py-2 fs-6 border-0"
+                          className="badge rounded-pill border-0 ov-badge"
                           style={{
                             backgroundColor: appColor,
                             color: getTextColor(appColor),
@@ -503,7 +536,7 @@ export const AnalysisOverview = () => {
                       return (
                         <button
                           key={proto}
-                          className="badge rounded-pill px-3 py-2 fs-6 border-0"
+                          className="badge rounded-pill border-0 ov-badge"
                           style={{
                             backgroundColor: bg,
                             color: getTextColor(bg),
@@ -521,6 +554,43 @@ export const AnalysisOverview = () => {
                   </div>
                 </div>
               )}
+            </section>
+          )}
+
+          {hostTops.length > 0 && (
+            <section className="ov-card" aria-labelledby="ov-hosts">
+              <div className="ov-head">
+                <h2 id="ov-hosts">Where the hosts are</h2>
+                <SourceTag id="src-hosts" source="the network map" title="How hosts are grouped">
+                  <p className="mb-0">
+                    The same groups the network map draws: networks found in the capture (VLANs,
+                    DHCP and DNS names), your internal ranges and your own map edits. Internet hosts
+                    are grouped by the names they were looked up by.
+                  </p>
+                </SourceTag>
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0 ms-auto"
+                  onClick={() => navigate(`/analysis/${fileId}/network-diagram`)}
+                >
+                  Network map
+                </button>
+              </div>
+              {hostTops.map(top => (
+                <div key={top.id} className="ov-sub ov-sub-first ov-hosts">
+                  <h3>
+                    {top.label} <span className="text-muted fw-normal">· {groupSize(top)}</span>
+                  </h3>
+                  <ul>
+                    {(top.children.length ? top.children : [top]).map(g => (
+                      <li key={g.id}>
+                        <span>{g.label}</span>
+                        <b>{groupSize(g)}</b>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </section>
           )}
         </div>
