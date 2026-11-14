@@ -138,6 +138,9 @@ export interface EdgeData {
   totalBytes: number;
   conversationId: string;
   bidirectional: boolean;
+  /** When the conversation started and ended, epoch ms, for the time axis. */
+  startTime?: number;
+  endTime?: number;
   // Extra conversation fields for filtering
   srcPort?: number;
   dstPort?: number;

@@ -6,6 +6,7 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import { EdgeArrowProgram } from 'sigma/rendering';
 import { EdgeCurvedArrowProgram, indexParallelEdgesIndex } from '@sigma/edge-curve';
+import { animatedEdges, drawParticles } from './trafficParticles';
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
@@ -45,6 +46,13 @@ interface NetworkGraphProps {
   activeFilterCount?: number;
   /** Monitor mode: map of node label (IP/MAC) → highlight colour + badge text */
   highlightedNodes?: Map<string, NodeHighlight>;
+  /**
+   * The time axis's window: what was active in it. Nodes outside it are dimmed and edges outside it
+   * hidden, by redrawing only, so the layout never moves while the window plays. Null shows all.
+   */
+  activeInWindow?: { nodeIds: Set<string>; edgeIds: Set<string> } | null;
+  /** Dots moving along the visible edges, in the edge's colour; more on busier conversations. */
+  animateTraffic?: boolean;
   /**
    * What edge colour encodes. Protocol (the default) uses `getProtocolColor`;
    * volume shades each edge by `totalBytes` on the shared volume scale — the same
@@ -427,6 +435,7 @@ function buildGraph(
       // Kept on the edge so the colour mode can be switched by repainting in
       // place, without rebuilding the graph and throwing away the layout.
       totalBytes: e.data.totalBytes ?? 0,
+      bidirectional: !!e.data.bidirectional,
       protocol: e.data.protocol,
       appName,
     });
@@ -493,6 +502,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   onFilterClick,
   activeFilterCount = 0,
   highlightedNodes,
+  activeInWindow = null,
+  animateTraffic = false,
   edgeColorMode = 'transport',
   forceLight = false,
 }: NetworkGraphProps) {
@@ -555,6 +566,50 @@ export const NetworkGraph = memo(function NetworkGraph({
     highlightedNodesRef.current = highlightedNodes;
     sigmaRef.current?.refresh();
   }, [highlightedNodes]);
+
+  // Traffic dots: an overlay canvas over Sigma's, redrawn every frame while on (and the tab shows).
+  const particlesRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!animateTraffic) {
+      const c = particlesRef.current;
+      c?.getContext('2d')?.clearRect(0, 0, c.width, c.height);
+      return;
+    }
+    let raf = 0;
+    let lastSigma: unknown = null;
+    let lastSize = -1;
+    let edges: ReturnType<typeof animatedEdges> = [];
+    const frame = (now: number) => {
+      raf = requestAnimationFrame(frame);
+      const sigma = sigmaRef.current;
+      const canvas = particlesRef.current;
+      if (!sigma || !canvas || document.hidden) return;
+      // Match the canvas to its box (and the screen's pixel ratio).
+      const ratio = window.devicePixelRatio || 1;
+      const w = Math.round(canvas.clientWidth * ratio);
+      const h = Math.round(canvas.clientHeight * ratio);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      const size = sigma.getGraph().size;
+      if (sigma !== lastSigma || size !== lastSize) {
+        edges = animatedEdges(sigma);
+        lastSigma = sigma;
+        lastSize = size;
+      }
+      const ctx = canvas.getContext('2d');
+      if (ctx) drawParticles(ctx, sigma, edges, now);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [animateTraffic]);
+
+  const activeInWindowRef = useRef(activeInWindow);
+  useEffect(() => {
+    activeInWindowRef.current = activeInWindow;
+    sigmaRef.current?.refresh();
+  }, [activeInWindow]);
 
   // Recompute node text lines when the label config changes, then redraw (no relayout).
   useEffect(() => {
@@ -667,6 +722,13 @@ export const NetworkGraph = memo(function NetworkGraph({
           res['label'] = '';
         }
 
+        // Time axis: quiet in the window → dimmed, label kept so the node is still findable.
+        const win = activeInWindowRef.current;
+        if (win && !win.nodeIds.has(node)) {
+          res['color'] = dimColor;
+          res['zIndex'] = 0;
+        }
+
         // Compare-mode secondary
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.4);
@@ -685,6 +747,13 @@ export const NetworkGraph = memo(function NetworkGraph({
         }
         if (data['isSecondaryOnly']) {
           res['color'] = blendColor(data['color'] as string, bgColor, 0.5);
+        }
+        // Time axis: a conversation outside the window isn't drawn. An edge standing for several
+        // conversations between the same pair (deduplicateEdges joins their ids with '|') is
+        // drawn when any of them is in the window.
+        const win = activeInWindowRef.current;
+        if (win && !win.edgeIds.has(edge) && !edge.split('|').some(id => win.edgeIds.has(id))) {
+          res['hidden'] = true;
         }
         return res;
       },
@@ -1000,6 +1069,13 @@ export const NetworkGraph = memo(function NetworkGraph({
     >
       {/* Sigma canvas — always mounted so Sigma's DOM is never torn out by React */}
       <div className="network-graph-canvas" ref={containerRef} />
+      {/* Traffic dots, drawn over the graph; clicks go through to it. */}
+      <canvas
+        ref={particlesRef}
+        className="network-graph-particles"
+        aria-hidden="true"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      />
 
       {/* Empty-state overlay — sits on top when there is nothing to show */}
       {nodes.length === 0 && (

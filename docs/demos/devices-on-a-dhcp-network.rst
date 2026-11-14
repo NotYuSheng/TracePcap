@@ -53,6 +53,23 @@ tool blames Alice.
 Each conversation goes to the device that held the address when it started, so the beacon lands on
 the phone and Alice's laptop is clean.
 
+**Watch it happen.** The time axis above the graph picks a window of the capture, and dots move
+along the conversations active in it (see :doc:`../features/network-time-axis`). Click early in the
+chart, or press **Play**:
+
+.. figure:: images/timeline-laptop.png
+   :alt: The time axis with a window early in the capture, and the graph: LAPTOP-ALICE is active
+         with its mail and file-share conversations; the phone and the beacon server are greyed out.
+
+   Early on, only the laptop holds ``10.0.0.50``: its mail and file-share traffic is drawn, and the
+   phone and ``185.220.101.77`` are greyed out.
+
+.. figure:: images/timeline-phone.png
+   :alt: The time axis with a window late in the capture, and the graph: Galaxy-S24 is active with
+         its beacon to 185.220.101.77 and its Google traffic; the laptop's traffic is gone.
+
+   Late in the capture the phone holds it, and its beaconing to ``185.220.101.77`` shows up.
+
 **Why TracePcap split it.** Click the phone's node. Under **Devices on this address**:
 
 .. figure:: images/reuse-phone-node.png

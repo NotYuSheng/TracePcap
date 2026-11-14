@@ -4,6 +4,9 @@ Network Visualization
 The Network Visualization tab renders an interactive topology graph of all
 hosts and flows extracted from the PCAP file.
 
+The time axis above the graph picks a window of the capture to show; see
+:doc:`network-time-axis`.
+
 How the Graph Is Constructed
 -----------------------------
 
