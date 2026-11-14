@@ -52,7 +52,19 @@ export function EntityDetailModal({
   // A peer/history navigation: route via the caller, then close (the graph is behind this modal).
   const navigateAndClose = (path: string) => { onClose(); onNavigate?.(path); };
 
-  const role = useEntityRole(entityType, entityKey, fileId, showRole);
+  // The device on a reused address being looked at (#918 slice 3): a graph node for one device
+  // starts on it, and picking another in the identity panel moves the role section with it.
+  const nodeDevice = graphNode?.data.occupancy;
+  const [device, setDevice] = useState<{ idx?: number; key: string }>({
+    idx: nodeDevice?.idx,
+    key: nodeDevice?.key ?? entityKey,
+  });
+  useEffect(() => {
+    setDevice({ idx: nodeDevice?.idx, key: nodeDevice?.key ?? entityKey });
+  }, [entityKey, nodeDevice?.idx, nodeDevice?.key]);
+  const roleKey = entityType === 'IP' ? device.key : entityKey;
+
+  const role = useEntityRole(entityType, roleKey, fileId, showRole);
   const { stats, statsLoading, statsError } = useEntityStats(entityType, entityKey, fileId);
   const note = useEntityNote(entityType, entityKey);
   const { history, historyLoading, historyError } = useEntityHistory(entityType, entityKey);
@@ -176,7 +188,10 @@ export function EntityDetailModal({
                   <HostIdentitySection
                     fileId={fileId}
                     ip={entityKey}
-                    occupancyIdx={graphNode?.data.occupancy?.idx}
+                    occupancyIdx={nodeDevice?.idx}
+                    deviceKey={nodeDevice?.key}
+                    fromGraphNode={!!nodeDevice}
+                    onSelectDevice={(idx, key) => setDevice({ idx, key })}
                   />
                 )}
 

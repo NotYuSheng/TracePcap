@@ -121,6 +121,12 @@ public class AdjudicatorRunner {
     runAll(event.fileId(), "rule vote re-scoring");
   }
 
+  /** An analyst split or merged an address's devices (#918): each device's identity is re-answered. */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onOccupanciesChanged(com.tracepcap.common.event.HostOccupanciesChangedEvent event) {
+    runAll(event.fileId(), "device split or merge");
+  }
+
   private void runAll(UUID fileId, String trigger) {
     for (Adjudicator adjudicator : adjudicators) {
       try {

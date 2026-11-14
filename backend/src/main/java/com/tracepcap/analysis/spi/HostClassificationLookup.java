@@ -137,6 +137,44 @@ public interface HostClassificationLookup {
   /** Never contains null elements — the adapter maps each persisted row to a fresh record. */
   List<ClassifiedHost> classifiedHosts(UUID fileId);
 
+  /**
+   * One device's stretch on an address that more than one device held (#918 slice 3): its key
+   * ({@link DeviceKeys}), and [startsAt, endsAt), null = capture start or end.
+   */
+  record DeviceSpan(String ip, String key, int idx, int of, java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt) {}
+
+  /**
+   * Every device on every address more than one device held, each classified from its own traffic
+   * and keyed by {@link DeviceKeys} (the first device under the bare IP). Empty when no address was
+   * reused. What lets identity, labels and evidence be per device rather than per address.
+   */
+  default List<ClassifiedHost> deviceHosts(UUID fileId) {
+    return List.of();
+  }
+
+  /** The device {@code key} names, when its address was held by more than one device. */
+  default Optional<DeviceSpan> deviceSpan(UUID fileId, String key) {
+    return Optional.empty();
+  }
+
+  /**
+   * The facts for the device {@code key} names: the address's, with the device's own MAC, vendor,
+   * hostname, TTL, classification and sign-in. Empty when the address wasn't held by more than one
+   * device (use {@link #hostFactsByIp} for it).
+   */
+  default Optional<HostFacts> deviceFacts(UUID fileId, String key) {
+    return Optional.empty();
+  }
+
+  /**
+   * Where the device with this MAC is in a file (#918 slice 3): its device key when it was one of
+   * several devices on an address, else the IP of the host with that MAC. What a device's label
+   * follows from one snapshot to the next, since its address and times change.
+   */
+  default Optional<String> keyForMac(UUID fileId, String mac) {
+    return hostFactsByMac(fileId, mac).map(HostFacts::ip);
+  }
+
   /** Every host in the file, in persistence order. Never contains null elements. */
   List<HostFacts> hostFacts(UUID fileId);
 

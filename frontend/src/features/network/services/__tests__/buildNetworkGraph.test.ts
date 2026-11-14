@@ -166,4 +166,32 @@ describe('buildNetworkGraph: an address more than one device held (#918 slice 2)
     const g = buildNetworkGraph(convs(), undefined, 500, addressRow as never, 0, undefined, undefined, [])
     expect(g.nodes.filter(n => n.data.ip === '10.0.0.50').map(n => n.id)).toEqual(['10.0.0.50'])
   })
+
+  it("shows an analyst's label and role on the one device they're on (#918 slice 3)", () => {
+    const phoneKey = '10.0.0.50@2026-11-10T11:00:00'
+    const withKeys = [
+      {
+        ...reused[0],
+        occupancies: reused[0].occupancies.map(o =>
+          o.startsAt ? { ...o, boundaryKey: '2026-11-10T11:00:00' } : o,
+        ),
+      },
+    ]
+    const identities = [
+      { ip: '10.0.0.50', primaryLabel: 'LAPTOP_DESKTOP', basis: 'MACHINE', confidence: 100, contested: false },
+      { ip: phoneKey, primaryLabel: 'IOT', basis: 'HUMAN', confidence: 100, contested: false },
+    ]
+    const roles = [{ entityType: 'IP', entityKey: phoneKey, roleLabel: 'Visitor phone' }]
+    const g = buildNetworkGraph(convs(), undefined, 500, addressRow as never, 0, identities as never, roles as never, withKeys as never)
+    const laptop = g.nodes.find(n => n.id === '10.0.0.50@0')!
+    const phone = g.nodes.find(n => n.id === '10.0.0.50@1')!
+
+    expect(phone.data.occupancy?.key).toBe(phoneKey)
+    expect(laptop.data.occupancy?.key).toBe('10.0.0.50')
+    expect(phone.data.identityLabel).toBe('IOT')
+    expect(phone.data.identityBasis).toBe('HUMAN')
+    expect(phone.data.roleLabel).toBe('Visitor phone')
+    expect(laptop.data.identityLabel).toBe('LAPTOP_DESKTOP')
+    expect(laptop.data.roleLabel).toBeUndefined()
+  })
 })

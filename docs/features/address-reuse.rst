@@ -33,9 +33,8 @@ Each conversation goes to the device that held the address when the
 conversation started, so the edges, traffic totals and alerts sit on the right
 device. An address one device held throughout stays a single node.
 
-Clicking a device's node opens the address's details with **this node** marked
-in the device list. The **Identity** further down is still the whole
-address's, worked out from every device's traffic together.
+Clicking a device's node opens its details, with **this node** marked in the
+device list. The **Identity**, role and evidence shown are that device's.
 
 How Changes Are Found
 ---------------------
@@ -105,6 +104,28 @@ Who can make corrections is the **Split or merge a host's devices** permission
 on the System page's **Permissions** tab (default: analysts; see
 :ref:`settings-permissions`).
 
+Labels on One Device
+--------------------
+
+On an address more than one device held, the **Identity** panel, the role and
+any evidence you add are about **one device**. The device list marks which one
+(**this node** when opened from the graph, **showing** otherwise), and **Show
+this device** switches to another. Opened from anywhere but the graph, the first
+device is shown.
+
+So a label you set ("Visitor phone, suspicious") stays on the phone and doesn't
+spread to the laptop that held the address before it.
+
+- **The first device keeps the address's own key.** A label you set before the
+  address was split stays with whichever device held it first.
+- **A split** keeps labels with the part that contains the device's start.
+- **A merge** moves the later device's labels, role and evidence to the joined
+  device. If the joined device already has its own label, the later device's is
+  kept aside. **Undoing the merge** moves them back.
+- **In the next monitor snapshot**, a device's label follows its **MAC**, since
+  its address and times change. A label on an address one device held still
+  carries by IP, as before.
+
 Try It
 ------
 
@@ -118,13 +139,9 @@ the phone. :doc:`../sample-files` has the generator script.
 What This Doesn't Change Yet
 ----------------------------
 
-Outside the network graph and the device list, the address is still one host:
-
-- its **Identity**, and the labels, roles and notes you put on it, are the
-  whole address's. A role on the address shows on each of its devices' nodes;
+- **Notes** are still per address (or per MAC, on a device's MAC).
 - Story, reports, the network cluster view and the monitor views use the
-  address's classification;
-- re-applying detection rules re-scores the address, not each device.
-
-Putting labels, roles and notes on one device, and recognising the same device
-across captures, are planned (#918).
+  address's classification.
+- Re-applying detection rules re-scores the address, not each device.
+- The same device on different addresses, across captures, isn't recognised as
+  one device yet (#918).

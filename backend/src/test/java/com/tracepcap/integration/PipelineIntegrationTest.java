@@ -692,6 +692,64 @@ class PipelineIntegrationTest {
   }
 
   /**
+   * Labels on one device (#918 slice 3): a label and role on the phone's key stay off the laptop,
+   * the identity and evidence answer per device, and a merge moves them onto the joined device
+   * while undoing it moves them back.
+   */
+  @Test
+  void occupancy_labelsAndRolesStayOnOneDevice_andSurviveAMergeAndUndo() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("identity-cases.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+    String files = "/api/v1/files/" + fileId;
+    JsonNode occ = rest.getForEntity(files + "/hosts/10.0.0.50/occupancies", JsonNode.class).getBody().get("occupancies");
+    String boundary = occ.get(1).get("boundaryKey").asText();
+    String phone = "10.0.0.50@" + boundary;
+
+    rest.put(files + "/adjudications/host-identity/" + phone + "/override", json("{\"label\":\"IOT\",\"rationale\":\"visitor phone\"}"));
+    rest.put("/api/v1/node-roles", json("{\"fileId\":\"" + fileId + "\",\"entityType\":\"IP\",\"entityKey\":\"" + phone
+        + "\",\"roleLabel\":\"Visitor phone\",\"confirmedByHuman\":true}"));
+
+    java.util.function.Supplier<java.util.Map<String, String>> identities = () -> {
+      java.util.Map<String, String> m = new java.util.HashMap<>();
+      for (JsonNode h : rest.getForEntity(files + "/host-identities", JsonNode.class).getBody()) {
+        if (h.get("ip").asText().startsWith("10.0.0.50")) m.put(h.get("ip").asText(), h.get("primaryLabel").asText());
+      }
+      return m;
+    };
+    assertThat(identities.get()).containsEntry(phone, "IOT").containsKey("10.0.0.50");
+    assertThat(identities.get().get("10.0.0.50")).isNotEqualTo("IOT");
+    JsonNode phoneEvidence = rest.getForEntity(files + "/hosts/" + phone + "/identity", JsonNode.class).getBody();
+    assertThat(phoneEvidence.get("primaryLabel").asText()).isEqualTo("IOT");
+    assertThat(phoneEvidence.get("ttl").asInt()).isEqualTo(64);
+
+    // Merge: the phone's label and role move to the joined device (the bare IP).
+    java.util.Map<String, Object> merge = new java.util.HashMap<>();
+    merge.put("action", "merge");
+    merge.put("reason", "same device");
+    merge.put("at", boundary);
+    JsonNode merged = rest.postForEntity(files + "/hosts/10.0.0.50/occupancy-decisions", merge, JsonNode.class).getBody();
+    assertThat(identities.get()).containsOnlyKeys("10.0.0.50").containsEntry("10.0.0.50", "IOT");
+    assertThat(jdbc.queryForObject(
+            "SELECT entity_key FROM node_roles WHERE file_id = ?::uuid AND role_label = 'Visitor phone'", String.class, fileId))
+        .isEqualTo("10.0.0.50");
+
+    // Undo: the phone is back, and so are its label and role.
+    rest.delete(files + "/hosts/10.0.0.50/occupancy-decisions/" + merged.get("decisions").get(0).get("id").asLong());
+    assertThat(identities.get()).containsEntry(phone, "IOT");
+    assertThat(identities.get().get("10.0.0.50")).isNotEqualTo("IOT");
+    assertThat(jdbc.queryForObject(
+            "SELECT entity_key FROM node_roles WHERE file_id = ?::uuid AND role_label = 'Visitor phone'", String.class, fileId))
+        .isEqualTo(phone);
+
+    rest.delete(files + "/adjudications/host-identity/" + phone + "/override");
+    jdbc.update("DELETE FROM node_roles WHERE file_id = ?::uuid AND role_label = 'Visitor phone'", fileId);
+  }
+
+  /**
    * Per-network address configuration (#915 phase 4a): a network layers its own entries on the
    * shared default per CIDR (override, add, hide), the default is unaffected, every change is
    * audited, and reverting brings the default back.

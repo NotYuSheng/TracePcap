@@ -42,7 +42,7 @@ public class HostIdentityEntity {
   @Column(name = "file_id", nullable = false)
   private UUID fileId;
 
-  @Column(nullable = false, length = 45)
+  @Column(nullable = false, length = 80)
   private String ip;
 
   /** The one answer to "what is this host?" — device type, or the human's label verbatim. */
