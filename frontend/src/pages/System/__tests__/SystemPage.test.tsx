@@ -107,7 +107,7 @@ describe('AuditLogPanel (#915)', () => {
 });
 
 describe('SystemPage (#915)', () => {
-  it('says who you are and has the four sections', async () => {
+  it('is the Settings page: says who you are, opens on Personal, and has every section', async () => {
     server.use(
       http.get('*/me', () => HttpResponse.json(me(false))),
       http.get('*/system/settings', () => HttpResponse.json([]))
@@ -118,8 +118,10 @@ describe('SystemPage (#915)', () => {
       </MemoryRouter>
     );
     expect(await screen.findByText(/login is off/)).toBeInTheDocument();
-    for (const tab of ['Settings', 'Permissions', 'Audit log', 'Users']) {
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    for (const tab of ['Personal', 'System', 'Detection rules', 'Address defaults', 'Permissions', 'Audit log', 'Users']) {
       expect(screen.getByRole('tab', { name: tab })).toBeInTheDocument();
     }
+    expect(screen.getByRole('tab', { name: 'Personal' })).toHaveAttribute('aria-selected', 'true');
   });
 });

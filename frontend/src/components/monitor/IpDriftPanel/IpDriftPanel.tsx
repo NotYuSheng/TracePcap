@@ -230,7 +230,7 @@ function PrivateOverridesSection({
             Force an IP or CIDR to be treated as internal or external, overriding the automatic
             RFC1918 sort (e.g. a public address used by a private terminal, or a private range that
             is actually reached over the internet).
-            {networkId && <> Changes here apply to this network only; overrides for every network are set in the System console's address defaults.</>}
+            {networkId && <> Changes here apply to this network only; overrides for every network are set in Settings › Address defaults.</>}
           </p>
           {customRanges.length > 0 && (
             <table className="table table-sm table-borderless mb-2">

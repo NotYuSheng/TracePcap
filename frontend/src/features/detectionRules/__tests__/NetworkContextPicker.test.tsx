@@ -34,7 +34,7 @@ describe('NetworkContextPicker (#925 phase 3)', () => {
       </MemoryRouter>
     )
     expect(await screen.findByTestId('network-context-hint')).toHaveTextContent('This capture is in HQ')
-    const select = screen.getByLabelText('Viewing with')
+    const select = screen.getByLabelText('Custom detection rules')
     expect(screen.getByRole('group', { name: 'Networks with this capture' })).toHaveTextContent("HQ's rules too")
     expect(screen.getByRole('group', { name: 'Other networks' })).toHaveTextContent("Branch's rules too")
 

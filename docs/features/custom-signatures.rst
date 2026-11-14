@@ -10,8 +10,7 @@ How It Works
 ------------
 
 Rules are stored in the **database**, as global rules that apply to every
-capture. They're edited on the **System** page, under **Detection rules**
-(the **Custom Detection Rules** button in the header links there too).
+capture. They're edited on the **Settings** page, under **Detection rules**.
 
 - **Add rule** opens a form: name, severity, description, the match fields,
   and payload patterns. Fields are checked as you type, and anything the
@@ -92,7 +91,7 @@ site's cameras live on ``10.20.0.0/16``". Open the network's page and click
   the network: they show as out of date, as for a global rule, until the rules
   are re-applied.
 - Switching a network rule off hides its matches at once.
-- On a capture's **Analysis** page, **Viewing with** (under the file ID)
+- On a capture's **Analysis** page, **Custom detection rules** (under the file ID)
   adds a network's rules to every tab that shows matches: the Overview, the
   conversations (list, filters and details), the network visualization, the
   Network Cluster's rule filter, and the PDF report's rule tags and rule
@@ -148,8 +147,8 @@ re-check those rules, so their old matches are dropped and the capture says
 date: which rule versions produced their matches isn't known. Their existing
 matches stay visible; Re-apply brings them up to date.
 
-The **Network Labels** tab of the **Custom Detection Rules** dialog defines
-CIDR-to-label mappings used in the Network Visualization grouping mode (see
+Network labels (CIDR-to-organisation mappings, used by the Network Labels grouping
+mode) are set under **Settings › Address defaults › Organisations** (see
 `Network Labels`_ below).
 
 .. _Network Labels:
@@ -416,7 +415,7 @@ For a deep-dive rule authoring guide, see :doc:`../configuration/signature-rules
 Network Labels
 --------------
 
-The **Network Labels** tab (in the **Custom Detection Rules** dialog) maps
+Network labels are the **organisations** of :doc:`network-address-config`: they map
 individual IP addresses or CIDR ranges to human-readable organisation labels.
 These labels are used as a grouping strategy in the **Network Visualization**
 — enabling you to cluster nodes by network segment rather than by ASN or
@@ -425,11 +424,12 @@ country.
 How to Add a Label
 ~~~~~~~~~~~~~~~~~~
 
-1. Open **Custom Detection Rules** in the navbar.
-2. Switch to the **Network Labels** tab.
-3. Enter a label name (e.g. ``Corporate LAN``, ``DMZ``, ``Guest Wi-Fi``) and
+1. Open **Settings** in the header, then **Address defaults** › **Organisations**
+   (for every network). For one network only, use its page's **Addresses** button
+   instead.
+2. Enter a label name (e.g. ``Corporate LAN``, ``DMZ``, ``Guest Wi-Fi``) and
    a CIDR range (e.g. ``10.0.1.0/24``) or individual IP (e.g. ``10.0.1.5``).
-4. Click **Add**.
+3. Add it.
 
 Labels are stored in the database and persist across sessions. Multiple CIDR
 entries can share the same label to group non-contiguous ranges under one name.

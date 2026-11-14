@@ -80,7 +80,7 @@ export function NetworkRulesModal({
           <p className="small text-muted">
             These rules flag conversations in this network's captures, and show when you view them
             here (snapshots, the Security tab). Each capture that joins the network is checked
-            against them. Rules for every capture are on the System page.
+            against them. Rules for every capture are in Settings › Detection rules.
           </p>
           {!perm.allowed && (
             <Alert variant="info" className="py-2 small">

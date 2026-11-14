@@ -233,7 +233,7 @@ one host is X", label the host instead.
 Editing Rules
 -------------
 
-Rules live in the database and are edited on the **System** page, under
+Rules live in the database and are edited on the **Settings** page, under
 **Detection rules**, with a form rather than YAML (see
 :doc:`../features/custom-signatures`). The YAML format on this page is what
 **Export** writes and **Import** reads, so rules can be kept in version

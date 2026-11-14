@@ -36,7 +36,7 @@ const KINDS: KindConfig[] = [
     kind: 'ip-org-rules',
     title: 'Organisations',
     valueLabel: 'Organisation',
-    intro: 'Which organisation owns a range, used to group hosts in the Network Cluster view.',
+    intro: 'Network labels: which organisation owns a range, used to group hosts in the Network Cluster view (Network Labels grouping).',
   },
 ];
 
@@ -84,8 +84,7 @@ export function NetworkAddressConfigModal({ show, networkId, networkName, onHide
 }
 
 /**
- * The three address lists as tabs, over a network's layer or the shared default. Plain Bootstrap
- * nav-tabs, as on the System page: the SGDS Tabs nav doesn't render visibly in this theme.
+ * The three address lists as tabs, over a network's layer or the shared default.
  */
 export function AddressTabs({
   source,
@@ -99,23 +98,25 @@ export function AddressTabs({
   const [active, setActive] = useState<AddressKind>('subnets');
   return (
     <>
-      <ul className="nav nav-tabs mb-3" role="tablist">
+      {/* SGDS buttons as the tabs: plain nav-tabs inside a card body collapse to zero width in
+          this theme and the panel covers them, so the lists couldn't be reached. */}
+      <div className="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="Address lists">
         {KINDS.map(k => (
-          <li className="nav-item" key={k.kind} role="presentation">
-            <button
-              type="button"
-              role="tab"
-              id={`${idPrefix}-tab-${k.kind}`}
-              aria-selected={active === k.kind}
-              aria-controls={`${idPrefix}-panel-${k.kind}`}
-              className={`nav-link${active === k.kind ? ' active' : ''}`}
-              onClick={() => setActive(k.kind)}
-            >
-              {k.title}
-            </button>
-          </li>
+          <Button
+            key={k.kind}
+            type="button"
+            size="sm"
+            role="tab"
+            id={`${idPrefix}-tab-${k.kind}`}
+            aria-selected={active === k.kind}
+            aria-controls={`${idPrefix}-panel-${k.kind}`}
+            variant={active === k.kind ? 'primary' : 'outline-primary'}
+            onClick={() => setActive(k.kind)}
+          >
+            {k.title}
+          </Button>
         ))}
-      </ul>
+      </div>
       <div role="tabpanel" id={`${idPrefix}-panel-${active}`} aria-labelledby={`${idPrefix}-tab-${active}`}>
         <AddressList key={active} config={KINDS.find(k => k.kind === active)!} source={source} onChanged={onChanged} />
       </div>

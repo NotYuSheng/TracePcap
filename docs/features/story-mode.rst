@@ -168,7 +168,7 @@ affected IPs, and numeric metrics. Detectors include:
        with the rule's own severity and description, and the hosts it matched
        most. It counts the rules in effect: enabled global rules, the capture's
        own, and, when the story is generated with a network picked in
-       **Viewing with**, that network's own (minus the global rules it switches
+       **Custom detection rules**, that network's own (minus the global rules it switches
        off). The story page says which network's rules it used; pick a
        different network and regenerate to change it.
    * - **NdpiRisk**

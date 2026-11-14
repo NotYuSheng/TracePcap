@@ -3,8 +3,6 @@ import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Button, Container, Row, Col, Navbar, Nav } from '@govtechsg/sgds-react';
 import { Activity } from 'lucide-react';
-import { SignaturesModal } from '@components/signatures/SignaturesModal';
-import { SettingsModal } from '@components/settings/SettingsModal/SettingsModal';
 import { usePreferencesSync } from '@/features/preferences/usePreferencesSync';
 import { AuthMenu } from '@/auth/AuthMenu';
 import { getAccessToken } from '@/auth/tokenStore';
@@ -85,8 +83,6 @@ function useResolvedDark(themeMode: ThemeMode): boolean {
 }
 
 export const MainLayout = () => {
-  const [showSignatures, setShowSignatures] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   // Personal preferences live on the server (#915): per account with login on, shared when off.
   usePreferencesSync();
   const backendReady = useBackendReady();
@@ -95,7 +91,7 @@ export const MainLayout = () => {
   const isDark = useResolvedDark(themeMode);
   const location = useLocation();
   const isMonitorActive = location.pathname.startsWith('/monitor');
-  const isSystemActive = location.pathname.startsWith('/system');
+  const isSystemActive = location.pathname.startsWith('/settings') || location.pathname.startsWith('/system');
 
   // Keeps the shared Escape coordinator alive for the whole session (#535).
   useEscapeLayerRoot();
@@ -143,8 +139,8 @@ export const MainLayout = () => {
                 <Nav.Link as={Link} to="/monitor" active={isMonitorActive}>
                   <i className="bi bi-activity me-1"></i>Monitor
                 </Nav.Link>
-                <Nav.Link as={Link} to="/system" active={isSystemActive}>
-                  <i className="bi bi-sliders me-1" aria-hidden="true"></i>System
+                <Nav.Link as={Link} to="/settings" active={isSystemActive}>
+                  <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
                 </Nav.Link>
               </Nav>
 
@@ -159,31 +155,12 @@ export const MainLayout = () => {
                 >
                   <i className={`bi ${THEME_ICONS[themeMode]}`}></i>
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={() => setShowSettings(true)}
-                  aria-label="Settings"
-                >
-                  <i className="bi bi-gear me-1" aria-hidden="true"></i>Settings
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={() => setShowSignatures(true)}
-                >
-                  <i className="bi bi-shield-check me-1"></i>Custom Detection Rules
-                </Button>
                 {env.AUTH_ENABLED && <AuthMenu />}
               </div>
             </Navbar.Collapse>
           </Container>
         </Navbar>
       </header>
-      <SignaturesModal show={showSignatures} onHide={() => setShowSignatures(false)} />
-      <SettingsModal show={showSettings} onHide={() => setShowSettings(false)} />
       <main className="main-content">{mainContent}</main>
       <footer className="main-footer mt-auto py-4">
         <Container>

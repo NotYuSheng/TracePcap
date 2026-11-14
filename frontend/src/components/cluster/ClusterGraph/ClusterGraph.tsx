@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Badge, Button, Form } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ReactFlow,
   Background,
@@ -833,9 +833,9 @@ export const ClusterGraph = ({ data, loading, groupBy, onGroupByChange, fileId, 
         <Alert variant="info" className="py-2 mb-3 d-flex align-items-center gap-2" style={{ fontSize: 13 }}>
           <i className="bi bi-tag-fill flex-shrink-0" />
           <span>
-            Network Labels are defined in{' '}
-            <strong>Custom Detection Rules</strong> — open it from the navigation bar and go to the{' '}
-            <strong>Network Labels</strong> tab to add or edit IP ranges.
+            Network Labels are the organisations in{' '}
+            <Link to="/settings?tab=addresses">Settings › Address defaults › Organisations</Link>
+            {' '}(for every network), or a network's own from its page's <strong>Addresses</strong> button.
           </span>
         </Alert>
       )}
