@@ -1,61 +1,105 @@
-import { useEffect, useState } from 'react';
-import { Form } from '@govtechsg/sgds-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Form } from '@govtechsg/sgds-react';
 import { Pagination } from '@components/common/Pagination/Pagination';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { meService, type AuditLogEntry, type Paged } from '@/features/me/meService';
-import { describeAction, diffValues } from '@/features/me/auditDiff';
+import { AUDIT_KINDS, describeAction, diffValues, kindOf, summarize } from '@/features/me/auditDiff';
+import { useEscapeLayer } from '@utils/useEscapeLayer';
 import './AuditLogPanel.css';
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 300;
 
-/** Rows shown before "Show N more". */
-const SHOWN = 4;
+function when(at: string): string {
+  const d = new Date(at);
+  const today = new Date();
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === today.toDateString()) return `Today ${time}`;
+  return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${time}`;
+}
 
-/** What an entry changed: only the fields that differ, as before → after; every field when added or removed. */
-function Changes({ before, after }: { before?: Record<string, unknown> | null; after?: Record<string, unknown> | null }) {
-  const [open, setOpen] = useState(false);
-  const changes = diffValues(before, after);
-  if (changes.length === 0) return <span className="text-muted">No field changed</span>;
-  const shown = open ? changes : changes.slice(0, SHOWN);
-  const whole = before == null ? 'Added' : after == null ? 'Removed' : null;
+/** The details of one entry: what changed field by field, who, when, what it was about. */
+function Details({ entry, onClose }: { entry: AuditLogEntry; onClose: () => void }) {
+  const ref = useRef<HTMLElement>(null);
+  const [raw, setRaw] = useState(false);
+  useEscapeLayer(onClose, { ref });
+  const changes = diffValues(entry.before, entry.after);
+  const whole = entry.before == null ? 'Added' : entry.after == null ? 'Removed' : null;
   return (
-    <div className="audit-changes">
-      {whole && <span className={`audit-tag audit-tag-${whole === 'Added' ? 'added' : 'removed'}`}>{whole}</span>}
-      <dl className="audit-fields">
-        {shown.map(c => (
-          <div key={c.field} className="audit-field">
-            <dt>{c.field}</dt>
-            <dd>
-              {c.kind === 'changed' && (
-                <>
-                  <del className="audit-old">{c.before}</del>
-                  <i className="bi bi-arrow-right mx-1 text-muted" aria-label="changed to" />
-                  <ins className="audit-new">{c.after}</ins>
-                </>
-              )}
-              {c.kind === 'added' && (whole ? <span>{c.after}</span> : <ins className="audit-new">{c.after}</ins>)}
-              {c.kind === 'removed' && (whole ? <span>{c.before}</span> : <del className="audit-old">{c.before}</del>)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {changes.length > SHOWN && (
-        <button type="button" className="btn btn-link btn-sm p-0" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-          {open ? 'Show fewer' : `Show ${changes.length - SHOWN} more`}
+    <aside ref={ref} className="audit-details" aria-labelledby="audit-details-title">
+      <div className="audit-details-head">
+        <div>
+          <div className="audit-details-kind">{describeAction(entry.action)}</div>
+          <h3 id="audit-details-title" className="audit-details-title">
+            {summarize(entry)}
+          </h3>
+        </div>
+        <button type="button" className="audit-details-close" onClick={onClose} aria-label="Close the details">
+          <i className="bi bi-x-lg" aria-hidden="true" />
         </button>
+      </div>
+      <dl className="audit-details-facts">
+        <dt>When</dt>
+        <dd>{new Date(entry.at).toLocaleString()}</dd>
+        <dt>Who</dt>
+        <dd>{entry.actor}</dd>
+        <dt>About</dt>
+        <dd>
+          {entry.targetType}
+          {entry.targetId && (
+            <>
+              {' · '}
+              <span className="font-monospace audit-target">{entry.targetId}</span>
+            </>
+          )}
+        </dd>
+      </dl>
+      <div className="audit-details-section">
+        {whole ?? 'What changed'}
+      </div>
+      {changes.length === 0 ? (
+        <p className="text-muted small mb-0">No field changed.</p>
+      ) : (
+        <div className="audit-details-changes">
+          {changes.map(c => (
+            <div key={c.field} className="audit-change-card">
+              <div className="audit-change-field">{c.field}</div>
+              {c.kind === 'changed' ? (
+                <div className="audit-change-values">
+                  <span className="audit-change-label">Before</span>
+                  <span className="audit-old-text">{c.before}</span>
+                  <span className="audit-change-label">After</span>
+                  <span className="audit-new-text">{c.after}</span>
+                </div>
+              ) : (
+                <div className="audit-change-values">
+                  <span className="audit-change-label">{c.kind === 'added' ? (whole ? 'Value' : 'Added') : whole ? 'Value' : 'Removed'}</span>
+                  <span className={c.kind === 'added' && !whole ? 'audit-new-text' : c.kind === 'removed' && !whole ? 'audit-old-text' : ''}>
+                    {c.after ?? c.before}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
-    </div>
+      <Button variant="outline-secondary" size="sm" className="align-self-start" onClick={() => setRaw(r => !r)} aria-expanded={raw}>
+        {raw ? 'Hide the raw record' : 'Show the raw record'}
+      </Button>
+      {raw && <pre className="audit-raw">{JSON.stringify({ action: entry.action, before: entry.before, after: entry.after }, null, 2)}</pre>}
+    </aside>
   );
 }
 
-/** Who changed what, when, before and after (#915). Newest first, searchable. */
+/** Who changed what, when (#915). Newest first, searchable, filterable by kind; a row opens its details. */
 export function AuditLogPanel() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
+  const [kind, setKind] = useState<string | null>(null);
   const [result, setResult] = useState<Paged<AuditLogEntry> | null>(null);
   const [error, setError] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -65,10 +109,12 @@ export function AuditLogPanel() {
     return () => clearTimeout(t);
   }, [search]);
 
+  const types = useMemo(() => AUDIT_KINDS.find(k => k.key === kind)?.types, [kind]);
+
   useEffect(() => {
     let active = true;
     meService
-      .getAuditLog(page, PAGE_SIZE, query || undefined)
+      .getAuditLog(page, PAGE_SIZE, query || undefined, types)
       .then(r => {
         if (!active) return;
         setResult(r);
@@ -80,23 +126,45 @@ export function AuditLogPanel() {
     return () => {
       active = false;
     };
-  }, [page, query]);
+  }, [page, query, types]);
+
+  const entry = result?.data.find(e => e.id === selected) ?? null;
+  const pick = (k: string | null) => {
+    setKind(k);
+    setPage(1);
+    setSelected(null);
+  };
 
   return (
     <div>
       <p className="small text-muted">
-        Every change to settings, rules and permissions, with who made it. With login off the actor
-        is <span className="font-monospace">system</span>, because there are no accounts.
+        Every change to settings, rules, maps and permissions, with who made it. With login off the
+        actor is <span className="font-monospace">system</span>, because there are no accounts.
+        Select a row for the details.
       </p>
-      <Form.Control
-        type="search"
-        size="sm"
-        className="mb-3"
-        placeholder="Search by who, action or target…"
-        aria-label="Search the audit log"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
+      <div className="audit-toolbar">
+        <Form.Control
+          type="search"
+          size="sm"
+          placeholder="Search by who, action or target…"
+          aria-label="Search the audit log"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <div className="audit-chips" role="group" aria-label="Show">
+          {[{ key: null as string | null, label: 'All' }, ...AUDIT_KINDS.map(k => ({ key: k.key as string | null, label: k.label }))].map(c => (
+            <button
+              key={c.label}
+              type="button"
+              className={`audit-chip${kind === c.key ? ' audit-chip-on' : ''}`}
+              aria-pressed={kind === c.key}
+              onClick={() => pick(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {error && <p className="text-danger small">Couldn't load the audit log.</p>}
       {!error && !result && (
         <div className="text-muted small py-3">
@@ -106,58 +174,55 @@ export function AuditLogPanel() {
       )}
       {result && result.total === 0 && (
         <p className="small text-muted">
-          {query ? `No entries match "${query}".` : 'No changes recorded yet.'}
+          {query || kind ? 'No entries match.' : 'No changes recorded yet.'}
         </p>
       )}
       {result && result.total > 0 && (
-        <>
-          <div className="table-responsive">
-            <table className="table table-sm small align-middle">
+        <div className={`audit-layout${entry ? ' audit-layout-open' : ''}`}>
+          <div className="audit-table-wrap">
+            <table className="table table-sm small align-middle audit-table mb-0">
               <thead>
                 <tr>
                   <th scope="col">When</th>
                   <th scope="col">Who</th>
-                  <th scope="col" className="audit-what">What</th>
-                  <th scope="col" className="audit-change">Change</th>
+                  <th scope="col">Change</th>
                 </tr>
               </thead>
               <tbody>
                 {result.data.map(e => (
-                  <tr key={e.id}>
-                    <td className="text-nowrap">{new Date(e.at).toLocaleString()}</td>
+                  <tr
+                    key={e.id}
+                    className={e.id === selected ? 'audit-row-on' : undefined}
+                    aria-selected={e.id === selected}
+                  >
+                    <td className="text-nowrap text-muted">{when(e.at)}</td>
                     <td>{e.actor}</td>
                     <td>
-                      <div className="fw-semibold">{describeAction(e.action)}</div>
-                      <div className="text-muted font-monospace audit-code">{e.action}</div>
-                      <div className="text-muted">
-                        {e.targetType}
-                        {e.targetId && (
-                          <>
-                            {' '}
-                            · <span className="font-monospace audit-target">{e.targetId}</span>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <Changes before={e.before} after={e.after} />
+                      <button type="button" className="audit-row-button" onClick={() => setSelected(s => (s === e.id ? null : e.id))}>
+                        <span className={`audit-kind audit-kind-${kindOf(e.targetType).toLowerCase()}`}>{kindOf(e.targetType)}</span>
+                        {summarize(e)}
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {result.totalPages > 1 && (
+              <Pagination
+                currentPage={page}
+                totalPages={result.totalPages}
+                totalItems={result.total}
+                pageSize={PAGE_SIZE}
+                onPageChange={p => {
+                  setPage(p);
+                  setSelected(null);
+                }}
+                showPageSizeSelector={false}
+              />
+            )}
           </div>
-          {result.totalPages > 1 && (
-            <Pagination
-              currentPage={page}
-              totalPages={result.totalPages}
-              totalItems={result.total}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-              showPageSizeSelector={false}
-            />
-          )}
-        </>
+          {entry && <Details entry={entry} onClose={() => setSelected(null)} />}
+        </div>
       )}
     </div>
   );

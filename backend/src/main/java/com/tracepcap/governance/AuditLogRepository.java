@@ -20,4 +20,14 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
           + " OR LOWER(COALESCE(a.targetId, '')) LIKE :q ESCAPE '\\'"
           + " ORDER BY a.at DESC, a.id DESC")
   Page<AuditLogEntity> search(@Param("q") String q, Pageable pageable);
+
+  /** As {@link #search}, limited to entries about the given kinds of thing (target types). */
+  @Query(
+      "SELECT a FROM AuditLogEntity a WHERE a.targetType IN :types AND (:q IS NULL"
+          + " OR LOWER(a.actor) LIKE :q ESCAPE '\\' OR LOWER(a.action) LIKE :q ESCAPE '\\'"
+          + " OR LOWER(a.targetType) LIKE :q ESCAPE '\\'"
+          + " OR LOWER(COALESCE(a.targetId, '')) LIKE :q ESCAPE '\\')"
+          + " ORDER BY a.at DESC, a.id DESC")
+  Page<AuditLogEntity> searchIn(
+      @Param("q") String q, @Param("types") java.util.Collection<String> types, Pageable pageable);
 }

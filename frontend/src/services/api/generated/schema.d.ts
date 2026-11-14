@@ -64,7 +64,7 @@ export interface paths {
         };
         /**
          * List audited changes, newest first
-         * @description search matches the actor, action, target type or target id.
+         * @description search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.
          */
         get: operations["list_13"];
         put?: never;
@@ -4643,6 +4643,7 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 search?: string;
+                targetTypes?: string[];
             };
             header?: never;
             path?: never;

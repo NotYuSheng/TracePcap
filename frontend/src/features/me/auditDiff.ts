@@ -126,3 +126,88 @@ export function describeAction(action: string): string {
   const what = humanize(subject);
   return rest.length ? `${what} · ${rest.join(' ')}` : what;
 }
+
+// ── One line per entry, for the audit table ─────────────────────────────────────────────────────
+
+/** The kinds of thing the audit log records, for its filter chips: label → target types. */
+export const AUDIT_KINDS: { key: string; label: string; types: string[] }[] = [
+  { key: 'rules', label: 'Rules', types: ['detection-rule'] },
+  { key: 'maps', label: 'Maps', types: ['network-map'] },
+  { key: 'devices', label: 'Devices', types: ['host-occupancy', 'network-device', 'host-classification'] },
+  { key: 'addresses', label: 'Addresses', types: ['network-subnet', 'network-private-range', 'network-ip-org-rule', 'subnet', 'private-range', 'ip-org-rule'] },
+  { key: 'access', label: 'Settings and access', types: ['system-setting', 'permission', 'network'] },
+];
+
+/** The kind of thing an entry is about, as a short tag. */
+export function kindOf(targetType: string): string {
+  const k = AUDIT_KINDS.find(x => x.types.includes(targetType));
+  if (!k) return humanize(targetType);
+  return { rules: 'Rule', maps: 'Map', devices: 'Device', addresses: 'Address', access: 'Setting' }[k.key] ?? k.label;
+}
+
+const VERBS: Record<string, string> = {
+  create: 'Created', update: 'Changed', delete: 'Deleted', set: 'Set', reset: 'Reset', edit: 'Edited',
+  undo: 'Undid', reapply: 'Re-applied', merge: 'Merged', split: 'Split', same: 'Linked as one device',
+  'not-same': 'Marked as different devices', not_same: 'Marked as different devices', promote: 'Made global',
+};
+
+/** What the entry was about, by name: a rule's name, a label, a range, else the last part of its id. */
+function subjectOf(before?: Record<string, unknown> | null, after?: Record<string, unknown> | null, targetId?: string | null): string {
+  const v = { ...(before ?? {}), ...(after ?? {}) } as Record<string, unknown>;
+  for (const k of ['name', 'label', 'cidr', 'ip', 'key']) if (typeof v[k] === 'string' && v[k]) return String(v[k]);
+  if (typeof v.macA === 'string' && typeof v.macB === 'string') return `${v.macA} and ${v.macB}`;
+  if (!targetId) return '';
+  const last = targetId.split('/').pop() ?? targetId;
+  return /^[0-9a-f-]{36}$/i.test(last) ? '' : last;
+}
+
+/** "Changed live_check_tcp: Enabled", "Created branch_smb", "Linked as one device 3a:… and 7e:…". */
+/** A network map edit (#649) in words: what moved, what was added, renamed or noted. */
+function summarizeMapEdit(before?: Record<string, unknown> | null, after?: Record<string, unknown> | null): string {
+  const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  const list = (v: unknown) => (Array.isArray(v) ? (v as Record<string, unknown>[]) : []);
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (!after) {
+    const b = before ?? {};
+    const n = Object.keys(obj(b.placements)).length + list(b.groups).length + Object.keys(obj(b.names)).length + Object.keys(obj(b.notes)).length;
+    return n ? `Reset the network map (${count(n, 'edit', 'edits')} dropped)` : 'Reset the network map';
+  }
+  const b = before ?? {};
+  const parts: string[] = [];
+  const keysChanged = (x: unknown, y: unknown) => {
+    const a = obj(x);
+    const c = obj(y);
+    return [...new Set([...Object.keys(a), ...Object.keys(c)])].filter(k => a[k] !== c[k]);
+  };
+  const moved = keysChanged(b.placements, after.placements);
+  if (moved.length) parts.push(`Moved ${count(moved.length, 'device', 'devices')}`);
+  const beforeGroups = new Map(list(b.groups).map(g => [String(g.id), g]));
+  const afterGroups = new Map(list(after.groups).map(g => [String(g.id), g]));
+  for (const [id, g] of afterGroups) if (!beforeGroups.has(id)) parts.push(`Added the group “${String(g.name)}”`);
+  for (const [id, g] of beforeGroups) if (!afterGroups.has(id)) parts.push(`Deleted the group “${String(g.name)}”`);
+  const renamed = keysChanged(b.names, after.names);
+  if (renamed.length) parts.push(`Renamed ${count(renamed.length, 'group', 'groups')}`);
+  const noted = keysChanged(b.notes, after.notes);
+  if (noted.length) parts.push(`Noted ${count(noted.length, 'group', 'groups')}`);
+  if (!parts.length) return 'Edited the network map';
+  const text = parts.join(', ');
+  return text.charAt(0) + text.slice(1).replace(/(, )([A-Z])/g, (_m, sep, c) => sep + c.toLowerCase());
+}
+
+export function summarize(e: {
+  action: string;
+  targetId?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}): string {
+  if (e.action.startsWith('network-map.')) return summarizeMapEdit(e.before, e.after);
+  const verbKey = e.action.split('.').pop() ?? e.action;
+  const verb = VERBS[verbKey] ?? humanize(verbKey);
+  const subject = subjectOf(e.before, e.after, e.targetId);
+  let text = subject ? `${verb} ${subject}` : verb;
+  if (e.before && e.after) {
+    const fields = [...new Set(diffValues(e.before, e.after).map(c => c.field.split(' › ')[0]))];
+    if (fields.length) text += `: ${fields.slice(0, 3).join(', ')}${fields.length > 3 ? ` and ${fields.length - 3} more` : ''}`;
+  }
+  return text;
+}

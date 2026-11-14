@@ -49,6 +49,12 @@ public class AuditLogService {
 
   @Transactional(readOnly = true)
   public PagedResponse<AuditLogDto> list(int page, int pageSize, String search) {
+    return list(page, pageSize, search, null);
+  }
+
+  /** {@code targetTypes} limits the list to entries about those kinds of thing; null or empty: all. */
+  @Transactional(readOnly = true)
+  public PagedResponse<AuditLogDto> list(int page, int pageSize, String search, java.util.List<String> targetTypes) {
     if (page < 1) throw new IllegalArgumentException("page must be 1 or more");
     if (pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
       throw new IllegalArgumentException("pageSize must be between 1 and " + MAX_PAGE_SIZE);
@@ -57,7 +63,10 @@ public class AuditLogService {
         search == null || search.isBlank()
             ? null
             : "%" + search.trim().toLowerCase(Locale.ROOT).replace("%", "\\%").replace("_", "\\_") + "%";
-    Page<AuditLogEntity> result = repository.search(q, PageRequest.of(page - 1, pageSize));
+    Page<AuditLogEntity> result =
+        targetTypes == null || targetTypes.isEmpty()
+            ? repository.search(q, PageRequest.of(page - 1, pageSize))
+            : repository.searchIn(q, targetTypes, PageRequest.of(page - 1, pageSize));
     return PagedResponse.of(
         result.getContent().stream().map(AuditLogService::toDto).toList(),
         result.getTotalElements(),

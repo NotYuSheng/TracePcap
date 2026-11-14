@@ -5499,7 +5499,7 @@
     },
     "/api/v1/audit-log": {
       "get": {
-        "description": "search matches the actor, action, target type or target id.",
+        "description": "search matches the actor, action, target type or target id. targetTypes (repeatable) limits the list to entries about those kinds of thing, e.g. detection-rule.",
         "operationId": "list_13",
         "parameters": [
           {
@@ -5528,6 +5528,17 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "targetTypes",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             }
           }
         ],
