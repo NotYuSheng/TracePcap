@@ -263,12 +263,12 @@ export function buildGroupTree(
 
 // ── Layout ───────────────────────────────────────────────────────────────────────────────────
 
-/** A device's cell: wide, as node labels run several lines of text. */
-const CELL_W = 200;
-const CELL_H = 140;
+/** A device's cell: wide, as node labels run several lines of text. Labels are fitted to it. */
+export const CELL_W = 240;
+export const CELL_H = 170;
 const PAD = 20;
 /** Where a node sits in its cell, from the top: room above for the node, below for its label. */
-const NODE_TOP = 34;
+export const NODE_TOP = 34;
 /** Room for a box's name on one line, by level (layout units). */
 const minWidthFor = (g: GroupNode) => (g.level === 1 ? 600 : g.level === 2 ? 360 : 0);
 const GAP = 28;

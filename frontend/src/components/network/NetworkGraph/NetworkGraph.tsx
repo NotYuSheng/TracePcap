@@ -12,7 +12,7 @@ const EMPTY_LINKS: { from: string; to: string; label: string }[] = [];
 import circular from 'graphology-layout/circular';
 import noverlap from 'graphology-layout-noverlap';
 import type { GraphNode, GraphEdge, GraphLayoutType } from '@/features/network/types';
-import { buildGroupTree, layoutGroups, type GroupedLayout } from '@/features/network/services/networkGroups';
+import { buildGroupTree, layoutGroups, CELL_H, CELL_W, NODE_TOP, type GroupedLayout } from '@/features/network/services/networkGroups';
 import type { NetworkSegment } from '@/features/networkSegments/networkSegmentService';
 import type { CustomPrivateRange } from '@/features/cluster/types/customPrivateRange.types';
 import { drawGroupBoxes } from './groupBoxes';
@@ -198,6 +198,7 @@ function drawNodeLabel(
   linesMap: Map<string, string[]>,
   hlMap?: Map<string, NodeHighlight>,
   contestedMap?: Map<string, boolean>,
+  fit?: { w: number; below: number } | null,
 ): void {
   const { x, y, size, label, color: accentColor } = data;
   // The per-node sidecars are keyed by node id: two nodes can share a label (one device that moved
@@ -255,7 +256,21 @@ function drawNodeLabel(
 
   // Text label(s) below — one line per configured field.
   // An empty label means the node is dimmed (hover) and should draw no text.
-  const lines = label ? linesMap.get(id) ?? linesMap.get(label) ?? [label] : [];
+  let lines = label ? linesMap.get(id) ?? linesMap.get(label) ?? [label] : [];
+  if (fit && lines.length > 0) {
+    // A cell of the network map: as many lines as fit under the node, each cut to the cell's width,
+    // so neighbours never overlap; zooming in shows the rest.
+    const room = Math.floor((fit.below - size - 8) / 13);
+    lines = lines.slice(0, Math.max(0, room));
+    ctx.font = `500 11px Inter, system-ui, sans-serif`;
+    const maxW = fit.w - 10;
+    lines = lines.map(l => {
+      if (ctx.measureText(l).width <= maxW) return l;
+      let t = l;
+      while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+      return t.length > 1 ? t + '…' : '';
+    }).filter(Boolean);
+  }
   if (lines.length > 0) {
     ctx.font = `500 11px Inter, system-ui, sans-serif`;
     ctx.fillStyle = labelColor;
@@ -623,6 +638,8 @@ export const NetworkGraph = memo(function NetworkGraph({
   // Dragged nodes keep their place until the layout runs again; this puts them back.
   const [nodesMoved, setNodesMoved] = useState(false);
   const resetLayoutRef = useRef<(() => void) | null>(null);
+  // The network map's cell size on screen, refreshed each render: labels are fitted to it.
+  const labelFitRef = useRef<{ w: number; below: number } | null>(null);
   const groupingRef = useRef({ segments: networkSegments, customRanges: customPrivateRanges, dnsNames });
   groupingRef.current = { segments: networkSegments, customRanges: customPrivateRanges, dnsNames };
   const deviceLinksRef = useRef(deviceLinks);
@@ -787,7 +804,7 @@ export const NetworkGraph = memo(function NetworkGraph({
         const faint = activeInWindowRef.current?.faintNodeIds?.has(data.key) ?? false;
         ctx.save();
         if (faint) ctx.globalAlpha = 0.3;
-        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current);
+        drawNodeLabel(ctx, data, labelColor, nodeFill, nodeTypeByLabel.current, deviceTypeByLabel.current, nodeLinesByLabel.current, highlightedNodesRef.current, contestedByLabel.current, labelFitRef.current);
         ctx.restore();
       },
       defaultDrawNodeHover: (ctx, data) => {
@@ -998,6 +1015,13 @@ export const NetworkGraph = memo(function NetworkGraph({
     // Before each render, rebuild the label→nodeType/deviceType sidecar maps.
     // Keyed by label (IP/hostname) which is unique per node in this graph.
     sigma.on('beforeRender', () => {
+      if (groupLayoutRef.current) {
+        const o = sigma.graphToViewport({ x: 0, y: 0 });
+        const c = sigma.graphToViewport({ x: CELL_W, y: -(CELL_H - NODE_TOP) });
+        labelFitRef.current = { w: Math.abs(c.x - o.x), below: Math.abs(c.y - o.y) };
+      } else {
+        labelFitRef.current = null;
+      }
       nodeTypeByLabel.current.clear();
       deviceTypeByLabel.current.clear();
       contestedByLabel.current.clear();
