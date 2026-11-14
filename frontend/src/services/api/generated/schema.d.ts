@@ -4209,6 +4209,8 @@ export interface components {
             labeledAt?: string;
             overridesDefault?: boolean;
             scope?: string;
+            segmentKey?: string;
+            segmentLabel?: string;
             /** Format: int32 */
             snapshotsSeen?: number;
             source?: string;
@@ -4388,6 +4390,8 @@ export interface components {
             label?: string;
             /** Format: uuid */
             networkId?: string;
+            segmentKey?: string;
+            segmentLabel?: string;
         };
         WebServerDetailResponse: {
             api?: boolean;

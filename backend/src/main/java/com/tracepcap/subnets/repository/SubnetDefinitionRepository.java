@@ -18,4 +18,13 @@ public interface SubnetDefinitionRepository extends JpaRepository<SubnetDefiniti
   java.util.List<SubnetDefinitionEntity> findByNetworkIdOrderByCidr(java.util.UUID networkId);
 
   Optional<SubnetDefinitionEntity> findByNetworkIdAndCidr(java.util.UUID networkId, String cidr);
+
+  /** A network's entry for a CIDR on one network segment (#462); a null segment is the range as a whole. */
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT s FROM SubnetDefinitionEntity s WHERE s.networkId = :networkId AND s.cidr = :cidr"
+          + " AND ((:segment IS NULL AND s.segmentKey IS NULL) OR s.segmentKey = :segment)")
+  Optional<SubnetDefinitionEntity> findForSegment(
+      @org.springframework.data.repository.query.Param("networkId") java.util.UUID networkId,
+      @org.springframework.data.repository.query.Param("cidr") String cidr,
+      @org.springframework.data.repository.query.Param("segment") String segment);
 }

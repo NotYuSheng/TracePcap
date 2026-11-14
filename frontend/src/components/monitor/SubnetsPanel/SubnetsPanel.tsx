@@ -19,6 +19,12 @@ interface SubnetsPanelProps {
   onChanged?: () => void;
 }
 
+
+/** A subnet's identity: its CIDR, and which network sharing the range it's for (#462). */
+function subnetKey(s: { cidr: string; segmentKey?: string | null }): string {
+  return `${s.cidr}|${s.segmentKey ?? ''}`;
+}
+
 export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted, onChanged }: SubnetsPanelProps) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addCidr, setAddCidr] = useState('');
@@ -121,8 +127,8 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
     setCandidates([]);
     try {
       const results = await subnetService.detect(snap.fileId);
-      const savedCidrs = new Set(subnets.map(s => s.cidr));
-      setCandidates(results.filter(c => !savedCidrs.has(c.cidr)));
+      const savedCidrs = new Set(subnets.map(subnetKey));
+      setCandidates(results.filter(c => !savedCidrs.has(subnetKey(c))));
     } finally {
       setDetecting(false);
     }
@@ -133,23 +139,25 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
     setCandidates([]);
     try {
       const results = await subnetService.detectFromNetwork(networkId);
-      const savedCidrs = new Set(subnets.map(s => s.cidr));
-      setCandidates(results.filter(c => !savedCidrs.has(c.cidr)));
+      const savedCidrs = new Set(subnets.map(subnetKey));
+      setCandidates(results.filter(c => !savedCidrs.has(subnetKey(c))));
     } finally {
       setDetecting(false);
     }
   };
 
   const handleSaveCandidate = async (candidate: SubnetDefinition) => {
-    setSavingCidr(candidate.cidr);
+    setSavingCidr(subnetKey(candidate));
     try {
       const saved = await networkAddressService.put(networkId, 'subnets', {
         cidr: candidate.cidr,
         label: candidate.label ?? null,
         description: candidate.description ?? null,
+        segmentKey: candidate.segmentKey ?? null,
+        segmentLabel: candidate.segmentLabel ?? null,
       });
       onSaved(saved as unknown as SubnetDefinition);
-      setCandidates(prev => prev.filter(c => c.cidr !== candidate.cidr));
+      setCandidates(prev => prev.filter(c => subnetKey(c) !== subnetKey(candidate)));
     } finally {
       setSavingCidr(null);
     }
@@ -181,7 +189,10 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                   style={{ cursor: 'pointer' }}
                   title="Open subnet details"
                 >
-                      <td className="small font-monospace">{subnet.cidr}</td>
+                      <td className="small">
+                        <span className="font-monospace">{subnet.cidr}</span>
+                        {subnet.segmentLabel && <div className="text-muted">on {subnet.segmentLabel}</div>}
+                      </td>
                       <td className="small">
                         <div className="d-flex align-items-center gap-1">
                           {subnet.label || <span className="text-muted fst-italic">—</span>}
@@ -292,8 +303,11 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
               </thead>
               <tbody>
                 {visibleCandidates.map(c => (
-                  <tr key={c.cidr}>
-                    <td className="font-monospace small">{c.cidr}</td>
+                  <tr key={subnetKey(c)}>
+                    <td className="small">
+                      <span className="font-monospace">{c.cidr}</span>
+                      {c.segmentLabel && <div className="text-muted">on {c.segmentLabel}</div>}
+                    </td>
                     <td className="small text-muted">{c.hostCount ?? '—'}</td>
                     <td className="small text-muted">
                       {c.densityScore != null
@@ -321,9 +335,9 @@ export const SubnetsPanel = ({ networkId, subnets, snapshots, onSaved, onDeleted
                           size="sm"
                           variant="outline-primary"
                           onClick={() => handleSaveCandidate(c)}
-                          disabled={savingCidr === c.cidr}
+                          disabled={savingCidr === subnetKey(c)}
                         >
-                          {savingCidr === c.cidr
+                          {savingCidr === subnetKey(c)
                             ? <Spinner animation="border" size="sm" />
                             : <><i className="bi bi-plus-lg me-1" />Save</>}
                         </Button>

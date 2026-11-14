@@ -112,7 +112,7 @@ public class SubnetController {
       @PathVariable Long id, @RequestParam UUID networkId) {
     return subnetService
         .find(id)
-        .map(s -> ResponseEntity.ok(subnetStalenessService.history(s.getCidr(), networkId)))
+        .map(s -> ResponseEntity.ok(subnetStalenessService.history(s.getCidr(), s.getSegmentKey(), networkId)))
         .orElseThrow(
             () ->
                 new com.tracepcap.common.exception.ResourceNotFoundException(

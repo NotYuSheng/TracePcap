@@ -28,6 +28,9 @@ export interface AddressEntryInput {
   description?: string | null;
   classification?: 'PRIVATE' | 'PUBLIC';
   hidden?: boolean;
+  /** On a subnet: which of several networks sharing the range it's for (#462). */
+  segmentKey?: string | null;
+  segmentLabel?: string | null;
 }
 
 const NETWORK_LIST: Record<AddressKind, (networkId: string) => string> = {

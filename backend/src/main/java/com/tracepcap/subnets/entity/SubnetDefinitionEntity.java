@@ -32,6 +32,17 @@ public class SubnetDefinitionEntity {
   @Column(nullable = false, length = 50)
   private String cidr;
 
+  /**
+   * Which of several networks sharing this range the label is for (#462): its VLAN or DHCP server
+   * key, e.g. vlan:20. Null for the range as a whole; always null on the shared default.
+   */
+  @Column(name = "segment_key", length = 100)
+  private String segmentKey;
+
+  /** That network's name when it was labelled, e.g. "branch.corp.example (VLAN 20)". */
+  @Column(name = "segment_label", length = 255)
+  private String segmentLabel;
+
   @Column(length = 100)
   private String label;
 
