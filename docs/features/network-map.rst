@@ -25,7 +25,9 @@ Each box sits inside the one above it:
     :doc:`overlapping-networks`), named by its DHCP domain and VLAN, with its
     range, gateway and DHCP server under the name. Local devices that no
     found network accounts for are in **Other local addresses** (or **Local
-    network** when the capture has no DHCP at all).
+    network** when the capture has no DHCP at all). A statically addressed
+    host (a server, a printer) joins the network whose range holds its
+    address, when exactly one network has that range.
 
     - **Subnet**: the /24 (IPv4) or /64 (IPv6).
 
@@ -66,6 +68,24 @@ minutes, a visitor's phone joins at 15).
          and office365.com.
 
    ``small_office.pcap``.
+
+``sample-files/site_to_site_vpn.pcap`` (``gen_site_to_site_vpn.py``) is two
+offices joined over the internet: each LAN sits behind a gateway that runs DHCP,
+DNS and NAT, and the gateways run a WireGuard tunnel between their public
+addresses. On the map the two offices are side by side under *Your networks*;
+the gateways' public addresses sit together in the Internet box (named by
+reverse DNS, so both fall under ``acme.example``), joined by the tunnel; long
+edges run from Branch's PCs and till to the HQ file and ERP servers (the traffic
+inside the tunnel, captured on each LAN); and each public address fans out to
+the sites the offices browse. A gateway's inside and outside addresses are
+separate devices on the map: nothing in the capture ties them together.
+
+.. figure:: images/network-map-site-to-site.png
+   :alt: The network map of site_to_site_vpn.pcap: hq.acme.example and branch.acme.example under
+         Your networks, the two gateways' public addresses together under acme.example in the
+         Internet box, and edges from the Branch devices to the HQ servers.
+
+   ``site_to_site_vpn.pcap``.
 
 With the Time Axis
 ------------------

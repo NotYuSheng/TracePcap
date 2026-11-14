@@ -135,7 +135,7 @@ function segmentDetail(s: NetworkSegment): string {
 /**
  * Which network a node belongs to: its device key names it; else, among the networks whose range
  * holds its address, the one that leased to its MAC, then the one whose gateway or DHCP server it
- * is, then the only one that leased its address. The range check matters for a router that serves
+ * is, then the only one that leased its address, then the only one whose range holds it. The range check matters for a router that serves
  * several VLANs with one MAC: each interface goes to its own network.
  */
 function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment | undefined {
@@ -155,7 +155,11 @@ function segmentFor(node: GraphNode, segments: NetworkSegment[]): NetworkSegment
   const infra = inRange.filter(x => x.routers.includes(ip) || x.serverIds.includes(ip));
   if (infra.length === 1) return infra[0];
   const holders = inRange.filter(x => x.clients.some(c => c.ip === ip));
-  return holders.length === 1 ? holders[0] : undefined;
+  if (holders.length === 1) return holders[0];
+  // A statically addressed host (a server, a printer) leased nothing, but sits in its network's
+  // range: it belongs there when exactly one network has that range (with overlaps, it's unknown).
+  const ranged = segments.filter(x => x.cidr && ipInCidr(ip, x.cidr));
+  return holders.length === 0 && ranged.length === 1 ? ranged[0] : undefined;
 }
 
 function bucket<T>(items: T[], keyOf: (t: T) => string): Map<string, T[]> {
