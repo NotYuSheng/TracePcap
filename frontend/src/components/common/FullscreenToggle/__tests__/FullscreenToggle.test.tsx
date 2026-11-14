@@ -1,7 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { useEscapeLayerRoot } from '@utils/useEscapeLayer'
 import { FullscreenToggle } from '../FullscreenToggle'
+
+function Root({ children }: { children: React.ReactNode }) {
+  useEscapeLayerRoot()
+  return <>{children}</>
+}
 
 describe('FullscreenToggle', () => {
   it('shows no hint until signalled', () => {
@@ -11,11 +18,11 @@ describe('FullscreenToggle', () => {
 
   it('points itself out when signalled; Escape dismisses the hint', async () => {
     const user = userEvent.setup()
-    const { rerender } = render(<FullscreenToggle isFullscreen={false} onToggle={() => {}} hintSignal={0} />)
-    rerender(<FullscreenToggle isFullscreen={false} onToggle={() => {}} hintSignal={1} />)
+    const { rerender } = render(<Root><FullscreenToggle isFullscreen={false} onToggle={() => {}} hintSignal={0} /></Root>)
+    rerender(<Root><FullscreenToggle isFullscreen={false} onToggle={() => {}} hintSignal={1} /></Root>)
     expect(await screen.findByText(/Looking for fullscreen/)).toBeInTheDocument()
     await user.keyboard('{Escape}')
-    expect(screen.queryByText(/Looking for fullscreen/)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(/Looking for fullscreen/)).not.toBeInTheDocument())
   })
 
   it('in fullscreen, says how to leave it; clicking toggles and hides the hint', async () => {
@@ -25,6 +32,24 @@ describe('FullscreenToggle', () => {
     expect(await screen.findByText(/To leave fullscreen/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Exit fullscreen' }))
     expect(onToggle).toHaveBeenCalledOnce()
-    expect(screen.queryByText(/To leave fullscreen/)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(/To leave fullscreen/)).not.toBeInTheDocument())
+  })
+
+  it('survives the click that raised it (a Fit view press elsewhere on the page)', async () => {
+    const user = userEvent.setup()
+    function Page() {
+      const [n, setN] = useState(0)
+      return (
+        <Root>
+          <FullscreenToggle isFullscreen={false} onToggle={() => {}} hintSignal={n} />
+          <button type="button" onClick={() => setN(x => x + 1)}>Fit view</button>
+        </Root>
+      )
+    }
+    render(<Page />)
+    await user.click(screen.getByRole('button', { name: 'Fit view' }))
+    expect(await screen.findByText(/Looking for fullscreen/)).toBeInTheDocument()
+    await new Promise(r => setTimeout(r, 50))
+    expect(screen.getByText(/Looking for fullscreen/)).toBeInTheDocument()
   })
 })

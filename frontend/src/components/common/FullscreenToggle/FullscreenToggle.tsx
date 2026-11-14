@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { Button, Overlay, Popover } from '@govtechsg/sgds-react';
 import { useEscapeLayer } from '@utils/useEscapeLayer';
+import { Button, Overlay } from '@govtechsg/sgds-react';
 import './FullscreenToggle.css';
 
 interface Props {
@@ -18,47 +18,80 @@ interface Props {
 const HINT_MS = 6000;
 
 /** The graph card's fullscreen button, which can point itself out to a user looking for it. */
-export function FullscreenToggle({ isFullscreen, onToggle, hintSignal = 0, hintId = 'fullscreen-hint' }: Props) {
-  const target = useRef<HTMLButtonElement>(null);
+export function FullscreenToggle({
+  isFullscreen,
+  onToggle,
+  hintSignal = 0,
+  hintId = 'fullscreen-hint',
+}: Props) {
+  // The hint anchors on a wrapper: SGDS Button doesn't forward its ref.
+  const target = useRef<HTMLSpanElement>(null);
   const [hint, setHint] = useState(false);
 
   useEffect(() => {
     if (hintSignal === 0) return;
     setHint(true);
-    const t = setTimeout(() => setHint(false), HINT_MS);
-    return () => clearTimeout(t);
+    const hide = setTimeout(() => setHint(false), HINT_MS);
+    return () => clearTimeout(hide);
   }, [hintSignal]);
 
   const layerRef = useMemo(
-    () => ({ get current() { return document.getElementById(hintId); } }) as RefObject<HTMLElement | null>,
-    [hintId],
+    () =>
+      ({
+        get current() {
+          return document.getElementById(hintId);
+        },
+      }) as RefObject<HTMLElement | null>,
+    [hintId]
   );
   useEscapeLayer(() => setHint(false), { enabled: hint, ref: layerRef });
 
   const label = isFullscreen ? 'Exit fullscreen' : 'Fullscreen';
   return (
     <>
-      <Button
-        ref={target}
-        variant="link"
-        size="sm"
-        className={`p-0 text-muted${hint ? ' fullscreen-toggle-pulse' : ''}`}
-        onClick={() => { setHint(false); onToggle(); }}
-        aria-label={label}
-        title={label}
-      >
-        <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`} aria-hidden="true" />
-      </Button>
-      <Overlay target={target.current} show={hint} placement="bottom-end" rootClose onHide={() => setHint(false)}>
-        <Popover id={hintId} className="fullscreen-hint">
-          <Popover.Body>
+      <span ref={target} className="d-inline-flex">
+        <Button
+          variant="link"
+          size="sm"
+          className={`p-0 text-muted${hint ? ' fullscreen-toggle-pulse' : ''}`}
+          onClick={() => {
+            setHint(false);
+            onToggle();
+          }}
+          aria-label={label}
+          title={label}
+        >
+          <i
+            className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`}
+            aria-hidden="true"
+          />
+        </Button>
+      </span>
+      {/* A status note, not a popover: no rootClose, so further clicks (another Fit view press)
+          don't dismiss it. It goes on a timer, on Escape (the shared layer stack) or on pressing
+          the button. */}
+      <Overlay target={target} show={hint} placement="bottom-end">
+        {overlay => (
+          <div
+            ref={overlay.ref}
+            style={overlay.style}
+            id={hintId}
+            role="status"
+            className="fullscreen-hint"
+          >
             {isFullscreen ? (
-              <>To leave fullscreen, use this button. <strong>Fit view</strong> only re-centres the graph.</>
+              <>
+                To leave fullscreen, use this button. <strong>Fit view</strong> only re-centres the
+                graph.
+              </>
             ) : (
-              <>Looking for fullscreen? It's this button. <strong>Fit view</strong>, at the bottom right of the graph, only re-centres it.</>
+              <>
+                Looking for fullscreen? It's this button. <strong>Fit view</strong>, at the bottom
+                right of the graph, only re-centres it.
+              </>
             )}
-          </Popover.Body>
-        </Popover>
+          </div>
+        )}
       </Overlay>
     </>
   );
