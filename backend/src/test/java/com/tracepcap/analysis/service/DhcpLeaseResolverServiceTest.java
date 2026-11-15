@@ -73,4 +73,49 @@ class DhcpLeaseResolverServiceTest {
         .containsExactlyInAnyOrder(
             "hq.corp.example|00:1b:21:aa:00:01|86400", "branch.corp.example|00:1b:21:bb:00:01|3600");
   }
+
+  /**
+   * A client that asked and was never ACKed is unanswered; one that was ACKed, or that holds a lease
+   * from a lone REQUEST, is not.
+   */
+  @Test
+  void aClientNobodyAckedIsUnanswered() {
+    Map<String, DhcpLeaseResolverService.Lease> leases = new LinkedHashMap<>();
+    Map<String, DhcpLeaseResolverService.Asking> asking = new LinkedHashMap<>();
+    java.util.Set<String> acked = new java.util.HashSet<>();
+    // A DISCOVER and a REQUEST with no address, from one MAC on VLAN 30: never answered.
+    String pi = "|||||||||";
+    DhcpLeaseResolverService.parseRow(
+        ("1730000000.0|1|0.0.0.0|0.0.0.0||b8:27:eb:5e:00:01|raspberrypi" + pi + "30").split("\\|", -1), leases, asking, acked);
+    DhcpLeaseResolverService.parseRow(
+        ("1730000030.0|3|0.0.0.0|0.0.0.0||B8:27:EB:5E:00:01|" + pi + "30").split("\\|", -1), leases, asking, acked);
+    // A client that asked and was ACKed.
+    DhcpLeaseResolverService.parseRow(
+        "1730000000.0|1|0.0.0.0|0.0.0.0||aa:00:00:00:00:01|LAPTOP".split("\\|", -1), leases, asking, acked);
+    DhcpLeaseResolverService.parseRow(
+        "1730000001.0|5|10.0.0.21|0.0.0.0||aa:00:00:00:00:01|".split("\\|", -1), leases, asking, acked);
+    // A client with a lease from a REQUEST for an address, its ACK not captured.
+    DhcpLeaseResolverService.parseRow(
+        "1730000002.0|3|0.0.0.0|0.0.0.0|10.0.0.22|aa:00:00:00:00:02|PHONE".split("\\|", -1), leases, asking, acked);
+
+    var unanswered = DhcpLeaseResolverService.unanswered(asking, acked, leases);
+    assertThat(unanswered).hasSize(1);
+    var u = unanswered.get(0);
+    assertThat(u.mac()).isEqualTo("b8:27:eb:5e:00:01");
+    assertThat(u.hostname()).isEqualTo("raspberrypi");
+    assertThat(u.vlanId()).isEqualTo(30);
+    assertThat(u.requests()).isEqualTo(2);
+    assertThat(u.lastSeen()).isAfter(u.firstSeen());
+  }
+
+  /** The real tshark pass, DISCOVERs included, with each client's VLAN. */
+  @Test
+  void findsTheUnansweredClientsInTheFixture() throws Exception {
+    assumeTrue(new ProcessBuilder("tshark", "-v").start().waitFor() == 0, "tshark not installed");
+    var r = new DhcpLeaseResolverService().resolveAll(new File("src/test/resources/fixtures/dhcp-unanswered.pcap"));
+    assertThat(r.leases()).extracting(DhcpLeaseResolverService.Lease::ip).containsExactly("10.20.10.21");
+    assertThat(r.unanswered())
+        .extracting(u -> u.hostname() + "@" + u.vlanId() + "x" + u.requests())
+        .containsExactlyInAnyOrder("raspberrypi@10x3", "CAM-LOBBY@99x1");
+  }
 }

@@ -324,6 +324,7 @@ public class AnalysisService {
     List<WindowsIdentityResolverService.Logon> logons = List.of();
     Map<String, FailoverAddressResolverService.VirtualAddress> failoverAddresses = Map.of();
     List<DhcpLeaseResolverService.Lease> dhcpLeases = List.of();
+    List<DhcpLeaseResolverService.Unanswered> dhcpUnanswered = List.of();
 
     /** Stage 2 writes; every later stage reads. */
     PcapParserService.PcapAnalysisResult parseResult;
@@ -500,7 +501,10 @@ public class AnalysisService {
     // Router failover virtual addresses (VRRP/HSRP, #918): a small filtered pass. Never throws.
     run.failoverAddresses = failoverAddressResolverService.resolve(run.pcap);
     // DHCP leases (#918 item 3): which client MAC held which address when. Never throws.
-    run.dhcpLeases = dhcpLeaseResolverService.resolve(run.pcap);
+    // The same pass finds the clients that asked and were never answered.
+    DhcpLeaseResolverService.Resolution dhcp = dhcpLeaseResolverService.resolveAll(run.pcap);
+    run.dhcpLeases = dhcp.leases();
+    run.dhcpUnanswered = dhcp.unanswered();
     log.info(
         "[{}] [3/7] Extract (tool runs, no transaction): {}ms",
         run.fileId,
@@ -597,6 +601,7 @@ public class AnalysisService {
     Map<String, List<String>> severalNetworks = Map.of();
     try {
       hostOccupancyService.saveLeases(fileId, run.dhcpLeases);
+      hostOccupancyService.saveUnanswered(fileId, run.dhcpUnanswered);
       occupancyCounts = hostOccupancyService.recompute(fileId, run.failoverAddresses.keySet());
       severalNetworks = hostOccupancyService.severalNetworks(fileId);
     } catch (Exception e) {

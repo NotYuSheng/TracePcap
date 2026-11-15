@@ -1983,6 +1983,30 @@ class PipelineIntegrationTest {
     return b.array();
   }
 
+  /**
+   * A client nobody answered is listed under the network on the VLAN it asked on; one whose VLAN
+   * no network handed a lease out on is listed at the top, unplaced.
+   */
+  @Test
+  void networkSegments_listUnansweredClientsUnderTheirVlan() throws Exception {
+    ResponseEntity<JsonNode> upload = uploadFixture("dhcp-unanswered.pcap");
+    String fileId =
+        upload.getStatusCode() == HttpStatus.CREATED
+            ? upload.getBody().get("fileId").asText()
+            : upload.getBody().get("existingFileId").asText();
+    assertThat(awaitAnalysis(fileId)).isEqualTo("completed");
+
+    JsonNode body = rest.getForEntity("/api/v1/files/" + fileId + "/network-segments", JsonNode.class).getBody();
+    JsonNode vlan10 = null;
+    for (JsonNode s : body.get("segments")) if (s.path("vlanId").asInt() == 10) vlan10 = s;
+    assertThat(vlan10).as("the VLAN 10 network").isNotNull();
+    assertThat(vlan10.get("unanswered")).hasSize(1);
+    assertThat(vlan10.get("unanswered").get(0).get("hostname").asText()).isEqualTo("raspberrypi");
+    assertThat(vlan10.get("unanswered").get(0).get("requests").asInt()).isEqualTo(3);
+    assertThat(body.get("unanswered")).hasSize(1);
+    assertThat(body.get("unanswered").get(0).get("mac").asText()).isEqualTo("44:19:b6:c0:00:09");
+  }
+
   /** Polls a file until it leaves "processing" (or 2 minutes pass) and returns its status. */
   private String awaitAnalysis(String fileId) throws InterruptedException {
     String status = "processing";
