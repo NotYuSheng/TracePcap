@@ -30,6 +30,9 @@ interface CategoryStat {
   category: string;
 }
 
+/** Apps offered as quick chips; the rest are under More filters. */
+const QUICK_APPS = 4;
+
 interface ConversationFilterPanelProps {
   filters: ConversationFilters;
   onFiltersChange: (update: Partial<ConversationFilters>) => void;
@@ -162,6 +165,50 @@ export function ConversationFilterPanel({
 
   return (
     <div className="conversation-filter-panel mb-3">
+      {/* Quick filters, always in view: search by address, flagged only, the busiest apps.
+          Everything else is under More filters. */}
+      <div className="cfp-quick">
+        <Form.Control
+          type="search"
+          size="sm"
+          className="cfp-search"
+          placeholder="Search by IP address"
+          aria-label="Search conversations by IP address"
+          value={ipInput}
+          onChange={e => handleIpChange(e.target.value)}
+        />
+        <div role="group" aria-label="Quick filters" className="d-flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`cfp-chip${activeFilterCount === 0 ? ' active' : ''}`}
+            aria-pressed={activeFilterCount === 0}
+            onClick={onClearAll}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`cfp-chip${filters.hasRisks ? ' active' : ''}`}
+            aria-pressed={filters.hasRisks}
+            onClick={() => onFiltersChange({ hasRisks: !filters.hasRisks })}
+          >
+            <i className="bi bi-flag-fill me-1" aria-hidden="true" />
+            Flagged
+          </button>
+          {apps.slice(0, QUICK_APPS).map(a => (
+            <button
+              key={a.name}
+              type="button"
+              className={`cfp-chip${filters.apps.includes(a.name) ? ' active' : ''}`}
+              aria-pressed={filters.apps.includes(a.name)}
+              onClick={() => toggle('apps', a.name, filters.apps)}
+            >
+              {a.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Toggle button */}
       <div className="d-flex align-items-center gap-2">
         <Button
@@ -170,7 +217,7 @@ export function ConversationFilterPanel({
           onClick={() => setIsOpen(o => !o)}
         >
           <i className="bi bi-funnel me-1"></i>
-          Filters
+          More filters
           {activeFilterCount > 0 && (
             <Badge bg="primary" className="ms-2">{activeFilterCount}</Badge>
           )}

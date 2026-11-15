@@ -24,6 +24,17 @@ remembers your choice.
 - **Table**: every column, sortable, with a column chooser. Click a row to
   open the conversation in a dialog.
 
+Above both views, the quick filters stay in view:
+
+- a search box for an IP address;
+- **All**, which clears every filter;
+- **Flagged**, which shows only conversations with risks, custom-rule matches
+  or IDS alerts;
+- a chip for each of the capture's four busiest apps.
+
+**More filters** opens the full set: port, payload, protocols, categories,
+file types, risk types, rules, IDS alerts, device types and countries.
+
 How Conversations Are Built
 ----------------------------
 

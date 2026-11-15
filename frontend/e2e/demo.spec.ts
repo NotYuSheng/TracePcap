@@ -419,7 +419,7 @@ test('README demo walkthrough', async ({ page }) => {
   });
   await frameCardTop(filterPanel);
   await beat(page, FEATURE);
-  await showClick(page, filterPanel.getByRole('button', { name: 'Filters' }).first());
+  await showClick(page, filterPanel.getByRole('button', { name: /More filters/ }).first());
   // Re-frame: expanding pushes the panel's own height down, and the badges the
   // next step clicks are in the part that just appeared.
   await frameCardTop(filterPanel);
