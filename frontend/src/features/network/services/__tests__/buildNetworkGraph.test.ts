@@ -222,6 +222,8 @@ describe('buildNetworkGraph: an address used on two networks that share a range 
     const branch = g.nodes.find(n => n.id === '192.168.1.10@1')!
     expect(branch.label).toBe('BR-TILL-01')
     expect(branch.data.occupancy?.key).toBe('192.168.1.10~server:00:1b:21:bb:00:01')
+    // Its name came from its own DHCP lease, so the card can say where the name came from.
+    expect(branch.data.hostnameSource).toBe('dhcp')
   })
 })
 
