@@ -108,3 +108,29 @@
     margin-left: 0;
   }
 }
+
+/* Compact: totals and tabs on one row, for a narrower pane (a Monitor capture's map). */
+.traffic-card-compact .card-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  padding: 6px 16px 0;
+}
+.traffic-card-compact .traffic-totals {
+  gap: 4px 18px;
+  font-size: 0.8rem;
+}
+.traffic-card-compact .traffic-totals b {
+  font-size: 1rem;
+}
+.traffic-card-compact .traffic-shown {
+  display: none;
+}
+.traffic-card-compact .traffic-tabs {
+  margin: 0 0 0 auto;
+  border-bottom: 0;
+}
+.traffic-card-compact .traffic-tab {
+  height: 36px;
+}

@@ -20,6 +20,7 @@ import { FullscreenToggle } from '@components/common/FullscreenToggle';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { useState, useMemo, useRef, useEffect, type MutableRefObject, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './NetworkDiagramView.css';
 import { Button, Card, Form, Modal } from '@govtechsg/sgds-react';
 import { Alert } from '@components/common/Alert';
 import type { GraphNode } from '@/features/network/types';
@@ -72,6 +73,8 @@ interface NetworkDiagramViewProps {
   networkId?: string;
   /** The analysis page's title and intro; off where the caller has its own. */
   showTitle?: boolean;
+  /** Tighter chrome for a narrower pane: a one-row traffic strip and a slim node-limit line. */
+  compact?: boolean;
   monitor?: NetworkDiagramMonitorExtras;
 }
 
@@ -87,6 +90,7 @@ export const NetworkDiagramView = ({
   networkDiagramFilters,
   networkId,
   showTitle = true,
+  compact = false,
   monitor,
 }: NetworkDiagramViewProps) => {
 
@@ -705,7 +709,7 @@ export const NetworkDiagramView = ({
             {stats.totalConversations?.toLocaleString()} conversations by packet count. Set{' '}
             <code>VITE_NETWORK_DIAGRAM_CONVERSATION_LIMIT=false</code> to render all.
           </Alert>
-        ) : (
+        ) : compact ? null : (
           <Alert variant="info" className="mb-3">
             <i className="bi bi-info-circle me-2"></i>
             <strong>Performance limit enabled</strong> — all{' '}
@@ -725,9 +729,55 @@ export const NetworkDiagramView = ({
         selectedPair={selectedPair}
         onSelectPair={setSelectedPair}
         onHostClick={setSelectedNode}
+        compact={compact}
       />
 
-      {stats.totalNodes > MAX_DIAGRAM_NODES &&
+      {compact && stats.totalNodes > MAX_DIAGRAM_NODES && (
+        <div className="nd-limit-slim">
+          <span>
+            {hiddenNodes > 0 ? (
+              <>
+                <b>{nodeLimit}</b> of {stats.totalNodes.toLocaleString()} hosts, the most significant
+              </>
+            ) : (
+              <>
+                All <b>{stats.totalNodes.toLocaleString()}</b> hosts
+              </>
+            )}
+          </span>
+          <Form.Select
+            size="sm"
+            aria-label="How many hosts to show"
+            value={nodeLimit >= stats.totalNodes ? 'all' : String(nodeLimit)}
+            onChange={e =>
+              setNodeLimit(e.target.value === 'all' ? stats.totalNodes : parseInt(e.target.value, 10))
+            }
+          >
+            {[25, 50, 100, 200]
+              .filter(p => p < stats.totalNodes)
+              .map(p => (
+                <option key={p} value={p}>
+                  Top {p}
+                </option>
+              ))}
+            {![25, 50, 100, 200].includes(nodeLimit) && nodeLimit < stats.totalNodes && (
+              <option value={nodeLimit}>Top {nodeLimit}</option>
+            )}
+            <option value="all">All {stats.totalNodes.toLocaleString()}</option>
+          </Form.Select>
+          <Button
+            variant="link"
+            size="sm"
+            className="p-0"
+            onClick={() => setShowSignificanceModal(true)}
+            aria-label="How significance is decided"
+          >
+            <i className="bi bi-info-circle" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+
+      {!compact && stats.totalNodes > MAX_DIAGRAM_NODES &&
         (() => {
           const totalNodes = stats.totalNodes;
           const presets = [25, 50, 100, 200].filter(p => p < totalNodes);

@@ -1,0 +1,21 @@
+/* Compact mode's node limit: one quiet line instead of the info alert. */
+.nd-limit-slim {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 10px;
+  font-size: 0.8rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+.nd-limit-slim b {
+  color: var(--tp-text, #1f2937);
+}
+
+.nd-limit-slim .form-select {
+  width: auto;
+  font-size: 0.8rem;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
