@@ -2571,6 +2571,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test the LLM connection
+         * @description Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Requires the permission to edit the LLM connection.
+         */
+        post: operations["test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/settings": {
         parameters: {
             query?: never;
@@ -3766,6 +3786,18 @@ export interface components {
             macB?: string;
             reason?: string;
         };
+        LlmTestRequest: {
+            apiKey?: string;
+            baseUrl?: string;
+            model?: string;
+        };
+        LlmTestResult: {
+            baseUrl?: string;
+            model?: string;
+            models?: string[];
+            ok?: boolean;
+            steps?: components["schemas"]["Step"][];
+        };
         Match: {
             app?: string;
             cidr?: string;
@@ -4162,7 +4194,7 @@ export interface components {
         };
         PermissionDto: {
             /** @enum {string} */
-            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
+            action?: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION" | "LLM_CONNECTION";
             allowed?: boolean;
             /** @enum {string} */
             defaultLevel?: "ANALYST" | "ADMIN";
@@ -4422,6 +4454,14 @@ export interface components {
             /** Format: uuid */
             fileId?: string;
         };
+        Step: {
+            detail?: string;
+            key?: string;
+            label?: string;
+            /** Format: int64 */
+            ms?: number;
+            status?: string;
+        };
         StepExplanation: {
             explanation?: string;
             /** Format: int32 */
@@ -4541,6 +4581,7 @@ export interface components {
             kind?: string;
         };
         SystemSettingDto: {
+            choices?: string[];
             defaultValue?: string;
             deployValue?: string;
             description?: string;
@@ -4554,6 +4595,7 @@ export interface components {
             secret?: boolean;
             set?: boolean;
             takesEffect?: string;
+            type?: string;
             value?: string;
         };
         TimelineDataDto: {
@@ -8491,7 +8533,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION";
+                action: "DETECTION_RULES_GLOBAL" | "DETECTION_RULES_NETWORK" | "DETECTION_RULES_CAPTURE" | "HOST_OCCUPANCY" | "ADDRESS_DEFAULTS" | "NETWORK_SETTINGS" | "NETWORK_MAP" | "ANALYSIS_POLICY" | "RETENTION" | "LLM_CONNECTION";
             };
             cookie?: never;
         };
@@ -8972,6 +9014,30 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LlmTestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LlmTestResult"];
                 };
             };
         };

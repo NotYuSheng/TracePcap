@@ -88,7 +88,7 @@ class PolicySettingsServiceTest {
   void aDeployTimeSettingCantBeChanged() {
     assertThatThrownBy(() -> service.set("SURICATA_ENABLED", "false"))
         .isInstanceOf(ResourceNotFoundException.class);
-    assertThatThrownBy(() -> service.reset("LLM_API_KEY")).isInstanceOf(ResourceNotFoundException.class);
+    assertThatThrownBy(() -> service.reset("DATABASE_PASSWORD")).isInstanceOf(ResourceNotFoundException.class);
   }
 
   @Test

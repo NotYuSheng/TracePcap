@@ -11,7 +11,7 @@ public class SystemSettingDto {
   String key;
 
   String label;
-  /** INFRASTRUCTURE | MEMORY | POLICY: decides why it can't be changed here. */
+  /** INFRASTRUCTURE | MEMORY | POLICY | LLM: decides why it can't be changed here. */
   String group;
   /** The effective value; null for a secret or when unset with no default. */
   String value;
@@ -34,6 +34,13 @@ public class SystemSettingDto {
   boolean overridden;
   /** For an in-app-editable setting: when a change takes effect. */
   String takesEffect;
+  /**
+   * For an in-app-editable setting, how it's entered: INT, RATIO, DECIMAL, TEXT, URL, SECRET or
+   * CHOICE.
+   */
+  String type;
+  /** For a CHOICE setting, the allowed values. */
+  java.util.List<String> choices;
   /** Why it can't be changed here, in words an analyst can act on. Null when editable. */
   String lockedReason;
 

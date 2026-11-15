@@ -34,6 +34,11 @@ public class RuntimePolicy {
     return Double.parseDouble(value(p));
   }
 
+  /** The effective value as text; for a text, URL, secret or choice setting, the value itself. */
+  public String getString(EditablePolicy p) {
+    return value(p);
+  }
+
   /** The effective value as text. */
   public String value(EditablePolicy p) {
     String override = overrides().get(p.name());

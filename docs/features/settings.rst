@@ -62,17 +62,18 @@ is listed with its **effective value**, including values derived from ``APP_MEMO
 such as the upload cap. They are grouped as:
 
 - **Analysis policy**: detection thresholds, retention, display limits.
+- **LLM**: the server Story and Insights use, with **Test connection** (see
+  :doc:`../configuration/llm-setup`).
 - **Memory and capacity**: limits tied to how much memory the backend has.
-- **Infrastructure**: servers, storage, login, and the LLM.
+- **Infrastructure**: servers, storage and login.
 
 Most settings can't be changed in the app: each is greyed out with a lock, and clicking
 it shows why, which variable sets it, its default, and what it does. **Secrets**
 (database password, MinIO keys, LLM API key) only show whether they're set. Their values
 are never sent to the browser.
 
-**Changing policy in the app.** A few analysis-policy settings can be changed here
-without a redeploy, by whoever has the permission for them (see
-:ref:`settings-permissions`):
+**Changing settings in the app.** A few settings can be changed here without a
+redeploy, by whoever has the permission for them (see :ref:`settings-permissions`):
 
 .. list-table::
    :header-rows: 1
@@ -92,6 +93,11 @@ without a redeploy, by whoever has the permission for them (see
    * - ``HTTP_CLIENT_ERROR_SUSPICIOUS_RATIO``, ``HTTP_MIN_REQUESTS``
      - Analysis policy (analysts)
      - At once in a web server's HTTP tab (its host details).
+   * - ``LLM_API_BASE_URL``, ``LLM_API_KEY``, ``LLM_MODEL``, ``LLM_TEMPERATURE``,
+       ``LLM_MAX_TOKENS``, ``LLM_TIMEOUT``, ``LLM_TOOL_CALLING``
+     - LLM connection (admins)
+     - From the next LLM call (tool calling: the next story). The key is never shown
+       again once saved.
 
 Click the setting, then **Change…**. The value from the deployment's ``.env`` stays the
 default: a setting changed in the app is marked *changed in the app*, and **Reset to the
@@ -130,6 +136,8 @@ the defaults favour analysts:
    * - Analysis policy
      - analysts
    * - Retention
+     - admins
+   * - The LLM connection (server, key, model)
      - admins
    * - Which items need an admin (this table)
      - admins, always

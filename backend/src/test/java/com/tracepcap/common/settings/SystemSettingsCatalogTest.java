@@ -79,7 +79,9 @@ class SystemSettingsCatalogTest {
   @Test
   void everyEditablePolicyIsInTheCatalog() {
     for (EditablePolicy p : EditablePolicy.values()) {
-      assertThat(RuntimePolicy.entry(p).group()).isEqualTo(SystemSettingsCatalog.Group.POLICY);
+      // Policy settings sit in Analysis policy; the LLM connection has its own section.
+      assertThat(RuntimePolicy.entry(p).group())
+          .isEqualTo(p.kind() == EditablePolicy.Kind.LLM ? SystemSettingsCatalog.Group.LLM : SystemSettingsCatalog.Group.POLICY);
     }
   }
 

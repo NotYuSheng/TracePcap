@@ -52,12 +52,33 @@ with strong instruction-following and code understanding:
 - **Qwen2.5-7B-Coder-Instruct** — lighter option for machines with less RAM.
 - **Llama-3.1-8B-Instruct** — general-purpose alternative.
 
+Changing It Without a Restart
+-----------------------------
+
+The ``.env`` values are the starting point. The server, key, model, temperature,
+max tokens, timeout and tool calling can also be changed in **Settings › System ›
+LLM**, by whoever has the *Edit the LLM connection* permission (admins by default;
+with login off, that needs ``SYSTEM_SETTINGS_EDITABLE=true``). A change applies to
+the next LLM call: the client re-checks the new server's limits and, with tool
+calling on ``auto``, asks it afresh whether it supports tools. The API key is
+never shown again once saved, and the audit log records only that it changed.
+**Reset to the deployment's value** goes back to ``.env``.
+
 Testing the Connection
 -----------------------
 
-After configuring ``.env`` and restarting the stack, open the **AI Filter**
-tab. If the LLM server is reachable, the text input will be enabled. If it
-shows a warning, check:
+**Settings › System › LLM › Test connection** checks the connection in four steps,
+and says which one fails:
+
+1. **Reach the server**: ``LLM_API_BASE_URL/models`` answers, and how fast.
+2. **Key accepted**: the server doesn't refuse the key (401 or 403).
+3. **Model available**: the model is among the server's models. The server's models
+   are listed, and clicking one makes it the model.
+4. **Model replies**: a one-token chat completion comes back.
+
+Anyone can test what's in effect. When changing the URL, key or model, **Test this
+value** tests the typed value before saving it (that needs the permission, since it
+sends requests to the typed address). If a step fails, check:
 
 1. The inference server is running.
 2. ``LLM_API_BASE_URL`` is correct and reachable from inside the Docker

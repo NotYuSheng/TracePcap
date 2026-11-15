@@ -57,17 +57,22 @@ public class SystemSettingsService {
 
   private SystemSettingDto toEditableDto(Entry e, EditablePolicy p) {
     boolean canEdit = editGate.canEdit(p.kind());
+    // A secret is never sent back: only whether it's set, here and in the deployment.
+    String value = runtimePolicy.value(p);
+    boolean secret = p.secret();
     return SystemSettingDto.builder()
         .key(e.env())
         .label(e.label())
         .group(e.group().name())
-        .value(runtimePolicy.value(p))
-        .defaultValue(e.defaultValue())
-        .secret(false)
-        .set(true)
+        .value(secret ? null : value)
+        .defaultValue(secret ? null : e.defaultValue())
+        .secret(secret)
+        .set(value != null && !value.isBlank())
+        .type(p.type().name())
+        .choices(p.choices().isEmpty() ? null : p.choices())
         .editable(canEdit)
         .inAppEditable(true)
-        .deployValue(runtimePolicy.deployValue(p))
+        .deployValue(secret ? null : runtimePolicy.deployValue(p))
         .overridden(runtimePolicy.isOverridden(p))
         .takesEffect(p.takesEffect())
         .lockedReason(canEdit ? null : editGate.reason(p.kind()))
@@ -93,6 +98,9 @@ public class SystemSettingsService {
           "Analysis policy that is set when TracePcap is deployed, because changing it means"
               + " restarting a component. Set " + e.env() + " in the deployment's .env file and"
               + " restart.";
+      case LLM ->
+          "Read when the LLM server is first contacted, so it's set when TracePcap is deployed."
+              + " Set " + e.env() + " in the deployment's .env file and restart.";
     };
   }
 }

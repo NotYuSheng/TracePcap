@@ -5,7 +5,9 @@ import com.tracepcap.common.exception.ContextLengthExceededException;
 import com.tracepcap.common.exception.LlmException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.tracepcap.common.settings.LlmSettings;
 import com.tracepcap.config.LlmConfig;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import lombok.Data;
@@ -21,16 +23,61 @@ import org.springframework.web.client.RestTemplate;
 public class LlmClient {
 
   private final LlmConfig llmConfig;
-  private final RestTemplate llmRestTemplate;
+  private final LlmSettings settings;
   private final RestTemplate llmHealthCheckRestTemplate;
 
   public LlmClient(
       LlmConfig llmConfig,
+      LlmSettings settings,
       RestTemplate llmRestTemplate,
       RestTemplate llmHealthCheckRestTemplate) {
     this.llmConfig = llmConfig;
-    this.llmRestTemplate = llmRestTemplate;
+    this.settings = settings;
     this.llmHealthCheckRestTemplate = llmHealthCheckRestTemplate;
+    // The deployment's client, built with the deployment's timeout; replaced if Settings changes it.
+    this.generationTemplate = llmRestTemplate;
+    this.generationTimeoutSeconds =
+        llmConfig.getApi() != null && llmConfig.getApi().getTimeoutSeconds() != null
+            ? llmConfig.getApi().getTimeoutSeconds()
+            : 300;
+  }
+
+  /** The generation client, rebuilt when the timeout changes in Settings. */
+  private volatile RestTemplate generationTemplate;
+  private volatile int generationTimeoutSeconds;
+
+  private RestTemplate llmRestTemplate() {
+    int timeout = settings.timeoutSeconds();
+    RestTemplate t = generationTemplate;
+    if (timeout != generationTimeoutSeconds) {
+      SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+      factory.setConnectTimeout(timeout * 1000);
+      factory.setReadTimeout(timeout * 1000);
+      t = new RestTemplate(factory);
+      generationTemplate = t;
+      generationTimeoutSeconds = timeout;
+    }
+    return t;
+  }
+
+  /**
+   * What the capabilities below were worked out for: the server, model and max tokens. When any of
+   * them changes in Settings, they're worked out again (and what the old server said about tool
+   * calling is forgotten), so a new server isn't judged by the old one's limits.
+   */
+  private volatile String capabilitiesFor;
+
+  private void refreshCapabilitiesIfChanged() {
+    String key = settings.baseUrl() + "|" + settings.model() + "|" + settings.maxTokens();
+    if (key.equals(capabilitiesFor)) return;
+    synchronized (this) {
+      if (key.equals(capabilitiesFor)) return;
+      capabilitiesFor = key;
+      modelContextLength = null;
+      toolCallingSupported = null;
+      toolChoiceRequiredSupported = true;
+      initializeModelCapabilities();
+    }
   }
 
   private static final Pattern PATTERN_PROMPT_TOKENS = Pattern.compile("\\((\\d+) in the messages");
@@ -61,9 +108,13 @@ public class LlmClient {
    * not delay application startup when the LLM server is unavailable.
    */
   @PostConstruct
-  public void initializeModelCapabilities() {
+  public void start() {
+    refreshCapabilitiesIfChanged();
+  }
+
+  private void initializeModelCapabilities() {
     // Set a safe default immediately so the app is usable before the background check finishes
-    effectiveMaxTokens = llmConfig.getApi().getMaxTokens();
+    effectiveMaxTokens = settings.maxTokens();
 
     Thread.ofVirtual()
         .name("llm-capability-check")
@@ -76,7 +127,7 @@ public class LlmClient {
                   modelContextLength = llmConfig.getApi().getContextLength();
                   log.info(
                       "Using configured context length for model '{}': {}",
-                      llmConfig.getApi().getModel(),
+                      settings.model(),
                       modelContextLength);
                 } else {
                   log.info("Querying LLM server for model capabilities...");
@@ -85,12 +136,12 @@ public class LlmClient {
                     modelContextLength = modelInfo.getContextLength();
                     log.info(
                         "Auto-detected context length for model '{}': {}",
-                        llmConfig.getApi().getModel(),
+                        settings.model(),
                         modelContextLength);
                   } else {
                     log.warn(
                         "Could not determine model context length, using configured max_tokens: {}",
-                        llmConfig.getApi().getMaxTokens());
+                        settings.maxTokens());
                   }
                 }
 
@@ -100,19 +151,19 @@ public class LlmClient {
                   // reserving more tokens for the response than the context window can support.
                   int recommendedMaxTokens = (int) (modelContextLength * 0.8);
                   effectiveMaxTokens =
-                      Math.min(llmConfig.getApi().getMaxTokens(), recommendedMaxTokens);
+                      Math.min(settings.maxTokens(), recommendedMaxTokens);
 
                   log.info(
                       "Model '{}': context_length={}, configured_max_tokens={}, effective_max_tokens={}",
-                      llmConfig.getApi().getModel(),
+                      settings.model(),
                       modelContextLength,
-                      llmConfig.getApi().getMaxTokens(),
+                      settings.maxTokens(),
                       effectiveMaxTokens);
 
-                  if (llmConfig.getApi().getMaxTokens() > recommendedMaxTokens) {
+                  if (settings.maxTokens() > recommendedMaxTokens) {
                     log.warn(
                         "Configured LLM_MAX_TOKENS ({}) exceeds 80% of context window ({}). Using {} tokens for responses.",
-                        llmConfig.getApi().getMaxTokens(),
+                        settings.maxTokens(),
                         modelContextLength,
                         effectiveMaxTokens);
                   }
@@ -121,7 +172,7 @@ public class LlmClient {
                 log.warn(
                     "Failed to initialise model capabilities: {}. Using configured max_tokens: {}",
                     e.getMessage(),
-                    llmConfig.getApi().getMaxTokens());
+                    settings.maxTokens());
               }
             });
   }
@@ -129,18 +180,19 @@ public class LlmClient {
   /** Query the LLM server for model information */
   private ModelInfo queryModelCapabilities() {
     try {
-      String url = llmConfig.getApi().getBaseUrl() + "/models";
+      String url = settings.baseUrl() + "/models";
 
       HttpHeaders headers = new HttpHeaders();
-      headers.setBearerAuth(llmConfig.getApi().getApiKey());
+      headers.setBearerAuth(settings.apiKey());
       HttpEntity<Void> entity = new HttpEntity<>(headers);
 
+      // The short-timeout client: listing models is quick, and a slow server shouldn't hold this.
       ResponseEntity<ModelsResponse> response =
-          llmRestTemplate.exchange(url, HttpMethod.GET, entity, ModelsResponse.class);
+          llmHealthCheckRestTemplate.exchange(url, HttpMethod.GET, entity, ModelsResponse.class);
 
       if (response.getBody() != null && response.getBody().getData() != null) {
         // Find the configured model in the response
-        String configuredModel = llmConfig.getApi().getModel();
+        String configuredModel = settings.model();
         for (ModelInfo model : response.getBody().getData()) {
           if (model.getId() != null && model.getId().equals(configuredModel)) {
             return model;
@@ -171,9 +223,9 @@ public class LlmClient {
    */
   private void checkReachable() {
     try {
-      String url = llmConfig.getApi().getBaseUrl() + "/models";
+      String url = settings.baseUrl() + "/models";
       HttpHeaders headers = new HttpHeaders();
-      headers.setBearerAuth(llmConfig.getApi().getApiKey());
+      headers.setBearerAuth(settings.apiKey());
       HttpEntity<Void> entity = new HttpEntity<>(headers);
       llmHealthCheckRestTemplate.exchange(url, HttpMethod.GET, entity, String.class);
       log.debug("LLM health check passed");
@@ -190,9 +242,14 @@ public class LlmClient {
     }
   }
 
+  /** The model calls go to now (Settings, else the deployment), for recording on a story. */
+  public String currentModel() {
+    return settings.model();
+  }
+
   /** Get the effective max tokens (adjusted based on model capabilities) */
   public Integer getEffectiveMaxTokens() {
-    return effectiveMaxTokens != null ? effectiveMaxTokens : llmConfig.getApi().getMaxTokens();
+    return effectiveMaxTokens != null ? effectiveMaxTokens : settings.maxTokens();
   }
 
   /** Get the model's context length */
@@ -321,7 +378,7 @@ public class LlmClient {
   }
 
   private String toolCallingMode() {
-    String mode = llmConfig.getApi().getToolCalling();
+    String mode = settings.toolCalling();
     return mode == null ? "auto" : mode.trim().toLowerCase();
   }
 
@@ -363,6 +420,8 @@ public class LlmClient {
    * for the full generation timeout.
    */
   private void preflight(String systemPrompt, String userPrompt) {
+    // Settings may have changed since the last call: a new server or model is checked afresh.
+    refreshCapabilitiesIfChanged();
     if (modelContextLength != null) {
       int estimatedPromptTokens = (systemPrompt.length() + userPrompt.length()) / 2;
       int responseReserve = getEffectiveMaxTokens();
@@ -380,9 +439,9 @@ public class LlmClient {
   private ChatCompletionRequest buildRequest(
       String systemPrompt, String userPrompt, List<Tool> tools, String toolChoice) {
     return ChatCompletionRequest.builder()
-        .model(llmConfig.getApi().getModel())
+        .model(settings.model())
         .messages(List.of(new Message("system", systemPrompt), new Message("user", userPrompt)))
-        .temperature(llmConfig.getApi().getTemperature())
+        .temperature(settings.temperature())
         .maxTokens(getEffectiveMaxTokens())
         .tools(tools)
         .toolChoice(toolChoice)
@@ -395,7 +454,7 @@ public class LlmClient {
    */
   private Message post(ChatCompletionRequest request, String systemPrompt, String userPrompt) {
     try {
-      log.info("Sending request to LLM API: {}", llmConfig.getApi().getBaseUrl());
+      log.info("Sending request to LLM API: {}", settings.baseUrl());
       log.debug(
           "Generating completion with max_tokens: {}, tools: {}",
           getEffectiveMaxTokens(),
@@ -403,13 +462,13 @@ public class LlmClient {
 
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
-      headers.setBearerAuth(llmConfig.getApi().getApiKey());
+      headers.setBearerAuth(settings.apiKey());
 
       HttpEntity<ChatCompletionRequest> entity = new HttpEntity<>(request, headers);
 
-      String url = llmConfig.getApi().getBaseUrl() + "/chat/completions";
+      String url = settings.baseUrl() + "/chat/completions";
       ResponseEntity<ChatCompletionResponse> response =
-          llmRestTemplate.exchange(url, HttpMethod.POST, entity, ChatCompletionResponse.class);
+          llmRestTemplate().exchange(url, HttpMethod.POST, entity, ChatCompletionResponse.class);
 
       if (response.getBody() != null
           && response.getBody().getChoices() != null
