@@ -300,7 +300,9 @@ public class FileServiceImpl implements FileService {
       boolean enableNdpi,
       boolean enableSuricata,
       boolean enableFileExtraction,
-      FileSource source) {
+      FileSource source,
+      boolean generateStory,
+      boolean keepForever) {
     log.info("Starting file upload: {}", file.getOriginalFilename());
 
     // Validate file
@@ -356,6 +358,10 @@ public class FileServiceImpl implements FileService {
               .enableNdpi(enableNdpi)
               .enableSuricata(enableSuricata)
               .enableFileExtraction(enableFileExtraction)
+              // Set with the row, so even a very quick analysis finds it when it completes.
+              .generateStory(generateStory)
+              .storyStatus(generateStory ? FileEntity.STORY_QUEUED : null)
+              .keepForever(keepForever)
               .build();
 
       FileEntity saved = persistOrReportDuplicate(fileEntity, minioPath);

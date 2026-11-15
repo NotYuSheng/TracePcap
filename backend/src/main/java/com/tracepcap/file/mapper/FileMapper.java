@@ -133,6 +133,9 @@ public class FileMapper {
         .enableNdpi(entity.isEnableNdpi())
         .enableSuricata(effectiveSuricata)
         .enableFileExtraction(entity.isEnableFileExtraction())
+        .storyStatus(entity.getStoryStatus())
+        .storyError(entity.getStoryError())
+        .keepForever(entity.isKeepForever())
         .estimatedAnalysisSeconds(
             estimateAnalysisSeconds(
                 entity.getFileSize(),

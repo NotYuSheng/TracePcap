@@ -244,6 +244,12 @@
   font-size: 0.82rem;
   color: var(--tp-text-muted, #4b5563);
 }
+/* "Delete after 12 hours": the retention line as an option, on its own row under the stages. */
+.home-retention-option {
+  padding-top: 14px;
+  border-top: 1px solid var(--tp-border, #eceef3);
+  font-size: 0.82rem;
+}
 .home-side {
   min-width: 0;
   display: flex;

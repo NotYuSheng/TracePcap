@@ -51,6 +51,7 @@ const storyState = (overrides: Record<string, unknown>) => ({
   setMaxRiskMatrix: vi.fn(),
   totalFindings: 0,
   totalRiskMatrix: 0,
+  background: null,
   ...overrides,
 });
 
@@ -80,5 +81,18 @@ describe('StoryPage', () => {
     withStoryState({ story: { id: 's', narrative: [] } });
     rerender(<StoryPage />);
     expect(await screen.findByTestId('story-rules-scope')).toHaveTextContent('Uses the shared detection rules.');
+  });
+
+  it('says the story is on its way when it was asked for at upload', () => {
+    withStoryState({ background: { status: 'WRITING' } });
+    render(<StoryPage />);
+    expect(screen.getByTestId('story-background')).toHaveTextContent('The story is being written');
+  });
+
+  it('explains a failed background story and offers to try again', () => {
+    withStoryState({ background: { status: 'FAILED', error: 'LLM server is not responding' } });
+    render(<StoryPage />);
+    expect(screen.getByText(/couldn.t be written: LLM server is not responding/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Write the story/ })).toBeInTheDocument();
   });
 });

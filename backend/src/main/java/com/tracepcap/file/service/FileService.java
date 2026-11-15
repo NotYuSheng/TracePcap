@@ -20,12 +20,29 @@ public interface FileService {
    * @param file the multipart file
    * @return upload response with file metadata
    */
+  default FileUploadResponse uploadFile(
+      MultipartFile file,
+      boolean enableNdpi,
+      boolean enableSuricata,
+      boolean enableFileExtraction,
+      FileSource source) {
+    return uploadFile(file, enableNdpi, enableSuricata, enableFileExtraction, source, false, false);
+  }
+
+  /**
+   * Upload a PCAP file with the upload-time options.
+   *
+   * @param generateStory write the story in the background when analysis completes
+   * @param keepForever skip the retention cleanup: kept until someone deletes it
+   */
   FileUploadResponse uploadFile(
       MultipartFile file,
       boolean enableNdpi,
       boolean enableSuricata,
       boolean enableFileExtraction,
-      FileSource source);
+      FileSource source,
+      boolean generateStory,
+      boolean keepForever);
 
   /**
    * Get file metadata by ID

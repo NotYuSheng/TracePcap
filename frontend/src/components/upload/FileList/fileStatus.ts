@@ -29,6 +29,10 @@ export interface StatusFile {
   enableSuricata?: boolean;
   enableFileExtraction?: boolean;
   packetsRemoved?: boolean;
+  /** Uploaded with "expires" unticked: the retention cleanup skips it. */
+  keepForever?: boolean;
+  /** The story asked for at upload: QUEUED, WRITING, READY or FAILED. */
+  storyStatus?: string | null;
 }
 
 export interface StatusContext {
@@ -44,6 +48,14 @@ export interface StatusContext {
 /** "Expiring soon": deleted within this long. */
 export const EXPIRING_WITHIN_MS = 2 * 3600_000;
 
+/** The background story asked for at upload, as a note on the row. */
+const STORY_NOTE: Record<string, string> = {
+  QUEUED: 'Story queued',
+  WRITING: 'Writing story',
+  READY: 'Story ready',
+  FAILED: 'Story failed',
+};
+
 const LABELS: Record<StatusKey, string> = {
   queued: 'Queued',
   analysing: 'Analysing',
@@ -55,6 +67,7 @@ const LABELS: Record<StatusKey, string> = {
 /** When a capture will be deleted, or null if it is kept. */
 export function expiresAt(file: StatusFile, ctx: StatusContext): number | null {
   if (!ctx.retentionHours || file.source === 'MONITOR' || ctx.keptWith.length > 0) return null;
+  if (file.keepForever) return null;
   return file.uploadedAt + ctx.retentionHours * 3600_000;
 }
 
@@ -79,6 +92,9 @@ export function notesOf(file: StatusFile, ctx: StatusContext): CaptureNote[] {
     to: `/monitor/${n.networkId}`,
     tone: 'kept' as const,
   }));
+  if (file.keepForever && ctx.keptWith.length === 0 && file.source !== 'MONITOR') {
+    notes.push({ key: 'forever', label: 'Kept until deleted', tone: 'kept' });
+  }
   if (file.source === 'MONITOR' && ctx.keptWith.length === 0) {
     notes.push({ key: 'monitor', label: 'Monitor upload' });
   }
@@ -94,6 +110,14 @@ export function notesOf(file: StatusFile, ctx: StatusContext): CaptureNote[] {
     notes.push({ key: 'rules', label: 'Rules changed since', to: '/settings?tab=rules' });
   }
   if (file.packetsRemoved) notes.push({ key: 'packets', label: 'Packets removed' });
+  const story = STORY_NOTE[file.storyStatus ?? ''];
+  if (story) {
+    notes.push({
+      key: 'story',
+      label: story,
+      to: file.storyStatus === 'READY' ? `/analysis/${file.fileId}/story` : undefined,
+    });
+  }
   return notes;
 }
 

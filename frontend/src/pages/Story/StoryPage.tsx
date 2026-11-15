@@ -45,6 +45,7 @@ export const StoryPage = () => {
     maxRiskMatrix, setMaxRiskMatrix,
     totalFindings,
     totalRiskMatrix,
+    background,
   } = storyState;
 
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
@@ -189,9 +190,39 @@ export const StoryPage = () => {
     );
   }
 
+  // Asked for at upload and still on its way: the page fills in by itself when it lands.
+  if (!story && background && background.status !== 'FAILED') {
+    return (
+      <div className="story-start">
+        <Card className="story-start-card" data-testid="story-background">
+          <Card.Body>
+            <span className="story-pill story-pill-writing">
+              {background.status === 'QUEUED' ? 'Queued' : 'Writing…'}
+            </span>
+            <h1 className="story-start-title">
+              {background.status === 'QUEUED'
+                ? 'The story is waiting its turn'
+                : 'The story is being written'}
+            </h1>
+            <p className="text-muted mb-0">
+              It was asked for when this capture was uploaded and is written in the background, one
+              capture at a time. You can leave this page; it shows here when it is ready.
+            </p>
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  }
+
   if (!story) {
     return (
       <div className="story-start">
+        {background?.status === 'FAILED' && (
+          <Alert variant="warning" className="mb-3">
+            The story asked for at upload couldn&apos;t be written
+            {background.error ? <>: {background.error.replace(/\.?\s*$/, '')}</> : ''}. Try again below.
+          </Alert>
+        )}
         <Card className="story-start-card">
           <Card.Body>
             <span className="story-pill">No story yet</span>

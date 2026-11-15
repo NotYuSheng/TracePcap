@@ -66,6 +66,24 @@ describe('notesOf', () => {
   })
 })
 
+describe('upload options', () => {
+  it('never expires a capture uploaded not to, and says so', () => {
+    const kept = file({ uploadedAt: NOW - 11 * H, keepForever: true })
+    expect(expiresAt(kept, ctx())).toBeNull()
+    expect(statusOf(kept, ctx()).key).toBe('ready')
+    expect(notesOf(kept, ctx())).toEqual([{ key: 'forever', label: 'Kept until deleted', tone: 'kept' }])
+  })
+
+  it('follows the background story, linking to it once ready', () => {
+    expect(notesOf(file({ storyStatus: 'WRITING' }), ctx()).map(n => n.label)).toEqual(['Writing story'])
+    expect(notesOf(file({ storyStatus: 'READY' }), ctx())[0]).toMatchObject({
+      label: 'Story ready',
+      to: '/analysis/f1/story',
+    })
+    expect(notesOf(file({ storyStatus: null }), ctx())).toEqual([])
+  })
+})
+
 describe('actionOf', () => {
   it('offers what each status allows', () => {
     expect(actionOf('ready')).toBe('Open')

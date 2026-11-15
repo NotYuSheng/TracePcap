@@ -3389,6 +3389,7 @@ export interface components {
             fileName?: string;
             /** Format: int64 */
             fileSize?: number;
+            keepForever?: boolean;
             /** Format: int32 */
             packetCount?: number;
             packetsRemoved?: boolean;
@@ -3396,6 +3397,8 @@ export interface components {
             /** Format: date-time */
             startTime?: string;
             status?: string;
+            storyError?: string;
+            storyStatus?: string;
             /** Format: date-time */
             uploadedAt?: string;
             version?: boolean;
@@ -5838,6 +5841,8 @@ export interface operations {
                 enableSuricata?: boolean;
                 enableFileExtraction?: boolean;
                 source?: "ANALYSIS" | "MONITOR";
+                generateStory?: boolean;
+                expires?: boolean;
             };
             header?: never;
             path?: never;

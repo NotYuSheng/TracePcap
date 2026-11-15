@@ -55,6 +55,20 @@ you choose files; there is no popup afterwards.
 
 Turning a stage off shortens analysis of a large capture.
 
+Two more options sit with them:
+
+- **Write the story when analysis finishes**: the LLM writes the capture's
+  :doc:`story <story-mode>` in the background once analysis completes, so it is
+  ready when you open the Story tab. Stories are written one at a time, so a
+  batch of uploads queues behind each other rather than all going to the model
+  at once. **Off by default**, and only shown when an LLM is configured. While
+  it is on its way the Story tab says so and fills in by itself; if it fails
+  (the LLM server is unreachable, say), the tab says why and offers to try
+  again.
+- **Delete after <retention>**: **on by default**. Untick it to keep the
+  capture until you delete it; file retention then skips it. Only shown when
+  file retention is on.
+
 Duplicate Detection
 -------------------
 
@@ -147,8 +161,12 @@ Anything else is a grey **note** under the name, only when it applies:
 
 - **Kept with <network>**: the capture is a snapshot of that monitored network,
   so file retention never deletes it. The note links to the network.
+- **Kept until deleted**: uploaded with *Delete after* unticked, so file
+  retention never deletes it.
 - **Without Suricata** (or nDPI, or file extraction): that tool was switched
   off at upload. This is a choice, not a fault.
+- **Story queued**, **Writing story**, **Story ready** or **Story failed**: the
+  story asked for at upload. *Story ready* links to the Story tab.
 - **Rules changed since**: detection rules changed after the capture was
   analysed. The note links to the rules in Settings, where you can re-apply
   them.
@@ -161,7 +179,8 @@ File Retention
 By default, uploaded files are automatically deleted **12 hours** after upload.
 This window is configurable via the ``FILE_RETENTION_HOURS`` environment
 variable. Set ``FILE_RETENTION_ENABLED=false`` to disable automatic deletion
-entirely (see :doc:`../configuration/environment-variables`).
+entirely (see :doc:`../configuration/environment-variables`). A capture uploaded
+with *Delete after* unticked is never deleted by retention, whatever the window.
 
 .. note::
 

@@ -171,3 +171,13 @@
   font-weight: 700;
   margin: 10px 0 6px;
 }
+
+.story-pill-writing {
+  background: #ede9fe;
+  color: #3b1891;
+}
+
+[data-theme='dark'] .story-pill-writing {
+  background: rgb(155 125 255 / 18%);
+  color: #c9b8ff;
+}

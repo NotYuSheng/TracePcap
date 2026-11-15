@@ -9,6 +9,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 
 /** Repository for FileEntity */
@@ -56,4 +60,15 @@ public interface FileRepository
   default List<java.util.UUID> findCompletedIds() {
     return findIdsByStatus(FileEntity.FileStatus.COMPLETED);
   }
+
+  /**
+   * Records how far the background story got, touching only those two columns: the file row is
+   * also written by analysis and the UI, and a whole-entity save from a long-running story job
+   * would put back whatever it read minutes earlier.
+   */
+  @Modifying
+  @Transactional
+  @Query("UPDATE FileEntity f SET f.storyStatus = :status, f.storyError = :error WHERE f.id = :id")
+  int updateStoryStatus(
+      @Param("id") UUID id, @Param("status") String status, @Param("error") String error);
 }

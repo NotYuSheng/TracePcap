@@ -41,6 +41,15 @@ public class FileMetadataDto {
 
   private boolean enableFileExtraction;
 
+  /** Kept until deleted: the retention cleanup skips it. */
+  private boolean keepForever;
+
+  /** The background story asked for at upload: null, QUEUED, WRITING, READY or FAILED. */
+  private String storyStatus;
+
+  /** Why the background story failed, when it did. */
+  private String storyError;
+
   // Rough pre-analysis time estimate (seconds), derived from file size and which analysis stages
   // are effectively enabled for this file (nDPI / Suricata / file extraction). Lets the loading
   // view show an estimate that reflects the user's upload choices instead of a size-only guess.

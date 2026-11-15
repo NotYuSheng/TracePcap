@@ -49,17 +49,23 @@ public class FileController {
       @RequestParam(value = "enableSuricata", defaultValue = "true") boolean enableSuricata,
       @RequestParam(value = "enableFileExtraction", defaultValue = "true")
           boolean enableFileExtraction,
-      @RequestParam(value = "source", defaultValue = "ANALYSIS") FileSource source) {
+      @RequestParam(value = "source", defaultValue = "ANALYSIS") FileSource source,
+      @RequestParam(value = "generateStory", defaultValue = "false") boolean generateStory,
+      @RequestParam(value = "expires", defaultValue = "true") boolean expires) {
     log.info(
-        "Received file upload request: {} (ndpi={}, suricata={}, extraction={}, source={})",
+        "Received file upload request: {} (ndpi={}, suricata={}, extraction={}, source={}, story={},"
+            + " expires={})",
         file.getOriginalFilename(),
         enableNdpi,
         enableSuricata,
         enableFileExtraction,
-        source);
+        source,
+        generateStory,
+        expires);
 
     FileUploadResponse response =
-        fileService.uploadFile(file, enableNdpi, enableSuricata, enableFileExtraction, source);
+        fileService.uploadFile(
+            file, enableNdpi, enableSuricata, enableFileExtraction, source, generateStory, !expires);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }

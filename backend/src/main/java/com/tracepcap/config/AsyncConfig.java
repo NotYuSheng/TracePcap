@@ -83,4 +83,20 @@ public class AsyncConfig {
   static int connectionsNeeded(int analysisConcurrency) {
     return analysisConcurrency * CONNECTIONS_PER_ANALYSIS + REQUEST_RESERVE;
   }
+
+  /**
+   * One background story at a time (the upload option "write the story when analysis finishes").
+   * Story generation is minutes of local-model time; a batch of uploads queues behind it rather
+   * than running side by side and starving the model or the analysis executor.
+   */
+  @Bean(name = "storyExecutor")
+  public Executor storyExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(1);
+    executor.setQueueCapacity(500);
+    executor.setThreadNamePrefix("story-");
+    executor.initialize();
+    return executor;
+  }
 }

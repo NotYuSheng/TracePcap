@@ -1931,6 +1931,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "keepForever": {
+            "type": "boolean"
+          },
           "packetCount": {
             "format": "int32",
             "type": "integer"
@@ -1946,6 +1949,12 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          },
+          "storyError": {
+            "type": "string"
+          },
+          "storyStatus": {
             "type": "string"
           },
           "uploadedAt": {
@@ -7902,6 +7911,24 @@
                 "MONITOR"
               ],
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "generateStory",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expires",
+            "required": false,
+            "schema": {
+              "default": true,
+              "type": "boolean"
             }
           }
         ],
