@@ -1,0 +1,48 @@
+/* Session tab: the same small tags and text sizes as the rest of the conversation pane. */
+.session-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.session-tag {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.session-tag-warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+[data-theme='dark'] .session-tag {
+  background: rgba(129, 140, 248, 0.2);
+  color: #c7d2fe;
+}
+.session-bytes {
+  font-size: 0.8rem;
+  color: var(--tp-text-muted, #525a68);
+}
+.session-refresh {
+  font-size: 0.8rem;
+}
+.session-note {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--tp-bg-subtle, #f3f4f8);
+  font-size: 0.8rem;
+  color: var(--tp-text-muted, #525a68);
+}
+.session-note-warn {
+  background: #fffbeb;
+  color: #92400e;
+}
+.session-empty {
+  margin: 8px 0;
+  font-size: 0.8rem;
+  color: var(--tp-text-muted, #525a68);
+}
