@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card } from '@govtechsg/sgds-react';
+import { Button, Card, Form } from '@govtechsg/sgds-react';
+import { Pagination } from '@components/common/Pagination/Pagination';
 import { ChangeList } from '@/components/monitor/ChangeList';
 import { changeSummary } from '@/features/monitor/utils/describeChange';
 import { CapturePane } from './CapturePane';
@@ -13,6 +14,15 @@ type Filter = 'all' | 'changes' | 'captures' | 'notes';
 
 /** A capture with this many changes or fewer lists them; more start as a one-line summary. */
 const INLINE_CHANGES = 3;
+/** Entries per page; pages (and the search box) appear only past this many. */
+const PAGE_SIZE = 20;
+
+/** The text an entry is found by: a capture's file name, an event's title and description, a note. */
+function entryText(e: Entry): string {
+  if (e.kind === 'capture') return e.snapshot.fileName;
+  if (e.kind === 'event') return `${e.event.title} ${e.event.description ?? ''}`;
+  return e.note.body;
+}
 
 interface NetworkTimelineProps {
   networkId: string;
@@ -56,6 +66,8 @@ export function NetworkTimeline({
   const ordered = useMemo(() => [...snapshots].sort((a, b) => a.snapshotOrder - b.snapshotOrder), [snapshots]);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [openChanges, setOpenChanges] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const picked = ordered.find(s => s.id === pickedId) ?? ordered[ordered.length - 1] ?? null;
@@ -89,19 +101,35 @@ export function NetworkTimeline({
     captures: ordered.length,
     notes: externalEvents.length + annotations.length,
   };
-  const shown = entries.filter(e => {
+  const q = query.trim().toLowerCase();
+  const byKind = entries.filter(e => {
     if (filter === 'all') return true;
     if (filter === 'captures') return e.kind === 'capture';
     if (filter === 'changes') return e.kind === 'capture' && (changesBy.get(e.snapshot.id)?.length ?? 0) > 0;
     return e.kind !== 'capture' || (notesBy.get(e.snapshot.id)?.length ?? 0) > 0;
   });
+  const matching = q ? byKind.filter(e => entryText(e).toLowerCase().includes(q)) : byKind;
+  // Pages and search only once there are enough entries to need them.
+  const paged = entries.length > PAGE_SIZE;
+  const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const shown = paged ? matching.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE) : matching;
+  /** Pick a capture and turn to the page that holds it, so the picked entry is never off-page. */
+  const pickCapture = (id: string) => {
+    setPickedId(id);
+    const at = matching.findIndex(e => e.kind === 'capture' && e.snapshot.id === id);
+    if (at >= 0) setPage(Math.floor(at / PAGE_SIZE) + 1);
+  };
 
   const chip = (key: Filter, label: string, count?: number) => (
     <button
       type="button"
       className={`nt-chip${filter === key ? ' active' : ''}`}
       aria-pressed={filter === key}
-      onClick={() => setFilter(key)}
+      onClick={() => {
+        setFilter(key);
+        setPage(1);
+      }}
     >
       {label}
       {count !== undefined && <span className="nt-chip-count">{count}</span>}
@@ -132,10 +160,25 @@ export function NetworkTimeline({
             </Button>
           </div>
         </div>
+        {paged && (
+          <div className="nt-search">
+            <Form.Control
+              size="sm"
+              type="search"
+              placeholder="Search: capture name, event, note…"
+              aria-label="Search the timeline"
+              value={query}
+              onChange={e => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+        )}
         <ol className="nt-list">
           {shown.length === 0 && (
             <li className="nt-empty">
-              {ordered.length === 0 ? 'Add a capture of this network to start its timeline.' : 'Nothing here for this filter.'}
+              {ordered.length === 0 ? 'Add a capture of this network to start its timeline.' : 'Nothing matches.'}
             </li>
           )}
           {shown.map(e => {
@@ -153,7 +196,7 @@ export function NetworkTimeline({
                     className="nt-capture-pick"
                     aria-pressed={isPicked}
                     aria-label={`Show ${s.fileName} on the map`}
-                    onClick={() => setPickedId(s.id)}
+                    onClick={() => pickCapture(s.id)}
                   >
                     <span className="nt-when">{when(e.at)}</span>
                     <span className="nt-title">{s.fileName}</span>
@@ -226,6 +269,18 @@ export function NetworkTimeline({
             );
           })}
         </ol>
+        {paged && pages > 1 && (
+          <div className="nt-pages">
+            <Pagination
+              currentPage={current}
+              totalPages={pages}
+              totalItems={matching.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+              compact
+            />
+          </div>
+        )}
       </Card>
 
       {picked ? (
@@ -235,7 +290,7 @@ export function NetworkTimeline({
           previous={previous}
           index={pickedIndex}
           total={ordered.length}
-          onStep={delta => setPickedId(ordered[pickedIndex + delta].id)}
+          onStep={delta => pickCapture(ordered[pickedIndex + delta].id)}
           snapshots={snapshots}
           changeEvents={changeEvents}
           onPatchChange={onPatchChange}
