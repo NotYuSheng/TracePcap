@@ -22,7 +22,7 @@
 
 <div align="center">
 
-![TracePcap network diagram: a capture's devices grouped by network, the traffic played back over time, edges coloured by application, and a device's identity card](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
+![TracePcap network diagram: an office capture's devices grouped by network and played back over time, two phones that held the same address in turn, one phone's identity card, and the map filtered down to a flagged telnet login to a camera](https://raw.githubusercontent.com/NotYuSheng/TracePcap/main/sample-files/TracePcap-Hero.gif)
 
 </div>
 

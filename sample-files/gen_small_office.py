@@ -18,8 +18,16 @@ Traffic that fills each part of the map:
 
 The capture runs 30 minutes, so the time axis has something to play: the guest phone appears at
 15 minutes, and the cameras only start recording at 5.
+
+With --showcase it writes office_showcase.pcap instead (the README hero): the same office, plus
+the things the map is best at showing:
+- one address, two devices: Galaxy-A55 releases 10.20.20.51 at 14:30 and Visitors-iPhone is given it;
+- one device, two addresses: LAPTOP-CHLOE renews onto 10.20.10.33 at 18:20;
+- a client nobody answers: a Raspberry Pi on the devices VLAN asks for an address, again and again;
+- something to flag: the visitor's phone logs in to the entrance camera over telnet.
 """
 import os
+import sys
 from datetime import datetime, timezone
 
 from scapy.all import wrpcap
@@ -67,6 +75,13 @@ SITES = [  # name -> address answered by DNS
     ("cdn.example.co.uk", "93.184.216.50"),
     ("www.bbc.co.uk", "151.101.0.81"),
 ]
+
+SHOWCASE = "--showcase" in sys.argv
+if SHOWCASE:
+    # The visitor's phone is given the address Galaxy-A55 released, instead of its own.
+    VLANS[20]["clients"][1] = ("a4:83:e7:b0:00:02", 51, "Visitors-iPhone", 900)
+# Showcase: when a client stops (it released its address, or moved off it), in seconds.
+ENDS = {"Galaxy-A55": 870, "LAPTOP-CHLOE": 1100} if SHOWCASE else {}
 
 pkts = []
 ports = iter(range(40000, 65000))
@@ -120,7 +135,7 @@ for vlan, cfg in VLANS.items():
                 / UDP(sport=5353, dport=5353) / DNS(qd=DNSQR(qname="_companion-link._tcp.local", qtype="PTR")), t + 1)
         if vlan == 10 or vlan == 20:
             # Browse: look a name up, then HTTPS to the answer. Every few minutes, a different site.
-            span = 1800 - t
+            span = ENDS.get(name, 1800) - t
             for k in range(6):
                 name_q, addr = SITES[(c_i * 3 + k + vlan) % len(SITES)]
                 tt = t + 20 + k * span / 7
@@ -137,6 +152,8 @@ for vlan, cfg in VLANS.items():
             # Office work across VLANs: the file server, the domain controller, a print job.
             for k in range(4):
                 tt = t + 40 + k * 400
+                if tt > ENDS.get(name, 1800):
+                    break
                 tcp_flow(vlan, mac, ip, ROUTER_MAC, SERVERS["files"][1], 445, tt)
                 tcp_flow(vlan, mac, ip, ROUTER_MAC, SERVERS["dc"][1], 88, tt + 2, n=1)
             tcp_flow(vlan, mac, ip, ROUTER_MAC, "10.20.30.31" if c_i % 2 == 0 else "10.20.30.32", 631, t + 300)
@@ -145,7 +162,63 @@ for vlan, cfg in VLANS.items():
             for k in range(8):
                 tcp_flow(vlan, mac, ip, VLANS[30]["clients"][4][0], "10.20.30.50", 554, t + k * 180, n=4)
 
+
+def dhcp(vlan, mac, ip, name, xid, t, op="request"):
+    """A client asking from 0.0.0.0; answered with an ACK when `ip` is given."""
+    cfg = VLANS[vlan]
+    gw = f"{cfg['net']}.1"
+    ch = bytes.fromhex(mac.replace(":", ""))
+    opts = [("message-type", op), ("hostname", name), "end"]
+    if ip:
+        opts.insert(1, ("requested_addr", ip))
+    add(vlan, Ether(src=mac, dst="ff:ff:ff:ff:ff:ff") / IP(src="0.0.0.0", dst="255.255.255.255")
+        / UDP(sport=68, dport=67) / BOOTP(op=1, chaddr=ch, xid=xid) / DHCP(options=opts), t)
+    if ip:
+        add(vlan, Ether(src=ROUTER_MAC, dst=mac) / IP(src=gw, dst=ip) / UDP(sport=67, dport=68)
+            / BOOTP(op=2, yiaddr=ip, siaddr=gw, chaddr=ch, xid=xid)
+            / DHCP(options=[("message-type", "ack"), ("server_id", gw), ("router", gw),
+                            ("name_server", SERVERS["dns"][1]), ("domain", cfg["domain"]),
+                            ("lease_time", cfg["lease"]), ("subnet_mask", "255.255.255.0"), "end"]), t + 0.01)
+        add(vlan, Ether(src=mac, dst=ROUTER_MAC) / ARP(op=2, hwsrc=mac, psrc=ip, hwdst=ROUTER_MAC, pdst=gw), t + 0.02)
+
+
+if SHOWCASE:
+    # Galaxy-A55 hands its address back.
+    a55_mac = VLANS[20]["clients"][0][0]
+    add(20, Ether(src=a55_mac, dst=ROUTER_MAC) / IP(src="10.20.20.51", dst="10.20.20.1") / UDP(sport=68, dport=67)
+        / BOOTP(op=1, ciaddr="10.20.20.51", chaddr=bytes.fromhex(a55_mac.replace(":", "")), xid=0x14F0)
+        / DHCP(options=[("message-type", "release"), ("server_id", "10.20.20.1"), "end"]), 870)
+
+    # LAPTOP-CHLOE renews onto a new address and carries on there.
+    chloe_mac = VLANS[10]["clients"][2][0]
+    dhcp(10, chloe_mac, "10.20.10.33", "LAPTOP-CHLOE", 0xA10, 1100)
+    for k in range(4):
+        tt = 1110 + k * 160
+        name_q, addr = SITES[(k + 2) % len(SITES)]
+        tcp_flow(10, chloe_mac, "10.20.10.33", ROUTER_MAC, addr, 443, tt)
+        tcp_flow(10, chloe_mac, "10.20.10.33", ROUTER_MAC, SERVERS["files"][1], 445, tt + 5)
+
+    # A Raspberry Pi plugged into the devices VLAN: it asks, and nothing answers.
+    for k in range(6):
+        dhcp(30, "b8:27:eb:5e:00:01", None, "raspberrypi", 0xB800 + k, 400 + k * 200, op="discover")
+
+    # The visitor's phone, ten minutes after joining: a telnet login to the entrance camera with
+    # the default password, in clear text.
+    phone_mac, phone_ip = "a4:83:e7:b0:00:02", "10.20.20.51"
+    sport = next(ports)
+    t = 1500
+    cam = "10.20.30.41"
+    add(20, Ether(src=phone_mac, dst=ROUTER_MAC) / IP(src=phone_ip, dst=cam) / TCP(sport=sport, dport=23, flags="S"), t)
+    add(20, Ether(src=ROUTER_MAC, dst=phone_mac) / IP(src=cam, dst=phone_ip) / TCP(sport=23, dport=sport, flags="SA"), t + 0.02)
+    for k, (c, srv) in enumerate([(b"", b"login: "), (b"admin\r\n", b"Password: "), (b"12345\r\n", b"# ")]):
+        if c:
+            add(20, Ether(src=phone_mac, dst=ROUTER_MAC) / IP(src=phone_ip, dst=cam)
+                / TCP(sport=sport, dport=23, flags="PA") / c, t + 0.5 + k)
+        add(20, Ether(src=ROUTER_MAC, dst=phone_mac) / IP(src=cam, dst=phone_ip)
+            / TCP(sport=23, dport=sport, flags="PA") / srv, t + 0.6 + k)
+
 pkts.sort(key=lambda p: float(p.time))
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "small_office.pcap")
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                   "office_showcase.pcap" if SHOWCASE else "small_office.pcap")
 wrpcap(out, pkts)
 print(f"Wrote {out}: {len(pkts)} packets")

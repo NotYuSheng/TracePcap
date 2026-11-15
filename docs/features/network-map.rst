@@ -42,8 +42,19 @@ Each box sits inside the one above it:
   and ``www.example.com`` share ``example.com``). The domain comes from the
   host's name, else from the name clients looked its address up by in the
   capture's DNS traffic; with neither, **No hostname**.
-- **Broadcast and multicast**: ``0.0.0.0``, ``255.255.255.255`` and multicast
-  addresses.
+- **Broadcast and multicast**: ``255.255.255.255``, multicast addresses, and a
+  subnet's own broadcast address (such as ``10.20.30.255``) when it only ever
+  receives. A host that holds a ``.255`` address in a wider subnet sends traffic,
+  so it stays a device.
+
+A client asking for an address sends from ``0.0.0.0``, before it has one, so its
+MAC is what tells it apart. Its request is drawn on the device the DHCP server
+then gave an address to, so you can follow a client from asking to answered;
+a device that moved address has each request on the address it got next. A
+client nobody answered gets its own node, named by its MAC, under **No IP
+address**. Past 20 unanswered clients they are drawn as one node, *N devices
+asking for an address*: hundreds of made-up MACs asking at once is a DHCP
+starvation attack, not hundreds of devices.
 
 Device labels are fitted to their cell, so neighbours never overlap: with the
 whole map in view a device shows its first lines (name and address), cut to fit,
