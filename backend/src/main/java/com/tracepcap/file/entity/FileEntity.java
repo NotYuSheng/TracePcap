@@ -76,6 +76,13 @@ public class FileEntity {
   @Column(name = "keep_forever", nullable = false)
   private boolean keepForever = false;
 
+  /**
+   * When this capture is deleted, if someone extended it past the retention window; null means
+   * the retention window applies. {@link #keepForever} wins over both.
+   */
+  @Column(name = "expires_at")
+  private LocalDateTime expiresAt;
+
   /** Why the background story failed, when it did. */
   @Column(name = "story_error", columnDefinition = "text")
   private String storyError;

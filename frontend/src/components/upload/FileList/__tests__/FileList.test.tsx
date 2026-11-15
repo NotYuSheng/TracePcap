@@ -1,0 +1,76 @@
+/**
+ * The captures list against a mocked files API: the page-size menu stays while it can still matter,
+ * and a star marks a favourite.
+ */
+import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { HttpResponse, http } from 'msw'
+
+import { apiUrl, server } from '@/test/msw'
+import { FileList } from '../FileList'
+
+const files = Array.from({ length: 60 }, (_, i) => ({
+  fileId: `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`,
+  fileName: `cap-${i}.pcap`,
+  fileSize: 1000,
+  uploadedAt: [2026, 11, 15, 10, 0],
+  status: 'COMPLETED',
+  source: 'ANALYSIS',
+  favourite: i === 0,
+}))
+
+function serve(favourites: string[] = []) {
+  server.use(
+    http.get(apiUrl('/files'), ({ request }) => {
+      const u = new URL(request.url)
+      const size = Number(u.searchParams.get('pageSize') ?? 20)
+      const page = Number(u.searchParams.get('page') ?? 1)
+      const list = u.searchParams.get('favourite') === 'true' ? files.filter(f => f.favourite) : files
+      return HttpResponse.json({
+        data: list.slice((page - 1) * size, page * size),
+        page,
+        pageSize: size,
+        total: list.length,
+        totalPages: Math.ceil(list.length / size),
+      })
+    }),
+    http.get(apiUrl('/system/limits'), () => HttpResponse.json({ fileRetentionHours: 12 })),
+    http.get(apiUrl('/network-memberships'), () => HttpResponse.json([])),
+    http.get(apiUrl('/detection-rules/stale-captures'), () => HttpResponse.json([])),
+    http.put(apiUrl('/files/:id/favourite'), ({ params }) => {
+      favourites.push(String(params.id))
+      return new HttpResponse(null, { status: 204 })
+    })
+  )
+}
+
+const renderList = () =>
+  render(
+    <MemoryRouter>
+      <FileList defaultPageSize={5} />
+    </MemoryRouter>
+  )
+
+describe('FileList', () => {
+  it('keeps the page-size menu after picking a size that fits every capture', async () => {
+    serve()
+    renderList()
+    const menu = await screen.findByLabelText(/items per page/i, { selector: 'select' })
+    fireEvent.change(menu, { target: { value: '100' } })
+    // All 60 on one page now, and the menu is still there to pick a smaller size.
+    await waitFor(() => expect(screen.getAllByRole('link', { name: /^cap-\d+\.pcap$/ })).toHaveLength(60))
+    expect(screen.getByLabelText(/items per page/i, { selector: 'select' })).toBeInTheDocument()
+  })
+
+  it('stars a capture as a favourite', async () => {
+    const favourites: string[] = []
+    serve(favourites)
+    renderList()
+    const star = await screen.findByRole('button', { name: 'Favourite cap-1.pcap' })
+    expect(star).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(star)
+    await waitFor(() => expect(favourites).toEqual([files[1].fileId]))
+    expect(screen.getByRole('button', { name: 'Unfavourite cap-1.pcap' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})

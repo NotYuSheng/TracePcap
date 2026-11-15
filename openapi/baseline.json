@@ -1818,6 +1818,18 @@
         ],
         "type": "object"
       },
+      "ExpiryRequest": {
+        "properties": {
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "keepForever": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "ExtractedFileResponse": {
         "properties": {
           "conversationId": {
@@ -1920,6 +1932,13 @@
           "estimatedAnalysisSeconds": {
             "format": "int32",
             "type": "integer"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "favourite": {
+            "type": "boolean"
           },
           "fileId": {
             "type": "string"
@@ -7780,7 +7799,7 @@
     },
     "/api/v1/files": {
       "get": {
-        "description": "Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms).",
+        "description": "Get all uploaded files with pagination. Optional filters: search (name contains), status, fileIds (only these), excludeFileIds, uploadedBefore (epoch ms), expiringBefore (epoch ms: deleted before then, by its own expiry or the retention window), favourite (only the caller's favourites).",
         "operationId": "getAllFiles",
         "parameters": [
           {
@@ -7880,6 +7899,23 @@
             "schema": {
               "format": "int64",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expiringBefore",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "favourite",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -8700,6 +8736,49 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/expiry": {
+      "put": {
+        "description": "keepForever: never. Else expiresAt (epoch ms, in the future, at most a year away) keeps it until then; null puts it back on the retention window.",
+        "operationId": "setExpiry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMetadataDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Change when a capture is deleted",
+        "tags": [
+          "File Management"
+        ]
+      }
+    },
     "/api/v1/files/{fileId}/extractions": {
       "get": {
         "operationId": "listExtractions",
@@ -8855,6 +8934,56 @@
         "summary": "Preview an extracted file inline (browser-renderable types only)",
         "tags": [
           "Extracted Files"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/favourite": {
+      "delete": {
+        "description": "Idempotent.",
+        "operationId": "removeFavourite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Unmark a favourite capture",
+        "tags": [
+          "File Management"
+        ]
+      },
+      "put": {
+        "description": "Personal: the caller's account, or the shared profile when login is off. Idempotent.",
+        "operationId": "addFavourite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Mark a capture as a favourite",
+        "tags": [
+          "File Management"
         ]
       }
     },

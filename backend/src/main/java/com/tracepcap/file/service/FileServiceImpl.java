@@ -404,6 +404,34 @@ public class FileServiceImpl implements FileService {
     return fileRepository.findAll(filter.toSpecification(), pageable).map(fileMapper::toMetadataDto);
   }
 
+  /** The furthest a capture can be kept by date; past that, keep it forever instead. */
+  static final java.time.Duration MAX_EXTENSION = java.time.Duration.ofDays(366);
+
+  @Override
+  @Transactional
+  public FileMetadataDto setExpiry(UUID fileId, boolean keepForever, java.time.LocalDateTime expiresAt) {
+    FileEntity file =
+        fileRepository
+            .findById(fileId)
+            .orElseThrow(() -> new ResourceNotFoundException("File", "id", fileId));
+    if (keepForever) {
+      file.setKeepForever(true);
+      file.setExpiresAt(null);
+    } else {
+      java.time.LocalDateTime now = java.time.LocalDateTime.now();
+      if (expiresAt != null && !expiresAt.isAfter(now)) {
+        throw new IllegalArgumentException("expiresAt must be in the future");
+      }
+      if (expiresAt != null && expiresAt.isAfter(now.plus(MAX_EXTENSION))) {
+        throw new IllegalArgumentException("expiresAt can be at most a year away; keep it forever instead");
+      }
+      file.setKeepForever(false);
+      file.setExpiresAt(expiresAt);
+    }
+    log.info("Capture {} expiry: keepForever={}, expiresAt={}", fileId, file.isKeepForever(), file.getExpiresAt());
+    return fileMapper.toMetadataDto(fileRepository.save(file));
+  }
+
   @Override
   @Transactional(readOnly = true)
   public InputStream downloadFile(UUID fileId) {

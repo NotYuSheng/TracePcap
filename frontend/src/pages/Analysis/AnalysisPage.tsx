@@ -1,4 +1,5 @@
 import { AnalysisRail, type RailItem } from './AnalysisRail';
+import { FavouriteStar } from '@/features/captureKeep/FavouriteStar';
 import { useNetworkContext } from '@/features/detectionRules/useNetworkContext';
 import { NetworkContextPicker } from '@/features/detectionRules/NetworkContextPicker';
 import { Spinner } from '@components/common/Spinner/Spinner';
@@ -590,7 +591,10 @@ export const AnalysisPage = () => {
                   ›
                 </span>
               </div>
-              <h2 className="analysis-capture-name">{data.fileName}</h2>
+              <h2 className="analysis-capture-name">
+                <FavouriteStar fileId={fileId!} fileName={data.fileName} />
+                {data.fileName}
+              </h2>
               <div className="analysis-capture-facts">{captureFacts(data)}</div>
             </div>
           </div>
