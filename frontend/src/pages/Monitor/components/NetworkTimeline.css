@@ -189,23 +189,5 @@
   font-size: 0.85rem;
 }
 
-.nt-map-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
 
-.nt-map-title {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0;
-}
 
-.nt-map-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}

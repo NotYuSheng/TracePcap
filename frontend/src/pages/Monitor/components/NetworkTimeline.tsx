@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '@govtechsg/sgds-react';
 import { ChangeList } from '@/components/monitor/ChangeList';
 import { changeSummary } from '@/features/monitor/utils/describeChange';
-import { SnapshotMap } from '@/components/monitor/SnapshotMap';
+import { CapturePane } from './CapturePane';
 import type { ChangeEvent, NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import type { NetworkAnnotation, NetworkExternalEvent } from '@/features/insights/types/insights.types';
 import { formatBytes, formatSpan } from '@/utils/formatters';
@@ -21,8 +21,7 @@ interface NetworkTimelineProps {
   externalEvents: NetworkExternalEvent[];
   annotations: NetworkAnnotation[];
   onPatchChange: (eventId: string, patch: { reviewed?: boolean; notes?: string | null }) => Promise<void>;
-  /** Opens a capture's full detail (security, subnets, insights). */
-  onOpenDetails: (snapshot: NetworkSnapshot) => void;
+  onSnapshotUpdated: (updated: NetworkSnapshot) => void;
   onAddNote: () => void;
   onAddEvent: () => void;
   onManage: () => void;
@@ -35,7 +34,6 @@ type Entry =
 
 const when = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-const dayOf = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 const timeOf = (s: NetworkSnapshot) => new Date(s.startTime ?? s.addedAt).getTime();
 
 /**
@@ -50,7 +48,7 @@ export function NetworkTimeline({
   externalEvents,
   annotations,
   onPatchChange,
-  onOpenDetails,
+  onSnapshotUpdated,
   onAddNote,
   onAddEvent,
   onManage,
@@ -202,9 +200,6 @@ export function NetworkTimeline({
                     </p>
                   ))}
                   <div className="nt-capture-links">
-                    <Button size="sm" variant="link" className="nt-link" onClick={() => onOpenDetails(s)}>
-                      Details
-                    </Button>
                     <Button size="sm" variant="link" className="nt-link" onClick={() => navigate(`/analysis/${s.fileId}`)}>
                       Open the capture
                     </Button>
@@ -233,53 +228,26 @@ export function NetworkTimeline({
         </ol>
       </Card>
 
-      <Card className="nt-map-card">
-        <Card.Body>
-          {picked ? (
-            <>
-              <div className="nt-map-head">
-                <h2 className="nt-map-title">The network on {when(timeOf(picked))}</h2>
-                <span className="text-muted small">
-                  {previous ? `compared with ${dayOf(timeOf(previous))}` : 'the baseline'}
-                </span>
-                <div className="nt-map-nav">
-                  <Button
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={pickedIndex <= 0}
-                    onClick={() => setPickedId(ordered[pickedIndex - 1].id)}
-                    aria-label="Earlier capture"
-                  >
-                    <i className="bi bi-chevron-left" aria-hidden="true" />
-                  </Button>
-                  <span className="small text-muted">
-                    {pickedIndex + 1} of {ordered.length}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline-secondary"
-                    disabled={pickedIndex >= ordered.length - 1}
-                    onClick={() => setPickedId(ordered[pickedIndex + 1].id)}
-                    aria-label="Later capture"
-                  >
-                    <i className="bi bi-chevron-right" aria-hidden="true" />
-                  </Button>
-                </div>
-              </div>
-              <SnapshotMap
-                key={picked.id}
-                networkId={networkId}
-                snapshot={picked}
-                previous={previous}
-                changeEvents={changeEvents}
-                height={520}
-              />
-            </>
-          ) : (
-            <p className="text-muted mb-0">The map shows here once the network has a capture.</p>
-          )}
-        </Card.Body>
-      </Card>
+      {picked ? (
+        <CapturePane
+          networkId={networkId}
+          snapshot={picked}
+          previous={previous}
+          index={pickedIndex}
+          total={ordered.length}
+          onStep={delta => setPickedId(ordered[pickedIndex + delta].id)}
+          snapshots={snapshots}
+          changeEvents={changeEvents}
+          onPatchChange={onPatchChange}
+          onSnapshotUpdated={onSnapshotUpdated}
+        />
+      ) : (
+        <Card className="nt-map-card">
+          <Card.Body>
+            <p className="text-muted mb-0">A capture's map and details show here once the network has one.</p>
+          </Card.Body>
+        </Card>
+      )}
     </div>
   );
 }

@@ -106,10 +106,9 @@ A network's page has the same layout as a capture's analysis (see
   place) and any notes attached to it, plus outside events and notes where they
   fall. Chips narrow it to changes, captures, or notes and events; **Note** and
   **Outside event** add one, and **Manage captures** removes them. Beside the
-  list is **the network map at the picked capture**, compared with the capture
-  before: the changes it brought are highlighted, and devices that left since
-  are listed under it. Pick a capture in the list or step with the arrows.
-  **Details** on a capture opens its full detail (security, subnets, insights).
+  list is **the picked capture** (see `Capture Details`_): its network map and
+  everything else about it, in tabs. Pick a capture in the list, or step with
+  the arrows or ← →.
 - **Inventory** is one card with three tabs: **Devices**, **Addresses**, and
   **Apps and protocols**.
 
@@ -344,18 +343,28 @@ status on the networks page updates on its next refresh.
 Capture Details
 ---------------
 
-**Details** on a capture in the Timeline opens the **Snapshot Detail** modal,
-which contains five tabs:
+The capture picked in the Timeline fills the right of the page, compared with
+the capture before it. ‹ › (or ← →) step through the captures, and **Open the
+capture** opens it in analysis mode (conversations, story, files). It has six
+tabs:
 
-- **Network Diagram** — topology graph for that snapshot with change highlights
-  overlaid. Navigate between snapshots with the prev/next arrows or dropdown;
-  use ← → arrow keys as a shortcut.
-- **Changes** — all change events that were produced when this snapshot was
-  compared to its predecessor.
-- **Context & Notes** — free-text fields for capturing what was happening during
+- **Map** — the same network diagram as the analysis page's Network tab: traffic
+  counts with busiest pairs and the matrix, the node limit, filters, colour edges
+  by, groups, draw.io download, node labels, fullscreen and the play bar. The
+  changes this capture brought are highlighted (see `Network Diagram Overlay`_).
+  Under it, the devices **gone since the capture before** are listed; **Show them
+  on the map, faded** draws them where they were, and hovering one in the list
+  rings it on the map. The map's filters stay as you step between captures; its
+  edits (groups, names, moved devices) belong to that capture, the same as in
+  analysis mode.
+- **Changes** — the change events produced when this capture was compared with
+  the one before: severity, kind and reviewed filters, search, and pages.
+- **Security** — the capture's security signals: IDS alerts, flow risks, custom
+  rule matches and detected file types.
+- **Subnets** — per-capture subnet overrides (see `Per-Snapshot Subnet Overrides`_).
+- **Context & notes** — free-text fields for capturing what was happening during
   this capture (sent to the AI when generating insights).
-- **Subnets** — per-snapshot subnet overrides (see `Per-Snapshot Subnet Overrides`_).
-- **Insights** — AI-generated analysis scoped to this single snapshot (see
+- **Insights** — AI-generated analysis scoped to this single capture (see
   `Network Insights`_ below).
 
 
@@ -749,8 +758,8 @@ A completed insight contains:
 Per-snapshot insights
 ~~~~~~~~~~~~~~~~~~~~~
 
-Each snapshot also has its own **Insights** tab (inside the Snapshot Detail
-modal). This generates an insight scoped to that single snapshot — what changed
+Each capture also has its own **Insights** tab (in the Timeline, beside the
+captures list). This generates an insight scoped to that single snapshot — what changed
 versus its predecessor, whether the changes are explained by external events in
 the capture window, and what is recommended. The same audience and focus options
 are available.
@@ -758,15 +767,16 @@ are available.
 Network Diagram Overlay
 -----------------------
 
-The **Network Diagram** tab inside the Snapshot Detail modal renders the
-topology graph for the selected snapshot. Change events are overlaid as coloured
+The **Map** tab of the capture picked in the Timeline renders the topology graph
+for that capture. Change events are overlaid as coloured
 highlights:
 
 - Red nodes — CRITICAL events
 - Yellow/orange nodes — WARNING events
 - Green nodes — INFO events
 
-Use the snapshot selector or ← → arrow keys to step through the timeline. Nodes
+Pick a capture in the Timeline's list, or use ‹ › or the ← → arrow keys, to step
+through the captures. Nodes
 involved in change events are labelled with the event type (e.g. "Potential ARP
 spoof", "New device"). Click a highlighted node to open its details.
 
