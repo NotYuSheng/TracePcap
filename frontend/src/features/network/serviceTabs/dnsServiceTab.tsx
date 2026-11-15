@@ -4,6 +4,7 @@ import {
   type DnsQueryEntry,
 } from '@/features/cluster/services/clusterApi';
 import type { ServiceTabConfig } from './types';
+import { IpList } from './IpList';
 
 const pct = (ratio: number) => Math.round(ratio * 100);
 
@@ -25,11 +26,11 @@ export const dnsServiceTab: ServiceTabConfig<DnsQueryLogResponse, DnsQueryEntry>
       ? 'Possible DNS tunnelling or domain-generation algorithm detected — this server returned an unusually high share of NXDOMAIN responses.'
       : null,
 
-  // Light-red highlight for unresolvable queries (theme-independent; Bootstrap danger-subtle palette).
-  rowStyle: row => (row.resolvable ? undefined : { backgroundColor: '#f8d7da', color: '#842029' }),
+  // Unresolvable queries get a red edge.
+  rowTone: row => (row.resolvable ? undefined : 'danger'),
 
   columns: [
-    { header: 'Domain', cell: row => <span style={{ fontFamily: 'monospace' }}>{row.queryName}</span> },
+    { header: 'Domain', slot: 'title', cell: row => <span className="font-monospace">{row.queryName}</span> },
     { header: 'Type', cell: row => row.queryType ?? '—' },
     {
       header: 'Response',
@@ -43,12 +44,12 @@ export const dnsServiceTab: ServiceTabConfig<DnsQueryLogResponse, DnsQueryEntry>
       header: 'Resolved IPs',
       cell: row =>
         row.resolvedIps.length > 0 ? (
-          <span style={{ fontFamily: 'monospace' }}>{row.resolvedIps.join(', ')}</span>
+          <IpList ips={row.resolvedIps} />
         ) : (
           <span className="text-muted">—</span>
         ),
     },
-    { header: 'Count', cell: row => row.queryCount },
+    { header: 'Count', slot: 'aside', cell: row => `×${row.queryCount.toLocaleString()}` },
     {
       header: 'Packet',
       cell: (row, ctx) =>
@@ -59,7 +60,7 @@ export const dnsServiceTab: ServiceTabConfig<DnsQueryLogResponse, DnsQueryEntry>
             title="View this DNS response packet"
             onClick={() => ctx.openPacket(row.frame!)}
           >
-            <i className="bi bi-box-arrow-up-right me-1" />#{row.frame}
+            #{row.frame}<i className="bi bi-box-arrow-up-right ms-1" aria-hidden="true" />
           </button>
         ) : (
           <span className="text-muted">—</span>

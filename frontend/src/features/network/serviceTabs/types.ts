@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 /** Context passed to a column cell so it can render actions like "view packet" links. */
 export interface ServiceLogCellContext {
@@ -7,10 +7,15 @@ export interface ServiceLogCellContext {
   openPacket: (frame: number) => void;
 }
 
-/** One column of a service-log detail table. */
+/**
+ * One field of a service-log entry. Entries render as a stacked list (no table, so nothing scrolls
+ * sideways in the modal): `lead` and `title` on the first line, `aside` at its right end, and every
+ * `meta` field (the default) on a muted second line, labelled with its header.
+ */
 export interface ServiceLogColumn<Row> {
   header: string;
   cell: (row: Row, ctx: ServiceLogCellContext) => ReactNode;
+  slot?: 'lead' | 'title' | 'aside' | 'meta';
 }
 
 /**
@@ -31,8 +36,8 @@ export interface ServiceTabConfig<Detail = unknown, Row = unknown> {
   /** Extracts the table rows from the detail payload. */
   getRows: (detail: Detail) => Row[];
   columns: ServiceLogColumn<Row>[];
-  /** Optional inline style per row (e.g. light-red for failed/flagged rows). */
-  rowStyle?: (row: Row) => CSSProperties | undefined;
+  /** Marks an entry as failed/flagged: drawn with a red edge. */
+  rowTone?: (row: Row) => 'danger' | undefined;
   /** One-line summary shown above the table. */
   getSummary: (detail: Detail) => string;
   /** Alert-banner text when the host looks suspicious for this role; null when not. */
