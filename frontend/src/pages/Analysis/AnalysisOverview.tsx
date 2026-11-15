@@ -216,8 +216,6 @@ export const AnalysisOverview = () => {
         reason={rulesPermission.reason}
       />
 
-      {/* Two networks on one range in this capture (#462): shown only when there are. */}
-      <NetworkSegmentsPanel fileId={fileId} />
 
       <div className="ov-grid">
         {/* Left: the traffic. */}
@@ -603,6 +601,9 @@ export const AnalysisOverview = () => {
           )}
         </div>
       </div>
+
+      {/* Two networks on one range in this capture (#462): a note, after the rest. */}
+      <NetworkSegmentsPanel fileId={fileId} />
 
       {entityModal && (
         <EntityDetailModal
