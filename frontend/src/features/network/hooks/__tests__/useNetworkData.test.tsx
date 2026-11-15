@@ -12,7 +12,7 @@ import { useNetworkData } from '../useNetworkData'
 
 vi.mock('@/features/conversation/services/conversationService', () => ({
   conversationService: {
-    getConversations: vi.fn(),
+    getAllConversations: vi.fn(),
     getHostClassifications: vi.fn(),
     getHostIdentities: vi.fn(),
   },
@@ -44,9 +44,7 @@ const conversation = (src: string, dst: string) => ({
 
 /** All four endpoints succeed unless a test overrides one. */
 function serveAll() {
-  convService.getConversations.mockResolvedValue({
-    data: [conversation('10.0.0.1', '8.8.8.8')],
-  } as never)
+  convService.getAllConversations.mockResolvedValue([conversation('10.0.0.1', '8.8.8.8')] as never)
   convService.getHostClassifications.mockResolvedValue([] as never)
   convService.getHostIdentities.mockResolvedValue([] as never)
   insights.listNodeRoles.mockResolvedValue([] as never)
@@ -59,7 +57,7 @@ describe('useNetworkData', () => {
     serveAll()
     const { result } = renderHook(() => useNetworkData(FILE, undefined, 50, 'net-1'))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(convService.getConversations).toHaveBeenCalledWith(FILE, expect.objectContaining({ networkId: 'net-1' }))
+    expect(convService.getAllConversations).toHaveBeenCalledWith(FILE, expect.objectContaining({ networkId: 'net-1' }))
   })
 
   it('builds a graph from the conversations', async () => {
@@ -101,7 +99,7 @@ describe('useNetworkData', () => {
 
   it('fails when conversations cannot be loaded', async () => {
     serveAll()
-    convService.getConversations.mockRejectedValue(new Error('backend down'))
+    convService.getAllConversations.mockRejectedValue(new Error('backend down'))
 
     const { result } = renderHook(() => useNetworkData(FILE, undefined, 50))
 
@@ -119,14 +117,14 @@ describe('useNetworkData', () => {
       { initialProps: { max: 50 } }
     )
     await waitFor(() => expect(result.current.loading).toBe(false))
-    const fetches = convService.getConversations.mock.calls.length
+    const fetches = convService.getAllConversations.mock.calls.length
 
     rerender({ max: 1 })
 
     // Conversations are cached in a ref precisely so the node-limit slider is instant. Moving
     // it re-downloading a 10,000-conversation page would make the control unusable.
     await waitFor(() => expect(result.current.nodes).toHaveLength(1))
-    expect(convService.getConversations.mock.calls.length).toBe(fetches)
+    expect(convService.getAllConversations.mock.calls.length).toBe(fetches)
     expect(result.current.hiddenNodes).toBe(1)
   })
 
@@ -135,10 +133,10 @@ describe('useNetworkData', () => {
 
     const { result } = renderHook(() => useNetworkData(FILE, undefined, 50))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    const before = convService.getConversations.mock.calls.length
+    const before = convService.getAllConversations.mock.calls.length
 
     await result.current.refetch()
 
-    expect(convService.getConversations.mock.calls.length).toBe(before + 1)
+    expect(convService.getAllConversations.mock.calls.length).toBe(before + 1)
   })
 })

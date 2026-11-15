@@ -1,4 +1,5 @@
-export type SortField = 'srcIp' | 'dstIp' | 'packets' | 'bytes' | 'duration' | 'startTime' | '';
+/** 'id' is for paging through everything in a stable order, not a column a user sorts by. */
+export type SortField = 'srcIp' | 'dstIp' | 'packets' | 'bytes' | 'duration' | 'startTime' | 'id' | '';
 
 export type SortDir = 'asc' | 'desc';
 

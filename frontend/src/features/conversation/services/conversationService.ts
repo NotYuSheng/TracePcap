@@ -218,7 +218,35 @@ export interface SessionData {
   errorMessage: string | null;
 }
 
+/** The most conversations the API returns in one page. */
+const API_MAX_PAGE_SIZE = 10000;
+
 export const conversationService = {
+  /**
+   * Every conversation matching `filters`, fetched a page at a time: the API caps a page at
+   * 10,000, and a diagram that stopped at one page silently lost every edge past it. Pages are
+   * ordered by id, so they never overlap or skip a row; after the first, they load in parallel.
+   */
+  getAllConversations: async (
+    fileId: string,
+    filters: Omit<ConversationFilters, 'page' | 'pageSize' | 'sortBy' | 'sortDir'>
+  ): Promise<Conversation[]> => {
+    const page = (n: number) =>
+      conversationService.getConversations(fileId, {
+        ...filters,
+        sortBy: 'id',
+        sortDir: 'asc',
+        page: n,
+        pageSize: API_MAX_PAGE_SIZE,
+      });
+    const first = await page(1);
+    if (first.totalPages <= 1) return first.data;
+    const rest = await Promise.all(
+      Array.from({ length: first.totalPages - 1 }, (_, i) => page(i + 2))
+    );
+    return [...first.data, ...rest.flatMap(r => r.data)];
+  },
+
   /**
    * Get conversations for a PCAP file with structured filtering, sorting, and pagination.
    */
