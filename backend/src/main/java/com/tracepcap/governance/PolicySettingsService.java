@@ -67,6 +67,11 @@ public class PolicySettingsService {
   }
 
   private void audit(String key, String before, boolean beforeOverridden, String after, boolean afterOverridden) {
+    // A secret's value never reaches the audit log: only that it was set, changed or reset.
+    if (EditablePolicy.of(key).map(EditablePolicy::secret).orElse(false)) {
+      before = before == null || before.isBlank() ? "(not set)" : "(hidden)";
+      after = after == null || after.isBlank() ? "(not set)" : "(hidden)";
+    }
     auditLog.record(
         "system-setting.update",
         AUDIT_TARGET,

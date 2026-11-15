@@ -2876,6 +2876,46 @@
         },
         "type": "object"
       },
+      "LlmTestRequest": {
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LlmTestResult": {
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "Match": {
         "properties": {
           "app": {
@@ -3978,7 +4018,8 @@
               "NETWORK_SETTINGS",
               "NETWORK_MAP",
               "ANALYSIS_POLICY",
-              "RETENTION"
+              "RETENTION",
+              "LLM_CONNECTION"
             ],
             "type": "string"
           },
@@ -4704,6 +4745,27 @@
         },
         "type": "object"
       },
+      "Step": {
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "ms": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "StepExplanation": {
         "properties": {
           "explanation": {
@@ -5054,6 +5116,12 @@
       },
       "SystemSettingDto": {
         "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "defaultValue": {
             "type": "string"
           },
@@ -5091,6 +5159,9 @@
             "type": "boolean"
           },
           "takesEffect": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           },
           "value": {
@@ -12281,7 +12352,8 @@
                 "NETWORK_SETTINGS",
                 "NETWORK_MAP",
                 "ANALYSIS_POLICY",
-                "RETENTION"
+                "RETENTION",
+                "LLM_CONNECTION"
               ],
               "type": "string"
             }
@@ -12989,6 +13061,37 @@
         ]
       }
     },
+    "/api/v1/system/llm/test": {
+      "post": {
+        "description": "Checks, in order, that the server can be reached, accepts the key, offers the model and replies, and lists its models. Blank fields use the current settings, so an empty body tests what's in effect and a filled one tests a change before saving it. Testing other values than the current ones requires the permission to edit the LLM connection.",
+        "operationId": "test",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmTestResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Test the LLM connection",
+        "tags": [
+          "LLM Connection"
+        ]
+      }
+    },
     "/api/v1/system/settings": {
       "get": {
         "description": "Lists each environment-driven setting, grouped as infrastructure, memory-tied or analysis policy, with its effective value and why it can't be changed in the app. Secrets are reported as set or not set; their values are never returned.",
@@ -13344,6 +13447,10 @@
     {
       "description": "AI-generated insights for a monitored network",
       "name": "Network Insights"
+    },
+    {
+      "description": "Test the LLM server Story and Insights use",
+      "name": "LLM Connection"
     },
     {
       "description": "A capture's packets in capture order, for replaying them on the network graph",

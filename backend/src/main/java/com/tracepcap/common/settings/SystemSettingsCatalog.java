@@ -19,7 +19,9 @@ final class SystemSettingsCatalog {
     /** Tied to memory sizing: set in .env; a wrong value can crash the backend. */
     MEMORY,
     /** Analysis policy: editable in the app in a later phase of #915; .env for now. */
-    POLICY
+    POLICY,
+    /** The LLM connection behind Story and Insights; mostly editable in the app. */
+    LLM
   }
 
   /**
@@ -77,21 +79,21 @@ final class SystemSettingsCatalog {
           "Files that may wait in the in-memory queue once all threads are busy. Once the queue is also full, uploads apply back-pressure (run analysis inline). This queue is not persisted — pending work is lost on restart and recovered as FAILED by reconciliation."),
       new Entry("CORS_ALLOWED_ORIGINS", "cors.allowed-origins", "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8888", Group.INFRASTRUCTURE, false, "CORS allowed origins",
           "Comma-separated allowed browser origins for /api. Under prod it has no localhost defaults; leave it empty for the same-origin shipped stack (nginx proxies /api, so CORS is never exercised). Set it only when the frontend is hosted on a different origin from the API."),
-      new Entry("LLM_API_BASE_URL", "llm.api.base-url", "https://api.openai.com/v1", Group.INFRASTRUCTURE, false, "LLM API base URL",
+      new Entry("LLM_API_BASE_URL", "llm.api.base-url", "https://api.openai.com/v1", Group.LLM, false, "LLM API base URL",
           "Base URL of an OpenAI-compatible inference API. See llm-setup."),
-      new Entry("LLM_API_KEY", "llm.api.api-key", "your-api-key-here", Group.INFRASTRUCTURE, true, "LLM API key",
+      new Entry("LLM_API_KEY", "llm.api.api-key", "your-api-key-here", Group.LLM, true, "LLM API key",
           "API key sent in the Authorization: Bearer header. Leave empty for local servers that don't require authentication."),
-      new Entry("LLM_MODEL", "llm.api.model", "gpt-4", Group.INFRASTRUCTURE, false, "LLM model",
+      new Entry("LLM_MODEL", "llm.api.model", "gpt-4", Group.LLM, false, "LLM model",
           "Model identifier passed in each API request. Must match a model loaded on your inference server."),
-      new Entry("LLM_TEMPERATURE", "llm.api.temperature", "0.7", Group.INFRASTRUCTURE, false, "LLM temperature",
+      new Entry("LLM_TEMPERATURE", "llm.api.temperature", "0.7", Group.LLM, false, "LLM temperature",
           "Sampling temperature (0.0–2.0). Lower values produce more deterministic output; higher values more creative output."),
-      new Entry("LLM_MAX_TOKENS", "llm.api.max-tokens", "2000", Group.INFRASTRUCTURE, false, "LLM max tokens",
+      new Entry("LLM_MAX_TOKENS", "llm.api.max-tokens", "2000", Group.LLM, false, "LLM max tokens",
           "Maximum number of tokens the LLM may generate per response. Controls response length only — not the context window. Increase if stories are cut off; decrease to save compute. Recommended 4000–8000."),
-      new Entry("LLM_CONTEXT_LENGTH", "llm.api.context-length", null, Group.INFRASTRUCTURE, false, "LLM context length",
+      new Entry("LLM_CONTEXT_LENGTH", "llm.api.context-length", null, Group.LLM, false, "LLM context length",
           "The context window size (in tokens) configured on your LLM server. Used to detect prompt-too-large errors early. If unset, auto-detected from the /v1/models endpoint; if that fails, the configured LLM_MAX_TOKENS value remains in effect. Example: 32768 for a 32k model."),
-      new Entry("LLM_TIMEOUT", "llm.api.timeout-seconds", "300", Group.INFRASTRUCTURE, false, "LLM timeout",
+      new Entry("LLM_TIMEOUT", "llm.api.timeout-seconds", "300", Group.LLM, false, "LLM timeout",
           "HTTP timeout in seconds for LLM API requests. Local models can be slow — increase if you get timeout errors."),
-      new Entry("LLM_TOOL_CALLING", "llm.api.tool-calling", "auto", Group.INFRASTRUCTURE, false, "LLM tool calling",
+      new Entry("LLM_TOOL_CALLING", "llm.api.tool-calling", "auto", Group.LLM, false, "LLM tool calling",
           "Whether Story mode's investigation phase declares its query as a native tool, so the server constrains generation to the real schema instead of letting the model free-type JSON. auto offers tools once and remembers whether the server accepted them; on always offers them; off never does and uses the free-text JSON path. Support varies by backend — leave on auto unless a server misreports its capabilities."),
       new Entry("TRACEPCAP_AUTH_ENABLED", "tracepcap.auth.enabled", "false", Group.INFRASTRUCTURE, false, "TracePcap auth enabled",
           "Gates the API behind a Keycloak JWT and adds a login flow. Set to true by the production overlays; you rarely set it directly. See authentication."),

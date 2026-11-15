@@ -3,7 +3,6 @@ package com.tracepcap.insights.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tracepcap.common.exception.ResourceNotFoundException;
-import com.tracepcap.config.LlmConfig;
 import com.tracepcap.insights.dto.GenerateInsightRequest;
 import com.tracepcap.insights.dto.NetworkInsightDto;
 import com.tracepcap.insights.dto.NetworkInsightDto.Anomaly;
@@ -37,7 +36,7 @@ public class SnapshotInsightService {
   private final NetworkExternalEventRepository externalEventRepository;
   private final NodeRoleRepository nodeRoleRepository;
   private final com.tracepcap.story.service.LlmClient llmClient;
-  private final LlmConfig llmConfig;
+  private final com.tracepcap.common.settings.LlmSettings llmSettings;
   private final ObjectMapper objectMapper;
 
   private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -89,7 +88,7 @@ public class SnapshotInsightService {
       String json = extractJson(raw);
       saved = SnapshotInsightEntity.builder()
           .snapshot(snapshot)
-          .modelUsed(llmConfig.getApi().getModel())
+          .modelUsed(llmSettings.model())
           .status("COMPLETED")
           .content(json)
           .audience(audience)
@@ -100,7 +99,7 @@ public class SnapshotInsightService {
       log.error("Failed to generate snapshot insight for {}: {}", snapshotId, e.getMessage());
       saved = SnapshotInsightEntity.builder()
           .snapshot(snapshot)
-          .modelUsed(llmConfig.getApi().getModel())
+          .modelUsed(llmSettings.model())
           .status("FAILED")
           .errorMessage(e.getMessage())
           .audience(audience)

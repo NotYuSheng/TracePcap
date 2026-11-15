@@ -63,7 +63,21 @@ class LlmClientTest {
         .expect(ExpectedCount.manyTimes(), requestTo(MODELS_URL))
         .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
 
-    client = new LlmClient(config, restTemplate, healthRestTemplate);
+    client = new LlmClient(config, settingsFrom(config), restTemplate, healthRestTemplate);
+  }
+
+  /** The deployment's values, as Settings reads them when nothing is changed in the app. */
+  static com.tracepcap.common.settings.LlmSettings settingsFrom(LlmConfig config) {
+    LlmConfig.ApiConfig a = config.getApi();
+    return new com.tracepcap.common.settings.LlmSettings(null) {
+      @Override public String baseUrl() { return a.getBaseUrl(); }
+      @Override public String apiKey() { return a.getApiKey(); }
+      @Override public String model() { return a.getModel(); }
+      @Override public double temperature() { return a.getTemperature(); }
+      @Override public int maxTokens() { return a.getMaxTokens(); }
+      @Override public int timeoutSeconds() { return a.getTimeoutSeconds() == null ? 300 : a.getTimeoutSeconds(); }
+      @Override public String toolCalling() { return a.getToolCalling() == null ? "auto" : a.getToolCalling(); }
+    };
   }
 
   private static String messageResponse(String content) {
@@ -315,10 +329,11 @@ class LlmClientTest {
     RestTemplate healthRestTemplate = new RestTemplate();
     MockRestServiceServer rejectingHealthServer =
         MockRestServiceServer.createServer(healthRestTemplate);
+    // The model-capability check lists models on the same short-timeout client, so expect it too.
     rejectingHealthServer
-        .expect(requestTo(MODELS_URL))
+        .expect(ExpectedCount.manyTimes(), requestTo(MODELS_URL))
         .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-    LlmClient rejectedClient = new LlmClient(config, restTemplate, healthRestTemplate);
+    LlmClient rejectedClient = new LlmClient(config, settingsFrom(config), restTemplate, healthRestTemplate);
 
     assertThatThrownBy(() -> rejectedClient.generateCompletion("sys", "user"))
         .isInstanceOf(LlmException.class)
