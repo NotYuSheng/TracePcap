@@ -1,5 +1,6 @@
 /* Your captures (All uploads A, in the home page). */
 .captures-card {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
   background: var(--tp-surface, #fff);
   border: 1px solid var(--tp-border, #d8dce5);
   border-radius: 14px;
@@ -68,11 +69,14 @@
 .captures-monitor .form-check-label {
   line-height: 1;
 }
+.captures-table tbody tr:last-child td {
+  border-bottom: 0;
+}
 .captures-table th {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--tp-text-muted, #4b5563);
-  background: var(--tp-bg-subtle, #f7f8fb);
+  background: #eef0f5;
   padding: 8px 12px;
 }
 .captures-table td {
@@ -214,4 +218,8 @@ a.file-note {
 }
 [data-theme='dark'] .file-note-kept {
   color: #86efac;
+}
+
+[data-theme='dark'] .captures-table th {
+  background: var(--tp-bg-subtle, #1a1d27);
 }

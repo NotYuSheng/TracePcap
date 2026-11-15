@@ -44,3 +44,7 @@ What Needs a Look (right)
 
 The capture's own detection rules are in the **Capture** tab, with the rules
 picker and the report.
+
+When two networks in the capture use the same address range (two sites or two
+VLANs on one subnet), a card at the bottom of the overview says so and lists
+each network with its DHCP clients.
