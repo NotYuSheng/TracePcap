@@ -16,6 +16,7 @@ import {
 import { Button, Card } from '@govtechsg/sgds-react';
 import { Link, useParams, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAnalysisData } from '@features/analysis/hooks/useAnalysisData';
+import { useNetworkDiagramFilterState } from '@/features/network/hooks/useNetworkDiagramFilterState';
 import { ErrorMessage } from '@components/common/ErrorMessage';
 import { AnalysisLoadingView } from './AnalysisLoadingView';
 import { apiClient } from '@/services/api/client';
@@ -23,7 +24,6 @@ import { API_ENDPOINTS } from '@/services/api/endpoints';
 import { storyService } from '@/features/story/services/storyService';
 import type { Story } from '@/types';
 import { captureNetworkDiagrams } from '@/features/report/captureNetworkDiagrams';
-import { MAX_DIAGRAM_NODES } from '@/features/network/hooks/useNetworkData';
 import { buildActiveFilterLabels } from '@/features/network/constants';
 import type { GraphNode, GraphEdge } from '@/features/network/types';
 import type { AnalysisData } from '@/types';
@@ -361,51 +361,12 @@ export const AnalysisPage = () => {
   );
 
   // ── Network diagram filter state (lifted here so it survives tab switches) ──
-  const [nodeLimit, setNodeLimit] = useState(MAX_DIAGRAM_NODES);
-  const [ipFilter, setIpFilter] = useState('');
-  const [portFilter, setPortFilter] = useState('');
-  const [hasRisksOnly, setHasRisksOnly] = useState(false);
-  const [activeLegendProtocols, setActiveLegendProtocols] = useState<string[]>([]);
-  const [activeNodeFilters, setActiveNodeFilters] = useState<string[]>([]);
-  const [activeAppFilters, setActiveAppFilters] = useState<string[]>([]);
-  const [activeL7Protocols, setActiveL7Protocols] = useState<string[]>([]);
-  const [activeCategories, setActiveCategories] = useState<string[]>([]);
-  const [activeRiskTypes, setActiveRiskTypes] = useState<string[]>([]);
-  const [activeCustomSigs, setActiveCustomSigs] = useState<string[]>([]);
-  const [activeFileTypes, setActiveFileTypes] = useState<string[]>([]);
-  const [activeCountries, setActiveCountries] = useState<string[]>([]);
-  const [activeGhostFilters, setActiveGhostFilters] = useState<string[]>([]);
-
-  const networkDiagramFilters: NetworkDiagramFilterState = {
-    nodeLimit,
-    setNodeLimit,
-    ipFilter,
-    setIpFilter,
-    portFilter,
-    setPortFilter,
-    hasRisksOnly,
-    setHasRisksOnly,
-    activeLegendProtocols,
-    setActiveLegendProtocols,
-    activeNodeFilters,
-    setActiveNodeFilters,
-    activeAppFilters,
-    setActiveAppFilters,
-    activeL7Protocols,
-    setActiveL7Protocols,
-    activeCategories,
-    setActiveCategories,
-    activeRiskTypes,
-    setActiveRiskTypes,
-    activeCustomSigs,
-    setActiveCustomSigs,
-    activeFileTypes,
-    setActiveFileTypes,
-    activeCountries,
-    setActiveCountries,
-    activeGhostFilters,
-    setActiveGhostFilters,
-  };
+  const networkDiagramFilters = useNetworkDiagramFilterState();
+  const {
+    nodeLimit, ipFilter, portFilter, hasRisksOnly, activeLegendProtocols, activeNodeFilters,
+    activeAppFilters, activeL7Protocols, activeCategories, activeRiskTypes, activeCustomSigs,
+    activeFileTypes, activeCountries, activeGhostFilters,
+  } = networkDiagramFilters;
 
   // NetworkDiagramPage writes its current filtered nodes/edges here so the
   // report captures exactly what the user sees.
@@ -453,21 +414,7 @@ export const AnalysisPage = () => {
 
       // Build filter labels from the lifted state — always accurate regardless
       // of whether the Network Diagram tab has been visited.
-      const activeFilterLabels = buildActiveFilterLabels({
-        ipFilter,
-        portFilter,
-        hasRisksOnly,
-        activeLegendProtocols,
-        activeNodeFilters,
-        activeAppFilters,
-        activeL7Protocols,
-        activeCategories,
-        activeRiskTypes,
-        activeCustomSigs,
-        activeFileTypes,
-        activeCountries,
-        activeGhostFilters,
-      });
+      const activeFilterLabels = buildActiveFilterLabels(networkDiagramFilters);
 
       let diagramNodes = filteredNodes;
       let diagramEdges = filteredEdges;

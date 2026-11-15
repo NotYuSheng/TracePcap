@@ -3,10 +3,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, Card, Container, Form, Modal } from '@govtechsg/sgds-react';
 import { Spinner } from '@components/common/Spinner/Spinner';
 import { Alert } from '@components/common/Alert';
-import { SnapshotDetailModal } from '@/components/monitor/SnapshotDetailModal/SnapshotDetailModal';
 import { SnapshotMap } from '@/components/monitor/SnapshotMap';
 import { SideDrawer } from '@components/common/SideDrawer';
-import type { NetworkSnapshot } from '@/features/monitor/types/monitor.types';
 import { DeviceDriftPanel } from '@/components/monitor/DeviceDriftPanel/DeviceDriftPanel';
 import { ProtocolDriftPanel } from '@/components/monitor/ProtocolDriftPanel/ProtocolDriftPanel';
 import { IpDriftPanel } from '@/components/monitor/IpDriftPanel/IpDriftPanel';
@@ -70,7 +68,6 @@ export const NetworkDetailPage = () => {
   const [showInactivity, setShowInactivity] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showEvents, setShowEvents] = useState(false);
-  const [detailSnapshot, setDetailSnapshot] = useState<NetworkSnapshot | null>(null);
   const [inventoryTab, setInventoryTab] = useState<'devices' | 'addresses' | 'apps'>('devices');
 
   const [params, setParams] = useSearchParams();
@@ -408,7 +405,7 @@ export const NetworkDetailPage = () => {
                 externalEvents={externalEvents}
                 annotations={annotations}
                 onPatchChange={data.handlePatchChange}
-                onOpenDetails={setDetailSnapshot}
+                onSnapshotUpdated={data.handleSnapshotUpdated}
                 onAddNote={() => setShowNotes(true)}
                 onAddEvent={() => setShowEvents(true)}
                 onManage={() => setShowManage(true)}
@@ -538,8 +535,8 @@ export const NetworkDetailPage = () => {
                       <p className="mb-2">
                         <strong>Per-snapshot overrides.</strong> Individual snapshots can carry
                         their own subnet list that shadows the global definitions for that
-                        snapshot's change detection. Set overrides from the <em>Subnets</em> tab
-                        inside a snapshot's detail view.
+                        snapshot's change detection. Set them from a capture's <em>Subnets</em> tab in
+                        the Timeline.
                       </p>
                       <p className="fw-semibold mb-1">Limitations</p>
                       <ul className="mb-0 ps-3">
@@ -643,17 +640,6 @@ export const NetworkDetailPage = () => {
         </Modal.Body>
       </Modal>
 
-      {detailSnapshot && (
-        <SnapshotDetailModal
-          snapshot={detailSnapshot}
-          networkId={network.id}
-          changeEvents={changeEvents}
-          snapshots={snapshots}
-          onPatchChange={data.handlePatchChange}
-          onSnapshotUpdated={data.handleSnapshotUpdated}
-          onHide={() => setDetailSnapshot(null)}
-        />
-      )}
 
       <ManagePcapsModal
         show={showManage}

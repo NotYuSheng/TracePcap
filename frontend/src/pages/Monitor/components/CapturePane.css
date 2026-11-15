@@ -1,0 +1,163 @@
+/* A capture beside the Timeline's list: header, tabs, then the tab's content. */
+.capture-pane {
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.capture-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px 6px;
+}
+
+.capture-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.capture-title h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.capture-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capture-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--tp-border, #eceef3);
+}
+
+.capture-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--tp-text-muted, #525a68);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.capture-tab.active {
+  border-bottom-color: #5925dc;
+  color: #3b1891;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .capture-tab.active {
+  color: #c9b8ff;
+  border-bottom-color: #a993ff;
+}
+
+.capture-tab-count {
+  font-size: 0.72rem;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--tp-bg-subtle, #f3f4f6);
+}
+
+.capture-body {
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+/* The diagram's own page frame is the pane here. */
+.capture-body .network-diagram-page {
+  min-width: 0;
+}
+
+.capture-gone {
+  margin-top: 10px;
+}
+
+.capture-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  font-size: 0.8rem;
+  color: var(--tp-text-muted, #525a68);
+}
+
+.capture-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.capture-dot {
+  display: inline-block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid;
+}
+
+.capture-dot-gone {
+  border: 1.5px dashed #98a2b3;
+}
+
+.capture-ghosts {
+  margin: 0;
+  min-height: 0;
+}
+
+.capture-ghosts .form-check-label {
+  font-size: inherit;
+}
+
+.capture-gone-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 132px;
+  overflow-y: auto;
+  border: 1px solid var(--tp-border, #eceef3);
+  border-radius: 8px;
+}
+
+.capture-gone-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px dashed #98a2b3;
+  border-radius: 10px;
+  background: var(--tp-surface, #fff);
+  color: var(--tp-text, #374151);
+  font-size: 0.75rem;
+}
+
+.capture-gone-item:hover,
+.capture-gone-item.active {
+  border-style: solid;
+  border-color: #5925dc;
+  background: #f7f5ff;
+}
+
+[data-theme='dark'] .capture-gone-item:hover,
+[data-theme='dark'] .capture-gone-item.active {
+  border-color: #a993ff;
+  background: rgb(155 125 255 / 12%);
+}
+
+.capture-gone-mac {
+  color: var(--tp-text-muted, #525a68);
+}
