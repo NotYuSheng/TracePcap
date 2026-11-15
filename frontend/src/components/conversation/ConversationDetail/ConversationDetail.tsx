@@ -34,6 +34,8 @@ interface ConversationDetailProps {
   fileId?: string;
   /** When set, the packet with this frame number is scrolled into view and briefly highlighted. */
   highlightPacketNumber?: number | null;
+  /** Docked in a pane that already has its own frame and title: drop the outer card. */
+  bare?: boolean;
 }
 
 function countryFlag(code: string): string {
@@ -174,7 +176,14 @@ function HostFlowCard({
   onOpen?: () => void;
 }) {
   // Prefer the adjudicated verdict; fall back to the raw device type when identities haven't loaded.
-  const label = identity?.primaryLabel ?? (cls ? deviceTypeLabel(cls.deviceType) : null);
+  // A machine verdict's primaryLabel is a DeviceType code ("LAPTOP_DESKTOP"): show it in words.
+  const label = identity?.primaryLabel
+    ? identity.basis === 'HUMAN'
+      ? identity.primaryLabel
+      : deviceTypeLabel(identity.primaryLabel as DeviceType)
+    : cls
+      ? deviceTypeLabel(cls.deviceType)
+      : null;
   // primaryLabel is only a DeviceType code for MACHINE verdicts; a HUMAN label (e.g. "Bob's Laptop")
   // is free text, so it must not be cast to DeviceType or the icon/colour lookup gets garbage. Fall
   // back to the machine classification's deviceType for the icon in that case.
@@ -271,6 +280,7 @@ export const ConversationDetail = ({
   hostClassMap,
   fileId,
   highlightPacketNumber,
+  bare,
 }: ConversationDetailProps) => {
   const navigate = useNavigate();
   const [source, destination] = conversation.endpoints;
@@ -375,9 +385,11 @@ export const ConversationDetail = ({
 
   return (
     <div className="conversation-detail">
-      <Card className="mb-4">
-        <Card.Header className="d-flex align-items-center justify-content-between">
-          <h5 className="mb-0">Conversation Details</h5>
+      <Card className={bare ? 'mb-4 cd-bare' : 'mb-4'}>
+        <Card.Header
+          className={`d-flex align-items-center justify-content-between${bare && !(extractedCount && fileId) ? ' d-none' : ''}`}
+        >
+          <h5 className={bare ? 'visually-hidden' : 'mb-0'}>Conversation Details</h5>
           {extractedCount != null && extractedCount > 0 && fileId && (
             <Button
               size="sm"

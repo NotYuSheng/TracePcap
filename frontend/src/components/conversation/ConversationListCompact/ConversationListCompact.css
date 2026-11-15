@@ -1,0 +1,13 @@
+.ccl { list-style: none; margin: 0; padding: 0; }
+.ccl-row { width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border: 0; border-top: 1px solid var(--tp-border, #eceef3); background: none; color: inherit; text-align: left; }
+.ccl li:first-child .ccl-row { border-top: 0; }
+.ccl-row:hover { background: rgba(89, 37, 220, 0.04); }
+.ccl-row.active { background: rgba(89, 37, 220, 0.08); box-shadow: inset 3px 0 0 #5925dc; }
+.ccl-row:focus-visible { outline: 2px solid #5925dc; outline-offset: -2px; }
+.ccl-ends { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; overflow-wrap: anywhere; }
+.ccl-port { color: var(--tp-text-muted, #8a93a3); }
+.ccl-meta { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--tp-text-muted, #525a68); }
+.ccl-app { padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+.ccl-flag { color: #b45309; font-weight: 500; }
+[data-theme='dark'] .ccl-flag { color: #fcd34d; }
+.ccl-size { margin-left: auto; font-variant-numeric: tabular-nums; }
