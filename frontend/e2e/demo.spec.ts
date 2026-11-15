@@ -420,17 +420,22 @@ test('README demo walkthrough', async ({ page }) => {
   await frameCardTop(filterPanel);
   await beat(page, FEATURE);
   await showClick(page, filterPanel.getByRole('button', { name: /More filters/ }).first());
-  // Re-frame: expanding pushes the panel's own height down, and the badges the
-  // next step clicks are in the part that just appeared.
-  await frameCardTop(filterPanel);
+  // More filters opens a right-side drawer over the page.
+  const drawer = page.locator('.filter-drawer');
+  await expect(drawer, 'filter drawer did not open').toBeVisible({ timeout: 10_000 });
   await beat(page, FEATURE);
 
   // App badges are buttons, one per detected application. Telegram is the most
-  // recognisable app in this capture.
-  const telegram = page.getByRole('button', { name: 'Telegram', exact: true }).first();
-  await expect(telegram, 'no Telegram badge in the filter panel').toBeVisible({ timeout: 15_000 });
+  // recognisable app in this capture. Scoped to the drawer: the quick chips row
+  // behind it can carry the same name.
+  const telegram = drawer.getByRole('button', { name: 'Telegram', exact: true }).first();
+  await expect(telegram, 'no Telegram badge in the filter drawer').toBeVisible({ timeout: 15_000 });
   await beat(page);
   await showClick(page, telegram);
+  await beat(page);
+  // Filters apply live; the footer button closes the drawer on the narrowed list.
+  await showClick(page, drawer.getByRole('button', { name: /^Show .* conversations?$|^Done$/ }));
+  await expect(drawer).toBeHidden({ timeout: 10_000 });
   // Wait for the filtered refetch rather than a fixed sleep.
   await expect(page.getByRole('heading', { name: /Network Conversations/i })).toBeVisible();
   await beat(page, HOLD);
